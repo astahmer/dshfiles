@@ -6,6 +6,39 @@ Backlog statuses were **not** changed for this handoff. Item numbers below are `
 Repo: `astahmer/dshfiles` (Jujutsu colocated). Owned plugins live in `plugins/@dshfiles/<name>`; native DSH packages we
 replace are listed in `docs/native-forks.md`.
 
+## Done since the snapshot
+
+The one-day list (section G) is done except A5. Each fix is documented where its behavior lives:
+
+| Item  | Fix                                                                                                                                                                           | Documented in                                                                            |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| B1    | A failed turn's code badge and actions sit on named grid cells; the badge drops under the message below 28rem.                                                                | `plugins/@dshfiles/chat/README.md` (Local delta)                                         |
+| B2    | The composer action bar tightens its gaps first, then wraps into icons above model + send; send stays visible.                                                                | `plugins/@dshfiles/rich-composer/src/native/skeleton/control-row-layout.ts`              |
+| B3    | Clean up workspaces rows size to their text through `BulkSelectList`'s opt-in `density="compact"`. The dialog is `jujutsu`'s, not `jj-integration`'s.                         | `plugins/@dshfiles/plugin-ui/src/components/motion/bulk-select-list.tsx`                 |
+| B4+B5 | Consecutive subagent rows fold under one count header; each row is named by its task. The row lives in `thread-sidebar`, the grouping in `chat`.                              | `plugins/@dshfiles/chat/README.md`                                                       |
+| A1    | Quote in composer (#34): a message, or the selection inside it, goes into the draft as an editable blockquote.                                                                | `plugins/@dshfiles/chat/README.md`                                                       |
+| B10   | New thread keeps Mod+T and New tab moves to Mod+Alt+T, guarded by `scripts/shortcut-defaults.test.mjs`; diff-viewed reads a turn summary once and treats a 404 as no summary. | `plugins/@dshfiles/command-palette/README.md`, `plugins/@dshfiles/diff-viewed/README.md` |
+
+B10's description was out of date: the composer now has an "Own workspace / In place" picker, not a checkbox, and
+"signal failed" exists only as a backlog Host log line. The `changes.summary` 404s came from `diff-viewed`, not
+`workspace-nav`; the ones left after a Host restart come from the native Deliverables card and need a fork of
+`dsh-client-ui-deliverables` to remove.
+
+## Found while doing it
+
+- **B11, likely:** choosing "Own workspace" in the New-thread composer crashes the `dshfiles.workbench.conversation`
+  slot with `useConversation is not a function` (`plugins/@dshfiles/workbench/src/thread-panel.tsx`). None of the fixes
+  above touch the code that hands that slot its props, so it is probably already on `main`; not reproduced there yet.
+- Two more console errors in that flow: ai-accounts' `cannot create effect on inactive context`, and
+  `SlotAssemblyError: scope 'session-maybe' rendered without an installed adapter` (also thrown at boot under full
+  `devices['iPhone 14']` emulation, so phone scratch shots use a plain 390×844 viewport).
+- `pnpm check:e2e rich-composer` fails on `main`: in `@scenario:workbench.conversation-header` the page intercepts the
+  click on the Workbench header's **Unpin** button. Probably the same Workbench conversation-slot problem as B11.
+- `main-tabs`' `tab-keyboard` catalog reach looks for a tab named "Plugins"; it is now "Plugin Manager: Plugins".
+- `dshx dev up` fails with `spawn dsh ENOENT` unless `DSHX_DSH_EXECUTABLE` points at `node_modules/.bin/dsh`.
+- Not verified on a real iPhone: the Quote action's touch path and the composer bar at phone width were checked only
+  in a WebKit viewport.
+
 ## Before you start (read once)
 
 1. `AGENTS.md` at the repo root is the contract: `jj` only, one described revision per logical change, never push.
@@ -16,41 +49,34 @@ replace are listed in `docs/native-forks.md`.
 4. Useful checks: `pnpm --dir plugins/@dshfiles/<plugin> test`, `pnpm typecheck`, `pnpm check:cycles`.
 5. Upstream-facing work goes through the `dsh-upstream-pr` skill, not a fork-only commit.
 
-## A. Ready-to-pick upstream GitHub issues (7)
+## A. Ready-to-pick upstream GitHub issues (6)
 
 These already carry a crisp problem statement and acceptance criteria on `astahmer/dshfiles`. Comment on the issue
 before starting so two people don't collide — three of them already have activity from outside contributors.
 
-| #   | Issue                                                 | Item                                                                 | Owner plugin                     | Note                                                                                                                                                     |
-| --- | ----------------------------------------------------- | -------------------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A1  | [#34](https://github.com/astahmer/dshfiles/issues/34) | b:32 quote a conversation message into the composer                  | `rich-composer`                  | Small. Insert editable quote + source context, keep it in the draft until send.                                                                          |
-| A2  | [#35](https://github.com/astahmer/dshfiles/issues/35) | b:86 persistent notification history                                 | `activity-timeline`              | Medium. Bounded history, read/dismiss/clear, navigate back to a live thread. Tagged `needs-approval`, so confirm scope with me first.                    |
-| A3  | [#36](https://github.com/astahmer/dshfiles/issues/36) | b:108 Cmd+J / Ctrl+J toggle for the terminal                         | `workbench`                      | Small. Must not swallow keys while terminal input has focus. ⚠ OzakIOne already wrote "Prompting it right now".                                          |
-| A4  | [#37](https://github.com/astahmer/dshfiles/issues/37) | b:183 remote-thread interaction parity                               | `multi-host`, `rich-composer`    | Large. Model/attachment pickers, workspace/JJ actions, approvals inside the controlling chat.                                                            |
-| A5  | [#47](https://github.com/astahmer/dshfiles/issues/47) | b:588 duplicate edited-file summary after a turn                     | `turn-summary`                   | Small and well-specified. Native `ui-deliverables` card already shows it; keep the walkthrough + "Review in Changes". ⚠ Meiyo40 commented with evidence. |
-| A6  | [#51](https://github.com/astahmer/dshfiles/issues/51) | b:597 right-panel toggle should close the only open panel            | `frame-layout` / `sidebar-right` | Small. ⚠ OzakIOne already wrote "Prompting it right now".                                                                                                |
-| A7  | [#57](https://github.com/astahmer/dshfiles/issues/57) | b:609 Windows: DSH crashes at startup (dshx bridges on socket files) | `tooling/dshx`                   | Not UI, but a release blocker — someone should own it.                                                                                                   |
+| #   | Issue                                                 | Item                                                                 | Owner plugin                     | Note                                                                                                                                                                                                      |
+| --- | ----------------------------------------------------- | -------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A2  | [#35](https://github.com/astahmer/dshfiles/issues/35) | b:86 persistent notification history                                 | `activity-timeline`              | Medium. Bounded history, read/dismiss/clear, navigate back to a live thread. Tagged `needs-approval`, so confirm scope with me first.                                                                     |
+| A3  | [#36](https://github.com/astahmer/dshfiles/issues/36) | b:108 Cmd+J / Ctrl+J toggle for the terminal                         | `workbench`                      | Small. Must not swallow keys while terminal input has focus. ⚠ OzakIOne already wrote "Prompting it right now".                                                                                           |
+| A4  | [#37](https://github.com/astahmer/dshfiles/issues/37) | b:183 remote-thread interaction parity                               | `multi-host`, `rich-composer`    | Large. Model/attachment pickers, workspace/JJ actions, approvals inside the controlling chat.                                                                                                             |
+| A5  | [#47](https://github.com/astahmer/dshfiles/issues/47) | b:588 duplicate edited-file summary after a turn                     | `turn-summary`                   | Small and well-specified. Native `ui-deliverables` card already shows it; keep the walkthrough + "Review in Changes". ⚠ Meiyo40 commented with evidence; PR #56 waits on the direction (open question 5). |
+| A6  | [#51](https://github.com/astahmer/dshfiles/issues/51) | b:597 right-panel toggle should close the only open panel            | `frame-layout` / `sidebar-right` | Small. ⚠ OzakIOne already wrote "Prompting it right now".                                                                                                                                                 |
+| A7  | [#57](https://github.com/astahmer/dshfiles/issues/57) | b:609 Windows: DSH crashes at startup (dshx bridges on socket files) | `tooling/dshx`                   | Not UI, but a release blocker — someone should own it.                                                                                                                                                    |
 
-## B. Our GUI: concrete visual bugs (14)
+## B. Our GUI: concrete visual bugs (8)
 
 Each has a screenshot on the item. These are the cheapest wins and the least likely to conflict with other work.
 
-| #   | Item  | What's wrong                                                                                                                                                                                                                                      | Owner plugin                                    |
-| --- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| B1  | b:607 | "Retry" / "Ask to fix" row after a failed turn still looks broken: the `RATE_LIMIT` badge is clipped and overlaps the error text, retry pill is off-grid.                                                                                         | `chat` (turn-error action seat)                 |
-| B2  | b:554 | Composer action bar gets a weird width when the container is narrow.                                                                                                                                                                              | `rich-composer`                                 |
-| B3  | b:638 | "Clean up workspaces" dialog rows are too tall — every row is sized for a title even when it shows one line.                                                                                                                                      | `jj-integration`                                |
-| B4  | b:641 | Subagent rows in the transcript should be collapsible as one block, like the message queue.                                                                                                                                                       | `chat`                                          |
-| B5  | b:620 | Subagent rows need a name / short truncated title of what they do; today they read "Subagent · Working".                                                                                                                                          | `chat`                                          |
-| B6  | b:585 | Hovering the "1/5 subagents" counter jumps to the row and changes the label; probably unexpected. Needs a decision, then a fix.                                                                                                                   | `chat`                                          |
-| B7  | b:581 | Mermaid flowchart renders incorrectly.                                                                                                                                                                                                            | `mermaid-diagrams`                              |
-| B8  | b:556 | Opening a file from the resource list does nothing.                                                                                                                                                                                               | `editor` / `resource-packs`                     |
-| B9  | b:145 | Screenshots render as text/links instead of images. Partially diagnosed: old replies wrapped links in code spans (unfixable in place); the rendering path itself is unverified.                                                                   | `tweet-context` / markdown render               |
-| B10 | b:123 | Console noise + "signal failed" beside the workspace checkbox. Real error found: shortcut default conflict `commandPalette.newThread` vs `mainTabs.newTab`, plus a 404 on `changes.summary`.                                                      | `command-palette`, `main-tabs`, `workspace-nav` |
-| B11 | b:469 | Unchecking the workspace checkbox in the New-thread composer leads to a broken state.                                                                                                                                                             | `workspace-nav`                                 |
-| B12 | b:292 | "Broken workspace stuff": Backlog `startThreadForItems → jj-integration.provision` path, not the composer toggle. Not reproducible after a restart, and no Host-level test covers that orchestration. First step is a regression test, not a fix. | `backlog` + `jj-integration`                    |
-| B13 | b:285 | Same class as B12/B14: the running Host held a stale bundle, so the visible bug may be code that is already fixed. Check `dshx status` before touching code.                                                                                      | build/Host state                                |
-| B14 | b:387 | "Run perf opti again": blocked because the live Host boots an older bundle than the rebuilt plugins; the after-measurement is only valid after a Host restart (my decision, not yours).                                                           | `docs/performance.md`                           |
+| #   | Item  | What's wrong                                                                                                                                                                                                                                      | Owner plugin                      |
+| --- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| B6  | b:585 | Hovering the "1/5 subagents" counter jumps to the row and changes the label; probably unexpected. Needs a decision, then a fix.                                                                                                                   | `chat`                            |
+| B7  | b:581 | Mermaid flowchart renders incorrectly.                                                                                                                                                                                                            | `mermaid-diagrams`                |
+| B8  | b:556 | Opening a file from the resource list does nothing.                                                                                                                                                                                               | `editor` / `resource-packs`       |
+| B9  | b:145 | Screenshots render as text/links instead of images. Partially diagnosed: old replies wrapped links in code spans (unfixable in place); the rendering path itself is unverified.                                                                   | `tweet-context` / markdown render |
+| B11 | b:469 | Changing the workspace choice in the New-thread composer leads to a broken state. Likely the `useConversation` crash in "Found while doing it".                                                                                                   | `workspace-nav`                   |
+| B12 | b:292 | "Broken workspace stuff": Backlog `startThreadForItems → jj-integration.provision` path, not the composer toggle. Not reproducible after a restart, and no Host-level test covers that orchestration. First step is a regression test, not a fix. | `backlog` + `jj-integration`      |
+| B13 | b:285 | Same class as B12/B14: the running Host held a stale bundle, so the visible bug may be code that is already fixed. Check `dshx status` before touching code.                                                                                      | build/Host state                  |
+| B14 | b:387 | "Run perf opti again": blocked because the live Host boots an older bundle than the rebuilt plugins; the after-measurement is only valid after a Host restart (my decision, not yours).                                                           | `docs/performance.md`             |
 
 ## C. The "what needs me" surfaces — the one coherent UX project (6)
 
@@ -105,11 +131,9 @@ b:634, b:354, b:591, b:598, b:594, b:52, b:609 (release blocker, see A7), b:86 (
 
 ## G. Suggested order if you only have a day
 
-1. B1, B2, B3 — retry/action-bar/row-height polish, all small and screenshot-provable.
-2. B4 + B5 — the subagent row work is the same component; do it as one patch.
-3. A5 (duplicate edited-file summary) and A1 (quote into composer) — both small, both upstream-facing.
-4. B10 — the shortcut conflict is a real console error and cheap to fix.
-5. Then read C1–C4 and come back with a design note, not code.
+1. B11 — reproduce the `useConversation` crash on `main` (see "Found while doing it") and fix it.
+2. A5 — once its direction is chosen (open question 5).
+3. Then read C1–C4 and come back with a design note, not code.
 
 ## Open questions for me (do not guess)
 
@@ -117,3 +141,5 @@ b:634, b:354, b:591, b:598, b:594, b:52, b:609 (release blocker, see A7), b:86 (
 2. B6 (subagent hover jump) — is the current behaviour intentional?
 3. D1/D2 (workbench main view) — still "do not start", or unblocked now?
 4. Which of E is a real direction versus just bookmarked inspiration?
+5. A5 (#47): keep both cards, fork `dsh-client-ui-deliverables`, or trim the walkthrough to its Review in Changes action?
+   Meiyo40's PR #56 waits on this choice.
