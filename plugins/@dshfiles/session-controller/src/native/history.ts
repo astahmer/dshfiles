@@ -161,11 +161,36 @@ export class SessionHistoryController {
       follower.closed = true
       notify()
     }
+    /**
+     * A client that reads slower than the Session writes must not grow Host memory without bound: this buffer held
+     * every streamed frame of a long turn (measured: ~650k retained chunks against a 3 GB heap). Past the cap the
+     * follower ends and the client resyncs from a fresh snapshot instead of the Host queueing frames nobody read.
+     */
+    const MAX_BUFFERED_FRAMES = 4_096
+    const pushBack = (item: Parameters<typeof buffered.pushBack>[0]): void => {
+      if (follower.closed) return
+      if (buffered.size >= MAX_BUFFERED_FRAMES) {
+        follower.closed = true
+        notify()
+        return
+      }
+      buffered.pushBack(item)
+      notify()
+    }
+    const pushFront = (item: Parameters<typeof buffered.pushFront>[0]): void => {
+      if (follower.closed) return
+      if (buffered.size >= MAX_BUFFERED_FRAMES) {
+        follower.closed = true
+        notify()
+        return
+      }
+      buffered.pushFront(item)
+      notify()
+    }
     this.closeFollowers.add(close)
     const disposeEvent = this.ctx.on('session/event', (session, event) => {
       if (session.id !== target) return
-      buffered.pushBack({ type: 'event', event })
-      notify()
+      pushBack({ type: 'event', event })
     }, { global: true })
     const disposeCreated = this.ctx.on('session/created', (session) => {
       if (session.id !== target) return
@@ -177,20 +202,18 @@ export class SessionHistoryController {
         ? session.firstLiveSeq
         : SessionLogOffset(snapshotCursor + 1))
       for (let index = suffix.length - 1; index >= 0; index -= 1) {
-        buffered.pushFront({ type: 'event', event: suffix[index] as SessionEvent })
+        pushFront({ type: 'event', event: suffix[index] as SessionEvent })
       }
-      notify()
     }, { global: true })
     const disposeAssistantStream = request.assistantStream !== true
       ? undefined
       : this.ctx.on('agent/assistant-stream', ({ agent, frame }) => {
         if (agent.session.id !== target) return
-        buffered.pushBack({
+        pushBack({
           type: 'assistant-stream',
           frame: wireAssistantStreamFrame(frame, cursorBeforeNext(agent.session.seq)),
           ordinal: ++assistantStreamOrdinal,
         })
-        notify()
       }, { global: true })
     const onAbort = (): void => { notify() }
     signal.addEventListener('abort', onAbort, { once: true })
