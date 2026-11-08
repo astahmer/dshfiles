@@ -40,20 +40,26 @@ const make = Effect.gen(function* () {
   const lock = yield* Semaphore.make(1)
   const failed = (operation: string) => (cause: unknown) => new AutomationStorageFailure({ operation, cause })
 
-  const listAll = Effect.fn('automation store list')(function* <A>(prefix: string, decode: (entry: StoredEntry) => Option.Option<A>) {
-    const out: A[] = []
+  const listEntries = Effect.fn('automation store list')(function* (prefix: string) {
+    const out: StoredEntry[] = []
     let cursor: string | undefined
     do {
       const input: StorageListInput = cursor === undefined ? { prefix, limit: 500 } : { prefix, limit: 500, cursor }
       const page = yield* storage.list(input).pipe(Effect.mapError(failed('list')))
-      for (const entry of page.entries) Option.match(decode(entry), { onNone: () => undefined, onSome: value => out.push(value) })
+      out.push(...page.entries)
       cursor = page.cursor ?? undefined
     } while (cursor !== undefined)
     return out
   })
 
-  const automations = listAll(AUTOMATION_PREFIX, entry => decodeAutomation(entry.value)).pipe(
-    Effect.map(rows => rows.toSorted((a, b) => a.createdAt - b.createdAt)),
+  const decodeAll = <A>(entries: readonly StoredEntry[], decode: (entry: StoredEntry) => Option.Option<A>) => {
+    const out: A[] = []
+    for (const entry of entries) Option.match(decode(entry), { onNone: () => undefined, onSome: value => out.push(value) })
+    return out
+  }
+
+  const automations = listEntries(AUTOMATION_PREFIX).pipe(
+    Effect.map(entries => decodeAll(entries, entry => decodeAutomation(entry.value)).toSorted((a, b) => a.createdAt - b.createdAt)),
   )
 
   const get = (id: string) =>
@@ -66,8 +72,11 @@ const make = Effect.gen(function* () {
 
   /** Runs newest first: of one automation, or of every automation. */
   const runs = Effect.fn('automation store runs')(function* (input: { readonly automationId?: string | undefined; readonly limit: number }) {
-    const rows = yield* listAll(input.automationId === undefined ? RUN_PREFIX : runPrefix(input.automationId), entry => decodeRun(entry.value))
-    return rows.toSorted((a, b) => b.startedAt - a.startedAt).slice(0, input.limit)
+    const entries = yield* listEntries(input.automationId === undefined ? RUN_PREFIX : runPrefix(input.automationId))
+    // The key starts with the zero-padded start time, so the newest runs are the last keys: history older than the
+    // requested rows is never decoded.
+    const newest = entries.toSorted((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0)).slice(0, input.limit)
+    return decodeAll(newest, entry => decodeRun(entry.value)).toSorted((a, b) => b.startedAt - a.startedAt)
   })
 
   const recordRun = Effect.fn('automation store record run')(function* (run: RunRecord) {
