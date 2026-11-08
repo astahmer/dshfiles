@@ -20,6 +20,24 @@ patterns keep it bounded. Numbers below were measured on this machine (2026-11-0
 
 ## What the memory is
 
+Measured on 2026-11-09 after a fresh restart, the sweep's 610 MB baseline no longer holds. The live Host reachived
+**2.82 GB live heap** (`heapUsed` after `HeapProfiler.collectGarbage`, 8.5 minutes uptime, 6 attached clients), and one
+Chrome renderer for the DSH tab held **3.3 GB RSS** with another at 1.7 GB during the same window.
+
+A heap snapshot attributed the Host's 2.92 GB of nodes as: **2.03 GB of strings** (12.2 million string nodes, average
+174 bytes), 382 MB objects, 261 MB arrays. The largest string groups are serialized payloads, not module source:
+streamed `{"type":"reasoning",…}` chunks (hundreds of thousands of nodes), tool-call argument JSON (44 k nodes with
+`file_path`), shell command JSON (30 k nodes) and repeated system reminders. That is retained conversation/session
+data, so the caches hold decoded prompts and tool payloads, not the 3 GB log corpus itself.
+
+Two things follow and are still unattributed at the owner level:
+
+- The Host's live set is dominated by per-event payload strings. The next step is retainer attribution (which array or
+  map holds them) before changing any cache; a census is still forbidden on the live Host.
+- The browser tab is now the larger consumer, and the open lever in the table above stays the client-side resident
+  state for opened threads (`per-session client state LRU`). Both need the same measurement discipline: identical
+  profile, ~110 s settle, `heapUsed` after a forced GC, and a before/after on the same workload.
+
 Measured composition of a 610 MB Host with the web profile, no client attached. The rows come from different ablation
 boots (the sweep measured each owner by booting without it), so they are per-owner costs rather than one additive boot:
 
