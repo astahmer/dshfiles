@@ -104,6 +104,8 @@ export class VitestReport {
     const summary = VitestReport.summary(lines)
     if (summary === undefined) return undefined
     const files = new Map<string, MutableFile>()
+    /** Positions of a file's tests by title, so a FAIL block finds its test without rescanning the file. Built on that file's first FAIL block only. */
+    const positionsByFile = new Map<MutableFile, Map<string, number[]>>()
     const fileFor = (path: string): MutableFile => {
       const existing = files.get(path)
       if (existing !== undefined) return existing
@@ -119,6 +121,24 @@ export class VitestReport {
       }
       files.set(path, created)
       return created
+    }
+    const indexTitle = (positions: Map<string, number[]>, test: TestCase, at: number): void => {
+      const known = positions.get(test.title)
+      if (known === undefined) positions.set(test.title, [at])
+      else known.push(at)
+    }
+    const appendTest = (file: MutableFile, test: TestCase): void => {
+      const positions = positionsByFile.get(file)
+      if (positions !== undefined) indexTitle(positions, test, file.tests.length)
+      file.tests.push(test)
+    }
+    const titlePositions = (file: MutableFile): Map<string, number[]> => {
+      const known = positionsByFile.get(file)
+      if (known !== undefined) return known
+      const positions = new Map<string, number[]>()
+      file.tests.forEach((test, at) => indexTitle(positions, test, at))
+      positionsByFile.set(file, positions)
+      return positions
     }
     let currentFile: MutableFile | undefined
     for (let index = 0; index < lines.length; index++) {
@@ -138,7 +158,7 @@ export class VitestReport {
       if (verboseMatch !== null) {
         currentFile = undefined
         const names = (verboseMatch[3] ?? '').split(' > ')
-        fileFor(verboseMatch[2] ?? '').tests.push({
+        appendTest(fileFor(verboseMatch[2] ?? ''), {
           suites: names.slice(0, -1),
           suitesKnown: true,
           title: (names.at(-1) ?? '').trim(),
@@ -150,7 +170,7 @@ export class VitestReport {
       }
       const nestedMatch = currentFile === undefined ? null : NESTED_TEST_LINE.exec(line)
       if (nestedMatch !== null && currentFile !== undefined) {
-        currentFile.tests.push({
+        appendTest(currentFile, {
           suites: [],
           suitesKnown: false,
           title: (nestedMatch[2] ?? '').trim(),
@@ -163,9 +183,15 @@ export class VitestReport {
       const failMatch = FAIL_HEADER.exec(line)
       if (failMatch === null) continue
       currentFile = undefined
-      const blockEnd = lines.findIndex((candidate, at) => at > index && (SECTION_RULE.test(candidate) || FAIL_HEADER.test(candidate)))
-      const block = lines.slice(index + 1, blockEnd === -1 ? lines.length : blockEnd)
-      index = (blockEnd === -1 ? lines.length : blockEnd) - 1
+      const blockStart = index + 1
+      let blockEnd = blockStart
+      while (blockEnd < lines.length) {
+        const candidate = lines[blockEnd] ?? ''
+        if (SECTION_RULE.test(candidate) || FAIL_HEADER.test(candidate)) break
+        blockEnd += 1
+      }
+      const block = lines.slice(blockStart, blockEnd)
+      index = blockEnd - 1
       const file = fileFor(failMatch[1] ?? '')
       file.status = 'failed'
       const failure = VitestReport.failure(block)
@@ -177,11 +203,14 @@ export class VitestReport {
       const title = names.at(-1) ?? ''
       const suites = names.slice(0, -1)
       const status: TestStatus = TIMEOUT_MESSAGE.test(failure.message) ? 'timeout' : 'failed'
-      const existing = file.tests.findIndex(
-        test => test.title === title && test.status !== 'passed' && (!test.suitesKnown || test.suites.join(' > ') === suites.join(' > ')),
-      )
+      const sameTitle = titlePositions(file).get(title)
+      const existing =
+        sameTitle?.find(at => {
+          const test = file.tests[at]
+          return test !== undefined && test.status !== 'passed' && (!test.suitesKnown || test.suites.join(' > ') === suites.join(' > '))
+        }) ?? -1
       if (existing === -1) {
-        file.tests.push({ suites, suitesKnown: true, title, status, durationMs: undefined, failure })
+        appendTest(file, { suites, suitesKnown: true, title, status, durationMs: undefined, failure })
         continue
       }
       const previous = file.tests[existing]
