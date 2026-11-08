@@ -253,6 +253,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             align="start"
             className="dshx-root dshx:w-[min(50rem,calc(100vw-1rem))] dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:shadow-none"
             style={popoverWidth === null ? undefined : { width: popoverWidth }}
+            onOpenAutoFocus={event => {
+              event.preventDefault()
+              searchInputRef.current?.focus()
+            }}
             onEscapeKeyDown={(event: KeyboardEvent) => {
               if (!narrowDetails || !window.matchMedia('(max-width: 43rem)').matches) return
               event.preventDefault()
@@ -287,7 +291,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   <Input
                     aria-label="Search models and accounts"
                     autoComplete="off"
-                    autoFocus
                     className="dshx:h-7 dshx:rounded-lg dshx:border-border dshx:bg-muted/40 dshx:pl-7 dshx:pr-11 dshx:text-[11px] dshx:focus-visible:ring-1 dshx:focus-visible:ring-info/60"
                     onChange={event => setQuery(event.currentTarget.value)}
                     onKeyDown={event => {
