@@ -5,7 +5,7 @@
     {
       "id": "group-exit-backoff",
       "title": "Wait for detached process groups without probing every 15 ms",
-      "summary": "Owned fork of the native local subprocess service: the group-exit poll backs off from 15 ms to 500 ms, so a job an agent detaches no longer costs the Host seconds of CPU while a short-lived tree is still seen at once.",
+      "summary": "Owned fork of the native local subprocess service: the group-exit poll backs off from 15 ms to 500 ms, so a job an agent detaches no longer costs the Host seconds of CPU while a short-lived tree is still seen at once, and the terminal readiness probe no longer forks the whole process table on every 50 ms poll.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -14,6 +14,7 @@
       "states": ["running", "group-alive", "exited"],
       "failureModes": [
         "A process group that outlives its leader is still awaited until empty, only probed less often.",
+        "Readiness polls refresh terminal descendant evidence at most once per second; a teardown still scans fresh, so that evidence only ages for the host-exit fallback when the process table is unreadable.",
         "Every other behaviour is the pinned upstream code; drift is checked with scripts/native-fork-diff.mjs."
       ],
       "externalDependencies": [],
