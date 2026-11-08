@@ -32,7 +32,17 @@ const whitespacePattern = (old: string): RegExp | undefined => {
   return parts.length === 0 ? undefined : new RegExp(parts.map(escapeRegExp).join('\\s+'), 'gu')
 }
 
-const matchStartLines = (content: string, starts: readonly number[]): readonly number[] => starts.map(start => content.slice(0, start).split('\n').length)
+/** One forward pass over the content: `starts` ascend, so each scan resumes where the previous one stopped. */
+const matchStartLines = (content: string, starts: readonly number[]): readonly number[] => {
+  const lines: number[] = []
+  let line = 1
+  let cursor = 0
+  for (const start of starts) {
+    for (; cursor < start; cursor += 1) if (content[cursor] === '\n') line += 1
+    lines.push(line)
+  }
+  return lines
+}
 
 /** Short text for the lines a failed anchor names, so one retry can copy a real anchor. */
 const linesAt = ({ content, lines }: { readonly content: string; readonly lines: readonly number[] }): readonly AnchorCandidate[] => {
@@ -85,6 +95,7 @@ const exactStarts = ({ content, needle, all }: { readonly content: string; reado
   return starts
 }
 
+/** One accumulator instead of one rebuilt string per match: `starts` ascend and never overlap. */
 const replaceRanges = ({
   content,
   needle,
@@ -96,9 +107,14 @@ const replaceRanges = ({
   readonly replacement: string
   readonly starts: readonly number[]
 }): string => {
-  let next = content
-  for (const start of [...starts].reverse()) next = next.slice(0, start) + replacement + next.slice(start + needle.length)
-  return next
+  const parts: string[] = []
+  let cursor = 0
+  for (const start of starts) {
+    parts.push(content.slice(cursor, start), replacement)
+    cursor = start + needle.length
+  }
+  parts.push(content.slice(cursor))
+  return parts.join('')
 }
 
 const fuzzyMatches = ({ content, needle }: { readonly content: string; readonly needle: string }): readonly RegExpMatchArray[] => {
@@ -131,12 +147,15 @@ const applyOne = ({ content, edit, index }: { readonly content: string; readonly
     return { ok: false, error: { kind: 'ambiguous', edit: index, lines, candidates: linesAt({ content, lines }) } }
   }
   const selected = edit.replaceAll === true ? fuzzy : fuzzy.slice(0, 1)
-  let next = content
-  for (const match of [...selected].reverse()) {
+  const parts: string[] = []
+  let cursor = 0
+  for (const match of selected) {
     const start = match.index ?? 0
-    next = next.slice(0, start) + edit.new + next.slice(start + match[0].length)
+    parts.push(content.slice(cursor, start), edit.new)
+    cursor = start + match[0].length
   }
-  return { ok: true, value: { content: next, exact: 0, fuzzy: selected.length } }
+  parts.push(content.slice(cursor))
+  return { ok: true, value: { content: parts.join(''), exact: 0, fuzzy: selected.length } }
 }
 
 /**
