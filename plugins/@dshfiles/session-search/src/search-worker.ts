@@ -61,7 +61,10 @@ const Handlers = SearchWorkerRpcs.toLayer(
     // The user's archived Sessions: cold history, dropped from the index and only read back for a targeted search.
     const archived = yield* Ref.make<ReadonlySet<string>>(new Set())
     // A large prune is reclaimed once per process; a second VACUUM would only rewrite an already-compact file.
-    let compacted = false
+    // An hour between compactions: the index re-bloats as archived Sessions are pruned again, and a once-per-process
+    // flag left every later pass with the garbage the first one never saw.
+    const COMPACTION_INTERVAL_MS = 60 * 60_000
+    let lastCompactionAt = 0
 
     const health = Effect.flatMap(Ref.get(progress), (current): Effect.Effect<IndexHealth, SearchWorkerFailed> =>
       Effect.try({
@@ -103,9 +106,9 @@ const Handlers = SearchWorkerRpcs.toLayer(
         // failure is reported instead of swallowed by the pass.
         // Un-merged FTS5 segments are the real garbage after a prune (measured 1.82 GB of a 2.01 GB index), and the page
         // freelist stays small, so the trigger is bytes per document as well as free pages.
-        if (!compacted && (index.freePageRatio() > 0.25 || index.bytesPerDocument() > 2_048)) {
+        if (Date.now() - lastCompactionAt > COMPACTION_INTERVAL_MS && (index.freePageRatio() > 0.25 || index.bytesPerDocument() > 2_048)) {
           const reclaimed = yield* Effect.try({ try: () => (index.compact(), true), catch: error => describeError(error) }).pipe(Effect.result)
-          if (reclaimed._tag === 'Success') compacted = true
+          if (reclaimed._tag === 'Success') lastCompactionAt = Date.now()
           else yield* Effect.logWarning('session-search: the index could not be compacted yet', reclaimed.failure)
         }
         yield* Ref.update(progress, current => ({

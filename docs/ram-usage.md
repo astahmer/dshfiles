@@ -49,7 +49,8 @@ The browser tab is a different shape: ~126 MB at load is mostly bytecode and mod
   still read), traces (30 k spans, 60 k points). Nothing derived should live forever.
 - **Compact what deletes.** FTS5 keeps pruned postings in un-merged segments: 1.82 GB of a 2.01 GB index for
   80 MB of text. `optimize` + VACUUM took it to 182 MB and searches from 15–47 ms to 1–2 ms. `VACUUM` alone only
-  frees the page freelist.
+  frees the page freelist. The index re-bloats as Sessions are archived and pruned again, so the worker compacts at
+  most once an hour whenever it holds more than 2 KB per document or a quarter of its pages are free.
 - **Bound the write-ahead log.** Without `journal_size_limit`, a store's `-wal` grows beside it: 246 MB next to a
   245 MB database. `sqlite-store` sets 32 MB and an autocheckpoint.
 - **Gate background work on demand.** An index pass is worth running when someone reads its panel. Usage,

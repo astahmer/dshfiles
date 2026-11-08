@@ -745,7 +745,7 @@ every number below is taken after 110 s.
 
 | Change | Before | After | Where |
 | --- | --- | --- | --- |
-| session-search index (un-merged FTS5 postings) | 2,010 MB | 182 MB | `optimize` + VACUUM in the worker; searches 15–47 ms → 1–2 ms |
+| session-search index (un-merged FTS5 postings) | 2,010 MB | 182 MB, compacted hourly on bloat | `optimize` + VACUUM in the worker; searches 15–47 ms → 1–2 ms |
 | projection cache (derived per-Session checkpoints) | 325 MB / 202.8 MB heap | 17 MB / ~15 MB heap | 14-day prune at startup and hourly |
 | WAL beside usage / traces / memory | 246 / 160 / 102 MB | ≤ 32 MB each | `journal_size_limit` + `wal_autocheckpoint` in sqlite-store |
 | job history index | 20,000 rows / 13.2 MB | 1 day / 8.9 MB | settled jobs leave after 24 h |
