@@ -269,10 +269,24 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+/* The row sizes by its own width (transcript column, split pane or phone), not the viewport. */
+.turnErrorFrame {
+  container-type: inline-size;
+}
+
+/*
+ * Dot | copy | code badge on the first line; actions wrap on their own line in the copy column, so they share its left
+ * edge (10px dot + 8px gap) with the bar plugins add under the row. Areas, not auto-placement: a seat that renders
+ * several children can no longer push the badge into the dot column.
+ */
 .turnErrorRow {
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-areas:
+    'dot copy code'
+    '. actions actions';
+  column-gap: 8px;
+  row-gap: 0;
   align-items: start;
   padding: 2px 0;
   font-size: var(--dsh-content-font-size-secondary, 13px);
@@ -280,10 +294,12 @@
 }
 
 .turnErrorDot {
+  grid-area: dot;
   margin-top: 5px;
 }
 
 .turnErrorCopy {
+  grid-area: copy;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -299,8 +315,50 @@
 }
 
 .turnErrorCode {
+  grid-area: code;
+  justify-self: end;
+  box-sizing: border-box;
+  max-width: 24ch;
+  margin-top: 1px;
+  padding: 0 6px;
+  overflow: hidden;
+  border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.12));
+  border-radius: var(--dsw-radius-sm);
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-markdown-code-block-small);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.turnErrorActions {
+  display: flex;
+  grid-area: actions;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.turnErrorActions:not(:empty) {
+  padding-top: 4px;
+}
+
+/* Phones and narrow panes: the badge leaves the text column its width and sits under the message, before the actions. */
+@container (max-width: 28rem) {
+  .turnErrorRow {
+    grid-template-columns: 10px minmax(0, 1fr);
+    grid-template-areas:
+      'dot copy'
+      '. code'
+      '. actions';
+  }
+
+  .turnErrorCode {
+    justify-self: start;
+    max-width: 100%;
+    margin-top: 4px;
+  }
 }
 
 .maxTokensTitle {

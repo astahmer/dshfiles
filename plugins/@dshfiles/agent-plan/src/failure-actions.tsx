@@ -12,6 +12,7 @@ export interface FailureComposer {
 
 /**
  * The bar under a native failure row: retry count, and two actions that write into the composer for the user to send.
+ * Its left edge (18px: the row's 10px dot plus 8px gap) lines up with the error text and the row's own actions.
  * Neither sends on its own: the user reviews the text first, the same contract `test-runs` uses for "Ask to fix".
  */
 export const FailureActions = (props: {
@@ -24,7 +25,7 @@ export const FailureActions = (props: {
   if (retry === undefined && !actionable) return null
   return (
     <div
-      className="dshx-root dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:py-1 dshx:pl-6 dshx:text-xs dshx:text-muted-foreground"
+      className="dshx-root dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:py-1 dshx:pl-[18px] dshx:text-xs dshx:text-muted-foreground"
       data-dshfiles-agent-failure={props.facts.kind}
     >
       {retry !== undefined && (
