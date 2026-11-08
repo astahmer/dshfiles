@@ -17,10 +17,14 @@ const MIN_TAIL_BYTES = 1_000_000
  * 2 ms instead of 153 ms plus 86 MB of buffer per concurrent cold open.
  */
 const TAIL_WINDOW_BYTES = 4_000_000
-/** How many times the window doubles when it holds fewer than two complete frames (a log of huge appends). */
-const TAIL_WINDOW_GROWTHS = 6
+/**
+ * How many times the window doubles when it holds fewer than two complete frames (a log of huge appends). Six growths
+ * meant a 256 MB window per tail, so three kept tails could hold 768 MB of the Host for logs nobody was reading; two
+ * growths cap one at 16 MB, and a log whose appends still do not fit falls back to the full read.
+ */
+const TAIL_WINDOW_GROWTHS = 2
 /** Opened tails kept for the opening's next pages; each holds its log's bytes. */
-const KEPT_TAILS = 3
+const KEPT_TAILS = 2
 const KEPT_TAIL_MS = 120_000
 
 const cacheRecordSchema = Schema.Struct({ rows: Schema.Record(Schema.String, Schema.Unknown) })
