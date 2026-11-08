@@ -18,15 +18,9 @@ export interface ResourceSeatInjected {
 type ResourceSeatProps = RightbarSeatProps & InjectFace<ResourceSeatInjected>
 
 /** Records remain in their original session store; only their presentation travels through a portal. */
-function AddressableTab({
-  props,
-  tab,
-  target,
-}: {
-  readonly props: ResourceSeatProps
-  readonly tab: TabRecord
-  readonly target: SidebarResourceTarget | undefined
-}): ReactNode {
+function AddressableTab({ props, tab }: { readonly props: ResourceSeatProps; readonly tab: TabRecord }): ReactNode {
+  const targetId = SidebarResourcePanelModel.id(props.sessionId, tab.id)
+  const target = props.useResourceTargets(targets => targets.find(value => value.id === targetId))
   const occurrence = props.occurrence(tab)
   const { retainTab } = props
   useLayoutEffect(() => retainTab(tab.id, occurrence.signal), [retainTab, tab.id, occurrence.signal])
@@ -85,7 +79,6 @@ function AddressableTab({
 /** The declaring entry remains mounted in the frame's hidden carrier, owning the real session bindings. */
 function AddressableSeat(props: ResourceSeatProps): ReactNode {
   const surface = props.useStore(state => state.bySession[props.sessionId])
-  const targets = props.useResourceTargets(value => value)
   const tabs = useMemo(
     () => Object.values(surface?.layout.tabs ?? {}).filter(tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel'),
     [surface],
@@ -96,12 +89,7 @@ function AddressableSeat(props: ResourceSeatProps): ReactNode {
   return (
     <>
       {tabs.map(tab => (
-        <AddressableTab
-          key={tab.id}
-          props={props}
-          tab={tab}
-          target={targets.find(target => target.id === SidebarResourcePanelModel.id(props.sessionId, tab.id))}
-        />
+        <AddressableTab key={tab.id} props={props} tab={tab} />
       ))}
     </>
   )
