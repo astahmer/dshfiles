@@ -67,6 +67,7 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/chat/AssistantMarkdown.tsx` | rewrites links whose scheme a dshx `LinkHandler` claims before `MarkdownText`, which keeps only http(s) and mailto hrefs, and routes clicks on them to the handler (`MarkdownLinks.openFromClick` on the root's click and aux-click capture) |
 | `src/native/chat/ChatView.module.css` | outlines (inside its box, so a folded group's scroll body does not clip it) and tints the row carrying `data-chat-focus` |
 | `src/native/conversation-nodes/tool.ts` | a call whose tool name a `PinnedToolCalls` provider registered gets group-tree position `turn`, so it stays visible outside the completed Turn's fold and splits the step group around it |
+| `src/native/conversation-nodes/chat-snapshot-builder.ts` | an incremental update whose only structural change is the latest Turn's tail row moving later keeps the visible order, so it skips the whole-window re-sort and Location rebuild every streamed chunk would otherwise pay |
 | `src/pinned-tool-calls.ts` | new: the published `@dshfiles/chat/pinned-tool-calls` registry token |
 | `src/pinned-tool-names.ts` | new: the registered names, set from `client-entry.tsx` and read synchronously while tool nodes build |
 | `src/inline-references.tsx`, `src/inline-reference-markdown.tsx` | new: the published `@dshfiles/chat/inline-references` registry and `@dshfiles/chat/inline-reference-markdown` renderer (below) |

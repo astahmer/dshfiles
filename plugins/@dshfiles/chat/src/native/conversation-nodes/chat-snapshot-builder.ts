@@ -1139,6 +1139,10 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     const upserts = this.skillNames.apply(this.referenceLabels.apply(input.upserts, this.store), this.store)
     const processTurns = new Set<number>()
     let structural = false
+    // A Turn tail only moves later (each streamed chunk raises its seq), so it stays the last mounted
+    // row; while every structural change is one of those, re-deriving the whole order would only
+    // reproduce it.
+    let orderHolds = true
     const contentOnly: ChatConversationViewNode[] = []
     const changes: NodeChange<ChatConversationViewNode>[] = []
     for (const node of upserts) {
@@ -1152,6 +1156,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
         || locationIdentity(previous.location) !== locationIdentity(node.location)
       structural ||= nodeStructural
       if (!nodeStructural) contentOnly.push(node)
+      else orderHolds &&= trailingTailAdvance(previous, node, this.order)
       if (processPresentationInputChanged(previous as ChatNode | undefined, node as ChatNode, nodeStructural)) {
         const previousTurn = previous === undefined ? undefined : locationCoordinates(previous.location).turn
         const nextTurn = locationCoordinates(node.location).turn
@@ -1160,19 +1165,23 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       }
     }
     this.store.upsert(upserts)
+    const reorder = structural && !orderHolds
+    const touched = structural && orderHolds ? upserts : contentOnly
     let changedTurnOrders: readonly number[] = EMPTY_TURNS
-    if (structural) {
+    if (reorder) {
       const next = orderedVisibleChatNodes(this.store.values()).map(node => node.key)
       this.order = sameReferences(this.order, next) ? this.order : next
       changedTurnOrders = this.locations.rebuild(this.order, this.store)
     }
-    this.locations.touch(contentOnly)
+    this.locations.touch(touched)
     this.store.updateProcesses(processTurns, this.locations)
     this.store.settleBottom(input.timeline.turnOrder, this.locations)
-    if (structural || input.timeline !== this.timeline) {
+    const turnOrderHolds = this.timeline !== null
+      && sameReferences(input.timeline.turnOrder, this.timeline.turnOrder)
+    if (reorder || (input.timeline !== this.timeline && !turnOrderHolds)) {
       this.navigation.rebuild(input.timeline, this.locations, this.store)
     } else {
-      this.navigation.touch(turnsOf(contentOnly), this.locations, this.store)
+      this.navigation.touch(turnsOf(touched), this.locations, this.store)
     }
     this.timeline = input.timeline
     this.latestGroupInput = {
@@ -1226,6 +1235,29 @@ function turnsOf(nodes: readonly ChatConversationViewNode[]): ReadonlySet<number
 function locationIdentity(location: ConversationLocation): string {
   const coordinates = locationCoordinates(location)
   return `${location.kind}:${coordinates.turn ?? ''}:${coordinates.step ?? ''}`
+}
+
+/**
+ * Whether a structural Node change keeps every visible row where it is: the Turn's tail row moves
+ * later, and it is already the last mounted row, so the visible key order still holds.
+ * @param previous - replaced Node; absent for an addition.
+ * @param node - replacing Node.
+ * @param order - current visible key order.
+ * @returns whether the change cannot reorder the visible rows.
+ */
+function trailingTailAdvance(
+  previous: ChatConversationViewNode | undefined,
+  node: ChatConversationViewNode,
+  order: readonly string[],
+): boolean {
+  return previous !== undefined
+    && node.kind === 'turn-tail'
+    && previous.kind === node.kind
+    && previous.visibility === node.visibility
+    && previous.groupTree === node.groupTree
+    && locationIdentity(previous.location) === locationIdentity(node.location)
+    && node.anchorSeq > previous.anchorSeq
+    && order.at(-1) === node.key
 }
 
 /** Chat target factory contributed to the Conversation view registry. */

@@ -59,6 +59,7 @@
     "src/native/contract/slots.ts",
     "src/native/conversation-nodes/README.md",
     "src/native/conversation-nodes/assistant.ts",
+    "src/native/conversation-nodes/chat-snapshot-builder.ts",
     "src/native/conversation-nodes/tool.ts",
     "src/native/conversation-nodes/turn-error.ts",
     "src/native/conversation-nodes/turn-process.ts",
