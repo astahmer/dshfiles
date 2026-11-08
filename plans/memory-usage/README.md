@@ -79,6 +79,20 @@ runtime (measured), and serialising 3.1 GB inside a 4.14 GB limit can kill every
 sampling heap profile started at boot (heap ~500 MB) and stopped after the workload that grows it — that names the
 retaining allocation sites without a snapshot.
 
+## M01b result: the sampling profile named one site (2026-11-08, after the user's restart)
+
+The Host booted at ~500 MB; after a normal workload (one page load, eight thread switches, `thread_list`, `find_threads`,
+`traces_list_services`, `usage_report`, `memory_search`, `list_thread_questions`) the heap was 3,045 MB and flat. A
+sampling heap profile running across that window reported 1,470 MB of live objects in the top sites, of which
+**1,376.6 MB at `@deepseek-ai/dsh-session-persistence-jsonl` `SessionLogScanner.write`** — the session-log restore path.
+The rest was noise under 2 MB.
+
+So the retained memory is decoded session-log content held by the native `SessionQueryEngine`'s prepared-session cache
+(`preparedSessionCacheSize`, default 5). Each prepared Session holds that Session's whole decoded log, and the biggest
+logs here are 283 / 199 / 157 MB uncompressed, so five entries account for the GB. The owned backend can only lower the
+entry count: `profiles/web` now sets `preparedSessionCacheSize: 1` (Host gap 102 records the byte-bounded fix that needs
+the core engine).
+
 ## Work packages
 
 | ID  | Work                                                                                                   | Evidence so far                                                                 |
@@ -86,7 +100,8 @@ retaining allocation sites without a snapshot.
 | M01 | Attribute the 3.15 GB live heap on a scratch Host with an isolated corpus copy (boot heap, then after the first Session listing and sidebar load; snapshot there if it still fits) | Heap is flat when idle; external is only 55 MB; a snapshot on the live Host is unsafe |
 | M02 | Bound whatever M01 names (leading hypothesis: the Session list materialising per-Session state for thousands of Sessions — the same class of cost the plugin sweep fixed for titles and question targets) | `session/list` folds every stored log (p50 8.2 s, recorded as Host gap `b:17rs`); 2,820 Sessions |
 | M03 | Traces store: lower the retained span/metric window, checkpoint the 50 MB WAL on idle, VACUUM after a trim | 218 MB db + 50 MB WAL, 99,999 spans retained                                    |
-| M04 | Session-search index 3.8 GB: the FTS `_content` tables are **not** a duplicate of the `_data` index — 2,336 MB content + 1,312 MB index for 1,236,466 documents is normal FTS sizing. Two real levers: (a) contentless FTS (`content=''`) and read snippets back from the Session log by `(session, seq)`, worth ~2.3 GB, at the cost of a log read per snippet; (b) drop the `conversation_documents` table (344,544 rows, 810 MB) that indexes the same messages a second time, at the cost of the filtered-search fast path its comment describes | `dbstat`: session_documents_content 1,836 MB, session_documents_data 1,002 MB, conversation_documents_content 500 MB, conversation_documents_data 310 MB; 2,817 indexed Sessions vs 2,813 logs, so there is no stale-Session win |
+| M04 | **Done (archived tier)**: archived Sessions are cold — their documents are dropped and only a targeted search indexes them back. Age is not the cutoff (2,294 of 2,406 logs are within 30 days), but 2,079 of 2,820 Sessions are archived, so the index only needs the hot ~740 | 2,336 MB content + 1,312 MB index for 1,236,466 documents before; the cold prune runs on the next pass |
+| M04b | Session-search index 3.8 GB (remaining, optional): the FTS `_content` tables are **not** a duplicate of the `_data` index — 2,336 MB content + 1,312 MB index for 1,236,466 documents is normal FTS sizing. Two real levers: (a) contentless FTS (`content=''`) and read snippets back from the Session log by `(session, seq)`, worth ~2.3 GB, at the cost of a log read per snippet; (b) drop the `conversation_documents` table (344,544 rows, 810 MB) that indexes the same messages a second time, at the cost of the filtered-search fast path its comment describes | `dbstat`: session_documents_content 1,836 MB, session_documents_data 1,002 MB, conversation_documents_content 500 MB, conversation_documents_data 310 MB; 2,817 indexed Sessions vs 2,813 logs, so there is no stale-Session win |
 | M05 | Usage store: 82 MB WAL next to a 274 MB db — find the long-lived reader blocking checkpoints, set an explicit checkpoint policy, trim the retention window | WAL is 20× the 4 MB autocheckpoint                                              |
 | M06 | `optmem` 334 MB is an **orphan**: `optmem.db` was last written 2026-10-16 and no `plugins/@dshfiles/optmem` package exists any more (only a `optmem-full` profile and a 1.2 MB `optmem.stage3-backfill`). Deleting it is the user's call, not an agent's. `storages/session_projcache` 317 MB is one JSON checkpoint per Session (2,819 files, ~115 KB each) owned by the native projection cache: a derived cache that a cap/eviction policy could bound, but the owner is core, so record it as a Host gap | `file`/`ls` on both stores |
 | M06b | M01 measured: the stores cost only ~226 MB resident (519 MB scratch heap with stores vs 293 MB without), so store work is disk-only | scratch boot A/B |

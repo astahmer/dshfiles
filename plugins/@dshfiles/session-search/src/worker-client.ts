@@ -57,6 +57,8 @@ export class SearchWorker extends Context.Service<
     /** Wake the ingest loop now, for example after a Session event was committed. */
     readonly nudge: WorkerCall<IndexHealth>
     readonly startIngest: (root: string) => WorkerCall<IndexHealth>
+    /** Replace the archived set: those Sessions are cold, so the ingest pass drops their documents. */
+    readonly setArchived: (archivedSessionIds: readonly string[]) => WorkerCall<IndexHealth>
   }
 >()('@dshfiles/session-search/SearchWorker') {
   /** The worker spawns on the first call and terminates when the layer's scope closes. */
@@ -86,6 +88,7 @@ export class SearchWorker extends Context.Service<
           health: call(client.Health()),
           nudge: call(client.Nudge()),
           startIngest: root => call(client.StartIngest({ root })),
+          setArchived: archivedSessionIds => call(client.SetArchived({ archivedSessionIds: [...archivedSessionIds] })),
         })
       }),
     ).pipe(

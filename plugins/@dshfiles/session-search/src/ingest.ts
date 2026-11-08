@@ -23,6 +23,8 @@ export interface IngestPassResult {
   readonly documents: number
   readonly behindSessions: number
   readonly behindBytes: number
+  /** Archived Sessions whose documents were dropped: archived history is cold and not kept in the index. */
+  readonly pruned: number
   /** False when the time budget ran out, so the caller schedules another pass immediately. */
   readonly complete: boolean
 }
@@ -33,6 +35,8 @@ export interface IngestPassOptions {
   readonly budgetMs: number
   readonly windowBytes: number
   readonly now: () => number
+  /** Sessions the user archived: cold history, dropped from the index and indexed again only when asked for by id. */
+  readonly archived?: ReadonlySet<string>
 }
 
 const parseEvents = (text: string, skipHeader: boolean): readonly SessionEvent[] => {
@@ -128,8 +132,17 @@ export const runIngestPass = async (options: IngestPassOptions): Promise<IngestP
   let documents = 0
   let behindSessions = 0
   let behindBytes = 0
+  let pruned = 0
   let complete = true
   for (const log of logs) {
+    if (options.archived?.has(log.sessionId) === true) {
+      // Cold by the user's own decision: keep no documents for it, and index it again only for a targeted search.
+      if (options.index.cursor(log.sessionId) !== undefined) {
+        options.index.forget(log.sessionId)
+        pruned += 1
+      }
+      continue
+    }
     const cursor = options.index.cursor(log.sessionId)
     const unchanged =
       cursor !== undefined &&
@@ -151,5 +164,22 @@ export const runIngestPass = async (options: IngestPassOptions): Promise<IngestP
     // Searches queue on this thread's message port; let them run between sessions.
     await setImmediate()
   }
-  return { scanned: logs.length, ingested, documents, behindSessions, behindBytes, complete }
+  return { scanned: logs.length, ingested, documents, behindSessions, behindBytes, pruned, complete }
+}
+
+/**
+ * Index exactly the Sessions a caller asked about, even archived ones. A targeted search is the slow path back into cold
+ * history, so it pays for the read instead of the whole corpus staying indexed.
+ */
+export const indexSessions = async (options: IngestPassOptions, sessionIds: readonly string[]): Promise<number> => {
+  const wanted = new Set(sessionIds.filter(sessionId => options.index.cursor(sessionId) === undefined))
+  if (wanted.size === 0) return 0
+  const logs = await FrameLog.list(options.root)
+  let documents = 0
+  for (const log of logs) {
+    if (!wanted.delete(log.sessionId)) continue
+    documents += await ingestSession({ ...options, log })
+    if (wanted.size === 0) break
+  }
+  return documents
 }

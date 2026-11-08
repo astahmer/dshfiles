@@ -69,6 +69,19 @@ const main = Effect.gen(function* () {
       onNone: () => dshHomePath('sessions'),
       onSome: persistence => persistence.config.root,
     })
+    // Archived Sessions are cold: the index keeps no documents for them and reads one back only for a targeted search.
+    let lastArchived = ''
+    const sendArchived = () =>
+      Effect.gen(function* () {
+        const registry = host.ctx.get('workspaceRegistry')
+        const archived = (registry?.archivedSessionIds ?? []).map(String)
+        const signature = archived.join('\u0000')
+        if (signature === lastArchived) return
+        lastArchived = signature
+        yield* worker.setArchived(archived)
+      }).pipe(Effect.catchCause(cause => Effect.logWarning('session-search: archived Sessions could not be sent', cause)))
+    yield* sendArchived()
+    yield* Effect.forever(Effect.andThen(Effect.sleep('10 seconds'), sendArchived())).pipe(Effect.forkChild)
     yield* worker.startIngest(root).pipe(Effect.catchCause(cause => Effect.logWarning('session-search: ingest could not start', cause)))
   }
   yield* HostEvents.stream('session/event').pipe(

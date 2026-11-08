@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { SearchIndex } from '../src/index-db.js'
-import { runIngestPass } from '../src/ingest.js'
+import { indexSessions, runIngestPass } from '../src/ingest.js'
 import { writeSessionLog } from './session-log-fixture.js'
 
 const roots: string[] = []
@@ -54,5 +54,32 @@ it('indexes an event the writer split across frames and catches the log up', asy
 
   expect(behind).toBe(0)
   expect(index.searchSessions({ query: 'zanzibar', limit: 5 }).matches.map(match => match.header.id)).toEqual([sessionId])
+  index.close()
+})
+
+it('drops an archived Session’s documents and indexes it again only for a targeted search', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'session-search-cold-'))
+  roots.push(root)
+  const sessionId = 'session-ffffffff-0000-4000-8000-000000000000'
+  await writeSessionLog({ directory: join(root, 'sessions', 'project', sessionId), exchanges: 2, sessionId })
+  const index = new SearchIndex(join(root, 'index.sqlite'))
+  const ingest = (archived?: ReadonlySet<string>) => {
+    const options = { index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1024 * 1024, now: Date.now }
+    return runIngestPass(archived === undefined ? options : { ...options, archived })
+  }
+
+  expect((await ingest()).ingested).toBe(1)
+  expect(index.searchSessions({ query: 'retry storm', limit: 5 }).matches).toHaveLength(1)
+
+  const cold = await ingest(new Set([sessionId]))
+  expect(cold.pruned).toBe(1)
+  expect(index.searchSessions({ query: 'retry storm', limit: 5 }).matches).toHaveLength(0)
+
+  // Cold stays out of a broad pass, and the targeted path is what reads it back.
+  expect((await ingest(new Set([sessionId]))).ingested).toBe(0)
+  await indexSessions({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1024 * 1024, now: Date.now, archived: new Set([sessionId]) }, [
+    sessionId,
+  ])
+  expect(index.searchSessions({ query: 'retry storm', limit: 5 }).matches.map(match => match.header.id)).toEqual([sessionId])
   index.close()
 })

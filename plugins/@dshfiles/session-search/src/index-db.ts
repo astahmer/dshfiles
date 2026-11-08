@@ -637,6 +637,22 @@ export class SearchIndex {
     }
   }
 
+  /**
+   * Reclaim the space a large prune left behind. Deleting the documents of archived Sessions empties most of the file,
+   * and SQLite reuses those pages only for new rows; a one-shot VACUUM gives the bytes back. The caller runs it off the
+   * Host thread and only when the free share says it is worth minutes of the worker's time.
+   */
+  vacuum(): void {
+    this.#database.exec('VACUUM')
+  }
+
+  /** Share of the index file that is free pages after deletes, 0 when the file holds nothing yet. */
+  freePageRatio(): number {
+    const count = (name: string): number => Schema.decodeUnknownSync(countRowSchema)(this.#database.prepare(`PRAGMA ${name}`).get()).count
+    const pages = count('page_count')
+    return pages === 0 ? 0 : count('freelist_count') / pages
+  }
+
   health(input: {
     readonly behindSessions: number
     readonly behindBytes: number
