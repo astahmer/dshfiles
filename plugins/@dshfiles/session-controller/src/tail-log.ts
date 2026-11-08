@@ -26,6 +26,12 @@ const TAIL_WINDOW_GROWTHS = 2
 /** Opened tails kept for the opening's next pages; each holds its log's bytes. */
 const KEPT_TAILS = 2
 const KEPT_TAIL_MS = 120_000
+/**
+ * Decoded events one tail keeps. `before()` used to prepend every page a reader asked for, so paging back through a
+ * large log grew this array to the whole log (a 24.9 MB log decodes to ~96 MB of events). Past this many events the
+ * oldest are dropped and the tail stops claiming to restore a checkpoint, which sends that read to the full path.
+ */
+const MAX_DECODED_EVENTS = 4_096
 
 const cacheRecordSchema = Schema.Struct({ rows: Schema.Record(Schema.String, Schema.Unknown) })
 const logPathSchema = Schema.String.check(Schema.isEndingWith('.zstd'))
@@ -86,6 +92,7 @@ export class TailLog {
   private readonly texts = new Map<number, string>()
   private firstFrame: number
   private decoded: readonly SessionEvent[] = []
+  private truncated = false
 
   private constructor(
     readonly header: SessionHeader,
@@ -312,7 +319,7 @@ export class TailLog {
 
   /** Whether the decoded events already start at the first event of the log. */
   get complete(): boolean {
-    return this.holdsFromLogStart && this.firstFrame <= 1
+    return this.holdsFromLogStart && this.firstFrame <= 1 && !this.truncated
   }
 
   /** Frames decoded so far; unchanged means the window holds nothing further back. */
@@ -354,8 +361,9 @@ export class TailLog {
       if (events[index]?.seq !== (events[index - 1]?.seq ?? -2) + 1) throw new Error(`session "${this.header.id}" log tail has a seq gap`)
     }
     this.firstFrame = first
-    this.decoded = events
-    return events
+    this.decoded = events.length > MAX_DECODED_EVENTS ? events.slice(events.length - MAX_DECODED_EVENTS) : events
+    if (this.decoded.length < events.length) this.truncated = true
+    return this.decoded
   }
 
   /**
@@ -363,6 +371,7 @@ export class TailLog {
    * when no checkpoint of this lifecycle exists or the tail does not reach back to its watermark.
    */
   restore(ctx: Context): ProjectionSnapshot | undefined {
+    if (this.truncated) return undefined
     const cache = ctx.get('sessionProjectionCache')
     const registry = ctx.get('sessionProjections')
     if (cache === undefined || registry === undefined) return undefined
