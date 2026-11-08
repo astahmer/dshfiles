@@ -14,7 +14,7 @@
  * rows the user can still fill in by hand.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-api-remotes/client'
 import { Button, IconPlusOutlineRegular, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -135,6 +135,103 @@ function capacitySpelling(value: number | undefined): string {
   return value === undefined ? '' : formatCapacity(value)
 }
 
+/** Buffer key for one capacity field; the row half moves when rows do. */
+function bufferKey(index: number, field: CapacityField): string {
+  return `${String(index)}:${field}`
+}
+
+/** Drop one row's buffer entries and shift the rows after it down, in one pass. */
+function reindexOnRemove(current: ReadonlyMap<string, string>, index: number): Map<string, string> {
+  const next = new Map<string, string>()
+  for (const [key, value] of current) {
+    const at = Number(key.slice(0, key.indexOf(':')))
+    if (at === index) continue
+    // Only the row number moves; the field half of the key is untouched.
+    next.set(at > index ? key.replace(/^\d+/, String(at - 1)) : key, value)
+  }
+  return next
+}
+
+/** Replace one row's fields, dropping the optional ones an edit emptied. */
+function patchedRow(
+  models: readonly ModelDraft[],
+  index: number,
+  next: Record<string, string | number | undefined>,
+): ModelDraft[] {
+  return models.map((model, at) => {
+    if (at !== index) return model
+    // Rebuilt rather than spread over: an emptied optional field has to leave
+    // the profile, not be stored as a value its schema would reject.
+    // Spread first so a field this card does not edit survives.
+    const cleared = new Set(
+      Object.entries(next).filter(([, value]) => value === undefined || value === '').map(([key]) => key),
+    )
+    return Object.fromEntries(
+      Object.entries({ ...model, ...next }).filter(([key]) => !cleared.has(key)),
+    )
+  })
+}
+
+/** Row mutations, held at one identity so a memoized row outlives its parent's re-renders. */
+interface ModelRowActions {
+  patch: (index: number, next: Record<string, string | number | undefined>) => void
+  editCapacity: (index: number, field: CapacityField, text: string) => void
+  replace: (index: number, model: ModelDraft) => void
+  toggleExpanded: (index: number) => void
+  remove: (index: number) => void
+}
+
+/** What one memoized row reads: stable identities and primitives only. */
+interface ModelRowSlotProps {
+  index: number
+  model: ModelDraft
+  expanded: boolean
+  disabled: boolean
+  t: (key: keyof typeof en) => string
+  inputFallback: readonly string[] | undefined
+  inputLoading: boolean
+  reasoningLevels: readonly string[] | undefined
+  contextWindowText: string
+  maxTokensText: string
+  actions: ModelRowActions
+}
+
+/**
+ * One row that skips re-rendering while its own model, capacity text, and
+ * disclosure state are unchanged: a large model list re-renders one row per
+ * keystroke instead of all of them.
+ */
+const ModelRowSlot = memo((props: ModelRowSlotProps) => {
+  const { index, model, actions } = props
+  return (
+    <ModelRow
+      model={model}
+      position={index + 1}
+      inputField="input"
+      inputFallback={props.inputFallback}
+      inputLoading={props.inputLoading}
+      reasoningLevels={props.reasoningLevels}
+      expanded={props.expanded}
+      disabled={props.disabled}
+      t={props.t}
+      contextWindow={{
+        value: props.contextWindowText,
+        placeholder: CAPACITY_HINT.contextWindow,
+        onChange: (text) => { actions.editCapacity(index, 'contextWindow', text) },
+      }}
+      maxTokens={{
+        value: props.maxTokensText,
+        placeholder: CAPACITY_HINT.maxTokens,
+        onChange: (text) => { actions.editCapacity(index, 'maxTokens', text) },
+      }}
+      onFieldChange={(field, value) => { actions.patch(index, { [field]: value }) }}
+      onChange={(next) => { actions.replace(index, next) }}
+      onToggle={() => { actions.toggleExpanded(index) }}
+      onRemove={() => { actions.remove(index) }}
+    />
+  )
+})
+
 /** Adopt a candidate, preserving disclosed capacities and input types. */
 function adopt(candidate: LlmDiscoveredModel): ModelDraft {
   return {
@@ -185,57 +282,57 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   // the abandoned one would render its stored NaN as the literal `NaN`.
   const [editing, setEditing] = useState<ReadonlyMap<string, string>>(new Map())
 
-  /** Buffer key for one capacity field; the row half moves when rows do. */
-  const bufferKey = (index: number, field: CapacityField): string => `${String(index)}:${field}`
-
-  const editCapacity = (index: number, field: CapacityField, text: string): void => {
-    setEditing(current => new Map(current).set(bufferKey(index, field), text))
-    patch(index, { [field]: parseCapacity(text) })
-  }
-
   /** What a capacity field shows: the buffer while typing, else the stored count. */
   const capacityText = (model: ModelDraft, index: number, field: CapacityField): string =>
     editing.get(bufferKey(index, field)) ?? capacitySpelling(numberOf(model, field))
 
-  /** Drop one row's entries and shift the rows after it down, in one pass. */
-  const reindexOnRemove = (
-    current: ReadonlyMap<string, string>,
-    index: number,
-  ): Map<string, string> => {
-    const next = new Map<string, string>()
-    for (const [key, value] of current) {
-      const at = Number(key.slice(0, key.indexOf(':')))
-      if (at === index) continue
-      // Only the row number moves; the field half of the key is untouched.
-      next.set(at > index ? key.replace(/^\d+/, String(at - 1)) : key, value)
-    }
-    return next
-  }
+  /**
+   * A translated canary. The section injects one bound translate whose identity
+   * survives a locale switch, so a memoized row keyed by position alone would
+   * keep the previous language; keying by this string remounts the rows in the
+   * new one.
+   */
+  const copyRevision = t('modelId')
 
-  const toggleExpanded = (index: number): void => {
-    setExpanded((current) => {
-      const next = new Set(current)
-      if (!next.delete(index)) next.add(index)
-      return next
-    })
-  }
+  /** Latest rows and sink, so the row actions below keep one identity while reading current data. */
+  const latest = useRef({ models, onChange })
+  latest.current = { models, onChange }
 
-  const patch = (index: number, next: Record<string, string | number | undefined>): void => {
-    onChange(models.map((model, at) => {
-      if (at !== index) return model
-      // Rebuilt rather than spread over: an emptied optional field has to leave
-      // the profile, not be stored as a value its schema would reject.
-      // Spread first so a field this card does not edit survives; an emptied
-      // optional field is then dropped rather than stored as a value its
-      // schema would reject.
-      const cleared = new Set(
-        Object.entries(next).filter(([, value]) => value === undefined || value === '').map(([key]) => key),
-      )
-      return Object.fromEntries(
-        Object.entries({ ...model, ...next }).filter(([key]) => !cleared.has(key)),
-      )
-    }))
-  }
+  const actions = useMemo<ModelRowActions>(() => ({
+    patch: (index, next) => {
+      const current = latest.current
+      current.onChange(patchedRow(current.models, index, next))
+    },
+    replace: (index, model) => {
+      const current = latest.current
+      current.onChange(current.models.map((row, at) => at === index ? model : row))
+    },
+    editCapacity: (index, field, text) => {
+      setEditing(current => new Map(current).set(bufferKey(index, field), text))
+      const current = latest.current
+      current.onChange(patchedRow(current.models, index, { [field]: parseCapacity(text) }))
+    },
+    toggleExpanded: (index) => {
+      setExpanded((current) => {
+        const next = new Set(current)
+        if (!next.delete(index)) next.add(index)
+        return next
+      })
+    },
+    remove: (index) => {
+      const current = latest.current
+      current.onChange(current.models.filter((_model, at) => at !== index))
+      setExpanded((current) => {
+        const next = new Set<number>()
+        for (const at of current) {
+          if (at < index) next.add(at)
+          else if (at > index) next.add(at - 1)
+        }
+        return next
+      })
+      setEditing(current => reindexOnRemove(current, index))
+    },
+  }), [])
 
   const fetchModels = async (): Promise<void> => {
     setBusy(true)
@@ -361,42 +458,19 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
       {models.length === 0 ? <p className={styles['modelEmpty']}>{t('modelsEmpty')}</p> : null}
       <div className={styles['modelList']}>
         {models.map((model, index) => (
-          <ModelRow
-            key={index}
+          <ModelRowSlot
+            key={`${copyRevision}:${String(index)}`}
+            index={index}
             model={model}
-            position={index + 1}
-            inputField="input"
-            inputFallback={inputDefaults.get(textOf(model, 'id')) ?? props.defaultInput}
-            inputLoading={catalogProvider !== undefined && catalog === undefined}
-            reasoningLevels={props.reasoningLevels}
             expanded={expanded.has(index)}
             disabled={disabled}
             t={t}
-            contextWindow={{
-              value: capacityText(model, index, 'contextWindow'),
-              placeholder: CAPACITY_HINT.contextWindow,
-              onChange: (text) => { editCapacity(index, 'contextWindow', text) },
-            }}
-            maxTokens={{
-              value: capacityText(model, index, 'maxTokens'),
-              placeholder: CAPACITY_HINT.maxTokens,
-              onChange: (text) => { editCapacity(index, 'maxTokens', text) },
-            }}
-            onFieldChange={(field, value) => { patch(index, { [field]: value }) }}
-            onChange={(next) => { onChange(models.map((row, at) => at === index ? next : row)) }}
-            onToggle={() => { toggleExpanded(index) }}
-            onRemove={() => {
-              onChange(models.filter((_model, at) => at !== index))
-              setExpanded((current) => {
-                const next = new Set<number>()
-                for (const at of current) {
-                  if (at < index) next.add(at)
-                  else if (at > index) next.add(at - 1)
-                }
-                return next
-              })
-              setEditing(current => reindexOnRemove(current, index))
-            }}
+            inputFallback={inputDefaults.get(textOf(model, 'id')) ?? props.defaultInput}
+            inputLoading={catalogProvider !== undefined && catalog === undefined}
+            reasoningLevels={props.reasoningLevels}
+            contextWindowText={capacityText(model, index, 'contextWindow')}
+            maxTokensText={capacityText(model, index, 'maxTokens')}
+            actions={actions}
           />
         ))}
       </div>
