@@ -17,12 +17,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { MessageCircleQuestionIcon } from '@dshfiles/plugin-ui/icons'
 import { useSelector } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { useSyncExternalStore, type ReactNode } from 'react'
+import { useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { Option, Schema } from 'effect'
 import { BTW_LOCALE_NAMESPACE, btwLocale, type BtwKey } from './locales.js'
 import { createBtwSource } from './btw-source.js'
 import { mainViewThreadId } from './main-view-thread.js'
-import { PrefixCache } from './prefix-cache.js'
+import { PrefixCacheReader } from './prefix-cache.js'
 import { SideChatModel, startSideChat, type ModelRoute, type SideChatActor } from './side-chat-machine.js'
 import { SideQuestionDialog } from './side-question-dialog.js'
 
@@ -92,11 +92,11 @@ type Translate = (key: BtwKey, params?: Record<string, string | number>) => stri
 
 const CacheReading = (props: { readonly reference: SessionReference; readonly t: Translate }): ReactNode => {
   const source = props.reference.binding.eventSource
-  const events = useSyncExternalStore(
-    listener => source.subscribe(listener),
-    () => source.getSnapshot(),
-  )
-  const reading = PrefixCache.firstRequestAfterFork(events.entries.map(entry => entry.event))
+  const read = useMemo(() => {
+    const reader = new PrefixCacheReader()
+    return () => reader.read(source.getSnapshot())
+  }, [source])
+  const reading = useSyncExternalStore(listener => source.subscribe(listener), read)
   if (reading === undefined) return <span>{props.t('cacheWaiting')}</span>
   return (
     <TooltipProvider delayDuration={500}>
