@@ -1324,7 +1324,23 @@ export class UsageRepo extends Context.Service<
           const category = query.category ?? null
           const toolRows = yield* read(
             decode.toolActivity,
-            `WITH durations AS (
+            `WITH grouped AS (
+            SELECT t.category, t.owner, t.name, COUNT(*) AS calls,
+              SUM(CASE WHEN t.outcome = 'success' THEN 1 ELSE 0 END) AS successes,
+              SUM(CASE WHEN t.outcome = 'error' THEN 1 ELSE 0 END) AS errors,
+              SUM(CASE WHEN t.outcome = 'interrupted' THEN 1 ELSE 0 END) AS interrupted,
+              SUM(CASE WHEN t.outcome = 'unknown' THEN 1 ELSE 0 END) AS unknown,
+              SUM(CASE WHEN t.outcome = 'pending' THEN 1 ELSE 0 END) AS pending,
+              MIN(t.started_at) AS firstStartedAt, MAX(t.started_at) AS lastStartedAt,
+              MIN(t.ended_at) AS firstEndedAt, MAX(t.ended_at) AS lastEndedAt,
+              AVG(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS averageDurationMs,
+              COALESCE(SUM(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END), 0) AS totalDurationMs,
+              MAX(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS maxDurationMs,
+              COALESCE(SUM(t.result_chars), 0) AS resultChars,
+              SUM(CASE WHEN t.result_chars IS NOT NULL THEN 1 ELSE 0 END) AS measuredCalls
+            FROM tools t WHERE t.started_at >= ? AND t.started_at < ? AND (? IS NULL OR t.category = ?)
+            GROUP BY t.category, t.owner, t.name
+          ), durations AS (
             SELECT category, owner, name, ended_at - started_at AS duration_ms,
               ROW_NUMBER() OVER (PARTITION BY category, owner, name ORDER BY ended_at - started_at) AS rank,
               COUNT(*) OVER (PARTITION BY category, owner, name) AS count
@@ -1335,24 +1351,12 @@ export class UsageRepo extends Context.Service<
               MAX(CASE WHEN rank = CAST(count * 0.9 AS INTEGER) + 1 THEN duration_ms END) AS p90DurationMs
             FROM durations GROUP BY category, owner, name
           )
-          SELECT t.name, t.category, t.owner, COUNT(*) AS calls,
-            SUM(CASE WHEN t.outcome = 'success' THEN 1 ELSE 0 END) AS successes,
-            SUM(CASE WHEN t.outcome = 'error' THEN 1 ELSE 0 END) AS errors,
-            SUM(CASE WHEN t.outcome = 'interrupted' THEN 1 ELSE 0 END) AS interrupted,
-            SUM(CASE WHEN t.outcome = 'unknown' THEN 1 ELSE 0 END) AS unknown,
-            SUM(CASE WHEN t.outcome = 'pending' THEN 1 ELSE 0 END) AS pending,
-            MIN(t.started_at) AS firstStartedAt, MAX(t.started_at) AS lastStartedAt,
-            MIN(t.ended_at) AS firstEndedAt, MAX(t.ended_at) AS lastEndedAt,
-            AVG(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS averageDurationMs,
-            COALESCE(SUM(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END), 0) AS totalDurationMs,
-            ds.p50DurationMs, ds.p90DurationMs,
-            MAX(CASE WHEN t.ended_at IS NOT NULL THEN t.ended_at - t.started_at END) AS maxDurationMs,
-            COALESCE(SUM(t.result_chars), 0) AS resultChars,
-            CAST((COALESCE(SUM(t.result_chars), 0) + 3) / 4 AS INTEGER) AS outputTokens,
-            SUM(CASE WHEN t.result_chars IS NOT NULL THEN 1 ELSE 0 END) AS measuredCalls
-          FROM tools t LEFT JOIN duration_stats ds ON ds.category = t.category AND ds.owner IS t.owner AND ds.name = t.name
-          WHERE t.started_at >= ? AND t.started_at < ? AND (? IS NULL OR t.category = ?)
-          GROUP BY t.category, t.owner, t.name ORDER BY calls DESC, t.category, t.owner, t.name LIMIT ?`,
+          SELECT g.name, g.category, g.owner, g.calls, g.successes, g.errors, g.interrupted, g.unknown, g.pending,
+            g.firstStartedAt, g.lastStartedAt, g.firstEndedAt, g.lastEndedAt, g.averageDurationMs, g.totalDurationMs,
+            ds.p50DurationMs, ds.p90DurationMs, g.maxDurationMs, g.resultChars,
+            CAST((g.resultChars + 3) / 4 AS INTEGER) AS outputTokens, g.measuredCalls
+          FROM grouped g LEFT JOIN duration_stats ds ON ds.category = g.category AND ds.owner IS g.owner AND ds.name = g.name
+          ORDER BY g.calls DESC, g.category, g.owner, g.name LIMIT ?`,
             [query.from, query.to, category, category, query.from, query.to, category, category, query.limit ?? 100],
           )
           const identifierRows = (column: 'normalized_command' | 'test_runner') =>
