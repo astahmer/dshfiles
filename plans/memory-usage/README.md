@@ -1,7 +1,6 @@
 # Memory usage: Host resident heap and the on-disk stores
 
-Resume here: **M01** (attribute the 3.15 GB live Host heap on a scratch Host, where a crash costs nothing). Everything
-else waits on it.
+Resume here: **M04** (session-search FTS) for disk, and **M01b** (a sampling heap profile started at boot, after the user's restart) for RAM. M01 already ruled the corpus and the stores out: a scratch Host with the identical corpus, stores and profile held 519 MB after GC against the live 3,156 MB, so ~2.6 GB comes from live runtime activity that a scratch cannot reproduce.
 
 ## Context
 
@@ -65,6 +64,21 @@ revision, and is reversible.
 3. Change the owner; bound by construction (caps, external-content FTS, checkpoint policy), not by dropping data.
 4. Prove with the same probe on the same corpus; keep the table in [`docs/performance.md`](../../docs/performance.md).
 
+## M01 result (2026-11-08)
+
+| Host                                   | heapUsed after full GC | external | note                                                    |
+| -------------------------------------- | ---------------------- | -------- | ------------------------------------------------------- |
+| live, 80 min uptime                    | 3,156 MB / 4,144 limit | 96 MB    | flat over 40 min: retention, not churn                  |
+| scratch, identical corpus + all stores | 519 MB                 | 53 MB    | same 2,820 Sessions, 6.2 GB plugin stores, same profile |
+| scratch, corpus only (no plugin stores) | 293 MB                | 54 MB    | so the stores cost ~226 MB resident                     |
+| scratch, after one GUI page load       | 312 MB                 | 86 MB    | the client/sidebar path is cheap                        |
+| live, after six thread switches        | 3,168 MB (+13 MB)      | 89 MB    | the switch path is not the owner                        |
+
+A live heap snapshot is not safe: `v8.setFlagsFromString('--max-old-space-size=8192')` does not raise the limit at
+runtime (measured), and serialising 3.1 GB inside a 4.14 GB limit can kill every open Session. The safe route is a
+sampling heap profile started at boot (heap ~500 MB) and stopped after the workload that grows it — that names the
+retaining allocation sites without a snapshot.
+
 ## Work packages
 
 | ID  | Work                                                                                                   | Evidence so far                                                                 |
@@ -72,9 +86,10 @@ revision, and is reversible.
 | M01 | Attribute the 3.15 GB live heap on a scratch Host with an isolated corpus copy (boot heap, then after the first Session listing and sidebar load; snapshot there if it still fits) | Heap is flat when idle; external is only 55 MB; a snapshot on the live Host is unsafe |
 | M02 | Bound whatever M01 names (leading hypothesis: the Session list materialising per-Session state for thousands of Sessions — the same class of cost the plugin sweep fixed for titles and question targets) | `session/list` folds every stored log (p50 8.2 s, recorded as Host gap `b:17rs`); 2,820 Sessions |
 | M03 | Traces store: lower the retained span/metric window, checkpoint the 50 MB WAL on idle, VACUUM after a trim | 218 MB db + 50 MB WAL, 99,999 spans retained                                    |
-| M04 | Session-search index: 3.8 GB for a 2.9 GB corpus — external-content FTS instead of duplicated `_content`, drop documents of deleted/archived Sessions, cap per-Session documents | 1,236,334 + 344,493 documents; index is 1.3× the corpus it indexes              |
+| M04 | Session-search index 3.8 GB: the FTS `_content` tables are **not** a duplicate of the `_data` index — 2,336 MB content + 1,312 MB index for 1,236,466 documents is normal FTS sizing. Two real levers: (a) contentless FTS (`content=''`) and read snippets back from the Session log by `(session, seq)`, worth ~2.3 GB, at the cost of a log read per snippet; (b) drop the `conversation_documents` table (344,544 rows, 810 MB) that indexes the same messages a second time, at the cost of the filtered-search fast path its comment describes | `dbstat`: session_documents_content 1,836 MB, session_documents_data 1,002 MB, conversation_documents_content 500 MB, conversation_documents_data 310 MB; 2,817 indexed Sessions vs 2,813 logs, so there is no stale-Session win |
 | M05 | Usage store: 82 MB WAL next to a 274 MB db — find the long-lived reader blocking checkpoints, set an explicit checkpoint policy, trim the retention window | WAL is 20× the 4 MB autocheckpoint                                              |
-| M06 | `optmem` 334 MB and `storages/session_projcache` 317 MB: what they hold, whether it is derivable and prunable | unexamined                                                                      |
+| M06 | `optmem` 334 MB is an **orphan**: `optmem.db` was last written 2026-10-16 and no `plugins/@dshfiles/optmem` package exists any more (only a `optmem-full` profile and a 1.2 MB `optmem.stage3-backfill`). Deleting it is the user's call, not an agent's. `storages/session_projcache` 317 MB is one JSON checkpoint per Session (2,819 files, ~115 KB each) owned by the native projection cache: a derived cache that a cap/eviction policy could bound, but the owner is core, so record it as a Host gap | `file`/`ls` on both stores |
+| M06b | M01 measured: the stores cost only ~226 MB resident (519 MB scratch heap with stores vs 293 MB without), so store work is disk-only | scratch boot A/B |
 | M07 | `fff-search` 584 MB index: prune roots that no longer exist, bound the per-root file list               | unexamined                                                                      |
 | M08 | `memory` 96 MB + `backlog` 38 MB: retention and VACUUM after pruning                                   | unexamined                                                                      |
 | M09 | Report the detached process leftovers to the user (never kill another thread's processes)               | 129 MB across three processes                                                   |
