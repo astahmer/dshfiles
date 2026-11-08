@@ -33,7 +33,7 @@
   "dependencies": {
     "@dshfiles/shared-runtime": "workspace:*",
     "effect": "catalog:",
-    "picomatch": "4.0.3"
+    "picomatch": "4.0.7"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

@@ -35,7 +35,14 @@
   "workspaces": {
     ".": {
       // Measurement scripts under .agents, docs and plans run by hand with the arguments in their headers.
-      "entry": ["scripts/*.{ts,mjs}!", "scripts/dsh-lkg/*.mjs!", ".agents/skills/*/scripts/*.mjs", "docs/ade-performance/*.mjs", "docs/ade-ux/**/*.mjs", "plans/**/*.mjs"],
+      "entry": [
+        "scripts/*.{ts,mjs}!",
+        "scripts/dsh-lkg/*.mjs!",
+        ".agents/skills/*/scripts/*.mjs",
+        "docs/ade-performance/*.mjs",
+        "docs/ade-ux/**/*.mjs",
+        "plans/**/*.mjs",
+      ],
       // oxlint runs through `pnpm exec` inside scripts/lint-ratchet.ts. Cordis and the typert generator are
       // unreferenced, but removing them re-resolves dsh peer variants in the undeduped lockfile (docs/guardrails.md).
       // The measurement scripts resolve Playwright from the tooling/dshx workspace they are run with.
@@ -53,9 +60,7 @@
     "plugins/@dshfiles/frame-layout": {
       // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
-      // @deepseek-ai/dsh-client-store's node build imports zustand and immer without declaring them; the
-      // persisted-widths unit test drives that store, so the engine's own deps stay in devDependencies.
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "zustand", "immer"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/whiteboard": {
       // The Excalidraw editor is its own Vite build (vite.editor.config.ts → src/editor/entry.tsx) the Host serves

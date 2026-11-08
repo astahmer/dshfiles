@@ -101,7 +101,6 @@
     "lucide-react": "1.48.0",
     "motion": "catalog:",
     "radix-ui": "1.7.0",
-    "react-resizable-panels": "4.14.2",
     "shiki": "4.5.0",
     "tailwind-merge": "catalog:",
     "tailwindcss": "4.3.3",

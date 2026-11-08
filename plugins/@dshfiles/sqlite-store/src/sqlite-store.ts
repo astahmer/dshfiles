@@ -2,7 +2,7 @@ import { SqliteClient, SqliteMigrator } from '@effect/sql-sqlite-node'
 import { Context, Duration, Effect, Exit, FileSystem, Layer, Path, Schema, Scope, Semaphore } from 'effect'
 import { Reactivity } from 'effect/reactivity'
 import { Migrator, SqlClient, SqlSchema } from 'effect/sql'
-import { SqliteMigrationFailed, SqliteStoreOpenFailed, type SqliteStoreError, SqliteStoreVersionUnsupported } from './errors.ts'
+import { DeferredStoreMemberMissing, SqliteMigrationFailed, SqliteStoreOpenFailed, type SqliteStoreError, SqliteStoreVersionUnsupported } from './errors.ts'
 import { untracedSqlClient } from './untraced-sql-client.ts'
 
 /** Migration effects keyed `<id>_<name>`, e.g. `0001_init`; ids are positive integers and `1..legacyUserVersion` map to the old `user_version` steps. */
@@ -202,9 +202,12 @@ const deferred = <Self, Shape extends object, E, R>(service: Context.Service<Sel
           (...args: ReadonlyArray<unknown>) =>
             Effect.flatMap(built, context => {
               const instance = Context.get(context, service)
-              const member: unknown = Reflect.get(instance as object, key)
+              // SAFETY: the proxy only forwards calls; a member that is not a function cannot start the build, so it
+              // reports a named failure instead of resolving to a wrapper.
+              const member = (instance as Record<PropertyKey, unknown>)[key]
               if (typeof member !== 'function')
-                return Effect.die(new Error(`sqlite-store: ${service.key}.${String(key)} is not a method, so a deferred store cannot forward it`))
+                return Effect.die(new DeferredStoreMemberMissing({ service: service.key, member: String(key) }))
+              // SAFETY: typeof proved the member is a callable method of this service.
               return (member as (...values: Array<unknown>) => Effect.Effect<unknown, E>).apply(instance, [...args])
             }),
       }) as Shape

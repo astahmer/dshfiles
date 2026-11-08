@@ -2922,7 +2922,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › auxiliary-and-wait-spans"
       ],
       "details": [
-        "Used by 100 catalog feature(s)",
+        "Used by 103 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

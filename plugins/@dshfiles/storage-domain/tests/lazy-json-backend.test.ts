@@ -6,7 +6,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import Storage from '@deepseek-ai/dsh-storage'
 import { JsonStorageBackend } from '../../storage-json/src/native/index.ts'
-import { DomainFacility, defineDomain, domainTable } from '../src/native/index.ts'
+import { defineDomain, domainTable } from '../src/native/spec.ts'
+import { DomainFacility } from '../src/native/index.ts'
 
 const roots: string[] = []
 

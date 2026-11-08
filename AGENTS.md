@@ -58,6 +58,14 @@ instance. So, before proposing any fix:
 3. Prove it with the same probe before and after, and keep the table in
    [docs/performance.md](docs/performance.md).
 
+## RAM work: read the doc first
+
+Before changing what a Host or the browser tab holds, read [RAM usage](docs/ram-usage.md): how to measure without
+fooling yourself (settle 110 s, never census a live Host — one object census pinned 2.3 GB and OOMed it, close the
+inspector), the measured composition of a 610 MB Host, and the bounding patterns that keep it there (byte budgets on
+per-client streams, retention on derived stores, FTS `optimize`, WAL limits, demand-gated indexers, lazy stores).
+The sweep itself is in [performance.md](docs/performance.md#ram-sweep-2026-11-08).
+
 ## Adopt, port, or build
 
 - **Adopt** a plugin from [dshmarket.com](https://dshmarket.com) whenever one
@@ -450,15 +458,15 @@ the file first.
 Never `sleep` and never loop a discovery tool to pass time; both hold the turn
 with nothing running.
 
-| Waiting for                                               | Do this                                                                                                                                                                     |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A background command                                      | `background_jobs_wait` (Host-side, no polling); a bounded `job_output` wait only when the job is nearly done                                                               |
-| Your parent, or a child you started                       | native `send_message`; a child's final result resumes you                                                                                                                  |
-| A thread you started with `thread_create` / `thread_fork` | `thread_prompt` (queue, or steer a live turn) is the channel; it is a root thread, not your child, so `send_message` refuses it with `subagent "…" belongs to another parent session`. Mid-turn it is not a wait: end your turn and do something else |
-| Its completion, after your turn ends | `thread_subscribe { sessionId }` first: the subscription queues one compact notice (status plus answer preview) into your thread and wakes you when it is idle. Without it nothing wakes you — a created thread is silent, and `thread_unsubscribe` stops it |
-| Any other top-level thread                                | `thread_prompt` to start or queue its turn, or `dshx_comm_send` for a passive note it reads at its next prompt                                                             |
-| The user                                                  | async `ask_user_question`, or a `schedule_*` reminder; a pending question or the next message resumes you                                                                   |
-| Thread questions                                          | `list_thread_questions` once, with `sessionId` when known; never in a poll loop                                                                                             |
+| Waiting for                                               | Do this                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A background command                                      | `background_jobs_wait` (Host-side, no polling); a bounded `job_output` wait only when the job is nearly done                                                                                                                                                 |
+| Your parent, or a child you started                       | native `send_message`; a child's final result resumes you                                                                                                                                                                                                    |
+| A thread you started with `thread_create` / `thread_fork` | `thread_prompt` (queue, or steer a live turn) is the channel; it is a root thread, not your child, so `send_message` refuses it with `subagent "…" belongs to another parent session`. Mid-turn it is not a wait: end your turn and do something else        |
+| Its completion, after your turn ends                      | `thread_subscribe { sessionId }` first: the subscription queues one compact notice (status plus answer preview) into your thread and wakes you when it is idle. Without it nothing wakes you — a created thread is silent, and `thread_unsubscribe` stops it |
+| Any other top-level thread                                | `thread_prompt` to start or queue its turn, or `dshx_comm_send` for a passive note it reads at its next prompt                                                                                                                                               |
+| The user                                                  | async `ask_user_question`, or a `schedule_*` reminder; a pending question or the next message resumes you                                                                                                                                                    |
+| Thread questions                                          | `list_thread_questions` once, with `sessionId` when known; never in a poll loop                                                                                                                                                                              |
 
 **Cap every blocking wait.** Steering is boundary input: a user's steer is only
 read at the start of the next step, so it cannot interrupt a tool call already

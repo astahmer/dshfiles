@@ -234,7 +234,9 @@ export class ApiSessionList {
     const settle = (): void => {
       if (this.persistedRead === read) this.persistedRead = undefined
     }
-    void read.then(settle, settle)
+    // The read is a Promise the caller already awaits; settling only drops the shared handle, so its rejection is the
+    // caller's to observe and this chain stays silent.
+    read.then(settle, settle).catch(() => undefined)
     return read
   }
 

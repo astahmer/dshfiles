@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { openLogHead, recentLogEvents, TailLog } from './index.ts'
+import { openLogHead, recentLogEvents, TailLog } from './window.ts'
 
 const contexts: Context[] = []
 const directories: string[] = []

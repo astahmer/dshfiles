@@ -28,6 +28,10 @@ const zodImport = /^\s*(?:import|export)\b[^'"]*from\s*['"]zod(?:\/[^'"]*)?['"]/
 /** Every remaining zod import, with the reason it stays. */
 const bridges = new Map([
   ['tooling/dshx/packages/dshx/src/api/zod-view.ts', 'Effect → zod bridge: dsh-storage-domain and createStoredValue take a ZodType'],
+  ['plugins/@dshfiles/storage-domain/src/native/spec.ts', 'vendored native contract: the storage domain takes a ZodType from the core'],
+  ['plugins/@dshfiles/storage-domain/src/native/domain.ts', 'vendored native contract: the storage domain takes a ZodType from the core'],
+  ['plugins/@dshfiles/storage-domain/tests/lazy-hydration.test.ts', 'test boundary: exercises the vendored contract with a ZodType'],
+  ['plugins/@dshfiles/storage-domain/tests/lazy-json-backend.test.ts', 'test boundary: exercises the vendored contract with a ZodType'],
   ['tooling/dshx/packages/dshx/tests/api-zod-schema.spec.ts', 'the bridge spec'],
   ['plugins/@dshfiles/session-controller/typert/host.js', 'derived by scripts/derive-typert.mjs from the native package, not hand-written'],
 ])

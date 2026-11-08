@@ -63,3 +63,20 @@ the upstream diff into plain copies and delta files to merge by hand.
 To bump a fork: copy the upstream files listed under `copy`, merge the ones under `reapplyDelta`, set
 `upstream.version` and `upstream.ref` in `native-fork.json` and the README, run the first form until it is clean, then
 build, type-check, test and run the plugin's boot check and journeys.
+
+## A new fork joins the lint gate too
+
+A vendored fork mirrors the core package's untyped internals, so it trips the antislop rules that police our own
+boundaries. A new fork is not done when it builds: record it in the gate or `pnpm run lint` fails for everyone.
+
+- `scripts/lint-ratchet.ts`: add the vendored `src/native/**` directories (and their tests) to `astGrepVendored`,
+  and the package's public entry modules to `astGrepBoundaries`.
+- `.oxlintrc.json`: add an `overrides` entry for the vendored directories that turns off the antislop rules they
+  cannot satisfy (`no-unknown-parameters`, `no-unknown-returns`, `no-unsafe-dictionary-type`,
+  `require-safety-comment-for-type-assertion`, …). Keep the override narrow: the package's own non-vendored code
+  still follows the rules.
+- `scripts/check-zod-imports.mjs`: list every file that keeps `zod` because the core contract hands it a `ZodType`,
+  with the reason.
+- `tooling/antislop/effect/baseline.json`: record a pre-existing `effect-migration` finding by file and count
+  instead of suppressing it inline.
+- Never raise a cap in `scripts/lint-ratchet.json` to absorb a new fork; caps only move down.

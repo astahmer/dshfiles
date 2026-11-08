@@ -58,7 +58,6 @@ const SAFE_KEY_RE = /^[a-zA-Z0-9_-]+$/
  * @param onClose - Backend callback releasing the unit's open-slot.
  * @returns the opened unit.
  */
-// oxlint-disable-next-line typescript/require-await -- async keeps both openers' call sites uniform
 export async function openPerRecordUnit(
   descriptor: KvUnitDescriptor,
   root: string,

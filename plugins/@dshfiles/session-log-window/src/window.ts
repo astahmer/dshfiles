@@ -382,7 +382,7 @@ export class TailLog {
 const eventOf = (line: string): SessionEvent => {
   // The row itself is returned, not the schema's output, which would move the declared keys first: the browser copy
   // must match the full read byte for byte.
-  const record = Schema.decodeUnknownSync(rowSchema)(JSON.parse(line))
+  const record = Schema.decodeUnknownSync(Schema.fromJsonString(rowSchema))(line)
   const sources = Schema.decodeUnknownSync(eventRowSchema)(record).sourceEventSeqs?.flatMap(entry =>
     typeof entry === 'number' ? [entry] : Array.from({ length: entry[1] - entry[0] + 1 }, (_, index) => entry[0] + index),
   )
@@ -437,7 +437,7 @@ export const openLogHead = async (
 }
 
 /** Whether one stored row is an event rather than the log's leading header row, which carries no seq. */
-const isEventRow = (line: string): boolean => Schema.decodeUnknownResult(eventRowSchema)(JSON.parse(line))._tag === 'Success'
+const isEventRow = (line: string): boolean => Schema.decodeUnknownResult(Schema.fromJsonString(eventRowSchema))(line)._tag === 'Success'
 
 /** Decode the events of complete frames, oldest first, plus whether every frame yielded its records whole. */
 const decodeFrames = (bytes: Buffer, frames: readonly FrameRange[]): { readonly events: readonly SessionEvent[]; readonly complete: boolean } => {
