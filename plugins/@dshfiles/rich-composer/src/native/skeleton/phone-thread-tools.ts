@@ -1,45 +1,23 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- * The phone shell (thread-sidebar marks the document with `data-shell-phone-nav`) folds secondary thread controls
- * behind one menu. Header controls move into the menu; controls elsewhere opt in with `data-phone-thread-tool` and
- * stay hidden on a phone until the document carries the open attribute.
+ * The phone shell (thread-sidebar marks the document with `data-shell-phone-nav`) names the thread in its top bar and
+ * owns the thread menu button, which sets `data-phone-thread-tools` on the document. The header reads both: on a phone
+ * it drops its own title row and shows its controls in a drawer only while the menu is open.
  */
-const OPEN_ATTRIBUTE = 'data-phone-thread-tools'
 const PHONE_ATTRIBUTE = 'data-shell-phone-nav'
+const OPEN_ATTRIBUTE = 'data-phone-thread-tools'
 
-const listeners = new Set<() => void>()
-
-const notify = (): void => {
-  for (const listener of listeners) listener()
-}
-
-const subscribeOpen = (listener: () => void): (() => void) => {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
+const documentAttribute = (name: string): (() => boolean) => {
+  const subscribe = (listener: () => void): (() => void) => {
+    const observer = new MutationObserver(listener)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: [name] })
+    return () => observer.disconnect()
   }
+  const read = (): boolean => document.documentElement.hasAttribute(name)
+  return () => useSyncExternalStore(subscribe, read, () => false)
 }
 
-const subscribePhone = (listener: () => void): (() => void) => {
-  const observer = new MutationObserver(listener)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: [PHONE_ATTRIBUTE] })
-  return () => {
-    observer.disconnect()
-  }
-}
+export const usePhoneShell = documentAttribute(PHONE_ATTRIBUTE)
 
-const readOpen = (): boolean => document.documentElement.hasAttribute(OPEN_ATTRIBUTE)
-
-const readPhone = (): boolean => document.documentElement.hasAttribute(PHONE_ATTRIBUTE)
-
-const readServer = (): boolean => false
-
-export const togglePhoneThreadTools = (): void => {
-  document.documentElement.toggleAttribute(OPEN_ATTRIBUTE)
-  notify()
-}
-
-export const usePhoneThreadToolsOpen = (): boolean => useSyncExternalStore(subscribeOpen, readOpen, readServer)
-
-export const usePhoneShell = (): boolean => useSyncExternalStore(subscribePhone, readPhone, readServer)
+export const usePhoneThreadToolsOpen = documentAttribute(OPEN_ATTRIBUTE)

@@ -227,33 +227,11 @@ button.crumbEditable {
 }
 
 /* Phone shell (thread-sidebar marks the document with data-shell-phone-nav):
-   the title row keeps only a menu button. Opening it drops a drawer under the
-   title with the view tabs, header actions, utilities and the right-panel
-   opener, and reveals the controls other plugins mark data-phone-thread-tool
-   (the composer's annotation picker and change ribbon). The button sets
-   data-phone-thread-tools on the document (phone-thread-tools.ts). */
-.phoneMenuToggle {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin-left: 8px;
-  margin-right: -16px;
-  padding: 0;
-  border: none;
-  border-radius: var(--dsw-radius-md);
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary);
-  cursor: pointer;
-}
-
-.phoneMenuToggle[aria-expanded='true'] {
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-state-business-primary);
-}
-
+   the top bar names the thread and owns the menu button, so the session header
+   renders no title row. The menu (data-phone-thread-tools on the document)
+   shows this drawer with the view tabs, header actions, utilities and the
+   thread-panel opener, and reveals controls other plugins mark
+   data-phone-thread-tool (the composer's annotation picker and change ribbon). */
 .phoneMenu {
   grid-column: 1 / -1;
   display: flex;
@@ -296,6 +274,17 @@ button.crumbEditable {
 @media (max-width: 639.98px) {
   :global(html[data-shell-phone-nav]:not([data-phone-thread-tools])) :global([data-phone-thread-tool]) {
     display: none !important;
+  }
+
+  /* No title row on a phone: the header is only as tall as its drawer or strip,
+     and disappears when neither shows and no leading control rendered. */
+  :global(html[data-shell-phone-nav]) .header {
+    min-height: 0;
+    padding-top: 0;
+  }
+
+  :global(html[data-shell-phone-nav]) .header:not(:has(.tabs, .phoneMenu, .headerLeading [data-slot] > *)) {
+    display: none;
   }
 }
 

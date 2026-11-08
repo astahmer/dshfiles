@@ -9,7 +9,7 @@ import type {
 } from '../contract/slots.ts'
 import { resolveActiveView } from '../view-selection.ts'
 import { DefaultConversationViews } from './DefaultConversationViews.tsx'
-import { togglePhoneThreadTools, usePhoneShell, usePhoneThreadToolsOpen } from './phone-thread-tools.ts'
+import { usePhoneShell, usePhoneThreadToolsOpen } from './phone-thread-tools.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -144,7 +144,6 @@ export function ConversationSessionHeader({
     }
   }
   const showTabs = !hideChrome && tabs.length > 1
-  const phoneMenu = phone && !hideChrome
   // A selected view other than the first keeps its strip on a phone, so the way back to it is never hidden.
   const secondaryViewActive = active !== undefined && active.id !== tabs[0]?.id
   const tabStrip = (
@@ -180,6 +179,21 @@ export function ConversationSessionHeader({
       {renderSlot('conversation.session.header.corner', {})}
     </div>
   )
+  // The phone top bar names the thread and owns the menu button: no second title row here.
+  if (phone && hideChrome) return null
+  if (phone)
+    return phoneToolsOpen
+      ? (
+        <div className={css.phoneMenu} role="group" aria-label={t('session.phoneTools')} data-phone-thread-menu="">
+          {showTabs && tabStrip}
+          <div className={css.phoneMenuRow}>
+            {headerActions}
+            {headerUtilities}
+            {headerCorner}
+          </div>
+        </div>
+      )
+      : showTabs && secondaryViewActive && tabStrip
   return (
     <>
       <div className={css.titleRow}>
@@ -266,45 +280,14 @@ export function ConversationSessionHeader({
                 })}
                 {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
               </nav>
-              {!phoneMenu && headerActions}
+              {headerActions}
             </div>
-            {!phoneMenu && headerUtilities}
+            {headerUtilities}
           </>
         )}
-        {phoneMenu
-          ? (
-            <button
-              type="button"
-              className={css.phoneMenuToggle}
-              aria-label={t('session.phoneTools')}
-              aria-expanded={phoneToolsOpen}
-              data-phone-thread-tools-toggle=""
-              onClick={togglePhoneThreadTools}
-            >
-              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-                <path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" fill="none" />
-              </svg>
-            </button>
-          )
-          : !phone && headerCorner}
+        {headerCorner}
       </div>
-      {phoneMenu
-        ? (
-          <>
-            {showTabs && secondaryViewActive && !phoneToolsOpen && tabStrip}
-            {phoneToolsOpen && (
-              <div className={css.phoneMenu} role="group" aria-label={t('session.phoneTools')} data-phone-thread-menu="">
-                {showTabs && tabStrip}
-                <div className={css.phoneMenuRow}>
-                  {headerActions}
-                  {headerUtilities}
-                  {headerCorner}
-                </div>
-              </div>
-            )}
-          </>
-        )
-        : showTabs && tabStrip}
+      {showTabs && tabStrip}
     </>
   )
 }

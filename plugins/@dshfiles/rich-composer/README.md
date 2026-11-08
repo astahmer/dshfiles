@@ -12,7 +12,7 @@
 
 ![The same run row when it cannot hold the model seat: the chips keep one line and the model sits in the input card beside Send](docs/screenshots/composer-run-row-tool-row.png)
 
-![On a phone the thread header keeps one menu button; opening it shows the view tabs, header actions, utilities and the right-panel opener](docs/screenshots/phone-thread-menu.png)
+![On a phone the top bar names the thread and holds its menu button; opening it shows the view tabs, header actions, utilities and the thread-panel opener](docs/screenshots/phone-thread-menu.png)
 
 Owned fork of DSH's native Conversation client plugin. It preserves the full native shell, services, Slots and composer, while recognizing canonical session-reference wire text on paste and inserting it as a structured reference chip. Plain text is preferred; when only HTML is available, session-link anchors are converted to canonical mention text and other markup is reduced to safe text.
 
@@ -116,4 +116,4 @@ The web profile seed includes this package. Its patch replaces the loaded native
 
 ## Phone thread menu
 
-In the phone shell (thread-sidebar marks the document with `data-shell-phone-nav`), the conversation title row keeps only a menu button. Opening it shows a drawer under the title with the Chat / Trajectory / Traces / Requests tabs, `conversation.session.header.actions`, `conversation.session.header.utilities` and the corner (right-panel opener). Controls owned by other plugins opt in with `data-phone-thread-tool` and stay hidden on a phone until the menu is open: the jujutsu change ribbon and the annotations picker use it. When a view other than Chat is selected, its tab strip stays visible with the menu closed so Chat is always one tap away. The open state is the `data-phone-thread-tools` attribute on the document, shared by every mounted header ([phone-thread-tools.ts](src/native/skeleton/phone-thread-tools.ts)).
+In the phone shell (thread-sidebar marks the document with `data-shell-phone-nav`), the session header renders no title row: the phone top bar already names the thread, and its menu button sets `data-phone-thread-tools` on the document. While that attribute is set, the header shows a drawer under the top bar with the Chat / Trajectory / Traces / Requests tabs, `conversation.session.header.actions`, `conversation.session.header.utilities` and the corner (the thread-panel opener, which opens the bottom sheet). Controls owned by other plugins opt in with `data-phone-thread-tool` and stay hidden on a phone until the menu is open: the jujutsu change ribbon and the annotations picker use it. When a view other than Chat is selected, its tab strip stays visible with the menu closed so Chat is always one tap away. The header only reads both attributes ([phone-thread-tools.ts](src/native/skeleton/phone-thread-tools.ts)); thread-sidebar is the sole writer.

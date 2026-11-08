@@ -309,7 +309,7 @@ describe('fixed Conversation content factory composition', () => {
     expect(titleInput()).toBeNull()
   })
 
-  it('moves the header controls into a phone menu, but keeps the strip of a selected secondary view', async () => {
+  it('drops the title row on a phone and shows the header controls only while the thread menu is open', async () => {
     const slotMarker: ConversationSessionHeaderSlotProps['renderSlot'] = name => <span data-test-slot={name} />
     const chat = fixture('menu-chat')
     const other = fixture('menu-other', 'other')
@@ -317,9 +317,10 @@ describe('fixed Conversation content factory composition', () => {
     document.body.append(element)
     const root = createRoot(element)
     dispose.push(() => act(() => root.unmount()))
+    const html = document.documentElement
     dispose.push(() => {
-      document.documentElement.removeAttribute('data-shell-phone-nav')
-      document.documentElement.removeAttribute('data-phone-thread-tools')
+      html.removeAttribute('data-shell-phone-nav')
+      html.removeAttribute('data-phone-thread-tools')
     })
     act(() =>
       root.render(
@@ -335,27 +336,22 @@ describe('fixed Conversation content factory composition', () => {
     )
     const inChat = (selector: string) => element.querySelector(`[data-bound-session="menu-chat"] ${selector}`)
     const inOther = (selector: string) => element.querySelector(`[data-bound-session="menu-other"] ${selector}`)
-    const utilities = '[data-test-slot="conversation.session.header.utilities"]'
-    expect(inChat(utilities)).not.toBeNull()
-    expect(inChat('[data-phone-thread-tools-toggle]')).toBeNull()
+    const slot = (name: string) => `[data-test-slot="conversation.session.header.${name}"]`
+    expect(inChat(slot('utilities'))).not.toBeNull()
+    expect(Array.from(element.querySelectorAll('button'), button => button.textContent)).toContain('menu-chat')
 
-    await act(async () => document.documentElement.setAttribute('data-shell-phone-nav', ''))
-    expect(inChat(utilities)).toBeNull()
-    expect(inChat('[data-test-slot="conversation.session.header.corner"]')).toBeNull()
+    await act(async () => html.setAttribute('data-shell-phone-nav', ''))
+    expect(Array.from(element.querySelectorAll('button'), button => button.textContent)).not.toContain('menu-chat')
+    for (const name of ['actions', 'utilities', 'corner']) expect(inChat(slot(name))).toBeNull()
     expect(inChat('[data-conversation-tabs]')).toBeNull()
     expect(inOther('[data-conversation-tabs]')).not.toBeNull()
 
-    const toggle = inChat('[data-phone-thread-tools-toggle]')
-    expect(toggle?.getAttribute('aria-expanded')).toBe('false')
-    act(() => (toggle instanceof HTMLButtonElement ? toggle.click() : undefined))
-    expect(document.documentElement.hasAttribute('data-phone-thread-tools')).toBe(true)
-    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
-    for (const slot of ['actions', 'utilities', 'corner'])
-      expect(inChat(`[data-phone-thread-menu] [data-test-slot="conversation.session.header.${slot}"]`)).not.toBeNull()
+    await act(async () => html.setAttribute('data-phone-thread-tools', ''))
+    for (const name of ['actions', 'utilities', 'corner']) expect(inChat(`[data-phone-thread-menu] ${slot(name)}`)).not.toBeNull()
     expect(inChat('[data-phone-thread-menu] [data-conversation-tabs]')).not.toBeNull()
     expect(element.querySelectorAll('[data-bound-session="menu-other"] [data-conversation-tabs]')).toHaveLength(1)
 
-    act(() => (toggle instanceof HTMLButtonElement ? toggle.click() : undefined))
+    await act(async () => html.removeAttribute('data-phone-thread-tools'))
     expect(inChat('[data-phone-thread-menu]')).toBeNull()
   })
 

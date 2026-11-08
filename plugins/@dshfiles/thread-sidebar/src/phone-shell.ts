@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { Destinations, type DestinationId, type ResolvedDestination } from './destinations.js'
 
 /** Where the phone top bar's Back goes: a destination's list, the More list, or the page a thread was opened from. */
@@ -124,3 +124,24 @@ export const useSoftwareKeyboard = (): void => {
     }
   }, [])
 }
+
+/**
+ * The thread menu the top bar's menu button opens: `data-phone-thread-tools` on the document. Rich Composer reads it to
+ * show its header drawer (view tabs, header actions and utilities, the thread-panel opener) and to reveal controls marked
+ * `data-phone-thread-tool`. The top bar is its only writer; it closes whenever the stage stops showing a thread.
+ */
+const THREAD_MENU_ATTRIBUTE = 'data-phone-thread-tools'
+
+const subscribeThreadMenu = (listener: () => void): (() => void) => {
+  const observer = new MutationObserver(listener)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: [THREAD_MENU_ATTRIBUTE] })
+  return () => observer.disconnect()
+}
+
+const readThreadMenu = (): boolean => document.documentElement.hasAttribute(THREAD_MENU_ATTRIBUTE)
+
+export const PhoneThreadMenu = {
+  useOpen: (): boolean => useSyncExternalStore(subscribeThreadMenu, readThreadMenu, () => false),
+  toggle: (): void => void document.documentElement.toggleAttribute(THREAD_MENU_ATTRIBUTE),
+  close: (): void => document.documentElement.removeAttribute(THREAD_MENU_ATTRIBUTE),
+} as const

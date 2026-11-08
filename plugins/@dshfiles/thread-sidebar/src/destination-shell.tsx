@@ -15,7 +15,7 @@ import {
   LibraryIcon,
   ListTodoIcon,
   MessagesSquareIcon,
-  PanelBottomOpenIcon,
+  MenuIcon,
   PlusIcon,
   SettingsIcon,
   SearchIcon,
@@ -38,7 +38,7 @@ import {
   type ResolvedDestination,
 } from './destinations.js'
 import type { NavigationRecord } from './navigation-api.js'
-import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard } from './phone-shell.js'
+import { PhoneThreadMenu, PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard } from './phone-shell.js'
 
 const ICONS = {
   'messages-square': MessagesSquareIcon,
@@ -130,8 +130,6 @@ export interface DestinationShellProps {
   readonly useDocking: () => void
   /** The thread the stage shows, as its title (the phone top bar names the stage). */
   readonly stageTitle?: string | undefined
-  /** Opens or closes the thread panel (a bottom sheet on a phone); null when no owner serves it. */
-  readonly togglePanels?: (() => void) | null
   readonly toggleSidebar: () => void
   readonly record: (record: NavigationRecord) => void
 }
@@ -657,7 +655,11 @@ const PhoneNavigation = (
     props.record({ destination: bar.back.to, surface: 'back' })
     if (!listOpen) props.toggleSidebar()
   }
-  const togglePanels = props.togglePanels ?? null
+  const threadMenuOpen = PhoneThreadMenu.useOpen()
+  useEffect(() => {
+    if (!bar.thread) PhoneThreadMenu.close()
+  }, [bar.thread])
+  useEffect(() => PhoneThreadMenu.close, [])
   // Tapping the row of the thread (or the page) already on the stage changes no selection, so the effect above would
   // leave the list open: close it after the click, unless the selection change already did.
   const listOpenRef = useRef(listOpen)
@@ -695,15 +697,19 @@ const PhoneNavigation = (
           >
             {bar.title}
           </h1>
-          {bar.thread && togglePanels !== null ? (
+          {bar.thread ? (
             <button
               type="button"
-              data-phone-panels=""
-              aria-label="Thread panels"
-              onClick={togglePanels}
-              className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+              data-phone-thread-menu-toggle=""
+              aria-label="Thread menu"
+              aria-expanded={threadMenuOpen}
+              onClick={PhoneThreadMenu.toggle}
+              className={cn(
+                'dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent',
+                threadMenuOpen && 'dshx:bg-accent dshx:text-foreground',
+              )}
             >
-              <PanelBottomOpenIcon className="dshx:size-5" aria-hidden="true" />
+              <MenuIcon className="dshx:size-5" aria-hidden="true" />
             </button>
           ) : null}
         </div>

@@ -3201,7 +3201,7 @@
     {
       "id": "phone-stack-navigation",
       "title": "Navigate the phone as a stack",
-      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux \u00a78 phase 6): a top bar names the screen and Back pops one level \u2014 a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers Thread panels, which opens the thread panel as a bottom sheet. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
+      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux \u00a78 phase 6): a top bar names the screen and Back pops one level \u2014 a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers a Thread menu button: it sets data-phone-thread-tools on the document, which Rich Composer reads to show the thread's view tabs, header controls and thread-panel opener (the bottom sheet) under the bar; it closes when the stage stops showing a thread. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3209,7 +3209,7 @@
       "configuration": [],
       "states": ["list", "stage-thread", "stage-page", "stage-draft", "keyboard-open"],
       "failureModes": [
-        "Without the Workbench's toggle command the bar offers no Thread panels button instead of a dead control.",
+        "Without a header reader of data-phone-thread-tools the Thread menu button toggles nothing visible; the thread panel opener lives in that menu.",
         "An older Host that rejects the new 'back' navigation surface only loses that count; navigation never waits on it."
       ],
       "externalDependencies": [],
