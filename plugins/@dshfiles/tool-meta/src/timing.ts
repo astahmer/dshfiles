@@ -10,6 +10,11 @@ export type ToolTiming =
   | { readonly kind: 'finished'; readonly startedAt: number; readonly endedAt: number }
   | { readonly kind: 'ended'; readonly endedAt: number }
 
+export interface DescribedTiming {
+  readonly text: string
+  readonly label: string
+}
+
 export interface WaitTimer {
   readonly timeoutMs: number | undefined
   readonly elapsedMs: number
@@ -132,7 +137,7 @@ export class ToolTimingModel {
     readonly now: number
     readonly format: TimeFormat
     readonly t: ToolMetaTranslate
-  }) => {
+  }): DescribedTiming => {
     const { timing, now, format, t } = input
     if (timing.kind === 'ended') {
       const end = ToolTimingModel.formatMoment({ at: timing.endedAt, now, format, t })
@@ -142,5 +147,15 @@ export class ToolTimingModel {
     const duration = ToolTimingModel.formatDuration({ ms: (live ? now : timing.endedAt) - timing.startedAt, live, t })
     const start = ToolTimingModel.formatMoment({ at: timing.startedAt, now, format, t })
     return { text: `${duration} · ${start}`, label: t(live ? 'runningLabel' : 'finishedLabel', { duration, start }) }
+  }
+
+  /** What a line shows; equal keys mean a clock tick would change nothing on screen. */
+  static readonly lineKey = (input: { readonly described: DescribedTiming; readonly waitTimer: WaitTimer | undefined }): string => {
+    const shown = `${input.described.text}\u0000${input.described.label}`
+    const timer = input.waitTimer
+    if (timer === undefined) return shown
+    const waitingFor =
+      typeof timer.waitingFor === 'string' ? timer.waitingFor : `${timer.waitingFor.kind}:${timer.waitingFor.count}:${timer.waitingFor.until}`
+    return `${shown}\u0000${timer.elapsedMs}\u0000${timer.remainingMs ?? ''}\u0000${timer.timeoutMs ?? ''}\u0000${waitingFor}`
   }
 }

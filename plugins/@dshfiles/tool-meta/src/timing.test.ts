@@ -116,6 +116,29 @@ describe('formatMoment', () => {
   })
 })
 
+describe('lineKey', () => {
+  const now = at('15:00:00')
+  const timing = { kind: 'finished' as const, startedAt: at('14:02:11'), endedAt: at('14:02:12.2') }
+  const describedAt = (offset: number) => ToolTimingModel.describeTiming({ timing, now: now + offset, format: 'relative', t })
+  const keyAt = (offset: number) => ToolTimingModel.lineKey({ described: describedAt(offset), waitTimer: undefined })
+
+  it('stays equal while a tick changes nothing on screen and moves when it does', () => {
+    expect(keyAt(0)).toBe(keyAt(1_000))
+    expect(keyAt(60_000)).not.toBe(keyAt(0))
+  })
+
+  it('moves every second while a wait timer runs', () => {
+    const waitTimerAt = (elapsedMs: number) => ({
+      timeoutMs: 120_000,
+      elapsedMs,
+      remainingMs: 120_000 - elapsedMs,
+      waitingFor: { kind: 'jobs' as const, count: 2, until: 'settled' as const },
+    })
+    const described = describedAt(0)
+    expect(ToolTimingModel.lineKey({ described, waitTimer: waitTimerAt(90_000) })).not.toBe(ToolTimingModel.lineKey({ described, waitTimer: waitTimerAt(91_000) }))
+  })
+})
+
 describe('describeTiming', () => {
   it('pairs the duration with the start time, live while the call runs', () => {
     const now = at('14:02:15')
