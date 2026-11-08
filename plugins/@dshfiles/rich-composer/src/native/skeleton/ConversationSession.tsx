@@ -1,7 +1,7 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
 import clsx from 'clsx'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
@@ -9,7 +9,10 @@ import type {
 } from '../contract/slots.ts'
 import { resolveActiveView } from '../view-selection.ts'
 import { DefaultConversationViews } from './DefaultConversationViews.tsx'
-import { usePhoneShell, usePhoneThreadToolsOpen } from './phone-thread-tools.ts'
+import {
+  closePhoneThreadTools, concealPhoneThreadTools, findPhoneThreadTools, openPhoneThreadTool, usePhoneShell, usePhoneThreadToolsOpen,
+  type PhoneThreadTool,
+} from './phone-thread-tools.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -126,6 +129,13 @@ export function ConversationSessionHeader({
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const phone = usePhoneShell()
   const phoneToolsOpen = usePhoneThreadToolsOpen()
+  const phoneMenuRef = useRef<HTMLDivElement>(null)
+  const [phoneTools, setPhoneTools] = useState<readonly PhoneThreadTool[]>([])
+  useLayoutEffect(() => {
+    if (!phone || !phoneToolsOpen) return
+    concealPhoneThreadTools()
+    setPhoneTools(phoneMenuRef.current === null ? [] : findPhoneThreadTools(phoneMenuRef.current))
+  }, [phone, phoneToolsOpen])
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string>()
   useEffect(() => {
@@ -181,19 +191,72 @@ export function ConversationSessionHeader({
   )
   // The phone top bar names the thread and owns the menu button: no second title row here.
   if (phone && hideChrome) return null
+  if (phone && !phoneToolsOpen) return showTabs && secondaryViewActive && tabStrip
   if (phone)
-    return phoneToolsOpen
-      ? (
-        <div className={css.phoneMenu} role="group" aria-label={t('session.phoneTools')} data-phone-thread-menu="">
-          {showTabs && tabStrip}
-          <div className={css.phoneMenuRow}>
-            {headerActions}
-            {headerUtilities}
-            {headerCorner}
-          </div>
+    return (
+      <div className={css.phoneMenuLayer} ref={phoneMenuRef} data-phone-thread-menu="">
+        <button type="button" className={css.phoneMenuScrim} aria-label={t('session.phoneMenuClose')} tabIndex={-1} onClick={closePhoneThreadTools} />
+        <div
+          className={css.phoneMenu}
+          role="dialog"
+          aria-label={t('session.phoneTools')}
+          onKeyDown={event => {
+            if (event.key === 'Escape') closePhoneThreadTools()
+          }}
+        >
+          {showTabs && (
+            <section className={css.phoneMenuSection}>
+              <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuViews')}</h3>
+              <div role="tablist" className={css.phoneMenuList}>
+                {tabs.map(viewTab => (
+                  <button
+                    key={viewTab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={viewTab.id === active?.id}
+                    className={clsx(css.phoneMenuItem, viewTab.id === active?.id && css.phoneMenuItemActive)}
+                    onClick={() => {
+                      selectView(viewTab.id)
+                      closePhoneThreadTools()
+                    }}
+                  >
+                    {viewTab.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          <section className={css.phoneMenuSection}>
+            <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuThread')}</h3>
+            <div className={css.phoneMenuRow}>
+              {headerActions}
+              {headerUtilities}
+              <div className={css.phoneMenuCorner} onClickCapture={() => requestAnimationFrame(closePhoneThreadTools)}>
+                {headerCorner}
+              </div>
+            </div>
+          </section>
+          {phoneTools.length > 0 && (
+            <section className={css.phoneMenuSection}>
+              <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuComposer')}</h3>
+              <div className={css.phoneMenuList}>
+                {phoneTools.map(tool => (
+                  <button
+                    key={tool.label}
+                    type="button"
+                    className={css.phoneMenuItem}
+                    data-phone-thread-tool-proxy=""
+                    onClick={() => { openPhoneThreadTool(tool.element) }}
+                  >
+                    {tool.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
-      )
-      : showTabs && secondaryViewActive && tabStrip
+      </div>
+    )
   return (
     <>
       <div className={css.titleRow}>

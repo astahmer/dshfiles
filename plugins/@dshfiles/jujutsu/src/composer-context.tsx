@@ -244,7 +244,7 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
     <TooltipProvider delayDuration={500}>
       <div
         className="dshx-root dshx:mb-1.5 dshx:rounded-lg dshx:border dshx:bg-background/90 dshx:text-xs"
-        data-phone-thread-tool=""
+        data-phone-thread-tool={heading}
         ref={context.ref}
         style={ABOVE_STYLE}
       >

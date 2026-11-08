@@ -127,8 +127,9 @@ export const useSoftwareKeyboard = (): void => {
 
 /**
  * The thread menu the top bar's menu button opens: `data-phone-thread-tools` on the document. Rich Composer reads it to
- * show its header drawer (view tabs, header actions and utilities, the thread-panel opener) and to reveal controls marked
- * `data-phone-thread-tool`. The top bar is its only writer; it closes whenever the stage stops showing a thread.
+ * show its thread menu (views, header actions and utilities, the thread-panel opener, and the composer tools marked
+ * `data-phone-thread-tool`). The top bar opens it and closes it whenever the stage stops showing a thread; the menu
+ * closes itself after a pick.
  */
 const THREAD_MENU_ATTRIBUTE = 'data-phone-thread-tools'
 

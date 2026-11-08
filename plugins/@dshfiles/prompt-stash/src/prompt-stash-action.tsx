@@ -105,7 +105,7 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
     <Popover open={isOpen} onOpenChange={next => (next ? openLibrary() : closeLibrary())}>
       <PopoverTrigger asChild>
         <Button
-          data-phone-thread-tool=""
+          data-phone-thread-tool="Saved prompts"
           type="button"
           variant="ghost"
           size="sm"

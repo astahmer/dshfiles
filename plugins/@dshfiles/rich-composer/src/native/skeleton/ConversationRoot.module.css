@@ -228,26 +228,86 @@ button.crumbEditable {
 
 /* Phone shell (thread-sidebar marks the document with data-shell-phone-nav):
    the top bar names the thread and owns the menu button, so the session header
-   renders no title row. The menu (data-phone-thread-tools on the document)
-   shows this drawer with the view tabs, header actions, utilities and the
-   thread-panel opener, and reveals controls other plugins mark
-   data-phone-thread-tool (the composer's annotation picker and change ribbon). */
-.phoneMenu {
-  grid-column: 1 / -1;
+   renders no title row. While the menu is open (data-phone-thread-tools on the
+   document) a layer covers the conversation (.root is its containing block):
+   a scrim, and a panel listing the views, the header controls and the composer
+   tools other plugins mark data-phone-thread-tool="<label>". Those stay hidden
+   on a phone until the menu reveals one (phone-thread-tools.ts). */
+.phoneMenuLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  margin-top: 8px;
-  padding-bottom: 10px;
 }
 
-.phoneMenu .tabs {
-  gap: 24px;
-  margin-top: 0;
-  padding-bottom: 0;
-  overflow-x: auto;
+.phoneMenuScrim {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: none;
+  background: color-mix(in srgb, black 32%, transparent);
+  cursor: default;
+}
+
+.phoneMenu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 85%;
+  overflow-y: auto;
+  padding: 12px 16px 16px;
   border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 0 0 var(--dsw-radius-lg) var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-base);
+  box-shadow: 0 12px 32px color-mix(in srgb, black 18%, transparent);
+}
+
+.phoneMenuSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.phoneMenuHeading {
+  margin: 0;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-caption);
+}
+
+.phoneMenuList {
+  display: flex;
+  flex-direction: column;
+}
+
+.phoneMenuItem {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  font-size: 15px;
+  line-height: 20px;
+  text-align: left;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.phoneMenuItem:active {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.phoneMenuItemActive {
+  font-weight: 600;
+  color: var(--dsw-alias-state-business-primary);
 }
 
 .phoneMenuRow {
@@ -267,23 +327,33 @@ button.crumbEditable {
   flex-wrap: wrap;
 }
 
-.phoneMenuRow > .headerCorner {
+.phoneMenuCorner {
+  display: contents;
+}
+
+.phoneMenuCorner > .headerCorner {
   margin: 0 0 0 auto;
 }
 
 @media (max-width: 639.98px) {
-  :global(html[data-shell-phone-nav]:not([data-phone-thread-tools])) :global([data-phone-thread-tool]) {
+  :global(html[data-shell-phone-nav]) :global([data-phone-thread-tool]:not([data-phone-thread-tool-revealed])) {
     display: none !important;
   }
 
-  /* No title row on a phone: the header is only as tall as its drawer or strip,
-     and disappears when neither shows and no leading control rendered. */
+  /* No title row on a phone: the header is only as tall as a selected
+     secondary view's strip, holds the menu layer without taking room, and
+     disappears when neither shows and no leading control rendered. */
   :global(html[data-shell-phone-nav]) .header {
     min-height: 0;
     padding-top: 0;
   }
 
-  :global(html[data-shell-phone-nav]) .header:not(:has(.tabs, .phoneMenu, .headerLeading [data-slot] > *)) {
+  :global(html[data-shell-phone-nav]) .header:not(:has(.tabs)) {
+    padding: 0;
+    border-bottom: none;
+  }
+
+  :global(html[data-shell-phone-nav]) .header:not(:has(.tabs, .phoneMenuLayer, .headerLeading [data-slot] > *)) {
     display: none;
   }
 }

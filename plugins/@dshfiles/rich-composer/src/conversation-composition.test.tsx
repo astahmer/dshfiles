@@ -309,10 +309,11 @@ describe('fixed Conversation content factory composition', () => {
     expect(titleInput()).toBeNull()
   })
 
-  it('drops the title row on a phone and shows the header controls only while the thread menu is open', async () => {
+  it('drops the title row on a phone and opens a thread menu that lists the header controls and composer tools', async () => {
     const slotMarker: ConversationSessionHeaderSlotProps['renderSlot'] = name => <span data-test-slot={name} />
     const chat = fixture('menu-chat')
     const other = fixture('menu-other', 'other')
+    const openPrompts = vi.fn()
     const element = document.createElement('div')
     document.body.append(element)
     const root = createRoot(element)
@@ -327,6 +328,8 @@ describe('fixed Conversation content factory composition', () => {
         <>
           <section data-bound-session="menu-chat">
             <ConversationSessionHeader {...chat.header} renderSlot={slotMarker} />
+            <div data-composer-input="" />
+            <button type="button" data-phone-thread-tool="Saved prompts" onClick={openPrompts} />
           </section>
           <section data-bound-session="menu-other">
             <ConversationSessionHeader {...other.header} renderSlot={slotMarker} />
@@ -348,11 +351,19 @@ describe('fixed Conversation content factory composition', () => {
 
     await act(async () => html.setAttribute('data-phone-thread-tools', ''))
     for (const name of ['actions', 'utilities', 'corner']) expect(inChat(`[data-phone-thread-menu] ${slot(name)}`)).not.toBeNull()
-    expect(inChat('[data-phone-thread-menu] [data-conversation-tabs]')).not.toBeNull()
-    expect(element.querySelectorAll('[data-bound-session="menu-other"] [data-conversation-tabs]')).toHaveLength(1)
+    const views = Array.from(element.querySelectorAll('[data-bound-session="menu-chat"] [data-phone-thread-menu] [role="tab"]'), tab => tab.textContent)
+    expect(views).toEqual(['Chat', 'Other'])
+    const proxy = inChat('[data-phone-thread-tool-proxy]')
+    expect(proxy?.textContent).toBe('Saved prompts')
 
-    await act(async () => html.removeAttribute('data-phone-thread-tools'))
+    await act(async () => {
+      if (proxy instanceof HTMLButtonElement) proxy.click()
+      await new Promise(resolve => requestAnimationFrame(resolve))
+    })
+    expect(html.hasAttribute('data-phone-thread-tools')).toBe(false)
     expect(inChat('[data-phone-thread-menu]')).toBeNull()
+    expect(inChat('[data-phone-thread-tool]')?.hasAttribute('data-phone-thread-tool-revealed')).toBe(true)
+    expect(openPrompts).toHaveBeenCalledTimes(1)
   })
 
   it('selects native child views independently in two fixed Sessions without replacing either editor', () => {

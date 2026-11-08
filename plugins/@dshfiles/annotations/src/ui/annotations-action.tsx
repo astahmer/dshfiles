@@ -227,7 +227,7 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
             variant="ghost"
             size="sm"
             aria-label="Annotate an element"
-            data-phone-thread-tool=""
+            data-phone-thread-tool="Annotations"
             onMouseDown={event => event.preventDefault()}
             className="dshx-root dshx:relative dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent"
           >
