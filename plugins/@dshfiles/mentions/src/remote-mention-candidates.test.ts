@@ -21,6 +21,20 @@ const thread = (sessionId: string, title: string, includeMention = true): Remote
   return { ...remoteThread, mention: formatSessionReferenceMention({ sessionId: SessionId(sessionId), label: title }) }
 }
 
+test('resolves a duplicated session id to the first summary, as the single-pass scan did', () => {
+  const duplicatedId = SessionId('duplicated-1')
+  const shadowKey = SessionId('duplicated-1-shadow')
+  const candidates = remoteMentionCandidates({
+    threads: [thread('duplicated-1', 'Duplicated thread')],
+    sessions: { [duplicatedId]: summary(duplicatedId), [shadowKey]: summary(duplicatedId, true) },
+    currentSessionId: SessionId('current'),
+    currentCwd: '/project',
+  })
+
+  expect(candidates).toHaveLength(1)
+  expect(candidates[0]).toMatchObject({ label: 'Duplicated thread' })
+})
+
 test('offers recorded remote threads as native mentions and omits absent or blank sessions', () => {
   const remoteId = SessionId('remote-1')
   const blankId = SessionId('blank-1')
