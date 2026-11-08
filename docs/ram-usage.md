@@ -24,19 +24,26 @@ Measured on 2026-11-09 after a fresh restart, the sweep's 610 MB baseline no lon
 **2.82 GB live heap** (`heapUsed` after `HeapProfiler.collectGarbage`, 8.5 minutes uptime, 6 attached clients), and one
 Chrome renderer for the DSH tab held **3.3 GB RSS** with another at 1.7 GB during the same window.
 
-A heap snapshot attributed the Host's 2.92 GB of nodes as: **2.03 GB of strings** (12.2 million string nodes, average
-174 bytes), 382 MB objects, 261 MB arrays. The largest string groups are serialized payloads, not module source:
-streamed `{"type":"reasoning",…}` chunks (hundreds of thousands of nodes), tool-call argument JSON (44 k nodes with
-`file_path`), shell command JSON (30 k nodes) and repeated system reminders. That is retained conversation/session
-data, so the caches hold decoded prompts and tool payloads, not the 3 GB log corpus itself.
+A heap snapshot attributed the Host's 2.92 GB of nodes as: **2.03 GB of strings** (12.2 million string nodes over 3.06
+million distinct values, average 174 bytes), 382 MB objects, 261 MB arrays. Deep retainer chains name the owner: the
+strings sit under `Object.events[] → Object.data → Object.stream[] → Object.chunk → Object.replayState →
+Object.blocks[] → Object.thinkingSignature`, and the same shape appears through message data and through suspended
+async stacks that hold an `events` array. So the Host retains **every streamed assistant chunk with its per-chunk
+`replayState` blocks** for the live Sessions it keeps. That is the same payload the browser path already strips:
+[`browser-event.ts`](../plugins/@dshfiles/session-controller/src/browser-event.ts) deletes `replayState.blocks`
+before an event reaches a client, which is why the wire is small while the Host copy is not.
 
-Two things follow and are still unattributed at the owner level:
+Module source, schemas and Effect are minor in comparison; the 3 GB log corpus only matters once something decodes
+it. Two owners follow:
 
-- The Host's live set is dominated by per-event payload strings. The next step is retainer attribution (which array or
-  map holds them) before changing any cache; a census is still forbidden on the live Host.
-- The browser tab is now the larger consumer, and the open lever in the table above stays the client-side resident
-  state for opened threads (`per-session client state LRU`). Both need the same measurement discipline: identical
-  profile, ~110 s settle, `heapUsed` after a forced GC, and a before/after on the same workload.
+- **Host:** drop the replay blocks from a chunk event once its attempt has settled, instead of only stripping them on
+  the way to a client. That is a native session-store shape, so the candidate is an owned append/settle hook; verify
+  that a replayed thought still renders from the settled assistant message before changing it.
+- **Browser:** one renderer held 3.3 GB for this tab, with a second at 1.7 GB. The documented lever is the same one:
+  bound the client's resident per-thread state instead of keeping every opened thread.
+
+Measured composition of a 610 MB Host with the web profile, no client attached. The rows come from different ablation
+boots (the sweep measured each owner by booting without it), so they are per-owner costs rather than one additive boot:
 
 Measured composition of a 610 MB Host with the web profile, no client attached. The rows come from different ablation
 boots (the sweep measured each owner by booting without it), so they are per-owner costs rather than one additive boot:
