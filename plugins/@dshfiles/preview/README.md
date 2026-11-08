@@ -64,9 +64,14 @@ preview_* tool ─► previewApi (dshx, agent tool) ─► PreviewBrowsers
                                                    └─ newContext per thread (no downloads, no service workers)
                                                        └─ route guard: top-level navigations checked against allowedHosts
 
-thread header chip ─► previewApi.devServers ─► lsof/ss + ps + cwd probe (3 s cache) ─► attributeDevServers
-                                                live jobs (ctx.jobs) ┘                  sessionController.list ┘
+thread header chip ─► previewApi.devServers ─► lsof/ss + ps + cwd probe (9 s round cache) ─► attributeDevServers
+                                                live jobs (ctx.jobs) ┘                  sessionController.list (5 min fold) ┘
 ```
+
+- **Cost.** Every open thread's header polls the same round for 10 s, so one `lsof`/`ps` round serves every thread
+  polling it instead of one per thread. Listing the whole persisted Session corpus is folded on a five-minute clock
+  and reused across rounds: it reads unrelated history that does not change when a port appears. Nothing listening
+  skips the process table, the cwd probes and the fold entirely.
 
 - **Attribution.** A listening process that descends from a Host child matched to a live job belongs to the job's
   thread. Otherwise it belongs to the thread whose working directory is the deepest one containing the process's

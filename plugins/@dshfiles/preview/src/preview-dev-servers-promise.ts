@@ -2,14 +2,15 @@ import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-jobs'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { HostContext } from '@dshfiles/dshx/effect'
-import { Context, Deferred, Effect, FileSystem, Layer, Ref, Schema } from 'effect'
+import { Context, Duration, Effect, Exit, FileSystem, Layer, Ref, Schema } from 'effect'
 import { DevServers, type DevServer, type KnownSession, type LiveJob } from './dev-servers.js'
 
 const PROBE_TIMEOUT_MS = 10_000
 const SESSIONS_TIMEOUT_MS = 2_500
-// The chip polls every ten seconds and each round spawns lsof; a port that appears a few seconds late is still found
-// by the next round, so the shared probe answer lives long enough to serve several threads and rounds.
+/** Just under the Client's 10 s dev-server poll, so every thread polling in a window shares one round. */
 const PROBE_TTL_MS = 9_000
+/** Session working directories change when a thread moves, not on the poll cadence; folding every few minutes is enough. */
+const SESSIONS_TTL_MS = 5 * 60_000
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 const MAX_CWD_PROBES = 200
 
@@ -70,7 +71,6 @@ export class PreviewDevServers extends Context.Service<
       Effect.gen(function* () {
         const host = yield* HostContext
         const fs = yield* FileSystem.FileSystem
-        const cached = yield* Ref.make<{ readonly at: number; readonly result: Effect.Effect<DevServerProbeResult, PreviewProbeFailed> } | undefined>(undefined)
         const liveJobs = yield* Ref.make<readonly LiveJob[]>([])
 
         const exec = options.exec ?? contextProbeExec(host.ctx)
@@ -82,12 +82,17 @@ export class PreviewDevServers extends Context.Service<
             catch: cause => new PreviewProbeFailed({ command, cause }),
           }).pipe(Effect.withSpan('preview port-probe', { kind: 'client', attributes: { 'process.executable.name': command } }))
 
+        // Listing every persisted Session reads the whole session corpus; that work has nothing to do with a port
+        // appearing, so it is folded on its own slow clock instead of on every poll.
         const sessions = Effect.gen(function* () {
           const controller = host.ctx.get('sessionController')
           if (controller === undefined) return []
           const listed = yield* Effect.promise(() => controller.list({}, AbortSignal.timeout(SESSIONS_TIMEOUT_MS)).catch(() => undefined))
           return (listed?.items ?? []).map((summary): KnownSession => ({ sessionId: summary.sessionId, cwd: summary.cwd ?? null }))
-        })
+        }).pipe(Effect.withSpan('preview session-list', { kind: 'client' }))
+        const knownSessions = yield* Effect.cachedWithTTL(sessions, exit =>
+          Exit.isSuccess(exit) && exit.value.length > 0 ? Duration.millis(SESSIONS_TTL_MS) : Duration.zero,
+        )
 
         const readCwds = (pids: readonly number[]) =>
           Effect.gen(function* () {
@@ -130,7 +135,7 @@ export class PreviewDevServers extends Context.Service<
           // fold. Every poll of an idle thread used to pay all three to return `servers: []`.
           if (sockets.length === 0) return { supported: true, servers: [] }
           // The three reads share no input, so waiting for each before starting the next paid their sum: run them together.
-          const [rows, known, cwds] = yield* Effect.all([processTable, sessions, readCwds([...new Set(sockets.map(socket => socket.pid))])], {
+          const [rows, known, cwds] = yield* Effect.all([processTable, knownSessions, readCwds([...new Set(sockets.map(socket => socket.pid))])], {
             concurrency: 'unbounded',
           })
           const jobs = yield* Ref.get(liveJobs)
@@ -140,23 +145,12 @@ export class PreviewDevServers extends Context.Service<
           }
         })
 
-        const read = (fresh: boolean) =>
-          Effect.gen(function* () {
-            const now = Date.now()
-            const current = yield* Ref.get(cached)
-            if (!fresh && current !== undefined && now - current.at < PROBE_TTL_MS) return yield* current.result
-            const shared = yield* Deferred.make<DevServerProbeResult, PreviewProbeFailed>()
-            const result = Deferred.await(shared)
-            yield* Ref.set(cached, { at: now, result })
-            return yield* Effect.scoped(
-              probe.pipe(
-                Effect.onExit(exit => Deferred.done(shared, exit)),
-                Effect.ignore,
-                Effect.forkScoped,
-                Effect.andThen(result),
-              ),
-            )
-          })
+        // One round per TTL for every thread polling it: the probe spawns `lsof` and `ps`, and a thread's poll is a
+        // discovery net, not a reason to run them again.
+        const [cachedProbe, invalidateProbe] = yield* Effect.cachedInvalidateWithTTL(probe, Duration.millis(PROBE_TTL_MS))
+
+        /** `fresh` skips the round cache, for a caller that just changed what is listening. */
+        const read = (fresh: boolean) => (fresh ? probe : cachedProbe)
 
         /** Live jobs the Host reports, so a probe attributes a dev server to the job that started it. */
         host.ctx.inject(['jobs'], scoped => {
@@ -182,7 +176,7 @@ export class PreviewDevServers extends Context.Service<
 
         return PreviewDevServers.of({
           read,
-          invalidate: Ref.set(cached, undefined),
+          invalidate: invalidateProbe,
           readProcessTable: processTable,
         })
       }),

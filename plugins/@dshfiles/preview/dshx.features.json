@@ -161,6 +161,12 @@
           "span": "preview port-probe",
           "file": "plugins/@dshfiles/preview/src/preview-dev-servers-promise.test.ts",
           "testName": "runs each probe command under a preview port-probe span and caches one probe for every caller"
+        },
+        {
+          "kind": "custom",
+          "span": "preview session-list",
+          "file": "plugins/@dshfiles/preview/src/preview-dev-servers-promise.test.ts",
+          "testName": "runs each probe command under a preview port-probe span and caches one probe for every caller"
         }
       ]
     },
