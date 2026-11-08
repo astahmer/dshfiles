@@ -7,7 +7,9 @@ import { DevServers, type DevServer, type KnownSession, type LiveJob } from './d
 
 const PROBE_TIMEOUT_MS = 10_000
 const SESSIONS_TIMEOUT_MS = 2_500
-const PROBE_TTL_MS = 3_000
+// The chip polls every ten seconds and each round spawns lsof; a port that appears a few seconds late is still found
+// by the next round, so the shared probe answer lives long enough to serve several threads and rounds.
+const PROBE_TTL_MS = 9_000
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 const MAX_CWD_PROBES = 200
 
