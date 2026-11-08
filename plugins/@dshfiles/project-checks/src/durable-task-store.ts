@@ -149,6 +149,8 @@ export class DurableTaskStore extends Context.Service<
     readonly importLegacy: (data: LegacyDurableTaskData) => Effect.Effect<void, TaskStoreUnavailable>
     readonly get: (taskId: string) => Effect.Effect<Option.Option<DurableTask>, TaskStoreUnavailable>
     readonly all: Effect.Effect<ReadonlyArray<DurableTask>, TaskStoreUnavailable>
+    /** The newest `limit` tasks of one session, read through `tasks_session_created` instead of scanning every task. */
+    readonly listForSession: (input: { readonly sessionId: string; readonly limit: number }) => Effect.Effect<ReadonlyArray<DurableTask>, TaskStoreUnavailable>
     readonly createIfAbsent: (input: {
       readonly task: DurableTask
       readonly maxRows?: number
@@ -231,6 +233,16 @@ export class DurableTaskStore extends Context.Service<
           Effect.flatMap(rows => Effect.forEach(rows, row => decodeTaskJson(row.payload).pipe(Effect.orDie))),
         ),
       )
+
+      const listForSession = Effect.fn('project-checks task list session')(function* (input: { readonly sessionId: string; readonly limit: number }) {
+        const limit = Math.max(1, Math.min(MAX_TASK_ROWS, Math.trunc(input.limit)))
+        const rows = yield* statement('list')(
+          sql`SELECT payload FROM tasks WHERE session_id = ${input.sessionId} ORDER BY created_at DESC, task_id LIMIT ${limit}`.pipe(
+            Effect.flatMap(decodeRowsOrDie(PayloadRow)),
+          ),
+        )
+        return yield* Effect.forEach(rows, row => decodeTaskJson(row.payload).pipe(Effect.orDie))
+      })
 
       const createIfAbsent = Effect.fn('project-checks task create')(function* (input: { readonly task: DurableTask; readonly maxRows?: number }) {
         const task = input.task
@@ -344,7 +356,18 @@ export class DurableTaskStore extends Context.Service<
         }).pipe(Effect.retry({ while: error => error.busy, schedule: CLAIM_RETRY }))
       }).pipe(Effect.withSpan('project-checks worker claim'))
 
-      return DurableTaskStore.of({ importLegacy, get, all, createIfAbsent, update, saveAttemptReceipt, findAttemptReceipt, listAttemptReceipts, claimWorker })
+      return DurableTaskStore.of({
+        importLegacy,
+        get,
+        all,
+        listForSession,
+        createIfAbsent,
+        update,
+        saveAttemptReceipt,
+        findAttemptReceipt,
+        listAttemptReceipts,
+        claimWorker,
+      })
     }),
   ).pipe(Layer.provide(taskDbLayer))
 }
