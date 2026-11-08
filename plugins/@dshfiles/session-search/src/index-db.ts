@@ -114,6 +114,8 @@ const rankedRowSchema = Schema.Struct({
 })
 
 const countRowSchema = Schema.Struct({ count: numberLike })
+const pageCountRowSchema = Schema.Struct({ page_count: numberLike })
+const freelistRowSchema = Schema.Struct({ freelist_count: numberLike })
 
 const documentRowidSchema = Schema.Struct({ document_rowid: numberLike })
 
@@ -648,9 +650,9 @@ export class SearchIndex {
 
   /** Share of the index file that is free pages after deletes, 0 when the file holds nothing yet. */
   freePageRatio(): number {
-    const count = (name: string): number => Schema.decodeUnknownSync(countRowSchema)(this.#database.prepare(`PRAGMA ${name}`).get()).count
-    const pages = count('page_count')
-    return pages === 0 ? 0 : count('freelist_count') / pages
+    const pages = Schema.decodeUnknownSync(pageCountRowSchema)(this.#database.prepare('PRAGMA page_count').get()).page_count
+    if (pages === 0) return 0
+    return Schema.decodeUnknownSync(freelistRowSchema)(this.#database.prepare('PRAGMA freelist_count').get()).freelist_count / pages
   }
 
   health(input: {

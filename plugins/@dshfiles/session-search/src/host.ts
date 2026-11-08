@@ -19,6 +19,8 @@ const rowConfig = Schema.UndefinedOr(
   Schema.Struct({
     indexPath: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1))),
     windowBytes: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
+    // Each prepared cold Session holds its whole decoded log, so this is the profile's memory knob for search.
+    preparedSessionCacheSize: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
   }),
 )
 
@@ -45,7 +47,7 @@ const IDLE_HEALTH: IndexHealth = {
 }
 
 const layer = (config: typeof rowConfig.Type) =>
-  SessionQueryOwnership.layer.pipe(
+  SessionQueryOwnership.layer(config?.preparedSessionCacheSize === undefined ? {} : { preparedSessionCacheSize: config.preparedSessionCacheSize }).pipe(
     Layer.provideMerge(
       SearchWorker.layer({
         indexPath: config?.indexPath ?? dshHomePath('plugins', 'session-search', 'index.sqlite'),

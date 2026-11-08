@@ -91,11 +91,6 @@ const Handlers = SearchWorkerRpcs.toLayer(
           // One bounded step per loop, so searches still run between steps while an older index gains its conversation table.
           const backfilled = index.backfillConversation(BACKFILL_ROWIDS) && index.backfillRowMap(BACKFILL_ROWIDS)
           const result = await runIngestPass({ index, root, budgetMs: 1_000, windowBytes, now: Date.now, archived: cold })
-          // Dropping archived Sessions empties most of the file; give the bytes back once, not on every pass.
-          if (result.pruned > 0 && !compacted && index.freePageRatio() > 0.25) {
-            index.vacuum()
-            compacted = true
-          }
           return { backfilled, result }
         }).pipe(Effect.result)
         const elapsed = (yield* Clock.currentTimeMillis) - startedAt
@@ -104,6 +99,13 @@ const Handlers = SearchWorkerRpcs.toLayer(
           return IDLE_SLEEP
         }
         const result = outcome.success.result
+        // Dropping archived Sessions empties most of the file; give the bytes back once, in a step of its own so a
+        // failure is reported instead of swallowed by the pass.
+        if (!compacted && index.freePageRatio() > 0.25) {
+          const reclaimed = yield* Effect.try({ try: () => (index.vacuum(), true), catch: error => describeError(error) }).pipe(Effect.result)
+          if (reclaimed._tag === 'Success') compacted = true
+          else yield* Effect.logWarning('session-search: the index could not be compacted yet', reclaimed.failure)
+        }
         yield* Ref.update(progress, current => ({
           ...current,
           ingesting: false,
