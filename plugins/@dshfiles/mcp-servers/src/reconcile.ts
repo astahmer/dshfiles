@@ -15,6 +15,9 @@ export interface ReconcilePlan<Target extends ClientTarget> {
 
 export type ClientLifecycle = 'inactive' | 'starting' | 'loaded' | 'start-failed' | 'manually-disconnected'
 
+/** Each start awaits a transport handshake and spawns a child process; a profile boot overlaps a few, not all of them. */
+const START_CONCURRENCY = 4
+
 /** One entry per target: a loaded client is the only state that owns a running child Scope. */
 type ClientEntry =
   | { readonly state: 'inactive' }
@@ -96,7 +99,8 @@ export const makeClientReconciler = <Target extends ClientTarget>(
         } else next.set(id, current.get(id)?.state === 'start-failed' ? { state: 'start-failed' } : { state: 'starting', fingerprint: target.fingerprint })
       }
       yield* Ref.set(clients, next)
-      for (const target of desired.values()) if (!running.has(target.id)) yield* launch(target)
+      const starting = [...desired.values()].filter(target => !running.has(target.id))
+      yield* Effect.forEach(starting, launch, { concurrency: START_CONCURRENCY })
     })
 
     const restartNow = Effect.fnUntraced(function* (id: string, targets: ReadonlyArray<Target>) {
