@@ -9,9 +9,16 @@ no jj writes, finish with a passing typecheck + build + tests).
 
 ## Resume here
 
-Waves run at 3–5 concurrent agents in this shared thread workspace. Next plugin to dispatch: first unclaimed row
-below in LOC order. Verify each `optimized` row here before landing it (typecheck + build + tests, then read the
-diff).
+Waves run at 3–5 concurrent agents in this shared thread workspace. **Wave 2 running:** rich-composer, chat,
+workbench, editor, session-controller. Before dispatching, pick the first plugin below that has neither a row in
+the results table nor a `wave 2` mention, in LOC order: plugin-ui, secret-catalog (host effect already fixed),
+settings-shell, mcp-servers, workspace-nav, sidebar-right, main-tabs, activity-timeline, workspace-folder-picker,
+subprocess-local, then the rest of `plugins/@dshfiles/*`.
+
+Landing shape (already applied once, reuse the same shape): one commit per plugin above the macro commit, appended
+above the previous wave, plus one `perf(plugins): …` macro commit per cross-plugin round. Verify each plugin with
+`/tmp/verify-plugin.sh <name> --build` before committing, and check that every landed client plugin keeps
+`client.shared` (guard: `node plugins/scripts/check-shared-runtime.mjs`).
 
 ## Results
 
@@ -25,6 +32,14 @@ diff).
 | shared-runtime migration (macro) | done | 11 Client plugins re-inlined the UI stack | Client bytes 36616 → 35320 KB |
 | secret-catalog (macro) | done | Host bundle kept its own Effect runtime | Host bundle 1132 → 264 KB |
 | project-checks | optimized | `DurableTasks.list` scanned and decoded every task row (up to 1000) then filtered to one Session | 9.7 / 6.0 / 5.9 ms → 0.16 / 0.39 / 0.15 ms (indexed per-session query), results identical |
+| secret-catalog | no-change | list warm 0.10 ms with 0 CLI spawns (rev-keyed cache, 15 s TTL), resolve CPU 0.039 ms (one `get` is the value read), client filter 1.1 ms at the 5000-row cap; the live p50 499–593 ms is the external `secret` CLI | — (noted, not fixed without a GUI profile: the aliases table rebuilds its row-actions context each render, so Radix tooltips re-render per keystroke; `elsewhereIn` can spawn 16 `print`s for one broken reference, only 12 `print` spans in the whole trace window) |
+| activity-timeline | no-change | reads over a 5000-event / 2.5 MB store already p50 0.05–0.6 ms (revision-keyed snapshot cache, condensation only on the returned slice); cold stale read 29.4 ms happens at boot/30 s idle, not per page | — (ingest write 15 ms at 32 writes/hour rejected; schema-encode shortcut measured 11.3 → 3.4 ms but rejected as a serialization-semantics risk for 0.25 s/hour) |
+| mcp-servers | optimized | cold reconcile launched MCP clients one at a time, each awaiting its handshake | cold 8 servers 263 → 74 ms (3.6×), 16 servers 583 → 137 ms (4.3×); control lands on ceil(N/4) waves |
+| editor | optimized | file-index walk kept only 8 `list` calls in flight on one gateway socket → ~138 sequential rounds for this repo | 138 → 52 rounds; modelled 1 ms-RTT index 158 → 58 ms, 5 ms-RTT 677 → 258 ms (round count exact, absolute modelled) |
+| chat | optimized | live-tail node re-anchored per streamed chunk → structural upsert → full sort + location/rail rebuild per chunk | per-chunk 0.087→0.010 (280n), 0.248→0.022 (840n), 0.914→0.009 (2800n), 4.78→0.014 ms (7000n) |
+| workbench | optimized | float-layer `sync()` walked every panel body on every layout change even with nothing floating | layer sync 0.369/0.436 → 0.097/0.113 ms per layout change; end-to-end switch not resolvable (jsdom) |
+| session-controller | optimized | `messages` decoded a whole cold session log (JSON.parse every row + schema decode of every spoken message) to keep its last 20 | cold read p50 97.8 → 5.9 ms, 44.1 → 1.0 ms, 68.4 → 2.6 ms (16–44×); live fold 5.8 → 0.18 ms; tail falls back to the full read on any doubt |
+| rich-composer | optimized | `ConversationContent` subscribed to InputState only to build the dock InputZone, so every draft publish re-rendered the conversation view | conversation renders per 60 keystrokes 60 → 0; wall 59.3 → 10.5 ms, CPU 72.2 → 17.7 ms |
 | backlog | no-change | owned reads already sub-millisecond (list 0.22 ms / 614 live items, 0.6–0.9 ms / 2000); a search cache was implemented, measured below the noise floor and reverted | — (the only large number is contract encode: 12.9 ms + 868 KB payload for the panel's `limit:2000` request — product decision) |
 | jj-integration | optimized | workspace scan ran two `jj log` processes per workspace (2N spawns, each loading the repo view) | real repo 82 → 42 spawns, scan median 1849 → 1023 ms (−45%), results identical on 40 workspaces |
 | jujutsu | optimized | landmark reads sequential (Effect.forEach default); `readRevisionRelationship` ran 9 waves of independent `jj log` | navigation 259 → 138 ms medians; relationship 465 → 209 ms medians; spawns unchanged, jj busy/wall 1.00 → 2.4-2.6 |
