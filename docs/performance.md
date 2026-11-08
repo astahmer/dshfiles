@@ -721,6 +721,32 @@ agent-questions targets) are live, and none of them is what a user waits for any
 wins at their benchmark scale — prompt stash has 3 prompts in this profile, so its cap case never runs, and the 0.5–1.4 s
 composer-mount long task is not attributed to a single owned plugin without a browser CPU profile.
 
+## Idle indexing and first-build disk writes (2026-11-08; scratch, not live GUI)
+
+A scratch Host with the full web composition (94 bundles) on a synthetic 2,800-Session corpus, DSH 0.2.1-rc.2,
+Node 22.23.3, 4 cores. Every number is taken after 110 s of settle, over a 120 s idle window, from `/proc/<host>/stat`,
+`/io` and `/status` (worker threads included). Probe: boot, seed `<home>/sessions`, settle, sample; the per-pass numbers
+come from `session-search/tests/idle-pass.bench.spec.ts` (`IDLE_BENCH=1`).
+
+| Measure (idle Host, 2,800 Sessions) | Before                | After            |
+| ----------------------------------- | --------------------- | ---------------- |
+| Host CPU                            | 6.53 % of a core      | 0.23 %           |
+| syscalls (read + write)             | 2,086 /s              | 19 /s            |
+| bytes read / written                | 489 / 489 KB per min  | 4 / 4 KB per min |
+| settled RSS                         | 541 MB                | 526 MB           |
+
+The owner was the session-search worker's ingest loop, which re-walked the whole corpus every 5 s even when nothing
+changed:
+
+| Cost                        | Before                                  | After                                            | Why                                                                                                     |
+| --------------------------- | --------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| one idle pass               | 354 ms CPU / 462 ms wall                | 33 ms / 30 ms                                    | the log walk used promise fs calls (294 ms of thread-pool round trips); the worker owns its thread, so sync calls; one cursor query per pass instead of two per Session |
+| idle poll                   | every 5 s                               | 5 s doubling to 60 s, back to 5 s on any wake    | every committed Session event already nudges the worker, so the poll only catches outside writers       |
+| first build                 | 10.6 s, 285 MB written for an 8.6 MB index | 4.2 s, 42 MB written for 8.3 MB              | Sessions commit in groups (64 or 250 ms, a savepoint each) instead of one FTS5 segment per transaction; read buffers sized to the file instead of a zero-filled 2 MiB window (13 % of build CPU); constant SQL prepared once |
+
+Ruled out: marking a new index's backfills done changes nothing, because the worker's first backfill runs before any
+document exists and finishes at once (285.1 MB written either way).
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
