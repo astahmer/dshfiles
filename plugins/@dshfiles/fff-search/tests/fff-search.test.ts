@@ -91,6 +91,21 @@ describe('FffSearch.grep', () => {
     expect(grep('LifecycleRules', { path: 'src/rules.ts' }).matches.map(match => match.path)).toEqual(['src/rules.ts'])
   })
 
+  it('sends a single file as a glob constraint instead of searching its directory', () => {
+    expect(FffSearch.scopeConstraint({ root: '/workspace' })).toBeUndefined()
+    expect(FffSearch.scopeConstraint({ root: '/workspace', directory: 'src' })).toBe('src/')
+    expect(FffSearch.scopeConstraint({ root: '/workspace', directory: 'src', file: 'src/rules.ts' })).toBe('src/rules.ts*')
+    expect(FffSearch.scopeConstraint({ root: '/workspace', file: 'many.txt' })).toBe('**/many.txt*')
+    expect(FffSearch.scopeConstraint({ root: '/workspace', directory: 'src', file: 'src/a b.ts' })).toBe('src/')
+    expect(FffSearch.scopeConstraint({ root: '/workspace', file: 'rules[1].ts' })).toBeUndefined()
+  })
+
+  it('keeps every match of a single file beyond one page', () => {
+    const outcome = grep('needle \\d+', { path: 'many.txt' })
+    expect(outcome.matches).toHaveLength(FffSearch.maxGrepMatches)
+    expect(outcome.total).toBe(300)
+  })
+
   it('reads a pattern that looks like an fff constraint as a regular expression', () => {
     expect(grep('\\*\\.yml').matches.map(match => match.path)).toEqual(['src/rules.ts'])
   })
