@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -136,6 +136,31 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
     })
     expect(readFileSync(join(directory, 'dist/index.js'), 'utf8')).toBe('export {}\n')
     expect(readFileSync(join(directory, 'dist/client.js'), 'utf8')).toBe('export {}\n')
+  })
+
+  it('repairs a library export once without a Host restart', async () => {
+    const directory = join(checkout, 'plugins/@dshfiles/library')
+    writeFile(join(checkout, 'plugins/package.json'), JSON.stringify({ name: 'dshfiles-plugins', private: true }))
+    writeFile(join(checkout, 'plugins/pnpm-workspace.yaml'), "packages:\n  - '@dshfiles/*'\n")
+    writeFile(
+      join(directory, 'package.json'),
+      JSON.stringify({
+        name: '@dshfiles/library',
+        scripts: { build: 'tsc -p tsconfig.build.json' },
+        exports: { '.': { default: './dist/library.js' } },
+      }),
+    )
+    const compiler = join(directory, 'node_modules/.bin/tsc')
+    writeFile(
+      compiler,
+      "#!/usr/bin/env node\nrequire('fs').mkdirSync('dist', { recursive: true }); require('fs').writeFileSync('dist/library.js', 'export {}')\n",
+    )
+    chmodSync(compiler, 0o755)
+
+    expect(await sync(true)).toMatchObject({ status: 'would-sync', restart: { needed: false }, rebuilt: { plugins: ['@dshfiles/library'] } })
+    expect(await sync()).toMatchObject({ status: 'synced', restart: { needed: false }, rebuilt: { plugins: ['@dshfiles/library'] } })
+    expect(readFileSync(join(directory, 'dist/library.js'), 'utf8')).toBe('export {}')
+    expect(await sync()).toMatchObject({ status: 'up-to-date', restart: { needed: false }, rebuilt: { plugins: [] } })
   })
 
   it('absorbs described revisions main already holds and keeps the local edits above them', async () => {
