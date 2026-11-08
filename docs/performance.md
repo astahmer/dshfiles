@@ -744,6 +744,13 @@ changed:
 | idle poll                   | every 5 s                               | 5 s doubling to 60 s, back to 5 s on any wake    | every committed Session event already nudges the worker, so the poll only catches outside writers       |
 | first build                 | 10.6 s, 285 MB written for an 8.6 MB index | 4.2 s, 42 MB written for 8.3 MB              | Sessions commit in groups (64 or 250 ms, a savepoint each) instead of one FTS5 segment per transaction; read buffers sized to the file instead of a zero-filled 2 MiB window (13 % of build CPU); constant SQL prepared once |
 
+Boot, same scratch Host (`--cpu-prof` through `NODE_OPTIONS`, 2,800 Sessions): about 8.3 s of main-thread CPU before
+the Host settles, and no owned plugin reaches the top 30 self-time owners. Node internals and module compilation
+(`compileSourceTextModule` 1.3 s) lead, then cordis, Effect, zod, `dsh-app-boot` and the JSONL persistence reading
+every Session header (`readGenerationHeader`, zstd). That is core work, and the launcher already sets
+`NODE_COMPILE_CACHE` (`scripts/launcher-config.mjs`), so there is no plugin-side lever left at boot. The session-search
+worker's first build of the same corpus costs about 3.7 s of CPU on its own thread.
+
 Ruled out: marking a new index's backfills done changes nothing, because the worker's first backfill runs before any
 document exists and finishes at once (285.1 MB written either way).
 
