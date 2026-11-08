@@ -36,11 +36,15 @@ before an event reaches a client, which is why the wire is small while the Host 
 Module source, schemas and Effect are minor in comparison; the 3 GB log corpus only matters once something decodes
 it. Two owners follow:
 
-- **Host:** drop the replay blocks from a chunk event once its attempt has settled, instead of only stripping them on
-  the way to a client. That is a native session-store shape, so the candidate is an owned append/settle hook; verify
-  that a replayed thought still renders from the settled assistant message before changing it.
-- **Browser:** one renderer held 3.3 GB for this tab, with a second at 1.7 GB. The documented lever is the same one:
-  bound the client's resident per-thread state instead of keeping every opened thread.
+- The Host copy is not a leak to trim blindly: `@deepseek-ai/dsh-session` treats `assistant/message`'s embedded
+  `stream` as durable event data ("assistant/message embeds its source stream"), and the format migrator reads it. So
+  dropping the blocks needs an owner-side change: keep full replay state for the live attempt and the newest settled
+  one, and trim older settled attempts in the session store once nothing replays them. That is a native session
+  contract, so it is an upstream ask (drafted below) rather than a plugin patch.
+- **Browser:** one renderer held 3.3 GB for this tab, with a second at 1.7 GB. Its own copy is already block-stripped,
+  so the cost is resident per-thread client state. The store lives in the native client package, not in
+  `@dshfiles/session-controller` (its `MirroredSessions` map holds ids and status only), so bounding it means a fork
+  of that client package or its own upstream ask.
 
 Measured composition of a 610 MB Host with the web profile, no client attached. The rows come from different ablation
 boots (the sweep measured each owner by booting without it), so they are per-owner costs rather than one additive boot:
