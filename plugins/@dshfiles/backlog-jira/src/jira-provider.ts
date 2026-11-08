@@ -362,9 +362,9 @@ export const makeJiraProvider = Effect.fn('backlog jira provider')(function* () 
     const update: IssueUpdate = {}
     if (patch.title !== undefined) fields['summary'] = patch.title.replace(/\s+/gu, ' ').trim().slice(0, 255)
     if (patch.body !== undefined) {
+      const document = JiraAdf.fromMarkdown(patch.body)
       const currentBody = JiraMapping.markdownOf(input.current?.fields.description).markdown
-      if (input.current === undefined || JiraAdf.normalise(patch.body) !== JiraAdf.normalise(currentBody))
-        fields['description'] = JiraAdf.fromMarkdown(patch.body)
+      if (input.current === undefined || JiraAdf.toMarkdown(document).markdown !== JiraAdf.normalise(currentBody)) fields['description'] = document
     }
     if (patch.tags !== undefined) fields['labels'] = JiraMapping.labelsFor(patch.tags)
     if (patch.priority !== undefined) {
