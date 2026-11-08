@@ -197,17 +197,20 @@ export class ReviewWorkspace extends Context.Service<
           ),
         )
 
-      /** One revision's change, within what is left of the review's one patch budget. */
+      /** One revision's change, within what is left of the review's one patch budget; `patch` is the batched read's own text. */
       const readRevision = Effect.fn('review revision read')(function* (input: {
         readonly path: string
         readonly revision: ResolvedRevision
         readonly budget: number
+        readonly patch?: string | undefined
       }) {
         // An exhausted budget still lists the revision, flagged, instead of dropping it from the review.
         const diff =
           input.budget <= 0
             ? { stdout: '', truncated: true }
-            : yield* jjReads.read({ path: input.path, args: RevisionReviewModel.diffArgs(input.revision.commitId), outputLimit: input.budget })
+            : input.patch === undefined
+              ? yield* jjReads.read({ path: input.path, args: RevisionReviewModel.diffArgs(input.revision.commitId), outputLimit: input.budget })
+              : { stdout: input.patch, truncated: false }
         const patch = diff.stdout
         const grouped = yield* groupPatch({ patch, title: input.revision.shortChangeId })
         return {
@@ -224,8 +227,34 @@ export class ReviewWorkspace extends Context.Service<
         } satisfies RevisionReview
       })
 
-      const readRevisions = Effect.fn('review revisions read')(function* (input: RevisionsReviewInput) {
+      /** Every revision's own patch in one jj read; undefined when that read fails, is cut, or its framing is unusable, so the one-by-one reads still decide. */
+      const readPatches = Effect.fn('review revisions patch batch')(function* (input: {
+        readonly path: string
+        readonly revisions: readonly ResolvedRevision[]
+      }) {
+        if (input.revisions.length < 2) return undefined
+        const output = yield* jjReads
+          .read({ path: input.path, args: RevisionReviewModel.patchesArgs(input.revisions.map(revision => revision.commitId)), outputLimit: MAX_PATCH_CHARS })
+          .pipe(Effect.option)
+        return Option.isNone(output) || output.value.truncated ? undefined : RevisionReviewModel.decodePatches(output.value.stdout)
+      })
+
+      /** Every requested id's revision in one read, ancestors first; undefined unless each id names one of the returned revisions. */
+      const describeSelection = Effect.fn('review revisions describe')(function* (input: { readonly path: string; readonly revisions: readonly string[] }) {
+        if (input.revisions.length < 2) return undefined
+        const output = yield* jjReads
+          .read({ path: input.path, args: RevisionReviewModel.describeManyArgs(input.revisions), outputLimit: 128_000 })
+          .pipe(Effect.option)
+        if (Option.isNone(output) || output.value.truncated) return undefined
+        return RevisionReviewModel.decodeSelection(input.revisions, output.value.stdout)
+      })
+
+      /** The selected revisions, ancestors first, plus the requested ids jj could not name: one read when every id resolves, one per id otherwise. */
+      const selection = Effect.fn('review revisions selection')(function* (input: RevisionsReviewInput) {
         const requested = [...new Set(input.revisions)]
+        const described = yield* describeSelection({ path: input.path, revisions: requested })
+        const noneSkipped: readonly UnresolvedRevision[] = []
+        if (described !== undefined) return { ordered: described, unresolved: noneSkipped }
         const outcomes = yield* Effect.forEach(requested, revision => resolveRevision({ path: input.path, revision }), { concurrency: 4 })
         const found = new Map<string, ResolvedRevision>()
         for (const outcome of outcomes) if ('commitId' in outcome && !found.has(outcome.commitId)) found.set(outcome.commitId, outcome)
@@ -235,12 +264,22 @@ export class ReviewWorkspace extends Context.Service<
             ? ''
             : (yield* jjReads.read({ path: input.path, args: RevisionReviewModel.orderArgs(resolved.map(revision => revision.commitId)), outputLimit: 16_384 }))
                 .stdout
-        const ordered = RevisionReviewModel.inOrder(resolved, ordering)
+        return {
+          ordered: RevisionReviewModel.inOrder(resolved, ordering),
+          unresolved: outcomes.filter((outcome): outcome is UnresolvedRevision => !('commitId' in outcome)),
+        }
+      })
+
+      const readRevisions = Effect.fn('review revisions read')(function* (input: RevisionsReviewInput) {
+        const { ordered, unresolved } = yield* selection(input)
+        const batched = yield* readPatches({ path: input.path, revisions: ordered })
         const revisions: RevisionReview[] = []
         let budget = MAX_PATCH_CHARS
         // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- oldest first, each read takes what the earlier ones left of one patch budget.
         for (const revision of ordered) {
-          const read = yield* readRevision({ path: input.path, revision, budget })
+          const batchedPatch = budget > 0 ? batched?.get(revision.commitId) : undefined
+          const patch = batchedPatch !== undefined && batchedPatch.length <= budget ? batchedPatch : undefined
+          const read = yield* readRevision({ path: input.path, revision, budget, ...(patch === undefined ? undefined : { patch }) })
           revisions.push(read)
           budget -= read.patch.length
         }
@@ -248,7 +287,7 @@ export class ReviewWorkspace extends Context.Service<
           status: 'ok',
           path: input.path,
           revisions,
-          unresolved: outcomes.filter((outcome): outcome is UnresolvedRevision => !('commitId' in outcome)),
+          unresolved,
           segments: RevisionReviewModel.segments(ordered),
           truncated: revisions.some(revision => revision.truncated),
           fileCount: revisions.reduce((total, revision) => total + revision.fileCount, 0),
