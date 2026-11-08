@@ -69,14 +69,48 @@ const snapshotOf = (state: MarksState): ViewedMarksSnapshot => ({
     .map(mark => mark.key),
 })
 
-const rangeMarksOf = (state: MarksState, range: ViewedRange): RangeMarks => {
-  const paths: { readonly path: string; readonly version: number }[] = []
+type RangeEntry = { readonly path: string; readonly version: number }
+
+const rangeKeyOf = (range: ViewedRange): string => JSON.stringify([range.workspacePath, range.base, range.head])
+
+/** Every range's entries in one pass: a combined review reads one range per revision, so parsing the keys per read would repeat the whole scan. */
+const rangeEntriesOf = (state: MarksState): ReadonlyMap<string, readonly RangeEntry[]> => {
+  const ranges = new Map<string, RangeEntry[]>()
   for (const mark of state.records.values()) {
     const parsed = ViewedKeys.rangeFromKey(mark.key)
-    if (parsed !== null && parsed.workspacePath === range.workspacePath && parsed.base === range.base && parsed.head === range.head)
-      paths.push({ path: parsed.path, version: mark.version })
+    if (parsed === null) continue
+    const key = rangeKeyOf(parsed)
+    const entries = ranges.get(key)
+    if (entries === undefined) ranges.set(key, [{ path: parsed.path, version: mark.version }])
+    else entries.push({ path: parsed.path, version: mark.version })
   }
-  return { revision: state.revision, paths: paths.sort((left, right) => left.version - right.version).map(entry => entry.path) }
+  return ranges
+}
+
+const rangeMarksOf = (state: MarksState, range: ViewedRange, ranges: ReadonlyMap<string, readonly RangeEntry[]>): RangeMarks => ({
+  revision: state.revision,
+  paths: [...(ranges.get(rangeKeyOf(range)) ?? [])].sort((left, right) => left.version - right.version).map(entry => entry.path),
+})
+
+/**
+ * Reads repeat on one unchanged state: a client polls `state`, and a combined review reads one range per revision.
+ * The store replaces the state object on every write, so memoizing on that identity is the whole invalidation story.
+ */
+const createReads = () => {
+  let read: { readonly state: MarksState; snapshot: ViewedMarksSnapshot | null; ranges: ReadonlyMap<string, readonly RangeEntry[]> | null } | null = null
+  const readOf = (state: MarksState) => (read?.state === state ? read : (read = { state, snapshot: null, ranges: null }))
+  return {
+    snapshot: (state: MarksState): ViewedMarksSnapshot => {
+      const current = readOf(state)
+      current.snapshot ??= snapshotOf(state)
+      return current.snapshot
+    },
+    range: (state: MarksState, range: ViewedRange): RangeMarks => {
+      const current = readOf(state)
+      current.ranges ??= rangeEntriesOf(state)
+      return rangeMarksOf(state, range, current.ranges)
+    },
+  }
 }
 
 /** Keys past each kind's bound; turn and range marks are trimmed separately so one cannot evict the other. */
@@ -118,6 +152,7 @@ export class ViewedMarks extends Context.Service<
           records: new Map(stored),
         })
         const bounds = { turn: bound, range: rangeBound }
+        const reads = createReads()
 
         const unmark = Effect.fnUntraced(function* (key: string) {
           yield* table.delete(key).pipe(Effect.mapError(cause => new ViewedMarksWriteFailed({ operation: 'unmark', cause })))
@@ -155,7 +190,7 @@ export class ViewedMarks extends Context.Service<
         const toggle = Effect.fn('diff viewed mark toggle')(function* (file: ViewedFile) {
           const key = viewedKey(file)
           const current = yield* Ref.get(state)
-          return snapshotOf(current.records.has(key) ? yield* unmark(key) : yield* mark(key))
+          return reads.snapshot(current.records.has(key) ? yield* unmark(key) : yield* mark(key))
         }, domain.withWriteLock)
 
         const set = Effect.fn('diff viewed marks set')(function* (input: { readonly targets: readonly ViewedTarget[]; readonly viewed: boolean }) {
@@ -190,9 +225,9 @@ export class ViewedMarks extends Context.Service<
         }, domain.withWriteLock)
 
         return ViewedMarks.of({
-          snapshot: Effect.map(Ref.get(state), snapshotOf),
+          snapshot: Effect.map(Ref.get(state), reads.snapshot),
           toggle,
-          rangeState: range => Effect.map(Ref.get(state), current => rangeMarksOf(current, range)),
+          rangeState: range => Effect.map(Ref.get(state), current => reads.range(current, range)),
           set,
         })
       }),
