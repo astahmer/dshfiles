@@ -113,6 +113,10 @@ export class PreviewDevServers extends Context.Service<
             return cwds
           })
 
+        const processTable = probeExec('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,lstart=,args=']).pipe(
+          Effect.map(DevServers.parsePs),
+        )
+
         const probe = Effect.gen(function* () {
           if (process.platform !== 'darwin' && process.platform !== 'linux') return { supported: false, servers: [] }
           const socketsText = yield* probeExec(
@@ -123,9 +127,10 @@ export class PreviewDevServers extends Context.Service<
           // No listening socket means no row to attribute: skip the process table, the cwd probes and the Session
           // fold. Every poll of an idle thread used to pay all three to return `servers: []`.
           if (sockets.length === 0) return { supported: true, servers: [] }
-          const rows = DevServers.parsePs(yield* probeExec('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,lstart=,args=']))
-          const known = yield* sessions
-          const cwds = yield* readCwds([...new Set(sockets.map(socket => socket.pid))])
+          // The three reads share no input, so waiting for each before starting the next paid their sum: run them together.
+          const [rows, known, cwds] = yield* Effect.all([processTable, sessions, readCwds([...new Set(sockets.map(socket => socket.pid))])], {
+            concurrency: 'unbounded',
+          })
           const jobs = yield* Ref.get(liveJobs)
           return {
             supported: true,
@@ -176,9 +181,7 @@ export class PreviewDevServers extends Context.Service<
         return PreviewDevServers.of({
           read,
           invalidate: Ref.set(cached, undefined),
-          readProcessTable: probeExec('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,lstart=,args=']).pipe(
-            Effect.map(DevServers.parsePs),
-          ),
+          readProcessTable: processTable,
         })
       }),
     )
