@@ -63,6 +63,13 @@ const RESIDENT_SESSION_STATE_LIMIT = 3
 const LIST_ROW_STATE_KEYS = ['title', 'sessionListMetadata'] as const
 
 /**
+ * Session instances nobody renders that stay instantiated. The sidebar restores and revisits threads freely, and a
+ * resident instance carries its whole event window; past this many, the least recently viewed unsubscribed instance
+ * is released and rebuilt (with a fresh window) the next time a view opens it.
+ */
+const RESIDENT_UNMOUNTED_SESSION_LIMIT = 4
+
+/**
  * The generated Remote client type still describes the native list request.
  * The fork's Host accepts the selector, so this boundary adapter widens only
  * that one call.
@@ -187,6 +194,8 @@ export class SessionManager {
   private readonly hostKnown = new Set<SessionId>()
   /** Viewed Session ids, oldest first: bounds how much history projection state stays resident. */
   private readonly viewedSessions: SessionId[] = []
+  /** Guards the release pass: `drop` re-enters state release, and the pass already mutates `sessions`. */
+  private releasingSessions = false
 
 
   private listSnapshotCache: SessionListSnapshot
@@ -422,12 +431,37 @@ export class SessionManager {
   private releaseStaleSessionState(): void {
     let resident = this.viewedSessions.length
     for (const sessionId of [...this.viewedSessions]) {
-      if (resident <= RESIDENT_SESSION_STATE_LIMIT) return
+      if (resident <= RESIDENT_SESSION_STATE_LIMIT) break
       if (this.sessions.has(sessionId) || this.provisional.has(sessionId)) continue
       this.viewedSessions.splice(this.viewedSessions.indexOf(sessionId), 1)
       this.projectionStores.get(sessionId)?.retainOnly(LIST_ROW_STATE_KEYS)
       this.projectionLoads.delete(sessionId)
       resident -= 1
+    }
+    this.releaseUnrenderedSessions()
+  }
+
+  /**
+   * Release the least recently viewed Session instances that no view subscribes to.
+   * A released instance is rebuilt by the next `get`, which refetches its window from the Host.
+   */
+  private releaseUnrenderedSessions(): void {
+    if (this.releasingSessions) return
+    const unrendered = this.viewedSessions.filter(sessionId => {
+      const session = this.sessions.get(sessionId)
+      if (session === undefined || session.mounted) return false
+      return !this.provisional.has(sessionId) && !this.engagedSessions.has(sessionId)
+    })
+    const surplus = unrendered.length - RESIDENT_UNMOUNTED_SESSION_LIMIT
+    if (surplus <= 0) return
+    this.releasingSessions = true
+    try {
+      for (const sessionId of unrendered.slice(0, surplus)) {
+        const session = this.sessions.get(sessionId)
+        if (session !== undefined) void this.drop(sessionId, session)
+      }
+    } finally {
+      this.releasingSessions = false
     }
   }
 

@@ -33,8 +33,7 @@ const viewThenLeave = async (manager: SessionManager, sessionId: SessionId): Pro
   await manager.drop(sessionId, session)
 }
 
-const projectedKeys = (manager: SessionManager, sessionId: SessionId): string[] =>
-  Object.keys(manager.projectionValues(sessionId) ?? {}).sort()
+const projectedKeys = (manager: SessionManager, sessionId: SessionId): string[] => Object.keys(manager.projectionValues(sessionId) ?? {}).sort()
 
 describe('SessionManager resident per-session state', () => {
   it(`keeps history projections only for the last ${RESIDENT_LIMIT} viewed Sessions`, async () => {
@@ -73,5 +72,28 @@ describe('SessionManager resident per-session state', () => {
 
     expect(projectedKeys(manager, first)).toEqual(['title', 'turnOutline'])
     expect(projectedKeys(manager, second)).toEqual(['title', 'turnOutline'])
+  })
+
+  it('releases instances no view subscribes to beyond the unrendered limit', async () => {
+    const manager = createManager()
+    const mountedId = SessionId('session-mounted')
+    const mounted = manager.get(mountedId)
+    const unsubscribe = mounted.subscribe(() => undefined)
+
+    const visited = Array.from({ length: 8 }, (_value, index) => SessionId(`session-visit-${String(index)}`))
+    for (const sessionId of visited) {
+      manager.get(sessionId)
+      seedSession(manager, sessionId)
+    }
+
+    // The newest unrendered instances stay resident, so reopening one reuses it.
+    expect(manager.get(visited.at(-1)!)).toBe(manager.get(visited.at(-1)!))
+    // The oldest were released: the next open builds a new instance instead of reusing history.
+    const reopened = manager.get(visited[0]!)
+    expect(projectedKeys(manager, visited[0]!)).toEqual(['title'])
+    expect(manager.get(visited[0]!)).toBe(reopened)
+    // A subscribed Session is never released.
+    expect(manager.get(mountedId)).toBe(mounted)
+    unsubscribe()
   })
 })

@@ -17,25 +17,24 @@
       "local": "locale"
     }
   ],
-  "added": [
-    "src/native/cold-reads.ts",
-    "src/native/control.test.ts"
-  ],
+  "added": ["src/native/cold-reads.ts", "src/native/control.test.ts"],
   "delta": [
-    "src/native/history.ts",
-    "src/native/commands.ts",
-    "src/native/index.ts",
-    "src/native/catalog.ts",
-    "src/native/types.ts",
-    "src/native/client/sessions/session.ts",
-    "src/native/client/sessions/lineage.ts",
-    "src/native/client/index.ts",
-    "src/native/list.ts",
-    "src/native/client/sessions/manager.ts",
-    "src/native/client/contract/sessions.ts",
-    "src/native/client/sessions/service.ts",
     "src/native/assistant-stream.ts",
+    "src/native/catalog.ts",
+    "src/native/client/contract/sessions.ts",
+    "src/native/client/index.ts",
+    "src/native/client/sessions/lineage.ts",
+    "src/native/client/sessions/manager.ts",
+    "src/native/client/sessions/notifier.ts",
+    "src/native/client/sessions/projection-store.ts",
+    "src/native/client/sessions/service.ts",
+    "src/native/client/sessions/session.ts",
+    "src/native/commands.ts",
     "src/native/control.ts",
-    "src/native/model-selection-projection.ts"
+    "src/native/history.ts",
+    "src/native/index.ts",
+    "src/native/list.ts",
+    "src/native/model-selection-projection.ts",
+    "src/native/types.ts"
   ]
 }
