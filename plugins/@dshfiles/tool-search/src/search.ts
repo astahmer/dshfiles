@@ -90,10 +90,7 @@ const rankTools = (query: string, schemas: readonly ToolSchema[]): SearchMatch[]
   const rawTerms = new Set(normalizedQuery.split(/\s+/u).filter(Boolean))
   const entries = schemas.map(schema => ({ schema, prepared: prepare(schema) }))
   const documentFrequency = new Map(queryTokens.map(term => [term, entries.filter(entry => entry.prepared.frequencies.has(term)).length]))
-  const averageLength = Math.max(
-    1,
-    entries.reduce((total, entry) => total + entry.prepared.length, 0) / Math.max(1, entries.length),
-  )
+  const averageLength = Math.max(1, entries.reduce((total, entry) => total + entry.prepared.length, 0) / Math.max(1, entries.length))
   const ranked = entries.flatMap(entry => {
     let score = 0
     if (entry.prepared.name === normalizedQuery) score += 1_000_000

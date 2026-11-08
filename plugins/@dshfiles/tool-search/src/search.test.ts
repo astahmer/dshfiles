@@ -23,7 +23,12 @@ describe('rankTools', () => {
   it('ranks freshly projected schemas exactly like cached ones', () => {
     const baseline = ToolSearchModel.rank('thread file', catalog)
     expect(ToolSearchModel.rank('thread file', catalog)).toEqual(baseline)
-    expect(ToolSearchModel.rank('thread file', catalog.map(tool => ({ ...tool })))).toEqual(baseline)
+    expect(
+      ToolSearchModel.rank(
+        'thread file',
+        catalog.map(tool => ({ ...tool })),
+      ),
+    ).toEqual(baseline)
   })
 
   it('returns no candidates for an unrelated query in a broad catalog', () => {
