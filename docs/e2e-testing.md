@@ -95,6 +95,13 @@ cell and a native entry was still registered behind it.
   `dist/` is ignored) whose client `apply` throws, and asserts the boot card
   names `@dshfiles-e2e/failing-client: failed`. The fixture never joins a
   real profile.
+- **A lost bundle fetch is retried once.** A fresh page asks for its Client
+  bundles while the Host is still serving them, and one navigation can lose
+  that race: the boot card then names core entries that never loaded, while the
+  same scenario passes when run alone. The harness navigates once more and
+  prints `[boot-retry]` with the first attempt's problems; when the second also
+  fails, the failure names both navigations, so a broken bundle still reports
+  what broke instead of hiding behind the retry.
 
 ## Feature catalogs
 
