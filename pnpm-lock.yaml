@@ -4395,20 +4395,20 @@ importers:
         version: link:../shared-runtime
       '@effect/platform-node':
         specifier: 'catalog:'
-        version: 4.1.0(effect@4.1.0)(redis@6.3.1)
+        version: 4.1.2(effect@4.1.2)(redis@6.3.1)
       dompurify:
         specifier: 3.4.17
         version: 3.4.17
       effect:
         specifier: 'catalog:'
-        version: 4.1.0
+        version: 4.1.2
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4
         version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
-        version: 0.2.1-rc.2(aa2eabd231061407f0aceb3cedf5b539)
+        version: 0.2.1-rc.2(270d4dc1290c940a1694f1ca388defa2)
       '@deepseek-ai/dsh-client-connection':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2)
@@ -4456,7 +4456,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: 'catalog:'
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2)
+        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2)
 
   plugins/@dshfiles/model-effort-picker:
     dependencies:
@@ -19042,7 +19042,7 @@ snapshots:
       '@deepseek-ai/dsh-timeout': 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-typert-protocol': 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/schemastery': 3.18.5
-      ws: 8.22.0
+      ws: 8.22.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -21041,7 +21041,7 @@ snapshots:
       '@deepseek-ai/schemastery': 3.18.5
       open: 11.0.4
       serve-static: 2.2.1
-      ws: 8.22.0
+      ws: 8.22.1
     transitivePeerDependencies:
       - '@deepseek-ai/cordis-plugin-group'
       - '@deepseek-ai/cordis-plugin-include'
@@ -27414,7 +27414,7 @@ snapshots:
       google-auth-library: 10.9.1
       p-retry: 4.6.2
       protobufjs: 7.6.6
-      ws: 8.22.0
+      ws: 8.22.1
     optionalDependencies:
       '@modelcontextprotocol/sdk': 1.32.2(zod@4.4.3)
     transitivePeerDependencies:
