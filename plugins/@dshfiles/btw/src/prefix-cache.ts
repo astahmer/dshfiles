@@ -8,6 +8,9 @@ const usageSchema = Schema.Struct({
 })
 const streamUsageSchema = Schema.Struct({ chunk: Schema.Struct({ type: Schema.Literal('usage'), usage: usageSchema }) })
 const eventSchema = Schema.Struct({ type: Schema.String, data: Schema.Unknown })
+type PrefixCacheEvent = Schema.Schema.Type<typeof eventSchema>
+// oxlint-disable-next-line antislop/no-unknown-parameters -- this is the boundary: the native event window hands over unknown JSON and the schema parses it
+const eventOf = (raw: unknown): Option.Option<PrefixCacheEvent> => Schema.decodeUnknownOption(eventSchema)(raw)
 const assistantSchema = Schema.Struct({ usage: Schema.optional(usageSchema), stream: Schema.optional(Schema.Array(Schema.Unknown)) })
 
 export interface PrefixCacheReading {
@@ -38,17 +41,15 @@ class PrefixCacheScan {
     return this.value
   }
 
-  readonly feed = (raw: unknown): void => {
+  readonly feed = (event: PrefixCacheEvent): void => {
     if (this.settled) return
-    const event = Schema.decodeUnknownOption(eventSchema)(raw)
-    if (Option.isNone(event)) return
-    if (event.value.type === 'session/end-seed') {
+    if (event.type === 'session/end-seed') {
       this.afterSeed = true
       return
     }
-    if (!this.afterSeed || event.value.type !== 'assistant/message') return
+    if (!this.afterSeed || event.type !== 'assistant/message') return
     this.settled = true
-    const message = Schema.decodeUnknownOption(assistantSchema)(event.value.data)
+    const message = Schema.decodeUnknownOption(assistantSchema)(event.data)
     if (Option.isNone(message)) return
     const usage =
       message.value.usage ??
@@ -73,7 +74,8 @@ export class PrefixCache {
   static firstRequestAfterFork(events: readonly unknown[]): PrefixCacheReading | undefined {
     const scan = new PrefixCacheScan()
     for (const raw of events) {
-      scan.feed(raw)
+      const event = eventOf(raw)
+      if (Option.isSome(event)) scan.feed(event.value)
       if (scan.done) break
     }
     return scan.reading
@@ -98,7 +100,8 @@ export class PrefixCacheReader {
     }
     for (let index = this.scanned; index < window.entries.length; index += 1) {
       const entry = window.entries[index]
-      if (entry !== undefined) this.scan.feed(entry.event)
+      const event = entry === undefined ? Option.none<PrefixCacheEvent>() : eventOf(entry.event)
+      if (Option.isSome(event)) this.scan.feed(event.value)
       if (this.scan.done) break
     }
     this.scanned = window.entries.length

@@ -49,7 +49,10 @@ describe('PrefixCacheReader', () => {
       { events: [seed], kind: 'replace' },
       { events: [seed, liveChunk], kind: 'append' },
       { events: [seed, liveChunk, assistant({ inputTokens: 300, outputTokens: 40, cacheReadTokens: 8700 })], kind: 'append' },
-      { events: [seed, liveChunk, assistant({ inputTokens: 300, outputTokens: 40, cacheReadTokens: 8700 }), assistant({ inputTokens: 5, outputTokens: 1 })], kind: 'append' },
+      {
+        events: [seed, liveChunk, assistant({ inputTokens: 300, outputTokens: 40, cacheReadTokens: 8700 }), assistant({ inputTokens: 5, outputTokens: 1 })],
+        kind: 'append',
+      },
     ]
     for (const tick of ticks) expect(reader.read(windowOf(tick.events, tick.kind))).toEqual(PrefixCache.firstRequestAfterFork(tick.events))
   })
