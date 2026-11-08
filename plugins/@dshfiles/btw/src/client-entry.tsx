@@ -307,6 +307,7 @@ export default defineClient({
                 variant="ghost"
                 size="icon-sm"
                 aria-label={label}
+                data-phone-thread-tool=""
                 className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground"
                 onMouseDown={event => event.preventDefault()}
                 onClick={() => askAbout(props.sessionId)}
