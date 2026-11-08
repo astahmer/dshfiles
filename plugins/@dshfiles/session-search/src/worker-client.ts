@@ -98,7 +98,16 @@ export class SearchWorker extends Context.Service<
           Effect.gen(function* () {
             const entry = options.workerUrl === undefined ? yield* workerEntry(import.meta.url) : { url: options.workerUrl, execArgv: noArgs }
             const workerData = { indexPath: options.indexPath, ...(options.windowBytes !== undefined && { windowBytes: options.windowBytes }) }
-            return NodeWorker.layer(() => new Worker(entry.url, { workerData, ...(entry.execArgv.length > 0 && { execArgv: [...entry.execArgv] }) }))
+            // The worker decodes bounded 2 MB windows into documents; 512 MB is far above that peak and keeps a runaway
+            // index pass from growing its own isolate to the Host's 4 GB limit.
+            return NodeWorker.layer(
+              () =>
+                new Worker(entry.url, {
+                  workerData,
+                  resourceLimits: { maxOldGenerationSizeMb: 512, maxYoungGenerationSizeMb: 32 },
+                  ...(entry.execArgv.length > 0 && { execArgv: [...entry.execArgv] }),
+                }),
+            )
           }),
         ),
       ),

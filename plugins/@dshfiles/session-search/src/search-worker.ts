@@ -101,8 +101,10 @@ const Handlers = SearchWorkerRpcs.toLayer(
         const result = outcome.success.result
         // Dropping archived Sessions empties most of the file; give the bytes back once, in a step of its own so a
         // failure is reported instead of swallowed by the pass.
-        if (!compacted && index.freePageRatio() > 0.25) {
-          const reclaimed = yield* Effect.try({ try: () => (index.vacuum(), true), catch: error => describeError(error) }).pipe(Effect.result)
+        // Un-merged FTS5 segments are the real garbage after a prune (measured 1.82 GB of a 2.01 GB index), and the page
+        // freelist stays small, so the trigger is bytes per document as well as free pages.
+        if (!compacted && (index.freePageRatio() > 0.25 || index.bytesPerDocument() > 2_048)) {
+          const reclaimed = yield* Effect.try({ try: () => (index.compact(), true), catch: error => describeError(error) }).pipe(Effect.result)
           if (reclaimed._tag === 'Success') compacted = true
           else yield* Effect.logWarning('session-search: the index could not be compacted yet', reclaimed.failure)
         }
