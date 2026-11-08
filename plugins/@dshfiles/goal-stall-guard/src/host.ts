@@ -122,7 +122,10 @@ const stallGuard = (threshold: number) =>
             return
         }
       }
-      yield* Effect.acquireRelease(Effect.sync(() => ctx.on('session/event', onSessionEvent)), dispose => Effect.sync(() => dispose()))
+      yield* Effect.acquireRelease(
+        Effect.sync(() => ctx.on('session/event', onSessionEvent)),
+        dispose => Effect.sync(() => dispose()),
+      )
     }),
   )
 
