@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
 import { SessionId } from '@dshfiles/dshx/ids'
+import { recentLogEvents } from '@dshfiles/session-log-window'
 import { Context, Effect, Layer, Option, Schema, type Scope } from 'effect'
 import type { ProjectHookEvent } from './api.js'
 import type { ProjectChecksVerifiedTurn } from './completion-event.js'
@@ -25,6 +26,11 @@ const PACKAGE_NAME = '@dshfiles/project-checks'
 const MAX_HOOK_EVENTS = 12
 
 export type TurnStopping = Parameters<Events['agent/turn-stopping']>[0]
+
+const HOOK_EVENT_TYPES = new Set(['hook/invoked', 'hook/result'])
+
+/** Whether one Session event is a hook point this Host reports to its activity timeline. */
+const isHookEvent = (event: { readonly type: string }): boolean => HOOK_EVENT_TYPES.has(event.type)
 
 const decodeConfig = Schema.decodeUnknownEffect(projectChecksConfigSchema, { onExcessProperty: 'error' })
 const decodeSessionId = Schema.decodeUnknownEffect(SessionId)
@@ -94,16 +100,19 @@ export class ChecksHost extends Context.Service<
 
       const hookEvents = Effect.fn('project-checks hook events read')(function* (sessionId: string) {
         const id = yield* decodeSessionId(sessionId).pipe(Effect.orDie)
-        const observations = yield* Effect.tryPromise({
+        const events = yield* Effect.tryPromise({
           try: async signal => {
+            // Hook events land at turn boundaries, so the newest window of the log holds the newest of them: one
+            // bounded read instead of listing the whole event log and then re-reading one log per event.
+            const recent = await recentLogEvents({ ctx: host.ctx, sessionId: id, signal, matches: isHookEvent, keep: MAX_HOOK_EVENTS })
+            if (recent !== undefined) return recent.events
             const listed = await sessionQuery.listEvents(id)
-            const selected = listed.filter(event => event.type === 'hook/invoked' || event.type === 'hook/result').slice(-MAX_HOOK_EVENTS)
-            return Promise.all(selected.map(event => sessionQuery.readEvent({ sessionId: id, seq: event.seq }, signal)))
+            const selected = listed.filter(isHookEvent).slice(-MAX_HOOK_EVENTS)
+            return Promise.all(selected.map(async event => (await sessionQuery.readEvent({ sessionId: id, seq: event.seq }, signal)).target))
           },
           catch: cause => new SessionEventsUnavailable({ cause }),
         })
-        const summaries = observations.flatMap((observation): ReadonlyArray<ProjectHookEvent> => {
-          const event = observation.target
+        const summaries = events.flatMap((event): ReadonlyArray<ProjectHookEvent> => {
           if (event.type === 'hook/invoked')
             return [
               {

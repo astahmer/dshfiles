@@ -50,6 +50,7 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@dshfiles/session-log-window": "workspace:*",
     "effect": "catalog:",
     "mime-types": "3.0.2"
   },

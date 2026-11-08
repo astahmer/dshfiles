@@ -10,7 +10,7 @@ export default defineConfig({
     'sessions-api': 'src/sessions-api.ts',
   },
   // tsc lowers the Host's TC39 `@Remote` decorators first, as the native build does; the bundler keeps them as is.
-  host: { entry: 'build/host/host.js' },
+  host: { entry: 'build/host/host.js', bundleDependencies: ['@dshfiles/session-log-window'] },
   client: {
     entry: 'src/client-entry.tsx',
     // The native build inlines these into its client chunk; they are not browser-roster modules.
