@@ -74,6 +74,49 @@ it('records bounded corpus cache and invalidation diagnostics', async () => {
   expect(JSON.stringify(spans.map(span => span.attributes))).not.toContain('private-session-id')
 })
 
+it('does not cache a corpus read invalidated while it is in flight', async () => {
+  const ctx = await hostContext()
+  const oldRecord = coldRecord(ctx, 'old-corpus')
+  const newRecord = coldRecord(ctx, 'new-corpus')
+  const pending: Array<(records: readonly SessionRecord[]) => void> = []
+  ctx.provide('sessionQuery', {
+    listSessions: () => new Promise<readonly SessionRecord[]>(resolve => pending.push(resolve)),
+  } as never)
+  const list = new ApiSessionList(ctx, 8)
+  using recorder = recordSpans()
+  const first = list.list()
+  ctx.emit('session/disposed', ctx.sessions.prepare(SessionId('old-corpus'), { meta: { createdAt: 100, cwd: resolve('cold-list-fixture') } }))
+  const second = list.list()
+  expect(pending).toHaveLength(2)
+  pending[1]?.([newRecord])
+  expect((await second).map(item => item.sessionId)).toEqual(['new-corpus'])
+  pending[0]?.([oldRecord])
+  await first
+  expect((await list.list()).map(item => item.sessionId)).toEqual(['new-corpus'])
+  expect(recorder.named('session corpus read').map(span => span.attributes['dshx.session-controller.current'])).toEqual([true, false])
+  expect(recorder.named('session list read').some(span => span.attributes['dshx.session-controller.last_invalidation'] === 'disposed')).toBe(true)
+})
+
+it('retries a failed corpus read without retaining sensitive diagnostics', async () => {
+  const ctx = await hostContext()
+  const record = coldRecord(ctx, 'sensitive-session')
+  let reads = 0
+  ctx.provide('sessionQuery', {
+    listSessions: async () => {
+      reads += 1
+      if (reads === 1) throw new Error('sensitive failure detail')
+      return [record]
+    },
+  } as never)
+  const list = new ApiSessionList(ctx, 8)
+  using recorder = recordSpans()
+  await expect(list.list()).rejects.toThrow('sensitive failure detail')
+  expect((await list.list()).map(item => item.sessionId)).toEqual(['sensitive-session'])
+  expect(reads).toBe(2)
+  const spans = [...recorder.named('session corpus read'), ...recorder.named('session list read')]
+  expect(JSON.stringify(spans.map(span => span.attributes))).not.toContain('sensitive')
+})
+
 it('stops waiting for a corpus read at the caller budget without repeating the read', async () => {
   const ctx = await hostContext()
   const record = coldRecord(ctx, 'cold-abort')
