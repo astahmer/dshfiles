@@ -42,34 +42,73 @@ const compileAlwaysVisible = (patterns: readonly string[]): readonly RegExp[] =>
   })
 }
 
+interface PreparedTool {
+  readonly name: string
+  readonly description: string
+  readonly length: number
+  readonly frequencies: ReadonlyMap<string, number>
+  readonly nameTokens: ReadonlySet<string>
+}
+
+const prepareTool = (schema: ToolSchema): PreparedTool => {
+  const nameTokens = tokenize(schema.name)
+  const tokens = [...nameTokens, ...tokenize(schema.description)]
+  const frequencies = new Map<string, number>()
+  for (const token of tokens) frequencies.set(token, (frequencies.get(token) ?? 0) + 1)
+  return {
+    name: normalize(schema.name),
+    description: normalize(schema.description),
+    length: tokens.length,
+    frequencies,
+    nameTokens: new Set(nameTokens),
+  }
+}
+
+/** Only the name and description feed the preparation, so identical text reuses one entry across registry projections. */
+const preparedTools = new Map<string, Map<string, PreparedTool>>()
+const preparedLimit = 2048
+let preparedCount = 0
+
+const prepare = (schema: ToolSchema): PreparedTool => {
+  const cached = preparedTools.get(schema.name)?.get(schema.description)
+  if (cached !== undefined) return cached
+  const prepared = prepareTool(schema)
+  if (preparedCount >= preparedLimit) {
+    preparedTools.clear()
+    preparedCount = 0
+  }
+  const byDescription = preparedTools.get(schema.name) ?? new Map<string, PreparedTool>()
+  byDescription.set(schema.description, prepared)
+  preparedTools.set(schema.name, byDescription)
+  preparedCount += 1
+  return prepared
+}
+
 const rankTools = (query: string, schemas: readonly ToolSchema[]): SearchMatch[] => {
   const normalizedQuery = normalize(query)
   const queryTokens = [...new Set(tokenize(query))]
   const rawTerms = new Set(normalizedQuery.split(/\s+/u).filter(Boolean))
-  const entries = schemas.map(schema => {
-    const tokens = [...tokenize(schema.name), ...tokenize(schema.description)]
-    const frequencies = new Map<string, number>()
-    for (const token of tokens) frequencies.set(token, (frequencies.get(token) ?? 0) + 1)
-    return { schema, name: normalize(schema.name), description: normalize(schema.description), tokens, frequencies }
-  })
-  const documentFrequency = new Map(queryTokens.map(term => [term, entries.filter(entry => entry.frequencies.has(term)).length]))
-  const averageLength = Math.max(1, entries.reduce((total, entry) => total + entry.tokens.length, 0) / Math.max(1, entries.length))
+  const entries = schemas.map(schema => ({ schema, prepared: prepare(schema) }))
+  const documentFrequency = new Map(queryTokens.map(term => [term, entries.filter(entry => entry.prepared.frequencies.has(term)).length]))
+  const averageLength = Math.max(
+    1,
+    entries.reduce((total, entry) => total + entry.prepared.length, 0) / Math.max(1, entries.length),
+  )
   const ranked = entries.flatMap(entry => {
     let score = 0
-    if (entry.name === normalizedQuery) score += 1_000_000
-    if (rawTerms.has(entry.name)) score += 100_000
-    if (normalizedQuery.length > 0 && entry.name.includes(normalizedQuery)) score += 1_000
-    if (normalizedQuery.length > 0 && entry.description.includes(normalizedQuery)) score += 100
-    const nameTokens = new Set(tokenize(entry.schema.name))
+    if (entry.prepared.name === normalizedQuery) score += 1_000_000
+    if (rawTerms.has(entry.prepared.name)) score += 100_000
+    if (normalizedQuery.length > 0 && entry.prepared.name.includes(normalizedQuery)) score += 1_000
+    if (normalizedQuery.length > 0 && entry.prepared.description.includes(normalizedQuery)) score += 100
     for (const term of queryTokens) {
-      const termFrequency = entry.frequencies.get(term) ?? 0
+      const termFrequency = entry.prepared.frequencies.get(term) ?? 0
       if (termFrequency > 0) {
         const frequency = documentFrequency.get(term) ?? 0
         const idf = Math.log(1 + (entries.length - frequency + 0.5) / (frequency + 0.5))
-        score += (idf * termFrequency * 2.2) / (termFrequency + 1.2 * (0.25 + (0.75 * entry.tokens.length) / averageLength))
+        score += (idf * termFrequency * 2.2) / (termFrequency + 1.2 * (0.25 + (0.75 * entry.prepared.length) / averageLength))
       }
-      if (nameTokens.has(term)) score += 50
-      if (entry.name.startsWith(term)) score += 20
+      if (entry.prepared.nameTokens.has(term)) score += 50
+      if (entry.prepared.name.startsWith(term)) score += 20
     }
     return score > 0 ? [{ name: entry.schema.name, description: entry.schema.description, score }] : []
   })

@@ -20,6 +20,12 @@ describe('rankTools', () => {
     expect(ToolSearchModel.rank('earlier conversations', catalog).map(tool => tool.name)).toContain('search_threads')
   })
 
+  it('ranks freshly projected schemas exactly like cached ones', () => {
+    const baseline = ToolSearchModel.rank('thread file', catalog)
+    expect(ToolSearchModel.rank('thread file', catalog)).toEqual(baseline)
+    expect(ToolSearchModel.rank('thread file', catalog.map(tool => ({ ...tool })))).toEqual(baseline)
+  })
+
   it('returns no candidates for an unrelated query in a broad catalog', () => {
     const decoys = Array.from({ length: 599 }, (_, index): ToolSchema => ({
       name: `inspect_catalog_${String(index + 1).padStart(3, '0')}`,
