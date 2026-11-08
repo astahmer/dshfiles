@@ -56,3 +56,15 @@ Feature: Chat browser journeys
     Then the thread gallery includes images from other turns
 
 
+
+  @scenario:chat.quote-message
+  Scenario: Quote an assistant reply into the composer without sending it
+    Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/session-controller, @dshfiles/input-trigger, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When the assistant reply of a chat thread is quoted
+    Then the draft holds the reply as a blockquote with its source, unsent
+
+  @scenario:chat.quote-selection
+  Scenario: Quote only the selected part of a message after the existing draft
+    Given the isolated plugin composition of "@dshfiles/rich-composer, @dshfiles/session-controller, @dshfiles/input-trigger, @dshfiles/chat, @dshfiles/multi-host, @dshfiles/jj-integration" is booted
+    When part of the user message is selected and quoted
+    Then the draft adds only the selected words after the existing text

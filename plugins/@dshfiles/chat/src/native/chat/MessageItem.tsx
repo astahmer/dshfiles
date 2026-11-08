@@ -328,6 +328,10 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
           time={data.time}
           clock="start"
           className={css.actions}
+          quote={{
+            author: 'user',
+            turn: node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn.turn : undefined,
+          }}
           t={t}
         />
       )}

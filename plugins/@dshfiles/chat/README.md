@@ -6,6 +6,8 @@
 
 ![Choose how widely Chat image previews can browse](docs/screenshots/image-gallery-scope.png)
 
+![Quote a message into the composer](docs/screenshots/quote-message.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.
@@ -74,6 +76,18 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/code-fences.tsx`, `src/code-fence-transform.tsx`, `src/fenced-markdown.tsx`, `src/report-once.ts` | new: the published `@dshfiles/chat/code-fences` registry, the transform `InlineReferenceMarkdown` applies, the published `@dshfiles/chat/fenced-markdown` renderer (below), and the log-once reporter both registries use |
 | `src/native/chat/ReasoningContent.tsx`, `CompactionItem.tsx` | reasoning and the compaction summary render through `FencedMarkdown`, so a claimed fence renders there too |
 | `src/native/chat/AssistantMarkdown.tsx` (also), `UserContent.tsx`, `ChatView.tsx` (also) | text blocks render through `InlineReferenceMarkdown`, the Referenced-session line through `InlineReferenceText`, and the transcript sits in an `InlineReferenceScope` naming its Session |
+| `src/native/chat/MessageIconActions.tsx` (also), `MessageItem.tsx` (also), `TurnTailNodeView.tsx` (also), `src/native/locale.ts` (also) | a **Quote in composer** action beside Copy on durable user messages and completed assistant replies (below) |
+| `src/message-quote.ts` | new: the quote text (one `> ` per line, blank lines kept as `>`, an existing `>` nested one level), its source line and the selection scope of one message |
+
+### Quote a message into the composer
+
+**Quote in composer** inserts the message at the composer caret as a Markdown blockquote, followed by a source line
+(`— Assistant · turn 3 · 14:05`) and an empty line for the reply, then focuses the composer. A selection inside that
+message (read on pointer-down, so a tap does not collapse it first) quotes only the selected text; a selection that
+reaches outside it quotes the whole message. Nothing is sent: the quote is ordinary draft text, editable and persisted
+like any draft. The write goes through the dshx `Composer` contract, so Chat imports nothing from Rich Composer and the
+action hides while no composer provides it. It has no agent tool: it only edits the user's own unsent draft, which
+AGENTS.md treats as presentation-only state; an agent that wants to quote writes the text in its own reply.
 
 ### Focus a Turn, Step or tool call from another plugin
 

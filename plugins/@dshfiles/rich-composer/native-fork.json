@@ -52,6 +52,7 @@
     "src/native/input/detached-sends.test.ts",
     "src/native/input/detached-sends.ts",
     "src/native/input/editor/keymap.test.ts",
+    "src/native/input/editor/insert-async-text.test.ts",
     "src/native/input/editor/reference-activation.test.ts",
     "src/native/input/editor/restore-draft-references.test.ts",
     "src/native/input/machine.test.ts",

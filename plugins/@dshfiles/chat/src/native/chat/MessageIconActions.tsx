@@ -1,10 +1,14 @@
 // Shared IconActions chrome for user and assistant messages: copy
-// live, optional branch wiring, and an optional date-aware clock.
+// live, quote into the composer, optional branch wiring, and an optional
+// date-aware clock.
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import {
   IconBranchOutlineRegular, IconCheckOutlineRegular, IconCopyOutlineRegular, Tooltip, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Composer, useContract } from '@dshfiles/dshx/client'
+import { TextQuoteIcon } from '@dshfiles/plugin-ui/icons'
+import { MessageQuote, quoteScopeFor, selectedQuoteText } from '../../message-quote.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { formatMessageClock } from './message-chrome.ts'
 import { useCalendarDay } from './use-calendar-day.ts'
@@ -33,8 +37,67 @@ export interface MessageIconActionsProps {
    * branch control at the end of the icon cluster.
    */
   usageAction?: ReactNode
+  /**
+   * Quote this message into the composer draft. `author` is who wrote it; `scope` says where its rendered text
+   * lives so a selection inside it quotes only the selected part. Omission hides the action.
+   */
+  quote?: { readonly author: 'user' | 'assistant'; readonly turn?: number | undefined } | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
+}
+
+/**
+ * Quote action: inserts the message (or the selection inside it) as a Markdown blockquote with a source line at the
+ * composer caret, then focuses the composer. Nothing is sent. Hidden while no composer provides dshx `Composer`.
+ */
+function QuoteAction({ text, time, quote, t, day }: {
+  text: string
+  time: number | undefined
+  quote: NonNullable<MessageIconActionsProps['quote']>
+  t: ChatViewSlotProps['t']
+  day: ReturnType<typeof useCalendarDay>
+}) {
+  const composer = useContract(Composer)
+  const button = useRef<HTMLButtonElement>(null)
+  // The selection is read on pointerdown: on touch devices the tap itself collapses it before click.
+  const selected = useRef<string | undefined>(undefined)
+  const capture = useCallback(() => {
+    const actions = button.current?.parentElement
+    selected.current = actions === null || actions === undefined
+      ? undefined
+      : selectedQuoteText(window.getSelection(), quoteScopeFor(actions, quote.author === 'user' ? 'row' : 'turn-assistant'))
+  }, [quote.author])
+  const onQuote = useCallback(() => {
+    if (composer.status !== 'active') return
+    const service = composer.value
+    const source = selected.current ?? text
+    selected.current = undefined
+    const block = MessageQuote.format(source, {
+      author: t(quote.author === 'user' ? 'message.quote.authorUser' : 'message.quote.authorAssistant'),
+      turn: quote.turn,
+      clock: time === undefined ? undefined : formatMessageClock(time, t, day),
+    }, { turn: turn => t('message.quote.turn', { turn }) })
+    if (block === undefined) return
+    const inserted = service.insert({ text: MessageQuote.separatorBefore(service.text() ?? '') + block })
+    if (inserted) service.focus()
+  }, [composer, day, quote.author, quote.turn, t, text, time])
+  if (composer.status !== 'active' || text.trim() === '') return null
+  return (
+    <Tooltip label={t('message.quote')} side="bottom">
+      <button
+        ref={button}
+        type="button"
+        className={css.action}
+        aria-label={t('message.quote')}
+        data-message-quote={quote.author}
+        onPointerDown={capture}
+        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') capture() }}
+        onClick={onQuote}
+      >
+        <TextQuoteIcon />
+      </button>
+    </Tooltip>
+  )
 }
 
 /**
@@ -44,7 +107,7 @@ export interface MessageIconActionsProps {
  */
 export function MessageIconActions({
   text, time, clock, onBranch, branchUnavailable = false, className,
-  extraActions, usageAction, t,
+  extraActions, usageAction, quote, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
   const reasonId = useId()
@@ -87,6 +150,7 @@ export function MessageIconActions({
           {copied ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
         </button>
       </Tooltip>
+      {quote !== undefined && <QuoteAction text={text} time={time} quote={quote} t={t} day={day} />}
       {extraActions}
       {onBranch !== undefined && (
         <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom">

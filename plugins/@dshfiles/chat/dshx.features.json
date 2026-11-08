@@ -175,6 +175,54 @@
       ]
     },
     {
+      "id": "quote-message",
+      "title": "Quote a message into the composer",
+      "summary": "Quote in composer on a user message or an assistant reply inserts it, or only the part selected inside it, at the caret as an editable Markdown blockquote with line breaks kept and a source line (author, turn, time); nothing is sent and the draft persists like any draft.",
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: Quote in composer beside Copy",
+      "reach": ["seed chat-reference-thread", "click button \"Quote in composer\"", "expect text \"— You*\""],
+      "configuration": [],
+      "states": ["hidden-without-composer", "idle", "quoted"],
+      "failureModes": [
+        "No plugin provides the dshx Composer contract: the action stays hidden.",
+        "A selection reaching outside the message quotes the whole message instead.",
+        "A busy or locked composer refuses the insert and the draft is unchanged."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.quote-format",
+          "file": "plugins/@dshfiles/chat/tests/message-quote.test.ts",
+          "testName": "nests an existing quote one level deeper"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.quote-selection-scope",
+          "file": "plugins/@dshfiles/chat/tests/message-quote.test.ts",
+          "testName": "quotes a selection across the assistant steps of the same turn"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.quote-message",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.quote-selection",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: Quote a message into the composer writes the browser draft through the Composer contract and starts no Host work of its own."
+        }
+      ]
+    },
+    {
       "id": "focus-from-plugin",
       "title": "Scroll to a turn, step or tool call on request",
       "summary": "Another plugin asks Chat to scroll to and highlight one turn, step or tool call: through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the folded process group with the beforematch event browser find uses, and outlines the row; Turn-footer entries get the thread's View opener.",

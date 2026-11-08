@@ -73,6 +73,7 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         branchUnavailable={data.branchUnavailable || hasLaterChatNode}
         className={css.actions}
         extraActions={assistantActions}
+        quote={{ author: 'assistant', turn: data.turn }}
         usageAction={detailed && data.tokenUsage !== undefined
           ? <TurnUsagePanel
               usage={data.tokenUsage}

@@ -2,7 +2,7 @@
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { LexicalEditor, NodeKey } from 'lexical'
 import {
-  $addUpdateTag, $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isRangeSelection,
+  $addUpdateTag, $createLineBreakNode, $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isRangeSelection,
   BLUR_COMMAND, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_CRITICAL, createEditor, HISTORY_MERGE_TAG, PASTE_TAG,
   RootNode, SELECTION_CHANGE_COMMAND, SKIP_DOM_SELECTION_TAG,
 } from 'lexical'
@@ -261,8 +261,18 @@ export class DraftEditorRuntime {
    */
   insertAsyncText(span: DetectSpan, text: string): boolean {
     let applied = false
-    const clean = text.replace(REFERENCE_PLACEHOLDER_RE, '')
-    this.applyEdit(() => { applied = $replaceDetectSpanWithText(span, clean) }, PASTE_TAG)
+    const clean = text.replace(REFERENCE_PLACEHOLDER_RE, '').replace(/\r\n?/gu, '\n')
+    this.applyEdit(() => {
+      // dshfiles: a raw `\n` inside a text node cannot hold the caret after it, so text typed after an inserted
+      // block ending in a blank line landed before that line. Line breaks become LineBreakNodes, which the
+      // projection already reads back as `\n`.
+      applied = clean.includes('\n')
+        ? $replaceDetectSpanWithNodes(span, clean.split('\n').flatMap((line, index) => [
+          ...index === 0 ? [] : [$createLineBreakNode()],
+          ...line === '' ? [] : [$createTextNode(line)],
+        ]))
+        : $replaceDetectSpanWithText(span, clean)
+    }, PASTE_TAG)
     return applied
   }
 
