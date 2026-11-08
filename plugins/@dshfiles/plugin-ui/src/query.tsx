@@ -17,11 +17,16 @@ let pluginQueryClientInstance: QueryClient | undefined
  * and leave focus refetching off because the Host pushes its own updates.
  * Thirty seconds of staleness keeps a remounting panel from re-reading what it
  * already has; mutations invalidate their keys and live views poll explicitly.
+ * A minute of garbage collection is deliberate: the default five minutes kept every
+ * Session-keyed read resident, and a tab that opened twenty threads held ~133 MB of
+ * per-Session data that only ever expired after the full window.
  */
+export const PLUGIN_QUERY_GC_MS = 60_000
+
 export const pluginQueryClient = (): QueryClient => {
   pluginQueryClientInstance ??= new QueryClient({
     defaultOptions: {
-      queries: { retry: retryOnceUnlessTimedOut, refetchOnWindowFocus: false, staleTime: 30_000 },
+      queries: { retry: retryOnceUnlessTimedOut, refetchOnWindowFocus: false, staleTime: 30_000, gcTime: PLUGIN_QUERY_GC_MS },
       mutations: { retry: false },
     },
   })
