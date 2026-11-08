@@ -8,6 +8,8 @@ import { UsageRepo } from './store.js'
 import { toolSourceSnapshotsEqual } from './tool-source-snapshots.js'
 
 const MAX_ERROR_LENGTH = 500
+/** How long after the last read a periodic catch-up pass stays worth running. */
+const DEMAND_WINDOW_MS = 5 * 60_000
 
 export type IndexStatus = typeof indexStatusSchema.Type
 
@@ -31,6 +33,10 @@ export class Indexer extends Context.Service<
   {
     readonly pass: Effect.Effect<void>
     readonly status: Effect.Effect<IndexStatus, UsageStoreFailed>
+    /** Mark that someone is reading the ledger, so the periodic catch-up pass is worth running. */
+    readonly touch: Effect.Effect<void>
+    /** Whether a read happened inside the demand window: closed panels do not keep the indexer running. */
+    readonly demanded: Effect.Effect<boolean>
   }
 >()('@dshfiles/usage/Indexer') {
   static readonly layer = (input: { readonly sessionsRoot: string }) =>
@@ -42,6 +48,8 @@ export class Indexer extends Context.Service<
         const pricing = yield* Pricing
         const registry = yield* ToolRegistry
         const running = yield* FiberHandle.make<void, never>()
+        // The panel is the only reason to fold session logs periodically: no read in this window means nobody is looking.
+        const demand = yield* Ref.make(0)
         const outcome = yield* Ref.make<{ readonly lastIndexedAt: number | null; readonly lastError: string | null }>({ lastIndexedAt: null, lastError: null })
         const syncedToolSources = yield* Ref.make(Option.none<ReadonlyMap<string, ToolSourceMetadata>>())
 
@@ -77,6 +85,8 @@ export class Indexer extends Context.Service<
 
         return Indexer.of({
           pass: FiberHandle.run(running, recorded, { onlyIfMissing: true }).pipe(Effect.andThen(FiberHandle.awaitEmpty(running))),
+          touch: Ref.set(demand, Date.now()),
+          demanded: Ref.get(demand).pipe(Effect.map(at => Date.now() - at <= DEMAND_WINDOW_MS)),
           status: Effect.gen(function* () {
             const counts = yield* repo.counts
             const current = yield* Ref.get(outcome)

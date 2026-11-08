@@ -107,6 +107,7 @@ the core engine).
 | M06b | M01 measured: the stores cost only ~226 MB resident (519 MB scratch heap with stores vs 293 MB without), so store work is disk-only | scratch boot A/B |
 | M07 | `fff-search` 584 MB index: prune roots that no longer exist, bound the per-root file list               | unexamined                                                                      |
 | M08 | `memory` 96 MB + `backlog` 38 MB: retention and VACUUM after pruning                                   | unexamined                                                                      |
+| M10 | **Done (demand gate)**: the usage indexer (30 s, 413 s of CPU per 90 min) and agentsview catch-up loop (2-30 s, 167 s per 90 min) now run only while something reads them — a read marks demand for 5 minutes, so a closed panel costs nothing | traces: 164 and 172 passes in 90 min with no panel open |
 | M09 | Report the detached process leftovers to the user (never kill another thread's processes)               | 129 MB across three processes                                                   |
 
 ## Acceptance
