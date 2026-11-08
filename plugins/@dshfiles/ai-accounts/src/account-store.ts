@@ -262,6 +262,7 @@ export class AccountProfilesModel {
   static readonly connectionMetadata = connectionMetadata
   static readonly readAccountIdentity = readAccountIdentity
   static readonly layoutFor = layoutFor
+  static readonly displayNameOf = defaultName
 }
 
 const decodeStoreText = Schema.decodeUnknownOption(Schema.fromJsonString(storeFileSchema))
