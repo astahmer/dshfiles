@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
+import { toStorageSchema } from '@dshfiles/dshx/host'
 import * as Schema from 'effect/Schema'
-import { asZodSchema } from './effect-zod-schema.js'
 import {
   FastModeUsageModel,
   fastModeUsageEventSchema,
@@ -21,7 +21,7 @@ const fastModeUsageDomain = defineDomain({
   layout: 'per-record',
   invalidRecords: 'backup-and-skip',
   tables: {
-    events: { valueSchema: asZodSchema(fastModeUsageEventSchema), __key: 'eventId' },
+    events: { valueSchema: toStorageSchema(fastModeUsageEventSchema), __key: 'eventId' },
   },
 })
 

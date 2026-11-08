@@ -2,8 +2,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PendingRestartSources } from '@dshfiles/thread-sidebar/restart-sources'
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import { useSyncExternalStore } from 'react'
-import { z } from 'zod'
 import { createPendingReread } from './reread.js'
 
 /**
@@ -25,15 +26,15 @@ const RECOVERY_DELAY_MS = 1_500
 // A probe stream the Host never answers must not stay open past one connect round trip.
 const REREAD_TIMEOUT_MS = 10_000
 
-const deferredPackageSchema = z.object({ id: z.string().min(1), reason: z.string().min(1) })
+const deferredPackageSchema = Schema.Struct({ id: Schema.NonEmptyString, reason: Schema.NonEmptyString })
 
-const frameSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('graph'), graph: z.unknown() }),
-  z.object({ type: z.literal('rebuilt'), id: z.string().min(1), rev: z.string().min(1) }),
-  z.object({ type: z.literal('deferred'), packages: z.array(deferredPackageSchema).max(64) }),
+const frameSchema = Schema.Union([
+  Schema.Struct({ type: Schema.Literal('graph'), graph: Schema.Unknown }),
+  Schema.Struct({ type: Schema.Literal('rebuilt'), id: Schema.NonEmptyString, rev: Schema.NonEmptyString }),
+  Schema.Struct({ type: Schema.Literal('deferred'), packages: Schema.Array(deferredPackageSchema).check(Schema.isMaxLength(64)) }),
 ])
 
-type DeferredPackage = z.infer<typeof deferredPackageSchema>
+type DeferredPackage = typeof deferredPackageSchema.Type
 
 let current: readonly DeferredPackage[] = []
 let currentIds: readonly string[] = []
@@ -114,21 +115,22 @@ export default defineClient({
       } catch {
         return false
       }
-      const frame = frameSchema.safeParse(decoded)
-      if (!frame.success) return false
-      if (frame.data.type === 'graph') {
-        void ctx.modules.entries.sync(frame.data.graph).catch((error: unknown) => {
+      const frame = Schema.decodeUnknownOption(frameSchema)(decoded)
+      if (Option.isNone(frame)) return false
+      const frameValue = frame.value
+      if (frameValue.type === 'graph') {
+        void ctx.modules.entries.sync(frameValue.graph).catch((error: unknown) => {
           ctx.logger.warn(error)
         })
         return false
       }
-      if (frame.data.type === 'rebuilt') {
-        void ctx.modules.entries.reload(frame.data.id, frame.data.rev).catch((error: unknown) => {
+      if (frameValue.type === 'rebuilt') {
+        void ctx.modules.entries.reload(frameValue.id, frameValue.rev).catch((error: unknown) => {
           ctx.logger.warn(error)
         })
         return false
       }
-      publish(frame.data.packages)
+      publish(frameValue.packages)
       return true
     }
 

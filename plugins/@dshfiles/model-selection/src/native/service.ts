@@ -17,7 +17,8 @@ import type {} from '@deepseek-ai/dsh-token-meter/client'
 import type {} from '@dshfiles/session-controller/draft-client'
 import { Service } from '@deepseek-ai/cordis'
 import { createRegisteredApiClient } from '@dshfiles/dshx/client'
-import { z } from 'zod'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
@@ -31,6 +32,8 @@ interface LiveState {
   /** Directories keyed by Client binding, removed by their scope disposer. */
   readonly directories: WeakMapWithValues<SessionBinding, ModelDirectory>
 }
+
+const contextWindowSchema = Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0)))
 
 /** The `ctx.modelDirectories` session model-selection service. */
 export class ModelDirectoryResolver extends Service {
@@ -74,8 +77,8 @@ export class ModelDirectoryResolver extends Service {
     if (contextWindow === undefined) return null
     const result = await contextWindow(route)
     if (!result.ok) return null
-    const decoded = z.number().int().positive().nullable().safeParse(result.value)
-    return decoded.success ? decoded.data : null
+    const decoded = Schema.decodeUnknownOption(contextWindowSchema)(result.value)
+    return Option.getOrNull(decoded)
   }
 
   directoryFor(sessionId: SessionId): ModelDirectory {

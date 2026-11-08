@@ -6,7 +6,6 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import * as Schema from 'effect/Schema'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { asZodSchema } from './effect-zod-schema.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
@@ -62,7 +61,7 @@ const clamp = (position: EdgePosition, viewport: ViewportSize): EdgePosition => 
 
 const viewport = (): ViewportSize => ({ innerWidth: window.innerWidth, innerHeight: window.innerHeight })
 
-const storedPosition = createStoredValue({ key: EDGE_USAGE_STORAGE_KEY, schema: asZodSchema(positionSchema), fallback: null })
+const storedPosition = createStoredValue({ key: EDGE_USAGE_STORAGE_KEY, schema: positionSchema, fallback: null })
 /** One persisted position per this window while a drag moves the widget. */
 const POSITION_WRITE_DELAY_MS = 200
 
