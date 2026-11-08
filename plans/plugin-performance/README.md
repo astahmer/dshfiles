@@ -7,6 +7,20 @@ A plugin with no measured bottleneck is recorded as `no-change` with its evidenc
 Shared brief given to every agent: `/tmp/plugin-perf-brief.md` (scratch files never under `src/`, no installs,
 no jj writes, finish with a passing typecheck + build + tests).
 
+## Verifying the whole sweep
+
+`pnpm exec turbo run typecheck` — 206/206 tasks, clean.
+`pnpm exec turbo run test` — passes per package, but a *fully parallel* run flakes the packages whose
+integration tests spawn real `jj`/`git` repos and assert ordering or timing: agents, backlog, git-worktrees,
+jj-integration, references, resource-packs, workspace-folder-picker. Every one of those passes when run
+alone (`pnpm --dir plugins/@dshfiles/<name> run test`); jj-integration is 58 files / 488 tests solo.
+So treat a parallel-run failure in those packages as contention, and re-run the package alone before
+suspecting a regression.
+
+The plan's result table is the source of truth for coverage: every package under `plugins/@dshfiles`
+with a `package.json` has a row, and every row carries numbers. A package with **no** row is unmeasured —
+that is how `memory` and `ui-styles` were briefly lost.
+
 ## Resume here
 
 **Wave 6 running:** tool-search, queue-reorder, worktree-memory, tweet-context. Every earlier wave is landed as
