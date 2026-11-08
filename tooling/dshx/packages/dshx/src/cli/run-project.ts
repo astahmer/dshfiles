@@ -245,18 +245,20 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
       hint: `Verified boundaries are ${compatibility.verified.minimum} and ${compatibility.verified.latest}.`,
     })
   }
-  const typecheck = await (runtime.typecheckProject ?? typecheckProject)(project.root)
   const diagnostics = [
     ...versionDiagnostics,
     ...(await (runtime.checkManifest ?? checkProjectManifest)(project, {
       compatibility,
     })),
     ...(await (runtime.checkMigrations ?? checkMigrationDiagnostics)(project)),
-    ...typecheck.diagnostics,
   ]
   for (const item of diagnostics) printDiagnostic(io, item)
   if (hasErrors(diagnostics)) return 1
   const staged = await StagedOutput.create(project.outDir)
+  // The typecheck runs in its own compiler process and stays idle while TypeScript reads and
+  // resolves the project, so it overlaps the face builds instead of delaying them. Its
+  // diagnostics are still reported first and still block publishing.
+  const typecheck = (runtime.typecheckProject ?? typecheckProject)(project.root)
   const jobs: Array<{
     readonly fallback: string
     readonly task: Promise<unknown>
@@ -323,7 +325,9 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
     })
   }
   const results = await Promise.allSettled(jobs.map(job => job.task))
-  let failed = false
+  const typechecked = await typecheck
+  for (const item of typechecked.diagnostics) printDiagnostic(io, item)
+  let failed = hasErrors(typechecked.diagnostics)
   const artifacts: string[] = []
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
@@ -392,6 +396,9 @@ interface CheckFixResult {
 
 async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig, requireRuntime: boolean): Promise<CheckResult> {
   const runtime = options.runtime ?? {}
+  // Started before the runtime inspection so the compiler process overlaps the bridge round trip
+  // to the running DSH rather than following it. Both still report every diagnostic.
+  const typecheck = (runtime.typecheckProject ?? typecheckProject)(project.root)
   const runtimeDiagnostics: DshxDiagnostic[] = []
   let dsh: ResolvedDshInstallation | undefined
   let profile: ProjectProfileLink | undefined
@@ -440,13 +447,13 @@ async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig,
     runtimePlugins = mergeRuntimePluginStatus(runtimePlugins, bridge)
     runtimeDiagnostics.push(...runtimePlugins.diagnostics, ...bridge.diagnostics)
   }
-  const typecheck = await (runtime.typecheckProject ?? typecheckProject)(project.root)
+  const typecheckResult = await typecheck
   const staticDiagnostics = [
     ...(await (runtime.checkManifest ?? checkProjectManifest)(project, {
       compatibility,
     })),
     ...(await (runtime.checkMigrations ?? checkMigrationDiagnostics)(project)),
-    ...typecheck.diagnostics,
+    ...typecheckResult.diagnostics,
     ...projectCompatibilityDiagnostics(compatibilityAssessment, project.packageFile, project.compatibility),
   ]
   const diagnostics = [...staticDiagnostics, ...runtimeDiagnostics]
@@ -461,7 +468,7 @@ async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig,
     bridge,
     connection,
     compatibility: compatibilityAssessment,
-    typecheck,
+    typecheck: typecheckResult,
     runtime: {
       requested: requireRuntime,
       status: requireRuntime ? (hasErrors(runtimeDiagnostics) ? 'failed' : 'passed') : 'skipped',
