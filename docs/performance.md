@@ -666,6 +666,61 @@ run: `prepareMs`, `spawnToFirstOutputMs`, `spawnToUrlMs`, `spawnToReadyMs`),
 workspace has no `bench/effect-tracer.mjs`, so that one file was copied there temporarily and removed after the run.
 Launch URLs are secrets and are not recorded here.
 
+## Plugin performance sweep validated on the live GUI (2026-11-08)
+
+Method: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) probes against the running
+Host, after it was restarted onto `jj:main` @ `836ef334` (the plugin sweep). Host `pid 44684`, started 12:58:21, 286
+plugins / 230 active, checkout `/Users/astahmer/dev/dshfiles`. Machine: 10 logical CPUs, load average 4.8–7.5, no build
+or e2e run of ours in flight. Probes: `host-lag.mjs`, `switch-probe.mjs` plus a by-title variant (the sidebar shows three
+rows and a cross-project click re-renders the list, so index-based clicking walks off the end), the `thread switch`
+interaction spans and per-plugin spans already stored by the traces plugin, and direct calls through the agent tools
+(`thread_list`, `find_threads`, `grep`, `list_thread_questions`).
+
+Host health, settled (60 s, 560 samples): p50 3 ms, p90 9 ms, p99 65 ms, max 150 ms, no stall. The first minute after the
+restart still had p99 97 ms / max 806 ms with two stalls; one coincides with `preview/devServers` running its `lsof`/`ps`
+port probes for 2.6–3.0 s, the other had no span of that length (unspanned native work during warm-up).
+
+### Recorded wins, re-measured
+
+| Interaction                         | Sweep record                                     | Live now (same Host, 2026-11-08)                                                                                                            | Verdict                                                                                       |
+| ----------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `thread-actions/list` (sidebar page, `thread_list`) | 5,751 → 1,151 ms model; 250 → 50 title folds | cold 14,312 ms; warm 3,532 ms at `limit 50`, 2,540 ms at `limit 5`                                                                           | folds reduced as claimed (the limit only costs ~22 ms per folded title), but a fixed ~2.5 s remains: the native Session list |
+| New thread                          | not in the sweep                                 | composer ready 633 ms, one 533 ms long task, 15 requests, none >250 ms                                                                       | over budget; client render, not RPC                                                           |
+| Thread switch (sidebar click)       | 5,751 → 1,151 ms of sidebar fold work            | n=7 interaction spans: p50 1,073 ms, range 801–3,235 ms; 1–2 long tasks of 497–1,352 ms each                                                | over budget; see attribution below                                                            |
+| Memory finder (`find_threads`)      | 1,402–1,679 → 4–5 ms for the digest loop         | end-to-end 2,576 ms = native Session list 1,580 ms + titles 678 ms + project resolve 219 ms; the fixed loop is not measurable (≤5 ms)        | loop win holds; the finder is still slow at the native list                                   |
+| Prompt stash keystroke              | 1,058 → 1.57 ms at the 50 × 8,800-char cap       | live library holds 3 prompts: 33–42 ms wall per keystroke including driver overhead, 0 long tasks                                            | cap case not reachable live — unproven end-to-end                                             |
+| fff-search single-file `grep`       | 1,515 → 0.88 ms (root-level file, one match)     | root-level file: 2.4 ms (2 matches), 3.0 ms; 14.4 ms for a no-match file                                                                     | holds — the whole-tree scan is gone                                                           |
+| session-undo guard read             | 318 → 0.051 ms                                   | `session undo history read` p50 0.063 ms, p90 0.18 ms, max 1.27 ms (n=295)                                                                   | holds                                                                                         |
+| agent-questions `listTargets` (60 s reconcile) | 422 → 0.014 ms                          | per-minute reconcile spans 0.06–0.56 ms; `list_thread_questions` reports `nativeSessionsScanned: 5` instead of the persisted corpus          | holds                                                                                         |
+
+### Attribution of interactions over 250 ms
+
+Read from the `thread switch` interaction traces (one per sidebar click) and the spans under them:
+
+- **A 0.5–1.4 s main-thread long task starts at click time**, before any request leaves the browser. It is client render
+  work on composer mount; the fan-out below only runs after it. This is the largest single term in a switch and it is
+  not Host time.
+- **Mount-time RPC fan-out queues behind the six HTTP/1.1 sockets.** Every one of these shows a client duration far above
+  its server duration: `ai-accounts-serving-account/snapshot` 504–752 ms client vs 6–7 ms server, `ai-accounts/read`
+  484 ms vs 242–260 ms (a 82–148 ms keychain read inside), `preview/devServers` 285 ms vs 7 ms (3.0 s when it runs the
+  port probes), `ai-accounts-model-fast-mode/status` 281 ms vs 6 ms, `ai-accounts/usage` 281 ms vs 7 ms,
+  `multi-host/sessionRuntime` 390 ms vs 173 ms, `annotations/list` 399 ms vs 5 ms, `session-undo/history` 399 ms vs 5 ms.
+- **Host-side costs that are over budget and have an owner:** `jujutsu-composer/context` 509–2,167 ms (a `jj workspace
+  root` of 337 ms and a `jj log` of 554 ms inside), `jujutsu/referenceTitles` 605 ms (two `jj root` calls plus a `jj log`),
+  `secret-catalog-setup/referenceStatus` 727 ms (external `secret` CLI: `print` 358 ms + `get` 312 ms), `ai-accounts/read`
+  242–260 ms (keychain).
+- **Errors seen in the same traces:** `ai-accounts/quoteRoutes` fails with `LegacyHandlerFailed` (`dshx.defect: true`),
+  and `jj-threads/destination` aborts when the switch supersedes it. Filed separately; neither is a perf regression.
+- `session/page` still reaches 255–906 ms per switch, and 8.8 s once on a cold page load, without a matching server span —
+  same unresolved ownership as the note below.
+
+### What this does and does not prove
+
+Proven: the fold-reduction wins (thread titles, memory digest loop, fff single-file scope, session-undo guard,
+agent-questions targets) are live, and none of them is what a user waits for any more. Not proven: the two client-side
+wins at their benchmark scale — prompt stash has 3 prompts in this profile, so its cap case never runs, and the 0.5–1.4 s
+composer-mount long task is not attributed to a single owned plugin without a browser CPU profile.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
@@ -677,3 +732,7 @@ Launch URLs are secrets and are not recorded here.
 - `session/page` reached 4.9–12.4 s in noisy browser switch probes without matching server spans. That is not isolated
   Host time, so leave ownership unresolved pending a clean capture rather than declaring a core gap.
 - Main-thread work on open is ~0.6 s spread over many small tasks; no single leaf above 80 ms.
+- The sidebar list's fixed ~2.5 s is the native Session list, not the plugin: `thread-actions/list` costs 2,540 ms at
+  `limit 5` and 3,532 ms at `limit 50`, so the fold count is no longer the lever (same owner as Host gap `b:17rs`).
+- The 0.5–1.4 s composer-mount long task behind thread switch and New thread is unowned: attribute it with a browser CPU
+  profile before changing a plugin, rather than guessing from the plugin list.
