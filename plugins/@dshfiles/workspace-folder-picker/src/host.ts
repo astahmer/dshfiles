@@ -3,18 +3,26 @@ import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
-import { Effect, FileSystem, Layer, Option, Path } from 'effect'
+import { Effect, FileSystem, Layer, Option } from 'effect'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 import { FolderInspector } from './folder-inspection.js'
 import { DirectoryBrowser, executableLookupLayer, ProjectRemover, projectRegistryLayer } from './host-edge-promise.js'
 import { CloneJobs, ExecutableLookup, ProjectCommands, ProjectCreator, ProjectHome } from './project-lifecycle.js'
-import { Clock } from 'effect'
-import { ProjectIcon } from './project-icon.js'
+import { ProjectIcons } from './project-icons.js'
+import { ProjectIdentities } from './project-identities.js'
 import { loadProjectConfig } from './project-config.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
 import { registeredProjects } from './registered-projects.js'
 
-const projectLayer = Layer.mergeAll(CloneJobs.layer, ProjectCreator.layer, FolderInspector.layer).pipe(
+const inspectionLayer = FolderInspector.layer
+
+const projectLayer = Layer.mergeAll(
+  CloneJobs.layer,
+  ProjectCreator.layer,
+  inspectionLayer,
+  ProjectIcons.layer,
+  ProjectIdentities.layer.pipe(Layer.provide(inspectionLayer)),
+).pipe(
   Layer.provide(ProjectCommands.layer),
   Layer.provideMerge(Layer.mergeAll(executableLookupLayer, projectRegistryLayer, DshChildProcessSpawner.layer, nodeFileSystemLayer, nodePathLayer)),
 )
@@ -58,34 +66,8 @@ export default DshxPlugin.make({
         Effect.map(hostService('workspaceRegistry'), registry => ({
           projects: registeredProjects(registry.list().map(workspace => ({ workspaceId: String(workspace.id), title: workspace.title, path: workspace.path }))),
         })),
-      projectIdentities: input =>
-        Effect.gen(function* () {
-          const inspector = yield* FolderInspector
-          const identities = yield* Effect.forEach(
-            input.paths,
-            path =>
-              inspector.inspect(path).pipe(
-                Effect.map(inspection => ({
-                  path,
-                  key: inspection.remoteUrl ?? inspection.repositoryRoot ?? inspection.path,
-                  remoteUrl: inspection.remoteUrl,
-                  repositoryRoot: inspection.repositoryRoot,
-                })),
-                Effect.catch(() => Effect.succeed({ path, key: path, remoteUrl: null, repositoryRoot: null })),
-              ),
-            { concurrency: 4 },
-          )
-          return { identities }
-        }),
-      icon: input =>
-        Effect.gen(function* () {
-          const fs = yield* FileSystem.FileSystem
-          const path = yield* Path.Path
-          const now = yield* Clock.currentTimeMillis
-          const icons = yield* ProjectIcon.cache({ fs, path })
-          const title = input.title ?? path.basename(input.path)
-          return yield* icons.read({ workspaceRoot: input.path, title, now })
-        }),
+      projectIdentities: input => ProjectIdentities.use(identities => Effect.map(identities.read(input.paths), identities => ({ identities }))),
+      icon: input => ProjectIcons.use(icons => icons.read(input)),
       readProjectConfig: input =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem
