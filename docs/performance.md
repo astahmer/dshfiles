@@ -325,7 +325,7 @@ The work now starts while the draft is written instead of on Send:
   hides the main outlet rather than unmounting it). Otherwise the send still lands and a toast offers the thread. A
   journey can't race that reliably under load, so `mainViewWaitsOnNewThread` is covered by unit tests
   (`thread-warmup.test.ts`) instead.
-- `main-tabs` cancels a pending main-view navigation when the Start page opens (`tab.new`, ⌘T / the "+" button), so a
+- `main-tabs` cancels a pending main-view navigation when the Start page opens (`tab.new`, ⌘⌥T / the "+" button), so a
   New thread created earlier cannot replace the page the user chose.
 
 Verification: `jj-integration.new-thread-preparation-browser-journey` (no workspace for an untouched New thread; the

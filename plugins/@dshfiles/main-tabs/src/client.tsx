@@ -3,7 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
@@ -26,6 +26,7 @@ import { OPEN_PANEL_TAB_EVENT, PANEL_TAB_TITLE_EVENT, PanelTabs } from './panel-
 import { panelShortcut, recentThreads } from './start-suggestions.js'
 import { PanelTitlesModel } from './panel-titles.js'
 import { TabMenuItems } from './tab-menu-items.js'
+import { tabShortcutBindings, tabShortcutDefaults } from './tab-shortcuts.js'
 import { effectiveTabPreferences } from './tab-preferences-policy.js'
 import { installThreadLinkClicks } from './thread-link-click.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
@@ -581,75 +582,31 @@ export default defineClient({
       ),
     )
 
-    interface TabCommand {
-      readonly id: string
-      readonly label: () => string
-      /** Absent when another registered command already owns this chord on every desktop shell. */
-      readonly desktop?: ShortcutBinding
-      /** Desktop Linux reserves Tab, so cycling uses Ctrl+Shift+] / [ there. */
-      readonly linux?: ShortcutBinding
-      readonly web?: ShortcutBinding
-      readonly defaults?: ShortcutCommand['defaults']
-      readonly event: TabsEvent
-    }
-    const commands: readonly TabCommand[] = [
-      {
-        id: 'mainTabs.newTab',
-        label: () => translate('newTab'),
-        desktop: { code: 'KeyT', modifiers: ['primary'] },
-        web: { code: 'KeyT', modifiers: ['primary', 'alt'] },
-        event: { type: 'tab.new' },
-      },
-      {
-        id: 'mainTabs.reopenClosed',
-        label: () => translate('reopenClosedTab'),
-        desktop: { code: 'KeyT', modifiers: ['primary', 'shift'] },
-        web: { code: 'KeyT', modifiers: ['primary', 'alt', 'shift'] },
-        event: { type: 'tab.reopenClosed' },
-      },
-      {
-        // DSH's own page.close owns Mod+W on every desktop shell, and the Host's shortcut registry
-        // refuses two commands that claim one default, so this command ships without a default and
-        // stays rebindable in Settings › Shortcuts instead of failing to register on every launch.
-        id: 'mainTabs.closeActive',
-        label: () => translate('closeActiveTab'),
-        event: { type: 'tab.closeActive' },
-      },
-      {
-        id: 'mainTabs.next',
-        label: () => translate('nextTab'),
-        desktop: { code: 'Tab', modifiers: ['control'] },
-        linux: { code: 'BracketRight', modifiers: ['control', 'shift'] },
-        web: { code: 'BracketRight', modifiers: ['primary', 'alt'] },
-        event: { type: 'tab.cycle', direction: 1 },
-      },
-      {
-        id: 'mainTabs.previous',
-        label: () => translate('previousTab'),
-        desktop: { code: 'Tab', modifiers: ['control', 'shift'] },
-        linux: { code: 'BracketLeft', modifiers: ['control', 'shift'] },
-        web: { code: 'BracketLeft', modifiers: ['primary', 'alt'] },
-        event: { type: 'tab.cycle', direction: -1 },
-      },
-      ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((index): TabCommand => ({
-        id: `mainTabs.goTo${index}`,
-        label: () => (index === 9 ? translate('goToLastTab') : translate('goToTab', { index: String(index) })),
-        desktop: { code: `Digit${index}`, modifiers: ['primary'] },
-        web: { code: `Digit${index}`, modifiers: ['primary', 'alt'] },
-        event: { type: 'tab.activateIndex', index: index === 9 ? -1 : index - 1 },
-      })),
-    ]
-    const defaultsFor = (command: TabCommand): ShortcutCommand['defaults'] => {
-      if (command.defaults !== undefined) return command.defaults
-      if (command.desktop === undefined) return {}
-      const defaults: ShortcutCommand['defaults'] = {
-        'desktop:macos': command.desktop,
-        'desktop:windows': command.desktop,
-        'desktop:linux': command.linux ?? command.desktop,
+    /** Label and tab event of one command in `tabShortcutBindings`, which owns its default chords. */
+    const tabCommandOf = (id: string): { readonly label: () => string; readonly event: TabsEvent } | undefined => {
+      switch (id) {
+        case 'mainTabs.newTab':
+          return { label: () => translate('newTab'), event: { type: 'tab.new' } }
+        case 'mainTabs.reopenClosed':
+          return { label: () => translate('reopenClosedTab'), event: { type: 'tab.reopenClosed' } }
+        case 'mainTabs.closeActive':
+          return { label: () => translate('closeActiveTab'), event: { type: 'tab.closeActive' } }
+        case 'mainTabs.next':
+          return { label: () => translate('nextTab'), event: { type: 'tab.cycle', direction: 1 } }
+        case 'mainTabs.previous':
+          return { label: () => translate('previousTab'), event: { type: 'tab.cycle', direction: -1 } }
       }
-      if (command.web === undefined) return defaults
-      return { ...defaults, 'web:macos': command.web, 'web:windows': command.web }
+      const index = Number(/^mainTabs\.goTo([1-9])$/u.exec(id)?.[1])
+      if (!Number.isInteger(index)) return undefined
+      return {
+        label: () => (index === 9 ? translate('goToLastTab') : translate('goToTab', { index: String(index) })),
+        event: { type: 'tab.activateIndex', index: index === 9 ? -1 : index - 1 },
+      }
     }
+    const commands = tabShortcutBindings.flatMap(binding => {
+      const command = tabCommandOf(binding.id)
+      return command === undefined ? [] : [{ id: binding.id, ...command, defaults: tabShortcutDefaults(binding) }]
+    })
     for (const command of commands) {
       const commandId = command.id
       if (!isShortcutCommandId(commandId)) continue
@@ -660,7 +617,7 @@ export default defineClient({
             id: commandId,
             label: command.label,
             aliases: ['tab', 'tabs'],
-            defaults: withDefaults ? defaultsFor(command) : {},
+            defaults: withDefaults ? command.defaults : {},
             regions: ['page', 'editable'],
             modals: [],
             resolve: () => {

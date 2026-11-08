@@ -8,6 +8,10 @@
 
 The app-wide searchable palette lives in this plugin and mounts into DSH's additive `shell.overlay` slot. It owns the UI, keyboard shortcut, action registry, thread/file/content search, and global theme/workspace actions. Thread Sidebar contributes sidebar navigation and actions for the currently open thread.
 
+The palette's **New thread** command is also bound to Mod+T on desktop shells (no Web default; DSH's own
+`session.new` keeps Mod+N / Web Mod+Alt+N, and main-tabs' New tab uses Mod+Alt+T). Rebind it in Settings ›
+Shortcuts. `scripts/shortcut-defaults.test.mjs` fails when two shipped defaults claim one chord.
+
 Type `<` to switch into **Backlog** capture, then Enter opens the full Backlog composer with the typed draft carried over. The composer keeps its attachments, `@` mentions, tags, and link support; the Backlog plugin is required for the handoff.
 
 ## Threads tab scope

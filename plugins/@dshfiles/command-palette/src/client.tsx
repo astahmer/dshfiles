@@ -433,7 +433,8 @@ export default defineClient({
             modals: [],
             resolve: () => ({ status: 'handled', run: startNewThread }),
           })
-        // Another plugin (main-tabs' new tab) may already own the default key; keep the command, unbound.
+        // A user rebinding may already own the default key; keep the command, unbound. The shipped defaults never
+        // collide (scripts/shortcut-defaults.test.mjs).
         try {
           return register(true)
         } catch (error) {
