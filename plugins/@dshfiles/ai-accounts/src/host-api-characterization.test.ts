@@ -35,6 +35,8 @@ const BUSY = 'An account operation is already running. Wait for it to finish bef
 
 const wireCases: readonly WireCase[] = [
   { apiId: 'ai-accounts', method: 'read', payload: undefined, expected: { ok: true } },
+  { apiId: 'ai-accounts', method: 'pricingStatus', payload: undefined, expected: { ok: true } },
+  { apiId: 'ai-accounts', method: 'quoteRoutes', payload: { routes: [{ provider: 'cc_a', model: 'gpt-6-luna' }] }, expected: { ok: true } },
   {
     apiId: 'ai-accounts',
     method: 'read',

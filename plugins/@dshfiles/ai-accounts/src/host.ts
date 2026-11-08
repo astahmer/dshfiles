@@ -128,6 +128,10 @@ const startAccountsHost = (input: {
   const pool = input.pool.view
   const resolveCredential = resolveKeyFromContext(ctx)
   const runtime = activateAccountRuntime(ctx)
+  runtime.pricing = input.pricing
+  onRelease(() => {
+    if (runtime.pricing === input.pricing) delete runtime.pricing
+  })
   const servingAccount = createServingAccountService(ctx)
   runtime.servingAccount = servingAccount
   onRelease(() => {
