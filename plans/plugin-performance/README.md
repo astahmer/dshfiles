@@ -9,16 +9,27 @@ no jj writes, finish with a passing typecheck + build + tests).
 
 ## Resume here
 
-Waves run at 3–5 concurrent agents in this shared thread workspace. **Wave 2 running:** rich-composer, chat,
-workbench, editor, session-controller. Before dispatching, pick the first plugin below that has neither a row in
-the results table nor a `wave 2` mention, in LOC order: plugin-ui, secret-catalog (host effect already fixed),
-settings-shell, mcp-servers, workspace-nav, sidebar-right, main-tabs, activity-timeline, workspace-folder-picker,
-subprocess-local, then the rest of `plugins/@dshfiles/*`.
+**Wave 6 running:** tool-search, queue-reorder, worktree-memory, tweet-context. Every earlier wave is landed as
+one commit per plugin above the previous wave's `docs(plans)` commit.
 
-Landing shape (already applied once, reuse the same shape): one commit per plugin above the macro commit, appended
-above the previous wave, plus one `perf(plugins): …` macro commit per cross-plugin round. Verify each plugin with
-`/tmp/verify-plugin.sh <name> --build` before committing, and check that every landed client plugin keeps
-`client.shared` (guard: `node plugins/scripts/check-shared-runtime.mjs`).
+Before dispatching, take the first plugin below with neither a result row nor a running mention, in LOC order:
+`plugin-ui`, `agent-questions`, `component-gallery`, `pulls-review`, `agent-communication`, `plugin-guide`,
+`loopback-access`, `frame-layout`, `user-questions`, `html-render`, `agentsview`, `annotations`,
+`project-automations`, `pull-requests`, `worktrees`, `goal-tool`, `goal-stall-guard`, `tool-ask-user`,
+`prompt-stash`, then the remainder of `plugins/@dshfiles/*`.
+
+Landing recipe (proven, reuse it): one commit per plugin above the previous wave's docs commit, built by
+`/tmp/land-wave2.mjs <base> <messages-file> --apply` — it saves a patch per group, rebuilds the chain from the base,
+verifies the tree is content-identical, then abandons the old working copy. Two rules that matter:
+
+- Never land while an agent owns uncommitted files: the script abandons the previous working copy, so a running
+  lane's edits would be destroyed. Check `jj status` first.
+- Re-run the formatter and `node scripts/lint-ratchet.ts oxlint` AFTER landing: the agents write working code but the
+  ratchet catches new `react-hooks/exhaustive-deps` and `antislop` findings, and those get squashed into the plugin's
+  commit (or a follow-up `chore(plugins)` commit) rather than left for CI.
+
+Verify each plugin before commit with `/tmp/verify-plugin.sh <name> --build`, and keep
+`node plugins/scripts/check-shared-runtime.mjs` green (every Client plugin stays on the shared UI runtime).
 
 ## Results
 
@@ -32,6 +43,10 @@ above the previous wave, plus one `perf(plugins): …` macro commit per cross-pl
 | shared-runtime migration (macro) | done | 11 Client plugins re-inlined the UI stack | Client bytes 36616 → 35320 KB |
 | secret-catalog (macro) | done | Host bundle kept its own Effect runtime | Host bundle 1132 → 264 KB |
 | project-checks | optimized | `DurableTasks.list` scanned and decoded every task row (up to 1000) then filtered to one Session | 9.7 / 6.0 / 5.9 ms → 0.16 / 0.39 / 0.15 ms (indexed per-session query), results identical |
+| tool-search | optimized | each search re-projected the whole 429-tool registry (deep-cloning every schema) ~2× and re-tokenized every description per query | search p50 10.59 → 4.75 ms, p90 11.3 → 5.74; CPU/search 12.8 → 5.4 ms; projections 2.06 → 0.84; 64 queries × 2 modes, 0 mismatches |
+| worktree-memory | optimized | RAM snapshot ran a serial `ps` then `lsof` chain and scanned the process table twice per probe | snapshot p50 96.1 → 86.4 ms, min 80.2 → 76.5; one fewer process spawn per snapshot; reported numbers identical |
+| tweet-context | optimized | video windows decoded from file start to window end in both ffmpeg passes — a late window paid for the preceding minutes twice | window at 110–120 s of a 120 s video 1008 → 207 ms (4.9×); raw scan 0.48 → 0.09 s; frames byte-identical across 4 cases |
+| queue-reorder | optimized | dock re-derived every row's preview per render and collapsed whitespace over the whole ~8.9k-char body to show 200 code points | row derive 3.24 → 0.27 ms (11.8×), per reorder 4.50 → 1.45 ms; 20k-case fuzz output-identical |
 | prompt-stash | optimized | whole prompt bodies went into cmdk item values, so its superlinear scorer re-ran per keystroke | per keystroke at the library cap 1057.9 → 1.57 ms; recent tab 2083.9 → 1.62 ms; match set identical, relevance ranking traded for library order |
 | policies | optimized | every pre-tool-call check re-derived each rule's escaped glob regex and serialized arguments before looking at any rule | 500 rules/check 67.1 → 8.7 µs (7.7×), 0 rules + 20 KB payload 38.7 → 0.3 µs; 30,153 before/after comparisons, 0 mismatches |
 | agents | optimized | every editor keystroke re-rendered the 100-row agent registry (EntityRow + Switch + DropdownMenu each) | keystroke 19.6 → 2.16 ms (~9×); 10 agents 3.65 → 2.51 ms; host `agents.list` measured at ~2.3 ms and left alone |
