@@ -64,14 +64,40 @@ held by a blank tab after 20 threads. Those figures come from that single probe 
 - **Open stores on first use.** `sqlite-store`'s `deferred` layer builds the store inside the plugin scope on the
   first call, so a plugin nobody reads costs nothing.
 
+## Lazy Host halves, measured (2026-11-08)
+
+`DshxPlugin.make({ lazy: true })` is now the opt-in dshx primitive: tools, APIs, settings and prompt contributions still
+register at activation, but the layer and `main` start on the first call, and every call that arrives while that build
+runs waits for the same one. `@dshfiles/agentsview` is the proof row. Measured on a scratch
+`dshx dev up --plugin @dshfiles/agentsview` Host (base bundles plus that row, panel never opened, browser attached,
+115 s settle, `heapUsed` after `HeapProfiler.collectGarbage` attached to the Host's own child pid, launch URL never
+printed):
+
+| Measurement                                             | Eager               | Lazy                         |
+| ------------------------------------------------------- | ------------------- | ---------------------------- |
+| `heapUsed`, panel never opened                          | 97.1 MB             | 96.9 MB                      |
+| that row's layer, same process before → after first use | n/a (built at boot) | 96.9 → 97.8 MB (+0.9 MB)     |
+| first `agentsview.list` call                            | 15.4 ms             | 17.1 ms (includes the build) |
+| warm `agentsview.list` call                             | 4.2 ms              | 10.1 ms                      |
+
+The row's activation costs **0.9 MB of heap and a few ms**; the boot-to-boot difference (0.2 MB) is inside the ±15 MB
+boot-to-boot noise, so the per-row cost is measured in-process. Two costs layer deferral cannot remove explain the
+remaining distance to the 80 MB lever: the **module graph** (importing `agentsview/dist/index.js` into a process that
+already loaded Effect, dshx and `@effect/platform-node` adds 3.0 MB of heap; 29.6 MB including those shared modules) and
+what an activation **enables downstream** (`session-search` registers the `sessionQuery` service at activation, 90 MB
+above). A facade row that imports the real bundle on first use would defer the module graph, but keeping tool and API
+registration static then needs a split build: a manifest module with tool names, schemas and API contracts separate from
+the layer's module graph. dshx emits one Host artifact per plugin, so that facade is a further primitive, not a flag on
+this one.
+
 ## Levers still open
 
-| Lever                                          | Measured                         | Needs                                                                                                                                                                    |
-| ---------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Lazy storage-domain hydration                  | 67 MB                            | the `storage-domain`/`storage-json` forks hydrate per record with an LRU; the remaining cost is the core contract's `loadAll` for domains that do not declare lazy reads |
-| Lazy Host halves for panel rows                | 80 MB                            | dshx builds every plugin layer at activation; a lazy mode (or the plugin-manager facade) would keep a panel's module graph out of a Host nobody opened it in             |
-| Per-session client state LRU                   | 100–110 MB per tab at 20 threads | the session-controller client fork keeps every opened thread resident                                                                                                    |
-| One shared Effect `HostContext` per activation | 20–40 (est.)                     | dshx builds a fresh tracer/host layer per plugin                                                                                                                         |
+| Lever                                          | Measured                         | Needs                                                                                                                                                                                                                            |
+| ---------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lazy storage-domain hydration                  | 67 MB                            | the `storage-domain`/`storage-json` forks hydrate per record with an LRU; the remaining cost is the core contract's `loadAll` for domains that do not declare lazy reads                                                         |
+| Lazy Host halves for panel rows                | 0.9 MB / 7 ms per unopened row   | the opt-in `lazy` mode keeps the layer out (§ above); the remaining 80 MB is each row's module graph (3.0 MB marginal) and the services an activation enables downstream, which need a facade row with a split manifest artifact |
+| Per-session client state LRU                   | 100–110 MB per tab at 20 threads | the session-controller client fork keeps every opened thread resident                                                                                                                                                            |
+| One shared Effect `HostContext` per activation | 20–40 (est.)                     | dshx builds a fresh tracer/host layer per plugin                                                                                                                                                                                 |
 
 ## Ruled out
 

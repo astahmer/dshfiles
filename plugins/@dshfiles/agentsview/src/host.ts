@@ -74,6 +74,9 @@ const AgentSessionsLive = IndexingLoop.pipe(
 
 export default DshxPlugin.make({
   name: '@dshfiles/agentsview',
+  // Nothing in this layer has to run before the panel does: it reads local agent logs on demand and its only loop is
+  // demand-gated, so a Host nobody opens the panel in should not pay for the index it would build.
+  lazy: true,
   layer: AgentSessionsLive,
   apis: [
     Api.bind(agentSessionsApi, {
