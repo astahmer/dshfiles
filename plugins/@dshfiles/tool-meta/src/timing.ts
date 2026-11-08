@@ -154,8 +154,7 @@ export class ToolTimingModel {
     const shown = `${input.described.text}\u0000${input.described.label}`
     const timer = input.waitTimer
     if (timer === undefined) return shown
-    const waitingFor =
-      typeof timer.waitingFor === 'string' ? timer.waitingFor : `${timer.waitingFor.kind}:${timer.waitingFor.count}:${timer.waitingFor.until}`
+    const waitingFor = typeof timer.waitingFor === 'string' ? timer.waitingFor : `${timer.waitingFor.kind}:${timer.waitingFor.count}:${timer.waitingFor.until}`
     return `${shown}\u0000${timer.elapsedMs}\u0000${timer.remainingMs ?? ''}\u0000${timer.timeoutMs ?? ''}\u0000${waitingFor}`
   }
 }

@@ -135,7 +135,9 @@ describe('lineKey', () => {
       waitingFor: { kind: 'jobs' as const, count: 2, until: 'settled' as const },
     })
     const described = describedAt(0)
-    expect(ToolTimingModel.lineKey({ described, waitTimer: waitTimerAt(90_000) })).not.toBe(ToolTimingModel.lineKey({ described, waitTimer: waitTimerAt(91_000) }))
+    expect(ToolTimingModel.lineKey({ described, waitTimer: waitTimerAt(90_000) })).not.toBe(
+      ToolTimingModel.lineKey({ described, waitTimer: waitTimerAt(91_000) }),
+    )
   })
 })
 
