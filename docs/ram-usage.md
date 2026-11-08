@@ -42,12 +42,16 @@ it. Two owners follow:
   one, and trim older settled attempts in the session store once nothing replays them. That is a native session
   contract, so it is an upstream ask (drafted below) rather than a plugin patch.
 - **Browser:** one renderer held 3.3 GB for this tab, with a second at 1.7 GB. Its own copy is already block-stripped,
-  so the cost is resident per-thread client state. The store lives in the native client package, not in
-  `@dshfiles/session-controller` (its `MirroredSessions` map holds ids and status only), so bounding it means a fork
-  of that client package or its own upstream ask.
+  so the cost is resident per-thread client state. The client store is the owned
+  [session-controller fork](../plugins/@dshfiles/session-controller/README.md#local-delta): history projections stay
+  resident for the last 3 viewed Sessions (`RESIDENT_SESSION_STATE_LIMIT`), and since `jj:zrstxszz` a Session instance
+  no view subscribes to is released past 4 (`RESIDENT_UNMOUNTED_SESSION_LIMIT`), so its event window and projections
+  are dropped and refetched on the next open. The remaining growth is the resident window of threads still mounted or
+  recently viewed; a per-thread LRU below that needs a rather different ownership change.
 
-Measured composition of a 610 MB Host with the web profile, no client attached. The rows come from different ablation
-boots (the sweep measured each owner by booting without it), so they are per-owner costs rather than one additive boot:
+Both asks are filed as [discussion #12693](https://github.com/deepseek-ai/deepseek-harness/discussions/12693) (the
+repository has issues disabled). Re-measure the tab after a refresh: open a dozen threads, return to one, settle
+110 s, then compare against the 3.3 GB baseline with the same `heapUsed`-after-GC protocol.
 
 Measured composition of a 610 MB Host with the web profile, no client attached. The rows come from different ablation
 boots (the sweep measured each owner by booting without it), so they are per-owner costs rather than one additive boot:
