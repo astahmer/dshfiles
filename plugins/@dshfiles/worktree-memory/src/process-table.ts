@@ -16,6 +16,12 @@ export interface ProcessRow {
   readonly command: string
 }
 
+/** One `ps -o pid=,ppid=,pgid=,rss=,%cpu=,lstart=,args=` line: the snapshot and the scratch detector share one scan. */
+export interface PsRow extends ProcessRow {
+  readonly pgid: number
+  readonly cpuPercent: number
+}
+
 export interface KnownWorkspace {
   readonly path: string
   readonly title: string
@@ -59,7 +65,7 @@ interface ResolvedGroup {
 }
 
 // `Mon Oct 19 14:02:03 2026`: what `ps -o lstart` prints under LC_ALL=C on macOS and Linux.
-const PS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.*)$/
+const PS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+(\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.*)$/
 // Orphans living in these trees are apps and system agents, never something a thread started.
 const SYSTEM_PREFIXES = ['/Applications/', '/System/', '/Library/', '/usr/libexec/', '/usr/sbin/', '/sbin/', '/private/var/', '/opt/homebrew/Caskroom/']
 const ADOPTER = /^(?:\S*\/)?(?:systemd|init|tini|dumb-init|launchd)(?:\s+--user)?\s*$/
@@ -90,14 +96,22 @@ const dirname = (path: string): string => path.slice(0, Math.max(0, path.lastInd
 const basename = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
 
 export class ProcessTable {
-  static parsePs(text: string): ProcessRow[] {
-    const rows: ProcessRow[] = []
+  static parsePs(text: string): PsRow[] {
+    const rows: PsRow[] = []
     for (const line of text.split('\n')) {
       const match = PS_LINE.exec(line)
       if (match === null) continue
-      const startedAt = Date.parse(match[4] ?? '')
+      const startedAt = Date.parse(match[6] ?? '')
       if (Number.isNaN(startedAt)) continue
-      rows.push({ pid: Number(match[1]), ppid: Number(match[2]), rssKb: Number(match[3]), startedAt, command: (match[5] ?? '').trim() })
+      rows.push({
+        pid: Number(match[1]),
+        ppid: Number(match[2]),
+        pgid: Number(match[3]),
+        rssKb: Number(match[4]),
+        cpuPercent: Number(match[5]),
+        startedAt,
+        command: (match[7] ?? '').trim(),
+      })
     }
     return rows
   }

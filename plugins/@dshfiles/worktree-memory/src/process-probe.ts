@@ -126,12 +126,8 @@ export class ProcessProbe extends Context.Service<
         (effect, command) => Effect.mapError(effect, cause => new ProbeFailed({ command, cause })),
       )
 
-      const processTable = run('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,rss=,lstart=,args=']).pipe(
+      const psRows = run('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,pgid=,rss=,%cpu=,lstart=,args=']).pipe(
         Effect.map(ProcessTable.parsePs),
-      )
-
-      const scratchTable = run('ps', ['-ww', '-x', '-U', String(process.getuid?.() ?? 0), '-o', 'pid=,ppid=,pgid=,rss=,%cpu=,lstart=,args=']).pipe(
-        Effect.map(ScratchHostDetector.parsePs),
       )
 
       // A missing directory means dshx wrote no record yet; an unreadable or foreign file is skipped, never trusted.
@@ -152,24 +148,27 @@ export class ProcessProbe extends Context.Service<
         return records.flatMap(record => Option.toArray(record))
       }).pipe(Effect.withSpan('worktree-memory read scratch records'))
 
-      const scratchHosts = Effect.gen(function* () {
-        const [rows, records, configured, now] = yield* Effect.all([scratchTable, scratchRecords, settings.get, Clock.currentTimeMillis], {
-          concurrency: 'unbounded',
-        })
-        const summary = ScratchHostDetector.detect({
-          rows,
-          records,
-          now,
-          hostPid: process.pid,
-          alert: { cpuPercent: configured.orphanAlertCpuPercent, memoryBytes: configured.orphanAlertMemoryMb * 1024 * 1024 },
-        })
-        yield* Effect.annotateCurrentSpan({
-          'worktree_memory.scratch.host_count': summary.hosts.length,
-          'worktree_memory.scratch.orphan_count': summary.orphanCount,
-        })
-        const probed: ScratchProbe = { summary, rows }
-        return probed
-      }).pipe(Effect.withSpan('worktree-memory scratch hosts'))
+      const scratchSummary = (rows: readonly ScratchProcessRow[]) =>
+        Effect.gen(function* () {
+          const [records, configured, now] = yield* Effect.all([scratchRecords, settings.get, Clock.currentTimeMillis], {
+            concurrency: 'unbounded',
+          })
+          const summary = ScratchHostDetector.detect({
+            rows,
+            records,
+            now,
+            hostPid: process.pid,
+            alert: { cpuPercent: configured.orphanAlertCpuPercent, memoryBytes: configured.orphanAlertMemoryMb * 1024 * 1024 },
+          })
+          yield* Effect.annotateCurrentSpan({
+            'worktree_memory.scratch.host_count': summary.hosts.length,
+            'worktree_memory.scratch.orphan_count': summary.orphanCount,
+          })
+          const probed: ScratchProbe = { summary, rows }
+          return probed
+        }).pipe(Effect.withSpan('worktree-memory scratch hosts'))
+
+      const scratchHosts = Effect.flatMap(psRows, scratchSummary)
 
       const readCwds = Effect.fn('worktree-memory read cwds')(function* (pids: readonly number[]) {
         const probed = pids.slice(0, MAX_CWD_PROBES)
@@ -209,10 +208,13 @@ export class ProcessProbe extends Context.Service<
         const now = yield* Clock.currentTimeMillis
         if (!supportedPlatform) return { snapshot: unsupported(now), rows: [] }
         const sessions = includeSessions ? yield* sessionMetadata.current : []
-        const [rows, currentPressure, scratch] = yield* Effect.all([processTable, pressure, scratchHosts], { concurrency: 'unbounded' })
+        const [rows, currentPressure] = yield* Effect.all([psRows, pressure], { concurrency: 'unbounded' })
         const candidates = ProcessTable.candidates({ rows, hostPid: process.pid })
         const nodePids = nodeProcessCwdPids({ rows, limit: MAX_NODE_CWD_PROBES })
-        const cwds = yield* readCwds([...new Set([...candidates.hostChildren, ...candidates.orphans, ...nodePids])])
+        const [cwds, scratch] = yield* Effect.all(
+          [readCwds([...new Set([...candidates.hostChildren, ...candidates.orphans, ...nodePids])]), scratchSummary(rows)],
+          { concurrency: 'unbounded' },
+        )
         const home = userInfo().homedir
         const snapshot = ProcessTable.snapshot({
           rows,
@@ -240,10 +242,10 @@ export class ProcessProbe extends Context.Service<
       return ProcessProbe.of({
         snapshot,
         probeForStop: Effect.andThen(probe(false), result => Effect.as(invalidate, result)),
-        processTable,
+        processTable: psRows,
         pressure,
         scratchHosts,
-        scratchTable,
+        scratchTable: psRows,
       })
     }),
   )
