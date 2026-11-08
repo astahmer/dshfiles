@@ -1661,24 +1661,24 @@ const make = (sql: SqlClient.SqlClient) =>
         const window = [range.from, range.to]
         const modelCountRows = yield* read(
           decode.modelCounts,
-          `SELECT provider, model, purpose, status, COUNT(*) AS calls FROM requests r
+          `SELECT r.provider, r.model, r.purpose, r.status, COUNT(*) AS calls FROM ${FROM_SQL}
               WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ?
-              GROUP BY provider, model, purpose, status ORDER BY calls DESC LIMIT 1000`,
+              GROUP BY r.provider, r.model, r.purpose, r.status ORDER BY calls DESC LIMIT 1000`,
           window,
         )
         const modelTokenRows = yield* read(
           decode.modelTokens,
-          `SELECT provider, model, purpose, COALESCE(SUM(input), 0) AS input,
-                COALESCE(SUM(cache_read), 0) AS cacheRead, COALESCE(SUM(cache_write), 0) AS cacheWrite,
-                COALESCE(SUM(output), 0) AS output, COALESCE(SUM(reasoning), 0) AS reasoning
-              FROM requests r WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ?
-              GROUP BY provider, model, purpose ORDER BY SUM(COALESCE(input, 0) + COALESCE(cache_read, 0) + COALESCE(cache_write, 0) + COALESCE(output, 0) + COALESCE(reasoning, 0)) DESC LIMIT 1000`,
+          `SELECT r.provider, r.model, r.purpose, COALESCE(SUM(r.input), 0) AS input,
+                COALESCE(SUM(r.cache_read), 0) AS cacheRead, COALESCE(SUM(r.cache_write), 0) AS cacheWrite,
+                COALESCE(SUM(r.output), 0) AS output, COALESCE(SUM(r.reasoning), 0) AS reasoning
+              FROM ${FROM_SQL} WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ?
+              GROUP BY r.provider, r.model, r.purpose ORDER BY SUM(COALESCE(r.input, 0) + COALESCE(r.cache_read, 0) + COALESCE(r.cache_write, 0) + COALESCE(r.output, 0) + COALESCE(r.reasoning, 0)) DESC LIMIT 1000`,
           window,
         )
         const modelDurationRows = yield* read(
           decode.modelDurations,
           `WITH duration_rows AS (
-                SELECT provider, model, purpose, status, ended_at - started_at AS duration_ms FROM requests r
+                SELECT r.provider, r.model, r.purpose, r.status, r.ended_at - r.started_at AS duration_ms FROM ${FROM_SQL}
                 WHERE ${VISIBLE_SQL} AND r.started_at >= ? AND r.started_at < ? AND r.ended_at IS NOT NULL AND r.ended_at >= r.started_at
               )
               SELECT provider, model, purpose, status, COUNT(*) AS calls, SUM(duration_ms) AS durationSumMs, ${OTEL_BUCKET_SELECT}

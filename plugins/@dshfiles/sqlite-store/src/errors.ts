@@ -32,9 +32,12 @@ export class SqliteStoreVersionUnsupported extends Schema.TaggedError<SqliteStor
   }
 }
 
-export type SqliteStoreError = SqliteStoreOpenFailed | SqliteMigrationFailed | SqliteStoreVersionUnsupported | DeferredStoreMemberMissing
+export type SqliteStoreError = SqliteStoreOpenFailed | SqliteMigrationFailed | SqliteStoreVersionUnsupported
 
-/** A deferred store was read for a member it does not expose as a method; nothing can start the build for it. */
+/**
+ * A deferred store was read for a member it does not expose as a method. This is a defect, not a typed failure: the
+ * proxy cannot know the service's error type, so it dies with this named error instead.
+ */
 export class DeferredStoreMemberMissing extends Schema.TaggedError<DeferredStoreMemberMissing>()('DeferredStoreMemberMissing', {
   service: Schema.String,
   member: Schema.String,

@@ -61,7 +61,9 @@ const readBoundedThread = async (input: BoundedReadInput): Promise<{ readonly cw
         return text.trim().length === 0 ? [] : [{ role: event.type === 'user/message' ? 'user' : 'assistant', text }]
       })
       .slice(-MAX_MESSAGES)
-    if (messages.length >= MAX_MESSAGES || recent.complete) return { cwd: recent.session.cwd, route: routeOf(recent.events), messages }
+    if (messages.length >= MAX_MESSAGES || recent.complete)
+      // A window that covers the log start is the only one whose silence about a route proves there is none.
+      return { cwd: recent.session.cwd, route: recent.complete ? routeOf(recent.events) : undefined, messages }
   }
 }
 

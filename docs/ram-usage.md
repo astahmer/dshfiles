@@ -20,21 +20,23 @@ patterns keep it bounded. Numbers below were measured on this machine (2026-11-0
 
 ## What the memory is
 
-Measured composition of a 610 MB Host with the web profile, no client attached:
+Measured composition of a 610 MB Host with the web profile, no client attached. The rows come from different ablation
+boots (the sweep measured each owner by booting without it), so they are per-owner costs rather than one additive boot:
 
-| Owner                              | MB                            | Why it is there                                                                                                 |
-| ---------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `session_projcache` storage domain | 252 before pruning, ~15 after | one derived checkpoint per Session, and `@deepseek-ai/dsh-storage-json` materializes a whole domain at `open()` |
-| other JSON storage domains         | 67                            | same contract: `backlog_files`, `ai_accounts_usage`, …                                                          |
-| plugin SQLite stores               | 61                            | opened and hydrated at activation, before any read                                                              |
-| Session corpus on disk             | 25                            | 2.9 GB of logs costs little until something decodes them                                                        |
-| core + 230 plugins + Effect + dshx | 263                           | module graph (~179 MB for 96 Host bundles) and per-activation layers                                            |
+| Owner                              | MB                            | Why it is there                                                                                                                                                                                                |
+| ---------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `session_projcache` storage domain | 252 before pruning, ~15 after | one derived checkpoint per Session; the owned `storage-domain` + `storage-json` forks hydrate a per-record domain one record at a time behind a 64-row LRU, and the 14-day prune keeps the directory at ~17 MB |
+| other JSON storage domains         | 67                            | the same contract for domains that never opt into per-record reads: `backlog_files`, `ai_accounts_usage`, …                                                                                                    |
+| plugin SQLite stores               | ~2                            | the shared `sqlite-store` layer defers a store to its first call; opened at activation each cost about 0.5 MB of heap                                                                                          |
+| Session corpus on disk             | 25                            | 2.9 GB of logs costs little until something decodes them                                                                                                                                                       |
+| core + 230 plugins + Effect + dshx | 263                           | module graph (~179 MB for 96 Host bundles) and per-activation layers; the SQLite row above sits inside this one                                                                                                |
 
 Effect is only **3.6 %** (~22 MB): schemas are built once per module and 4.1 has no separate compile step to
 exploit. The session-log corpus is not the problem either; the _caches_ that hold decoded logs are.
 
-The browser tab is a different shape: ~126 MB at load is mostly bytecode and module source (110 bundles,
-24.8 MB), and each distinct thread opened adds **~6.6 MB** that was never evicted.
+The browser tab is a different shape. One headless-Chromium probe against a scratch Host measured ~126 MB at load
+(mostly bytecode and module source across the client bundles), +6.6 MB per distinct thread opened, and 189 MB still
+held by a blank tab after 20 threads. Those figures come from that single probe run, not from a checked-in artifact.
 
 ## Patterns that keep it bounded
 
@@ -52,7 +54,8 @@ The browser tab is a different shape: ~126 MB at load is mostly bytecode and mod
   frees the page freelist. The index re-bloats as Sessions are archived and pruned again, so the worker compacts at
   most once an hour whenever it holds more than 2 KB per document or a quarter of its pages are free.
 - **Bound the write-ahead log.** Without `journal_size_limit`, a store's `-wal` grows beside it: 246 MB next to a
-  245 MB database. `sqlite-store` sets 32 MB and an autocheckpoint.
+  245 MB database. `sqlite-store` sets 32 MB and an autocheckpoint, and the search worker's own index sets the same
+  pair (its log had reached 225 MB beside a 291 MB index).
 - **Gate background work on demand.** An index pass is worth running when someone reads its panel. Usage,
   agentsview and the job-history indexer stop after five minutes without a read; the projection-cache prune runs
   hourly and no-ops when nothing is stale.
@@ -74,6 +77,6 @@ The browser tab is a different shape: ~126 MB at load is mostly bytecode and mod
 
 - Effect schema "precompilation" (4.1 parsers already are functions; the win would be CPU, not RAM).
 - More transcript virtualisation: the DOM is already windowed to ~24 rows per thread.
-- Hidden plugin panels: they replace content, 300–700 nodes each.
-- Age-based retention on the Session logs: only 212 MB of 2.9 GB is older than a week, so it buys little and
-  loses history.
+- Hidden plugin panels: they replace content (externally measured, 300–700 nodes each; no artifact in this repo).
+- Age-based retention on the Session logs: by file mtime about 2.5 GB of the 2.9 GB is more than a week old, and
+  only 21 MB more than 30 days, so an age cutoff deletes most of the history to reclaim little of the recent bulk.

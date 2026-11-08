@@ -8,8 +8,17 @@
     "path": "packages/storage/storage-json"
   },
   "files": [
-    { "upstream": "src", "local": "src/native" },
-    { "upstream": "locale", "local": "locale" }
+    {
+      "upstream": "src",
+      "local": "src/native"
+    },
+    {
+      "upstream": "locale",
+      "local": "locale"
+    }
   ],
-  "delta": ["src/native/per-record-unit.ts"]
+  "delta": [
+    "src/native/per-record-unit.ts",
+    "src/native/single-unit.ts"
+  ]
 }

@@ -40,7 +40,8 @@
     "src/native/skeleton/ConversationContent.tsx",
     "src/native/skeleton/ConversationRoot.module.css",
     "src/native/queue/QueueDock.tsx",
-    "src/native/service.ts"
+    "src/native/service.ts",
+    "src/native/draft.ts"
   ],
   "added": [
     "src/native/conversation/live-bindings.test.ts",

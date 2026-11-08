@@ -278,8 +278,14 @@ export class SessionHistoryController {
         }
       }
       let nextOffset = SessionLogOffset(cursor + 1)
-      while (!follower.closed && !signal.aborted) {
+      // The budget is a queue depth, not a lifetime cap: what the consumer takes leaves the queue.
+      const take = (): (typeof buffered extends Deque<infer Item> ? Item : never) | undefined => {
         const item = buffered.popFront()
+        if (item !== undefined) bufferedBytes -= bytesOf(item)
+        return item
+      }
+      while (!follower.closed && !signal.aborted) {
+        const item = take()
         if (item === undefined) {
           await new Promise<void>((resolve) => { wake = resolve })
           continue

@@ -299,9 +299,9 @@ export class TailLog {
     return this.bytes.length
   }
 
-  /** Complete frames this window holds. */
+  /** Complete frames this window holds; none once the decoded cap truncated the tail. */
   get frameCount(): number {
-    return this.frames.length
+    return this.truncated ? 0 : this.frames.length
   }
 
   /** Whether this window starts after the beginning of the log. */
@@ -332,10 +332,16 @@ export class TailLog {
     for (let index = 1; index <= added.length && index < events.length; index += 1) {
       if (events[index]?.seq !== (events[index - 1]?.seq ?? -2) + 1) throw new Error(`session "${this.header.id}" log tail has a seq gap`)
     }
+    // Truncation is terminal: once the cap drops the oldest events, the frames no longer line up with what is decoded,
+    // so the tail stops claiming to page further back instead of throwing a seq gap on the next page.
+    if (events.length > MAX_DECODED_EVENTS) {
+      this.truncated = true
+      this.decoded = events.slice(events.length - MAX_DECODED_EVENTS)
+      return this.decoded
+    }
     this.firstFrame = first
-    this.decoded = events.length > MAX_DECODED_EVENTS ? events.slice(events.length - MAX_DECODED_EVENTS) : events
-    if (this.decoded.length < events.length) this.truncated = true
-    return this.decoded
+    this.decoded = events
+    return events
   }
 
   /**

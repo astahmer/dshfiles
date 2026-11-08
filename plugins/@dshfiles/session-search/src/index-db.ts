@@ -257,6 +257,10 @@ export class SearchIndex {
     this.#database = new DatabaseSync(path)
     this.#database.exec('PRAGMA journal_mode = wal')
     this.#database.exec('PRAGMA synchronous = normal')
+    // The index is the biggest store here and its worker writes in bursts; without a limit the log grew to 225 MB
+    // beside a 291 MB index. Keep it at 32 MB and checkpoint as it fills.
+    this.#database.exec('PRAGMA journal_size_limit = 33554432')
+    this.#database.exec('PRAGMA wal_autocheckpoint = 1000')
     this.#database.exec(SCHEMA)
   }
 

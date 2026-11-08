@@ -86,17 +86,30 @@ export class ControlQueue {
    * Measured on the live Host: a connected client held gigabytes of queued frames while a long turn streamed updates.
    */
   private static readonly MAX_PENDING = 4_096
+  /** A projection value can be large, so the queue also carries a byte budget: a frame count alone is not a bound. */
+  private static readonly MAX_PENDING_BYTES = 4 * 1024 * 1024
   private readonly buffer = new Deque<SessionControlFrame>()
+  private bufferedBytes = 0
   private wake: (() => void) | undefined
   private done = false
 
   push(frame: SessionControlFrame): void {
     if (this.done) return
+    const bytes = ControlQueue.bytesOf(frame)
     this.buffer.pushBack(frame)
-    while (this.buffer.size > ControlQueue.MAX_PENDING) this.buffer.popFront()
+    this.bufferedBytes += bytes
+    while (this.buffer.size > ControlQueue.MAX_PENDING || this.bufferedBytes > ControlQueue.MAX_PENDING_BYTES) {
+      const dropped = this.buffer.popFront()
+      if (dropped === undefined) break
+      this.bufferedBytes -= ControlQueue.bytesOf(dropped)
+    }
     const wake = this.wake
     this.wake = undefined
     wake?.()
+  }
+
+  private static bytesOf(frame: SessionControlFrame): number {
+    return Buffer.byteLength(JSON.stringify(frame))
   }
 
   end(): void {
