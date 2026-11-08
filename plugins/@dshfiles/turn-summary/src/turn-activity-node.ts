@@ -14,8 +14,8 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
 
 interface TurnActivityState {
   readonly turn: number
-  readonly calls: readonly ToolCallRecord[]
-  readonly results: readonly ToolResultRecord[]
+  readonly calls: ToolCallRecord[]
+  readonly results: ToolResultRecord[]
   readonly closed: boolean
   /** Sequence of the turn's `workspace/changes` event, which addresses its changed-files review. */
   readonly changesSeq: number | undefined
@@ -60,16 +60,19 @@ export const turnActivityDefinition: ConversationNodeDefinitionInput<TurnActivit
   },
   update: (context, update) => {
     const event = update.event
-    if (event.type === 'turn/end') return { ...context.state, closed: true }
-    if (isWorkspaceChanges(event)) return { ...context.state, changesSeq: 'seq' in event ? event.seq : undefined }
-    if (event.type === 'tool/call')
-      return { ...context.state, calls: [...context.state.calls, { callId: event.data.callId, name: event.data.name, arguments: event.data.arguments }] }
-    if (event.type === 'tool/result')
-      return {
-        ...context.state,
-        results: [...context.state.results, { callId: event.data.message.toolCallId, isError: event.data.message.isError === true, text: firstText(event) }],
-      }
-    return context.state
+    const state = context.state
+    if (event.type === 'turn/end') return { ...state, closed: true }
+    if (isWorkspaceChanges(event)) return { ...state, changesSeq: 'seq' in event ? event.seq : undefined }
+    // A replay applies one update per Session event, so appending in place keeps collecting a turn's events linear.
+    if (event.type === 'tool/call') {
+      state.calls.push({ callId: event.data.callId, name: event.data.name, arguments: event.data.arguments })
+      return state
+    }
+    if (event.type === 'tool/result') {
+      state.results.push({ callId: event.data.message.toolCallId, isError: event.data.message.isError === true, text: firstText(event) })
+      return state
+    }
+    return state
   },
   publication: published => (published.event.type === 'turn/end' || isWorkspaceChanges(published.event) ? 'immediate' : 'none'),
   buildLocationData: (context, scope) => {
