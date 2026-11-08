@@ -8,7 +8,7 @@
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { reconcileManualOrder, type ArchivedFilter, type SessionRowState } from './tree.ts'
+import { reconcileManualOrder, type ArchivedFilter, type IndexedRowState } from './tree.ts'
 
 /** Browser-local order account for the hierarchy-free flat Session list. */
 export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
@@ -33,7 +33,7 @@ type WorkspaceViewState = {
 type SessionOrderSource = {
   members: Readonly<Record<string, readonly SessionId[]>>
   summaries: SessionListState['byId']
-  rowState: Pick<SessionRowState, 'pinnedSessionIds' | 'archivedSessionIds'>
+  rowState: IndexedRowState
 }
 
 /**
