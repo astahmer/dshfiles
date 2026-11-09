@@ -1,7 +1,7 @@
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { Context, Effect, Layer, Option, Queue, Schema, Stream } from 'effect'
 import { PluginStorageContract, type StorageListInput, type StoragePage, type StoredEntry } from '../api/storage.js'
-import { PluginStorageModel } from '../host/plugin-storage.js'
+import { PluginStorageModel, type StorageListAllInput } from '../host/plugin-storage.js'
 import type { JsonValue } from '../json.js'
 import { HostContext } from './host-context.js'
 
@@ -44,6 +44,11 @@ export class PluginStorage extends Context.Service<
     readonly set: (key: string, value: JsonValue) => Effect.Effect<StoredEntry, PluginStorageError>
     readonly delete: (key: string) => Effect.Effect<boolean, PluginStorageError>
     readonly list: (input?: StorageListInput) => Effect.Effect<StoragePage, PluginStorageError>
+    /**
+     * Every entry under one prefix, in key order, from a single snapshot — what paging `list` to exhaustion returns,
+     * asked once. For Host callers that need the whole prefix; the browser-facing `list` keeps its page size cap.
+     */
+    readonly listAll: (input?: StorageListAllInput) => Effect.Effect<readonly StoredEntry[], PluginStorageError>
     /** Changes under `prefix` from any writer (Host or browser) as they become durable. */
     readonly changes: (prefix?: string) => Stream.Stream<PluginStorageChange>
   }
@@ -91,6 +96,10 @@ const makePluginStorage = Effect.fnUntraced(function* (namespace: string) {
     list: Effect.fn('plugin-storage list')(function* (input = {}) {
       yield* checked('list', PluginStorageContract.listInput, { ...input, namespace: checkedNamespace })
       return yield* call('list', () => storage.list(input))
+    }),
+    listAll: Effect.fn('plugin-storage list all')(function* (input = {}) {
+      yield* checked('list', PluginStorageContract.listInput, { prefix: input.prefix ?? '', namespace: checkedNamespace })
+      return yield* call('list', () => storage.listAll(input))
     }),
     changes: (prefix = '') =>
       Stream.callback<PluginStorageChange>(queue =>

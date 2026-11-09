@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import type { StorageListInput, StoredEntry } from '@dshfiles/dshx/api'
+import type { StoredEntry } from '@dshfiles/dshx/api'
 import { PluginStorage } from '@dshfiles/dshx/effect/plugin-storage'
 import { Context, Effect, Layer, Option, Schema, Semaphore, Stream } from 'effect'
 import { automationRecordSchema, runRecordSchema, type AutomationRecord, type RunRecord } from './automations-api.js'
@@ -40,16 +40,12 @@ const make = Effect.gen(function* () {
   const lock = yield* Semaphore.make(1)
   const failed = (operation: string) => (cause: unknown) => new AutomationStorageFailure({ operation, cause })
 
+  /**
+   * Every entry under one prefix, in key order. `run/` holds thousands of keys, and paging it at the wire maximum made
+   * each page re-scan and re-sort the shared key table, so one snapshot read replaces the whole cursor walk.
+   */
   const listEntries = Effect.fn('automation store list')(function* (prefix: string) {
-    const out: StoredEntry[] = []
-    let cursor: string | undefined
-    do {
-      const input: StorageListInput = cursor === undefined ? { prefix, limit: 500 } : { prefix, limit: 500, cursor }
-      const page = yield* storage.list(input).pipe(Effect.mapError(failed('list')))
-      out.push(...page.entries)
-      cursor = page.cursor ?? undefined
-    } while (cursor !== undefined)
-    return out
+    return yield* storage.listAll({ prefix }).pipe(Effect.mapError(failed('list')))
   })
 
   const decodeAll = <A>(entries: readonly StoredEntry[], decode: (entry: StoredEntry) => Option.Option<A>) => {
