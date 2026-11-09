@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { Plugin, Rollup } from 'vite'
 import { DshxError } from '../../diagnostics.js'
+import { retryWindowsLock } from '../windows-locks.js'
 
 function cssSource(asset: Rollup.OutputAsset): string {
   return typeof asset.source === 'string' ? asset.source : Buffer.from(asset.source).toString('utf8')
@@ -70,20 +71,21 @@ export function clientCssPlugin(options: {
     async writeBundle() {
       if (pendingMaterializer === '') return
       const file = resolve(outDir, 'client.js')
-      const code = await readFile(file, 'utf8')
+      // Rolldown wrote client.js a moment ago; on Windows a scanner may still hold it (see windows-locks).
+      const code = await retryWindowsLock(() => readFile(file, 'utf8'))
       const offset = code.lastIndexOf('return module.exports;')
       if (offset >= 0) {
         const lineStart = code.lastIndexOf('\n', offset) + 1
         const indentation = code.slice(lineStart, offset)
         // Insertion occurs after all mapped module code and immediately before the
         // generated factory return, so existing source mappings remain aligned.
-        await writeFile(file, `${code.slice(0, lineStart)}${indentation}${pendingMaterializer}\n${code.slice(lineStart)}`, 'utf8')
+        await retryWindowsLock(() => writeFile(file, `${code.slice(0, lineStart)}${indentation}${pendingMaterializer}\n${code.slice(lineStart)}`, 'utf8'))
         return
       }
       // A minified factory ends `return e.Config=…,t.exports}})`; insert before that return on the same line.
       const minifiedReturn = [...code.matchAll(/return\s[^;{}]*?[\w$]+\.exports\s*\}\s*\}\s*\)/g)].at(-1)
       if (minifiedReturn === undefined) throw new DshxError('DSHX1102', 'The lazy Client factory return marker is missing from client.js.')
-      await writeFile(file, `${code.slice(0, minifiedReturn.index)}${pendingMaterializer}${code.slice(minifiedReturn.index)}`, 'utf8')
+      await retryWindowsLock(() => writeFile(file, `${code.slice(0, minifiedReturn.index)}${pendingMaterializer}${code.slice(minifiedReturn.index)}`, 'utf8'))
     },
   }
 }

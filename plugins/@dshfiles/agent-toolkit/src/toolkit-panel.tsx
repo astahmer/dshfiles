@@ -72,7 +72,11 @@ const Section = (props: { readonly id: string; readonly title: string; readonly 
 )
 
 /** A project is filed by its folder; show its name and keep the path in a tooltip. */
-const projectName = (project: string): string => project.replace(/\/+$/u, '').split('/').at(-1) || project
+const projectName = (project: string): string =>
+  project
+    .replace(/[\\/]+$/u, '')
+    .split(/[\\/]/u)
+    .at(-1) || project
 
 const Muted = (props: { readonly children: ReactNode }): ReactNode => <p className="dshx:text-sm dshx:text-muted-foreground">{props.children}</p>
 

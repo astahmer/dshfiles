@@ -242,7 +242,7 @@ export interface ActivityInput {
   readonly level?: ActivityLevel | undefined
 }
 
-const basenameOf = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
+const basenameOf = (path: string): string => path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
 
 /** One workspace Activity item on the shared activity event; reporting never fails the work it reports on. */
 export class ActivityLog extends Context.Service<ActivityLog, { readonly emit: (input: ActivityInput) => Effect.Effect<void> }>()(

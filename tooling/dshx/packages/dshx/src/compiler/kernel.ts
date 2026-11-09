@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
-import type { InlineConfig, Plugin, PluginOption, ResolvedConfig, Rollup } from 'vite'
+import { normalizePath, type InlineConfig, type Plugin, type PluginOption, type ResolvedConfig, type Rollup } from 'vite'
 import { DshxError } from '../diagnostics.js'
 import { resolveVitePlugins } from '../config/vite-plugins.js'
 import type { BuildArtifact, BuildReport, BuildWatcher } from './types.js'
@@ -51,7 +51,8 @@ const kernelBoundaryPlugin = (boundary: KernelBoundary): Plugin => {
     enforce: 'post',
     configResolved(config) {
       if (config.command !== 'build') fail('command')
-      if (config.root !== boundary.root) fail('root')
+      // Vite stores root with forward slashes; on Windows the boundary root is a native backslash path.
+      if (config.root !== normalizePath(resolve(boundary.root))) fail('root')
       if (config.configFile !== undefined) fail('configFile')
       if (config.publicDir !== '') fail('publicDir')
       if (config.build.target !== boundary.target) fail('build.target')

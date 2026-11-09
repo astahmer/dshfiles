@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change. The only delta adds the synchronous per-record reads (listKeysSync / getRecordSync / getGlobalSync) the domain layer's lazy hydrate needs; every document format and write path is upstream byte-for-byte.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change. The delta adds the synchronous per-record reads (listKeysSync / getRecordSync / getGlobalSync) the domain layer's lazy hydrate needs, and a Windows-only bounded retry of the replacing rename in atomic.ts while antivirus or the indexer briefly holds the target; every document format is upstream byte-for-byte.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-storage-json",
@@ -18,6 +18,7 @@
     }
   ],
   "delta": [
+    "src/native/atomic.ts",
     "src/native/per-record-unit.ts",
     "src/native/single-unit.ts"
   ]

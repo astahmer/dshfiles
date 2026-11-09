@@ -194,11 +194,13 @@ const make = Effect.gen(function* () {
           .pipe(Effect.catch(warnAndSkip('list secondary workspaces', repository.repoRoot)))
         // The registry canonicalizes the path it is given, so a workspace whose checkout folder is gone cannot be
         // resolved by path; matching the recorded one keeps that row cleanable instead of failing the whole scan.
-        const registeredByPath = new Map<string, Workspace>((yield* registry.list).map(workspace => [workspace.path, workspace]))
+        // jj and the registry may spell one Windows folder with a different drive-letter case or separator.
+        const pathKey = (candidate: string): string => (path.sep === '\\' ? candidate.replaceAll('/', '\\').toLowerCase() : candidate)
+        const registeredByPath = new Map<string, Workspace>((yield* registry.list).map(workspace => [pathKey(workspace.path), workspace]))
         // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- secondary workspaces are few and each registry read is a map lookup.
         for (const workspace of secondary) {
-          const resolved = workspace.missing ? registeredByPath.get(workspace.path) : yield* registry.resolveByPath(workspace.path)
-          const registered = resolved?.path === workspace.path ? resolved : undefined
+          const resolved = workspace.missing ? registeredByPath.get(pathKey(workspace.path)) : yield* registry.resolveByPath(workspace.path)
+          const registered = resolved !== undefined && pathKey(resolved.path) === pathKey(workspace.path) ? resolved : undefined
           workspaceIds.set(workspace.path, registered?.id ?? null)
           const sessionCwds = yield* Effect.filter(sessionRecords ?? [], record =>
             WorkspaceSessionPath.includes({ fileSystem, path, sessionCwd: record.cwd, workspacePath: workspace.path }),

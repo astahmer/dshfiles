@@ -1,8 +1,12 @@
 import { randomBytes } from 'node:crypto'
 import { mkdir, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
+import { retryWindowsLock } from './windows-locks.js'
 
 const isMissing = (error: unknown): boolean => typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
+
+/** Windows refuses to rename a directory while any file inside it is open; see windows-locks. */
+const renameDirectory = (from: string, to: string): Promise<void> => retryWindowsLock(() => rename(from, to))
 
 const isRunning = (pid: number): boolean => {
   try {
@@ -45,7 +49,7 @@ export class StagedOutput {
   async publish(): Promise<void> {
     await rm(resolve(this.directory, '.gitignore'), { force: true })
     const retired = `${this.directory}-retired`
-    const replaced = await rename(this.outDir, retired).then(
+    const replaced = await renameDirectory(this.outDir, retired).then(
       () => true,
       (error: unknown) => {
         if (isMissing(error)) return false
@@ -53,9 +57,9 @@ export class StagedOutput {
       },
     )
     try {
-      await rename(this.directory, this.outDir)
+      await renameDirectory(this.directory, this.outDir)
     } catch (error) {
-      if (replaced) await rename(retired, this.outDir)
+      if (replaced) await renameDirectory(retired, this.outDir)
       throw error
     }
     if (replaced) await rm(retired, { recursive: true, force: true })

@@ -4,6 +4,7 @@ import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { basename, isAbsolute } from 'node:path'
 import { ProcessGroupStillRunning } from './errors.js'
 import { Executables } from './host-promise.js'
+import { WindowsCommandLine } from './windows-command-line.js'
 
 type ProcessFailure = 'spawn-failed' | 'process-group-failed' | 'timed-out'
 
@@ -42,6 +43,12 @@ const tailText = <E>(stream: Stream.Stream<Uint8Array, E>, limit: number) =>
 
 const failed = (failure: ProcessFailure, exitCode: number | null = null): ProcessResult => ({ exitCode, stdout: '', stderr: '', failure })
 
+/** A Windows batch shim runs as one escaped cmd.exe line (the spawner refuses `shell` with separate arguments). */
+const spawnCommand = (executable: string, args: readonly string[]) =>
+  WindowsCommandLine.needsShell(executable)
+    ? { command: WindowsCommandLine.forBatchFile(executable, args), args: [], shell: true }
+    : { command: executable, args, shell: false }
+
 /**
  * Runs one check process on the DSH spawner. A timeout or interruption terminates its whole process range; the run
  * reports `process-group-failed` (or, when interrupted, dies with `ProcessGroupStillRunning`) unless that range is
@@ -62,6 +69,7 @@ export class ProcessRunner extends Context.Service<ProcessRunner, { readonly run
           yield* Effect.annotateCurrentSpan({ 'process.executable.name': executableName, 'dshx.project-checks.argument_count': request.args.length })
           const executable = yield* Effect.option(executables.resolve(request.command))
           if (Option.isNone(executable) || !isAbsolute(executable.value) || executable.value.includes('\0')) return failed('spawn-failed')
+          const spawnable = spawnCommand(executable.value, request.args)
 
           const stopAttempted = yield* Ref.make(false)
           const stopGroupOf = (handle: ChildProcessSpawner.ChildProcessHandle) =>
@@ -72,17 +80,26 @@ export class ProcessRunner extends Context.Service<ProcessRunner, { readonly run
               Effect.catch(() => Effect.succeed(false)),
             )
           const spawned = yield* Effect.uninterruptible(
-            spawner.spawn(ChildProcess.make(executable.value, request.args, { cwd: request.cwd, stdin: 'ignore', forceKillAfter: Duration.seconds(1) })).pipe(
-              Effect.tap(handle =>
-                Effect.addFinalizer(() =>
-                  Effect.gen(function* () {
-                    if (yield* Ref.get(stopAttempted)) return
-                    if (!(yield* stopGroupOf(handle))) return yield* Effect.die(new ProcessGroupStillRunning({ executable: executableName }))
-                  }),
+            spawner
+              .spawn(
+                ChildProcess.make(spawnable.command, spawnable.args, {
+                  cwd: request.cwd,
+                  stdin: 'ignore',
+                  forceKillAfter: Duration.seconds(1),
+                  shell: spawnable.shell,
+                }),
+              )
+              .pipe(
+                Effect.tap(handle =>
+                  Effect.addFinalizer(() =>
+                    Effect.gen(function* () {
+                      if (yield* Ref.get(stopAttempted)) return
+                      if (!(yield* stopGroupOf(handle))) return yield* Effect.die(new ProcessGroupStillRunning({ executable: executableName }))
+                    }),
+                  ),
                 ),
+                Effect.exit,
               ),
-              Effect.exit,
-            ),
           )
           if (Exit.isFailure(spawned)) return failed('spawn-failed')
           const handle = spawned.value

@@ -1,10 +1,11 @@
-import { randomUUID, createHash } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import * as Schema from 'effect/Schema'
 import * as SchemaIssue from 'effect/SchemaIssue'
 import { access, readFile } from 'node:fs/promises'
-import { homedir, tmpdir } from 'node:os'
+import { homedir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { JsonLineTransport, JsonLineTransportError } from '../bridge/json-line.js'
+import { LocalEndpoint, type LocalEndpointAddress } from '../bridge/local-endpoint.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { decodeJson, jsonObjectSchema, jsonValueSchema } from '../json.js'
@@ -12,6 +13,7 @@ import type { JsonObject, JsonValue } from '../json.js'
 import { withUnknownProperties } from '../schema.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { InspectProvider, InspectSlotOptions, ServiceSummary, EventSummary, SlotSummary, ToolSummary } from './types.js'
+import { inspectEndpoint } from './endpoint.js'
 
 const PROTOCOL_VERSION = 1
 const MAX_MESSAGE_BYTES = 64 * 1024
@@ -120,18 +122,9 @@ function isRecord(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function bridgeName(packageId: string): string {
-  return createHash('sha256').update(packageId).digest('hex').slice(0, 20)
-}
-
 function endpointPaths(packageId: string, env: Readonly<NodeJS.ProcessEnv>) {
   const dshHome = env.DSH_HOME?.trim() ? resolve(env.DSH_HOME.trim()) : join(homedir(), '.dsh')
-  const directory = join(dshHome, 'runtime', 'dshx', 'inspect')
-  const name = bridgeName(packageId)
-  const regularSocket = join(directory, `${name}.sock`)
-  const socketPath =
-    regularSocket.length > 90 ? join(tmpdir(), `dshx-${createHash('sha256').update(`${dshHome}:${packageId}`).digest('hex').slice(0, 24)}.sock`) : regularSocket
-  return { metadataPath: join(directory, `${name}.json`), socketPath }
+  return inspectEndpoint(dshHome, packageId)
 }
 
 function fail(code: 'DSHX3201' | 'DSHX3202' | 'DSHX3203' | 'DSHX3204' | 'DSHX3205', message: string, hint: string): DshxError {
@@ -214,7 +207,7 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
   if (
     endpoint.packageId !== project.packageId ||
     resolve(endpoint.root) !== resolve(project.root) ||
-    resolve(endpoint.socketPath) !== resolve(paths.socketPath)
+    !LocalEndpoint.accepts(paths.address, endpoint.socketPath)
   ) {
     return {
       state: 'invalid',
@@ -245,7 +238,8 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
     }
   }
   try {
-    await access(endpoint.socketPath)
+    // Probing a named pipe opens a connection to the Host, so for a pipe the process check above stands in for it.
+    if (!LocalEndpoint.isNamedPipe(endpoint.socketPath)) await access(endpoint.socketPath)
   } catch {
     return {
       state: 'stale',
@@ -280,7 +274,7 @@ export async function inspectBridgeStatus(project: ResolvedDshxConfig, options: 
   }
 }
 
-async function readMetadata(path: string, project: ResolvedDshxConfig, expectedSocket: string): Promise<BridgeCredentials> {
+async function readMetadata(path: string, project: ResolvedDshxConfig, address: LocalEndpointAddress): Promise<BridgeCredentials> {
   let text: string
   try {
     text = await readFile(path, 'utf8')
@@ -319,7 +313,7 @@ async function readMetadata(path: string, project: ResolvedDshxConfig, expectedS
       'Close stale DSH processes and restart the project from its configured root.',
     )
   }
-  if (resolve(credentials.socketPath) !== resolve(expectedSocket)) {
+  if (!LocalEndpoint.accepts(address, credentials.socketPath)) {
     throw fail(
       'DSHX3202',
       'Host Inspect bridge socket path does not match its package endpoint.',
@@ -367,11 +361,11 @@ const request = async <Item>({
 }): Promise<readonly Item[]> => {
   const env = { ...process.env, ...options.env }
   const paths = endpointPaths(project.packageId, env)
-  const metadata = await readMetadata(paths.metadataPath, project, paths.socketPath)
+  const metadata = await readMetadata(paths.metadataPath, project, paths.address)
   const requestId = `inspect-${randomUUID()}`
   const payload =
     JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation: 'list', target, ...(input !== undefined && { input }) }) + '\n'
-  const value = await JsonLineTransport.request(paths.socketPath, payload, {
+  const value = await JsonLineTransport.request(metadata.socketPath, payload, {
     maxRequestBytes: MAX_MESSAGE_BYTES,
     maxResponseBytes: MAX_MESSAGE_BYTES,
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,

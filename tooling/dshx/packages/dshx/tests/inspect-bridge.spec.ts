@@ -3,10 +3,13 @@ import * as Schema from 'effect/Schema'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HostInspectBridge } from '../src/host/inspect-bridge.js'
 import { DshInspectBridgeProvider, inspectBridgeStatus } from '../src/inspect/bridge.js'
+import { inspectEndpoint } from '../src/inspect/endpoint.js'
+import { LocalEndpoint } from '../src/bridge/local-endpoint.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 
 const project: ResolvedDshxConfig = {
@@ -26,11 +29,17 @@ const project: ResolvedDshxConfig = {
 
 const tempRoots: string[] = []
 
+// POSIX keeps /tmp: a long tmpdir() would push the socket onto the short-path fallback. Windows has no /tmp.
+const tempBase = process.platform === 'win32' ? tmpdir() : '/tmp'
+
+/** The endpoint a Host bridge for this home would listen on: a socket beside its metadata, or a per-run Windows pipe. */
+const testSocketPath = (directory: string): string => LocalEndpoint.listenPath(inspectEndpoint(join(directory, '..', '..', '..'), project.packageId).address)
+
 async function endpoint(envRoot: string, response: string): Promise<() => Promise<void>> {
   const directory = join(envRoot, 'runtime', 'dshx', 'inspect')
   await mkdir(directory, { recursive: true })
   const name = createHash('sha256').update(project.packageId).digest('hex').slice(0, 20)
-  const socketPath = join(directory, `${name}.sock`)
+  const socketPath = testSocketPath(directory)
   const metadataPath = join(directory, `${name}.json`)
   const server = createServer(socket => socket.once('data', () => socket.end(`${response}\n`)))
   await new Promise<void>((resolve, reject) => {
@@ -59,7 +68,7 @@ const replyingEndpoint = async ({
   const directory = join(envRoot, 'runtime', 'dshx', 'inspect')
   await mkdir(directory, { recursive: true })
   const name = createHash('sha256').update(project.packageId).digest('hex').slice(0, 20)
-  const socketPath = join(directory, `${name}.sock`)
+  const socketPath = testSocketPath(directory)
   const server = createServer(socket =>
     socket.once('data', data => socket.end(`${JSON.stringify(reply(Schema.decodeUnknownSync(requestSchema)(JSON.parse(data.toString()))))}\n`)),
   )
@@ -81,12 +90,12 @@ afterEach(async () => {
 
 describe('DshInspectBridgeProvider', () => {
   it('connects to the Host-owned socket and validates bridge DTOs', async () => {
-    const root = await mkdtemp(join('/tmp', 'dx-'))
+    const root = await mkdtemp(join(tempBase, 'dx-'))
     tempRoots.push(root)
     const directory = join(root, 'runtime', 'dshx', 'inspect')
     await mkdir(directory, { recursive: true })
     const name = createHash('sha256').update(project.packageId).digest('hex').slice(0, 20)
-    const socketPath = join(directory, `${name}.sock`)
+    const socketPath = testSocketPath(directory)
     const metadataPath = join(directory, `${name}.json`)
     const server = createServer(socket => {
       socket.once('data', data => {
@@ -116,7 +125,7 @@ describe('DshInspectBridgeProvider', () => {
   })
 
   it('reports a running bridge without exposing its authentication token', async () => {
-    const root = await mkdtemp(join('/tmp', 'dx-'))
+    const root = await mkdtemp(join(tempBase, 'dx-'))
     tempRoots.push(root)
     const close = await endpoint(root, JSON.stringify({ version: 1, requestId: 'unused', ok: true, target: 'services', items: [] }))
     const status = await inspectBridgeStatus(project, { env: { DSH_HOME: root } })
@@ -127,12 +136,12 @@ describe('DshInspectBridgeProvider', () => {
   })
 
   it('reports stale bridge metadata without connecting to a process', async () => {
-    const root = await mkdtemp(join('/tmp', 'dx-'))
+    const root = await mkdtemp(join(tempBase, 'dx-'))
     tempRoots.push(root)
     const directory = join(root, 'runtime', 'dshx', 'inspect')
     await mkdir(directory, { recursive: true })
     const name = createHash('sha256').update(project.packageId).digest('hex').slice(0, 20)
-    const socketPath = join(directory, `${name}.sock`)
+    const socketPath = testSocketPath(directory)
     const metadataPath = join(directory, `${name}.json`)
     await writeFile(
       metadataPath,
@@ -144,7 +153,7 @@ describe('DshInspectBridgeProvider', () => {
   })
 
   it('maps missing endpoints and malformed responses to stable diagnostics', async () => {
-    const root = await mkdtemp(join('/tmp', 'dx-'))
+    const root = await mkdtemp(join(tempBase, 'dx-'))
     tempRoots.push(root)
     const missing = new DshInspectBridgeProvider(project, { env: { DSH_HOME: root } })
     await expect(missing.listEvents()).rejects.toMatchObject({ code: 'DSHX3201' })
@@ -155,12 +164,12 @@ describe('DshInspectBridgeProvider', () => {
   })
 
   it('queries compact and exact Client Slot contracts through the Host bridge', async () => {
-    const root = await mkdtemp(join('/tmp', 'dx-'))
+    const root = await mkdtemp(join(tempBase, 'dx-'))
     tempRoots.push(root)
     const directory = join(root, 'runtime', 'dshx', 'inspect')
     await mkdir(directory, { recursive: true })
     const name = createHash('sha256').update(project.packageId).digest('hex').slice(0, 20)
-    const socketPath = join(directory, `${name}.sock`)
+    const socketPath = testSocketPath(directory)
     const metadataPath = join(directory, `${name}.json`)
     const server = createServer(socket => {
       socket.once('data', data => {
@@ -235,7 +244,7 @@ describe('DshInspectBridgeProvider', () => {
   })
 
   it('bridges native Client Slot and Factory nodes from the Host Inspect registry', async () => {
-    const root = await mkdtemp(join('/tmp', 'dx-slot-tree-'))
+    const root = await mkdtemp(join(tempBase, 'dx-slot-tree-'))
     tempRoots.push(root)
     vi.stubEnv('DSH_HOME', root)
     const context = new Context()
@@ -304,7 +313,7 @@ describe('DshInspectBridgeProvider', () => {
     ['a non-object metadata field', { items: [{ name: 'logger', metadata: 'composition' }] }],
     ['a missing item list', {}],
   ])('rejects a bridge response carrying %s', async (_label, body) => {
-    const root = await mkdtemp(join('/tmp', 'dx-'))
+    const root = await mkdtemp(join(tempBase, 'dx-'))
     tempRoots.push(root)
     const close = await replyingEndpoint({
       envRoot: root,
@@ -320,7 +329,7 @@ describe('DshInspectBridgeProvider', () => {
   })
 
   it('rejects a response whose header does not echo the request', async () => {
-    const root = await mkdtemp(join('/tmp', 'dx-'))
+    const root = await mkdtemp(join(tempBase, 'dx-'))
     tempRoots.push(root)
     const close = await replyingEndpoint({ envRoot: root, reply: request => ({ version: 1, requestId: 'other', ok: true, target: request.target, items: [] }) })
     const provider = new DshInspectBridgeProvider(project, { env: { DSH_HOME: root } })
@@ -329,7 +338,7 @@ describe('DshInspectBridgeProvider', () => {
   })
 
   it('surfaces a well-formed bridge error and rejects a malformed one', async () => {
-    const root = await mkdtemp(join('/tmp', 'dx-'))
+    const root = await mkdtemp(join(tempBase, 'dx-'))
     tempRoots.push(root)
     const close = await replyingEndpoint({
       envRoot: root,

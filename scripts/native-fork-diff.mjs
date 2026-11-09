@@ -16,7 +16,7 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, join, posix, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -67,7 +67,8 @@ const vendoredPairs = fork => {
     return upstreamFiles(upstream.ref, upstreamRoot).map(({ upstreamPath, blob }) => ({
       upstreamPath,
       blob,
-      local: join(mapping.local, upstreamPath.slice(upstreamRoot.length)).replace(/\/$/, ''),
+      // Manifest paths always use `/`, as native-fork.json records them, whatever the Host's separator.
+      local: posix.join(mapping.local, upstreamPath.slice(upstreamRoot.length)).replace(/\/$/, ''),
     }))
   })
 }
@@ -94,7 +95,7 @@ const drift = fork => {
   }
   const unvendored = files
     .flatMap(mapping => localFiles(join(fork.root, mapping.local)))
-    .map(path => relative(fork.root, path))
+    .map(path => relative(fork.root, path).split(sep).join('/'))
     .filter(path => !vendored.has(path))
   const added = unvendored.filter(path => !ownedFiles.has(path))
   const present = new Set(unvendored)

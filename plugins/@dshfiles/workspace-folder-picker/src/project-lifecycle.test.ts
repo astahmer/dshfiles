@@ -106,7 +106,7 @@ const lifecycle = (input: {
           register: path =>
             Effect.sync(() => {
               registered.push(path)
-              return { workspaceId: `ws-${String(registered.length)}`, title: path.split('/').at(-1) ?? path, path }
+              return { workspaceId: `ws-${String(registered.length)}`, title: path.split(/[\\/]/).at(-1) ?? path, path }
             }),
         }),
       ),

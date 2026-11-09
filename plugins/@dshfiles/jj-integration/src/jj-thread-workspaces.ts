@@ -869,7 +869,10 @@ const make = Effect.gen(function* () {
     yield* updateSpares(repoRoot, ({ [claim.target]: _claimed, ...rest }) => rest)
     // The thread keeps the name the client already shows: the spare's folder moves within the same directory, so
     // its relative pointer to the store still holds, and jj renames the workspace to match.
-    const name = claim.requestedName !== undefined && (yield* isFreeThreadName(repoRoot, claim.requestedName)) ? claim.requestedName : spare
+    // Windows refuses to rename a fresh checkout while antivirus or the indexer holds a file in it, and a failed move
+    // discards the spare, so there the thread keeps the spare's own name; the caller already accepts a different name.
+    const name =
+      path.sep !== '\\' && claim.requestedName !== undefined && (yield* isFreeThreadName(repoRoot, claim.requestedName)) ? claim.requestedName : spare
     const sparePath = path.join(directory, spare)
     const workspacePath = path.join(directory, name)
     return yield* Effect.gen(function* () {

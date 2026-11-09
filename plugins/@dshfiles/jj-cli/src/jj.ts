@@ -82,18 +82,20 @@ export class Jj extends Context.Service<
     const fileSystem = yield* FileSystem.FileSystem
     const path = yield* Path.Path
 
+    // Windows has no execute bits (an .exe reports 0o666); there the `.exe` name is what makes it runnable.
+    const windows = path.sep === '\\'
     const isExecutableFile = (candidate: string) =>
       fileSystem.stat(candidate).pipe(
-        Effect.map(info => info.type === 'File' && (info.mode & 0o111) !== 0),
+        Effect.map(info => info.type === 'File' && (windows || (info.mode & 0o111) !== 0)),
         Effect.orElseSucceed(() => false),
       )
 
     const findOnPath = Effect.gen(function* () {
       const searchPath = yield* Config.String('PATH').pipe(Config.withDefault(''))
       const candidates = searchPath
-        .split(path.sep === '\\' ? ';' : ':')
+        .split(windows ? ';' : ':')
         .filter(directory => directory.length > 0 && path.isAbsolute(directory))
-        .map(directory => path.join(directory, 'jj'))
+        .map(directory => path.join(directory, windows ? 'jj.exe' : 'jj'))
       const found = yield* Effect.findFirst(candidates, isExecutableFile)
       if (Option.isNone(found)) return yield* new JjSpawnFailed({ verb: '', reason: 'executable-not-found' })
       return found.value

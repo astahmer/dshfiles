@@ -10,6 +10,7 @@ import { AiAccountsSchema } from './effect-schema.js'
 import { readKeychainSecret } from './keychain.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
 import { providerFetch } from './provider-request.js'
+import { ShellCommand } from './shell-command.js'
 
 export interface ClaudeAccountServiceDependencies {
   readonly readFile: typeof readFile
@@ -201,10 +202,8 @@ export class ClaudeAccountModel {
     return environment
   }
 
-  static shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
-
   static claudeLoginHint = (configDir: string): string =>
-    configDir === DEFAULT_CONFIG_DIR ? 'claude auth login' : `CLAUDE_CONFIG_DIR=${ClaudeAccountModel.shellQuote(configDir)} claude auth login`
+    configDir === DEFAULT_CONFIG_DIR ? 'claude auth login' : ShellCommand.withEnvironment('CLAUDE_CONFIG_DIR', configDir, 'claude auth login')
 
   /** `utilization` is percent used; a window the plan does not meter arrives as null. */
   static parseClaudeUsage = (raw: JsonValue, plan: string | undefined): UsageCard => {

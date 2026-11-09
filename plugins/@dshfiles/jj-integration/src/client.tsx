@@ -758,7 +758,7 @@ export default defineClient({
     const sharedWorkspaceMoves = new Map<string, DeferredMove>()
     const sharedThreadWorkspaceMove = (sessionId: SessionSummary['id'], workspaceId: string): DeferredMove | undefined => {
       const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
-      if (workspace === undefined || !Schema.is(threadWorkspaceNameEffect)(workspace.path.split('/').at(-1))) return undefined
+      if (workspace === undefined || !Schema.is(threadWorkspaceNameEffect)(workspace.path.split(/[\\/]/u).at(-1))) return undefined
       if (!workspaceHasOtherSession({ sessionId, workspaceSessionIds: workspace.sessionIds })) return undefined
       const key = `${sessionId}\u0000${workspaceId}`
       const cached = sharedWorkspaceMoves.get(key)
@@ -857,7 +857,7 @@ export default defineClient({
         if (input.request.base === undefined) return
         // Reusing a client spare skips the Host rename, so the requested name is not always the folder's: read it back.
         const listed = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === input.workspaceId)
-        const name = listed?.path.split('/').at(-1) ?? input.name
+        const name = listed?.path.split(/[\\/]/u).at(-1) ?? input.name
         workspaceToggle.getSnapshot().context.client.keepSpare(WorkspaceToggle.spareKey(input.request.projectWorkspaceId, input.request.base), {
           workspaceId: input.workspaceId,
           name,

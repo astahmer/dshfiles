@@ -133,7 +133,11 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   }
 }
 
-const basename = (path: string): string => path.replace(/\/+$/, '').split('/').at(-1) ?? path
+const basename = (path: string): string =>
+  path
+    .replace(/[\\/]+$/u, '')
+    .split(/[\\/]/u)
+    .at(-1) ?? path
 
 const STATUS_CLASS = {
   A: 'dshx:text-success',
