@@ -93,6 +93,15 @@ describe('settings groups', () => {
     expect(withStatusBar.find(entry => entry.sectionId === 'dshfiles-status-bar')).toMatchObject({ groupId: 'general', label: 'Status bar' })
   })
 
+  it('puts the dshmarket section in Plugins, next to the built-in plugins it extends', () => {
+    const withMarket = SettingsGroups.group({
+      sections: [...sections, { id: 'market', order: 40, label: 'Plugin Market' }],
+      pages,
+      panels,
+    }).flatMap(group => group.entries.map(entry => ({ ...entry, groupId: group.group.id })))
+    expect(withMarket.find(entry => entry.sectionId === 'market')).toMatchObject({ groupId: 'plugins', label: 'Plugin Market' })
+  })
+
   it('links stage pages owned by other plugins only while they are loaded', () => {
     expect(all.find(entry => entry.id === 'link:mcp-servers')).toMatchObject({ groupId: 'tools', label: 'MCP servers' })
     expect(all.find(entry => entry.id === 'plugin:secret-catalog')).toMatchObject({

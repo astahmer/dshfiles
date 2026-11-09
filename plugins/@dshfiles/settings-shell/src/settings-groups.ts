@@ -54,6 +54,8 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   'dshfiles-new-thread': { group: 'projects', order: 0 },
   'dshfiles-network-access': { group: 'hosts', order: 20 },
   plugins: { group: 'plugins', order: 0 },
+  // dshmarket's own settings section: the community catalog, a full page of its own. Unplaced, it landed under "Other".
+  market: { group: 'plugins', label: 'Plugin Market', order: 10 },
 }
 
 /** Settings namespaces (Loader row ids), including DSH core rows that only have a package name for a title. */
