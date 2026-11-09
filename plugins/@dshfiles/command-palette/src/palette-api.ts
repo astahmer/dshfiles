@@ -10,12 +10,24 @@ interface PaletteApiSnapshot {
   readonly recentLimit: number
 }
 
+interface PaletteRowGroup {
+  rows: readonly PaletteAction[]
+}
+
+/** Rows that come and go together; `set` replaces them in one change instead of one per row. */
+interface PaletteRows {
+  readonly set: (actions: readonly PaletteAction[]) => void
+  readonly dispose: () => void
+}
+
 interface PaletteRegistry {
-  readonly actions: Map<string, PaletteAction>
+  readonly groups: Set<PaletteRowGroup>
+  readonly owners: Map<string, PaletteRowGroup>
   readonly listeners: Set<() => void>
   mode: PaletteMode | null
   recentLimit: number
-  snapshot?: PaletteApiSnapshot
+  dirty: boolean
+  snapshot: PaletteApiSnapshot
 }
 
 const isActionLabel = (value: unknown): value is string | (() => string) => typeof value === 'string' || typeof value === 'function'
@@ -47,49 +59,105 @@ let paletteRegistry: PaletteRegistry | undefined
 /** The palette's own rows and open state; other plugins reach it through the `palette-contract` registry and contract. */
 const registry = (): PaletteRegistry => {
   paletteRegistry ??= {
-    actions: new Map(),
+    groups: new Set(),
+    owners: new Map(),
     listeners: new Set(),
     mode: null,
     recentLimit: 10,
+    dirty: false,
     snapshot: { actions: [], mode: null, recentLimit: 10 },
   }
   return paletteRegistry
 }
 
 const refreshSnapshot = (current: PaletteRegistry): PaletteApiSnapshot => {
-  const actions = [...current.actions.values()]
+  if (!current.dirty) return current.snapshot
+  current.dirty = false
+  const actions = [...current.groups].flatMap(group => group.rows)
   const previous = current.snapshot
   if (
-    previous !== undefined &&
     previous.mode === current.mode &&
     previous.recentLimit === current.recentLimit &&
     previous.actions.length === actions.length &&
     previous.actions.every((action, index) => action === actions[index])
   )
     return previous
-  const next = { actions, mode: current.mode, recentLimit: current.recentLimit }
-  current.snapshot = next
-  return next
+  current.snapshot = { actions, mode: current.mode, recentLimit: current.recentLimit }
+  return current.snapshot
 }
 
 const notify = (current: PaletteRegistry): void => {
+  current.dirty = true
   refreshSnapshot(current)
   for (const listener of current.listeners) listener()
 }
 
+const decodeAction = Schema.decodeUnknownOption(paletteActionSchema)
+
+const releaseRows = (current: PaletteRegistry, group: PaletteRowGroup): void => {
+  for (const action of group.rows) if (current.owners.get(action.id) === group) current.owners.delete(action.id)
+}
+
 /** Register a browser-local action and return its lifecycle disposer. */
 const registerPaletteAction = (input: PaletteAction): (() => void) => {
-  const parsed = Schema.decodeUnknownOption(paletteActionSchema)(input)
+  const parsed = decodeAction(input)
   if (Option.isNone(parsed)) throw new Error('Command palette action has an invalid definition.')
   const action = parsed.value
   const current = registry()
-  if (current.actions.has(action.id)) throw new Error(`Command palette action id is already registered: ${action.id}`)
-  current.actions.set(action.id, action)
+  if (current.owners.has(action.id)) throw new Error(`Command palette action id is already registered: ${action.id}`)
+  const group: PaletteRowGroup = { rows: [action] }
+  current.groups.add(group)
+  current.owners.set(action.id, group)
   notify(current)
   return () => {
-    if (current.actions.get(action.id) !== action) return
-    current.actions.delete(action.id)
+    if (!current.groups.delete(group)) return
+    releaseRows(current, group)
     notify(current)
+  }
+}
+
+/**
+ * Open a set of rows replaced as a whole. A row with an invalid definition or an id another row holds is left out
+ * with a warning instead of breaking the rest; a `set` that keeps every row as it was notifies nobody.
+ */
+const openPaletteRows = (): PaletteRows => {
+  const current = registry()
+  const group: PaletteRowGroup = { rows: [] }
+  current.groups.add(group)
+  let decoded = new Map<PaletteAction, PaletteAction>()
+  return {
+    set: actions => {
+      if (!current.groups.has(group)) return
+      releaseRows(current, group)
+      const nextDecoded = new Map<PaletteAction, PaletteAction>()
+      const rows: PaletteAction[] = []
+      for (const input of actions) {
+        const known = decoded.get(input) ?? nextDecoded.get(input)
+        const parsed = known === undefined ? decodeAction(input) : Option.some(known)
+        if (Option.isNone(parsed)) {
+          console.warn(`command-palette: ${String(input.id)} is not listed`, new Error('Command palette action has an invalid definition.'))
+          continue
+        }
+        const action = parsed.value
+        if (current.owners.has(action.id)) {
+          console.warn(`command-palette: ${action.id} is not listed`, new Error(`Command palette action id is already registered: ${action.id}`))
+          continue
+        }
+        nextDecoded.set(input, action)
+        current.owners.set(action.id, group)
+        rows.push(action)
+      }
+      decoded = nextDecoded
+      const unchanged = rows.length === group.rows.length && rows.every((action, index) => action === group.rows[index])
+      if (unchanged) return
+      group.rows = rows
+      notify(current)
+    },
+    dispose: () => {
+      if (!current.groups.delete(group)) return
+      releaseRows(current, group)
+      if (group.rows.length > 0) notify(current)
+    },
   }
 }
 
@@ -97,12 +165,8 @@ const getPaletteSnapshot = (): PaletteApiSnapshot => refreshSnapshot(registry())
 
 const subscribePaletteActions = (listener: () => void): (() => void) => {
   const current = registry()
-  const onChange = (): void => {
-    refreshSnapshot(current)
-    listener()
-  }
-  current.listeners.add(onChange)
-  return () => current.listeners.delete(onChange)
+  current.listeners.add(listener)
+  return () => current.listeners.delete(listener)
 }
 const setPaletteRecentLimit = (recentLimit: number): void => {
   const parsed = Schema.decodeUnknownSync(recentLimitSchema)(recentLimit)
@@ -126,6 +190,7 @@ export class PaletteApi {
   static readonly getSnapshot = getPaletteSnapshot
   static readonly subscribe = subscribePaletteActions
   static readonly registerAction = registerPaletteAction
+  static readonly openRows = openPaletteRows
   static readonly setRecentLimit = setPaletteRecentLimit
   static readonly open = openPalette
   static readonly close = closePalette
