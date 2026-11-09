@@ -207,6 +207,9 @@ Session environment is detected, unless `DSH_LKG_ADMIN=1` is set.
   maintain its own profile and the state cannot be removed.
 - A snapshot captures the runtime, not your data; recovery clones the live data
   at start instead. Data written by a newer runtime is read by an older one in
-  that clone, never in place.
+  that clone, never in place. A plugin store migrated past what the snapshot
+  knows (`SqliteStoreVersionUnsupported`) fails the Host, so `dsh-recover`
+  moves that store aside in the clone (`<file>.newer-than-lkg`) and starts
+  again: that plugin starts empty during the recovery.
 - `clonefile` is APFS-only. On another filesystem the copy is real, and a
   snapshot then costs its full logical size (~4 GB here).
