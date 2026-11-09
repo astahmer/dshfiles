@@ -10,10 +10,15 @@ import { ChevronLeft, ChevronRight, RefreshCw } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useMemo, useState, type ReactNode } from 'react'
+import { GRAPH_DENSITY, GraphLanes, graphWidthFor, RevisionGraphCell } from '@dshfiles/jj-integration/revision-graph'
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { diffsReviewApi, type RevisionReview } from './api.js'
+import { ReviewGraphModel, type ReviewGraphEntry } from './review-graph.js'
 import { useRevisionsViewedMarks, type RevisionFile } from './viewed-marks.js'
 import { orderReviewFiles } from './file-importance.js'
+
+const METRICS = GRAPH_DENSITY.compact
+const CHIP = 'dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:font-mono! dshx:text-[10px] dshx:leading-none'
 
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
 const STAT = 'dshx:font-mono dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground'
@@ -78,6 +83,8 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       .sort((left, right) => (order.get(left.name) ?? Infinity) - (order.get(right.name) ?? Infinity))
   }, [current, currentPatch])
   const packageJson = usePackageJsonTables(currentPatch, parsed)
+  const graph = useMemo(() => ReviewGraphModel.entries(revisions), [revisions])
+  const graphWidth = graphWidthFor(METRICS, Math.max(1, ...graph.map(entry => entry.layout.laneCount)))
 
   if (query.isPending)
     return (
@@ -101,6 +108,17 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
   const viewedCount = allFiles.filter(file => marks.isViewed(file)).length
   const allViewed = allFiles.length > 0 && viewedCount === allFiles.length
   const show = (revision: RevisionReview, focusPath: string | null = null): void => setChosen({ commitId: revision.commitId, focusPath })
+  /** The graph lists newest first, so j and ArrowDown go to the older revision, as in the Jujutsu panel. */
+  const step = (event: KeyboardEvent<HTMLOListElement>): void => {
+    const delta = event.key === 'j' || event.key === 'ArrowDown' ? -1 : event.key === 'k' || event.key === 'ArrowUp' ? 1 : 0
+    if (delta === 0 || event.altKey || event.ctrlKey || event.metaKey) return
+    const target = revisions[currentIndex + delta]
+    if (target === undefined) return
+    event.preventDefault()
+    show(target)
+    const row = event.currentTarget.querySelector<HTMLButtonElement>(`[data-revision-commit="${target.commitId}"] > button`)
+    row?.focus()
+  }
 
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-3" data-testid="combined-review">
@@ -129,7 +147,9 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       </div>
       {result.segments > 1 ? (
         <p className={HINT} role="status">
-          These revisions are not adjacent, so each one is shown as its own change. Revisions between them are not part of this review.
+          {result.graphComplete === false
+            ? 'These revisions are not adjacent, so each one is shown as its own change. The history between them is too long to count here.'
+            : 'These revisions are not adjacent, so each one is shown as its own change. Dashed lines mark revisions between them that are not in this review.'}
         </p>
       ) : null}
       {result.truncated ? (
@@ -151,60 +171,69 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
         </p>
       )}
       {revisions.length === 0 ? <EmptyState>None of the selected revisions could be read. Select them again in the graph.</EmptyState> : null}
-      <ol aria-label="Reviewed revisions" className="dshx:flex dshx:flex-col dshx:gap-1">
-        {revisions.map(revision => (
-          <li className="dshx:rounded-md dshx:border dshx:border-border" data-revision-commit={revision.commitId} key={revision.commitId}>
-            <button
-              aria-current={revision.commitId === current?.commitId ? 'true' : undefined}
-              className={cn(
-                'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2 dshx:py-1 dshx:text-left dshx:text-xs dshx:hover:bg-accent',
-                revision.commitId === current?.commitId && 'dshx:bg-accent',
+      <ol
+        aria-label="Reviewed revisions"
+        className="dshx:flex dshx:flex-col dshx:rounded-md dshx:border dshx:border-border dshx:py-0.5"
+        data-testid="combined-graph"
+        onKeyDown={step}
+      >
+        {graph.map(entry =>
+          entry.kind === 'base' ? (
+            <BaseRow entry={entry} key={entry.layout.commitId} width={graphWidth} />
+          ) : (
+            <li className="dshx:flex dshx:flex-col" data-revision-commit={entry.revision.commitId} key={entry.revision.commitId}>
+              <RevisionRow
+                current={entry.revision.commitId === current?.commitId}
+                entry={entry}
+                onShow={() => show(entry.revision)}
+                viewed={entry.revision.files.filter(file => marks.isViewed({ commitId: entry.revision.commitId, path: file.path })).length}
+                width={graphWidth}
+              />
+              {entry.revision.files.length === 0 ? null : (
+                <LaneFiller lanes={entry.layout.bottomLanes} width={graphWidth}>
+                  <ul aria-label={`Files of ${entry.revision.shortChangeId}`} className="dshx:flex dshx:flex-col dshx:py-0.5">
+                    {orderReviewFiles({ files: entry.revision.files }).map(file => {
+                      const target = { commitId: entry.revision.commitId, path: file.path }
+                      const viewed = marks.isViewed(target)
+                      return (
+                        <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:py-0.5 dshx:pr-2" key={file.path}>
+                          <Checkbox
+                            aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.path} in ${entry.revision.shortChangeId}`}
+                            checked={viewed}
+                            className="dshx:size-3.5 dshx:data-[state=checked]:border-success dshx:data-[state=checked]:bg-success"
+                            disabled={!marks.ready}
+                            onCheckedChange={next => marks.set([target], next === true)}
+                          />
+                          <button
+                            className={cn(
+                              'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:font-mono dshx:text-xs dshx:hover:underline',
+                              viewed && 'dshx:text-muted-foreground',
+                            )}
+                            onClick={() => {
+                              if (entry.revision.commitId === current?.commitId && packageJson.isTextHidden(file.path)) packageJson.showText(file.path)
+                              show(entry.revision, file.path)
+                            }}
+                            type="button"
+                          >
+                            {file.path}
+                          </button>
+                          <Counts added={file.additions} deleted={file.deletions} />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </LaneFiller>
               )}
-              onClick={() => show(revision)}
-              type="button"
-            >
-              <span className="dshx:shrink-0 dshx:font-mono dshx:text-muted-foreground">{revision.shortChangeId}</span>
-              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{subject(revision)}</span>
-              <Counts added={revision.additions} deleted={revision.deletions} />
-            </button>
-            {revision.files.length === 0 ? null : (
-              <ul
-                aria-label={`Files of ${revision.shortChangeId}`}
-                className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:border-t dshx:border-border"
-              >
-                {orderReviewFiles({ files: revision.files }).map(file => {
-                  const target = { commitId: revision.commitId, path: file.path }
-                  const viewed = marks.isViewed(target)
-                  return (
-                    <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:py-1 dshx:pr-2 dshx:pl-4" key={file.path}>
-                      <Checkbox
-                        aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.path} in ${revision.shortChangeId}`}
-                        checked={viewed}
-                        className="dshx:size-3.5 dshx:data-[state=checked]:border-success dshx:data-[state=checked]:bg-success"
-                        disabled={!marks.ready}
-                        onCheckedChange={next => marks.set([target], next === true)}
-                      />
-                      <button
-                        className={cn(
-                          'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:font-mono dshx:text-xs dshx:hover:underline',
-                          viewed && 'dshx:text-muted-foreground',
-                        )}
-                        onClick={() => {
-                          if (revision.commitId === current?.commitId && packageJson.isTextHidden(file.path)) packageJson.showText(file.path)
-                          show(revision, file.path)
-                        }}
-                        type="button"
-                      >
-                        {file.path}
-                      </button>
-                      <Counts added={file.additions} deleted={file.deletions} />
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </li>
-        ))}
+              {entry.hiddenBelow === 0 ? null : (
+                <LaneFiller lanes={entry.layout.bottomLanes} width={graphWidth}>
+                  <p className="dshx:py-0.5 dshx:text-[11px] dshx:text-muted-foreground dshx:italic" data-testid="combined-gap">
+                    {entry.hiddenBelow === 1 ? '1 revision' : `${String(entry.hiddenBelow)} revisions`} not in this review
+                  </p>
+                </LaneFiller>
+              )}
+            </li>
+          ),
+        )}
       </ol>
       {props.comments}
       {current === undefined ? null : (
@@ -275,5 +304,89 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
         </>
       )}
     </div>
+  )
+}
+
+/** Content between two graph rows, with the lanes that pass it drawn on the left so the graph stays continuous. */
+const LaneFiller = (props: {
+  readonly lanes: ReviewGraphEntry['layout']['bottomLanes']
+  readonly width: number
+  readonly children: ReactNode
+}): JSX.Element => (
+  <div className="dshx:relative dshx:min-w-0" style={{ paddingLeft: props.width + 8 }}>
+    <GraphLanes lanes={props.lanes} metrics={METRICS} width={props.width} />
+    {props.children}
+  </div>
+)
+
+const RevisionRow = (props: {
+  readonly entry: Extract<ReviewGraphEntry, { kind: 'revision' }>
+  readonly current: boolean
+  readonly viewed: number
+  readonly width: number
+  readonly onShow: () => void
+}): JSX.Element => {
+  const { revision, node, layout } = props.entry
+  const id = ReviewGraphModel.changeIdParts(revision)
+  const bookmarks = revision.bookmarks ?? []
+  const fileCount = revision.files.length
+  return (
+    <button
+      aria-current={props.current ? 'true' : undefined}
+      className={cn(
+        'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:pr-2 dshx:text-left dshx:text-xs dshx:hover:bg-accent dshx:focus-visible:bg-accent dshx:focus-visible:outline-none',
+        props.current && 'dshx:bg-accent dshx:text-accent-foreground',
+      )}
+      onClick={props.onShow}
+      style={{ height: METRICS.rowHeight }}
+      type="button"
+    >
+      <RevisionGraphCell height={METRICS.rowHeight} layout={layout} metrics={METRICS} revision={node} width={props.width} />
+      <code className="dshx:shrink-0 dshx:font-mono! dshx:text-[11px]">
+        <span className="dshx:font-semibold">{id.prefix}</span>
+        <span className="dshx:text-muted-foreground">{id.rest}</span>
+      </code>
+      {revision.workingCopy === true ? <span className={cn(CHIP, 'dshx:bg-info/15 dshx:text-info')}>@</span> : null}
+      {revision.conflict === true ? <span className={cn(CHIP, 'dshx:bg-destructive/15 dshx:text-destructive')}>conflict</span> : null}
+      {revision.divergent === true ? <span className={cn(CHIP, 'dshx:bg-violet/15 dshx:text-violet')}>divergent</span> : null}
+      {revision.empty === true ? <span className={cn(CHIP, 'dshx:bg-muted dshx:text-muted-foreground')}>empty</span> : null}
+      {bookmarks.slice(0, 2).map(bookmark => (
+        <span className={cn(CHIP, 'dshx:max-w-24 dshx:truncate dshx:bg-success/15 dshx:text-success')} key={bookmark}>
+          {bookmark}
+        </span>
+      ))}
+      {bookmarks.length > 2 ? <span className="dshx:shrink-0 dshx:text-[10px] dshx:text-muted-foreground">+{bookmarks.length - 2}</span> : null}
+      <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', revision.description.length === 0 && 'dshx:text-muted-foreground dshx:italic')}>
+        {subject(revision)}
+      </span>
+      <Counts added={revision.additions} deleted={revision.deletions} />
+      {fileCount === 0 ? null : (
+        <span className={cn(STAT, 'dshx:@max-pane-narrow:hidden', props.viewed === fileCount && 'dshx:text-success')}>
+          {props.viewed}/{fileCount}
+        </span>
+      )}
+    </button>
+  )
+}
+
+/** A parent the selection sits on outside the review: context only, named by its bookmark when it has one. */
+const BaseRow = (props: { readonly entry: Extract<ReviewGraphEntry, { kind: 'base' }>; readonly width: number }): JSX.Element => {
+  const { base, node, layout } = props.entry
+  return (
+    <li
+      aria-label={`Base ${base.bookmarks[0] ?? (ReviewGraphModel.isRoot(base) ? 'root()' : base.shortChangeId)}, not in this review`}
+      className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:pr-2 dshx:text-xs dshx:text-muted-foreground"
+      data-testid="combined-base"
+      style={{ height: METRICS.rowHeight }}
+    >
+      <RevisionGraphCell height={METRICS.rowHeight} layout={layout} metrics={METRICS} revision={node} width={props.width} />
+      <code className="dshx:shrink-0 dshx:font-mono! dshx:text-[11px]">{ReviewGraphModel.isRoot(base) ? 'root()' : base.shortChangeId}</code>
+      {base.bookmarks.slice(0, 2).map(bookmark => (
+        <span className={cn(CHIP, 'dshx:max-w-24 dshx:truncate dshx:bg-muted dshx:text-muted-foreground')} key={bookmark}>
+          {bookmark}
+        </span>
+      ))}
+      <span className="dshx:min-w-0 dshx:truncate dshx:italic">base, not in this review</span>
+    </li>
   )
 }

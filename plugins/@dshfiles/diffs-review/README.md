@@ -60,13 +60,31 @@ read it, and can it land?" without leaving the thread:
 **Several revisions together.** Selecting revisions in the Jujutsu graph and choosing **Review
 together** opens them as one review, the **Revisions** scope of this facet. Each revision stays its
 own change: `jj diff` refuses a selection with gaps, and a net diff would lose which revision made
-which line. So every revision is listed oldest first with its own files, **Previous** and **Next**
-step through their diffs, a viewed mark belongs to one file of one revision (a file two revisions
-touched is read twice; rewriting a revision starts it unread), and a line comment says which
-revision it is on. A selection with gaps says so, and a revision that is gone or divergent is named
-and left out. The graph reads a revision by its change id, so a review left open follows a rewrite.
-When no thread on screen owns the repository, the same review opens on the Review page. Agents read
-it with the `diffs_review_revisions` tool.
+which line. So every revision has its own files, **Previous** and **Next** step through their diffs
+oldest first, a viewed mark belongs to one file of one revision (a file two revisions touched is
+read twice; rewriting a revision starts it unread), and a line comment says which revision it is
+on. A revision that is gone or divergent is named and left out. The graph reads a revision by its
+change id, so a review left open follows a rewrite. When no thread on screen owns the repository,
+the same review opens on the Review page. Agents read it with the `diffs_review_revisions` tool,
+whose text also counts the revisions each gap leaves out.
+
+The revisions are drawn as a small revision graph, newest first like the Jujutsu panel, with the
+layout and row cell jj-integration shares as its `revision-graph` module. Ideas taken from
+[lightjj](https://github.com/chronologos/lightjj) (MIT; reimplemented, no code copied):
+
+- **Gaps on the graph.** A revision builds on the nearest selected revision below it; when others
+  sit between, the edge is dashed and the row under it reads “N revisions not in this review”. The
+  Host counts them with one bounded `jj log -r 'connected(S) | parents(roots(connected(S)))'`
+  (400 revisions); past that bound edges link direct parents only and the review says the gaps were
+  not counted.
+- **The base.** The graph ends on what the selection sits on, named by its bookmark (`main`) when it
+  has one, muted because it is not part of the review.
+- **State at a glance.** The node glyph marks the working copy, conflicts and divergence; chips
+  repeat them with `empty` and up to two bookmarks; the change id shows its shortest unique prefix
+  apart from the rest; each row counts its viewed files.
+- **Keys.** With the graph focused, `j`/`k` (or the arrow keys) move to the older or newer revision.
+
+A Host from before the graph sends no links, and the rows then stand unconnected.
 
 ![Review several selected revisions together](docs/screenshots/combined-revisions.png)
 

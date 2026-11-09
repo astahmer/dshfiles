@@ -61,6 +61,24 @@ export type ReviewResult = typeof reviewResultSchema.Type
 /** One selection is one screen of review, not an export of history. */
 export const MAX_REVIEW_REVISIONS = 30
 
+const commitIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))
+const bookmarksSchema = Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))).check(Schema.isMaxLength(8))
+
+/** A selected revision this one builds on; `hidden` revisions between them are not in the review (0: a direct parent). */
+export const revisionGraphLinkSchema = Schema.Struct({
+  commitId: commitIdSchema,
+  hidden: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
+export type RevisionGraphLink = typeof revisionGraphLinkSchema.Type
+
+/** A parent outside the review that a run of the selection sits on, such as the bookmark it branched from. */
+export const revisionGraphBaseSchema = Schema.Struct({
+  commitId: commitIdSchema,
+  shortChangeId: commitIdSchema,
+  bookmarks: bookmarksSchema,
+})
+export type RevisionGraphBase = typeof revisionGraphBaseSchema.Type
+
 /** One revision's own change inside a combined review; `patch` shares the review's `MAX_PATCH_CHARS` budget. */
 export const revisionReviewSchema = Schema.Struct({
   changeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
@@ -73,6 +91,18 @@ export const revisionReviewSchema = Schema.Struct({
   additions: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   deletions: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   files: Schema.Array(reviewFileSchema).check(Schema.isMaxLength(MAX_FILES)),
+  // The graph fields are optional: a Host from before the review graph answers without them, and the review falls back
+  // to a flat list.
+  bookmarks: Schema.optional(bookmarksSchema),
+  immutable: Schema.optional(Schema.Boolean),
+  conflict: Schema.optional(Schema.Boolean),
+  divergent: Schema.optional(Schema.Boolean),
+  empty: Schema.optional(Schema.Boolean),
+  workingCopy: Schema.optional(Schema.Boolean),
+  /** The selected revisions this one builds on; absent when the Host could not place it. */
+  links: Schema.optional(Schema.Array(revisionGraphLinkSchema).check(Schema.isMaxLength(MAX_REVIEW_REVISIONS))),
+  /** Its parents outside the review, when no selected revision sits between. */
+  base: Schema.optional(Schema.Array(revisionGraphBaseSchema).check(Schema.isMaxLength(8))),
 })
 export type RevisionReview = typeof revisionReviewSchema.Type
 
@@ -95,6 +125,8 @@ export const revisionsReviewResultSchema = Schema.Union([
     ).check(Schema.isMaxLength(MAX_REVIEW_REVISIONS)),
     /** Unconnected runs in the selection; above 1, revisions between them are not part of this review. */
     segments: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+    /** False when the graph read was too large or failed: links are direct parents only and gaps go uncounted. */
+    graphComplete: Schema.optional(Schema.Boolean),
     truncated: Schema.Boolean,
     fileCount: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
     additions: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),

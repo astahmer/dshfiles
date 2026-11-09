@@ -1,5 +1,5 @@
 import { Option, Schema } from 'effect'
-import type { RevisionReview, RevisionsReviewFailureReason, RevisionsReviewResult } from './api.js'
+import type { RevisionGraphBase, RevisionGraphLink, RevisionReview, RevisionsReviewFailureReason, RevisionsReviewResult } from './api.js'
 
 /** One selected revision as jj reports it; its diff is read once the selection is ordered. */
 export interface ResolvedRevision {
@@ -9,9 +9,22 @@ export interface ResolvedRevision {
   readonly shortChangeId: string
   readonly description: string
   readonly parents: readonly string[]
+  readonly bookmarks: readonly string[]
+  readonly immutable: boolean
+  readonly conflict: boolean
+  readonly divergent: boolean
+  readonly empty: boolean
+  readonly workingCopy: boolean
 }
 
 const MAX_DESCRIPTION_CHARS = 300
+/** A review names at most this many bookmarks per revision; the graph shows the first ones. */
+const MAX_BOOKMARKS = 8
+/** A merge can sit on many parents; the graph names the first ones. */
+const MAX_BASE = 8
+
+const flag = (name: string, keyword: string): string => `',"${name}":' ++ if(self.${keyword}(), "true", "false") ++ `
+const BOOKMARKS_FIELD = '\',"bookmarks":[\' ++ self.local_bookmarks().map(|b| b.name().escape_json()).join(",") ++ \']\' ++ '
 
 /** One JSON line per revision, so a description holding a tab or a quote stays one field. */
 const REVISION_TEMPLATE =
@@ -19,15 +32,34 @@ const REVISION_TEMPLATE =
   '\',"changeId":\' ++ self.change_id().short(64).escape_json() ++ ' +
   '\',"shortChangeId":\' ++ self.change_id().shortest().prefix().escape_json() ++ ' +
   '\',"description":\' ++ self.description().first_line().escape_json() ++ ' +
+  BOOKMARKS_FIELD +
+  flag('immutable', 'immutable') +
+  flag('conflict', 'conflict') +
+  flag('divergent', 'divergent') +
+  flag('empty', 'empty') +
+  flag('workingCopy', 'current_working_copy') +
   '\',"parents":[\' ++ self.parents().map(|c| c.commit_id().short(64).escape_json()).join(",") ++ \']}\' ++ "\\n"'
 
 const COMMIT_ID_TEMPLATE = 'commit_id ++ "\\n"'
+
+/** What the graph read needs of every revision between and below the selection. */
+const GRAPH_TEMPLATE =
+  '\'{"commitId":\' ++ self.commit_id().short(64).escape_json() ++ ' +
+  '\',"shortChangeId":\' ++ self.change_id().shortest().prefix().escape_json() ++ ' +
+  BOOKMARKS_FIELD +
+  '\',"parents":[\' ++ self.parents().map(|c| c.commit_id().short(64).escape_json()).join(",") ++ \']}\' ++ "\\n"'
 
 const revisionLineSchema = Schema.Struct({
   commitId: Schema.String,
   changeId: Schema.String,
   shortChangeId: Schema.String,
   description: Schema.String,
+  bookmarks: Schema.Array(Schema.String),
+  immutable: Schema.Boolean,
+  conflict: Schema.Boolean,
+  divergent: Schema.Boolean,
+  empty: Schema.Boolean,
+  workingCopy: Schema.Boolean,
   parents: Schema.Array(Schema.String),
 })
 const decodeRevisionLine = Schema.decodeUnknownOption(Schema.fromJsonString(revisionLineSchema))
@@ -37,8 +69,15 @@ const decodeResolved = (requested: string, stdout: string): ResolvedRevision | u
   const lines = stdout.split('\n').filter(line => line.length > 0)
   if (lines.length !== 1) return undefined
   const line = decodeRevisionLine(lines[0] ?? '')
-  return Option.isSome(line) ? { requested, ...line.value, description: line.value.description.slice(0, MAX_DESCRIPTION_CHARS) } : undefined
+  return Option.isSome(line) ? clipped(requested, line.value) : undefined
 }
+
+const clipped = (requested: string, line: typeof revisionLineSchema.Type): ResolvedRevision => ({
+  requested,
+  ...line,
+  description: line.description.slice(0, MAX_DESCRIPTION_CHARS),
+  bookmarks: line.bookmarks.slice(0, MAX_BOOKMARKS),
+})
 
 /** Argv reading one requested id; the API pattern keeps it one revset symbol, never an expression. */
 const describeArgs = (revision: string): readonly string[] => ['log', '-r', revision, '--no-graph', '-T', REVISION_TEMPLATE]
@@ -98,11 +137,7 @@ const decodeSelection = (requested: readonly string[], stdout: string): readonly
     const match = matching[0]
     if (match === undefined || matching.length > 1) return undefined
     matchedBy.set(match, (matchedBy.get(match) ?? 0) + 1)
-    const revision: ResolvedRevision = {
-      requested: match,
-      ...decoded.value,
-      description: decoded.value.description.slice(0, MAX_DESCRIPTION_CHARS),
-    }
+    const revision = clipped(match, decoded.value)
     if (!found.has(revision.commitId)) found.set(revision.commitId, revision)
   }
   const everyRequestedFound = requested.every(id => matchedBy.get(id) === 1)
@@ -132,6 +167,104 @@ const inOrder = (resolved: readonly ResolvedRevision[], stdout: string): readonl
   )
   const rank = (revision: ResolvedRevision): number => position.get(revision.commitId) ?? Number.MAX_SAFE_INTEGER
   return [...resolved].sort((left, right) => rank(left) - rank(right))
+}
+
+/** The most revisions the graph read lists; past it the review keeps direct links and leaves the gaps uncounted. */
+const GRAPH_LIMIT = 400
+
+/**
+ * Every revision between the selected ones (`connected`) and the parents the selection sits on, newest first. One read,
+ * so a gap is counted rather than guessed, and bounded so a selection spanning months stays one cheap call.
+ */
+const graphArgs = (commitIds: readonly string[]): readonly string[] => {
+  const selection = commitIds.join(' | ')
+  return [
+    'log',
+    '-r',
+    `connected(${selection}) | parents(roots(connected(${selection})))`,
+    '--no-graph',
+    '--limit',
+    String(GRAPH_LIMIT + 1),
+    '-T',
+    GRAPH_TEMPLATE,
+  ]
+}
+
+const graphLineSchema = Schema.Struct({
+  commitId: Schema.String,
+  shortChangeId: Schema.String,
+  bookmarks: Schema.Array(Schema.String),
+  parents: Schema.Array(Schema.String),
+})
+const decodeGraphLine = Schema.decodeUnknownOption(Schema.fromJsonString(graphLineSchema))
+export type GraphNode = typeof graphLineSchema.Type
+
+/** The graph read's nodes, newest first; undefined when it hit the limit or a line is unreadable. */
+const decodeGraph = (stdout: string): readonly GraphNode[] | undefined => {
+  const nodes: GraphNode[] = []
+  for (const line of stdout.split('\n').filter(text => text.length > 0)) {
+    const node = decodeGraphLine(line)
+    if (Option.isNone(node)) return undefined
+    nodes.push(node.value)
+  }
+  return nodes.length > GRAPH_LIMIT ? undefined : nodes
+}
+
+/** Where one selected revision sits: the selected revisions below it, and the parents outside the review. */
+export interface RevisionPlacement {
+  readonly links: readonly RevisionGraphLink[]
+  readonly base: readonly RevisionGraphBase[]
+}
+
+const baseOf = (commitId: string, nodes: ReadonlyMap<string, GraphNode>): RevisionGraphBase => {
+  const node = nodes.get(commitId)
+  return { commitId, shortChangeId: node?.shortChangeId ?? commitId.slice(0, 8), bookmarks: (node?.bookmarks ?? []).slice(0, MAX_BOOKMARKS) }
+}
+
+/**
+ * Each selected revision's links to the selected revisions it builds on, with how many revisions between them are not
+ * in the review, and the parents it sits on outside the review. A walk stops at the first selected revision on each
+ * path, so a stack links each revision to the one below it. Without a graph read (`nodes` undefined) only direct
+ * parents link and gaps stay uncounted: the selection's own parents are all the review then knows.
+ */
+const placements = (
+  selected: readonly Pick<ResolvedRevision, 'commitId' | 'parents'>[],
+  nodes: readonly GraphNode[] | undefined,
+): ReadonlyMap<string, RevisionPlacement> => {
+  const chosen = new Set(selected.map(revision => revision.commitId))
+  const byId = new Map((nodes ?? []).map(node => [node.commitId, node]))
+  // `connected(S)` is every node that descends from the selection; the rest of the read are the parents it sits on.
+  const between = new Set<string>()
+  for (const node of [...(nodes ?? [])].reverse()) {
+    if (chosen.has(node.commitId) || node.parents.some(parent => between.has(parent))) between.add(node.commitId)
+  }
+  const result = new Map<string, RevisionPlacement>()
+  for (const revision of selected) {
+    const links = new Map<string, number>()
+    const base: RevisionGraphBase[] = []
+    const seen = new Set<string>()
+    let frontier = revision.parents.map(commitId => ({ commitId, hidden: 0 }))
+    while (frontier.length > 0) {
+      const next: { commitId: string; hidden: number }[] = []
+      for (const step of frontier) {
+        if (seen.has(step.commitId)) continue
+        seen.add(step.commitId)
+        if (chosen.has(step.commitId)) {
+          links.set(step.commitId, Math.min(links.get(step.commitId) ?? step.hidden, step.hidden))
+          continue
+        }
+        const node = byId.get(step.commitId)
+        if (nodes !== undefined && between.has(step.commitId) && node !== undefined) {
+          for (const parent of node.parents) next.push({ commitId: parent, hidden: step.hidden + 1 })
+          continue
+        }
+        if (step.hidden === 0) base.push(baseOf(step.commitId, byId))
+      }
+      frontier = next
+    }
+    result.set(revision.commitId, { links: [...links].map(([commitId, hidden]) => ({ commitId, hidden })), base: base.slice(0, MAX_BASE) })
+  }
+  return result
 }
 
 /**
@@ -168,7 +301,16 @@ const reportText = (result: RevisionsReviewResult): string => {
     `Diffs review · ${plural(result.revisions.length, 'revision')} · ${plural(result.fileCount, 'changed file')} · +${String(result.additions)} −${String(result.deletions)}`,
   ]
   if (result.segments > 1) lines.push(`The selection has gaps: ${String(result.segments)} separate runs, each revision shown as its own change.`)
-  for (const revision of result.revisions) lines.push(...revisionLines(revision))
+  const byCommit = new Map(result.revisions.map(revision => [revision.commitId, revision.shortChangeId]))
+  for (const revision of result.revisions) {
+    lines.push(...revisionLines(revision))
+    for (const link of revision.links ?? []) {
+      if (link.hidden === 0) continue
+      lines.push(
+        `  ${plural(link.hidden, 'revision')} between ${byCommit.get(link.commitId) ?? link.commitId.slice(0, 8)} and ${revision.shortChangeId} not in this review`,
+      )
+    }
+  }
   for (const skipped of result.unresolved) lines.push(`Skipped ${skipped.revision}: ${skipped.message}`)
   return lines.join('\n')
 }
@@ -183,6 +325,9 @@ export const RevisionReviewModel = {
   patchesArgs,
   decodePatches,
   inOrder,
+  graphArgs,
+  decodeGraph,
+  placements,
   segments,
   failure,
   reportText,

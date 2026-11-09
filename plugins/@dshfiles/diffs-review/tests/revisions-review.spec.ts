@@ -68,6 +68,16 @@ describe.skipIf(!jjAvailable)('combined revision review', () => {
         expect(result.revisions.map(revision => revision.files.map(file => file.path))).toEqual([['shared.ts'], ['third.ts']])
         expect(result.segments).toBe(2)
         expect(result.unresolved).toEqual([])
+        // The graph places the gap: third builds on first with one revision (second) left out, and first sits on root.
+        expect(result.graphComplete).toBe(true)
+        const [first, third] = result.revisions
+        expect(third?.links).toEqual([{ commitId: first?.commitId, hidden: 1 }])
+        expect(third?.base).toEqual([])
+        expect(first?.links).toEqual([])
+        expect(first?.base).toHaveLength(1)
+        expect(third).toMatchObject({ workingCopy: false, conflict: false, divergent: false, empty: false, bookmarks: [] })
+        const report = yield* Effect.promise(() => client(host).reportRevisions({ path: workspace, revisions: [ids.third, ids.first] }))
+        expect(report.text).toContain(`1 revision between ${first?.shortChangeId ?? ''} and ${third?.shortChangeId ?? ''} not in this review`)
       }),
     ),
   )
@@ -79,6 +89,7 @@ describe.skipIf(!jjAvailable)('combined revision review', () => {
         const result = yield* Effect.promise(() => client(host).reviewRevisions({ path: workspace, revisions: [ids.second, ids.first] }))
         if (result.status !== 'ok') throw new Error(result.message)
         expect(result.segments).toBe(1)
+        expect(result.revisions[1]?.links).toEqual([{ commitId: result.revisions[0]?.commitId, hidden: 0 }])
         expect(result.revisions[0]?.patch).toContain('+export const first = 1')
         expect(result.revisions[1]?.patch).toContain('-export const first = 1')
         expect(result.fileCount).toBe(3)

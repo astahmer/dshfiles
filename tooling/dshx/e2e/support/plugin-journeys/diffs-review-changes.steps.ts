@@ -203,6 +203,9 @@ Then('the Changes facet shows the combined review of {int} revisions with a gap'
     await expect(combined(page).getByTestId('combined-summary')).toContainText(`${String(count)} revisions`, { timeout: 30_000 })
     await expect(combined(page).locator('[data-revision-commit]')).toHaveCount(count)
     await expect(combined(page).getByText(/These revisions are not adjacent/u)).toBeVisible()
+    // The graph names the left-out revision between the two and the revision the selection sits on.
+    await expect(combined(page).getByTestId('combined-gap')).toHaveText('1 revision not in this review')
+    await expect(combined(page).getByTestId('combined-base')).toHaveCount(1)
   })
 })
 

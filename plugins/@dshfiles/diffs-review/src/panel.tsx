@@ -56,7 +56,7 @@ const CombinedReviewPage = (props: { readonly workspacePath: string; readonly re
   <div className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto">
     <Page
       heading="Review"
-      description="The selected revisions, oldest first, each as its own change."
+      description="The selected revisions, each as its own change, on the graph they form."
       actions={[
         {
           id: 'back-to-workspace',
