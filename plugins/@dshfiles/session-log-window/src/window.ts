@@ -88,8 +88,6 @@ interface ResolvedLog {
   readonly path: string
   /** The file's size right now, which is what a window read must be clamped to. */
   readonly sizeBytes: number
-  /** The size the persistence backend reported, which decides whether a log is worth a window at all. */
-  readonly statSizeBytes: number | undefined
 }
 
 /** What every bounded read needs, with an optional metrics bag the caller owns. */
@@ -111,7 +109,7 @@ const withMetrics = (input: LogWindowInput): OpenInput => ({ ...input, metrics: 
  * Resolve the current stored log of one Session to its path and size, or `undefined` when only the full read can serve
  * it: no persistence, another backend, a migration-required format, or a log path that is not the JSONL zstd artifact.
  */
-const resolveLog = async (input: OpenInput): Promise<ResolvedLog | undefined> => {
+const resolveLog = async (input: OpenInput & { readonly minStatBytes?: number }): Promise<ResolvedLog | undefined> => {
   const persistence = input.ctx.get('sessionPersistence')
   if (persistence === undefined || !isJsonlLogLookup(persistence)) {
     input.metrics.fallback_reason = 'persistence-unavailable'
@@ -126,6 +124,11 @@ const resolveLog = async (input: OpenInput): Promise<ResolvedLog | undefined> =>
     input.metrics.fallback_reason = 'unsupported-format'
     return undefined
   }
+  // Half of the live tail reads stopped at this size after paying for the log lookup and a second size read.
+  if (input.minStatBytes !== undefined && (snapshot.sizeBytes ?? 0) < input.minStatBytes) {
+    input.metrics.fallback_reason = 'below-tail-size-threshold'
+    return undefined
+  }
   const currentPath = await measure(input.metrics, 'lookup_ms', () => persistence.resolveCurrentLog(input.sessionId, input.signal))
   const path = Schema.decodeUnknownResult(logPathSchema)(currentPath)
   if (path._tag === 'Failure') {
@@ -137,7 +140,7 @@ const resolveLog = async (input: OpenInput): Promise<ResolvedLog | undefined> =>
     input.metrics.fallback_reason = 'log-size-unavailable'
     return undefined
   }
-  return { header: snapshot.header, path: path.success, sizeBytes, statSizeBytes: snapshot.sizeBytes }
+  return { header: snapshot.header, path: path.success, sizeBytes }
 }
 
 /**
@@ -174,9 +177,7 @@ export class TailLog {
    * @param input - the Host context, the stored Session, cancellation, the caller's metrics bag, and whether to keep
    *   the opened tail for that Session's next page. A title read keeps nothing: it reads dozens of Sessions once.
    */
-  static async open(
-    publicInput: LogWindowInput & { readonly retain?: boolean; readonly windowBytes?: number },
-  ): Promise<TailLog | undefined> {
+  static async open(publicInput: LogWindowInput & { readonly retain?: boolean; readonly windowBytes?: number }): Promise<TailLog | undefined> {
     const input = withMetrics(publicInput)
     const windowBytes = publicInput.windowBytes ?? TAIL_WINDOW_BYTES
     const kept = TailLog.kept.get(input.sessionId)
@@ -190,12 +191,8 @@ export class TailLog {
       }
       TailLog.forget(input.sessionId)
     }
-    const resolved = await resolveLog(input)
+    const resolved = await resolveLog({ ...input, minStatBytes: MIN_TAIL_BYTES })
     if (resolved === undefined) return undefined
-    if ((resolved.statSizeBytes ?? 0) < MIN_TAIL_BYTES) {
-      input.metrics.fallback_reason = 'below-tail-size-threshold'
-      return undefined
-    }
     const header = resolved.header
     if (header.cwd === undefined || header.isSeeded || header.origin === 'subagent') {
       input.metrics.fallback_reason = 'ineligible-session'
@@ -381,7 +378,6 @@ export class TailLog {
     this.texts.set(frame, text)
     return text
   }
-
 }
 
 /** A stored row is its event, except `sourceEventSeqs`, which the writer compresses into `[start, end]` ranges. */
@@ -416,10 +412,7 @@ export interface LogHead {
  * @param windowBytes - how many leading bytes to read; defaults to {@link HEAD_WINDOW_BYTES}.
  * @returns the decoded window, or `undefined` when only the full read can serve it.
  */
-export const openLogHead = async (
-  publicInput: LogWindowInput,
-  windowBytes: number = HEAD_WINDOW_BYTES,
-): Promise<LogHead | undefined> => {
+export const openLogHead = async (publicInput: LogWindowInput, windowBytes: number = HEAD_WINDOW_BYTES): Promise<LogHead | undefined> => {
   const input = withMetrics(publicInput)
   const resolved = await resolveLog(input)
   if (resolved === undefined) return undefined

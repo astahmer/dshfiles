@@ -102,6 +102,15 @@ it('reports a head window that covered the whole log', async () => {
   expect(head.events).toEqual(stored)
 }, 30_000)
 
+it('refuses a tail for a log below the tail size before looking its file up', async () => {
+  const { ctx, header } = await writeLargeLog('session-window-tail-small', 1)
+  const metrics: Record<string, string | number | boolean | undefined> = {}
+  const tail = await TailLog.open({ ctx, sessionId: header.id, signal: new AbortController().signal, metrics })
+  expect(tail).toBeUndefined()
+  expect(metrics.fallback_reason).toBe('below-tail-size-threshold')
+  expect(metrics).not.toHaveProperty('lookup_ms')
+}, 30_000)
+
 it('answers undefined for a Host with no JSONL persistence backend', async () => {
   const ctx = new Context()
   contexts.push(ctx)
