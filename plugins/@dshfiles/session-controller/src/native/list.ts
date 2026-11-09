@@ -12,6 +12,7 @@ import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import * as Schema from 'effect/Schema'
+import { coldReads } from './cold-reads.ts'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
@@ -97,6 +98,14 @@ export class ApiSessionList {
   private readonly coldProjections = new Map<string, SessionProjectionHints>()
 
   /**
+   * List metadata recovered from the stored log of a cold row whose projection checkpoint has no usable row. A
+   * checkpoint-less Session is normally one that never reached a durable projection: an abandoned New thread, or a
+   * start interrupted before its first turn. Defaulting those to `blank: false` puts them in the sidebar as untitled
+   * "Empty drafts" forever, so the log is read once per row and the answer is kept until the Session attaches.
+   */
+  private readonly coldMetadata = new Map<string, SessionListMetadata | undefined>()
+
+  /**
    * Persisted Session records, read once and kept until this Host creates or disposes a Session.
    * `sessionQuery.listSessions` re-enumerates every project directory and then reads each Session's header and stats
    * its log at a concurrency of three, so a 1 000-Session corpus costs thousands of filesystem round-trips per call
@@ -121,7 +130,10 @@ export class ApiSessionList {
    * @param workSliceMs - Resolved positive integral list-work budget in milliseconds.
    */
   constructor(private readonly ctx: Context, private readonly workSliceMs: number) {
-    const forgetProjections = (session: Session): void => { this.coldProjections.delete(session.id) }
+    const forgetProjections = (session: Session): void => {
+      this.coldProjections.delete(session.id)
+      this.coldMetadata.delete(session.id)
+    }
     ctx.on('session/created', session => {
       forgetProjections(session)
       this.invalidatePersisted('created')
@@ -213,7 +225,7 @@ export class ApiSessionList {
     }
     for (const record of cold) {
       signal?.throwIfAborted()
-      items.push(this.summarizeCold(record, selection))
+      items.push(await this.summarizeCold(record, selection))
       if (performance.now() >= yieldDeadline) {
         await scheduler.yield()
         signal?.throwIfAborted()
@@ -268,7 +280,7 @@ export class ApiSessionList {
     this.persistedGeneration += 1
   }
 
-  private summarizeCold({ header, formatStatus }: SessionRecord, selection?: ProjectionSelection): SessionSummary {
+  private async summarizeCold({ header, formatStatus }: SessionRecord, selection?: ProjectionSelection): Promise<SessionSummary> {
     const cached = this.coldProjections.get(header.id)
     const read = cached === undefined
       ? this.projectionsFor(header, undefined, selection)
@@ -278,17 +290,40 @@ export class ApiSessionList {
     if (cached === undefined && selection === undefined && read.projections !== undefined) {
       this.coldProjections.set(header.id, read.projections)
     }
-    const metadata = read.metadata
+    const metadata = read.metadata ?? await this.recoveredMetadata(header)
     return {
       sessionId: header.id,
       updatedAt: updatedAt(header, metadata),
       agentAvailable: false,
       ...(formatStatus === undefined ? {} : { formatStatus }),
       running: false,
-      // A large, metadata-less, or inaccessible cache miss remains unknown and visible.
+      // A row whose log cannot be read at all remains unknown and visible rather than silently disappearing.
       blank: metadata?.blank ?? false,
       ...listFields(header),
       ...(read.projections === undefined ? {} : { projections: read.projections }),
+    }
+  }
+
+  /**
+   * Fold the list metadata a cold cache miss could not serve from the stored log.
+   * The answer is remembered until this Session attaches: it then owns a live projection cut, and `session/event`
+   * invalidates the entry so a later detach re-reads the log.
+   * @param header - immutable header of the cold Session.
+   * @returns the metadata the log proves, or `undefined` when the log cannot be read.
+   */
+  private async recoveredMetadata(header: SessionHeader): Promise<SessionListMetadata | undefined> {
+    if (this.coldMetadata.has(header.id)) return this.coldMetadata.get(header.id)
+    try {
+      const { events } = await coldReads.use(() => this.ctx.sessionQuery.readSession(header.id))
+      const metadata = events.reduce(applySessionListMetadata, { blank: true, lastPromptAt: null })
+      this.coldMetadata.set(header.id, metadata)
+      return metadata
+    } catch (error) {
+      this.coldMetadata.set(header.id, undefined)
+      this.ctx.logger.warn(
+        `api-session.list: the stored log of "${header.id}" could not be read; serving the row without its list metadata: ${String(error)}`,
+      )
+      return undefined
     }
   }
 
