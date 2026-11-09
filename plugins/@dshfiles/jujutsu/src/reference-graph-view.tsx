@@ -2,8 +2,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo } from 'react'
 import type { Revision } from './api.js'
-import { RevisionGraphModel } from './graph.js'
-import { GRAPH_DENSITY, graphWidthFor, RevisionGraphCell } from './revision-graph-cell.js'
+import { GRAPH_DENSITY, graphWidthFor, RevisionGraphCell, RevisionGraphLayout } from '@dshfiles/jj-integration/revision-graph'
 
 const METRICS = GRAPH_DENSITY.compact
 
@@ -26,7 +25,7 @@ export const ReferenceGraphView = (props: {
       const revision = byId.get(commitId)
       return revision === undefined ? [] : [revision]
     })
-    return { rows: RevisionGraphModel.layoutRevisionGraph(listed, byId, false), revisionsById: byId }
+    return { rows: RevisionGraphLayout.layoutRevisionGraph(listed, byId, false), revisionsById: byId }
   }, [props.listedCommitIds, props.revisions])
   const width = graphWidthFor(METRICS, Math.max(1, ...rows.map(row => row.laneCount)))
 

@@ -11,6 +11,7 @@ export default defineConfig({
     'project-bookmark': 'src/project-bookmark-query.ts',
     // Sections other plugins add under a revision's details in the jj panel (backlog backlinks).
     'revision-sections': 'src/revision-sections.ts',
+    'revision-graph': 'src/revision-graph.ts',
   },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/vcs-provider-port', '@dshfiles/jj-cli', '@dshfiles/git-cli'] },
   client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },

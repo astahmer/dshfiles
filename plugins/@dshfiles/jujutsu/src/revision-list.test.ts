@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RevisionGraphRow } from './graph.ts'
+import type { RevisionGraphRow } from '@dshfiles/jj-integration/revision-graph'
 import { RevisionListModel } from './revision-list.ts'
 
 const layout = (commitId: string, lane = 0): RevisionGraphRow => ({

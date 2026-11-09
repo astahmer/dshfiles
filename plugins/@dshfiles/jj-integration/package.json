@@ -37,6 +37,10 @@
     "./revision-sections": {
       "types": "./src/revision-sections.ts",
       "default": "./dist/revision-sections.js"
+    },
+    "./revision-graph": {
+      "types": "./src/revision-graph.ts",
+      "default": "./dist/revision-graph.js"
     }
   },
   "scripts": {

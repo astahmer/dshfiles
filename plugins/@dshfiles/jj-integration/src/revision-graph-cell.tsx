@@ -1,12 +1,27 @@
+/**
+ * Draws one `RevisionGraphRow` as an SVG cell beside a revision's row, and `GraphLanes` as the straight lanes through a
+ * filler row (a day heading, expanded details). Colors are the kit's `dshx:` graph utilities, compiled into the one
+ * shared sheet `@dshfiles/ui-styles` injects, so a consumer needs no stylesheet of its own.
+ */
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import type { GraphDensity } from './preferences.js'
-import type { Revision } from './api.js'
-import type { GraphLane, RevisionGraphRow } from './graph.js'
+import type { GraphLane, RevisionGraphRow } from './revision-graph-layout.js'
+
+/** The revision fields the node glyph reads: a conflict is a red ✗, the working copy a ringed dot, a workspace head a dot. */
+export interface GraphNodeRevision {
+  readonly conflict: boolean
+  readonly divergent: boolean
+  readonly immutable: boolean
+  readonly workingCopy: boolean
+  /** Workspaces whose working copy sits on this revision. */
+  readonly workspaces: readonly string[]
+}
 
 export interface GraphMetrics {
   readonly rowHeight: number
   readonly laneGap: number
 }
+
+export type GraphDensity = 'comfortable' | 'compact'
 
 export const GRAPH_DENSITY = {
   comfortable: { rowHeight: 28, laneGap: 16 },
@@ -15,7 +30,7 @@ export const GRAPH_DENSITY = {
 
 const LANE_WIDTH = 2
 
-/** Indexed by `RevisionGraphRow.color`: the trunk, then one hue per side branch (`GRAPH_BRANCH_COLORS`). */
+/** Indexed by `RevisionGraphRow.color`: the trunk, then one hue per side branch (`RevisionGraphLayout.branchColors`). */
 const GRAPH_STROKE = [
   'dshx:stroke-info',
   'dshx:stroke-graph-1',
@@ -56,7 +71,7 @@ const lanePath = (input: { readonly fromX: number; readonly toX: number; readonl
   ].join(' ')
 }
 
-interface GraphLanesProps {
+export interface GraphLanesProps {
   readonly lanes: readonly GraphLane[]
   readonly metrics: GraphMetrics
   readonly width: number
@@ -81,7 +96,7 @@ export const GraphLanes = (props: GraphLanesProps): JSX.Element => (
 )
 
 export interface RevisionGraphCellProps {
-  readonly revision: Revision
+  readonly revision: GraphNodeRevision
   readonly layout: RevisionGraphRow
   readonly metrics: GraphMetrics
   readonly height: number

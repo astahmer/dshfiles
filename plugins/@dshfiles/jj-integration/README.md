@@ -632,6 +632,22 @@ history, bookmarks and other workspaces stay where they are.
 and returns `null` when it has nothing for that revision; the panel renders nothing when no plugin adds one.
 `@dshfiles/backlog` lists the items linking to the revision there.
 
+## Revision graph module
+
+`@dshfiles/jj-integration/revision-graph` is the VisualJJ-style lane layout and its SVG row renderer, shared so a
+plugin can draw a revision graph without depending on `@dshfiles/jujutsu` (which draws its graph with it;
+`@dshfiles/diffs-review` draws the revisions a review selected).
+
+- `RevisionGraphLayout.layoutRevisionGraph(revisions, revisionsById, hideImmutable)` takes structural revisions
+  (`GraphRevision`: `commitId`, `parents`, `shortestChangeId`, `immutable`, `bookmarks`) newest first and returns one
+  `RevisionGraphRow` per revision in display order. A row with `main`, `master` or `trunk` heads a straight lane 0.
+  A link through revisions that are in `revisionsById` but not listed is dashed; a parent missing from
+  `revisionsById` ends in a stub. Give a child an unlisted placeholder parent to draw an "elided revisions" link.
+- `RevisionGraphCell` draws one row (`revision`: `conflict`, `divergent`, `immutable`, `workingCopy`,
+  `workspaces`), sized by `GRAPH_DENSITY.comfortable | compact` and `graphWidthFor(metrics, maxLaneCount)`.
+  `GraphLanes` draws a row's `topLanes`/`bottomLanes` straight through a filler row, positioned absolutely inside it.
+- Colors are kit `dshx:` utilities in the shared sheet `@dshfiles/ui-styles` injects; no stylesheet to import.
+
 ## Agent tools
 
 - `jj_thread_isolate`: before the first code edit, create a dedicated jj workspace for the calling Session from the configured bookmark, even when its cwd is another Session's thread workspace. A repeated call by the same Session returns its own existing workspace. The Session cwd stays unchanged, so use the returned absolute path for all file operations and as shell `workdir`; status and rebase tools follow the isolated workspace automatically.
@@ -675,7 +691,7 @@ use **Rebase**.
 
 ## Limits
 
-- Git-only repositories cover the thread-workspace flows above, automatic fetch, pulls-review and session undo. The
+- Git-only repositories cover the thread-workspace flows above, automatic fetch, diffs-review and session undo. The
   revision graph panel stays jj-only ([`@dshfiles/jujutsu` › Git-only repositories](../jujutsu/README.md#git-only-repositories)).
 - A thread workspace starts without `node_modules`; run project-specific
   preparation only after the thread starts and only when its memory-note

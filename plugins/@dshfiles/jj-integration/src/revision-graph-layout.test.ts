@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'vitest'
-import type { Revision } from './api.ts'
-import { RevisionGraphModel, type GraphLink, type RevisionGraphRow } from './graph.ts'
+import { RevisionGraphLayout, type GraphLink, type GraphRevision, type RevisionGraphRow } from './revision-graph-layout.ts'
 
-type FixtureRevision = Pick<Revision, 'commitId' | 'parents' | 'shortestChangeId' | 'immutable' | 'bookmarks'>
+type FixtureRevision = GraphRevision
 
 const revision = (commitId: string, parents: readonly string[], options: Partial<FixtureRevision> = {}): FixtureRevision => ({
   commitId,
@@ -21,7 +20,7 @@ const chain = (prefix: string, count: number, base: string | undefined, options:
   })
 
 const layout = (revisions: readonly FixtureRevision[], hideImmutable = false, all: readonly FixtureRevision[] = revisions): readonly RevisionGraphRow[] =>
-  RevisionGraphModel.layoutRevisionGraph(revisions, new Map(all.map(row => [row.commitId, row])), hideImmutable)
+  RevisionGraphLayout.layoutRevisionGraph(revisions, new Map(all.map(row => [row.commitId, row])), hideImmutable)
 
 const ids = (rows: readonly RevisionGraphRow[]): string[] => rows.map(row => row.commitId)
 
@@ -126,7 +125,7 @@ describe('branch layout', () => {
   test('the project main branch claims the trunk lane even when it is not named main', () => {
     const develop = chain('develop', 3, undefined, index => ({ bookmarks: index === 0 ? ['develop'] : [] }))
     const topic = chain('topic', 2, 'develop1', index => ({ bookmarks: index === 0 ? ['topic'] : [] }))
-    const rows = RevisionGraphModel.layoutRevisionGraph(
+    const rows = RevisionGraphLayout.layoutRevisionGraph(
       [...topic, ...develop],
       new Map([...topic, ...develop].map(row => [row.commitId, row])),
       false,
@@ -152,6 +151,28 @@ describe('branch layout', () => {
   test('an empty workspace head is a one-revision branch', () => {
     expect(rowOf(rows, 'settings0')).toMatchObject({ commitLane: 1, incoming: [] })
     expect(rowOf(rows, 'settings0').outgoing.map(link => link.toLane)).toEqual([0])
+  })
+})
+
+describe('parent links', () => {
+  test('hiding immutable revisions retains explicit ancestry links to visible parents', () => {
+    const base = revision('base', [])
+    const middle = revision('middle', ['base'], { immutable: true })
+    const top = revision('top', ['middle'])
+    const byId = new Map([base, middle, top].map(row => [row.commitId, row]))
+    expect(RevisionGraphLayout.graphParentLinks(top, byId, true)).toEqual([{ commitId: 'base', label: 'base', hiddenParentCount: 1, terminal: false }])
+    expect(RevisionGraphLayout.graphParentLinks(top, byId, false)).toEqual([{ commitId: 'middle', label: 'middle', hiddenParentCount: 0, terminal: false }])
+  })
+
+  test('an unlisted placeholder parent joins two shown revisions with one dashed link', () => {
+    // A review of selected revisions: `upper` sits on `lower` through revisions it did not select.
+    const upper = revision('upper', ['elided'])
+    const elided = revision('elided', ['lower'])
+    const lower = revision('lower', ['beyond'])
+    const rows = layout([upper, lower], false, [upper, elided, lower])
+    expect(ids(rows)).toEqual(['upper', 'lower'])
+    expect(rowOf(rows, 'upper').outgoing).toEqual([{ fromLane: 0, toLane: 0, color: rowOf(rows, 'upper').color, dashed: true, terminal: false }])
+    expect(rowOf(rows, 'lower').outgoing).toEqual([{ fromLane: 0, toLane: 0, color: rowOf(rows, 'lower').color, dashed: false, terminal: true }])
   })
 })
 
@@ -221,7 +242,7 @@ describe('lane allocation', () => {
     const immutable = chain('immutable', 1200, undefined, () => ({ immutable: true }))
     const rows = layout([head], false, [head, ...immutable])
     expect(rowOf(rows, 'head').outgoing).toEqual([{ fromLane: 0, toLane: 0, color: rowOf(rows, 'head').color, dashed: true, terminal: true }])
-    expect(RevisionGraphModel.graphParentLinks(head, new Map([head, ...immutable].map(row => [row.commitId, row])), false, new Set(['head']))).toEqual([
+    expect(RevisionGraphLayout.graphParentLinks(head, new Map([head, ...immutable].map(row => [row.commitId, row])), false, new Set(['head']))).toEqual([
       { commitId: 'immutable1199', label: 'immutable1199', hiddenParentCount: 1200, terminal: true },
     ])
   })
@@ -230,7 +251,7 @@ describe('lane allocation', () => {
     const feature = revision('feature', ['foreign'])
     const foreign = revision('foreign', ['trunk'])
     const trunkRow = revision('trunk', [], { bookmarks: ['main'], immutable: true })
-    const rows = RevisionGraphModel.layoutRevisionGraph([feature, trunkRow], new Map([feature, foreign, trunkRow].map(row => [row.commitId, row])), false)
+    const rows = RevisionGraphLayout.layoutRevisionGraph([feature, trunkRow], new Map([feature, foreign, trunkRow].map(row => [row.commitId, row])), false)
     expect(rowOf(rows, 'feature').outgoing).toEqual([{ fromLane: 0, toLane: 0, color: rowOf(rows, 'feature').color, dashed: true, terminal: false }])
   })
 
