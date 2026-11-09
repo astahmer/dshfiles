@@ -47,8 +47,9 @@ const inspect = (input: { readonly directory: string }): BundleFreshnessReport =
     if (!existsSync(bundlePath)) return { status: 'stale', bundle, source: null, reason: 'bundle-missing' }
     const builtAt = statSync(bundlePath).mtimeMs
     const manifest = decodeJson(dependencyManifestSchema, readFileSync(join(distDirectory, manifestFile), 'utf8'))
-    for (const source of manifest.sources.filter(path => !path.includes('node_modules/'))) {
-      const sourcePath = resolve(input.directory, source)
+    // A Windows build records `..\node_modules\…` sources, and Vite ids may carry a `?worker&inline` style query.
+    for (const source of manifest.sources.filter(path => !/node_modules[\\/]/u.test(path))) {
+      const sourcePath = resolve(input.directory, source.replace(/\?.*$/su, ''))
       if (!existsSync(sourcePath)) return { status: 'stale', bundle, source, reason: 'source-missing' }
       if (statSync(sourcePath).mtimeMs <= builtAt) continue
       const recorded = manifest.hashes?.[source]
