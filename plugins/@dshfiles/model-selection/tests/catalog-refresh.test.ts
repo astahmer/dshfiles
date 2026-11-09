@@ -65,8 +65,28 @@ describe('ModelCatalogDirectory.scheduleRefresh', () => {
     catalog.scheduleRefresh()
     await vi.advanceTimersByTimeAsync(50)
     catalog.scheduleRefresh()
-    await vi.advanceTimersByTimeAsync(50)
+    await vi.advanceTimersByTimeAsync(1_000)
     expect(modelCatalog).toHaveBeenCalledTimes(3)
+  })
+
+  it('reads twice for the bursts of one thread switch, the last read starting after the last event', async () => {
+    const { catalog, modelCatalog } = fixture()
+    await catalog.load()
+    const readsStartedAt: number[] = []
+    modelCatalog.mockImplementation(async () => {
+      readsStartedAt.push(performance.now())
+      return { ok: true as const, value: catalogValue }
+    })
+    let lastEventAt = 0
+    for (let burst = 0; burst < 6; burst += 1) {
+      lastEventAt = performance.now()
+      catalog.scheduleRefresh()
+      await vi.advanceTimersByTimeAsync(150)
+    }
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(modelCatalog).toHaveBeenCalledTimes(3)
+    expect(readsStartedAt.at(-1)).toBeGreaterThan(lastEventAt)
+    expect(catalog.store.getSnapshot()).toEqual({ value: catalogValue, status: 'ready', error: null })
   })
 
   it('shares one catalog read with another owner refreshing for the same burst', async () => {

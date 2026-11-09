@@ -14,6 +14,7 @@ export interface ModelCatalogState {
 
 const CATALOG_REFRESH_QUIET_MS = 50
 const CATALOG_REFRESH_MAX_WAIT_MS = 250
+const CATALOG_REFRESH_MIN_INTERVAL_MS = 1_000
 
 /** Page-wide key: the native Models settings store reads the same catalog in the same Host event bursts. */
 const MODEL_CATALOG_READ = 'remote:session/modelCatalog'
@@ -107,24 +108,29 @@ export class ModelCatalogDirectory {
 
   /** Invalidate and reload the catalog after a Host-side model input changes. */
   refresh(): void {
+    this.lastRefreshAt = performance.now()
     this.invalidate()
     void this.load().catch(() => { /* the selector exposes the shared error */ })
   }
 
   private pendingRefresh: ReturnType<typeof setTimeout> | undefined
   private burstStartedAt: number | undefined
+  private lastRefreshAt = Number.NEGATIVE_INFINITY
 
   /**
    * Refresh once for a burst of Host change events. One settings or credential write announces several events,
    * spread over more than 50 ms on a busy page; refreshing on each started one `session/modelCatalog` read per event.
-   * The read waits until the burst is quiet for 50 ms, and at most 250 ms after it began.
+   * The read waits until the burst is quiet for 50 ms, and at most 250 ms after it began. A thread switch fires
+   * several such bursts within a second, each costing a full Host catalog rebuild, so reads start at most once per
+   * second; the deferred read still starts after the last event, so a changed catalog always shows up.
    */
   scheduleRefresh(): void {
     const now = performance.now()
     this.changedAt = now
     this.burstStartedAt ??= now
     if (this.pendingRefresh !== undefined) clearTimeout(this.pendingRefresh)
-    const delay = Math.max(0, Math.min(CATALOG_REFRESH_QUIET_MS, this.burstStartedAt + CATALOG_REFRESH_MAX_WAIT_MS - now))
+    const burstDelay = Math.min(CATALOG_REFRESH_QUIET_MS, this.burstStartedAt + CATALOG_REFRESH_MAX_WAIT_MS - now)
+    const delay = Math.max(0, burstDelay, this.lastRefreshAt + CATALOG_REFRESH_MIN_INTERVAL_MS - now)
     this.pendingRefresh = setTimeout(() => {
       this.pendingRefresh = undefined
       this.burstStartedAt = undefined
