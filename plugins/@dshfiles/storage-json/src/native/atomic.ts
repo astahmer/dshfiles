@@ -31,11 +31,31 @@ export async function writeAtomic(path: string, data: string): Promise<void> {
     } finally {
       await handle.close()
     }
-    await rename(tmp, path)
+    await replaceFile(tmp, path)
     await fsyncDirectory(dirname(path))
   } catch (error) {
     await rm(tmp, { force: true })
     throw error
+  }
+}
+
+const isTransientLock = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && 'code' in error && (error.code === 'EPERM' || error.code === 'EACCES' || error.code === 'EBUSY')
+
+/**
+ * Windows fails the replacing rename with EPERM, EACCES or EBUSY while another process (antivirus, the search indexer,
+ * a sync client or editor) holds the target open without FILE_SHARE_DELETE; those holds are brief, so retry there with
+ * a short backoff, as graceful-fs does. POSIX renames never fail that way.
+ */
+async function replaceFile(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(from, to)
+      return
+    } catch (error) {
+      if (process.platform !== 'win32' || attempt >= 10 || !isTransientLock(error)) throw error
+      await new Promise(resolveDelay => setTimeout(resolveDelay, 20 * (attempt + 1)))
+    }
   }
 }
 
