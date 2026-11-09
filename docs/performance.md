@@ -922,3 +922,33 @@ session × conversation view, one at a time → each registration runs the workb
 `tab-panels.tsx` `readSourceNames` (lists every source, 0.38 s) and `workbench-view.tsx` `takeOpenRequests` →
 `NewViewTabs.sourceId` (`new-view.ts:21`), whose failing `decodeUnknownResult` builds a `SchemaError` with a stack
 per panel (0.27 s). Not fixed here: those three plugins were being edited concurrently.
+
+## Boot and switch duplicate requests (2026-11-09)
+
+Scratch Host on an APFS clone of the live home (`:3263`, its own copy of the profile `node_modules` so the two new
+forks could be linked), headless Chromium, warm reload of a page landing on a thread, every `/api` request with its CDP
+initiator stack mapped to the combo section that sent it.
+
+Almost every boot duplicate had one cause: each owner read at setup, before the connection was up, then read again on
+the first `connection/reset`, which the gateway emits for the page's first connected generation too. Change events
+are only delivered from that generation on, so an owner now holds its boot read until then and treats only a later
+reset as a reconnect.
+
+| Duplicate                                | Owner                                      | Fix                                                                                          |
+| ---------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `session/modelCatalog` × 4               | model-selection × 2, settings-subagent × 2 | boot read waits for the first generation; settings-subagent forked, reads via `joinPageRead` |
+| `agentPresets/list` × 2                  | agent-preset                               | boot roster read waits for the first generation                                              |
+| `ai-accounts-serving-account` per switch | ai-accounts                                | idle snapshot keyed by the Session's `updatedAt`, kept 10 min; running still polls           |
+| `schedule/list` per header mount         | stock `ui-schedule`                        | forked: one source per Session; a remount keeps the read until `schedule/changed`/reset      |
+
+| Warm reload, thread landing | Before                                                             | After                                                             |
+| --------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `/api` requests (12–25 s)   | 48                                                                 | 36–39                                                             |
+| duplicate calls             | 8: modelCatalog 3, agentPresets 1, describe 1, cordis 2, runtime 1 | 5–6: describe 1, cordis 2, sessionRuntime 1–2, fast-mode status 1 |
+| warm switch, owned requests | ai-accounts snapshot 1                                             | 0                                                                 |
+
+Still duplicated, owners outside this pass: stock `ui-settings` (`settings/describe`), stock `cordis-client-runner`
+(`syncInspectManifest`) and `ui-cordis` (`inventory`), all the same first-reset pattern; `@dshfiles/model-effort-picker`
+(`multi-host` `sessionRuntime` × 2–3 and `ai-accounts` fast-mode `status` × 2 at landing). Per warm switch
+`@dshfiles/jujutsu` sends the same `jujutsu-composer/context` twice, and `session-undo` `history`, `preview`
+`devServers` and the browser-trace `export` follow most switches, so a warm switch is 2–6 requests, not ≤ 2.
