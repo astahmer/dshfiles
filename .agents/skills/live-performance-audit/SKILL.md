@@ -29,6 +29,7 @@ no headers, cookies, query strings or response bodies, request bodies replaced b
 node $S/har-capture.mjs --seconds 60 --summary                 # one fresh load, summarized
 node $S/har-capture.mjs --tabs 3 --seconds 60 --out $SCRATCH/three-tabs.har   # three pages share one socket pool
 node $S/har-summary.mjs <capture>.har                        # --json for the raw summary, --top N for more methods
+MATCH='^Thread title' node $S/reload-probe.mjs 3              # reload to interactive, cold and warm HTTP cache (PROFILE_DIR=… adds CPU profiles)
 node --test $S/har-capture.test.mjs $S/har-summary.test.mjs
 ```
 

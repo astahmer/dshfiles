@@ -890,3 +890,35 @@ on 10 cores. Warm switch = a thread visited earlier in the same page.
 Still above target: the new thread's React mount and its first layout (chat scroll restore, composer selection reveal,
 width measure) are ~100–200 ms of main thread; keeping the last views mounted needs a main-view retention contract
 that does not count hidden views as `mainView`, and transcript virtualization (U5) for the DOM budget.
+
+## Page reload to interactive (2026-11-09, U4)
+
+Scratch Host on an APFS clone of the live home (`:3141`), headless Chromium with a persistent profile,
+`reload-probe.mjs` reloading one thread with history: cold = HTTP cache cleared, warm = second and third reload.
+Load 4–6 on 10 cores; CPU profiles (200 µs) mapped to each combo section's plugin.
+
+Serving is already right: combos and chunks are `immutable` for a year and gzip-encoded (no brotli); a warm reload
+transfers 0.5 MB (the Vite `/assets/*` shell files have no `cache-control` and are revalidated — core). The cost is the
+main thread: 122 boot rows, 38 MB of decoded JS, then plugin setup.
+
+| Reload (thread with history) | Before                       | After                                    |
+| ---------------------------- | ---------------------------- | ---------------------------------------- |
+| composer + transcript, cold  | 1.95 s                       | 1.66–2.01 s                              |
+| composer + transcript, warm  | 1.87–1.96 s                  | 1.58–2.10 s                              |
+| JS decoded / on the wire     | 38.2 MB / 13.8 MB            | 31.8 MB / 11.5 MB                        |
+| page main thread (profile)   | 2.31 s busy                  | 2.05 s busy                              |
+| boot `/api` requests (HAR)   | 53, 26 duplicates            | 43, 16 duplicates                        |
+| longest task                 | 0.83–0.94 s                  | 0.80–1.03 s (unchanged owner, see below) |
+
+Changes: `effect` and its Schema/Option/Result subpaths moved into `@dshfiles/shared-runtime` (every Client bundle
+inlined ~110 KB of it: 7.4 MB over 63 rebuilt plugins, +0.76 MB in the supplier); five plugins that bundled it
+privately now consume the supplier. settings-shell keyed its plugin-page projection on the locale revision, so every
+namespace a plugin registered at boot rebuilt every page (130 ms; now 20 ms), and re-published equal search entries
+(6 requests; now 1).
+
+The longest task is one chain on the critical path between `session/list` and the sidebar paint, ~0.7 s:
+session-controller `projectList` → rich-composer `workbench-views.tsx` `sync` registers one workbench panel per
+session × conversation view, one at a time → each registration runs the workbench registry listeners:
+`tab-panels.tsx` `readSourceNames` (lists every source, 0.38 s) and `workbench-view.tsx` `takeOpenRequests` →
+`NewViewTabs.sourceId` (`new-view.ts:21`), whose failing `decodeUnknownResult` builds a `SchemaError` with a stack
+per panel (0.27 s). Not fixed here: those three plugins were being edited concurrently.
