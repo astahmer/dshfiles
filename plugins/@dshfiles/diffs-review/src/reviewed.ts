@@ -55,6 +55,8 @@ export class ReviewedMarksModel {
   static readonly legacyBrowserKey = 'dshfiles-pulls-review:reviewed'
   /** The package id this plugin had before it was diffs-review; its Host record is read once from there. */
   static readonly formerPackageId = '@dshfiles/pulls-review'
+  /** The Host key of that record: the global `reviewed` store. */
+  static readonly formerHostKey = 'store/reviewed'
   static readonly keyOf = reviewedKeyOf
   static readonly toggle = toggleReviewed
   static readonly record = recordReviewed

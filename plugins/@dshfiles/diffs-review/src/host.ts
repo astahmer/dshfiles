@@ -9,17 +9,23 @@ import { Jj } from '@dshfiles/jj-cli'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Effect, Layer, Option, Schema } from 'effect'
-import { diffsReviewApi } from './api.js'
+import { diffsReviewApi, type RevisionsReviewInput } from './api.js'
 import { ReviewGit } from './git.js'
 import { ReviewJj } from './jj.js'
 import { ProjectBase } from './project-base.js'
 import { reviewReportText } from './report.js'
-import { ReviewWorkspace } from './review.js'
+import { ReviewWorkspace, type ReviewInput } from './review.js'
 import { RevisionReviewModel } from './revision-review.js'
 import { DiffsReviewSummary } from './summarize.js'
 import { SummaryRoutes } from './summary-routes-promise.js'
 
 const decodeSessionId = Schema.decodeUnknownOption(SessionId)
+
+/** The report text agents read; the former tool names serve the same one. */
+const report = (input: ReviewInput) =>
+  ReviewWorkspace.use(workspace => workspace.review(input)).pipe(Effect.map(result => ({ text: reviewReportText(result) })))
+const reportRevisions = (input: RevisionsReviewInput) =>
+  ReviewWorkspace.use(workspace => workspace.reviewRevisions(input)).pipe(Effect.map(result => ({ text: RevisionReviewModel.reportText(result) })))
 
 /** The thread workspace's review report, printed in the thread. */
 const reportCommand = (name: string, description: string) =>
@@ -61,10 +67,11 @@ export default DshxPlugin.make({
   apis: [
     Api.bind(diffsReviewApi, {
       review: input => ReviewWorkspace.use(workspace => workspace.review(input)),
-      report: input => ReviewWorkspace.use(workspace => workspace.review(input)).pipe(Effect.map(result => ({ text: reviewReportText(result) }))),
+      report,
       reviewRevisions: input => ReviewWorkspace.use(workspace => workspace.reviewRevisions(input)),
-      reportRevisions: input =>
-        ReviewWorkspace.use(workspace => workspace.reviewRevisions(input)).pipe(Effect.map(result => ({ text: RevisionReviewModel.reportText(result) }))),
+      reportRevisions,
+      formerReport: report,
+      formerReportRevisions: reportRevisions,
       summarize: input =>
         DiffsReviewSummary.use(summary =>
           summary.summarize({

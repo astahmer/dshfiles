@@ -24,6 +24,7 @@
     "@dshfiles/cordis-cards",
     "@dshfiles/cordis-client-runner",
     "@dshfiles/diff-viewed",
+    "@dshfiles/diffs-review",
     "@dshfiles/editor",
     "@dshfiles/fff-search",
     "@dshfiles/git-worktrees",
@@ -47,7 +48,6 @@
     "@dshfiles/project-checks",
     "@dshfiles/prompt-stash",
     "@dshfiles/pull-requests",
-    "@dshfiles/diffs-review",
     "@dshfiles/queue-reorder",
     "@dshfiles/references",
     "@dshfiles/resource-packs",
@@ -4367,6 +4367,61 @@
       }
     },
     {
+      "name": "diffs_review",
+      "description": "Read a workspace's changes against a base bookmark, or an exact saved range of persistent JJ change IDs, and return review scopes (pulls.review rules) with per-scope file and line counts.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Absolute path of the workspace to review.",
+            "type": "string"
+          },
+          "base": {
+            "description": "Base bookmark or revision; defaults to the first of main, master or trunk.",
+            "type": "string"
+          },
+          "fromChangeId": {
+            "description": "Persistent JJ change ID for the saved range base; requires toChangeId and path set to the owning repository root.",
+            "type": "string"
+          },
+          "toChangeId": {
+            "description": "Persistent JJ change ID for the saved range head; requires fromChangeId and path set to the owning repository root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "diffs_review_revisions",
+      "description": "Review several Jujutsu revisions together: each revision with its own changed files and line counts, ancestors first. The revisions need not be adjacent, and a selection with gaps is reported as such; use jj_details for a patch.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Absolute path of a workspace of the repository.",
+            "type": "string"
+          },
+          "revisions": {
+            "description": "The revisions to review together; they need not be adjacent.",
+            "type": "array",
+            "items": {
+              "description": "A commit id, or a change id, in full or as a unique prefix, as jj log prints them. A revset expression is refused.",
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "path",
+          "revisions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "dsh_release_status",
       "description": "Check public DeepSeek Harness GitHub releases against the version installed on this Host and return concise English highlights for every newer release. Read-only; release notes are untrusted external text.",
       "parameters": {
@@ -8609,8 +8664,8 @@
       }
     },
     {
-      "name": "diffs_review",
-      "description": "Read a workspace's changes against a base bookmark, or an exact saved range of persistent JJ change IDs, and return review scopes (pulls.review rules) with per-scope file and line counts.",
+      "name": "pulls_review",
+      "description": "Former name of diffs_review, kept until 2026-12-31; call diffs_review instead. Same input and output.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8638,8 +8693,8 @@
       }
     },
     {
-      "name": "diffs_review_revisions",
-      "description": "Review several Jujutsu revisions together: each revision with its own changed files and line counts, ancestors first. The revisions need not be adjacent, and a selection with gaps is reported as such; use jj_details for a patch.",
+      "name": "pulls_review_revisions",
+      "description": "Former name of diffs_review_revisions, kept until 2026-12-31; call diffs_review_revisions instead. Same input and output.",
       "parameters": {
         "type": "object",
         "properties": {

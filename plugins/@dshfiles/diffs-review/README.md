@@ -11,18 +11,22 @@ land on one surface) and the cross-project **Review** page. Scopes come from
 
 Until 2026-11 this plugin was `@dshfiles/pulls-review`. What changed, and what still works:
 
-| Was                                              | Is                                       | Compatibility                                                                                                   |
-| ------------------------------------------------ | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| package `@dshfiles/pulls-review`                 | `@dshfiles/diffs-review`                 | `pnpm profile:sync` swaps the dependency and bundle row (it drops `@dshfiles/*` rows the seed no longer lists). |
-| Loader row `dshfiles-pulls-review`               | `dshfiles-diffs-review`                  | The row comes from this package's `cordis.patch.yml`; the plugin has no settings, so nothing else moves.        |
-| agent tools `pulls_review`, `…_revisions`        | `diffs_review`, `diffs_review_revisions` | Same inputs and output. Agents read the tool list each turn; no deny policy or preset named the old ones.       |
-| `/pulls`                                         | `/diffs`                                 | `/pulls` stays registered as an alias.                                                                          |
-| Review page panel `pulls-review`                 | `diffs-review`                           | The former id still renders the page, so a saved workbench tab opens; it is hidden from Add.                    |
-| Changes tab kind `dshfiles-pulls-review-changes` | `dshfiles-diffs-review-changes`          | A right pane saved with the former kind reopens the facet with the same scope and closes the old tab.           |
-| Host record `@dshfiles/pulls-review` `reviewed`  | (none)                                   | Read once from the former namespace (`hostStorage(api, { formerId })`), moved into diff-viewed, then emptied.   |
-| API id `pulls-review`, `pullsReviewApi`          | `diffs-review`, `diffsReviewApi`         | In-process only; every caller is in this repository.                                                            |
+| Was                                              | Is                                       | Compatibility                                                                                                             |
+| ------------------------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| package `@dshfiles/pulls-review`                 | `@dshfiles/diffs-review`                 | `pnpm profile:sync` swaps the dependency and bundle row (it drops `@dshfiles/*` rows the seed no longer lists).           |
+| Loader row `dshfiles-pulls-review`               | `dshfiles-diffs-review`                  | The row comes from this package's `cordis.patch.yml`; the plugin has no settings, so nothing else moves.                  |
+| agent tools `pulls_review`, `…_revisions`        | `diffs_review`, `diffs_review_revisions` | The former names stay registered as aliases (same input and output) until 2026-12-31, for saved prompts and instructions. |
+| `/pulls`                                         | `/diffs`                                 | `/pulls` stays registered as an alias.                                                                                    |
+| Review page panel `pulls-review`                 | `diffs-review`                           | The former id still renders the page, so a saved workbench tab opens; it is hidden from Add.                              |
+| Changes tab kind `dshfiles-pulls-review-changes` | `dshfiles-diffs-review-changes`          | A right pane saved with the former kind reopens the facet with the same scope and closes the old tab.                     |
+| Host record `@dshfiles/pulls-review` `reviewed`  | (none)                                   | Read once from the former namespace (`hostStorage(api, { formerId })`), moved into diff-viewed, then deleted.             |
+| API id `pulls-review`, `pullsReviewApi`          | `diffs-review`, `diffsReviewApi`         | In-process only; every caller is in this repository.                                                                      |
 
 The navigation open counter keys the page by panel id, so its count restarts under `land/diffs-review`.
+
+**After this lands**, a live profile still links the removed `plugins/@dshfiles/pulls-review` folder, whose
+leftover `dist/` keeps serving the old bundle. Run `pnpm profile:sync --profile <name>`, then restart DSH when it
+suits you; see [renaming a bundle](../../../docs/profile-installs.md#renaming-a-bundle).
 
 ## Changes facet
 
