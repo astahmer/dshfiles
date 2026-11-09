@@ -9,5 +9,13 @@ import { z, type ZodType } from 'zod'
  * filled the way `Schema.decodeUnknownSync` fills them, unknown properties are stripped, and an invalid value is
  * rejected through `parse` and `safeParse` alike.
  */
-export const zodSchemaFromEffect = <S extends Schema.ConstraintDecoder<unknown>>(schema: S): ZodType<S['Type']> =>
-  z.custom<S['Type']>(value => Option.isSome(Schema.decodeUnknownOption(schema)(value))).transform(value => Schema.decodeUnknownSync(schema)(value))
+export const zodSchemaFromEffect = <S extends Schema.ConstraintDecoder<unknown>>(schema: S): ZodType<S['Type']> => {
+  const decode = Schema.decodeUnknownOption(schema)
+  return z.custom<S['Type']>().transform((value, context) => {
+    const decoded = decode(value)
+    if (Option.isSome(decoded)) return decoded.value
+    // The issue a failed `z.custom` check raised, keys in the same order, so `ZodError.message` stays byte-identical.
+    context.addIssue({ code: 'custom', path: [], message: 'Invalid input' })
+    return z.NEVER
+  })
+}
