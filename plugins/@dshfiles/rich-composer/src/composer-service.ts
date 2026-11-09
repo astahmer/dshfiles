@@ -67,7 +67,7 @@ export const createComposerService = (ctx: Context): ComposerService => {
       const target = resolve(input.sessionId)
       if (target === undefined) return false
       const span = target.shell.actions.captureInsertion()
-      return target.shell.actions.insertText(input.text, input.replaceSelection === false ? { ...span, end: span.start } : span)
+      return target.shell.actions.insertText(input.text, input.selection === 'keep' ? { ...span, start: span.end } : span)
     },
     attach: input => {
       const target = resolve(input.sessionId)

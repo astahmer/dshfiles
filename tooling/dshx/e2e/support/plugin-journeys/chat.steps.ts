@@ -183,7 +183,7 @@ Then('user messages and selected assistant text become editable unsent quotes', 
   await page.keyboard.press('ControlOrMeta+A')
   await user.getByRole('button', { name: 'Quote message', exact: true }).click()
   await recordAssertion(page, 'chat-user-quote-preserves-draft-and-source', async () => {
-    await expect(composer).toContainText('Existing draft')
+    await expect.poll(() => composer.innerText()).toMatch(/^Existing draft\n\n> /u)
     await expect(composer).toContainText('Transcript question 1')
     await expect(composer).toContainText('session-chat-transcript-window-fixture')
     await expect(composer).toContainText('message 3')

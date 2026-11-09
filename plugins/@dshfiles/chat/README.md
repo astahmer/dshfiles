@@ -63,7 +63,7 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/chat-focus.ts` | new: the published `@dshfiles/chat/chat-focus` contract — a Turn/Step/tool-call focus, its opaque view-request encoding, and the cross-thread pending request (below) |
 | `src/chat-focus-reveal.ts` | new: takes a focus from the native `viewRequest` or the pending request, jumps with the rail's `navigateToTurn`, opens folded groups with `beforematch` and highlights the row |
 | `src/native/chat/ChatView.tsx` (also) | reads the native `viewRequest`/`completeViewRequest`/`openView` Conversation View props, runs `useChatFocus`, and provides `openView` to the Turn-tail seats |
-| `src/native/chat/ChatNodeSeat.tsx` | tags each row with `data-chat-step`, so a Step focus can find it (a tool row already carries the native `data-chat-call-id`) |
+| `src/native/chat/ChatNodeSeat.tsx` | tags each row with `data-chat-step`, so a Step focus can find it (a tool row already carries the native `data-chat-call-id`); tags assistant-step rows with `data-chat-message-seq` for quote selection identity |
 | `src/native/chat/TurnTailNodeView.tsx` | adds the thread's `openView` to every `conversation.chat.turnTail` entry's owner props (`ChatTurnTailExtras`) |
 | `src/native/contract/slots.ts` (also) | `TurnTailOwnerProps` extends `ChatTurnTailExtras` |
 | `src/native/chat/AssistantMarkdown.tsx` | rewrites links whose scheme a dshx `LinkHandler` claims before `MarkdownText`, which keeps only http(s) and mailto hrefs, and routes clicks on them to the handler (`MarkdownLinks.openFromClick` on the root's click and aux-click capture) |
@@ -82,8 +82,17 @@ Markdown with the author, Session ID and message sequence; line breaks and any e
 Nothing is queued or sent until you explicitly send. Edit or remove the quote like any other draft text.
 The action uses the supported dshx `Composer.insert` contract, not an attachment chip or a Host send API.
 
-The local delta adds the action in `MessageIconActions.tsx`, supplies message identity from
-`MessageItem.tsx` and `TurnTailNodeView.tsx`, and localizes its labels in `locale.ts`.
+Selections quote rendered plain text with preserved line breaks, not Markdown source: heading/list markers,
+code fences and link URLs are not reconstructed. Whole-message quotes use the original Markdown.
+The assistant action accepts a selection in any single assistant step of its own Turn and attributes it
+to that step's actual message sequence. Selections spanning steps or outside that Turn do not match.
+Quotes insert after selected draft content without replacing it; an empty draft has no leading separator.
+A refused insertion shows a live status with retry guidance while the button keeps its name.
+
+The local delta adds the action and a `data-message-actions` marker (excluding action labels from quoted
+selections) in `MessageIconActions.tsx`, supplies message identity from `MessageItem.tsx` and
+`TurnTailNodeView.tsx`, tags assistant-step rows with `data-chat-message-seq` in `ChatNodeSeat.tsx` for
+selection scoping, and localizes its labels in `locale.ts`.
 `src/quote-message.ts` owns selection scoping and draft insertion; `src/quote-message-action.tsx` renders the control.
 
 ### Focus a Turn, Step or tool call from another plugin

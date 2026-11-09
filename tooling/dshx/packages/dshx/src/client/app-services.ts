@@ -124,8 +124,8 @@ export interface ComposerService {
   text(target?: ComposerTarget): string | undefined
   /** Replace the whole draft. */
   setText(input: ComposerTarget & { readonly text: string }): boolean
-  /** Insert at the caret, or at the end when the composer never had focus. Set replaceSelection to false to keep selected draft content. */
-  insert(input: ComposerTarget & { readonly text: string; readonly replaceSelection?: boolean }): boolean
+  /** Insert at the caret, or at the end when the composer never had focus. Selection defaults to 'replace'; 'keep' inserts after selected draft content. */
+  insert(input: ComposerTarget & { readonly text: string; readonly selection?: 'replace' | 'keep' }): boolean
   attach(input: ComposerTarget & { readonly attachment: ComposerAttachment }): boolean
   /** Choose the model and variant the next message uses. */
   setModel(input: ComposerTarget & { readonly selection: ComposerModelSelection }): Promise<boolean>

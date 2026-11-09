@@ -14,8 +14,9 @@ describe('message quote draft', () => {
     let draft = 'Existing draft'
     const focused: string[] = []
     const composer = {
-      insert: (input: { sessionId?: string; text: string; replaceSelection?: boolean }) => {
-        expect(input.replaceSelection).toBe(false)
+      text: () => draft,
+      insert: (input: { sessionId?: string; text: string; selection?: 'replace' | 'keep' }) => {
+        expect(input.selection).toBe('keep')
         expect(input.sessionId).toBe(source.sessionId)
         draft += input.text
         return true
@@ -30,11 +31,26 @@ describe('message quote draft', () => {
     expect(focused).toEqual(['session-quote'])
   })
 
+  it('starts an empty draft at the quote without a leading separator', () => {
+    let draft = ''
+    const composer = {
+      text: () => draft,
+      insert: (input: { text: string }) => {
+        draft += input.text
+        return true
+      },
+      focus: () => true,
+    }
+    expect(insertMessageQuote({ composer, source, text: 'quote', attribution: 'Assistant' })).toBe(true)
+    expect(draft).toBe('> Assistant\n>\n> quote\n\n')
+  })
+
   it('does not move focus when the composer refuses an insertion', () => {
     let focused = false
     expect(
       insertMessageQuote({
         composer: {
+          text: () => '',
           insert: () => false,
           focus: () => {
             focused = true
@@ -76,13 +92,30 @@ const fixture = () => {
 describe('message quote selection', () => {
   it('uses only the selected text in the matching assistant turn', () => {
     const input = fixture()
-    expect(selectedMessageText({ ...input, source })).toBe('selected\nsecond')
+    expect(selectedMessageText({ ...input, source })).toEqual({ text: 'selected\nsecond', source })
+  })
+
+  it('quotes an earlier assistant step with its own sequence rather than the closing message', () => {
+    const input = fixture()
+    input.message.setAttribute('data-chat-message-seq', '3')
+    const closing = input.message.cloneNode(true)
+    if (!(closing instanceof Element)) throw new Error('Expected an element')
+    closing.setAttribute('data-chat-message-seq', '5')
+    closing.textContent = 'Final answer, not selected'
+    input.flow.append(closing)
+    expect(selectedMessageText({ ...input, source })).toEqual({ text: 'selected\nsecond', source: { ...source, seq: 3 } })
+  })
+
+  it.each([null, '', 'undefined', '3x', '-1', '9007199254740992'])('rejects an invalid selected-step sequence %s', sequence => {
+    const input = fixture()
+    if (sequence === null) input.message.removeAttribute('data-chat-message-seq')
+    else input.message.setAttribute('data-chat-message-seq', sequence)
+    expect(selectedMessageText({ ...input, source })).toBeUndefined()
   })
 
   it('ignores a selection in another turn or pane', () => {
     const input = fixture()
     expect(selectedMessageText({ ...input, source: { ...source, turn: 2 } })).toBeUndefined()
-    expect(selectedMessageText({ ...input, source: { ...source, seq: 7 } })).toBeUndefined()
     const otherFlow = document.createElement('div')
     otherFlow.setAttribute('data-chat-flow', '')
     document.body.append(otherFlow)
@@ -96,7 +129,7 @@ describe('message quote selection', () => {
     input.message.setAttribute('data-chat-flow-kind', 'user')
     expect(selectedMessageText({ ...input, source: user })).toBeUndefined()
     input.message.append(input.button)
-    expect(selectedMessageText({ ...input, source: user })).toBe('selected\nsecond')
+    expect(selectedMessageText({ ...input, source: user })).toEqual({ text: 'selected\nsecond', source: user })
   })
 
   it('ignores collapsed and action-label selections', () => {
