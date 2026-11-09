@@ -20,7 +20,7 @@ import type {
 import type { SessionReferenceSource } from '../index.ts'
 import { createScope, scopeIdentityOf, scopeOf as scopeTagOf } from '../scope.ts'
 import { SessionManager } from './manager.ts'
-import { shareRecord } from './share-record.ts'
+import { shareListSnapshot } from './share-record.ts'
 import type { SessionRemotes } from './remotes.ts'
 import type { SessionListPhase, SessionSearchResultItem, SessionProjectionSnapshot } from './manager.ts'
 import type { Session } from './session.ts'
@@ -793,12 +793,8 @@ export class ClientSessions implements ISessions {
     // The manager rebuilds every row and projection snapshot per flush; publishing those copies made
     // each streamed event re-render every list consumer. Share what did not change, and skip the set.
     const previous = this.list.getSnapshot()
-    const sharedById = shareRecord(previous.byId, byId)
-    const sharedProjections = shareRecord(previous.projectionsBySession, { ...projectionsBySession })
-    const sameIds = ids.length === previous.ids.length && ids.every((id, index) => id === previous.ids[index])
-    if (!sameIds || sharedById !== previous.byId || sharedProjections !== previous.projectionsBySession || phase !== previous.phase) {
-      this.list.set({ ids: sameIds ? previous.ids : ids, byId: sharedById, phase, projectionsBySession: sharedProjections })
-    }
+    const next = shareListSnapshot(previous, { ids, byId, phase, projectionsBySession })
+    if (next !== previous) this.list.set(next)
     const { nonblank, hostIds } = this.manager.draftEvidence()
     this.drafts.reconcile(nonblank, hostIds)
   }
