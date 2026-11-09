@@ -258,9 +258,10 @@ Then('the bottom panel shows the Jujutsu panel and the dock no longer does', asy
   })
 })
 
-/** The chord the bottom-panel command answers to: platform primary plus J. */
+/** The fake terminal marks body after receiving an unclaimed chord. */
 const TERMINAL_KEY_ATTRIBUTE = 'data-journey-terminal-keys'
 
+/** The chord the bottom-panel command answers to: platform primary plus J. */
 const pressBottomPanelChord = async (page: Page): Promise<void> => {
   await page.keyboard.press(`${await primaryModifierFor(page)}+KeyJ`)
 }

@@ -108,7 +108,7 @@
         },
         {
           "kind": "unit-test",
-          "id": "shortcuts.panel-selection-chords-unit-terminal-opt-in",
+          "id": "shortcuts.panel-selection-chords-unit-terminal-default",
           "file": "plugins/@dshfiles/shortcuts/src/keyboard.test.ts",
           "testName": "keeps claiming the chord in the terminal when it does not opt out"
         }

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { installShortcuts, ShortcutKeyboardModel, type Shortcut } from './keyboard.js'
 
 const searchShortcut = (run: Shortcut['run'] = () => {}): Shortcut => ({ id: 'search', key: 'KeyP', modifier: 'primary', label: 'Search', run })
@@ -76,6 +76,7 @@ const termInput = (): HTMLTextAreaElement => {
   input.className = 'xterm-helper-textarea'
   terminal.append(input)
   document.body.append(terminal)
+  onTestFinished(() => terminal.remove())
   return input
 }
 
@@ -140,19 +141,16 @@ describe('installShortcuts', () => {
     input.dispatchEvent(chord)
     expect(run).not.toHaveBeenCalled()
     expect(chord.defaultPrevented).toBe(false)
-    input.closest('.xterm')?.remove()
   })
 
   it('keeps claiming the chord in the terminal when it does not opt out', () => {
     const run = vi.fn()
-    // allowInEditable false still runs there: the terminal is its own region.
-    disposers.push(installShortcuts(window, [{ ...searchShortcut(run), allowInEditable: false, allowInTerminal: true }]))
+    disposers.push(installShortcuts(window, [{ ...searchShortcut(run), allowInEditable: false }]))
     const input = termInput()
     const chord = press(primaryHeld())
     input.dispatchEvent(chord)
     expect(run).toHaveBeenCalledOnce()
     expect(chord.defaultPrevented).toBe(true)
-    input.closest('.xterm')?.remove()
   })
 
   it('stops listening once disposed', () => {

@@ -1459,7 +1459,13 @@ export default defineClient({
     // The bottom-panel toggle arrives as a command, not as a Host shortcut row:
     // the browser owns `primary+J`, so `@dshfiles/shortcuts` binds the chord in its
     // capture listener and Settings › Shortcuts rebinds it there.
-    metadata?.plugin?.add(Command, bottomPanelCommand({ title: translate('toggleBottomPanel'), toggle: toggleBottomPanel }))
+    const commands = metadata?.plugin
+    if (commands === undefined) {
+      console.warn(
+        'workbench: this Host provides no command registry, so the bottom panel shortcut and palette entry are unavailable. Open the bottom panel from Pane options instead.',
+      )
+    }
+    commands?.add(Command, bottomPanelCommand({ title: translate('toggleBottomPanel'), toggle: toggleBottomPanel }))
     if (isShortcutCommandId(TOGGLE_COMMAND_ID)) {
       // No default chord: listed under Settings › Shortcuts and in the command palette for the user to bind.
       ctx.effect(() => {

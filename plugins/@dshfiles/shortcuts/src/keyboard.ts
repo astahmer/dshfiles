@@ -176,9 +176,7 @@ export const installShortcuts = (target: Window, shortcuts: readonly Shortcut[])
       // field. Without this the guard below would swallow every chord aimed at the
       // composer, which is where focus actually is.
       if (region === 'editable' && shortcut.allowInEditable !== true) continue
-      // The terminal forwards an unclaimed key to its shell, so only a chord that
-      // opts into the terminal is claimed there.
-      if (region === 'terminal' && shortcut.allowInTerminal !== true) continue
+      if (region === 'terminal' && shortcut.allowInTerminal === false) continue
       if (shortcut.run(event) === false) continue
 
       // Both calls are needed: preventDefault stops the browser's own binding,
