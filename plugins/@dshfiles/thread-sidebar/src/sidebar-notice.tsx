@@ -92,7 +92,7 @@ export const failedResumeNotice = <SessionId extends string>(options: {
 }
 
 export const SidebarNoticeMessage = (props: { readonly message: string }): JSX.Element => (
-  <AlertDescription className="dshx:text-xs dshx:whitespace-nowrap">{props.message}</AlertDescription>
+  <AlertDescription className="dshx:min-w-0 dshx:text-xs dshx:break-words">{props.message}</AlertDescription>
 )
 
 export const SidebarNotificationDismissButton = (props: { readonly label: string; readonly onDismiss: () => void }): JSX.Element => (
@@ -108,32 +108,41 @@ export const SidebarNoticeAlert = (props: {
   readonly notification: boolean
   readonly dismissLabel: string
   readonly onDismiss: () => void
-}): JSX.Element => (
-  <Alert
-    variant={props.notice.tone === 'danger' ? 'destructive' : props.notice.tone}
-    className={cn(
-      props.className,
-      props.transient &&
-        'dshx:flex dshx:w-fit dshx:max-w-full dshx:pointer-events-auto dshx:items-center dshx:gap-2 dshx:border-border dshx:bg-card dshx:text-card-foreground dshx:shadow-lg',
-    )}
-  >
-    <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-      {props.transient ? (
-        <span className="dshx:min-w-0 dshx:truncate dshx:text-card-foreground" title={props.notice.message}>
-          {props.notice.message}
-        </span>
-      ) : (
-        <SidebarNoticeMessage message={props.notice.message} />
+}): JSX.Element => {
+  const action =
+    props.notice.actionLabel !== undefined && props.notice.onAction !== undefined ? (
+      <Button size="xs" variant="outline" className="dshx:shrink-0" onClick={props.notice.onAction}>
+        {props.notice.actionLabel}
+      </Button>
+    ) : null
+  return (
+    <Alert
+      variant={props.notice.tone === 'danger' ? 'destructive' : props.notice.tone}
+      className={cn(
+        props.className,
+        props.transient &&
+          'dshx:flex dshx:w-fit dshx:max-w-full dshx:pointer-events-auto dshx:items-center dshx:gap-2 dshx:border-border dshx:bg-card dshx:text-card-foreground dshx:shadow-lg',
       )}
-      {props.notice.actionLabel !== undefined && props.notice.onAction !== undefined ? (
-        <Button size="xs" variant="outline" onClick={props.notice.onAction}>
-          {props.notice.actionLabel}
-        </Button>
-      ) : null}
-      {props.notification || !props.transient ? <SidebarNotificationDismissButton label={props.dismissLabel} onDismiss={props.onDismiss} /> : null}
-    </div>
-  </Alert>
-)
+    >
+      <div className="dshx:col-start-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+        {props.transient ? (
+          <>
+            <span className="dshx:min-w-0 dshx:truncate dshx:text-card-foreground" title={props.notice.message}>
+              {props.notice.message}
+            </span>
+            {action}
+          </>
+        ) : (
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:items-start dshx:gap-1.5">
+            <SidebarNoticeMessage message={props.notice.message} />
+            {action}
+          </div>
+        )}
+        {props.notification || !props.transient ? <SidebarNotificationDismissButton label={props.dismissLabel} onDismiss={props.onDismiss} /> : null}
+      </div>
+    </Alert>
+  )
+}
 
 export const scheduleSuccessNoticeDismissal = (
   notice: SidebarNotice,
