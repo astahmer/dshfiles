@@ -107,6 +107,7 @@ const thinUsageHistoryPoints = (points: readonly QuotaSnapshot[], bucketMinutes:
   })
 }
 
+/** The JSON home of the history before SQLite; `usage-history-store.ts` imports it once and never writes it. */
 export const usageHistoryDomain = defineDomain({
   name: USAGE_HISTORY_DOMAIN,
   version: 1,

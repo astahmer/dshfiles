@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { readAccountUsage } from './account-usage.js'
 import * as Schema from 'effect/Schema'
 import { UsageHistoryModel, usageHistoryDomain } from './usage-history.js'
+import { UsageHistoryStore } from './usage-history-store.js'
 import { mapRollingUntilAborted } from './rolling-concurrency.js'
 import { usageMetaSchema, type QuotaSnapshot, type UsageHistorySettings, type UsageMeta } from './usage-history-model.js'
 import type { AccountProfile, UsageCard } from './api.js'
@@ -39,53 +40,69 @@ const providerReader =
 
 const facilityOf = (ctx: Context) => ctx.get('storageDomain')
 type Facility = NonNullable<ReturnType<typeof facilityOf>>
-const openDomain = (facility: Facility) => facility.open(usageHistoryDomain)
-type UsageDomain = Awaited<ReturnType<typeof openDomain>>
 
-/**
- * The storage facility refuses a second `open` of a name that is already open,
- * so the domain is opened once per facility and every reader shares the handle.
- * The Host closes it on unload, so a reload can open it again.
- */
-const openedDomains = new WeakMap<Facility, Promise<UsageDomain>>()
+/** One connection per database file, shared by every reader; the Host closes it on unload so a reload can open it again. */
+const openedStores = new Map<string, Promise<UsageHistoryStore>>()
 
-const usageDomain = (ctx: Context): Promise<UsageDomain> | undefined => {
+const importJsonHistory = async (facility: Facility, store: UsageHistoryStore): Promise<void> => {
+  const domain = await facility.open(usageHistoryDomain)
+  try {
+    store.importJson({ settings: domain.global.get(), rows: domain.table('quota').entries() })
+  } finally {
+    await domain.close()
+  }
+}
+
+const openStore = async (facility: Facility, filename: string): Promise<UsageHistoryStore> => {
+  const store = UsageHistoryStore.open(filename)
+  try {
+    if (!store.jsonImported()) await importJsonHistory(facility, store)
+    return store
+  } catch (error) {
+    store.close()
+    throw error
+  }
+}
+
+/** History needs the storage facility: the legacy JSON domain is imported through it before the first read. */
+const usageStore = (ctx: Context): Promise<UsageHistoryStore> | undefined => {
   const facility = facilityOf(ctx)
   if (facility === undefined) return undefined
-  const existing = openedDomains.get(facility)
+  const filename = UsageHistoryStore.defaultFilename()
+  const existing = openedStores.get(filename)
   if (existing !== undefined) return existing
-  const opening = openDomain(facility)
-  openedDomains.set(facility, opening)
+  const opening = openStore(facility, filename)
+  openedStores.set(filename, opening)
   opening.catch(() => {
-    if (openedDomains.get(facility) === opening) openedDomains.delete(facility)
+    if (openedStores.get(filename) === opening) openedStores.delete(filename)
   })
   return opening
 }
 
-const closeUsageDomain = async (ctx: Context): Promise<void> => {
-  const facility = facilityOf(ctx)
-  if (facility === undefined) return
-  const opening = openedDomains.get(facility)
-  openedDomains.delete(facility)
-  const domain = await opening?.catch(() => undefined)
-  await domain?.close()
+const closeUsageStore = async (): Promise<void> => {
+  const filename = UsageHistoryStore.defaultFilename()
+  const opening = openedStores.get(filename)
+  openedStores.delete(filename)
+  const store = await opening?.catch(() => undefined)
+  store?.close()
 }
 
 const defaultUsageMeta = (): UsageMeta => Schema.decodeUnknownSync(usageMetaSchema)({})
 
+const settingsOf = (store: UsageHistoryStore): UsageMeta => store.settings() ?? defaultUsageMeta()
+
 const readUsageHistorySettings = async (ctx: Context): Promise<UsageMeta> => {
-  const opening = usageDomain(ctx)
+  const opening = usageStore(ctx)
   if (opening === undefined) return defaultUsageMeta()
-  const domain = await opening
-  return domain.global.get()
+  return settingsOf(await opening)
 }
 
 const saveUsageHistorySettings = async (ctx: Context, settings: UsageHistorySettings): Promise<UsageMeta> => {
-  const opening = usageDomain(ctx)
+  const opening = usageStore(ctx)
   if (opening === undefined) throw new Error('Usage history storage is unavailable.')
-  const domain = await opening
-  const next = Schema.decodeUnknownSync(usageMetaSchema)({ ...domain.global.get(), ...settings })
-  await domain.global.set(next)
+  const store = await opening
+  const next = Schema.decodeUnknownSync(usageMetaSchema)({ ...settingsOf(store), ...settings })
+  store.saveSettings(next)
   await pruneUsageHistory(ctx, next.retentionDays)
   return next
 }
@@ -97,11 +114,10 @@ const saveUsageHistorySettings = async (ctx: Context, settings: UsageHistorySett
  * therefore cannot diverge from the scheduled one.
  */
 const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfile[], readUsage: AccountUsageReader, signal?: AbortSignal): Promise<number> => {
-  const opening = usageDomain(ctx)
+  const opening = usageStore(ctx)
   if (opening === undefined) return 0
-  const domain = await opening
-  const quota = domain.table('quota')
-  const settings = domain.global.get()
+  const store = await opening
+  const settings = settingsOf(store)
 
   const enabled = accounts.filter(account => account.enabled)
   // Provider reads are independent, but bound concurrency to avoid an
@@ -136,7 +152,7 @@ const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfi
         bankedResetExpiries: usage.bankedResetExpiries,
       }
       const snapshot: QuotaSnapshot = usage.extraUsage === undefined ? reading : { ...reading, extraUsage: usage.extraUsage }
-      await quota.put(UsageHistoryModel.bucketKey(account.instanceId, at, settings.intervalMinutes), snapshot)
+      store.put(UsageHistoryModel.bucketKey(account.instanceId, at, settings.intervalMinutes), snapshot)
       return 1
     },
   })
@@ -147,8 +163,8 @@ const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfi
   const attemptedAt = Date.now()
   // Re-read: a settings save during the sweep must not be overwritten by the
   // snapshot taken before it.
-  await domain.global.set({
-    ...domain.global.get(),
+  store.saveSettings({
+    ...settingsOf(store),
     lastAttemptAt: attemptedAt,
     ...(written > 0 && { lastReadAt: attemptedAt }),
   })
@@ -157,19 +173,9 @@ const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfi
 
 /** Oldest snapshot worth keeping, given the configured retention. */
 const pruneUsageHistory = async (ctx: Context, retentionDays: number): Promise<number> => {
-  const opening = usageDomain(ctx)
+  const opening = usageStore(ctx)
   if (opening === undefined) return 0
-  const domain = await opening
-  const quota = domain.table('quota')
-  const cutoff = Date.now() - retentionDays * 24 * 60 * MINUTE_MS
-  let removed = 0
-  for (const [key, snapshot] of [...quota.entries()]) {
-    if (snapshot.at < cutoff) {
-      await quota.delete(key)
-      removed += 1
-    }
-  }
-  return removed
+  return (await opening).prune(Date.now() - retentionDays * 24 * 60 * MINUTE_MS)
 }
 
 const readUsageHistories = async (
@@ -178,23 +184,25 @@ const readUsageHistories = async (
   sinceMs: number,
   bucketMinutes?: number,
 ): Promise<readonly { readonly instanceId: string; readonly points: readonly QuotaSnapshot[] }[]> => {
-  const rowsByInstance = new Map(instanceIds.map(instanceId => [instanceId, [] as QuotaSnapshot[]]))
-  const opening = usageDomain(ctx)
+  const opening = usageStore(ctx)
   if (opening === undefined) return instanceIds.map(instanceId => ({ instanceId, points: [] }))
-  const domain = await opening
-  for (const [key, value] of domain.table('quota').entries()) {
-    const parsed = UsageHistoryModel.parseBucketKey(key)
-    if (parsed === null || !rowsByInstance.has(parsed.instanceId) || value.at < sinceMs) continue
-    const point: QuotaSnapshot = {
-      at: value.at,
-      instanceId: value.instanceId,
-      windows: value.windows,
-      resetsAt: value.resetsAt,
-      bankedResets: value.bankedResets,
-      bankedResetExpiries: value.bankedResetExpiries ?? [],
-    }
-    rowsByInstance.get(parsed.instanceId)?.push(value.extraUsage === undefined ? point : { ...point, extraUsage: value.extraUsage })
-  }
+  const stored = (await opening).read(instanceIds, sinceMs)
+  const rowsByInstance = new Map(
+    instanceIds.map(instanceId => [
+      instanceId,
+      (stored.get(instanceId) ?? []).map((value): QuotaSnapshot => {
+        const point: QuotaSnapshot = {
+          at: value.at,
+          instanceId: value.instanceId,
+          windows: value.windows,
+          resetsAt: value.resetsAt,
+          bankedResets: value.bankedResets,
+          bankedResetExpiries: value.bankedResetExpiries ?? [],
+        }
+        return value.extraUsage === undefined ? point : { ...point, extraUsage: value.extraUsage }
+      }),
+    ]),
+  )
   return instanceIds.map(instanceId => {
     const rows = rowsByInstance.get(instanceId) ?? []
     return {
@@ -238,7 +246,7 @@ const nextSweepAt = async (ctx: Context): Promise<number | undefined> => {
 }
 
 export const createUsageHistoryService = (ctx: Context) => ({
-  close: closeUsageDomain.bind(null, ctx),
+  close: closeUsageStore,
   readSettings: readUsageHistorySettings.bind(null, ctx),
   saveSettings: saveUsageHistorySettings.bind(null, ctx),
   collect: collectUsageHistory.bind(null, ctx),

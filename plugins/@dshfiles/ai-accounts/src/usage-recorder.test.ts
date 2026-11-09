@@ -1,17 +1,17 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
-import { afterEach, describe, expect, it } from '@effect/vitest'
+import { afterEach, describe, expect, it, vi } from '@effect/vitest'
 import { Deferred, Effect, Exit, Fiber, Schedule, Scope } from 'effect'
 import { TestClock } from 'effect/testing'
 import { UsageHistorySchedule } from './usage-history-schedule.js'
 import { UsageHistoryPromiseModel } from './usage-history-promise.js'
 import type { AccountProfile, UsageCard } from './api.js'
-import { usageHistoryDomain } from './usage-history.js'
+import type { QuotaSnapshot } from './usage-history-model.js'
 import { createUsageHistoryService, type AccountUsageReader } from './usage-recorder.js'
 
 const profile = (instanceId: string, kind: AccountProfile['kind'], enabled = true): AccountProfile => ({
@@ -56,12 +56,30 @@ const okCard = (remaining: number, resetsAt: number, banked = 0): UsageCard => (
 const roots: string[] = []
 const contexts: Context[] = []
 
-const openContext = async (): Promise<Context> => {
+const legacyPath = (root: string): string => join(root, 'storages', 'ai_accounts_usage.json')
+
+/** A whole-unit JSON document as the domain wrote it before history moved to SQLite. */
+const writeLegacyHistory = async (root: string, input: { readonly intervalMinutes: number; readonly quota: Record<string, QuotaSnapshot> }): Promise<void> =>
+  writeFile(
+    legacyPath(root),
+    JSON.stringify({
+      unit: { name: 'ai_accounts_usage', version: 1 },
+      global: { lastReadAt: 1, lastAttemptAt: 1, intervalMinutes: input.intervalMinutes, retentionDays: 30 },
+      tables: { quota: input.quota },
+    }),
+  )
+
+const openContext = async (legacy?: Parameters<typeof writeLegacyHistory>[1]): Promise<Context> => {
   const root = await mkdtemp(join(tmpdir(), 'ai-accounts-usage-'))
   roots.push(root)
+  vi.stubEnv('DSH_HOME', root)
+  if (legacy !== undefined) {
+    await mkdir(join(root, 'storages'), { recursive: true })
+    await writeLegacyHistory(root, legacy)
+  }
   const context = new Context()
   await context.plugin(Storage)
-  await context.plugin(StorageJson, { root })
+  await context.plugin(StorageJson, { root: join(root, 'storages') })
   await context.plugin(StorageDomain, { backend: 'json' })
   contexts.push(context)
   return context
@@ -72,6 +90,7 @@ afterEach(async () => {
     await createUsageHistoryService(context).close()
     await context.fiber.dispose()
   }
+  vi.unstubAllEnvs()
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
 })
 
@@ -172,11 +191,12 @@ describe('usage history collection', () => {
   })
 
   it('prunes snapshots older than the retention window', async () => {
-    const ctx = await openContext()
     const old = Date.now() - 10 * 86_400_000
+    const ctx = await openContext({
+      intervalMinutes: 5,
+      quota: { 'v2:codex_a:5:1': { at: old, instanceId: 'codex_a', windows: { 'Weekly limit': 10 }, resetsAt: {}, bankedResets: 0 } },
+    })
     await createUsageHistoryService(ctx).collect([profile('codex_a', 'codex')], async () => okCard(50, Date.now() + 60_000))
-    const domain = ctx.get('storageDomain')?.get(usageHistoryDomain.name)
-    await domain?.table('quota').put('v2:codex_a:5:1', { at: old, instanceId: 'codex_a', windows: { 'Weekly limit': 10 }, resetsAt: {}, bankedResets: 0 })
     expect(await createUsageHistoryService(ctx).prune(7)).toBe(1)
     const rows = await createUsageHistoryService(ctx).read('codex_a', 0)
     expect(rows).toHaveLength(1)
@@ -184,10 +204,39 @@ describe('usage history collection', () => {
   })
 })
 
+describe('legacy JSON history', () => {
+  const legacyReading = { at: Date.now() - 3_600_000, instanceId: 'codex_a', windows: { 'Weekly limit': 33 }, resetsAt: {}, bankedResets: 1 }
+
+  it('imports the JSON rows and settings once, and leaves the JSON file as an older build wrote it', async () => {
+    const ctx = await openContext({ intervalMinutes: 15, quota: { 'codex_a:1': legacyReading } })
+    const root = roots.at(-1) ?? ''
+    const before = await readFile(legacyPath(root), 'utf8')
+    const service = createUsageHistoryService(ctx)
+
+    expect((await service.readSettings()).intervalMinutes).toBe(15)
+    expect((await service.read('codex_a', 0)).map(point => point.windows['Weekly limit'])).toEqual([33])
+    await service.collect([profile('codex_a', 'codex')], async () => okCard(50, Date.now() + 60_000))
+    expect((await service.read('codex_a', 0)).map(point => point.windows['Weekly limit'])).toEqual([33, 80])
+    expect(await readFile(legacyPath(root), 'utf8')).toBe(before)
+  })
+
+  it('never reads the JSON file again once it is imported', async () => {
+    const ctx = await openContext({ intervalMinutes: 5, quota: { 'codex_a:1': legacyReading } })
+    const service = createUsageHistoryService(ctx)
+    expect(await service.read('codex_a', 0)).toHaveLength(1)
+    await service.close()
+
+    await writeFile(legacyPath(roots.at(-1) ?? ''), '{ not json')
+    expect(await createUsageHistoryService(ctx).prune(0)).toBe(1)
+    await createUsageHistoryService(ctx).close()
+    expect(await createUsageHistoryService(ctx).read('codex_a', 0)).toEqual([])
+  })
+})
+
 describe('usage history scheduler', () => {
   it.effect('collects on start, shares one in-flight sweep with a manual refresh, and waits for the interval', () =>
     Effect.gen(function* () {
-      const ctx = yield* Effect.promise(openContext)
+      const ctx = yield* Effect.promise(() => openContext())
       const history = createUsageHistoryService(ctx)
       let calls = 0
       const gate = yield* Deferred.make<void>()
@@ -207,6 +256,8 @@ describe('usage history scheduler', () => {
       }).pipe(Scope.provide(scope))
       yield* Effect.promise(() => new Promise(resolve => setTimeout(resolve, 20)))
       const manual = yield* Effect.forkChild(schedule.collectNow)
+      // The manual call must reach the sweep in flight before it finishes; a SQLite write finishes in the same tick.
+      yield* Effect.promise(() => new Promise(resolve => setTimeout(resolve, 20)))
       yield* Deferred.succeed(gate, undefined)
       expect(yield* Fiber.join(manual)).toBe(1)
       expect(calls).toBe(1)
