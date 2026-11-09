@@ -241,6 +241,9 @@ class ClientSessionReference implements SessionReference {
   }
 }
 
+/** Released Session generations kept open for a quick switch back. */
+const PARKED_SCOPE_LIMIT = 3
+
 /** Host catalog and local reference allocator; view selection remains outside the Controller. */
 export class ClientSessions implements ISessions {
   /**
@@ -257,6 +260,8 @@ export class ClientSessions implements ISessions {
   private readonly scopes = new Map<SessionId, ScopeRecord>()
   /** Stable per-id sources retained for the Client root lifetime, including across generation replacement. */
   private readonly retainObservers = new Map<SessionId, RetentionObserver>()
+  /** Released generations kept open, oldest first. */
+  private readonly parked = new Set<SessionId>()
   private readonly scopeDrops = new Set<Promise<void>>()
   private closed = false
   private readonly lifetime = new AbortController()
@@ -641,6 +646,7 @@ export class ClientSessions implements ISessions {
   }
 
   private retainScope(id: SessionId, source: SessionReferenceSource): ClientSessionReference {
+    this.parked.delete(id)
     const record = this.scopes.get(id) ?? this.materializeScope(id)
     const previous = record.retention
     record.retention = Object.freeze({
@@ -655,7 +661,7 @@ export class ClientSessions implements ISessions {
       record.retention = count === 0
         ? EMPTY_RETAIN_INFO
         : Object.freeze({ referenceCount: count, retainedBy: freezeRetainedBy(retainedBy) })
-      if (count === 0) this.retireScope(id, record)
+      if (count === 0) this.parkScope(id, record)
       else this.publishRetention(id)
     })
     if (this.list.getSnapshot().byId[id] === undefined && this.manager.subagentAddress(id) !== undefined) {
@@ -663,6 +669,27 @@ export class ClientSessions implements ISessions {
     }
     this.publishRetention(id)
     return reference
+  }
+
+  /**
+   * Keep the last released generations open instead of retiring them: switching back to a recent thread then reuses
+   * its open history and live stream instead of reopening and repaging it. A local draft that would be abandoned,
+   * and every generation past the limit, retires as before.
+   */
+  private parkScope(id: SessionId, record: ScopeRecord): void {
+    if (this.closed || this.drafts.list.getSnapshot()[id]?.local === true) {
+      this.retireScope(id, record)
+      return
+    }
+    this.parked.delete(id)
+    this.parked.add(id)
+    this.publishRetention(id)
+    for (const parkedId of this.parked) {
+      if (this.parked.size <= PARKED_SCOPE_LIMIT) break
+      this.parked.delete(parkedId)
+      const parkedRecord = this.scopes.get(parkedId)
+      if (parkedRecord !== undefined && parkedRecord.retention.referenceCount === 0) this.retireScope(parkedId, parkedRecord)
+    }
   }
 
   private retentionSnapshot(id: SessionId): SessionRetainInfo {
@@ -685,6 +712,7 @@ export class ClientSessions implements ISessions {
 
   private retireScope(id: SessionId, record: ScopeRecord, disposeFiber = true): void {
     if (!record.live) return
+    this.parked.delete(id)
     record.live = false
     if (this.scopes.get(id) === record) this.scopes.delete(id)
     record.session.unbindScope()

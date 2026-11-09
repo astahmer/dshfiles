@@ -187,3 +187,29 @@ describe('local view readiness and operation retention', () => {
     await expect(handle.settled).rejects.toThrow('disposed')
   })
 })
+
+describe('released session generations', () => {
+  it('keeps the last three released threads open for a switch back and retires older ones', () => {
+    const opened: Session[] = []
+    vi.spyOn(Session.prototype, 'open').mockImplementation(function (this: Session) {
+      opened.push(this)
+      return Promise.resolve()
+    })
+    const { sessions } = fixture()
+    const ids = Array.from({ length: 5 }, (_, index) => SessionId(`session-switched-${index}`))
+    for (const sessionId of ids) sessions.handleSessionAdded({ sessionId, agentAvailable: false, updatedAt: 0, running: false, blank: false })
+    const firstView = sessions.retain(ids[0]!, { source: 'mainView' })
+    const firstSession = firstView.binding.session
+    firstView.release()
+    expect(sessions.retainInfo(ids[0]!).getSnapshot().referenceCount).toBe(0)
+    expect(sessions.list.getSnapshot().byId[ids[0]!]?.retainedBy.mainView).toBeUndefined()
+    const again = sessions.retain(ids[0]!, { source: 'mainView' })
+    expect(again.binding.session).toBe(firstSession)
+    again.release()
+    for (const id of ids.slice(1)) sessions.retain(id, { source: 'mainView' }).release()
+    expect(sessions.binding(ids[0]!)).toBeUndefined()
+    expect(sessions.binding(ids[1]!)).toBeUndefined()
+    expect(ids.slice(2).every(id => sessions.binding(id) !== undefined)).toBe(true)
+    expect(sessions.retain(ids[0]!, { source: 'mainView' }).binding.session).not.toBe(firstSession)
+  })
+})

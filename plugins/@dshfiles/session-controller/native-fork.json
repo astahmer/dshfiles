@@ -17,7 +17,7 @@
       "local": "locale"
     }
   ],
-  "added": ["src/native/client/sessions/record-reuse.ts", "src/native/client/sessions/share-record.ts", "src/native/cold-reads.ts", "src/native/control.test.ts", "src/native/list-metadata-store.ts"],
+  "added": ["src/native/client/sessions/share-record.ts", "src/native/cold-reads.ts", "src/native/control.test.ts", "src/native/list-metadata-store.ts"],
   "delta": [
     "src/native/agent.ts",
     "src/native/assistant-stream.ts",
