@@ -451,7 +451,7 @@ export class SessionManager {
       const session = this.sessions.get(sessionId)
       // A scoped instance is held by a view that may not have subscribed yet; releasing it leaves that view on a
       // disposed Session whose history never opens (a blank transcript after a restore burst).
-      if (session === undefined || session.mounted || session.scoped) return false
+      if (session === undefined || session.retainedOrSubscribed) return false
       return !this.provisional.has(sessionId) && !this.engagedSessions.has(sessionId)
     })
     const surplus = unrendered.length - RESIDENT_UNMOUNTED_SESSION_LIMIT

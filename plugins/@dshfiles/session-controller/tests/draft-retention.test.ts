@@ -1,6 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ClientSessions } from '../src/native/client/sessions/service.ts'
 import { Session } from '../src/native/client/sessions/session.ts'
@@ -83,6 +84,27 @@ afterEach(async () => {
 })
 
 describe('local view readiness and operation retention', () => {
+  it('opens the same session held by an unsubscribed retained scope', async () => {
+    const opened: Session[] = []
+    vi.spyOn(Session.prototype, 'open').mockImplementation(function (this: Session) {
+      opened.push(this)
+      return Promise.resolve()
+    })
+    const { sessions } = fixture()
+    const ids = Array.from({ length: 5 }, (_, index) => SessionId(`session-retained-${index}`))
+    for (const sessionId of ids) {
+      sessions.handleSessionAdded({ sessionId, agentAvailable: false, updatedAt: 0, running: false, blank: false })
+    }
+    const references = ids.map(id => sessions.retainAgentScope(id))
+    const first = references[0]!
+    const view = sessions.retain(ids[0]!, { source: 'mainView' })
+    expect(view.binding.session).toBe(first.binding.session)
+    expect(opened[0] === first.binding.session).toBe(true)
+    await expect(view.ready).resolves.toBe(first.binding)
+    view.release()
+    for (const reference of references) reference.release()
+  })
+
   it('resolves local presentation synchronously even when both views release in the same turn', async () => {
     const { sessions, remote, stream } = fixture()
     const handle = sessions.drafts.create(options)

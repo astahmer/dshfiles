@@ -641,9 +641,9 @@ export class Session implements SessionFace {
     return this.notifier.subscribe(listener)
   }
 
-  /** True while a mounted view renders this Session; an unsubscribed Session holds history nobody reads. */
-  get mounted(): boolean {
-    return this.notifier.listenerCount > 0
+  /** True while a view subscribes or a retained scope owns this Session. */
+  get retainedOrSubscribed(): boolean {
+    return this.notifier.listenerCount > 0 || this.actx !== undefined
   }
 
   /**
