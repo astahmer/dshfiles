@@ -11,7 +11,7 @@
   name: '@deepseek-ai/dsh-session-query-sqlite'
   disabled: true
   config:
-    path: !!js (process.env.DSH_HOME || process.env.HOME + '/.dsh') + '/plugins/session-query-sqlite/index.sqlite'
+    path: !!js (process.env.DSH_HOME || (process.env.HOME || process.env.USERPROFILE) + '/.dsh') + '/plugins/session-query-sqlite/index.sqlite'
     openAt: first-search
     persistedReadConcurrency: 4
 # A prepared cold Session is kept for reuse, and each one holds that Session's whole decoded log: on the live Host
