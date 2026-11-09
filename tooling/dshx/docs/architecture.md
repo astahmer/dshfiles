@@ -37,7 +37,7 @@ Host-only Settings facets (`base`, `validate`, `setup`) remain in `src/host.ts`.
 3. Run offline manifest, provider-edge, migration, and TypeScript checks.
 4. Build Host and Client with internal entry/browser guards first, native user Vite transformations next, and protocol/capability/artifact guards last.
 5. Inline DSHX helper implementations into the output while keeping official runtime packages governed by the adapter external policy.
-6. Enforce one Host ESM chunk and one lazy-CJS Client chunk. Fold one standard Vite CSS asset into the Client factory and reject additional chunks/assets/workers/WASM.
+6. Enforce one Host ESM chunk and one lazy-CJS Client entry chunk. Each literal Client `import()` target that shares no module with the entry is built on its own into a self-contained lazy chunk `client.<name>.<hash>.js`, loaded through `require.async`; a target that shares a module or imports CSS stays inlined. Fold one standard Vite CSS asset into the entry factory and reject other chunks/assets/workers/WASM.
 7. Emit declarations for the actual `name`/`inject`/`Config`/`apply` module shape.
 
 Final artifacts contain no import of a DSHX authoring/runtime-private module.

@@ -23,6 +23,11 @@ export class SharedRuntime {
   private static readonly supplierModule = '\0dshx-shared-runtime'
   private static readonly facadePrefix = '\0dshx-shared:'
 
+  /** A consumer facade only re-reads the supplier's table, so copies of it share the supplier's single instance. */
+  static isFacade(id: string): boolean {
+    return id.startsWith(SharedRuntime.facadePrefix)
+  }
+
   /** Supplier side: build the `sharedModules` table and record what it provides next to `client.js`. */
   static supplierPlugin(options: {
     readonly packageId: string

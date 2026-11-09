@@ -1561,3 +1561,101 @@ describe('client compiler', () => {
     }
   })
 })
+
+describe('client lazy chunks', () => {
+  const lazyEntry = [
+    "export const name = 'lazy-fixture'",
+    'export const inject = []',
+    'export const Config = undefined',
+    "export function apply() { return import('./heavy').then(module => module.heavy) }",
+    '',
+  ].join('\n')
+
+  const loadChunks = (files: Readonly<Record<string, string>>) => {
+    const factories = new Map<string, (require: unknown) => { readonly [key: string]: unknown }>()
+    const registrationShape = Schema.Struct({ id: Schema.String, chunk: Schema.optional(Schema.String), factory: FunctionSchema })
+    for (const code of Object.values(files)) {
+      vm.runInNewContext(code, {
+        window: {
+          __ModuleLoader__: {
+            load: (value: unknown) => {
+              const registration = Schema.decodeUnknownSync(registrationShape)(value)
+              // SAFETY: the decoded factory is the compiler-emitted `(require) => module.exports` wrapper.
+              factories.set(registration.chunk ?? 'client.js', registration.factory as (require: unknown) => { readonly [key: string]: unknown })
+            },
+          },
+        },
+      })
+    }
+    const require = Object.assign(
+      (spec: string) => {
+        if (spec.startsWith('./')) throw new Error(`unexpected synchronous require ${spec}`)
+        return {}
+      },
+      { async: async (spec: string) => factories.get(spec.replace(/^\.\//u, ''))!(require) },
+    )
+    return { entry: factories.get('client.js')!(require), factories }
+  }
+
+  it('emits a self-contained chunk loaded through require.async and runs it', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/heavy.ts'), "export const heavy = 'heavy-' + 'lazyonly'.repeat(3)\n")
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry)
+    for (const minify of [false, true]) {
+      const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist', minify })
+      const chunkFile = report.output.find(item => /^client\.heavy\.[0-9a-f]{8}\.js$/u.test(item.fileName))?.fileName
+      expect(chunkFile).toBeDefined()
+      expect(report.output.map(item => item.fileName)).toContain(`${chunkFile}.map`)
+      const entryCode = await readFile(resolve(root, 'dist/client.js'), 'utf8')
+      const chunkCode = await readFile(resolve(root, 'dist', chunkFile!), 'utf8')
+      expect(entryCode).not.toContain('lazyonly')
+      expect(entryCode).toMatch(new RegExp(`\\.async\\(\\s*["'\`]\\./${chunkFile!.replaceAll('.', '\\.')}["'\`]\\)`, 'u'))
+      expect(chunkCode).toMatch(new RegExp(`chunk:\\s*["'\`]${chunkFile!.replaceAll('.', '\\.')}["'\`]`, 'u'))
+      expect(chunkCode.match(/\/\/# sourceMappingURL=.*$/gmu)).toEqual([`//# sourceMappingURL=${chunkFile}.map`])
+      const { entry } = loadChunks({ entry: entryCode, chunk: chunkCode })
+      // SAFETY: the fixture entry exports apply returning the lazy module's value.
+      await expect((entry.apply as () => Promise<string>)()).resolves.toBe('heavy-lazyonlylazyonlylazyonly')
+      const manifest = Schema.decodeUnknownSync(Schema.Struct({ sources: Schema.Array(Schema.String) }))(
+        JSON.parse(await readFile(resolve(root, 'dist/client.js.deps.json'), 'utf8')),
+      )
+      expect(manifest.sources).toContain('src/heavy.ts')
+    }
+  })
+
+  it('keeps a target inlined when it shares a module with the entry', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/state.ts'), 'export const registry = new Map<string, string>()\n')
+    await writeFile(resolve(root, 'src/heavy.ts'), "import { registry } from './state'\nexport const heavy = registry.get('key') ?? 'missing'\n")
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      lazyEntry.replace('export function apply()', "import { registry } from './state'\nregistry.set('key', 'shared-state')\nexport function apply()"),
+    )
+    const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
+    expect(report.output.filter(item => item.fileName.startsWith('client.heavy.'))).toEqual([])
+    const { entry } = loadChunks({ entry: await readFile(resolve(root, 'dist/client.js'), 'utf8') })
+    // SAFETY: the fixture entry exports apply returning the lazy module's value.
+    await expect((entry.apply as () => Promise<string>)()).resolves.toBe('shared-state')
+  })
+
+  it('keeps a target that imports CSS inlined so the entry still owns the sheet', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/heavy.css'), '.heavy { color: red }\n')
+    await writeFile(resolve(root, 'src/heavy.ts'), "import './heavy.css'\nexport const heavy = 'styled'\n")
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry)
+    const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
+    expect(report.output.filter(item => item.fileName.startsWith('client.heavy.'))).toEqual([])
+    expect(await readFile(resolve(root, 'dist/client.js'), 'utf8')).toContain('color')
+  })
+
+  it('refuses a plugin module duplicated across two lazy chunks', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/state.ts'), 'export const registry = new Map<string, string>()\n')
+    await writeFile(resolve(root, 'src/first.ts'), "import { registry } from './state'\nexport const first = registry.size\n")
+    await writeFile(resolve(root, 'src/second.ts'), "import { registry } from './state'\nexport const second = registry.size\n")
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      lazyEntry.replace("import('./heavy').then(module => module.heavy)", "Promise.all([import('./first'), import('./second')])"),
+    )
+    await expect(buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })).rejects.toMatchObject({ code: 'DSHX1105' })
+  })
+})

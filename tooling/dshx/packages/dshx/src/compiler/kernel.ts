@@ -155,6 +155,8 @@ const dependencyManifestPlugin = (options: {
   readonly root: string
   readonly outDir: string
   readonly entryFile: string
+  /** Modules the entry loads from its lazy chunks, which a change to them also rebuilds. */
+  readonly extraModules?: () => readonly string[]
 }): Plugin => {
   let modules: readonly string[] = []
   return {
@@ -162,7 +164,7 @@ const dependencyManifestPlugin = (options: {
     enforce: 'post',
     generateBundle(_bundleOptions, bundle) {
       const chunk = Object.values(bundle).find(item => item.type === 'chunk' && item.isEntry)
-      modules = chunk === undefined || chunk.type !== 'chunk' ? [] : Object.keys(chunk.modules)
+      modules = [...(chunk === undefined || chunk.type !== 'chunk' ? [] : Object.keys(chunk.modules)), ...(options.extraModules?.() ?? [])]
     },
     async writeBundle() {
       const sources = [...new Set(modules.flatMap(id => (id.startsWith('\0') || !isAbsolute(id) ? [] : [relative(options.root, id)])))].sort()
