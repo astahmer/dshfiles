@@ -5,15 +5,16 @@
     {
       "id": "phone-sign-in-qr",
       "title": "Print a phone sign-in QR for a trusted HTTPS origin",
-      "summary": "At startup the Host prints one scannable QR per configured HTTPS origin, carrying the process launch token so a phone can exchange it for a persistent browser cookie.",
+      "summary": "At startup the Host prints one scannable QR per configured HTTPS origin and runs a loopback rewrite proxy so a TLS-terminating tunnel (Tailscale Serve or Funnel) can forward the public authority to the loopback DSH listener without a trustedHosts setting.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: startup terminal output",
       "configuration": [],
-      "states": ["printed", "origin-rejected"],
+      "states": ["proxy-listening", "qr-printed", "origin-rejected"],
       "failureModes": [
         "A non-HTTPS, credentialed, or non-absolute origin is ignored instead of printed.",
+        "A busy proxy port is reported on the terminal and leaves the rest of DSH running.",
         "Nothing is printed when the loader or Connection service is unavailable."
       ],
       "externalDependencies": [],
@@ -25,6 +26,18 @@
           "testName": "renders a scannable square matrix"
         },
         {
+          "kind": "unit-test",
+          "id": "phone-access.rewrite-authority",
+          "file": "plugins/@dshfiles/phone-access/tests/rewrite-proxy.test.ts",
+          "testName": "rewrites Host and Origin to the loopback authority"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-access.listen-span",
+          "file": "plugins/@dshfiles/phone-access/tests/rewrite-proxy.test.ts",
+          "testName": "records one bounded listen span without addresses"
+        },
+        {
           "kind": "not-applicable",
           "id": "phone-access.no-browser-surface",
           "reason": "The Host prints to the terminal and renders no UI; the scratch Host boot check verifies the bundle loads and prints."
@@ -32,8 +45,10 @@
       ],
       "telemetry": [
         {
-          "kind": "not-applicable",
-          "reason": "Printing to the already-open terminal is not a work unit; the plugin opens no network connection and spawns nothing."
+          "kind": "custom",
+          "span": "phone access proxy listen",
+          "file": "plugins/@dshfiles/phone-access/tests/rewrite-proxy.test.ts",
+          "testName": "records one bounded listen span without addresses"
         }
       ]
     }

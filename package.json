@@ -44,7 +44,8 @@
     "test:scripts": "node --test scripts/*.test.mjs scripts/dsh-lkg/*.test.mjs",
     "screenshots": "node scripts/plugin-screenshots.mjs",
     "check:screenshots": "node scripts/plugin-screenshots.mjs --check",
-    "check:shared-runtime": "node plugins/scripts/check-shared-runtime.mjs"
+    "check:shared-runtime": "node plugins/scripts/check-shared-runtime.mjs",
+    "dsh:phone": "node --experimental-strip-types scripts/dsh-phone.ts"
   },
   "devDependencies": {
     "@ast-grep/cli": "0.45.3",
