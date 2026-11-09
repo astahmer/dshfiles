@@ -103,6 +103,8 @@ export const revisionReviewSchema = Schema.Struct({
   links: Schema.optional(Schema.Array(revisionGraphLinkSchema).check(Schema.isMaxLength(MAX_REVIEW_REVISIONS))),
   /** Its parents outside the review, when no selected revision sits between. */
   base: Schema.optional(Schema.Array(revisionGraphBaseSchema).check(Schema.isMaxLength(8))),
+  /** Parents outside the selection the Host could not place (graph read too large): a gap or a base, drawn as an open edge. */
+  unplaced: Schema.optional(Schema.Array(commitIdSchema).check(Schema.isMaxLength(8))),
 })
 export type RevisionReview = typeof revisionReviewSchema.Type
 

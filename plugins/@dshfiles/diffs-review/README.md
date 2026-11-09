@@ -79,8 +79,10 @@ layout and row cell jj-integration shares as its `revision-graph` module. Ideas 
 - **Gaps on the graph.** A revision builds on the nearest selected revision below it; when others
   sit between, the edge is dashed and the row under it reads “N revisions not in this review”. The
   Host counts them with one bounded `jj log -r 'connected(S) | parents(roots(connected(S)))'`
-  (400 revisions); past that bound edges link direct parents only and the review says the gaps were
-  not counted.
+  (400 revisions). Past that bound only direct selected parents link; any other parent could be a
+  gap or a base, so its edge ends in an open stub with “Earlier history not counted”, and the review
+  says to select fewer or closer revisions. A merge inside a gap brings in history from another
+  branch; that parent is not named as a base.
 - **The base.** The graph ends on what the selection sits on, named by its bookmark (`main`) when it
   has one, muted because it is not part of the review.
 - **State at a glance.** The node glyph marks the working copy, conflicts and divergence; chips
@@ -89,6 +91,20 @@ layout and row cell jj-integration shares as its `revision-graph` module. Ideas 
 - **Keys.** With the graph focused, `j`/`k` (or the arrow keys) move to the older or newer revision.
 
 A Host from before the graph sends no links, and the rows then stand unconnected.
+
+Left out on purpose, for now:
+
+- lightjj's **gap-fill** marks the revisions between selected ones as implied and diffs the
+  connected range as one change. Here a gap stays outside the review, because a combined review
+  keeps each revision's own diff; selecting the missing revisions in the graph includes them.
+- lightjj's **`[`/`]` hunk keys** and **space to check**: the diff view (`PatchView`) has no hunk
+  cursor yet, and the viewed checkbox and **Mark viewed** button already toggle a file.
+- [codiff](https://github.com/nkzw-tech/codiff), a local git diff viewer, was also studied. Its
+  LLM walkthrough is what **Summarize** and turn-summary's walkthrough do here; its viewed toggle
+  and inline comments exist (comments queue as composer chips). Not taken yet: copying review
+  comments as Markdown, a file filter, and Mod-click definition navigation.
+- [stars.astahmer.dev](https://stars.astahmer.dev) is a personal starred-repository list that
+  renders only in a browser; it pointed at these tools and adds no design of its own.
 
 ![Review several selected revisions together](docs/screenshots/combined-revisions.png)
 

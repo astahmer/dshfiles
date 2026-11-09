@@ -11,6 +11,8 @@ export type ReviewGraphEntry =
       readonly layout: RevisionGraphRow
       /** Revisions left out below this one, summed over its links; the row after it says so. */
       readonly hiddenBelow: number
+      /** Parents the Host could not place (its graph read was too large): an open edge and a row saying so. */
+      readonly uncountedBelow: boolean
     }
   | {
       readonly kind: 'base'
@@ -54,6 +56,7 @@ const entries = (revisions: readonly RevisionReview[]): readonly ReviewGraphEntr
   const reviewed = new Map<string, RevisionReview>()
   const bases = new Map<string, RevisionGraphBase>()
   const hiddenBelow = new Map<string, number>()
+  const uncountedBelow = new Set<string>()
   for (const revision of [...revisions].reverse()) {
     const parents: string[] = []
     let hidden = 0
@@ -71,6 +74,9 @@ const entries = (revisions: readonly RevisionReview[]): readonly ReviewGraphEntr
       parents.push(base.commitId)
       if (!bases.has(base.commitId)) bases.set(base.commitId, base)
     }
+    // An unplaced parent stays out of `byId`, so the layout ends its edge in a short open stub, not on a base row.
+    for (const commitId of revision.unplaced ?? []) parents.push(commitId)
+    if ((revision.unplaced ?? []).length > 0) uncountedBelow.add(revision.commitId)
     const node = nodeOf({
       commitId: revision.commitId,
       parents,
@@ -97,7 +103,11 @@ const entries = (revisions: readonly RevisionReview[]): readonly ReviewGraphEntr
     const node = nodes.get(layout.commitId)
     if (node === undefined) return []
     const revision = reviewed.get(layout.commitId)
-    if (revision !== undefined) return [{ kind: 'revision', revision, node, layout, hiddenBelow: hiddenBelow.get(layout.commitId) ?? 0 }]
+    if (revision !== undefined) {
+      return [
+        { kind: 'revision', revision, node, layout, hiddenBelow: hiddenBelow.get(layout.commitId) ?? 0, uncountedBelow: uncountedBelow.has(layout.commitId) },
+      ]
+    }
     const base = bases.get(layout.commitId)
     return base === undefined ? [] : [{ kind: 'base', base, node, layout }]
   })

@@ -23,7 +23,8 @@ const MAX_BOOKMARKS = 8
 /** A merge can sit on many parents; the graph names the first ones. */
 const MAX_BASE = 8
 
-const flag = (name: string, keyword: string): string => `',"${name}":' ++ if(self.${keyword}(), "true", "false") ++ `
+/** One boolean field of the JSON line, read from a jj template keyword. */
+const jsonFlagField = (name: string, keyword: string): string => `',"${name}":' ++ if(self.${keyword}(), "true", "false") ++ `
 const BOOKMARKS_FIELD = '\',"bookmarks":[\' ++ self.local_bookmarks().map(|b| b.name().escape_json()).join(",") ++ \']\' ++ '
 
 /** One JSON line per revision, so a description holding a tab or a quote stays one field. */
@@ -33,11 +34,11 @@ const REVISION_TEMPLATE =
   '\',"shortChangeId":\' ++ self.change_id().shortest().prefix().escape_json() ++ ' +
   '\',"description":\' ++ self.description().first_line().escape_json() ++ ' +
   BOOKMARKS_FIELD +
-  flag('immutable', 'immutable') +
-  flag('conflict', 'conflict') +
-  flag('divergent', 'divergent') +
-  flag('empty', 'empty') +
-  flag('workingCopy', 'current_working_copy') +
+  jsonFlagField('immutable', 'immutable') +
+  jsonFlagField('conflict', 'conflict') +
+  jsonFlagField('divergent', 'divergent') +
+  jsonFlagField('empty', 'empty') +
+  jsonFlagField('workingCopy', 'current_working_copy') +
   '\',"parents":[\' ++ self.parents().map(|c| c.commit_id().short(64).escape_json()).join(",") ++ \']}\' ++ "\\n"'
 
 const COMMIT_ID_TEMPLATE = 'commit_id ++ "\\n"'
@@ -69,10 +70,10 @@ const decodeResolved = (requested: string, stdout: string): ResolvedRevision | u
   const lines = stdout.split('\n').filter(line => line.length > 0)
   if (lines.length !== 1) return undefined
   const line = decodeRevisionLine(lines[0] ?? '')
-  return Option.isSome(line) ? clipped(requested, line.value) : undefined
+  return Option.isSome(line) ? withinLimits(requested, line.value) : undefined
 }
 
-const clipped = (requested: string, line: typeof revisionLineSchema.Type): ResolvedRevision => ({
+const withinLimits = (requested: string, line: typeof revisionLineSchema.Type): ResolvedRevision => ({
   requested,
   ...line,
   description: line.description.slice(0, MAX_DESCRIPTION_CHARS),
@@ -137,7 +138,7 @@ const decodeSelection = (requested: readonly string[], stdout: string): readonly
     const match = matching[0]
     if (match === undefined || matching.length > 1) return undefined
     matchedBy.set(match, (matchedBy.get(match) ?? 0) + 1)
-    const revision = clipped(match, decoded.value)
+    const revision = withinLimits(match, decoded.value)
     if (!found.has(revision.commitId)) found.set(revision.commitId, revision)
   }
   const everyRequestedFound = requested.every(id => matchedBy.get(id) === 1)
@@ -214,6 +215,8 @@ const decodeGraph = (stdout: string): readonly GraphNode[] | undefined => {
 export interface RevisionPlacement {
   readonly links: readonly RevisionGraphLink[]
   readonly base: readonly RevisionGraphBase[]
+  /** Parents outside the selection the review could not place, because the graph read was too large: a gap or a base. */
+  readonly unplaced: readonly string[]
 }
 
 const baseOf = (commitId: string, nodes: ReadonlyMap<string, GraphNode>): RevisionGraphBase => {
@@ -224,8 +227,11 @@ const baseOf = (commitId: string, nodes: ReadonlyMap<string, GraphNode>): Revisi
 /**
  * Each selected revision's links to the selected revisions it builds on, with how many revisions between them are not
  * in the review, and the parents it sits on outside the review. A walk stops at the first selected revision on each
- * path, so a stack links each revision to the one below it. Without a graph read (`nodes` undefined) only direct
- * parents link and gaps stay uncounted: the selection's own parents are all the review then knows.
+ * path, so a stack links each revision to the one below it. A merge inside a gap brings in history from elsewhere; that
+ * second parent is neither a selected revision nor what the selection sits on, so it is not named as a base.
+ *
+ * Without a graph read (`nodes` undefined) only direct selected parents link. Any other parent could be a gap or a
+ * base, so it is `unplaced`, and the graph draws an open edge rather than claim the run sits on it.
  */
 const placements = (
   selected: readonly Pick<ResolvedRevision, 'commitId' | 'parents'>[],
@@ -239,7 +245,18 @@ const placements = (
     if (chosen.has(node.commitId) || node.parents.some(parent => between.has(parent))) between.add(node.commitId)
   }
   const result = new Map<string, RevisionPlacement>()
+  if (nodes === undefined) {
+    for (const revision of selected) {
+      result.set(revision.commitId, {
+        links: revision.parents.filter(parent => chosen.has(parent)).map(commitId => ({ commitId, hidden: 0 })),
+        base: [],
+        unplaced: revision.parents.filter(parent => !chosen.has(parent)).slice(0, MAX_BASE),
+      })
+    }
+    return result
+  }
   for (const revision of selected) {
+    // Breadth first with `seen`, so each selected revision is first reached along its shortest path.
     const links = new Map<string, number>()
     const base: RevisionGraphBase[] = []
     const seen = new Set<string>()
@@ -250,11 +267,11 @@ const placements = (
         if (seen.has(step.commitId)) continue
         seen.add(step.commitId)
         if (chosen.has(step.commitId)) {
-          links.set(step.commitId, Math.min(links.get(step.commitId) ?? step.hidden, step.hidden))
+          links.set(step.commitId, step.hidden)
           continue
         }
         const node = byId.get(step.commitId)
-        if (nodes !== undefined && between.has(step.commitId) && node !== undefined) {
+        if (between.has(step.commitId) && node !== undefined) {
           for (const parent of node.parents) next.push({ commitId: parent, hidden: step.hidden + 1 })
           continue
         }
@@ -262,7 +279,11 @@ const placements = (
       }
       frontier = next
     }
-    result.set(revision.commitId, { links: [...links].map(([commitId, hidden]) => ({ commitId, hidden })), base: base.slice(0, MAX_BASE) })
+    result.set(revision.commitId, {
+      links: [...links].map(([commitId, hidden]) => ({ commitId, hidden })),
+      base: base.slice(0, MAX_BASE),
+      unplaced: [],
+    })
   }
   return result
 }
