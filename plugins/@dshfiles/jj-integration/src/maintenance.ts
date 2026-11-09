@@ -143,7 +143,7 @@ export const MaintenanceLive = Layer.effectDiscard(
         )
       if (scripts === null) return { status: 'no-script' } as const
       const executable = yield* executables.resolve(scripts.cleanup)
-      const command = `${executable} ${workspacePath}`
+      const command = MaintenanceFailures.commandLine([executable, workspacePath])
       const exitCode = yield* spawner
         .spawn(
           ChildProcess.make(executable, [workspacePath], {

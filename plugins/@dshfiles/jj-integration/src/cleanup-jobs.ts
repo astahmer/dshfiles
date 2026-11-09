@@ -65,9 +65,17 @@ export interface CleanupJobView {
 
 export const MAX_CLEANUP_JOBS = 12
 
-const MAX_RECOVERY_LENGTH = 600
+/** The API's limit on a cleanup row message, a job's current item and its error (`api.ts` checks these). */
+export const MAX_CLEANUP_MESSAGE_LENGTH = 400
+/** The API's limit on a job's recovery. */
+export const MAX_CLEANUP_RECOVERY_LENGTH = 600
+/** Activity events clamp their detail; reports keep the reasons first so the recovery still fits. */
+export const MAX_CLEANUP_ACTIVITY_DETAIL = 2000
 
-/** The project a recovery names: the last path segment, without a Node path module so the Client can share it. */
+/** Why a removal usually fails, for every recovery that asks the user to fix it first. */
+const BLOCKED_REMOVAL_HINT = 'often a permission, or a process still holding one of its files'
+
+/** The project a recovery names: the last path segment, read with either separator so a Windows root works too. */
 const projectName = (repoRoot: string | null): string | null => {
   if (repoRoot === null) return null
   const name = repoRoot
@@ -77,9 +85,16 @@ const projectName = (repoRoot: string | null): string | null => {
   return name === undefined || name.length === 0 ? repoRoot : name
 }
 
-const where = (repoRoot: string | null): string => {
+/** `the <project> Jujutsu panel`, where a recovery sends the user. */
+const panelOf = (repoRoot: string | null): string => {
   const name = projectName(repoRoot)
   return name === null ? 'the project’s Jujutsu panel' : `the ${name} Jujutsu panel`
+}
+
+/** ` in <project>` for an activity summary, empty when no project is known. */
+const inProject = (repoRoot: string | null): string => {
+  const name = projectName(repoRoot)
+  return name === null ? '' : ` in ${name}`
 }
 
 type FailedRow = { readonly repoRoot: string; readonly name: string; readonly path: string; readonly message?: string | undefined }
@@ -121,7 +136,11 @@ export class CleanupJobModel {
 
   static readonly failedRows = failedRows
 
-  static readonly projectName = projectName
+  static readonly panelOf = panelOf
+
+  static readonly inProject = inProject
+
+  static readonly blockedRemovalHint = BLOCKED_REMOVAL_HINT
 
   /**
    * The safe next step after a failure. Cleanup never forces unlanded work, so every recovery is the same guarded
@@ -132,16 +151,16 @@ export class CleanupJobModel {
     readonly error?: string | null | undefined
     readonly result?: CleanupResult | null | undefined
   }): string | null => {
-    const rerun = `run Clean up thread workspaces… again from ${where(input.repoRoot)}: its preview rechecks every workspace and never forces unlanded work.`
+    const rerun = `run Clean up thread workspaces… again from ${panelOf(input.repoRoot)}: its preview rechecks every workspace and never forces unlanded work.`
     if (input.error !== undefined && input.error !== null)
-      return `Nothing unlanded was removed. Fix what the error names, then ${rerun}`.slice(0, MAX_RECOVERY_LENGTH)
+      return `Nothing unlanded was removed. Fix what the error names, then ${rerun}`.slice(0, MAX_CLEANUP_RECOVERY_LENGTH)
     const rows = input.result === undefined || input.result === null ? [] : failedRows(input.result)
     const first = rows[0]
     if (first === undefined) return null
     const others = rows.length === 1 ? '' : ` and ${String(rows.length - 1)} more`
-    return `${first.name}${others} stayed in place. Fix what blocked the removal (often a permission, or a process still holding one of its files), then ${rerun} A folder whose workspace was already forgotten is offered under Untracked folders.`.slice(
+    return `${first.name}${others} stayed in place. Fix what blocked the removal (${BLOCKED_REMOVAL_HINT}), then ${rerun} A folder whose workspace was already forgotten is offered under Untracked folders.`.slice(
       0,
-      MAX_RECOVERY_LENGTH,
+      MAX_CLEANUP_RECOVERY_LENGTH,
     )
   }
 
@@ -266,7 +285,7 @@ export const createCleanupJobTrail = (options: { readonly now?: () => number; re
     },
     failed(id: string, message: string): CleanupJobView {
       const job = jobs.get(id)
-      const error = message.slice(0, 400)
+      const error = message.slice(0, MAX_CLEANUP_MESSAGE_LENGTH)
       return patch(id, {
         state: 'failed',
         phase: 'failed',

@@ -1,8 +1,6 @@
 import type { Path } from 'effect'
-import { CleanupJobModel, type CleanupJobView } from './cleanup-jobs.js'
+import { CleanupJobModel, MAX_CLEANUP_ACTIVITY_DETAIL, type CleanupJobView } from './cleanup-jobs.js'
 
-/** Activity events clamp their detail; keep the reasons first so the recovery still fits. */
-const MAX_DETAIL = 2000
 const MAX_LISTED_FAILURES = 5
 
 export interface CleanupFailureReport {
@@ -65,11 +63,6 @@ const ownerOfTargets = (targets: readonly { readonly repoRoot: string }[]): stri
 
 const plural = (count: number, noun: string): string => `${String(count)} ${noun}${count === 1 ? '' : 's'}`
 
-const inProject = (repoRoot: string | null): string => {
-  const name = CleanupJobModel.projectName(repoRoot)
-  return name === null ? '' : ` in ${name}`
-}
-
 /**
  * What a settled job reports to the activity timeline: one event when the whole job failed, else one per repository
  * whose workspaces or folders could not be removed. Each names its project and ends with the safe recovery.
@@ -82,8 +75,8 @@ const failures = (job: CleanupJobView): readonly CleanupFailureReport[] => {
     return [
       {
         repoRoot: job.repoRoot,
-        summary: `${automatic ? 'Automatic thread-workspace cleanup' : 'Thread-workspace cleanup'} failed${inProject(job.repoRoot)}`,
-        detail: `${error} ${recovery ?? ''}`.trim().slice(0, MAX_DETAIL),
+        summary: `${automatic ? 'Automatic thread-workspace cleanup' : 'Thread-workspace cleanup'} failed${CleanupJobModel.inProject(job.repoRoot)}`,
+        detail: `${error} ${recovery ?? ''}`.trim().slice(0, MAX_CLEANUP_ACTIVITY_DETAIL),
       },
     ]
   }
@@ -102,8 +95,8 @@ const failures = (job: CleanupJobView): readonly CleanupFailureReport[] => {
     const recovery = CleanupJobModel.recovery({ repoRoot, result: own })
     return {
       repoRoot,
-      summary: `${automatic ? 'Automatic cleanup could' : 'Cleanup could'} not remove ${plural(rows.length, 'workspace')}${inProject(repoRoot)}`,
-      detail: [...listed, ...more, recovery ?? ''].join('\n').trim().slice(0, MAX_DETAIL),
+      summary: `${automatic ? 'Automatic cleanup could' : 'Cleanup could'} not remove ${plural(rows.length, 'workspace')}${CleanupJobModel.inProject(repoRoot)}`,
+      detail: [...listed, ...more, recovery ?? ''].join('\n').trim().slice(0, MAX_CLEANUP_ACTIVITY_DETAIL),
     }
   })
 }

@@ -1,5 +1,5 @@
 import { Effect, Ref } from 'effect'
-import { CleanupJobModel } from './cleanup-jobs.js'
+import { CleanupJobModel, MAX_CLEANUP_ACTIVITY_DETAIL } from './cleanup-jobs.js'
 import { ActivityLog } from './host-edges-promise.js'
 
 /**
@@ -19,40 +19,41 @@ export interface MaintenanceFailure {
   readonly command?: string | undefined
 }
 
-const MAX_DETAIL = 2000
-
 const keyOf = (kind: MaintenanceFailureKind, path: string): string => `${kind}\u0000${path}`
 
-const inProject = (repoRoot: string): string => {
-  const name = CleanupJobModel.projectName(repoRoot)
-  return name === null ? '' : ` in ${name}`
+/** Words a POSIX shell reads as-is; any other goes in single quotes, where a single quote closes, escapes and reopens. */
+const POSIX_PLAIN_WORD = /^[\w@%+=:,./-]+$/u
+
+const quoteArgument = (word: string, platform: NodeJS.Platform): string => {
+  // Windows paths cannot hold a double quote, so wrapping one in double quotes is enough for cmd and PowerShell.
+  if (platform === 'win32') return /[\s&()^%!;,]/u.test(word) ? `"${word}"` : word
+  return POSIX_PLAIN_WORD.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`
 }
 
-const panel = (repoRoot: string): string => {
-  const name = CleanupJobModel.projectName(repoRoot)
-  return name === null ? 'the project\u2019s Jujutsu panel' : `the ${name} Jujutsu panel`
-}
+/** The exact command a recovery prints: each word quoted for the Host's shell, so a path with a space still runs. */
+const commandLine = (words: readonly string[], platform: NodeJS.Platform = process.platform): string =>
+  words.map(word => quoteArgument(word, platform)).join(' ')
 
 /** What one failure says in the activity timeline: what stayed, why, and the safe next step. */
 const report = (failure: MaintenanceFailure) => {
   if (failure.kind === 'finished-thread')
     return {
-      summary: `Could not remove finished thread workspace ${failure.name}${inProject(failure.repoRoot)}`,
+      summary: `Could not remove finished thread workspace ${failure.name}${CleanupJobModel.inProject(failure.repoRoot)}`,
       detail: [
         failure.reason,
-        `Its folder and work are kept: removal never forces unlanded work. Fix what blocked it (often a permission, or a process still holding one of its files), then remove it from its row in ${panel(failure.repoRoot)} or run Clean up thread workspaces\u2026 there. The sweep also retries every 10 minutes.`,
+        `Its folder and work are kept: removal never forces unlanded work. Fix what blocked it (${CleanupJobModel.blockedRemovalHint}), then remove it from its row in ${CleanupJobModel.panelOf(failure.repoRoot)} or run Clean up thread workspaces\u2026 there. The sweep also retries every 10 minutes.`,
       ]
         .join('\n')
-        .slice(0, MAX_DETAIL),
+        .slice(0, MAX_CLEANUP_ACTIVITY_DETAIL),
     }
   return {
-    summary: `Could not clear the dependencies of archived thread ${failure.name}${inProject(failure.repoRoot)}`,
+    summary: `Could not clear the dependencies of archived thread ${failure.name}${CleanupJobModel.inProject(failure.repoRoot)}`,
     detail: [
       failure.reason,
       `The thread's folder and unlanded work are kept; only its node_modules stayed in ${failure.path}. Once nothing holds a file there, ${failure.command === undefined ? 'delete that node_modules folder' : `run ${failure.command}`}; setup reinstalls it if the thread is reopened. The sweep also retries every 10 minutes.`,
     ]
       .join('\n')
-      .slice(0, MAX_DETAIL),
+      .slice(0, MAX_CLEANUP_ACTIVITY_DETAIL),
   }
 }
 
@@ -92,4 +93,5 @@ const make = Effect.gen(function* () {
 export class MaintenanceFailures {
   static readonly make = make
   static readonly report = report
+  static readonly commandLine = commandLine
 }

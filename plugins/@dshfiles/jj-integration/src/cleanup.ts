@@ -3,7 +3,7 @@ import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Clock, Context, Effect, FileSystem, Layer, Option, Path } from 'effect'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { CleanupKindView, CleanupResult, CleanupTarget } from './api.js'
-import { CleanupJobModel, type CleanupJobRequest, type CleanupJobView, type CleanupTrigger } from './cleanup-jobs.js'
+import { CleanupJobModel, MAX_CLEANUP_MESSAGE_LENGTH, type CleanupJobRequest, type CleanupJobView, type CleanupTrigger } from './cleanup-jobs.js'
 import { CleanupOwnership } from './cleanup-ownership.js'
 import { CleanupRunner, type CleanupReporter } from './cleanup-runner.js'
 import { filterCleanupTargets } from './cleanup-targets.js'
@@ -20,8 +20,6 @@ import { WorkspaceSync } from './workspace-sync.js'
 
 const HOUR_MS = 60 * 60_000
 const BOOKMARK_READ_CONCURRENCY = 4
-/** `cleanupWorkspaceSchema.message` in api.ts. */
-const MAX_ROW_MESSAGE = 400
 
 type PlannedWorkspace = Omit<CleanupResult['workspaces'][number], 'outcome' | 'message'>
 type PlannedUntracked = Omit<CleanupResult['untracked'][number], 'outcome' | 'message'>
@@ -356,12 +354,16 @@ const make = Effect.gen(function* () {
           continue
         }
         if (result?.status === 'has-work') {
-          workspaces.push({ ...workspace, outcome: 'has-work', ...(result.error !== null && { message: result.error.slice(0, MAX_ROW_MESSAGE) }) })
+          workspaces.push({ ...workspace, outcome: 'has-work', ...(result.error !== null && { message: result.error.slice(0, MAX_CLEANUP_MESSAGE_LENGTH) }) })
           yield* report.settleItem('kept')
           continue
         }
         // The API caps a row message; a longer one (a deep thread path) would fail every read of the job.
-        workspaces.push({ ...workspace, outcome: 'failed', message: (result?.error ?? 'Workspace cleanup returned no result.').slice(0, MAX_ROW_MESSAGE) })
+        workspaces.push({
+          ...workspace,
+          outcome: 'failed',
+          message: (result?.error ?? 'Workspace cleanup returned no result.').slice(0, MAX_CLEANUP_MESSAGE_LENGTH),
+        })
         yield* report.settleItem('failed')
       }
     }
@@ -372,7 +374,7 @@ const make = Effect.gen(function* () {
       untracked.push(
         removed._tag === 'Success'
           ? { ...entry, outcome: 'removed' }
-          : { ...entry, outcome: 'failed', message: removed.failure.message.slice(0, MAX_ROW_MESSAGE) },
+          : { ...entry, outcome: 'failed', message: removed.failure.message.slice(0, MAX_CLEANUP_MESSAGE_LENGTH) },
       )
       yield* report.settleItem(removed._tag === 'Success' ? 'removed' : 'failed')
     }

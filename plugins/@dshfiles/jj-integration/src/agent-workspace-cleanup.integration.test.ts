@@ -8,8 +8,11 @@ import { JjIntegrationTestHost, type JjIntegrationTestHarness } from './host-tes
 
 const jj = JjIntegrationTestHost.jj
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
-/** Root ignores directory permissions, so a read-only folder cannot make a removal fail there. */
-const permissionsEnforced = process.getuid?.() !== 0
+/**
+ * Root ignores directory permissions, and Windows does not let a read-only mode block deletion, so on either a read-only
+ * folder cannot make a removal fail.
+ */
+const permissionsEnforced = process.platform !== 'win32' && process.getuid?.() !== 0
 
 const isolatedWorkspace = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ name: Schema.String, path: Schema.String })))
 

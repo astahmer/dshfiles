@@ -39,7 +39,7 @@ import {
   workspaceSyncOutputSchema,
   workspaceSyncSchema,
 } from './api-effect-schemas.js'
-import { CleanupJobModel } from './cleanup-jobs.js'
+import { CleanupJobModel, MAX_CLEANUP_MESSAGE_LENGTH, MAX_CLEANUP_RECOVERY_LENGTH } from './cleanup-jobs.js'
 import { strictStandardSchema } from './schema.js'
 
 /**
@@ -103,7 +103,7 @@ const cleanupWorkspaceSchema = Schema.Struct({
   /** Other bookmarks that each hold all of this workspace's work: why a workspace with revisions is removable. */
   integratedInto: Schema.optional(Schema.Array(Schema.String)),
   outcome: Schema.Literals(['would-remove', 'removed', 'has-work', 'failed']),
-  message: Schema.optional(Schema.String.check(Schema.isMaxLength(400))),
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_MESSAGE_LENGTH))),
 })
 
 const cleanupSkippedSchema = Schema.Struct({
@@ -120,7 +120,7 @@ const cleanupUntrackedSchema = Schema.Struct({
   path: Schema.String,
   modifiedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   outcome: Schema.Literals(['would-remove', 'removed', 'failed']),
-  message: Schema.optional(Schema.String.check(Schema.isMaxLength(400))),
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_MESSAGE_LENGTH))),
 })
 
 const cleanupResultSchema = Schema.Struct({
@@ -163,13 +163,13 @@ const cleanupJobSchema = Schema.Struct({
     removed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
     kept: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
     failed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
-    current: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
+    current: Schema.NullOr(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_MESSAGE_LENGTH))),
   }),
-  error: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
+  error: Schema.NullOr(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_MESSAGE_LENGTH))),
   /** Only the newest job of each repository carries its rows, so a poll of the whole trail stays small. */
   result: Schema.NullOr(cleanupResultSchema),
   /** The safe next step after a failed job or a workspace it could not remove; never a forced removal. */
-  recovery: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(600)))),
+  recovery: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_RECOVERY_LENGTH)))),
 })
 export type CleanupJobView = typeof cleanupJobSchema.Type
 

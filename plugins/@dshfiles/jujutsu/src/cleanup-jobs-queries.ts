@@ -12,12 +12,8 @@ const CLEANUP_POLL_MS = 1_000
 /** A removal started from another window or an agent tool still shows up, without a one-second poll while idle. */
 const CLEANUP_IDLE_POLL_MS = 15_000
 
-export interface CleanupJobsClient {
-  readonly cleanupJobs: (
-    input: { readonly path?: string },
-    options: { readonly signal: AbortSignal },
-  ) => Promise<{ readonly repoRoot?: string | null | undefined; readonly jobs: readonly CleanupJobView[] }>
-}
+/** The one verb the trail reads, typed from jj-integration's contract so a fake client cannot drift from it. */
+export type CleanupJobsClient = Pick<JjIntegrationClient, 'cleanupJobs'>
 
 /**
  * Reads one project's trail when `path` is given (the Host traces a thread workspace to its project), the whole trail

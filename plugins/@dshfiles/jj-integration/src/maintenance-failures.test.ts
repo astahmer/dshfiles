@@ -77,4 +77,16 @@ describe('MaintenanceFailures', () => {
     expect(detail).toContain('run /work/.dsh/cleanup.sh /work/sample-threads/thread-bbbbbb')
     expect(MaintenanceFailures.report({ ...finished, kind: 'kept-thread' }).detail).toContain('delete that node_modules folder')
   })
+
+  it('quotes the retry command so a path with a space or a quote still runs as printed', () => {
+    expect(MaintenanceFailures.commandLine(['/work/.dsh/cleanup.sh', '/work/sample-threads/thread-bbbbbb'], 'darwin')).toBe(
+      '/work/.dsh/cleanup.sh /work/sample-threads/thread-bbbbbb',
+    )
+    expect(MaintenanceFailures.commandLine(['/Users/me/My Projects/cleanup.sh', "/work/it's-threads/thread-b"], 'linux')).toBe(
+      `'/Users/me/My Projects/cleanup.sh' '/work/it'\\''s-threads/thread-b'`,
+    )
+    expect(MaintenanceFailures.commandLine(['C:\\Program Files\\dsh\\cleanup.cmd', 'C:\\work\\sample-threads\\thread-b'], 'win32')).toBe(
+      '"C:\\Program Files\\dsh\\cleanup.cmd" C:\\work\\sample-threads\\thread-b',
+    )
+  })
 })
