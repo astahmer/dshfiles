@@ -25,7 +25,7 @@ export type ConversationPhase = 'blank' | 'engaging' | 'active'
  */
 export function conversationPhase(
   session: SessionSnapshot,
-  conversation: ConversationSnapshot,
+  conversation: Pick<ConversationSnapshot, 'activeTargets'>,
 ): ConversationPhase {
   const active = conversation.activeTargets.size > 0
     || (!session.blank && !session.awaitingFirstTurn)

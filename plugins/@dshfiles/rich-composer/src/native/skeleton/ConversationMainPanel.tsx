@@ -10,7 +10,8 @@ import css from './ConversationRoot.module.css'
 export function ConversationMainPanel(props: ConversationSlotProps) {
   const { sessionId, useSession, useSessions, useConversation, renderFactorySlot } = props
   const session = useSession(s => s)
-  const conversation = useConversation(s => s)
+  const activeTargets = useConversation(s => s.activeTargets)
+  const conversation = activeTargets === undefined ? undefined : { activeTargets }
   const shellPhase = session === undefined || conversation === undefined
     ? 'blank'
     : conversationPhase(session, conversation)

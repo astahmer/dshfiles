@@ -23,7 +23,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** Native MainPanel layout policy, without a second Session/editor state owner. */
 class HeroPolicy {
-  static content(session: SessionSnapshot, conversation: ConversationSnapshot, summaryBlank: boolean | undefined): ConversationContentInputProps {
+  static content(
+    session: SessionSnapshot,
+    conversation: Pick<ConversationSnapshot, 'activeTargets'>,
+    summaryBlank: boolean | undefined,
+  ): ConversationContentInputProps {
     // Native ui-conversation's value module is disabled by RichComposer. Use
     // its exact phase facts through public snapshot selectors, not a runtime
     // import of that disabled owner or a second state/projection implementation.
@@ -44,14 +48,16 @@ type ConversationSources = Pick<PropsRuntime<typeof WORKBENCH_CONVERSATION_SLOT>
 /** Register this child once; each occurrence binds the SessionProvider surrounding its own panel. */
 export const WorkbenchThreadConversation = (props: ConversationSources & PropsRenderFactories): ReactNode => {
   const session = props.useSession(snapshot => snapshot)
-  const conversation = props.useConversation(snapshot => snapshot)
+  // Only the active-target set: the whole snapshot changes on every streamed view publication, and re-rendering
+  // here re-renders the header and every Session slot entry under it.
+  const activeTargets = props.useConversation(snapshot => snapshot.activeTargets)
   const summaryBlank = props.useSessions(snapshot => snapshot.byId[session.sessionId]?.blank)
   // Both producer-owned Factories inherit this panel's fixed Session. Native
   // Content keeps its resident editor and per-Session child-view selection.
   return (
     <>
       {props.renderFactorySlot('dshfiles.workbench.conversation-header', { reserveHostCorner: true })}
-      {props.renderFactorySlot('conversation.content', HeroPolicy.content(session, conversation, summaryBlank))}
+      {props.renderFactorySlot('conversation.content', HeroPolicy.content(session, { activeTargets }, summaryBlank))}
     </>
   )
 }
