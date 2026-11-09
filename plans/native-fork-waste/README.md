@@ -40,17 +40,34 @@ Gate: no fix ships until the retainer is named. A guess here costs another day.
 
 ## P1 — store the tool catalog once per Session
 
-`request/header` is the largest event type in a real log: 8.87 MB of a 19 MB Session, ~260 KB per event, almost all of it
-the 455-tool catalog, repeated for every request group.
+Measured on the decompressed log of `session-6b9ec57a` (19.39 MB, zstd 5.43 MB): **34 `request/header` events = 9.30 MB
+= 48 % of the log**; reasons `initial` 1, `resume` 1, `change` 1, **`series` 31**; the `tools` JSON is 9.29 MB of those
+bytes; every one of the 34 catalogs is **byte-identical** (455 tools). About 8.5 MB is pure repetition.
 
-1. Locate the writer in the installed `@deepseek-ai/dsh-*` packages and list every reader (projections, history paging,
-   Requests/Trajectory views, repair/replay, export).
-2. If the readers can resolve "the catalog in force for this request" from a Session-level record, fork the writer and
-   store `{ catalogRef }` instead of the catalog, keeping one catalog event per change.
-3. Test: replay a Session, page its history, export it, and open the Requests view; all must render identical tool lists.
-   Also assert the on-disk log shrinks and an older log still parses.
+Writer: `buildRequest` in the vendored [`agent.ts`](../../plugins/@dshfiles/agent-loop/src/native/agent.ts) (installed
+`lib/index.js:1217-1240`). It emits `initial`/`resume` once, `change` only when `headerEquals` fails, and `series` on
+every request-series start **with the unchanged full header** — that is the repetition.
 
-Risk: history/export readers that assume the payload is inline; solve with a fallback reader in the same fork.
+No reader wants a per-group catalog: `dsh-session` keeps tools per header seq for `headerSeq` lookups and resets on
+`series`; `tool-history` feeds `requestHeader()` and `dsh-llm`'s tool-update projection; the timed ask-user question and
+token-meter recompute from the latest tools. The browser receives the **full** copy (`history.ts:610`; our
+[`browser-event.ts`](../../plugins/@dshfiles/session-controller/src/browser-event.ts) strips only assistant replay),
+where conversation and trajectory diff it with `JSON.stringify` and chat reads only `reason`/`startsSeries`.
+
+Ranked options:
+
+1. **Storage dedupe, no reader change.** Fork `@deepseek-ai/dsh-session-persistence-jsonl` (844 KB, row not yet
+   overridden): write the catalog once per Session plus a per-event reference, rehydrate inline on read. Every reader and
+   the browser stay untouched, the log loses ~8.5 MB of 19.4 MB. Risk: `session-log-download` (profile row 245) and
+   older harnesses must not read the new artifact.
+2. **Browser-boundary strip for `series` only.** Our session-controller fork can drop the repeated catalog from `series`
+   events; needs client fallbacks in the forked chat/conversation plus a new trajectory fork. Cuts traffic and client
+   RAM, log unchanged.
+3. **Format v5 catalog reference.** Writer plus a `dsh-session` fork (408 K, 30 importers, no Loader row, and the
+   ref shape forces `SESSION_FORMAT_VERSION` 5), migrations and trajectory. Biggest win, worst replay/export risk.
+
+Plan: option 1 first, option 2 second, option 3 only if the first two leave a measured gap. Confirming metric: header
+bytes ÷ log bytes (now 48 %, distinct catalog arrays = 1) on a regenerated Session, plus page-open bytes and client heap.
 
 ## P2 — session list attribution
 
