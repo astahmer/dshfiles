@@ -46,7 +46,8 @@
     "src/native/contract/snapshot.ts",
     "src/native/conversation/assembly.ts",
     "src/native/skeleton/ConversationHeader.tsx",
-    "src/native/skeleton/DefaultConversationViews.tsx"
+    "src/native/skeleton/DefaultConversationViews.tsx",
+    "src/native/skeleton/control-row-layout.ts"
   ],
   "added": [
     "src/native/conversation/live-bindings.test.ts",
@@ -61,6 +62,7 @@
     "src/native/input/machine.test.ts",
     "src/native/input/retained-send.test.ts",
     "src/native/input/retained-send.ts",
+    "src/native/skeleton/control-row-layout.test.ts",
     "src/native/skeleton/run-row-placement.ts"
   ]
 }
