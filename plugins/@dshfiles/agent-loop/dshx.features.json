@@ -20,7 +20,7 @@
       ],
       "states": ["streaming", "settled", "interrupted"],
       "failureModes": [
-        "A consumer that reads per-block replay metadata from the durable stream instead of the message source sees only the response-level envelope. The browser already receives neither copy, and provider replay reads the message source.",
+        "A consumer that reads per-block replay metadata from the durable stream instead of the message source sees only the response-level envelope. The browser already receives neither copy, and the provider replay path reads the message source \u2014 asserted by tests/agent-loop.integration.test.ts.",
         "Every other behaviour is the pinned upstream code; drift is checked with scripts/native-fork-diff.mjs."
       ],
       "externalDependencies": [],
@@ -30,6 +30,12 @@
           "id": "agent-loop.settled-stream",
           "file": "plugins/@dshfiles/agent-loop/tests/settled-stream.test.ts",
           "testName": "a settled message stores the response envelope once"
+        },
+        {
+          "kind": "host-test",
+          "id": "agent-loop.integration",
+          "file": "plugins/@dshfiles/agent-loop/tests/agent-loop.integration.test.ts",
+          "testName": "stores the replay envelope once and still replays it to the provider"
         },
         {
           "kind": "not-applicable",

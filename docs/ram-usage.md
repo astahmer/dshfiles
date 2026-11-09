@@ -44,6 +44,11 @@ it. What the fork in `plugins/@dshfiles/agent-loop` removes, measured on `sessio
 | `stream[].chunk.replayState.blocks` (dropped by the fork) | 433 KB  |
 | `data.stream` in total                                    | 2.85 MB |
 
+A scripted integration run through the real loop (`tests/agent-loop.integration.test.ts`, one 600-byte signature)
+compares both sides in one test: upstream stores the block list on the message source **and** the terminal stream
+record (1,981 B of event data), the fork keeps only the source copy (1,353 B) while the replayed assistant message in
+the next model request still carries the block list — 628 B saved per message, and provider replay proven intact.
+
 That is ~9.5 % of that Session's `assistant/message` bytes and ~2.3 % of its whole log. Across the eleven Sessions of one
 live thread the removable duplicate is **1.02 MB of 8.34 MB** of `assistant/message` data — a genuine duplicate
 removed, but **not** the explanation for the multi-GB live heap. The same log shows where the rest of a Session's

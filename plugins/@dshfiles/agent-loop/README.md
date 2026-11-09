@@ -24,6 +24,16 @@ Measured on `session-6b9ec57a` (760 assistant messages, 19 MB of events, 2026-11
 So the fork removes ~9.5 % of that Session's `assistant/message` bytes, and ~2.3 % of its whole event log. It is a
 real duplicate removed, **not** the explanation for a multi-GB live heap.
 
+`tests/agent-loop.integration.test.ts` drives the real loop with a scripted adapter and compares both sides of the
+fork in one run (one 600-byte provider signature):
+
+| Stored `assistant/message` data                     | Upstream | Fork    |
+| --------------------------------------------------- | -------- | ------- |
+| `message.source.replayState.blocks` in the event    | 1        | 1       |
+| `stream[].chunk.replayState.blocks` in the event    | 1        | 0       |
+| Serialized event bytes                              | 1,981 B  | 1,353 B |
+| Blocks on the replayed assistant message, request 2 | 1        | 1       |
+
 ## Delta
 
 | File                             | Change                                                                                                                                                                                       |

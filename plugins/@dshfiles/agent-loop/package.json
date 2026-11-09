@@ -35,7 +35,12 @@
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@deepseek-ai/dsh-agent-loop": "catalog:",
+    "@deepseek-ai/dsh-token-meter": "catalog:",
+    "@deepseek-ai/dsh-session-projection": "catalog:",
+    "@deepseek-ai/dsh-system-prompt": "catalog:",
+    "@deepseek-ai/dsh-tools": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
