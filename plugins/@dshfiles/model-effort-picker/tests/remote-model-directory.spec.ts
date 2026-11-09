@@ -84,4 +84,19 @@ describe('RemoteModelDirectory status', () => {
     expect(fetches).toBe(2)
     expect(remote.store.getSnapshot()).toMatchObject({ status: 'ready', routable: true })
   })
+
+  it('serves pickers that load the same Session at once from one catalog read', async () => {
+    let fetches = 0
+    const pending = deferredCatalog()
+    const { remote } = fixture(() => {
+      fetches += 1
+      return pending.fetchCatalog()
+    })
+    const first = remote.load()
+    const second = remote.load()
+    pending.settle()
+    await Promise.all([first, second])
+    expect(fetches).toBe(1)
+    expect(remote.store.getSnapshot()).toMatchObject({ status: 'ready', routable: true })
+  })
 })

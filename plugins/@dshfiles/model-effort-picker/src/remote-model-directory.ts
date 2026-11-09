@@ -52,6 +52,7 @@ export class RemoteModelDirectory {
   private catalogState: CatalogState = { kind: 'idle' }
   private generation = 0
   private loadedAt = Number.NEGATIVE_INFINITY
+  private loading: Promise<ModelDirectoryState> | undefined
   private readonly unsubscribe: () => void
 
   constructor(
@@ -62,9 +63,17 @@ export class RemoteModelDirectory {
     this.unsubscribe = base.store.subscribe(() => this.syncSelection())
   }
 
-  readonly load = async (): Promise<ModelDirectoryState> => {
+  readonly load = (): Promise<ModelDirectoryState> => {
     // The picker loads on every composer mount, i.e. every thread switch; a recent catalog answers it without a request.
-    if (this.catalogState.kind === 'ready' && performance.now() - this.loadedAt < CATALOG_FRESH_MS) return this.store.getSnapshot()
+    if (this.catalogState.kind === 'ready' && performance.now() - this.loadedAt < CATALOG_FRESH_MS) return Promise.resolve(this.store.getSnapshot())
+    // Every picker showing this Session mounts at once (a kept view beside the visible one); they share one read.
+    this.loading ??= this.readCatalog().finally(() => {
+      this.loading = undefined
+    })
+    return this.loading
+  }
+
+  private async readCatalog(): Promise<ModelDirectoryState> {
     const generation = ++this.generation
     this.setCatalogState({ kind: 'loading' })
     try {

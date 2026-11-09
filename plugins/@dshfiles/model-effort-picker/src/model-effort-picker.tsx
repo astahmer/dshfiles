@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
-import { useApiQuery, useSettings } from '@dshfiles/dshx/client'
+import { useApiQuery, useResource, useSettings } from '@dshfiles/dshx/client'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { aiAccountsFastModeApi } from '@dshfiles/ai-accounts/model-fast-mode-api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -50,7 +50,9 @@ const nameWidthShortfall = (list: HTMLElement): number | undefined => {
 const MOD_KEY = typeof navigator !== 'undefined' && /mac|iphone|ipad/iu.test(navigator.userAgent) ? '⌘' : 'Ctrl'
 
 const FastModeIndicator = ({ sessionId, provider, model, enabledOverride }: FastModeRoute & { readonly enabledOverride: boolean | undefined }) => {
-  const state = useApiQuery(aiAccountsFastModeApi, 'status', { input: { sessionId, provider, model } })
+  // Every picker showing this Session mounts its indicator within the same landing; the page-wide resource reads the
+  // route once for all of them (5 s covers the later mounts, a toggle shows through `enabledOverride` meanwhile).
+  const state = useResource(aiAccountsFastModeApi, 'status', { sessionId, provider, model }, { staleTime: 5_000 })
   if (enabledOverride ?? state.data?.enabled ?? false)
     return <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-warning" data-model-fast-mode-enabled />
   return <SparklesIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
