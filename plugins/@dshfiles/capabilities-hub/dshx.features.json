@@ -6,13 +6,28 @@
       "id": "capabilities-hub",
       "title": "Open the manager for skills, MCP servers or plugins from one page",
       "summary": "Settings › Capabilities hub lists the three kinds of capability an agent or DSH can gain: skills (agent instructions), MCP servers (tools and credentials) and DSH plugins (executable code), each with its own trust label, a read-only count from its owner (the dshx registry's skills, the MCP servers list, the plugin inventory) and a button that opens that owner's page. Skills also link out to skills.sh and offer a copyable install command with telemetry off and a pinned CLI version; DSH never runs it. The hub stores nothing, installs nothing and makes no network call. The capabilities_hub_overview agent tool returns the same routing and guidance.",
-      "reach": ["click tab \"Settings\"", "click button \"Capabilities hub\"", "expect heading \"Capabilities hub\""],
-      "surfaces": ["client", "host", "api", "tool"],
+      "reach": [
+        "click tab \"Settings\"",
+        "click button \"Capabilities hub\"",
+        "expect heading \"Capabilities hub\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "api",
+        "tool"
+      ],
       "surface": "destinationSection",
       "destination": "settings",
       "currentSurface": "rail: Settings › Capabilities hub (already on the rail)",
       "configuration": [],
-      "states": ["counting", "counted", "owner-missing", "manager-missing", "command-copied"],
+      "states": [
+        "counting",
+        "counted",
+        "owner-missing",
+        "manager-missing",
+        "command-copied"
+      ],
       "failureModes": [
         "A manager page that is not loaded keeps its card with a disabled Open button and names the package to add to the profile.",
         "An owner API that is absent shows which plugin the count needs instead of a number.",
@@ -26,8 +41,14 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" }
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ],
       "verification": [
         {
@@ -58,6 +79,58 @@
           "id": "capabilities-hub.agent-tool",
           "file": "plugins/@dshfiles/capabilities-hub/src/host.test.ts",
           "testName": "serves the launchpad over its API and as a read-only agent tool"
+        }
+      ]
+    },
+    {
+      "id": "plugin-market",
+      "title": "Open the plugin market from Settings",
+      "summary": "Settings › Plugin Market frames the catalog section the dshmarket plugin registers, the same section All settings lists, as a stage page beside the managers it fills. With no market plugin loaded the page names the install command and fills in once the section registers; it stores nothing itself and makes no network call.",
+      "reach": [
+        "click tab \"Settings\"",
+        "click button \"Plugin Market\"",
+        "expect heading \"Plugin Market\""
+      ],
+      "surfaces": [
+        "client"
+      ],
+      "surface": "destinationSection",
+      "destination": "settings",
+      "currentSurface": "rail: Settings › Plugin Market",
+      "configuration": [],
+      "states": [
+        "catalog-loaded",
+        "market-missing"
+      ],
+      "failureModes": [
+        "With no plugin registering the market section the page keeps its Settings row and names the install command instead of rendering an empty frame.",
+        "The catalog's own load failures stay inside the section it owns; the page only frames it."
+      ],
+      "externalDependencies": [
+        {
+          "id": "dshmarket",
+          "boundary": "A settings section registered by the installed dshmarket bundle; the page renders that section and never calls the catalog or npm itself.",
+          "deterministicFake": "src/plugin-market-page.test.tsx renders a stub section for the loaded case and the install hint for the missing one."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the page frames a settings section another plugin registers and starts no Host work of its own."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "capabilities-hub.plugin-market",
+          "file": "plugins/@dshfiles/capabilities-hub/src/plugin-market-page.test.tsx",
+          "testName": "frames the catalog section a market plugin registered"
+        },
+        {
+          "kind": "unit-test",
+          "id": "capabilities-hub.plugin-market-missing",
+          "file": "plugins/@dshfiles/capabilities-hub/src/plugin-market-page.test.tsx",
+          "testName": "says how to install the market when no plugin registered it"
         }
       ]
     }
