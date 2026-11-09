@@ -1,0 +1,5 @@
+- id: cordis-client-runner
+  disabled: true
+- insert:
+    - id: dshfiles-cordis-client-runner
+      name: '@dshfiles/cordis-client-runner'
