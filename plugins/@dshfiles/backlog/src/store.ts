@@ -24,6 +24,7 @@ import {
   type BacklogStatus,
 } from './item.js'
 import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item-relations.js'
+import { StartThreadForm } from './start-thread.js'
 import type { LeaseWrite } from './backlog-repo.js'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
@@ -233,7 +234,7 @@ const summarize = (
   freshness: BacklogItems.freshness(item, now, dormantDays),
   createdAt: item.createdAt,
   lastActivityAt: item.lastActivityAt,
-  preview: item.body.slice(0, 280),
+  preview: StartThreadForm.preview(item.body, 280),
   proposal: item.proposal ?? null,
   attention: item.attention ?? 'none',
   acknowledgedAt: item.acknowledgedAt ?? null,

@@ -168,7 +168,7 @@ export class ThreadStart extends Context.Service<
         const { items, missing } = yield* store.getMany(input.ids)
         if (items.length === 0 || missing.length > 0) return yield* new BacklogItemNotFound({ ids: missing.length === 0 ? input.ids : missing })
         const agent: Agent | null = input.agent === undefined ? null : yield* agentForStart(input.agent)
-        const details = items.map(detail => startThreadItemOf({ ...detail.item, preview: detail.item.body.slice(0, PREVIEW_CHARS) }))
+        const details = items.map(detail => startThreadItemOf({ ...detail.item, preview: StartThreadForm.preview(detail.item.body, PREVIEW_CHARS) }))
         const context = yield* BacklogStartContext.prepare({ details: items, readFile: store.readFile })
         const raw = input.message ?? StartThreadForm.message(details)
         const brief = raw === '' ? context.text : `${raw}\n\n${context.text}`
