@@ -381,6 +381,12 @@ const syncOwnedBundles = async (): Promise<void> => {
 
   await withProfileLock(async () => {
     const manifest = normalizedManifest(readJson(profileManifestSchema, manifestPath))
+    // dsh-superagent runs in a stock profile it owns (docs/superagent.md); every owned bundle would change its Sessions.
+    if (selectedNames === null && manifest.dependencies['dsh-superagent'] !== undefined) {
+      throw new Error(
+        `Profile ${values.profile} runs dsh-superagent, which keeps a stock DSH profile. Leave it unsynchronized, or add one bundle deliberately with --bundle @dshfiles/<name>.`,
+      )
+    }
     const dependencies = Object.fromEntries([
       ...Object.entries(manifest.dependencies).filter(([name]) => !replaced(name)),
       ...selectedBundles.map(bundle => [bundle.name, `link:${bundle.directory}`]),

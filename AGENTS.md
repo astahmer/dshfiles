@@ -278,6 +278,10 @@ for it, tell the user the live row needs the same edit — two 0.2.1 breakages
 (`webRuntime` → `webStartup`, the `{{cwd}}` persona suffix) were fixed in the seed
 and stayed broken live.
 
+The adopted `dsh-superagent` runs in its own stock `superagent` profile, never in
+`web` or a seeded profile; install and operate it only through
+`node scripts/superagent.mjs` ([guide](docs/superagent.md)).
+
 Experiment in a disposable `probe` profile, never the active live profile.
 Keep its home, dependencies and port isolated from the running installation:
 
