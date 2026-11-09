@@ -665,6 +665,7 @@ const startAccountsHost = (input: {
   }
 
   let registeredProviders: ReadonlySet<string> = new Set()
+  let announcedRoutes: string | undefined
   const applyRouteSnapshot = (sourceFile: AccountStoreFile): void => {
     runtime.accountLogin?.reconcile(
       AccountLoginHostModel.accountsFromFile({ ...sourceFile, accounts: [...sourceFile.accounts, ...(runtime.accountSetup?.candidates() ?? [])] }),
@@ -688,15 +689,20 @@ const startAccountsHost = (input: {
       settingsPath: [],
     }))
 
+    // Every `ai-accounts/read` lands here, and each replace broadcasts `llm/adapters-updated`, which makes every open page
+    // re-read the model catalog; announce only when the file, setup candidates or discovered models moved.
+    const announced = JSON.stringify([sourceFile, runtime.accountSetup?.candidates() ?? [], enabled.map(([id]) => catalogState.discovered(id) ?? null)])
+    const unchanged = announced === announcedRoutes
+    announcedRoutes = announced
     if (adapterRegistration === undefined) {
       if (providers.length > 0) adapterRegistration = llm.registerAdapter(providers, adapter)
-    } else {
+    } else if (!unchanged) {
       adapterRegistration.replace(providers)
     }
     registeredProviders = new Set(providers)
     if (directoryRegistration === undefined) {
       if (directoryEntries.length > 0) directoryRegistration = llm.registerConfigurableProviders(directoryEntries)
-    } else {
+    } else if (!unchanged) {
       directoryRegistration.replace(directoryEntries)
     }
 
