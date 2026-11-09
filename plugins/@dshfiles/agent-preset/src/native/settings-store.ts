@@ -66,6 +66,29 @@ export function markRosterChanged(): void {
   rosterChangedAt = performance.now()
 }
 
+let connected: Promise<void> | undefined
+let releaseConnected: (() => void) | undefined
+
+/**
+ * Hold roster reads until the page's first connected generation. Roster announcements only arrive from then on, so a
+ * read sent earlier would have to be repeated on that first `connection/reset`.
+ */
+export function holdRosterReadsUntilConnected(): void {
+  connected = new Promise((resolve) => { releaseConnected = resolve })
+}
+
+/**
+ * A connection generation became ready.
+ * @returns whether this was the first one, which only releases the held reads instead of invalidating the roster.
+ */
+export function rosterConnectionReset(): boolean {
+  if (releaseConnected === undefined) return false
+  releaseConnected()
+  releaseConnected = undefined
+  connected = undefined
+  return true
+}
+
 /**
  * One `agentPresets.list` request for every surface reading the roster at once: a refresh reloads the label, the
  * section and every seat in the same tick, each through its own store.
@@ -73,7 +96,11 @@ export function markRosterChanged(): void {
  * @returns the Host answer, shared with the other readers of this burst.
  */
 export function listRoster(ctx: ClientContext): ReturnType<ClientContext['remote']['agentPresets']['list']> {
-  return joinPageRead({ key: 'remote:agentPresets/list', read: () => ctx.remote.agentPresets.list(), notBefore: rosterChangedAt })
+  return joinPageRead({
+    key: 'remote:agentPresets/list',
+    read: () => (connected === undefined ? ctx.remote.agentPresets.list() : connected.then(() => ctx.remote.agentPresets.list())),
+    notBefore: rosterChangedAt,
+  })
 }
 
 /** A plugin can declare a preset without an announcement, so even an unchanged roster is read again after this long. */

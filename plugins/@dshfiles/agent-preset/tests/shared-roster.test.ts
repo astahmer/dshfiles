@@ -1,6 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
-import { markRosterChanged, readSharedRoster } from '../src/native/settings-store.ts'
+import { holdRosterReadsUntilConnected, markRosterChanged, readSharedRoster, rosterConnectionReset } from '../src/native/settings-store.ts'
 
 const contexts: Context[] = []
 afterEach(async () => {
@@ -51,5 +51,17 @@ describe('shared roster for the header label and composer seat', () => {
     f.fail(false)
     expect(await readSharedRoster(f.ctx)).toMatchObject({ ok: true })
     expect(f.reads()).toBe(2)
+  })
+
+  it('sends the boot read once the page connects, and treats only a later reset as a reconnect', async () => {
+    const f = fixture()
+    holdRosterReadsUntilConnected()
+    const boot = readSharedRoster(f.ctx)
+    await Promise.resolve()
+    expect(f.reads()).toBe(0)
+    expect(rosterConnectionReset()).toBe(true)
+    expect(await boot).toMatchObject({ ok: true })
+    expect(f.reads()).toBe(1)
+    expect(rosterConnectionReset()).toBe(false)
   })
 })

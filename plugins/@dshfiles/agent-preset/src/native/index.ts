@@ -44,7 +44,13 @@ import type { AgentPresetSectionInjected } from './AgentPresetSection.tsx'
 import { AgentPresetSeatController, AgentPresetStageStore } from './seat-store.ts'
 import { AgentPresetSectionController } from './section-store.ts'
 import { en, zh, type AgentPresetSettingsKey } from './locales.ts'
-import { AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController, markRosterChanged } from './settings-store.ts'
+import {
+  AGENT_PRESET_SETTINGS_NS,
+  AgentPresetSettingsController,
+  holdRosterReadsUntilConnected,
+  markRosterChanged,
+  rosterConnectionReset,
+} from './settings-store.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -61,6 +67,28 @@ export type { AgentPresetSectionState, PresetView } from './section-store.ts'
 export type { AgentPresetOption, AgentPresetSettingsState } from './settings-store.ts'
 export { AGENT_PRESET_SETTINGS_NS, writeDefaultPreset } from './settings-store.ts'
 
+/** The part of the Client `connection` service read here; its Context property is only typed on the Host side. */
+interface ConnectionGenerationView {
+  readonly interactions: string
+  readonly generation: { getSnapshot(): unknown }
+}
+
+const isConnectionGenerationView = (value: unknown): value is ConnectionGenerationView =>
+  typeof value === 'object' && value !== null
+  && 'interactions' in value && typeof value.interactions === 'string'
+  && 'generation' in value && typeof value.generation === 'object' && value.generation !== null
+  && 'getSnapshot' in value.generation && typeof value.generation.getSnapshot === 'function'
+
+/**
+ * Whether Host announcements already reach this page. The gateway starts the connection after every boot row loaded,
+ * so a boot-time plugin sees no generation yet; without a live event stream (`interactions: 'none'`) none ever comes.
+ */
+const isConnected = (ctx: ClientContext): boolean => {
+  const connection: unknown = ctx.get('connection')
+  if (!isConnectionGenerationView(connection)) return true
+  return connection.interactions === 'none' || connection.generation.getSnapshot() !== undefined
+}
+
 /** Required services (cordis fiber inject). */
 export const inject = [
   'slots', 'sessions', 'sessionDrafts', 'locale', 'remote', 'remote.agentPresets', 'remote.settings', 'configForms',
@@ -71,6 +99,7 @@ export const inject = [
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
+  if (!isConnected(ctx)) holdRosterReadsUntilConnected()
   const toolsSettings = ctx.configForms.get<{ enabled: boolean }>('ui-settings')
   const presetSettings = ctx.configForms.get(AGENT_PRESET_SETTINGS_NS)
   let active = true
@@ -166,7 +195,9 @@ export function apply(ctx: ClientContext): void {
         if (ns !== AGENT_PRESET_SETTINGS_NS) return
         refresh()
       }),
-      ctx.on('connection/reset', refresh),
+      ctx.on('connection/reset', () => {
+        if (!rosterConnectionReset()) refresh()
+      }),
     ]
     reconcile()
     return async () => {
