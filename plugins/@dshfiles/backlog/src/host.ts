@@ -49,6 +49,8 @@ import type { ExternalRef } from './sync-model.js'
 import { ShippedSummaries } from './shipped-summaries.js'
 import { SyncLocalProbes } from './sync-local-probes.js'
 import { BacklogStore } from './store.js'
+import { StartIntentClaims, StartIntents } from './start-intents.js'
+import { StartRecovery } from './start-recovery.js'
 import { AutomationHost, BacklogPeers } from './peer-replication.js'
 import { PeerTransport } from './peer-transport.js'
 import { actorOf, ThreadStart } from './thread-start.js'
@@ -75,7 +77,6 @@ const hostEdges = Layer.mergeAll(
 const backlogServices = Layer.mergeAll(
   BacklogPeers.layer,
   ScheduledRules.layer,
-  ThreadStart.layer,
   TriageBackfill.layer,
   TweetImport.layer,
   ReplyGenerator.layer,
@@ -84,6 +85,8 @@ const backlogServices = Layer.mergeAll(
 ).pipe(
   Layer.provideMerge(Triage.layer),
   Layer.provideMerge(BacklogSyncEngine.layer),
+  Layer.provideMerge(StartRecovery.layer),
+  Layer.provideMerge(ThreadStart.layer),
   Layer.provideMerge(
     Layer.mergeAll(
       BacklogStore.layer,
@@ -95,6 +98,8 @@ const backlogServices = Layer.mergeAll(
       PullRequestState.layer,
       PeerTransport.layer,
       AutomationHost.layer,
+      StartIntents.layer,
+      StartIntentClaims.layer,
     ),
   ),
   Layer.provideMerge(builtInProviderRegistry),
@@ -116,6 +121,7 @@ const BacklogLive = Layer.mergeAll(
   BacklogAttention.layer,
   RemoteSyncLoop,
   BacklogPeers.loop,
+  StartRecovery.loop,
 ).pipe(Layer.provideMerge(BacklogMainBranch.layer), Layer.provideMerge(backlogServices), Layer.provideMerge(hostEdges))
 
 /** No item has id 0, so a reference that names nothing reaches each verb as an id it answers `not-found` for. */

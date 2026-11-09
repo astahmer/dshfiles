@@ -338,6 +338,20 @@ in the toast and nothing is started, so a jj failure never falls back to a share
 Failures after creation keep the thread and the toast still offers it: a refused model switch leaves the Host default
 model, and a failed link is logged rather than losing the thread.
 
+### A start survives a Host restart
+
+A start is written to the backlog's own SQLite file before its Session exists: the item ids, the agent, the placement,
+the model route and the prompt request id. The row is refreshed after every step (create, model, rename, prompt) and
+removed once the thread is prompted and the items are linked, so a row a boot still finds is work the user already
+asked for. The recovery pass runs ten seconds after boot and every twenty seconds after that: it takes a row nobody
+refreshed for 45 seconds, reuses the Session that start created, links the items and clears the row. The opening message
+is always prompted with the request id recorded by the start: the Host answers `accepted` for a message it already
+holds, so a resumed start never delivers it twice and never drops it. Nothing is created twice, and a start a live Host is
+still running is skipped. A start that keeps failing (three attempts, or ten minutes) becomes a comment and a
+`blocked` flag on its item naming the handle to reply with, so a lost thread is visible instead of silent. This covers
+the window between `sessions.create` and the item link: the comment that asked for the thread was already saved, so the
+recovered start is the same request, not a new one.
+
 ### Smart reply routing
 
 Off by default (Settings → `dshfiles-backlog` → _Smart thread routing_); plain replies stay regular comments by default, so adding context cannot unexpectedly start a thread. Turn it on to classify plain replies before they are saved; when configured Jev receives that submitted text using the same Host-held TypeSafe credential as triage. Jev starts a linked `@dsh` thread when confidence meets _Reply thread threshold_. If Jev is off, its key is unavailable, or the request fails, a conservative leading-verb keyword fallback routes explicit work requests and leaves other text as a reply. A leading `@agent` remains an explicit, deterministic dispatch and does not need Jev.

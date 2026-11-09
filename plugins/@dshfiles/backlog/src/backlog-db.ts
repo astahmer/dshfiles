@@ -121,6 +121,30 @@ export const backlogMigrations = {
       last_error TEXT
     )`
   }),
+  /**
+   * The thread starts this Host owes after a crash: written before a Session exists, refreshed per step, removed on
+   * success. Local to this Host, never replicated: it describes work in flight here, not an item fact.
+   */
+  '8_start_intents': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    yield* sql`CREATE TABLE start_intents (
+      intent_id TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      session_id TEXT,
+      prompt_request_id TEXT NOT NULL,
+      items TEXT NOT NULL,
+      agent TEXT,
+      agent_preset TEXT,
+      placement TEXT NOT NULL,
+      route TEXT,
+      message TEXT,
+      actor TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT
+    )`
+    yield* sql`CREATE INDEX start_intents_updated ON start_intents (updated_at)`
+  }),
 }
 
 /** The backlog's SQLite file, through the shared store layer (WAL, migrations, `BEGIN IMMEDIATE`). */
