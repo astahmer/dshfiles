@@ -17,6 +17,6 @@ const RequestMessagesPolyfill = Layer.effectDiscard(
 
 export default DshxPlugin.make({
   name: '@dshfiles/request-messages',
-  inject: ['llm', 'agents', 'sessionProjections'],
+  inject: ['llm', 'agents'],
   layer: RequestMessagesPolyfill,
 })

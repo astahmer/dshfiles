@@ -10,11 +10,10 @@ import {
   type RequestMessage,
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
-import type { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
+import type { Session, SessionEventMap } from '@deepseek-ai/dsh-session'
 import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Effect, Schema } from 'effect'
 import type { RequestMessagesStatus } from './contract.ts'
-import { requestMessagesStepProjectionDefinition } from './step-projection.ts'
 
 /**
  * The runtime's opaque prepared-call handle: `adapterStream` receives it when the caller went through
@@ -54,7 +53,9 @@ class RequestMessagesListenerFailure extends Schema.TaggedError<RequestMessagesL
   }
 }
 
-const requestOptions = Effect.fn('request messages dispatch')(function* (ctx: Context, projections: SessionProjectionRegistry, options: GenerateOptions) {
+type LatestSteps = WeakMap<Session, SessionEventMap['step/start']>
+
+const requestOptions = Effect.fn('request messages dispatch')(function* (ctx: Context, latestSteps: LatestSteps, options: GenerateOptions) {
   if (!isAgentLoopRequest(options) || options.sessionId === undefined || options.toolHistory === undefined) return options
   const sessionId = options.sessionId
   const toolHistory = options.toolHistory
@@ -62,8 +63,8 @@ const requestOptions = Effect.fn('request messages dispatch')(function* (ctx: Co
   if (agent === undefined) return options
   const messages = options.messages
   if (!messages.every(isMessage)) return options
-  const step = projections.stateOf(agent.session, requestMessagesStepProjectionDefinition.key)
-  if (step === null || step === undefined) return options
+  const step = latestSteps.get(agent.session)
+  if (step === undefined) return options
   const signal = options.signal ?? new AbortController().signal
   const sent = yield* Effect.tryPromise({
     try: () =>
@@ -112,17 +113,18 @@ const release = (runtime: LlmRuntime, installation: Installation, token: symbol)
  */
 export const installRequestMessages = Effect.fn('request messages install')(function* (input: { readonly ctx: Context; readonly runtime: LlmRuntime }) {
   const runtime = input.runtime
-  const projections = input.ctx.get('sessionProjections')
-  if (projections === undefined)
-    return {
-      active: false,
-      reason:
-        'this DSH has no session projection registry, so the step a model request belongs to cannot be read without the deprecated session event snapshot',
-    } satisfies RequestMessagesStatus
   const token = Symbol('request-messages host')
-  const unregister = projections.register(requestMessagesStepProjectionDefinition)
-  yield* Effect.addFinalizer(() => Effect.sync(unregister))
-  const dispatch = yield* DshxPlugin.callback((options: GenerateOptions) => requestOptions(input.ctx, projections, options))
+  /**
+   * The agent loop appends `step/start` before every model request, so a live fold sees each step without the
+   * deprecated session event reads. A registered session projection would also persist a row whose absence from
+   * older checkpoints forces every cold Session open into a full log read.
+   */
+  const latestSteps: LatestSteps = new WeakMap()
+  const stopFolding = input.ctx.on('session/event', (session, event) => {
+    if (event.type === 'step/start') latestSteps.set(session, event.data)
+  })
+  yield* Effect.addFinalizer(() => Effect.sync(stopFolding))
+  const dispatch = yield* DshxPlugin.callback((options: GenerateOptions) => requestOptions(input.ctx, latestSteps, options))
   const existing = installationKey in runtime ? runtime[installationKey] : undefined
   if (isInstallation(existing)) {
     existing.hosts.set(token, dispatch)

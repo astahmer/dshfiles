@@ -9,7 +9,6 @@ import { Effect, Exit, Scope } from 'effect'
 import type { RequestMessagesPayload } from './contract.ts'
 import plugin from './host.ts'
 import { installRequestMessages } from './polyfill.ts'
-import { requestMessagesStepProjectionDefinition } from './step-projection.ts'
 
 class EchoAdapter extends LlmAdapter {
   readonly seen: (readonly string[])[] = []
@@ -81,22 +80,6 @@ const loopRequest = (): GenerateOptions => {
   )
 }
 
-describe('the latest step projection', () => {
-  it('folds the latest step/start payload and keeps the state reference for other events', () => {
-    const session = Session.create(SessionId('fold'))
-    const turnStart = session.append('turn/start', { turn: 1 })
-    const firstStep = session.append('step/start', { turn: 1, step: 1 })
-    const secondStep = session.append('step/start', { turn: 1, step: 2 })
-    const stepEnd = session.append('step/end', { turn: 1, step: 2 })
-    const folded = [turnStart, firstStep, secondStep, stepEnd].reduce(
-      requestMessagesStepProjectionDefinition.apply,
-      requestMessagesStepProjectionDefinition.init(),
-    )
-    expect(folded).toEqual({ turn: 1, step: 2 })
-    expect(requestMessagesStepProjectionDefinition.apply(folded, stepEnd)).toBe(folded)
-  })
-})
-
 describe('agent/request-messages polyfill', () => {
   it.effect('sends the messages a listener returns for an agent-loop request', () =>
     Effect.gen(function* () {
@@ -165,94 +148,43 @@ describe('agent/request-messages polyfill', () => {
     }),
   )
 
-  it.effect('reads the step of a restored session whose history predates the installation', () =>
+  it.effect('waits for a live step/start before dispatching for a session whose history predates the installation', () =>
     Effect.gen(function* () {
       const { ctx, adapter, payloads, session, install } = yield* startHost({
         seed: seeded([
           { turn: 1, step: 1 },
           { turn: 2, step: 1 },
-          { turn: 2, step: 2 },
         ]),
       })
       yield* install
       yield* drain(ctx.llm.stream(loopRequest()))
+      expect(payloads).toEqual([])
+      expect(adapter.seen).toEqual([['first turn', 'first answer', 'second turn']])
+      session.append('step/start', { turn: 2, step: 2 })
+      yield* drain(ctx.llm.stream(loopRequest()))
       expect(payloads).toEqual([{ turn: 2, step: 2, isFirstStepOfTurn: false, messages: history }])
-      appendStep(session, { turn: 2, step: 3 })
-      yield* drain(ctx.llm.stream(loopRequest()))
-      expect(adapter.seen).toHaveLength(2)
-      expect(payloads.at(-1)).toEqual({ turn: 2, step: 3, isFirstStepOfTurn: false, messages: history })
-    }),
-  )
-
-  it.effect('reads the step inherited by a forked session', () =>
-    Effect.gen(function* () {
-      const seed = seeded([
-        { turn: 1, step: 1 },
-        { turn: 2, step: 1 },
-      ])
-      const { ctx, payloads, session, install } = yield* startHost({ seed, fork: true })
-      yield* install
-      expect(session.inheritedEventCount).toBe(seed.length)
-      yield* drain(ctx.llm.stream(loopRequest()))
-      expect(payloads).toEqual([{ turn: 2, step: 1, isFirstStepOfTurn: true, messages: history }])
     }),
   )
 
   it.effect('reports the latest step own turn, not the turn the session is between', () =>
     Effect.gen(function* () {
-      const seed = seeded(
-        [
-          { turn: 2, step: 1 },
-          { turn: 2, step: 2 },
-        ],
-        3,
-      )
-      const { ctx, payloads, install } = yield* startHost({ seed })
+      const { ctx, payloads, session, install } = yield* startHost()
       yield* install
+      appendStep(session, { turn: 2, step: 1 })
+      session.append('step/start', { turn: 2, step: 2 })
+      session.append('turn/start', { turn: 3 })
       yield* drain(ctx.llm.stream(loopRequest()))
       expect(payloads).toEqual([{ turn: 2, step: 2, isFirstStepOfTurn: false, messages: history }])
     }),
   )
 
-  it.effect('keeps the projection until the last copy unloads', () =>
+  it.effect('adds no persisted session projection, so existing checkpoints keep their tail restore', () =>
     Effect.gen(function* () {
-      const { ctx, adapter, payloads, session, install } = yield* startHost()
-      const first = yield* install
-      const second = yield* install
+      const { ctx, session, install } = yield* startHost()
+      const before = ctx.sessionProjections.checkpoint(session)
+      yield* install
       appendStep(session, { turn: 1, step: 1 })
-      const stepOf = () => ctx.sessionProjections.stateOf(session, requestMessagesStepProjectionDefinition.key)
-      expect(stepOf()).toEqual({ turn: 1, step: 1 })
-      yield* first.dispose
-      expect(stepOf()).toEqual({ turn: 1, step: 1 })
-      yield* drain(ctx.llm.stream(loopRequest()))
-      expect(payloads).toHaveLength(1)
-      yield* second.dispose
-      expect(stepOf()).toBeUndefined()
-      yield* drain(ctx.llm.stream(loopRequest()))
-      expect(payloads).toHaveLength(1)
-      expect(adapter.seen.at(-1)).toEqual(['first turn', 'first answer', 'second turn'])
-    }),
-  )
-
-  it.effect('reports an inactive status when the session projection registry is absent', () =>
-    Effect.gen(function* () {
-      const ctx = new Context()
-      const adapter = new EchoAdapter()
-      yield* Effect.promise(async () => {
-        await ctx.plugin(LlmRuntime)
-        ctx.llm.registerAdapter(['echo'], adapter)
-        const session = Session.create(sessionId)
-        session.append('step/start', { turn: 1, step: 1 })
-        ctx.provide('agents')
-        ctx.set('agents', { get: (id: string) => (id === sessionId ? { id: sessionId, session } : undefined) })
-      })
-      const scope = yield* Scope.make()
-      const status = yield* Scope.provide(scope)(installRequestMessages({ ctx, runtime: ctx.llm }))
-      expect(status.active).toBe(false)
-      expect(status.active ? '' : status.reason).toContain('no session projection registry')
-      yield* drain(ctx.llm.stream(loopRequest()))
-      expect(adapter.seen).toEqual([['first turn', 'first answer', 'second turn']])
-      yield* Scope.close(scope, Exit.void)
+      expect(ctx.sessionProjections.checkpoint(session)).toEqual(before)
     }),
   )
 })
@@ -265,8 +197,8 @@ describe('the request-messages plugin', () => {
         testHost => Effect.promise(() => testHost.dispose()),
       )
       const { adapter, session } = yield* Effect.promise(() => provideAgentHost(host.ctx))
-      appendStep(session, { turn: 2, step: 1 })
       const mounted = yield* Effect.promise(() => host.mount(plugin, { packageId: '@dshfiles/request-messages' }))
+      appendStep(session, { turn: 2, step: 1 })
       expect(host.ctx.bail('request-messages/status')).toEqual({ active: true })
       yield* drain(host.ctx.llm.stream(loopRequest()))
       expect(adapter.seen).toEqual([['second turn']])

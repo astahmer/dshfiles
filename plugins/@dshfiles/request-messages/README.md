@@ -15,9 +15,9 @@ bundle wraps that method on the runtime instance:
 1. Requests the agent loop did not build (`isAgentLoopRequest` is false) pass
    through unchanged; this includes titles, compaction and plugin-owned calls.
 2. For a loop request, it finds the agent by `options.sessionId`, reads the
-   turn and step from the latest `step/start`, and runs
-   `agent/request-messages` in that agent's scope (agent-scoped `agent.ctx.on`
-   listeners receive it, as do unscoped ones).
+   turn and step from the latest `step/start` appended while the bundle is
+   loaded, and runs `agent/request-messages` in that agent's scope
+   (agent-scoped `agent.ctx.on` listeners receive it, as do unscoped ones).
 3. A different list is frozen and sent as `{ ...options, messages }`. Provider,
    model, effort, tools and tool history stay exactly as DSH built them, so the
    prepared-call config check and every `llm/stream` listener still see the
