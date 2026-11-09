@@ -11,6 +11,7 @@ export default defineConfig({
     'backlog-provider': 'src/provider-port.ts',
   },
   host: {
+    dshxRuntime: 'snapshot',
     entry: 'src/host.ts',
     bundleDependencies: [
       '@dshfiles/credential-port',

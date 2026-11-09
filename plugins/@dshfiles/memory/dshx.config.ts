@@ -4,6 +4,7 @@ import { defineConfig } from '@dshfiles/dshx'
 export default defineConfig({
   name: '@dshfiles/memory',
   host: {
+    dshxRuntime: 'snapshot',
     entry: 'src/host.ts',
     bundleDependencies: [
       '@dshfiles/optmem-core',

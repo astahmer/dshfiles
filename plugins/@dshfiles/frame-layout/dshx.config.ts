@@ -3,7 +3,7 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/frame-layout',
-  host: { entry: 'src/host.ts' },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: { entry: 'src/client-entry.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   // Public frame seats (including shell.main's authorized keyed renderer):
   // occupants import the SlotMap, owner props and observable mode contract here.

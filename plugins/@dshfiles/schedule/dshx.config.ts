@@ -2,7 +2,7 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/schedule',
-  host: { entry: 'src/host.ts' },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: {
     shared: '@dshfiles/shared-runtime',
     entry: 'src/client-entry.tsx',
