@@ -45,6 +45,12 @@ test('an equal field set makes two summaries the same', () => {
   assert.equal(HostSnapshotsModel.sameSessionSummary(summary('a', { cwd: '/tmp' }), summary('a', { cwd: '/other' })), false)
 })
 
+test('a thread switch that only moves view retention keeps the previous state object', () => {
+  const first = HostSnapshotsModel.stabilizeSessionListState(null, state([summary('a', { retainedBy: { mainView: 1 } }), summary('b')]))
+  const second = HostSnapshotsModel.stabilizeSessionListState(first, state([summary('a'), summary('b', { retainedBy: { mainView: 1 } })]))
+  assert.equal(second, first)
+})
+
 test('nested JSON values compare by content, not by key order or identity', () => {
   assert.equal(HostSnapshotsModel.sameJsonValue({ mainView: 1, nested: { list: [1, 2, 3] } }, { nested: { list: [1, 2, 3] }, mainView: 1 }), true)
   assert.equal(HostSnapshotsModel.sameJsonValue({ nested: { list: [1, 2] } }, { nested: { list: [1, 3] } }), false)

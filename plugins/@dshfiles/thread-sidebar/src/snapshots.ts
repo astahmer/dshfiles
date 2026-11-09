@@ -26,7 +26,20 @@ const sameJsonValue = (left: unknown, right: unknown): boolean => {
   return leftFields.length === rightFields.size && leftFields.every(([key, value]) => rightFields.has(key) && sameJsonValue(value, rightFields.get(key)))
 }
 
-const sameSessionSummary = (left: SessionSummary, right: SessionSummary): boolean => left === right || sameJsonValue(left, right)
+/**
+ * Retain counts are not presentation: which views hold a Session changes on every thread switch (main view, side
+ * panel, kept views), and the thread on screen comes from uiSession's current binding. A row that differs only there
+ * keeps its previous object, so a switch does not re-derive every list consumer.
+ */
+const sameSessionSummary = (left: SessionSummary, right: SessionSummary): boolean => {
+  if (left === right) return true
+  const rightFields = new Map(Object.entries(right))
+  const leftFields = Object.entries(left)
+  return (
+    leftFields.length === rightFields.size &&
+    leftFields.every(([key, value]) => rightFields.has(key) && (key === 'retainedBy' || sameJsonValue(value, rightFields.get(key))))
+  )
+}
 
 const sameIds = (left: readonly SessionId[], right: readonly SessionId[]): boolean =>
   left.length === right.length && left.every((id, index) => id === right.at(index))
