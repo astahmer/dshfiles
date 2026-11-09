@@ -80,6 +80,14 @@ const scheduleTone = (context: AudioContext, sound: ThreadNotificationSound, vol
 /** Play a sound outside a gesture: resume first, then schedule, so a suspended context still rings. */
 const playThreadNotificationSound = (sound: ThreadNotificationSound, volume: number): void => {
   if (storedNotificationSoundsMuted.get() === true) return
+  // Opening the audio device blocks the main thread for 100–300 ms; the caller is a list-publish handler.
+  if (audioContext === null) {
+    setTimeout(() => {
+      createAudioContext()
+      if (audioContext !== null) playThreadNotificationSound(sound, volume)
+    }, 0)
+    return
+  }
   void runningAudioContext().then(context => {
     if (storedNotificationSoundsMuted.get() === true) return
     if (context === null) return

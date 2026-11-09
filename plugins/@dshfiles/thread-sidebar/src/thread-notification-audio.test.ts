@@ -119,3 +119,10 @@ test('a browser without AudioContext cannot preview or play', async () => {
   audio.play('soft', 0.5)
   assert.equal(createdContexts.length, 0)
 })
+
+test('the first notification sound opens the audio device after the publish that triggered it, not inside it', async () => {
+  const audio = await loadAudioModel()
+  audio.play('soft', 0.5)
+  assert.equal(createdContexts.length, 0)
+  await vi.waitFor(() => assert.equal(createdContexts[0]?.oscillators.length !== undefined && createdContexts[0].oscillators.length > 0, true))
+})
