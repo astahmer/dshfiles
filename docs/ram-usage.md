@@ -44,17 +44,19 @@ it. What the fork in `plugins/@dshfiles/agent-loop` removes, measured on `sessio
 | `stream[].chunk.replayState.blocks` (dropped by the fork) | 433 KB  |
 | `data.stream` in total                                    | 2.85 MB |
 
-That is ~9.5 % of that Session's `assistant/message` bytes and ~2.3 % of its whole log — a genuine duplicate removed,
-but **not** the explanation for the multi-GB live heap. The same log shows where the rest of a Session's bytes sit:
-`request/header` 8.87 MB (34 events, mostly the 455-tool catalog), `assistant/message` 4.45 MB, `tool/result` 2.51 MB.
-A 2.82 GB live set over a handful of live Sessions therefore still means those events are held several times over, not
-that one event is huge; a per-client or per-consumer copy is the next thing to attribute before trimming further.
+That is ~9.5 % of that Session's `assistant/message` bytes and ~2.3 % of its whole log. Across the eleven Sessions of one
+live thread the removable duplicate is **1.02 MB of 8.34 MB** of `assistant/message` data — a genuine duplicate
+removed, but **not** the explanation for the multi-GB live heap. The same log shows where the rest of a Session's
+bytes sit: `request/header` 8.87 MB (34 events, mostly the 455-tool catalog), `assistant/message` 4.45 MB,
+`tool/result` 2.51 MB. A 2.82 GB live set over a handful of live Sessions therefore still means those events are held
+several times over, not that one event is huge; the next thing to attribute is the 12.2 M `{"type":"reasoning",…}`
+strings in the snapshot, which are raw adapter chunks and not the compact records this fork trims.
 
 Two owners follow:
 
 - **Host:** the per-block replay duplicate is fixed by the
   [`@dshfiles/agent-loop`](../plugins/@dshfiles/agent-loop/README.md) fork (see the table above); the `request/header`
-  tool catalog and the multi-copy question are separate and unattributed.
+  tool catalog, the raw reasoning-chunk strings and the multi-copy question are separate and unattributed.
 - **Browser:** one renderer held 3.3 GB for this tab, with a second at 1.7 GB. Its own copy is already block-stripped,
   so the cost is resident per-thread client state. The client store is the owned
   [session-controller fork](../plugins/@dshfiles/session-controller/README.md#local-delta): history projections stay
