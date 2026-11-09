@@ -89,6 +89,7 @@ export class ConversationWorkbenchSources {
     }
     const snapshot = (): AuthorizedViews | undefined => authorized
     const registrations = new Map<string, { readonly definition: WorkbenchPanelDefinition; readonly dispose: () => void }>()
+    const panelIds = new Map<string, string>()
 
     const componentFor = (sessionId: SessionId, viewId: string): WorkbenchPanelDefinition['component'] =>
       function ConversationViewPanel() {
@@ -123,7 +124,9 @@ export class ConversationWorkbenchSources {
       for (const session of ports.sessions.getSnapshot())
         for (const view of ports.views.getSnapshot()) {
           if (view.id === 'chat') continue
-          const id = ConversationWorkbenchSources.id(session.id, view.id)
+          const key = `${session.id}\u0000${view.id}`
+          const id = panelIds.get(key) ?? ConversationWorkbenchSources.id(session.id, view.id)
+          panelIds.set(key, id)
           desired.add(id)
           const previous = registrations.get(id)
           const title = `${view.label} — ${session.title}`
@@ -143,6 +146,7 @@ export class ConversationWorkbenchSources {
           registration.dispose()
           registrations.delete(id)
         }
+      for (const [key, id] of panelIds) if (!desired.has(id)) panelIds.delete(key)
     }
     const disposeSessions = ports.sessions.subscribe(sync)
     const disposeViews = ports.views.subscribe(sync)
