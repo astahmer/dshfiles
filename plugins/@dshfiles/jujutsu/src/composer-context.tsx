@@ -122,7 +122,8 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
     retry: false,
     ...refresh.queryOptions,
   })
-  refetch.current = () => void query.refetch()
+  // The composer bar, chips and header toggle all become visible on the same switch; they join one read.
+  refetch.current = () => void query.refetch({ cancelRefetch: false })
   const chooseBase = (next: string): void => {
     if (cwd !== null) storedBases.set({ ...bases, [cwd]: next })
   }
