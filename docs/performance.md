@@ -901,14 +901,14 @@ Serving is already right: combos and chunks are `immutable` for a year and gzip-
 transfers 0.5 MB (the Vite `/assets/*` shell files have no `cache-control` and are revalidated — core). The cost is the
 main thread: 122 boot rows, 38 MB of decoded JS, then plugin setup.
 
-| Reload (thread with history) | Before                       | After                                    |
-| ---------------------------- | ---------------------------- | ---------------------------------------- |
-| composer + transcript, cold  | 1.95 s                       | 1.66–2.01 s                              |
-| composer + transcript, warm  | 1.87–1.96 s                  | 1.58–2.10 s                              |
-| JS decoded / on the wire     | 38.2 MB / 13.8 MB            | 31.8 MB / 11.5 MB                        |
-| page main thread (profile)   | 2.31 s busy                  | 2.05 s busy                              |
-| boot `/api` requests (HAR)   | 53, 26 duplicates            | 43, 16 duplicates                        |
-| longest task                 | 0.83–0.94 s                  | 0.80–1.03 s (unchanged owner, see below) |
+| Reload (thread with history) | Before            | After                                    |
+| ---------------------------- | ----------------- | ---------------------------------------- |
+| composer + transcript, cold  | 1.95 s            | 1.66–2.01 s                              |
+| composer + transcript, warm  | 1.87–1.96 s       | 1.58–2.10 s                              |
+| JS decoded / on the wire     | 38.2 MB / 13.8 MB | 31.8 MB / 11.5 MB                        |
+| page main thread (profile)   | 2.31 s busy       | 2.05 s busy                              |
+| boot `/api` requests (HAR)   | 53, 26 duplicates | 43, 16 duplicates                        |
+| longest task                 | 0.83–0.94 s       | 0.80–1.03 s (unchanged owner, see below) |
 
 Changes: `effect` and its Schema/Option/Result subpaths moved into `@dshfiles/shared-runtime` (every Client bundle
 inlined ~110 KB of it: 7.4 MB over 63 rebuilt plugins, +0.76 MB in the supplier); five plugins that bundled it
@@ -947,8 +947,25 @@ reset as a reconnect.
 | duplicate calls             | 8: modelCatalog 3, agentPresets 1, describe 1, cordis 2, runtime 1 | 5–6: describe 1, cordis 2, sessionRuntime 1–2, fast-mode status 1 |
 | warm switch, owned requests | ai-accounts snapshot 1                                             | 0                                                                 |
 
-Still duplicated, owners outside this pass: stock `ui-settings` (`settings/describe`), stock `cordis-client-runner`
-(`syncInspectManifest`) and `ui-cordis` (`inventory`), all the same first-reset pattern; `@dshfiles/model-effort-picker`
-(`multi-host` `sessionRuntime` × 2–3 and `ai-accounts` fast-mode `status` × 2 at landing). Per warm switch
-`@dshfiles/jujutsu` sends the same `jujutsu-composer/context` twice, and `session-undo` `history`, `preview`
-`devServers` and the browser-trace `export` follow most switches, so a warm switch is 2–6 requests, not ≤ 2.
+Second pass (same day, scratch Host `:3472`, headless Chromium, three warm reloads landing on a thread then six
+switches; batch entries counted one by one):
+
+| Duplicate                                     | Owner                                         | Fix                                                                                                                         |
+| --------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `dynamicCordisRunner/syncInspectManifest` × 2 | stock `cordis-client-runner`                  | forked ([`@dshfiles/cordis-client-runner`](../plugins/@dshfiles/cordis-client-runner)): no sync before the first generation |
+| `dynamicCordisRunner/inventory` × 2           | stock `ui-cordis`                             | forked ([`@dshfiles/cordis-cards`](../plugins/@dshfiles/cordis-cards)): read waits for the first generation                 |
+| `multi-host/sessionRuntime` × 2               | model-effort-picker (two pickers), multi-host | one in-flight catalog load per Session; both owners read through `joinPageRead`                                             |
+| fast-mode `status` × 2                        | model-effort-picker `FastModeIndicator`       | page-wide `useResource` with a 5 s stale time                                                                               |
+| `jujutsu-composer/context` × 2 per switch     | jujutsu composer bar, chips, header toggle    | each surface's return-to-visible refresh joins the read in flight (`cancelRefetch: false`)                                  |
+
+| Measured                    | Before                                                           | After                |
+| --------------------------- | ---------------------------------------------------------------- | -------------------- |
+| warm reload `/api` calls    | 62–63, 9–10 duplicate                                            | 58–60, 5–6 duplicate |
+| owned or forked boot dups   | describe, syncInspectManifest, inventory, sessionRuntime, status | describe only        |
+| warm/cold switch duplicates | 1 per switch (`context` or `sessionRuntime`)                     | 0                    |
+
+Left: stock `ui-settings` still reads `settings/describe` at setup and on the first reset. It cannot be forked like the
+others: the Host settings namespace is the Loader row id (`ui-settings`, read by its own developer-tools form,
+`agent-preset` and `settings-shell`) and the Loader keys rows by id, so a replacement row would move that preference.
+The other repeats in a 15 s reload window (`quotaContinuations`, `threadList`, `multi-host/list`, `traces-alerts/feed`)
+are polls, not boot duplicates.

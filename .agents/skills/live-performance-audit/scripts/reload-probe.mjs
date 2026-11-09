@@ -26,7 +26,9 @@ const marksScript = () => {
     const flow = document.querySelector('[data-chat-flow]')
     if (flow !== null && flow.children.length > 0 && document.querySelector('[data-loading-history]') === null) mark('transcript')
     const composer = [...document.querySelectorAll('[role=textbox],textarea')].find(
-      element => /Message or run a task|Describe what you want/.test(element.getAttribute('aria-label') ?? element.getAttribute('placeholder') ?? '') && element.getAttribute('aria-disabled') !== 'true',
+      element =>
+        /Message or run a task|Describe what you want/.test(element.getAttribute('aria-label') ?? element.getAttribute('placeholder') ?? '') &&
+        element.getAttribute('aria-disabled') !== 'true',
     )
     if (composer !== undefined) mark('composer')
   }
@@ -43,7 +45,8 @@ const marksScript = () => {
 
 const measure = async (page, cdp, load, label) => {
   const requests = new Map()
-  const onSent = event => requests.set(event.requestId, { url: event.request.url, type: event.type, start: event.timestamp, bytes: 0, encoded: 0, cached: false })
+  const onSent = event =>
+    requests.set(event.requestId, { url: event.request.url, type: event.type, start: event.timestamp, bytes: 0, encoded: 0, cached: false })
   const onData = event => {
     const request = requests.get(event.requestId)
     if (request !== undefined) request.bytes += event.dataLength
@@ -78,7 +81,9 @@ const measure = async (page, cdp, load, label) => {
     await cdp.send('Profiler.start')
   }
   await load()
-  await page.waitForFunction(() => window.__probe?.marks.composer !== undefined && window.__probe.marks.transcript !== undefined, null, { timeout: 120_000 }).catch(() => {})
+  await page.waitForFunction(() => window.__probe?.marks.composer !== undefined, null, { timeout: 120_000 }).catch(() => {})
+  // A thread without history never draws a transcript; waiting 120 s for it on each of the three loads looked like a hang.
+  await page.waitForFunction(() => window.__probe?.marks.transcript !== undefined, null, { timeout: 10_000 }).catch(() => {})
   await page.waitForTimeout(2000)
   if (process.env.PROFILE_DIR !== undefined) {
     const { profile } = await cdp.send('Profiler.stop')
@@ -135,7 +140,10 @@ for (let run = 0; run < runs; run++) {
   await page.goto(url)
   const rows = page.locator('[data-thread-main-action]')
   await rows.first().waitFor({ timeout: 120_000 })
-  await rows.filter({ hasText: match }).first().click({ position: { x: 30, y: 10 } })
+  await rows
+    .filter({ hasText: match })
+    .first()
+    .click({ position: { x: 30, y: 10 } })
   await page.waitForTimeout(5000)
   const cdp = await context.newCDPSession(page)
   await cdp.send('Network.enable')
