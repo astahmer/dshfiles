@@ -117,6 +117,11 @@ interface GenerationHeader {
   readonly formatStatus: NonNullable<SessionPersistenceSnapshot['formatStatus']>
 }
 
+/** A generation header with the file identity it was read under. */
+interface StattedGenerationHeader extends GenerationHeader {
+  readonly identity: JsonlPhysicalIdentity
+}
+
 /** One stored event graph whose producer has established immutable sharing. */
 interface FrozenStoredEvents extends SessionHandleReadResult {
   readonly eventState: 'shared-frozen'
@@ -321,6 +326,18 @@ class JsonlSessionPersistence extends SessionPersistence {
    * previous owner never published.
    */
   private readonly toolCatalogWriters = new Map<SessionId, ToolCatalogWriter>()
+  /**
+   * Session directory each id last resolved to. A hit re-reads only that
+   * directory; a miss or an emptied directory falls back to the full project
+   * scan. Pruned to the ids each listing finds.
+   */
+  private readonly sessionDirs = new Map<SessionId, string>()
+  /**
+   * Decoded generation headers by log path, guarded by the file revision, so
+   * an unchanged log never decompresses or migrates its header again. Pruned
+   * to the paths each listing finds.
+   */
+  private readonly generationHeaders = new Map<string, { readonly revision: PersistenceRevision; readonly metadata: GenerationHeader }>()
 
   constructor(ctx: Context, public config: Config, private readonly tracker: JsonlBackendTracker) {
     super(ctx)
@@ -505,14 +522,13 @@ class JsonlSessionPersistence extends SessionPersistence {
     const metadata = await this.readGenerationHeader(selected, id, options?.signal)
     if (metadata === undefined) return undefined
     try {
-      const identity = await stat(selected.sourcePath, { bigint: true })
-      options?.signal?.throwIfAborted()
       return {
-        ...metadata,
+        header: metadata.header,
+        formatStatus: metadata.formatStatus,
         revision: selected.sourceVersion < SESSION_FORMAT_VERSION
-          ? SessionPersistenceRevision(`${fileRevision(identity)}:${await this.historicalCorpusRevision(options?.signal)}`)
-          : fileRevision(identity),
-        sizeBytes: Number(identity.size),
+          ? SessionPersistenceRevision(`${fileRevision(metadata.identity)}:${await this.historicalCorpusRevision(options?.signal)}`)
+          : fileRevision(metadata.identity),
+        sizeBytes: Number(metadata.identity.size),
       }
     } catch (error: unknown) {
       options?.signal?.throwIfAborted()
@@ -538,29 +554,15 @@ class JsonlSessionPersistence extends SessionPersistence {
     const artifacts = await this.listArtifacts(signal)
     const corpusRevision = artifacts.some(artifact => artifact.sourceVersion < SESSION_FORMAT_VERSION)
       ? await this.historicalCorpusRevision(signal) : undefined
-    const statted = settledValues(await settleLimited(this.listLimit, artifacts, async (artifact) => {
-      signal?.throwIfAborted()
-      try {
-        const identity = await stat(artifact.path, { bigint: true })
-        signal?.throwIfAborted()
-        return { artifact, identity }
-      } catch (error: unknown) {
-        signal?.throwIfAborted()
-        if (!isENOENT(error)) throw error
-        return undefined
-      }
-    }))
-    for (const entry of statted) {
-      if (entry === undefined) continue
-      const { artifact, identity } = entry
+    for (const artifact of artifacts) {
       listed.add(artifact.header.id)
       snapshots.push({
         header: artifact.header,
         formatStatus: artifact.formatStatus,
         revision: artifact.sourceVersion < SESSION_FORMAT_VERSION
-          ? SessionPersistenceRevision(`${fileRevision(identity)}:${corpusRevision}`)
-          : fileRevision(identity),
-        sizeBytes: Number(identity.size),
+          ? SessionPersistenceRevision(`${fileRevision(artifact.identity)}:${corpusRevision}`)
+          : fileRevision(artifact.identity),
+        sizeBytes: Number(artifact.identity.size),
       })
     }
     for (const [id, entry] of pending) {
@@ -1145,7 +1147,7 @@ class JsonlSessionPersistence extends SessionPersistence {
 
   private async listArtifacts(
     signal?: AbortSignal,
-  ): Promise<Array<GenerationHeader & { path: string; sourceVersion: number }>> {
+  ): Promise<Array<StattedGenerationHeader & { path: string; sourceVersion: number }>> {
     signal?.throwIfAborted()
     await this.ensureRootEncoding()
     signal?.throwIfAborted()
@@ -1161,7 +1163,7 @@ class JsonlSessionPersistence extends SessionPersistence {
         throw error
       }
     })
-    const artifacts: Array<GenerationHeader & { path: string; sourceVersion: number }> = []
+    const artifacts: Array<StattedGenerationHeader & { path: string; sourceVersion: number }> = []
     const ids = new Set<SessionId>()
     for (const outcome of headers) {
       if (outcome.status === 'rejected') throw outcome.reason
@@ -1173,6 +1175,14 @@ class JsonlSessionPersistence extends SessionPersistence {
       ids.add(metadata.header.id)
       artifacts.push({ ...metadata, path: selected.sourcePath, sourceVersion: selected.sourceVersion })
     }
+    const paths = new Set(generations.map(selected => selected.sourcePath))
+    for (const path of this.generationHeaders.keys()) {
+      if (!paths.has(path)) this.generationHeaders.delete(path)
+    }
+    for (const id of this.sessionDirs.keys()) {
+      if (!ids.has(id)) this.sessionDirs.delete(id)
+    }
+    for (const artifact of artifacts) this.sessionDirs.set(artifact.header.id, dirname(artifact.path))
     signal?.throwIfAborted()
     return artifacts
   }
@@ -1182,7 +1192,22 @@ class JsonlSessionPersistence extends SessionPersistence {
     selected: ResolvedJsonlGeneration,
     expectedId?: SessionId,
     signal?: AbortSignal,
-  ): Promise<GenerationHeader | undefined> {
+  ): Promise<StattedGenerationHeader | undefined> {
+    let identity: JsonlPhysicalIdentity
+    try {
+      identity = await stat(selected.sourcePath, { bigint: true })
+    } catch (error: unknown) {
+      signal?.throwIfAborted()
+      if (isENOENT(error)) return undefined
+      throw error
+    }
+    signal?.throwIfAborted()
+    const revision = fileRevision(identity)
+    const cached = this.generationHeaders.get(selected.sourcePath)
+    if (cached?.revision === revision) {
+      await this.assertStoredIdentity(selected.sourcePath, selected.sourceVersion, cached.metadata.header, expectedId, signal)
+      return { header: { ...cached.metadata.header }, formatStatus: cached.metadata.formatStatus, identity }
+    }
     let first: string | undefined
     try {
       first = this.compression === 'zstd'
@@ -1234,10 +1259,8 @@ class JsonlSessionPersistence extends SessionPersistence {
       expectedId,
       signal,
     )
-    return {
-      header,
-      formatStatus: result.status,
-    }
+    this.generationHeaders.set(selected.sourcePath, { revision, metadata: { header, formatStatus: result.status } })
+    return { header: { ...header }, formatStatus: result.status, identity }
   }
 
   /** Convert format-catalog string identities to current branded Session metadata. */
@@ -1298,6 +1321,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     }
     catalogs.commit()
     this.toolCatalogWriters.set(meta.id, catalogs)
+    this.sessionDirs.set(meta.id, dir)
   }
 
   /* v8 ignore start -- Windows uses the Win32 durable-publish path; POSIX coverage exercises this peer. */
@@ -1609,6 +1633,12 @@ class JsonlSessionPersistence extends SessionPersistence {
 
   /** Find the unique authoritative generation for an id across project directories. */
   private async findLog(id: SessionId, signal?: AbortSignal): Promise<ResolvedJsonlGeneration | undefined> {
+    const known = this.sessionDirs.get(id)
+    if (known !== undefined) {
+      const selected = await this.resolveGenerationInDirectory(known, signal)
+      if (selected !== undefined) return selected
+      this.sessionDirs.delete(id)
+    }
     const matches: ResolvedJsonlGeneration[] = []
     for (const project of await this.listProjectDirs(signal)) {
       signal?.throwIfAborted()
@@ -1622,7 +1652,9 @@ class JsonlSessionPersistence extends SessionPersistence {
       throw new Error(`duplicate JSONL session id "${id}" appears in multiple project directories`)
     }
     signal?.throwIfAborted()
-    return matches[0]
+    const found = matches[0]
+    if (found !== undefined) this.sessionDirs.set(id, dirname(found.sourcePath))
+    return found
   }
 
   /** Require an existing configured root to be a readable directory. */
