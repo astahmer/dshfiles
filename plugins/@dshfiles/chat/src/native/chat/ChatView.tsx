@@ -1,7 +1,7 @@
 // An enclosing `[data-conversation-scroll]` owns scrolling when present;
 // otherwise this view owns it. Each row subscribes to one stable node key.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   NodeKey, RenderEntry,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -308,6 +308,11 @@ export function ChatView({
     transcriptView,
   })
   followingTail.current = scroll.followingTail
+  // Back at the newest row (and while new rows stream in), the rows read further up leave the DOM again.
+  const keepTail = transcript.keepTail
+  useLayoutEffect(() => {
+    if (scroll.followingTail) keepTail()
+  }, [scroll.followingTail, keepTail])
   useChatFocus({
     sessionId, viewRequest, completeViewRequest, ready: scroll.initialized,
     railItems, navigateToTurn: scroll.navigateToTurn, listRef: scroll.listRef,
