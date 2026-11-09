@@ -67,6 +67,7 @@ import {
   type ThreadIntegrationCategory,
 } from './thread-integration-state.js'
 import { useToast } from './toast.js'
+import { ProjectBookmarkQuery } from './project-bookmark-query.js'
 import { threadAtQueryKey } from './thread-query-keys.js'
 import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
@@ -872,10 +873,12 @@ export const ThreadWorkspacesPanel = (props: {
       },
     },
   })
+  const repositoriesWithThreads = useMemo(() => repositories.data?.repositories.filter(repository => repository.threads.length > 0), [repositories.data])
+  const panelBookmark = ProjectBookmarkQuery.shared({ repositories: repositoriesWithThreads ?? [], fallback: props.bookmark })
   const integrationJobs = queueSnapshot.context.jobs
   const integrationNotice = queueSnapshot.context.notice
   const noticeOf = (pending: NonNullable<typeof integrationNotice>): IntegrationNotice => {
-    if (pending.kind === 'queued') return { tone: 'default', text: t('integrationQueuedHint', { bookmark: props.bookmark }) }
+    if (pending.kind === 'queued') return { tone: 'default', text: t('integrationQueuedHint', { bookmark: panelBookmark }) }
     if (pending.kind === 'failed') return { tone: 'destructive', text: pending.message.length > 0 ? pending.message : t('loadFailed') }
     if (pending.result.status === 'nothing-to-land') return { tone: 'default', text: t('upToDateNoChanges') }
     return { tone: 'destructive', text: describeLandResult(t, pending.result) }
@@ -894,7 +897,6 @@ export const ThreadWorkspacesPanel = (props: {
   const [search, setSearch] = useState('')
   const [shownCounts, setShownCounts] = useState<Readonly<Partial<Record<RowGroup, number>>>>({})
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string>>(new Set())
-  const repositoriesWithThreads = useMemo(() => repositories.data?.repositories.filter(repository => repository.threads.length > 0), [repositories.data])
   const showRepositoryHeader = (repositoriesWithThreads?.length ?? 0) > 1 || autoIntegrationApplies || excludedRepositoryRoots.length > 0
   const threads = useMemo(
     () => repositoriesWithThreads?.flatMap(repository => repository.threads.map(thread => ({ repository, thread }))) ?? [],
@@ -1053,13 +1055,13 @@ export const ThreadWorkspacesPanel = (props: {
     {
       id: 'ready',
       title: t('readyToIntegrate'),
-      description: t('readyDescription', { bookmark: props.bookmark }),
+      description: t('readyDescription', { bookmark: panelBookmark }),
       tone: 'ready',
     },
     {
       id: 'blocked',
       title: t('blockedHeading'),
-      description: t('blockedDescription', { bookmark: props.bookmark }),
+      description: t('blockedDescription', { bookmark: panelBookmark }),
       tone: 'blocked',
     },
     {
@@ -1071,7 +1073,7 @@ export const ThreadWorkspacesPanel = (props: {
     {
       id: 'completed',
       title: t('completedHeading'),
-      description: t('completedDescription', { bookmark: props.bookmark }),
+      description: t('completedDescription', { bookmark: panelBookmark }),
       tone: 'no-changes',
     },
   ]
@@ -1107,7 +1109,7 @@ export const ThreadWorkspacesPanel = (props: {
       <Page
         scroll
         heading={t('title')}
-        description={t('subtitle', { bookmark: props.bookmark })}
+        description={t('subtitle', { bookmark: panelBookmark })}
         {...(threads.length > 0 ? { count: threads.length } : {})}
         actions={[
           {
@@ -1226,7 +1228,7 @@ export const ThreadWorkspacesPanel = (props: {
                 <StatusGlyph status="ready" decorative />
                 <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
                   <p className="dshx:text-sm dshx:font-semibold">{t('readyBannerTitle', { count: counts.ready })}</p>
-                  <p className="dshx:text-xs dshx:text-muted-foreground">{t('readyBannerBody', { bookmark: props.bookmark })}</p>
+                  <p className="dshx:text-xs dshx:text-muted-foreground">{t('readyBannerBody', { bookmark: panelBookmark })}</p>
                 </div>
                 {selectedEligiblePaths.length === 0 ? null : (
                   <Button size="sm" variant="ghost" disabled={queueBusy || rebasesPending} onClick={() => setSelectedPaths(new Set())}>
@@ -1297,7 +1299,7 @@ export const ThreadWorkspacesPanel = (props: {
                                         />
                                       </div>
                                     </TooltipTrigger>
-                                    <TooltipContent>{t('autoIntegrationToggleHint', { bookmark: props.bookmark })}</TooltipContent>
+                                    <TooltipContent>{t('autoIntegrationToggleHint', { bookmark: repository.bookmark ?? props.bookmark })}</TooltipContent>
                                   </Tooltip>
                                 ) : null}
                               </div>
@@ -1318,7 +1320,7 @@ export const ThreadWorkspacesPanel = (props: {
                                 openSession={props.openSession}
                                 openChanges={props.openChanges}
                                 t={t}
-                                bookmark={props.bookmark}
+                                bookmark={repository.bookmark ?? props.bookmark}
                                 bookmarks={repository.bookmarks}
                                 selected={selectedPaths.has(entry.thread.path)}
                                 selectable={entry.assessment.category === 'ready'}

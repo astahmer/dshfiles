@@ -122,6 +122,8 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
         : `Other folder · ${reviewPath.split('/').filter(Boolean).at(-1) ?? reviewPath}`
       : selectedProject.title
 
+  // An empty base field leaves the base to the Host: the project's main branch (chosen, declared or detected), else
+  // main, master or trunk. The placeholder names the one it used.
   const query = useQuery({
     queryKey: ['pulls-review', reviewPath, baseRef],
     enabled: reviewPath.length > 0,
@@ -316,7 +318,7 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
           ) : null}
           <Input
             aria-label="Base branch or bookmark"
-            placeholder="Base branch (default)"
+            placeholder={baseRef === '' && base !== undefined ? `Base branch (${base})` : 'Base branch (default)'}
             value={baseRef}
             onChange={event => setBaseRef(event.target.value)}
             className="dshx:w-48 dshx:max-w-full dshx:font-mono!"

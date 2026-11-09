@@ -3,6 +3,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Deferred, Effect, Layer, References, Ref } from 'effect'
 import { SessionReads, WorkspaceRegistry } from './host-edges-promise.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
 import { ThreadWorkspaces } from './thread-workspaces.js'
@@ -19,6 +20,7 @@ const fixture = Effect.gen(function* () {
       Layer.mergeAll(
         registry,
         Layer.mock(ThreadWorkspaces, {}),
+        Layer.mock(ProjectBookmarks, {}),
         Layer.mock(SessionReads, {}),
         Layer.mock(SessionActivity, { display: Ref.update(scans, count => count + 1).pipe(Effect.andThen(Deferred.await(release)), Effect.as(undefined)) }),
         Layer.mock(IntegrationRequests, {}),

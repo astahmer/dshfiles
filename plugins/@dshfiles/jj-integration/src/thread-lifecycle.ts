@@ -8,6 +8,7 @@ import { AgentOnly, NoPath, NotARepository, NotAThread, WorkspaceFilesFailed, Wo
 import { ActivityLog, WorkspaceRegistry } from './host-edges-promise.js'
 import { IsolatedSessions } from './integration-requests.js'
 import { JjSettings } from './jj-settings.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { Landing, LandingMessages } from './landing.js'
 import { NoFolderWorkspace } from './no-folder.js'
 import { registeredProjects } from './registered-projects.js'
@@ -36,6 +37,7 @@ const make = Effect.gen(function* () {
   const registry = yield* WorkspaceRegistry
   const isolated = yield* IsolatedSessions
   const settings = yield* JjSettings
+  const projectBookmarks = yield* ProjectBookmarks
   const landing = yield* Landing
   const sync = yield* WorkspaceSync
   const log = yield* ActivityLog
@@ -58,8 +60,16 @@ const make = Effect.gen(function* () {
   const titleFor = (input: { readonly project: { readonly title: string } | undefined; readonly repoRoot: string; readonly name: string }) =>
     `${input.project?.title ?? path.basename(input.repoRoot)} · ${input.name}`
 
-  const destinationAt = Effect.fnUntraced(function* (input: { readonly root: string; readonly isolated: boolean; readonly projectWorkspaceId: string | null }) {
-    const [bookmarks, vcs] = yield* Effect.all([threads.bookmarks(input.root), threads.vcsAt(input.root)], { concurrency: 'unbounded' })
+  const destinationAt = Effect.fnUntraced(function* (input: {
+    readonly root: string
+    readonly repoRoot: string
+    readonly isolated: boolean
+    readonly projectWorkspaceId: string | null
+  }) {
+    const [bookmarks, vcs, targetBookmark] = yield* Effect.all(
+      [threads.bookmarks(input.root), threads.vcsAt(input.root), projectBookmarks.bookmarkFor(input.repoRoot)],
+      { concurrency: 'unbounded' },
+    )
     return {
       vcs,
       isolated: input.isolated,
@@ -67,6 +77,7 @@ const make = Effect.gen(function* () {
       bookmark: bookmarks.current,
       bookmarks: [...bookmarks.names],
       isolateByDefault: yield* isolateByDefault,
+      targetBookmark,
     } satisfies DestinationView
   })
 
@@ -86,7 +97,7 @@ const make = Effect.gen(function* () {
       return {
         workspaceId: project?.id ?? source.id,
         isolated: false,
-        destination: yield* destinationAt({ root: repoRoot, isolated: false, projectWorkspaceId: project?.id ?? null }),
+        destination: yield* destinationAt({ root: repoRoot, repoRoot, isolated: false, projectWorkspaceId: project?.id ?? null }),
       }
     const thread = yield* threads.provision(repoRoot, input.base, input.name)
     const workspace = yield* registry.create({ path: thread.path, title: titleFor({ project, repoRoot, name: thread.name }) })
@@ -95,7 +106,7 @@ const make = Effect.gen(function* () {
     return {
       workspaceId: workspace.id,
       isolated: true,
-      destination: yield* destinationAt({ root: thread.path, isolated: true, projectWorkspaceId: project?.id ?? null }),
+      destination: yield* destinationAt({ root: thread.path, repoRoot, isolated: true, projectWorkspaceId: project?.id ?? null }),
     }
   })
 
@@ -138,13 +149,36 @@ const make = Effect.gen(function* () {
     const [project, located] = yield* Effect.all(
       [
         registry.resolveByPath(location.value.repoRoot),
-        destinationAt({ root: location.value.workspaceRoot, isolated: location.value.threadName !== undefined, projectWorkspaceId: null }),
+        destinationAt({
+          root: location.value.workspaceRoot,
+          repoRoot: location.value.repoRoot,
+          isolated: location.value.threadName !== undefined,
+          projectWorkspaceId: null,
+        }),
       ],
       { concurrency: 'unbounded' },
     )
     // A new thread that will isolate on its first send finds its workspace already checked out.
     if (location.value.threadName === undefined && located.isolateByDefault) yield* threads.prewarm(location.value.repoRoot)
     return withOwnership({ ...located, projectWorkspaceId: project?.id ?? null })
+  })
+
+  /** The main branch of the project holding `path`, with every layer that could decide it and the bookmarks to pick from. */
+  const projectBookmark = Effect.fn('thread lifecycle project bookmark')(function* (input: { readonly path: string }) {
+    const location = yield* threads.locate(input.path)
+    const [resolved, bookmarks] = yield* Effect.all([projectBookmarks.describe(location.repoRoot), threads.bookmarks(location.repoRoot)], {
+      concurrency: 'unbounded',
+    })
+    return { ...resolved, bookmarks: [...bookmarks.names] }
+  })
+
+  /** Settings › Projects and `jj_set_project_bookmark`: record the choice for the owning checkout, then re-read every view. */
+  const setProjectBookmark = Effect.fn('thread lifecycle set project bookmark')(function* (input: { readonly path: string; readonly bookmark: string | null }) {
+    const location = yield* threads.locate(input.path)
+    yield* projectBookmarks.choose({ repositoryRoot: location.repoRoot, bookmark: input.bookmark })
+    // Repository views, thread status and Land compare against the new branch from their next read.
+    yield* views.invalidate
+    return yield* projectBookmark({ path: location.repoRoot })
   })
 
   const ownWorkspaceFor = Effect.fn('thread lifecycle own workspace')(function* (input: { readonly workspaceId: string }) {
@@ -269,7 +303,7 @@ const make = Effect.gen(function* () {
       location,
       caller: caller.kind === 'agent' ? { fromAgent: true, sessionId: caller.sessionId } : { fromAgent: false, sessionId: undefined },
     })
-    return { bookmark: (yield* settings.get).bookmark, thread: found?.thread ?? null }
+    return { bookmark: yield* projectBookmarks.bookmarkFor(location.repoRoot), thread: found?.thread ?? null }
   })
 
   const landThread = Effect.fn('thread lifecycle land thread')(function* (
@@ -297,7 +331,7 @@ const make = Effect.gen(function* () {
       yield* isolated.forget(found.thread.path)
       const correlationId = randomUUID()
       yield* log.emit({ type: 'workspace.discarded', summary: `Removed thread workspace ${found.thread.name}`, path: input.path, correlationId })
-      yield* sync.enqueue({ repoRoot: found.repoRoot, bookmark: (yield* settings.get).bookmark, correlationId })
+      yield* sync.enqueue({ repoRoot: found.repoRoot, bookmark: yield* projectBookmarks.bookmarkFor(found.repoRoot), correlationId })
       yield* views.invalidate
     }
     return { status: outcome.status, revisions: outcome.status === 'has-work' ? [...outcome.revisions] : [] }
@@ -341,6 +375,8 @@ const make = Effect.gen(function* () {
     provision,
     isolate,
     destination,
+    projectBookmark,
+    setProjectBookmark,
     ownWorkspaceFor,
     classifyWorkspaces,
     projects,

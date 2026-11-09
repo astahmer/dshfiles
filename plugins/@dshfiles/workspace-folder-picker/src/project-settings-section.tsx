@@ -1,4 +1,4 @@
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useRegistry } from '@dshfiles/dshx/client'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
@@ -8,6 +8,7 @@ import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { projectLifecycleApi, type LoadedProjectConfigOutput } from './project-lifecycle-api.js'
 import { projectCheckSnippet, projectSettingRows } from './project-settings.js'
+import { ProjectSettingsPanels, type ProjectSettingsPanelProps } from './project-settings-panels.js'
 
 const projectsKey = ['workspace-folder-picker', 'projects'] as const
 
@@ -40,6 +41,7 @@ const SettingList = (props: { readonly config: LoadedProjectConfigOutput }): JSX
           ) : (
             <span className="dshx:break-words">{row.declared}</span>
           )}
+          {row.overriddenBy === null ? null : <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{row.overriddenBy}</p>}
         </dd>
       </div>
     ))}
@@ -127,6 +129,19 @@ const ProjectConfigDetail = (props: { readonly path: string }): JSX.Element => {
   )
 }
 
+/** Settings other plugins keep for this project (its main branch), above what the repository file declares. */
+const ProvidedPanels = (props: ProjectSettingsPanelProps): JSX.Element | null => {
+  const panels = [...useRegistry(ProjectSettingsPanels)].sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
+  if (panels.length === 0) return null
+  return (
+    <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
+      {panels.map(panel => (
+        <panel.Panel key={panel.id} {...props} />
+      ))}
+    </div>
+  )
+}
+
 const ProjectChoice = (props: { readonly project: { readonly workspaceId: string; readonly title: string; readonly path: string } }): JSX.Element => {
   const choiceId = `project-${props.project.workspaceId}`
   return (
@@ -175,7 +190,8 @@ export const ProjectSettingsSection = (): JSX.Element => {
     <section className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:max-w-2xl dshx:flex-col dshx:gap-4">
       <h2 className="dshx:m-0 dshx:text-lg dshx:font-semibold">Projects</h2>
       <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">
-        This section only shows the values a repository declares in dsh.project.json, with the tier that wins for each key. Nothing in that file runs.
+        Choose per-project settings, and see the values a repository declares in dsh.project.json with the tier that wins for each key. Nothing in that file
+        runs.
       </p>
       {projects.length === 0 ? (
         <p role="status" className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">
@@ -192,6 +208,9 @@ export const ProjectSettingsSection = (): JSX.Element => {
             <ProjectChoice key={project.workspaceId} project={project} />
           ))}
         </RadioGroup>
+      )}
+      {selected === undefined ? null : (
+        <ProvidedPanels key={`panels-${selected.path}`} workspaceId={selected.workspaceId} name={selected.title} path={selected.path} />
       )}
       {selected === undefined ? null : <ProjectConfigDetail key={selected.path} path={selected.path} />}
     </section>

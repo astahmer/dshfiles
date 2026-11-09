@@ -18,6 +18,10 @@
       "types": "./src/api.ts",
       "default": "./dist/api.js"
     },
+    "./project-bookmark": {
+      "types": "./src/project-bookmark-query.ts",
+      "default": "./dist/project-bookmark.js"
+    },
     "./settings": {
       "types": "./src/settings.ts",
       "default": "./dist/settings.js"

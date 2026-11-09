@@ -72,6 +72,7 @@ export class ReviewGit extends Context.Service<ReviewGit, ReviewBackend>()('@dsh
       return ReviewGit.of({
         vcs: 'git',
         baseCandidates: ['main', 'master', 'trunk', 'origin/main', 'origin/master', 'origin/trunk'],
+        projectCandidates: branch => [branch, `origin/${branch}`],
         liveHead: 'HEAD',
         savedRevision: id => id,
         resolves: input => Effect.map(commit(input), short => short.length > 0),

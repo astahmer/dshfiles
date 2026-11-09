@@ -10,6 +10,7 @@ import { Executables } from './executables-promise.js'
 import { ActivityLog, SettledThreads, WorkspaceRegistry } from './host-edges-promise.js'
 import { JjSettings } from './jj-settings.js'
 import { MaintenanceFailures } from './maintenance-failures.js'
+import { ProjectBookmarkModel, ProjectBookmarks } from './project-bookmarks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SettleCleanupModel } from './settle-cleanup.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
@@ -37,6 +38,7 @@ export const MaintenanceLive = Layer.effectDiscard(
     const lifecycle = yield* ThreadLifecycle
     const cleanup = yield* Cleanup
     const settings = yield* JjSettings
+    const projectBookmarks = yield* ProjectBookmarks
     const settled = yield* SettledThreads
     const log = yield* ActivityLog
     const apis = yield* HostApis
@@ -84,7 +86,7 @@ export const MaintenanceLive = Layer.effectDiscard(
       return Effect.logDebug(`jj-integration: automatic cleanup ${outcome.jobId} failed: ${outcome.message}`)
     }
 
-    const reportAutoFetch = Effect.fnUntraced(function* (outcome: FetchOutcome) {
+    const reportAutoFetch = Effect.fnUntraced(function* (outcome: FetchOutcome, bookmark: string) {
       const current = yield* settings.get
       if (outcome.status === 'failed') {
         return yield* log.emit({
@@ -99,7 +101,7 @@ export const MaintenanceLive = Layer.effectDiscard(
       yield* views.invalidate
       yield* log.emit({
         type: 'repository.fetched',
-        summary: `Automatic fetch moved ${current.bookmark} in ${path.basename(outcome.repoRoot)}`,
+        summary: `Automatic fetch moved ${bookmark} in ${path.basename(outcome.repoRoot)}`,
         path: outcome.repoRoot,
         level: 'routine',
       })
@@ -109,9 +111,10 @@ export const MaintenanceLive = Layer.effectDiscard(
       const current = yield* settings.get
       if (!current.autoFetch.enabled) return
       for (const [repoRoot, vcs] of yield* repositoryRoots) {
-        const input = { repoRoot, remote: current.autoFetch.remote, bookmark: current.bookmark, fastForward: current.autoFetch.fastForwardBookmark }
+        const bookmark = yield* projectBookmarks.bookmarkFor(repoRoot)
+        const input = { repoRoot, remote: current.autoFetch.remote, bookmark, fastForward: current.autoFetch.fastForwardBookmark }
         const outcome = yield* vcs === 'git' ? AutoFetchModel.fetchGitRepository(input) : AutoFetchModel.fetchRepository(input)
-        yield* reportAutoFetch(outcome)
+        yield* reportAutoFetch(outcome, bookmark)
       }
     })
 
@@ -293,5 +296,7 @@ export const MaintenanceLive = Layer.effectDiscard(
     )
     yield* DshxPlugin.worker(settleCleanup)
     yield* DshxPlugin.worker(statusWarmup)
+    // A new main branch (Settings › Projects, or the global fallback) changes what every cached view compares against.
+    yield* DshxPlugin.worker(Stream.runForEach(ProjectBookmarkModel.mainBranchChanges(settings.changes), () => views.invalidate))
   }),
 )

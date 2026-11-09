@@ -24,7 +24,9 @@ import {
   ownWorkspaceForInputSchema,
   ownWorkspaceForOutputSchema,
   pathInputSchema,
+  projectBookmarkOutputSchema,
   projectsOutputSchema,
+  setProjectBookmarkInputSchema,
   provisionInputSchema,
   provisionOutputSchema,
   queuedAtOutputSchema,
@@ -56,6 +58,21 @@ const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Out
 export type ThreadRevisionView = JjRevisionView
 export type ThreadView = JjThreadView
 export type RepositoryView = JjRepositoryView
+/** One project's main branch and the layer that chose it, as `projectBookmark` returns it. */
+export type ProjectBookmarkView = typeof projectBookmarkOutputSchema.Type
+
+/** One line an agent reads: the branch, the layer that chose it, and every layer that could have. */
+const renderProjectBookmark = (output: ProjectBookmarkView): string =>
+  [
+    `${output.repositoryRoot}: main branch ${output.bookmark}`,
+    `chosen by ${{ project: 'the project setting', file: 'dsh.project.json', detected: 'origin’s default branch', global: 'the global setting' }[output.source]}`,
+    output.override === null ? undefined : `project setting ${output.override}`,
+    output.declared === null ? undefined : `dsh.project.json ${output.declared}`,
+    output.detected === null ? undefined : `origin default ${output.detected}`,
+    `global ${output.fallback}`,
+  ]
+    .filter(part => part !== undefined)
+    .join(' · ')
 
 const landResultSchema = Schema.Struct({
   status: Schema.Literals(['landed', 'nothing-to-land', 'needs-description', 'conflicted']),
@@ -225,6 +242,7 @@ export const jjIntegrationApi = defineApi({
             output.vcs === 'jj' ? 'Jujutsu repository' : output.vcs === 'git' ? 'Git repository' : 'No jj or git repository',
             output.isolated ? 'isolated thread workspace' : undefined,
             `bookmark ${output.bookmark ?? 'none'}`,
+            output.targetBookmark === undefined ? undefined : `main branch ${output.targetBookmark}`,
             output.bookmarks.length === 0 ? undefined : `available: ${output.bookmarks.join(', ')}`,
             output.ownedByAnotherSession === true ? 'owned by another thread' : undefined,
           ]
@@ -249,6 +267,20 @@ export const jjIntegrationApi = defineApi({
       },
     }),
     noFolder: method({ input: emptyInputSchema, output: noFolderOutputSchema }),
+    projectBookmark: method({
+      input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) }),
+      output: projectBookmarkOutputSchema,
+      description:
+        'The main branch of the project holding a path: the bookmark its thread workspaces start from, Land advances, and source control and Changes compare against, with the layer that chose it (Settings › Projects choice, dsh.project.json, origin’s default branch, or the global setting). Read-only.',
+      tool: { name: 'jj_project_bookmark', readOnly: true, render: output => renderProjectBookmark(output) },
+    }),
+    setProjectBookmark: method({
+      input: setProjectBookmarkInputSchema,
+      output: projectBookmarkOutputSchema,
+      description:
+        'Choose the main branch of the project holding a path, as Settings › Projects does: new thread workspaces start from it, Land advances it, and source control and Changes compare against it. `bookmark: null` removes the choice so dsh.project.json, origin’s default branch or the global setting decide again (reverse it the same way). Returns the new resolution. Call only when the user asked to change that project’s main branch.',
+      tool: { name: 'jj_set_project_bookmark', render: output => renderProjectBookmark(output) },
+    }),
     repositories: method({
       input: emptyInputSchema,
       output: jjRepositoriesEffectSchema,
@@ -371,7 +403,7 @@ export const jjIntegrationApi = defineApi({
       input: threadPathInputSchema,
       output: Schema.Struct({ bookmark: Schema.String, thread: Schema.NullOr(jjThreadEffectSchema) }),
       description:
-        'Show this thread’s jj workspace: its revisions not yet on the target bookmark (main by default), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.',
+        'Show this thread’s jj workspace: its revisions not yet on the project’s main branch (Settings › Projects), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.',
       tool: {
         name: 'jj_thread_status',
         readOnly: true,
@@ -385,7 +417,7 @@ export const jjIntegrationApi = defineApi({
       input: Schema.Struct({ ...threadPathInputSchema.fields, bookmark: Schema.optional(Schema.String.check(Schema.isMinLength(1))) }),
       output: Schema.Struct({ summary: Schema.String, result: Schema.NullOr(landResultSchema) }),
       description:
-        'Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',
+        'Integrate this thread’s described work into the project’s main branch (Settings › Projects) unless another bookmark is named: rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',
       tool: { name: 'jj_thread_rebase', render: output => output.summary },
     }),
     workspaceSetup: method({

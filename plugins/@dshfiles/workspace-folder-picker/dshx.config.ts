@@ -10,6 +10,7 @@ export default defineConfig({
     picker: 'src/picker/index.ts',
     'project-icon-view': 'src/project-icon-view.tsx',
     'project-config': 'src/project-config.ts',
+    'project-settings-panels': 'src/project-settings-panels.ts',
     'repository-setup-contract': 'src/repository-setup-contract.ts',
   },
   host: { entry: 'src/host.ts' },

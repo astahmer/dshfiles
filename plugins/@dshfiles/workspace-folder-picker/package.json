@@ -40,6 +40,10 @@
       "types": "./src/project-config.ts",
       "default": "./dist/project-config.js"
     },
+    "./project-settings-panels": {
+      "types": "./src/project-settings-panels.ts",
+      "default": "./dist/project-settings-panels.js"
+    },
     "./project-icon-view": {
       "types": "./src/project-icon-view.tsx",
       "default": "./dist/project-icon-view.js"

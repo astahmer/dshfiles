@@ -12,9 +12,11 @@ const options = (input: {
   readonly repoId: string | null
   readonly refreshedAt: number
   readonly onScreen: boolean
+  /** The project's main branch the `main` landmarks name. */
+  readonly bookmark: string
   readonly read: (repoId: string, signal: AbortSignal) => Promise<GraphNavigation>
 }) => ({
-  queryKey: ['jujutsu-landmarks', input.root, input.repoId, input.refreshedAt] as const,
+  queryKey: ['jujutsu-landmarks', input.root, input.repoId, input.bookmark, input.refreshedAt] as const,
   queryFn: ({ signal }: { readonly signal: AbortSignal }) => input.read(input.repoId ?? '', signal),
   enabled: input.repoId !== null && input.onScreen && input.refreshedAt > 0,
   retry: false,

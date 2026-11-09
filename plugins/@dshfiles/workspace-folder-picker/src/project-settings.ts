@@ -14,6 +14,8 @@ export interface ProjectSettingRow {
   readonly tierLabel: string
   /** What applies instead while the file declares nothing. */
   readonly fallback: string
+  /** A per-project profile choice that wins over the file, when the key has one; null otherwise. */
+  readonly overriddenBy: string | null
 }
 
 interface SettingDefinition {
@@ -21,6 +23,7 @@ interface SettingDefinition {
   readonly label: string
   readonly tierWhenAbsent: Exclude<ProjectSettingTier, 'file'>
   readonly fallback: string
+  readonly overriddenBy?: string
   readonly format: (config: ProjectConfig) => string | null
 }
 
@@ -41,9 +44,10 @@ const definitions: readonly SettingDefinition[] = [
   },
   {
     key: 'bookmark',
-    label: 'Bookmark',
+    label: 'Main branch',
     tierWhenAbsent: 'profile',
-    fallback: 'The profile setting',
+    fallback: 'Origin’s default branch, else the global Bookmark setting',
+    overriddenBy: 'A main branch chosen for this project in your profile wins over this file.',
     format: config => config.bookmark ?? null,
   },
   {
@@ -80,6 +84,7 @@ export const projectSettingRows = (config: ProjectConfig | null): readonly Proje
       tier,
       tierLabel: tierLabels[tier],
       fallback: definition.fallback,
+      overriddenBy: definition.overriddenBy ?? null,
     }
   })
 

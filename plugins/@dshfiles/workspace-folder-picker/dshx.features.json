@@ -549,8 +549,8 @@
     {
       "id": "project-settings-section",
       "title": "Read a project's declared settings",
-      "summary": "Settings › Projects lists the Host's registered projects, leaving out jj thread workspaces, and reads the chosen project's dsh.project.json. Each declared key shows its value and the tier that wins: the file when it declares the key, the profile setting for the new-thread workspace and bookmark, and a built-in default otherwise. A missing or invalid file is reported without changing anything. Each suggested script offers Copy entry, which puts the exact trusted project-checks profile entry on the clipboard for an operator to paste; nothing is imported automatically and the file never runs a command. The project_projects agent tool lists the same projects.",
-      "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Projects\"", "expect text \"dsh.project.json\""],
+      "summary": "Settings › Projects lists the Host's registered projects, shows the panels other plugins register for the chosen project (`project-settings-panels`, such as its main branch), leaving out jj thread workspaces, and reads the chosen project's dsh.project.json. Each declared key shows its value and the tier that wins: the file when it declares the key, the profile setting for the new-thread workspace and bookmark, and a built-in default otherwise. A missing or invalid file is reported without changing anything. Each suggested script offers Copy entry, which puts the exact trusted project-checks profile entry on the clipboard for an operator to paste; nothing is imported automatically and the file never runs a command. The project_projects agent tool lists the same projects.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Projects\"", "expect region \"Declared project settings\""],
       "surfaces": ["client", "host", "tool"],
       "surface": "settingsSection",
       "destination": "settings",
