@@ -17,7 +17,7 @@
       "local": "locale"
     }
   ],
-  "added": ["src/native/cold-reads.ts", "src/native/control.test.ts"],
+  "added": ["src/native/client/sessions/share-record.ts", "src/native/cold-reads.ts", "src/native/control.test.ts"],
   "delta": [
     "src/native/assistant-stream.ts",
     "src/native/catalog.ts",
