@@ -300,6 +300,14 @@ export class Session implements SessionFace {
     this.actx = undefined
   }
 
+  /**
+   * True while a live ClientSessions scope holds this instance. A view retains its scope before it subscribes (React
+   * subscribes after commit), so `mounted` alone misses a Session that is opening on screen.
+   */
+  get scoped(): boolean {
+    return this.actx !== undefined
+  }
+
   // ---- Operations ----
 
   /**
