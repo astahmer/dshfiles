@@ -1,5 +1,5 @@
 import type { Revision } from './api.js'
-import type { RevisionGraphRow } from './graph.js'
+import type { RevisionGraphRow } from '@dshfiles/jj-integration/revision-graph'
 
 /** One virtualized row of the revision graph: a date/push heading or a revision with its graph layout. */
 export type RevisionListItem<Row extends Pick<Revision, 'commitId'> = Revision> =

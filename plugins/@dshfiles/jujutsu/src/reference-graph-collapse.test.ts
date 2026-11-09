@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Revision } from './api.js'
-import { RevisionGraphModel } from './graph.js'
+import { RevisionGraphLayout } from '@dshfiles/jj-integration/revision-graph'
 import { ReferenceGraphModel } from './reference-graph.js'
 
 const id = (name: string) => name.padEnd(40, '0').replace(/[^0-9a-f]/g, 'a')
@@ -31,7 +31,7 @@ const revision = (name: string, parents: readonly string[]): Revision => ({
 const layout = (revisions: readonly Revision[], listedCommitIds: readonly string[]) => {
   const byId = new Map(revisions.map(item => [item.commitId, item]))
   const listed = listedCommitIds.flatMap(commitId => byId.get(commitId) ?? [])
-  return RevisionGraphModel.layoutRevisionGraph(listed, byId, false)
+  return RevisionGraphLayout.layoutRevisionGraph(listed, byId, false)
 }
 
 describe('ReferenceGraphModel.collapseHidden', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Revision } from './api.js'
 import { GraphNavigationModel, type GraphFilters } from './graph-navigation.js'
-import { RevisionGraphModel } from './graph.js'
+import { RevisionGraphLayout } from '@dshfiles/jj-integration/revision-graph'
 import { resolveGraphSelection } from './graph-selection.js'
 
 const revision = (commitId: string, parents: string[] = [], overrides: Partial<Revision> = {}): Revision => ({
@@ -86,7 +86,7 @@ describe('graph navigation projection', () => {
   it('filters search before layout so omitted parents become honest dashed bridges', () => {
     const revisions = [revision('tip', ['middle'], { description: 'match' }), revision('middle', ['root']), revision('root', [], { description: 'match' })]
     const projection = GraphNavigationModel.filterGraphRevisions(revisions, filters({ text: 'match' }))
-    const rows = RevisionGraphModel.layoutRevisionGraph(projection, new Map(revisions.map(row => [row.commitId, row])), false)
+    const rows = RevisionGraphLayout.layoutRevisionGraph(projection, new Map(revisions.map(row => [row.commitId, row])), false)
     expect(rows.map(row => row.commitId)).toEqual(['tip', 'root'])
     expect(rows[0]?.outgoing.some(link => link.dashed)).toBe(true)
   })

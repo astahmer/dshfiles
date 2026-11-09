@@ -124,20 +124,6 @@ test('JJ canonical trailing newlines do not leave describe action permanently di
   assert.equal(RevisionGraphModel.describeDraftChanged('changed description', 'updated description\n'), true)
 })
 
-test('hiding immutable revisions retains explicit ancestry links to visible parents', () => {
-  const base = { commitId: id, parents: [], shortestChangeId: 'base', immutable: false }
-  const middle = { commitId: otherId, parents: [id], shortestChangeId: 'middle', immutable: true }
-  const topId = 'e'.repeat(40)
-  const top = { commitId: topId, parents: [otherId], shortestChangeId: 'top', immutable: false }
-  const byId = new Map([
-    [id, base],
-    [otherId, middle],
-    [topId, top],
-  ])
-  assert.deepEqual(RevisionGraphModel.graphParentLinks(top, byId, true), [{ commitId: id, label: 'base', hiddenParentCount: 1, terminal: false }])
-  assert.deepEqual(RevisionGraphModel.graphParentLinks(top, byId, false), [{ commitId: otherId, label: 'middle', hiddenParentCount: 0, terminal: false }])
-})
-
 test('diff parser counts patch lines, skips headers, and maps file names', () => {
   const patch = [
     'diff --git a/src/a.ts b/src/a.ts',

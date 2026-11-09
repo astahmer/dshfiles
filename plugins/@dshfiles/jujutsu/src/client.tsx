@@ -75,7 +75,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import * as Schema from 'effect/Schema'
 import { REVISION_PAGE_SIZE, type GraphLandmark, type Mutation, type ReadFailure, type Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
-import { RevisionGraphModel, reverseHexChangeId, type RevisionGraphRow } from './graph.js'
+import { RevisionGraphModel, reverseHexChangeId } from './graph.js'
 import { RevisionSectionList } from './revision-section-list.js'
 import { GraphPagingModel } from './graph-paging.js'
 import { useAutoRefresh } from './auto-refresh.js'
@@ -88,7 +88,15 @@ import { repositoryLoadingState } from './repository-loading.js'
 import { repositoryRegistrationMachine } from './repository-registration-machine.js'
 import { openGraphRepository } from './repository-opening.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
-import { GRAPH_DENSITY, GraphLanes, graphWidthFor, RevisionGraphCell, type GraphMetrics } from './revision-graph-cell.js'
+import {
+  GRAPH_DENSITY,
+  GraphLanes,
+  graphWidthFor,
+  RevisionGraphCell,
+  RevisionGraphLayout,
+  type GraphMetrics,
+  type RevisionGraphRow,
+} from '@dshfiles/jj-integration/revision-graph'
 import { ANCESTOR_COUNT_OPTIONS, usePreferences, type RevisionDate } from './preferences.js'
 import { jujutsuReviewProgressApi, type ReviewProgressSnapshot, type ReviewProgressToggle } from './review-progress-api.js'
 import { MAX_REVIEW_STORE_BYTES, ReviewProgressModel, reviewStoreSchema, type ReviewChange, type ReviewStore } from './review-progress.js'
@@ -638,7 +646,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       hidden: navigation.hidden,
       revealed: new Set(navigation.revealed.map(row => row.commitId)),
     })
-    return RevisionGraphModel.layoutRevisionGraph(graphRevisions, revisionsByCommitId, false, projectBookmark)
+    return RevisionGraphLayout.layoutRevisionGraph(graphRevisions, revisionsByCommitId, false, projectBookmark)
   }, [
     allRevisions,
     revisionsByCommitId,
@@ -1698,7 +1706,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </Button>
             {reviewOpenFailed && (
               <span className="dshx:basis-full dshx:text-destructive" role="alert">
-                The review could not open. Select at most 30 revisions, and add @dshfiles/pulls-review to the profile if it is missing.
+                The review could not open. Select at most 30 revisions, and add @dshfiles/diffs-review to the profile if it is missing.
               </span>
             )}
           </div>
