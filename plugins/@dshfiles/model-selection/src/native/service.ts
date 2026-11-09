@@ -35,6 +35,29 @@ interface LiveState {
 
 const contextWindowSchema = Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0)))
 
+/** The part of the Client `connection` service read here; its Context property is only typed on the Host side. */
+interface ConnectionGenerationView {
+  readonly interactions: string
+  readonly generation: { getSnapshot(): unknown }
+}
+const connectionGenerationSchema = Schema.declare<ConnectionGenerationView>(
+  (value): value is ConnectionGenerationView =>
+    typeof value === 'object' && value !== null
+    && 'interactions' in value && typeof value.interactions === 'string'
+    && 'generation' in value && typeof value.generation === 'object' && value.generation !== null
+    && 'getSnapshot' in value.generation && typeof value.generation.getSnapshot === 'function',
+)
+
+/**
+ * Whether Host change events already reach this page. The gateway starts the connection after every boot row loaded,
+ * so a boot-time plugin sees no generation yet; without a live event stream (`interactions: 'none'`) none ever comes.
+ */
+const isConnected = (ctx: Context): boolean => {
+  const connection = Schema.decodeUnknownOption(connectionGenerationSchema)(ctx.get('connection'))
+  if (Option.isNone(connection)) return true
+  return connection.value.interactions === 'none' || connection.value.generation.getSnapshot() !== undefined
+}
+
 /** The `ctx.modelDirectories` session model-selection service. */
 export class ModelDirectoryResolver extends Service {
   static inject = ['sessions', 'sessionDrafts', 'remote', 'remote.session', 'remote.commands']
@@ -54,10 +77,10 @@ export class ModelDirectoryResolver extends Service {
       version: 1,
       methods: ['contextWindow'],
     })
-    this.catalog = new ModelCatalogDirectory(ctx)
+    this.catalog = new ModelCatalogDirectory(ctx, isConnected(ctx))
     void this.catalog.load().catch(() => { /* selectors expose the shared error */ })
     ctx.on('connection/reset', () => {
-      this.catalog.resetGeneration()
+      this.catalog.connectionReset()
       for (const directory of this.live.directories.values) directory.resetConnected()
     })
     ctx.remote.$on('llm/adapters-updated', () => { this.catalog.scheduleRefresh() })

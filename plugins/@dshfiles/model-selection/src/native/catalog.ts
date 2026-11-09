@@ -44,11 +44,18 @@ export class ModelCatalogDirectory {
   /** `performance.now()` of the last Host change: a shared read that started earlier may predate it. */
   private changedAt = Number.NEGATIVE_INFINITY
 
+  /** Settles on the page's first connected generation: Host change events are only delivered from then on. */
+  private readonly connected: Promise<void>
+  private markConnected: (() => void) | undefined
+
   /**
    * @param ctx - the providing plugin's context, whose `remote.session`
    * namespace carries the Host-generation catalog.
+   * @param connected - whether the connection already has a generation; otherwise reads wait for the first one.
    */
-  constructor(private readonly ctx: ClientContext) {}
+  constructor(private readonly ctx: ClientContext, connected = true) {
+    this.connected = connected ? Promise.resolve() : new Promise((resolve) => { this.markConnected = resolve })
+  }
 
   /**
    * Return the current generation's catalog, sharing its one in-flight load.
@@ -65,7 +72,7 @@ export class ModelCatalogDirectory {
     })
     const operation = joinPageRead({
       key: MODEL_CATALOG_READ,
-      read: () => this.ctx.remote.session.modelCatalog(),
+      read: () => this.connected.then(() => this.ctx.remote.session.modelCatalog()),
       notBefore: this.changedAt,
     }).then((response) => {
       if (!response.ok) {
@@ -145,8 +152,21 @@ export class ModelCatalogDirectory {
     this.burstStartedAt = undefined
   }
 
+  /**
+   * A connection generation became ready. The page's first one releases the reads that waited for it, which then
+   * cannot miss a change event, so it needs no reread; every later one is a reconnect to a possibly new Host.
+   */
+  connectionReset(): void {
+    if (this.markConnected === undefined) {
+      this.resetGeneration()
+      return
+    }
+    this.markConnected()
+    this.markConnected = undefined
+  }
+
   /** Clear Host-specific values and load the replacement Host generation. */
-  resetGeneration(): void {
+  private resetGeneration(): void {
     this.cancelScheduledRefresh()
     this.changedAt = performance.now()
     this.reasoning.clear()

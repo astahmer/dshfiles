@@ -133,8 +133,29 @@ describe('ModelCatalogDirectory.scheduleRefresh', () => {
     const { catalog, modelCatalog } = fixture()
     await catalog.load()
     catalog.scheduleRefresh()
-    catalog.resetGeneration()
+    catalog.connectionReset()
     await vi.advanceTimersByTimeAsync(50)
+    expect(modelCatalog).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('ModelCatalogDirectory.connectionReset', () => {
+  it('reads once at boot: reads wait for the first connected generation, which needs no reread', async () => {
+    const ctx = new Context()
+    const modelCatalog = vi.fn(async () => ({ ok: true as const, value: catalogValue }))
+    ctx.provide('remote', { session: { modelCatalog } })
+    const catalog = new ModelCatalogDirectory(ctx, false)
+    const boot = catalog.load()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(modelCatalog).not.toHaveBeenCalled()
+
+    catalog.connectionReset()
+    await boot
+    expect(modelCatalog).toHaveBeenCalledTimes(1)
+    expect(catalog.store.getSnapshot().status).toBe('ready')
+
+    catalog.connectionReset()
+    await vi.advanceTimersByTimeAsync(0)
     expect(modelCatalog).toHaveBeenCalledTimes(2)
   })
 })

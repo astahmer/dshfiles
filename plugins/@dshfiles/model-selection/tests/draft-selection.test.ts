@@ -121,7 +121,7 @@ describe('shared model directory', () => {
     const { catalog, directory, list, selectModel } = fixture()
     await directory.load()
     await directory.select(chosen)
-    catalog.resetGeneration()
+    catalog.connectionReset()
     directory.resetConnected()
     expect(directory.store.getSnapshot().current).toEqual(chosen)
     expect(list.getSnapshot()[sessionId]?.model).toEqual(chosen)
