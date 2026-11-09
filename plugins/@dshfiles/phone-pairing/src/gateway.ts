@@ -69,6 +69,13 @@ export const createPairingGateway = (options: GatewayOptions) => {
   const authority = `127.0.0.1:${options.upstream}`
   const nativeOrigin = `http://${authority}`
   const active = new Set<{ credential: string; sockets: Set<{ destroy: () => void }> }>()
+  const closeCredential = (credential: string): void => {
+    for (const entry of active) {
+      if (entry.credential !== credential) continue
+      for (const socket of entry.sockets) socket.destroy()
+      active.delete(entry)
+    }
+  }
 
   const authorised = (request: http.IncomingMessage): string | undefined => {
     const credential = cookieOf(request.headers.cookie)
@@ -226,6 +233,10 @@ export const createPairingGateway = (options: GatewayOptions) => {
 
   return {
     server,
+    /** Close sockets whose device credential no longer authenticates (revocation). */
+    closeUnauthorised: (): void => {
+      for (const entry of active) if (options.store.authenticate(entry.credential) === undefined) closeCredential(entry.credential)
+    },
     closeAll: (): void => {
       for (const entry of active) for (const socket of entry.sockets) socket.destroy()
       active.clear()

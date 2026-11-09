@@ -25,13 +25,14 @@
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
-    "@dshfiles/dshx": "workspace:*",
     "@deepseek-ai/schemastery": "3.18.5",
+    "@dshfiles/dshx": "workspace:*",
     "@nuintun/qrcode": "5.1.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-tools": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
@@ -39,6 +40,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.5",
     "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": ">=3.18.5 <4.0.0"
   },
   "dsh": {

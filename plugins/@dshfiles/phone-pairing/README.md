@@ -38,7 +38,11 @@ Devices live in `$DSH_HOME/plugins/phone-pairing/devices.json` as SHA-256 hashes
 4. No agent tools yet (list/revoke), and the pairing page has no per-device name.
 5. Verified by unit tests plus one end-to-end run of the gateway against a scratch
    DSH (code pairing, cookie, authenticated page, unpaired 401). No live pairing run.
-6. No agent tools yet, so enabling is a file edit and revocation is `devices.json`
-   plus a restart; open sockets survive a revocation until closed.
-7. One-click install of a missing provider is not wired: `detectProviders` reports the
-   per-platform command, and nothing runs it.
+6. Agent tools: `phone_pairing_status`, `phone_pairing_enable`, `phone_pairing_disable`,
+   `phone_pairing_code` and `phone_pairing_revoke` (with `confirm: true`). Revocation
+   closes that device's open sockets; enabling and disabling apply immediately, without
+   a restart.
+7. One-click install of a missing provider is not wired yet: `resolveProvider` reports
+   the per-platform command, and nothing runs it.
+8. A tailnet-only Tailscale endpoint needs the Tailscale app on the phone; the
+   cloudflared fallback needs no app but publishes the pairing page.
