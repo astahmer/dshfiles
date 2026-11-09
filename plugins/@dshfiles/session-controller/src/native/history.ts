@@ -42,6 +42,14 @@ import type { LogWindowMetrics } from '@dshfiles/session-log-window'
 const DEFAULT_MAX_MESSAGES = 50
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 
+interface FollowOpening {
+  readonly cursor: SessionSeqCursor
+  readonly snapshot: Extract<SessionFollowFrame, { readonly type: 'snapshot' }>
+  /** The snapshot's own record array, emptied once the frame is delivered. */
+  readonly records: SessionHistoryRecord[]
+  readonly promotion?: SessionObservation
+}
+
 /** Implements cold-safe history operations delegated by the Session Controller. */
 export class SessionHistoryController {
   private readonly closeFollowers = new Set<() => void>()
@@ -235,26 +243,17 @@ export class SessionHistoryController {
     const onAbort = (): void => { notify() }
     signal.addEventListener('abort', onAbort, { once: true })
     try {
-      // dshfiles delta: a cold Session opens from the end of its log (see ../tail-log.ts); the full read stays the path
-      // for a live Session and for every log the tail cannot serve exactly.
-      const cold = address.kind === 'session' && this.ctx.sessions.get(target) === undefined
-      const opened = cold ? await coldReads.use(() => tailOpening(this.ctx, target, request, signal)) : undefined
-      if (opened === 'missing') rejectNotFound(address)
-      const tail = opened
-      using source = tail !== undefined
-        ? undefined
-        : await (cold ? coldReads.use(() => this.sourceFor(address, signal, true)) : this.sourceFor(address, signal, true))
-      signal.throwIfAborted()
-      const opening = tail ?? (source === undefined ? undefined : {
-        header: source.header,
-        cursor: source.cursor,
-        page: paginate(source.events, undefined, request.maxMessages ?? DEFAULT_MAX_MESSAGES, source.cursor, request.turnWindow),
-        projections: source.projections,
-      })
-      /* v8 ignore next -- one of the two reads always produces the opening. */
-      if (opening === undefined) throw new RemoteError('gateway/internal', 'session follow produced no opening', {})
-      const { cursor, page } = opening
+      // dshfiles delta: the opening's read is released before the snapshot leaves. A follow lives as long as its view
+      // (kept views, parked scopes), and holding the read pinned one whole decoded log per open follow: on the live Host
+      // 502 follows held 1.4 GB of prepared logs and 620 MB of opening pages (2026-11-09). Locals stay in a suspended
+      // generator, so nothing the opening decoded is kept in one past the yield.
+      let opening: FollowOpening | undefined = await this.openFollow(request, signal)
+      const cursor = opening.cursor
       snapshotCursor = cursor
+      let promotion = opening.promotion
+      let snapshot: FollowOpening['snapshot'] | undefined = opening.snapshot
+      const records = opening.records
+      opening = undefined
       const assistantStream = request.assistantStream === true
         ? this.assistantStreams.get(target)?.snapshot() ?? { revision: 0 }
         : undefined
@@ -263,26 +262,29 @@ export class SessionHistoryController {
       // including larger revisions from a retired Agent; later revision
       // resets reach Client continuity validation.
       const assistantStreamOrdinalCut = assistantStreamOrdinal
-      yield {
-        type: 'snapshot',
-        header: wireHeader(opening.header),
-        cursor,
-        records: pageRecords(page.events),
-        hasMore: page.hasMore,
-        projections: opening.projections === undefined
-          ? { asOfSeq: cursor, values: {} }
-          : projectionBlock(opening.projections),
-        ...assistantStream === undefined ? {} : { assistantStream },
+      let delivered = false
+      try {
+        yield assistantStream === undefined ? snapshot : { ...snapshot, assistantStream }
+        delivered = true
+      } finally {
+        if (!delivered) promotion?.[Symbol.dispose]()
       }
+      snapshot = undefined
+      // The native gateway carrier (`cancellableStream` and the mux `pump` in @deepseek-ai/dsh-api-gateway) keeps the
+      // last frame it relayed until the next one arrives, and an idle follow sends none: every open follow kept its
+      // opening records, 1.86 GB across the live Host's follows. The pump wrote the frame before asking for the next,
+      // so the records it still points at are emptied here.
+      records.length = 0
       // dshfiles delta: opening a cold Session no longer resumes its Agent (about 1.2 s of main-thread work on a long
-      // thread, right as the snapshot is delivered). The first command resolves it from the preparation this follow
-      // keeps pinned; a log that stops inside a turn still resumes now, so its crash closers land while it is viewed.
-      if (address.kind === 'session' && source?.source === 'prepared' && endsInsideTurn(source.events)) {
-        const promotion = source.retain()
+      // thread, right as the snapshot is delivered); a log that stops inside a turn still resumes now, so its crash
+      // closers land while it is viewed.
+      if (promotion !== undefined) {
+        const promoted = promotion
+        promotion = undefined
         try {
-          this.promote(promotion)
+          this.promote(promoted)
         } catch (error: unknown) {
-          promotion[Symbol.dispose]()
+          promoted[Symbol.dispose]()
           throw error
         }
       }
@@ -323,6 +325,48 @@ export class SessionHistoryController {
       disposeEvent()
       disposeAssistantStream?.()
     }
+  }
+
+  /**
+   * The opening snapshot of one follow, with every read it took already released. A cold Session opens from the end
+   * of its log (see ../tail-log.ts); the full read serves a live Session and every log the tail cannot serve exactly.
+   * The snapshot leaves out the assistant-stream baseline, which the caller cuts synchronously against its queue.
+   */
+  private async openFollow(request: SessionFollowRequest, signal: AbortSignal): Promise<FollowOpening> {
+    const { address } = request
+    const target = addressId(address)
+    const cold = address.kind === 'session' && this.ctx.sessions.get(target) === undefined
+    const tail = cold ? await coldReads.use(() => tailOpening(this.ctx, target, request, signal)) : undefined
+    if (tail === 'missing') rejectNotFound(address)
+    using source = tail !== undefined
+      ? undefined
+      : await (cold ? coldReads.use(() => this.sourceFor(address, signal, true)) : this.sourceFor(address, signal, true))
+    signal.throwIfAborted()
+    const opening = tail ?? (source === undefined ? undefined : {
+      header: source.header,
+      cursor: source.cursor,
+      page: paginate(source.events, undefined, request.maxMessages ?? DEFAULT_MAX_MESSAGES, source.cursor, request.turnWindow),
+      projections: source.projections,
+    })
+    /* v8 ignore next -- one of the two reads always produces the opening. */
+    if (opening === undefined) throw new RemoteError('gateway/internal', 'session follow produced no opening', {})
+    const { cursor, page } = opening
+    const records = pageRecords(page.events)
+    const snapshot: FollowOpening['snapshot'] = {
+      type: 'snapshot',
+      header: wireHeader(opening.header),
+      cursor,
+      records,
+      hasMore: page.hasMore,
+      projections: opening.projections === undefined
+        ? { asOfSeq: cursor, values: {} }
+        : projectionBlock(opening.projections),
+    }
+    // Only a log that stops inside a turn keeps its preparation, as the lease its resumed Agent starts from.
+    const promotion = address.kind === 'session' && source?.source === 'prepared' && endsInsideTurn(source.events)
+      ? source.retain()
+      : undefined
+    return { cursor, snapshot, records, ...promotion === undefined ? {} : { promotion } }
   }
 
   private async sourceFor(

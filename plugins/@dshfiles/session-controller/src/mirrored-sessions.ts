@@ -162,15 +162,29 @@ export class MirroredSessions {
   ): AsyncIterable<SessionFollowFrame> {
     const sessionId = addressedSessionId(request.address)
     const source = sessionId === undefined ? undefined : await this.resolve(sessionId)
-    if (source === undefined) {
-      yield* local(request, signal)
-      return
+    if (source !== undefined && source.follow === undefined) {
+      throw new RemoteError('gateway/bad-request', 'This runtime cannot stream that Session.', {})
     }
-    if (source.follow === undefined) throw new RemoteError('gateway/bad-request', 'This runtime cannot stream that Session.', {})
+    const frames = (source?.follow === undefined ? local(request, signal) : source.follow(request, signal))[Symbol.asyncIterator]()
+    // Not `yield*`: a delegating generator keeps the last inner result in its frame while it waits for the next one, and
+    // a follow idles for as long as its view is open, so every open follow pinned its opening snapshot (up to ~6 MB of
+    // records each, 699 MB across the live Host's follows on 2026-11-09). The slots are cleared before each wait.
+    let step: IteratorResult<SessionFollowFrame> | undefined
+    let frame: SessionFollowFrame | undefined
     try {
-      yield* source.follow(request, signal)
+      for (;;) {
+        step = await frames.next()
+        if (step.done === true) return
+        frame = step.value
+        step = undefined
+        yield frame
+        frame = undefined
+      }
     } catch (error) {
+      if (source === undefined) throw error
       throw MirroredSessions.failure('session/follow', error)
+    } finally {
+      await frames.return?.()
     }
   }
 
