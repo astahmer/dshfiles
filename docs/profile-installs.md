@@ -77,6 +77,15 @@ and starts DSH with the previous profile.
 Preview a run against any home with `--dry-run`, and test against a scratch
 home and seed with `--home <dir> --seed <dir>`.
 
+### Renaming a bundle
+
+Renaming an owned bundle (`@dshfiles/pulls-review` became `@dshfiles/diffs-review`) changes only the seed. The
+next `pnpm profile:sync --profile <name>` drops the old row, because the seed no longer lists that `@dshfiles/*`
+package, and adds the new one. Until then the live profile still links the old folder; its ignored `dist/` survives
+the move and keeps serving the old bundle, so run the sync and restart DSH after landing the rename. The renamed
+plugin keeps what users saved under the old names itself: aliases for commands and agent tools, the former panel and
+tab ids, and `hostStorage(api, { formerId })` for its Host records.
+
 ### External configuration managers
 
 If a local Nix/Home Manager setup or another supervisor runs a separate copy of

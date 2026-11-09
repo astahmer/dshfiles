@@ -57,27 +57,24 @@ export default defineClientPlugin({
     const workspacePicker = createWorkspacePickerPorts(ctx.remote)
     ctx.effect(() => () => focus.dispose(), 'dshfiles-diffs-review: remember the on-screen thread')
 
-    // Marks the Review page kept before diff-viewed owned every viewed mark move there once; then this record empties.
-    // The record sits under the plugin's former package id. A failed write leaves it in place, so the next load tries
-    // again and nothing is lost.
+    // Marks the Review page kept before diff-viewed owned every viewed mark move there once: the Host record under the
+    // plugin's former package id, or before that this browser's localStorage. Each source is deleted only after the
+    // move succeeded, so a failed write leaves it in place for the next load and nothing is lost.
     const reviewedSchema = zodSchemaFromEffect(ReviewedMarksModel.schema)
-    const reviewed = hostStorage(api, { formerId: ReviewedMarksModel.formerPackageId }).store({
-      key: 'reviewed',
-      scope: 'global',
-      schema: reviewedSchema,
-      initial: {},
-    })
+    const former = hostStorage(api, { formerId: ReviewedMarksModel.formerPackageId })
     const viewedMarks = createApiClient(ctx, diffViewedApi)
-    void reviewed.ready
-      .then(async () => {
+    void former
+      .get(ReviewedMarksModel.formerHostKey)
+      .then(async entry => {
         const legacyText = globalThis.localStorage?.getItem(ReviewedMarksModel.legacyBrowserKey) ?? 'null'
-        globalThis.localStorage?.removeItem(ReviewedMarksModel.legacyBrowserKey)
+        const stored = reviewedSchema.safeParse(entry?.value ?? {})
         const legacy = reviewedSchema.safeParse(JSON.parse(legacyText))
-        if (legacy.success && Object.keys(reviewed.get()).length === 0) reviewed.set(legacy.data)
-        const targets = ReviewedMarksModel.migrationTargets(reviewed.get())
+        const record = stored.success && Object.keys(stored.data).length > 0 ? stored.data : legacy.success ? legacy.data : {}
+        const targets = ReviewedMarksModel.migrationTargets(record)
         for (let index = 0; index < targets.length; index += MIGRATION_BATCH)
           await viewedMarks.set({ targets: targets.slice(index, index + MIGRATION_BATCH), viewed: true })
-        if (Object.keys(reviewed.get()).length > 0) reviewed.set({})
+        globalThis.localStorage?.removeItem(ReviewedMarksModel.legacyBrowserKey)
+        if (entry !== undefined) await former.delete(ReviewedMarksModel.formerHostKey)
       })
       .catch((error: unknown) => console.warn('diffs-review: earlier reviewed marks stay where they were until diff-viewed answers.', error))
 

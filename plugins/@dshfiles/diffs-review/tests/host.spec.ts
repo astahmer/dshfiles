@@ -70,6 +70,19 @@ describe.skipIf(!jjAvailable)('diffs-review Host', () => {
     }),
   )
 
+  it.effect('answers the former agent tool names with the same report', () =>
+    Effect.gen(function* () {
+      const f = yield* fixture
+      const names = f.host.tools.schemas().map(schema => schema.name)
+      expect(names).toEqual(expect.arrayContaining(['diffs_review', 'diffs_review_revisions', 'pulls_review', 'pulls_review_revisions']))
+      const text = (name: string) =>
+        Effect.promise(() =>
+          f.host.tools.execute({ callId: ToolCallId(`call-${name}`), name, arguments: { path: f.workspace }, signal: new AbortController().signal }),
+        ).pipe(Effect.map(result => result.content.map(block => (block.type === 'text' ? block.text : '')).join('\n')))
+      expect(yield* text('pulls_review')).toBe(yield* text('diffs_review'))
+    }),
+  )
+
   it.effect('reports a missing workspace as a failed review the agent can read', () =>
     Effect.gen(function* () {
       const f = yield* fixture

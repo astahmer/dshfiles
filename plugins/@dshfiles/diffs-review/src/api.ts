@@ -244,6 +244,30 @@ export const diffsReviewApi = defineApi({
         render: report => report.text,
       },
     }),
+    // The agent tool names this plugin had as pulls-review, kept one release so saved prompts, automations and agent
+    // instructions that name them keep working. Remove after 2026-12-31.
+    formerReport: method({
+      input: reviewInputSchema,
+      output: Schema.Struct({ text: Schema.String }),
+      description: 'The same report as `report`, under the agent tool name this plugin had as pulls-review.',
+      tool: {
+        name: 'pulls_review',
+        description: 'Former name of diffs_review, kept until 2026-12-31; call diffs_review instead. Same input and output.',
+        readOnly: true,
+        render: report => report.text,
+      },
+    }),
+    formerReportRevisions: method({
+      input: revisionsReviewInputSchema,
+      output: Schema.Struct({ text: Schema.String }),
+      description: 'The same report as `reportRevisions`, under the agent tool name this plugin had as pulls-review.',
+      tool: {
+        name: 'pulls_review_revisions',
+        description: 'Former name of diffs_review_revisions, kept until 2026-12-31; call diffs_review_revisions instead. Same input and output.',
+        readOnly: true,
+        render: report => report.text,
+      },
+    }),
     summarize: method({
       input: summarizeInputSchema,
       output: summarizeResultSchema,
