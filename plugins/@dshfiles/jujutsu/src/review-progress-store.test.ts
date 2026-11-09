@@ -13,6 +13,10 @@ const memoryTable = (initial: readonly ReviewMark[] = []): ReviewMarksTable & { 
     entries: Effect.sync(() => [...rows.entries()]),
     size: Effect.sync(() => rows.size),
     put: (key, value) => Effect.sync(() => void rows.set(key, value)),
+    putMany: entries =>
+      Effect.sync(() => {
+        for (const [key, value] of entries) rows.set(key, value)
+      }),
     delete: key => Effect.sync(() => rows.delete(key)),
     update: (key, change) =>
       Effect.sync(() => {
