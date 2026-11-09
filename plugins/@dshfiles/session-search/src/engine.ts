@@ -9,7 +9,9 @@ import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionHeader } from '@deepseek-ai/dsh-session/types'
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import {
+  assertSessionHeadersCompatible,
   materializeSessionEventResultFilters,
+  readColdSessionLog,
   SessionQueryEngine,
   SessionQueryError,
   SessionSearchCursor,
@@ -22,6 +24,7 @@ import {
   type SessionSearchHit,
   type SessionSearchPage,
   type SessionSearchRequest,
+  type SessionLogSnapshot,
   type SessionRecord,
   type SessionTitleObservationResult,
 } from '@deepseek-ai/dsh-session-query'
@@ -76,6 +79,11 @@ const toHeader = (row: SessionHeaderRow): SessionHeader =>
     delegationDepth: row.delegationDepth,
     agentPreset: row.agentPreset,
   })
+
+const sessionNotFound = (sessionId: SessionId): SessionQueryError =>
+  new SessionQueryError(`session "${sessionId}" not found`, 'SESSION_QUERY_SESSION_NOT_FOUND')
+
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 const unsupportedFilters = (label: string): never => {
   throw new SessionQueryError(`the owned session-search backend does not implement ${label} yet`, 'SESSION_QUERY_INVALID_FILTER')
@@ -135,6 +143,50 @@ export class SessionSearchEngine extends SessionQueryEngine {
   }
 
   /**
+   * Core's `readSession` resolves a stored Session by listing the whole corpus (2,900 logs here) before reading the one
+   * it wants, and Memory, pull requests and the review panel each read Sessions that way. Core's own `readSession` body
+   * still runs — it owns the replay validation and the message projections it validates with — but against a corpus of
+   * this one Session, resolved by `stat` and one read handle instead of a listing. Results and error codes match core's.
+   */
+  override async readSession(sessionId: SessionId): Promise<SessionLogSnapshot> {
+    return SessionQueryEngine.prototype.readSession.call({ _corpus: { load: (id: SessionId) => this._loadOne(id) } }, sessionId)
+  }
+
+  /** Core's live-preferred `SessionCorpus.load` for one id, with `stat` in place of the corpus listing. */
+  async _loadOne(sessionId: SessionId): Promise<Omit<SessionLogSnapshot, 'session'> & { header: SessionHeader }> {
+    const live = () => {
+      const session = this.ctx.sessions.get(sessionId)
+      if (session === undefined) return undefined
+      return {
+        header: structuredClone(session.header),
+        inheritedEventCount: session.inheritedEventCount,
+        events: session.snapshotEvents().map(event => structuredClone(event)),
+      }
+    }
+    const attached = live()
+    if (attached !== undefined) return attached
+    const persistence = this.ctx.get('sessionPersistence')
+    if (persistence === undefined) throw sessionNotFound(sessionId)
+    const stored = await persistence.stat(sessionId).catch((error: unknown) => {
+      throw new SessionQueryError(`session persistence lookup failed: ${errorText(error)}`, 'SESSION_QUERY_PERSISTENCE_FAILED', { cause: error })
+    })
+    if (stored === undefined) throw sessionNotFound(sessionId)
+    const loaded = await readColdSessionLog(persistence, sessionId).catch((error: unknown) => {
+      if (error instanceof Error && error.name === 'SessionPersistenceCorruptionError')
+        throw new SessionQueryError(`stored session "${sessionId}" is corrupt: ${errorText(error)}`, 'SESSION_QUERY_CORRUPT_SESSION', { cause: error })
+      throw new SessionQueryError(`failed to read stored session "${sessionId}": ${errorText(error)}`, 'SESSION_QUERY_PERSISTENCE_FAILED', { cause: error })
+    })
+    const attachedMeanwhile = live()
+    if (attachedMeanwhile !== undefined) return attachedMeanwhile
+    assertSessionHeadersCompatible(loaded.header, stored.header)
+    return {
+      header: structuredClone(loaded.header),
+      inheritedEventCount: loaded.inheritedEventCount,
+      events: loaded.events.map(event => structuredClone(event)),
+    }
+  }
+
+  /**
    * Core folds a title by decoding the Session's whole log (86 MB for the largest here), four at a time, and Memory's
    * finder and the worktree-memory panel ask for dozens of titles per search or 3 s poll. A title read therefore takes
    * a bounded path first — a live Session's own events, else the first and last bytes of its log plus the projection
@@ -178,7 +230,8 @@ export class SessionSearchEngine extends SessionQueryEngine {
     const abort = signal ?? new AbortController().signal
     try {
       const live = this.ctx.sessions.get(id)
-      const value: BoundedTitleSnapshot | undefined = live === undefined ? await readBoundedTitle({ ctx: this.ctx, sessionId: id, signal: abort }) : readLiveTitle(live)
+      const value: BoundedTitleSnapshot | undefined =
+        live === undefined ? await readBoundedTitle({ ctx: this.ctx, sessionId: id, signal: abort }) : readLiveTitle(live)
       return value === undefined ? undefined : { sessionId: id, status: 'fulfilled', value }
     } catch (error) {
       if (abort.aborted) throw error
