@@ -247,7 +247,9 @@ export default defineClient({
           labels: labels.getSnapshot(),
           text: SettingsPluginPages.localizedTextReader(ctx.locale.getSnapshot().active),
         }),
-      () => `${String(describe.getSnapshot().view?.namespaces.length)}:${ctx.locale.getSnapshot().revision}:${labelsVersion()}:${describeVersion()}`,
+      // The pages read only the active locale's text; keying on the revision rebuilt them for every namespace a plugin
+      // registered during boot (~130 ms of the reload's main thread).
+      () => `${String(describe.getSnapshot().view?.namespaces.length)}:${ctx.locale.getSnapshot().active}:${labelsVersion()}:${describeVersion()}`,
       listener => {
         const offDescribe = describe.subscribe(listener)
         const offLabels = labels.subscribe(listener)
@@ -790,16 +792,18 @@ export default defineClient({
     const api = createApiClient(ctx, settingsShellApi, metadata?.packageId)
     // `settings_list` searches the same section entries for an Agent; a Host without the method just refuses it.
     ctx.effect(() => {
-      let published: readonly SectionEntryRow[] | undefined
+      let published: string | undefined
       let pending: ReturnType<typeof setTimeout> | undefined
       // Every section that registers changes the list, so boot would send one request per section; send the settled set.
+      // A locale revision rebuilds an equal list, so compare contents: identity sent six equal sets per page load.
       const publish = (): void => {
         if (pending !== undefined) clearTimeout(pending)
         pending = setTimeout(() => {
           pending = undefined
           const entries = sectionEntries.getSnapshot()
-          if (entries === published) return
-          published = entries
+          const serialized = JSON.stringify(entries)
+          if (serialized === published) return
+          published = serialized
           void api.safe.publishSearchEntries({ entries: [...entries] })
         }, PUBLISH_SETTLE_MS)
       }
