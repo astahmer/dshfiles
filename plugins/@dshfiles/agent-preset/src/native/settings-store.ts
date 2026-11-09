@@ -76,6 +76,35 @@ export function listRoster(ctx: ClientContext): ReturnType<ClientContext['remote
   return joinPageRead({ key: 'remote:agentPresets/list', read: () => ctx.remote.agentPresets.list(), notBefore: rosterChangedAt })
 }
 
+/** A plugin can declare a preset without an announcement, so even an unchanged roster is read again after this long. */
+const SHARED_ROSTER_MAX_AGE_MS = 60_000
+
+const sharedRosters = new WeakMap<object, { readonly startedAt: number; readonly read: Promise<RosterRead> }>()
+
+/**
+ * The roster the header label and the composer seat open on. Each thread switch mounts both, so a successful read is
+ * shared until the Host announces a roster change or it ages out; a failed read is not kept.
+ * @param ctx - the browser plugin context carrying the Remote namespaces.
+ * @returns the roster, or the message to show in its place.
+ */
+export function readSharedRoster(ctx: ClientContext): Promise<RosterRead> {
+  const now = performance.now()
+  const cached = sharedRosters.get(ctx)
+  if (cached !== undefined && cached.startedAt >= rosterChangedAt && now - cached.startedAt < SHARED_ROSTER_MAX_AGE_MS) return cached.read
+  const read = readRoster(ctx)
+  const entry = { startedAt: now, read }
+  sharedRosters.set(ctx, entry)
+  void read.then(
+    result => {
+      if (!result.ok && sharedRosters.get(ctx) === entry) sharedRosters.delete(ctx)
+    },
+    () => {
+      if (sharedRosters.get(ctx) === entry) sharedRosters.delete(ctx)
+    },
+  )
+  return read
+}
+
 /** The roster, or the message to show in its place. */
 export type RosterRead = { ok: true; value: AgentPresetRoster } | { ok: false; error: string }
 
@@ -114,7 +143,7 @@ export async function beginRosterRead<S extends { status: string; error: string 
   const before = store.getSnapshot()
   if (before.status === 'loading') return undefined
   store.set({ ...before, status: 'loading', error: null })
-  const roster = await readRoster(ctx)
+  const roster = await readSharedRoster(ctx)
   if (roster.ok) return roster.value
   store.set({ ...store.getSnapshot(), status: 'error', error: roster.error })
   return undefined

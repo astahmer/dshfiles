@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
-import { presetOptions, readRoster } from './settings-store.ts'
+import { presetOptions, readSharedRoster } from './settings-store.ts'
 import type { AgentPresetOption } from './settings-store.ts'
 
 /** A selection the Host refused, kept with its preset so the chip can name what failed. */
@@ -185,7 +185,7 @@ export class AgentPresetSeatController {
   async load(): Promise<void> {
     const token = {}
     this.loadToken = token
-    const roster = await readRoster(this.ctx)
+    const roster = await readSharedRoster(this.ctx)
     if (this.loadToken !== token) return
     if (!roster.ok) {
       // A roster refresh can finish after a selection; leave its announcement for the chip.
