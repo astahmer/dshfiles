@@ -206,7 +206,9 @@ export class ViewedMarks extends Context.Service<
           }
           const changed = keys.length
           if (input.viewed)
-            yield* Effect.forEach(added, mark => table.put(mark.key, mark), { discard: true }).pipe(
+            // One durable write for the whole batch on a backend that publishes the unit as one document; a stock domain
+            // (or a per-record layout) writes the same records one at a time.
+            yield* table.putMany(added.map(mark => [mark.key, mark] as const)).pipe(
               Effect.mapError(cause => new ViewedMarksWriteFailed({ operation: 'mark', cause })),
             )
           else

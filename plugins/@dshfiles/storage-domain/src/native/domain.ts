@@ -5,7 +5,9 @@
  * FIRST, then mutates memory, then emits `domain/changed` — a rejected
  * backend write leaves memory untouched (no divergence between reads and the
  * medium), and events carry values that equal the in-memory state at
- * emission, in write order.
+ * emission, in write order. A multi-record write (`putMany`) is one link of
+ * that same chain: on a backend that publishes the unit as one document it is
+ * one durable publish for the whole batch.
  * @module @deepseek-ai/dsh-storage-domain/src/domain
  */
 
@@ -73,6 +75,29 @@ export interface KvTable<K extends string, V> {
   put(key: K, value: V): Promise<void>
 
   /**
+   * Insert or overwrite several records in one durable write.
+   *
+   * The batch occupies ONE slot of the domain's write chain, so no other
+   * write of this domain interleaves with it. On a backend that publishes the
+   * unit as one document (the JSON `single` layout) the whole batch is ONE
+   * durable publish: it is all-or-nothing at the document level, a rejected
+   * batch leaves the previously persisted state intact, and nothing of it is
+   * durable. A backend with one document per record has no whole-unit publish:
+   * the batch still holds its chain slot, but each record lands on its own, so
+   * a mid-batch rejection leaves the records written before the failure
+   * durable and visible — the rejection is then a `DomainError` with code
+   * `batch-partial`, whose message names how many records landed.
+   *
+   * Duplicate keys apply in order, so the last value wins, and exactly one
+   * `domain/changed` `put` event is emitted per distinct key, after
+   * durability — never one per duplicate entry. An empty batch writes nothing
+   * and emits nothing.
+   * @param entries - `[key, value]` pairs, in application order.
+   * @returns resolution after durability and event emission.
+   */
+  putMany(entries: ReadonlyArray<readonly [K, V]>): Promise<void>
+
+  /**
    * Delete one record durably.
    * @param key - Record key.
    * @returns `true` when the record existed, `false` when it was already
@@ -123,6 +148,8 @@ export interface Domain<S extends DomainSpec> {
 interface TableHost {
   readonly domainName: string
   readonly unit: KvUnit
+  /** The unit's one-publish multi-record write, when the backend has one. */
+  readonly batch: BatchWriteCapability | undefined
   /** Queue one job on the domain's single write chain. */
   enqueue<T>(job: () => Promise<T>): Promise<T>
   /** Throw `closed` once the domain has fully closed (reads stay valid while draining). */
@@ -170,6 +197,38 @@ export function hydratingUnit(unit: KvUnit): HydrationCapability | undefined {
     getRecordSync: (table, key) => getRecordSync.call(candidate, table, key),
     getGlobalSync: () => getGlobalSync.call(candidate),
   }
+}
+
+/**
+ * Multi-record durable write a `single`-layout backend MAY expose (fork
+ * delta; the owned json backend's single-layout unit does). One call applies
+ * the whole batch to the unit's authoritative state and publishes it as ONE
+ * document, so the batch is all-or-nothing at the document level: a rejected
+ * publish leaves the previous document and the previous in-memory state
+ * intact, and nothing of the batch is durable. Duplicate keys apply in order
+ * (the last value wins) and an empty batch writes nothing. The capability is
+ * probed rather than required: a backend without it gets the per-record
+ * fallback of {@link commitPutMany}.
+ */
+export interface BatchWriteCapability {
+  /** Insert or overwrite every entry of one table in one durable publish. */
+  putRecords(table: string, entries: ReadonlyArray<readonly [string, unknown]>): Promise<void>
+}
+
+/**
+ * Narrow a unit to its one-publish batch write, when it has one. Same
+ * structural probe as {@link hydratingUnit}: no `as unknown` hop and no
+ * runtime coupling to the backend package.
+ * @param unit - The opened backend unit.
+ * @returns the capability, or `undefined` for a backend without it.
+ */
+function batchingUnit(unit: KvUnit): BatchWriteCapability | undefined {
+  const candidate: KvUnit & Partial<BatchWriteCapability> = unit
+  const { putRecords } = candidate
+  if (typeof putRecords !== 'function') return undefined
+  // The probe destructures the method, so the wrapper restores the backend
+  // instance as its receiver.
+  return { putRecords: (table, entries) => putRecords.call(candidate, table, entries) }
 }
 
 /** How many hydrated records one lazy table keeps before evicting its least recently read. */
@@ -233,6 +292,7 @@ export class DomainImpl {
     const host: TableHost = {
       domainName: spec.name,
       unit,
+      batch: batchingUnit(unit),
       enqueue: job => this.enqueue(job),
       assertReadable: () => { this.assertReadable() },
       emitChanged: (change) => { this.emitChanged(change) },
@@ -411,6 +471,18 @@ class KvTableImpl<K extends string, V> implements KvTable<K, V> {
     })
   }
 
+  putMany(entries: ReadonlyArray<readonly [K, V]>): Promise<void> {
+    return this.host.enqueue(() =>
+      commitPutMany({
+        host: this.host,
+        table: this.tableName,
+        entries,
+        apply: (key, value) => {
+          this.records.set(key, value)
+        },
+      }))
+  }
+
   delete(key: K): Promise<boolean> {
     return this.host.enqueue(async () => {
       // Existence is decided at this job's chain slot, not at call time: an
@@ -516,6 +588,19 @@ class LazyKvTableImpl<K extends string, V> implements KvTable<K, V> {
     })
   }
 
+  putMany(entries: ReadonlyArray<readonly [K, V]>): Promise<void> {
+    return this.host.enqueue(() =>
+      commitPutMany({
+        host: this.host,
+        table: this.tableName,
+        entries,
+        apply: (key, value) => {
+          this.index.set(key, true)
+          this.remember(key, value)
+        },
+      }))
+  }
+
   delete(key: K): Promise<boolean> {
     return this.host.enqueue(async () => {
       // Existence is decided at this job's chain slot, not at call time: an
@@ -604,5 +689,52 @@ class LazyKvTableImpl<K extends string, V> implements KvTable<K, V> {
       operation: 'put',
       value,
     })
+  }
+}
+
+/**
+ * Commit one batch of records inside the caller's write-chain slot. The batch
+ * is one durable publish when the unit offers one ({@link BatchWriteCapability}),
+ * so a rejection leaves memory and medium untouched; otherwise each record is
+ * written on its own and a mid-batch rejection reports exactly how many landed
+ * (`batch-partial`), because those stay durable and visible. Memory and
+ * `domain/changed` events change only after durability, once per distinct key.
+ */
+async function commitPutMany<K extends string, V>(input: {
+  readonly host: TableHost
+  readonly table: string
+  readonly entries: ReadonlyArray<readonly [K, V]>
+  readonly apply: (key: K, value: V) => void
+}): Promise<void> {
+  // Duplicate keys collapse to their last value, in first-appearance order, so
+  // the batch writes and announces each key exactly once.
+  const batch = [...new Map(input.entries)]
+  if (batch.length === 0) return
+  const { host } = input
+  const emitPut = (key: K, value: V): void => {
+    host.emitChanged({ domain: host.domainName, table: input.table, key, operation: 'put', value })
+  }
+  if (host.batch !== undefined) {
+    await host.batch.putRecords(input.table, batch)
+    for (const [key, value] of batch) {
+      input.apply(key, value)
+      emitPut(key, value)
+    }
+    return
+  }
+  let landed = 0
+  for (const [key, value] of batch) {
+    try {
+      await host.unit.putRecord(input.table, key, value)
+    } catch (cause) {
+      throw new DomainError(
+        'batch-partial',
+        `domain '${host.domainName}' table '${input.table}': the batch failed at '${key}' after ${String(landed)} of ${String(batch.length)} records were durably written; those ${String(landed)} stay durable and visible, the rest were not written`,
+        { detail: { table: input.table, key }, cause },
+      )
+    }
+    landed += 1
+    input.apply(key, value)
+    emitPut(key, value)
   }
 }

@@ -6,12 +6,17 @@
 /** Discriminant codes carried by every {@link DomainError}. */
 export type DomainErrorCode =
   | 'already-open'
+  | 'batch-partial'
   | 'facet-unsupported'
   | 'invalid-record'
   | 'missing-key'
   | 'closed'
 
-/** Location of the record that failed schema validation at the durable boundary. */
+/**
+ * Location of the record that failed at the durable boundary: the record
+ * rejected by its schema (`invalid-record`), or the one whose write failed
+ * inside a batch (`batch-partial`).
+ */
 export interface InvalidRecordDetail {
   /** Table holding the rejected record; `''` for the global singleton. */
   readonly table: string
@@ -19,9 +24,9 @@ export interface InvalidRecordDetail {
   readonly key: string
 }
 
-/** Construction options: standard `cause` plus the `invalid-record` location. */
+/** Construction options: standard `cause` plus the failing record's location. */
 export interface DomainErrorOptions extends ErrorOptions {
-  /** Present exactly when `code` is `invalid-record`. */
+  /** Present exactly when `code` is `invalid-record` or `batch-partial`. */
   readonly detail?: InvalidRecordDetail
 }
 
@@ -34,7 +39,7 @@ export interface DomainErrorOptions extends ErrorOptions {
 export class DomainError extends Error {
   override readonly name = 'DomainError'
 
-  /** Present exactly when `code` is `invalid-record`. */
+  /** Present exactly when `code` is `invalid-record` or `batch-partial`. */
   readonly detail?: InvalidRecordDetail
 
   /**

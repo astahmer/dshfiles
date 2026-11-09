@@ -5,7 +5,7 @@
     {
       "id": "lazy-per-record-reads",
       "title": "Read one stored JSON record without loading the whole unit",
-      "summary": "Owned fork of the native JSON storage backend: the per-record unit additionally answers synchronous per-record reads (listKeysSync, getRecordSync, getGlobalSync) so the owned storage-domain fork can hydrate one record on first read instead of materializing every record at open. The on-disk format, the atomic publish protocol, the legacy whole-unit bootstrap, and every write path are upstream byte-for-byte; the sync reads apply the same parse and version rules the open-time loadAll applies.",
+      "summary": "Owned fork of the native JSON storage backend: the per-record unit additionally answers synchronous per-record reads (listKeysSync, getRecordSync, getGlobalSync) so the owned storage-domain fork can hydrate one record on first read instead of materializing every record at open, and the single-layout unit answers putRecords so a multi-record batch is one whole-document rewrite instead of one per record. The on-disk format, the atomic publish protocol, the legacy whole-unit bootstrap, and every single-record write path are upstream byte-for-byte; the sync reads apply the same parse and version rules the open-time loadAll applies, and a batch publishes and rolls back as one document.",
       "surfaces": ["host", "storage"],
       "surface": "infrastructure",
       "destination": "none",
@@ -18,10 +18,11 @@
           "coveredBy": ["storage-json.root-config"]
         }
       ],
-      "states": ["indexed-only", "hydrated", "foreign-document", "closed"],
+      "states": ["indexed-only", "hydrated", "foreign-document", "batch-published", "batch-rejected", "closed"],
       "failureModes": [
         "A record document that is malformed or stamped with an unaccepted version reads as absent, exactly as loadAll reports it.",
         "A sync read after close rejects with the backend's `closed` StorageError.",
+        "A rejected batch publish leaves the previous document and the previous in-memory state intact, and the rejection is the underlying backend/fs error: nothing of that batch is durable.",
         "Every other behaviour is the pinned upstream code; drift is checked with scripts/native-fork-diff.mjs."
       ],
       "externalDependencies": [],
@@ -43,6 +44,41 @@
           "id": "storage-json.root-config",
           "file": "plugins/@dshfiles/storage-json/tests/lazy-reads.test.ts",
           "testName": "reads a record the stock backend wrote and writes one it reads back"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-json.batch-one-publish",
+          "file": "plugins/@dshfiles/storage-json/tests/batch-writes.test.ts",
+          "testName": "publishes a whole batch as ONE document rewrite"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-json.batch-rejected-rollback",
+          "file": "plugins/@dshfiles/storage-json/tests/batch-writes.test.ts",
+          "testName": "keeps the previously persisted state and rolls memory back when the publish is rejected"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-json.batch-restart",
+          "file": "plugins/@dshfiles/storage-json/tests/batch-writes.test.ts",
+          "testName": "shows a restart every record of a committed batch and none of a rejected one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-json.batch-empty",
+          "file": "plugins/@dshfiles/storage-json/tests/batch-writes.test.ts",
+          "testName": "writes nothing at all for an empty batch"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-json.batch-duplicate-keys",
+          "file": "plugins/@dshfiles/storage-json/tests/batch-writes.test.ts",
+          "testName": "applies duplicate keys in order, the last value winning, in one publish"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "storage-json.no-browser-scenario",
+          "reason": "Host-only storage infrastructure: no browser scenario reaches a JSON unit or its document directly."
         }
       ],
       "telemetry": [

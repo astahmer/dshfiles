@@ -26,18 +26,30 @@ export interface ReadCounts {
   getGlobal: number
   loadAll: number
   backup: number
+  /** Durable writes, one per `putRecord` and one per `putRecords` batch. */
+  writes: number
+  putRecord: number
+  putRecords: number
 }
 
 /** Shared media pool, so one medium can be reopened as a restart would. */
 export class CountingMediaPool {
   readonly media = new Map<string, CountingMedium>()
   readonly versions = new Map<string, number>()
-  readonly counts: ReadCounts = { listKeys: 0, getRecord: 0, getGlobal: 0, loadAll: 0, backup: 0 }
+  readonly counts: ReadCounts = { listKeys: 0, getRecord: 0, getGlobal: 0, loadAll: 0, backup: 0, writes: 0, putRecord: 0, putRecords: 0 }
   /** Backed-up record keys, in call order (`<table>/<key>`). */
   readonly backedUp: string[] = []
+  /** Whether units expose the fork's one-publish batch write (`putRecords`). */
+  batchWrites = true
   failNextWrites = 0
+  /** 1-based durable-write call number that throws instead of writing, for a mid-batch failure. */
+  failWriteCall = 0
 
   consumeInjectedFailure(): void {
+    if (this.failWriteCall === this.counts.writes + 1) {
+      this.failWriteCall = 0
+      throw new Error('injected write failure')
+    }
     if (this.failNextWrites > 0) {
       this.failNextWrites -= 1
       throw new Error('injected write failure')
@@ -47,13 +59,30 @@ export class CountingMediaPool {
 
 class CountingKvUnit implements KvUnit {
   private closed = false
+  /** The fork's one-publish batch write; absent when the pool simulates a backend without it. */
+  putRecords?: (table: string, entries: ReadonlyArray<readonly [string, unknown]>) => Promise<void>
 
   constructor(
     private readonly pool: CountingMediaPool,
     private readonly medium: CountingMedium,
     private readonly descriptor: KvUnitDescriptor,
     private readonly onClose: () => void,
-  ) {}
+  ) {
+    if (!pool.batchWrites) return
+    this.putRecords = async (table, entries) => {
+      this.assertOpen()
+      // One durable write for the whole batch: the injected failure lands
+      // before anything is applied, exactly like a rejected document publish.
+      this.pool.consumeInjectedFailure()
+      const records = this.tableRecords(table)
+      for (const [key, value] of entries) {
+        records.set(key, value)
+        this.medium.foreign.delete(`${table}\u0000${key}`)
+      }
+      this.pool.counts.putRecords += 1
+      this.pool.counts.writes += 1
+    }
+  }
 
   private assertOpen(): void {
     if (this.closed) {
@@ -63,6 +92,16 @@ class CountingKvUnit implements KvUnit {
 
   private isForeign(table: string, key: string): boolean {
     return this.medium.foreign.has(`${table}\u0000${key}`)
+  }
+
+  /** One table's medium map, materialized on first write. */
+  private tableRecords(table: string): Map<string, unknown> {
+    let records = this.medium.tables.get(table)
+    if (records === undefined) {
+      records = new Map()
+      this.medium.tables.set(table, records)
+    }
+    return records
   }
 
   async loadAll(): Promise<{ tables: Record<string, Record<string, unknown>>; global: unknown }> {
@@ -104,13 +143,10 @@ class CountingKvUnit implements KvUnit {
   async putRecord(table: string, key: string, value: unknown): Promise<void> {
     this.assertOpen()
     this.pool.consumeInjectedFailure()
-    let records = this.medium.tables.get(table)
-    if (records === undefined) {
-      records = new Map()
-      this.medium.tables.set(table, records)
-    }
-    records.set(key, value)
+    this.tableRecords(table).set(key, value)
     this.medium.foreign.delete(`${table}\u0000${key}`)
+    this.pool.counts.putRecord += 1
+    this.pool.counts.writes += 1
   }
 
   async deleteRecord(table: string, key: string): Promise<void> {

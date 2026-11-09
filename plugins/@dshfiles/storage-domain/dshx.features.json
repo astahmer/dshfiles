@@ -5,18 +5,19 @@
     {
       "id": "lazy-domain-hydration",
       "title": "Hydrate a per-record domain one record at a time",
-      "summary": "Owned fork of the native storage domain form: a per-record domain whose records are disposable derived data indexes document keys at open and reads one record per table read behind a 64-row LRU, instead of materializing the whole unit into JS heap at open. The measured owner is session_projcache, whose ~2.8k checkpoints cost 252 MB of a 610 MB Host heap before this fork. Reads stay synchronous and schema-validated, writes stay durable before memory changes, and every domain that does not qualify (single layout, or per-record over authoritative records) keeps the upstream open-time loadAll.",
+      "summary": "Owned fork of the native storage domain form: a per-record domain whose records are disposable derived data indexes document keys at open and reads one record per table read behind a 64-row LRU, instead of materializing the whole unit into JS heap at open. The measured owner is session_projcache, whose ~2.8k checkpoints cost 252 MB of a 610 MB Host heap before this fork. Reads stay synchronous and schema-validated, writes stay durable before memory changes, and every domain that does not qualify (single layout, or per-record over authoritative records) keeps the upstream open-time loadAll. It also adds `KvTable.putMany`: a multi-record write that is ONE durable publish when the backend publishes the unit as one document (a `single`-layout unit's `putRecords`), instead of one full-document rewrite per record.",
       "surfaces": ["host", "storage"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: no UI",
       "configuration": [],
-      "states": ["indexed", "hydrated", "evicted", "invalid-backed-up", "closed"],
+      "states": ["indexed", "hydrated", "evicted", "invalid-backed-up", "batch-published", "batch-partial", "closed"],
       "failureModes": [
         "keys() and size count stored documents, so a document that parses as foreign stays counted until its first read drops it from the index.",
         "A schema failure on a disposable record is backed up and skipped when first read, not at open; a domain without `invalidRecords: 'backup-and-skip'` keeps failing loud at open.",
         "The lazy path needs the backend's synchronous per-record reads; another backend keeps the upstream loadAll path unchanged.",
-        "An empty per-record tree still calls loadAll once, because that call is the backend's legacy whole-unit bootstrap."
+        "An empty per-record tree still calls loadAll once, because that call is the backend's legacy whole-unit bootstrap.",
+        "A rejected one-publish batch leaves memory and medium untouched; on a backend without that publish, a mid-batch failure leaves the earlier records durable and rejects with `batch-partial`, naming how many landed."
       ],
       "externalDependencies": [],
       "verification": [
@@ -61,6 +62,47 @@
           "id": "storage-domain.legacy-migration",
           "file": "plugins/@dshfiles/storage-domain/tests/lazy-json-backend.test.ts",
           "testName": "migrates a legacy whole-unit document into per-record documents, then hydrates lazily"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-domain.batch-one-publish",
+          "file": "plugins/@dshfiles/storage-domain/tests/batch-writes.test.ts",
+          "testName": "commits a batch as ONE durable write and announces each key once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-domain.batch-empty",
+          "file": "plugins/@dshfiles/storage-domain/tests/batch-writes.test.ts",
+          "testName": "writes and announces nothing for an empty batch"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-domain.batch-duplicate-keys",
+          "file": "plugins/@dshfiles/storage-domain/tests/batch-writes.test.ts",
+          "testName": "applies duplicate keys in order, the last value winning, with one event per key"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-domain.batch-rejected",
+          "file": "plugins/@dshfiles/storage-domain/tests/batch-writes.test.ts",
+          "testName": "keeps memory and medium untouched when the one-publish batch is rejected"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-domain.batch-partial-fallback",
+          "file": "plugins/@dshfiles/storage-domain/tests/batch-writes.test.ts",
+          "testName": "falls back to per-record writes and names exactly what landed when one fails mid-batch"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-domain.batch-lazy-table",
+          "file": "plugins/@dshfiles/storage-domain/tests/batch-writes.test.ts",
+          "testName": "serves a batch written through a lazy per-record table from its cache, with one durable write"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "storage-domain.no-browser-scenario",
+          "reason": "Host-only storage infrastructure: no browser scenario reaches a domain table or its write chain directly."
         }
       ],
       "telemetry": [

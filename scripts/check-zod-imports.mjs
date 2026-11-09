@@ -31,6 +31,8 @@ const bridges = new Map([
   ['plugins/@dshfiles/storage-domain/src/native/spec.ts', 'vendored native contract: the storage domain takes a ZodType from the core'],
   ['plugins/@dshfiles/storage-domain/src/native/domain.ts', 'vendored native contract: the storage domain takes a ZodType from the core'],
   ['plugins/@dshfiles/storage-domain/tests/lazy-hydration.test.ts', 'test boundary: exercises the vendored contract with a ZodType'],
+  ['plugins/@dshfiles/storage-domain/tests/batch-writes.test.ts', 'test boundary: exercises the vendored contract with a ZodType'],
+  ['tooling/dshx/packages/dshx/tests/storage-domain-batch.spec.ts', 'test boundary: opens a domain spec the native contract types as a ZodType'],
   ['plugins/@dshfiles/storage-domain/tests/lazy-json-backend.test.ts', 'test boundary: exercises the vendored contract with a ZodType'],
   ['tooling/dshx/packages/dshx/tests/api-zod-schema.spec.ts', 'the bridge spec'],
   ['plugins/@dshfiles/session-controller/typert/host.js', 'derived by scripts/derive-typert.mjs from the native package, not hand-written'],

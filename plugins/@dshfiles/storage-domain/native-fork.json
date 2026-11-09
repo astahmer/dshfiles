@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change. The delta adds the lazy-hydration seed path (per-record keys indexed at open, one record read per cache miss behind a 64-row LRU), the optional `hydration` spec field, and an async legacy-bootstrap fallback; every event, error, and write-chain behaviour is upstream.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change. The delta adds the lazy-hydration seed path (per-record keys indexed at open, one record read per cache miss behind a 64-row LRU), the optional `hydration` spec field, an async legacy-bootstrap fallback, and `KvTable.putMany`: a multi-record write that is ONE durable publish when the backend publishes the unit as one document (a `single`-layout unit's `putRecords`), with a per-record fallback that reports `batch-partial` when a mid-batch write fails. Every event, error, and write-chain behaviour is upstream.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-storage-domain",
@@ -11,5 +11,5 @@
     { "upstream": "src", "local": "src/native" },
     { "upstream": "locale", "local": "locale" }
   ],
-  "delta": ["src/native/domain.ts", "src/native/index.ts", "src/native/spec.ts"]
+  "delta": ["src/native/domain.ts", "src/native/error.ts", "src/native/index.ts", "src/native/spec.ts"]
 }

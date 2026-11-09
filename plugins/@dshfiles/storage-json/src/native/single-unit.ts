@@ -4,8 +4,10 @@
  * primitive mutates it and republishes the whole file atomically. Writes are
  * NOT queued here — per the backend contract, write ordering belongs to the
  * caller (the domain layer's write chain); this unit only guarantees that
- * each single call publishes a complete, durable file. The `per-record`
- * layout is a separate unit class in `per-record-unit.ts`.
+ * each single call publishes a complete, durable file. A multi-record write
+ * (`putRecords`, the fork delta) is one such call: the whole batch lands as
+ * one publish, or none of it does. The `per-record` layout is a separate unit
+ * class in `per-record-unit.ts`.
  * @module @deepseek-ai/dsh-storage-json/src/single-unit
  */
 
@@ -81,6 +83,36 @@ class SingleJsonUnit implements KvUnit {
     await this.publish().catch((error: unknown) => {
       if (hadKey) records.set(key, previous)
       else records.delete(key)
+      throw error
+    })
+  }
+
+  /**
+   * Insert or overwrite several records in ONE durable publish: the batch is
+   * applied to the authoritative memory, serialized once, and published once.
+   * A rejected publish rolls every key of the batch back, so the file and the
+   * memory both keep the state from before the call — nothing of the batch is
+   * durable. Duplicate keys apply in order (the last value wins) and an empty
+   * batch writes nothing at all.
+   * @param table - Declared table name.
+   * @param entries - `[key, value]` pairs, in application order.
+   */
+  async putRecords(table: string, entries: ReadonlyArray<readonly [string, unknown]>): Promise<void> {
+    this.assertOpen()
+    if (entries.length === 0) return
+    const records = this.records(table)
+    // Snapshot each key once, before its first write, so a duplicate cannot
+    // overwrite the pre-batch value a rollback needs.
+    const previous = new Map<string, { readonly had: boolean; readonly value: unknown }>()
+    for (const [key, value] of entries) {
+      if (!previous.has(key)) previous.set(key, { had: records.has(key), value: records.get(key) })
+      records.set(key, value)
+    }
+    await this.publish().catch((error: unknown) => {
+      for (const [key, entry] of previous) {
+        if (entry.had) records.set(key, entry.value)
+        else records.delete(key)
+      }
       throw error
     })
   }
