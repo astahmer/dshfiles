@@ -754,6 +754,30 @@ worker's first build of the same corpus costs about 3.7 s of CPU on its own thre
 Ruled out: marking a new index's backfills done changes nothing, because the worker's first backfill runs before any
 document exists and finishes at once (285.1 MB written either way).
 
+## Thread-switch lag and background list churn (2026-11-09, live Desktop GUI)
+
+Measured on the live Desktop app (headless Chromium using its own session, read-only). The Host answered every switch
+request in under ~0.4 s. The window's main thread was the bottleneck: each sidebar click held it for 0.3–0.55 s, and
+viewing a running thread allocated about 800 MB in 25 s (the Desktop window's RSS swung between 0.9 and 1.7 GB).
+
+| Cost (browser CPU / sampled heap profile)                                                         | Owner              | Fix                                                                             |
+| ------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------- |
+| ~75 ms per click: every palette action unregistered and re-registered, each notifying the palette | thread-sidebar     | `history` read through a ref, so `paletteActions` no longer changes per switch  |
+| Every manager flush rebuilt every list row, so every list consumer re-rendered all rows           | session-controller | `projectList` keeps unchanged rows (`shareRecord`) and skips an unchanged `set` |
+| Each list update re-derived a hex panel id for every Session × view (~10 MB per update)           | rich-composer      | the workbench catalog is republished only when ids or titles change             |
+
+Before/after, same thread open and the same burst of activity in it (30 s window, sampled heap profile):
+
+| Metric                                  | Before               | After                 |
+| --------------------------------------- | -------------------- | --------------------- |
+| Allocated per Session update            | 2.2 MB (120 MB / 55) | 1.5 MB (46.5 MB / 31) |
+| List flush path (projectList subtree)   | 36 MB                | 3 MB                  |
+| Palette registrations per sidebar click | whole action list    | 0                     |
+
+Not attributed: three ~4 s main-thread freezes, all within one minute (one on New thread, not a switch). The Desktop
+window has no remote-debugging port, so their content needs a DevTools Performance recording of the window itself.
+The remaining ~0.8 s per click is native style/layout of the new transcript.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
