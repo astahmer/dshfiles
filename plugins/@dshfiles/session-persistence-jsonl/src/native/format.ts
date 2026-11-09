@@ -46,12 +46,29 @@ export const TOOL_CATALOG_MARKER = 'dshfilesCatalogDedupe'
 /** Single-key object written in place of a tool catalog this artifact already holds. */
 export const TOOL_CATALOG_REFERENCE = '$dshfilesToolCatalog'
 
-/** Tool catalogs this artifact already holds, keyed by their canonical JSON digest. */
-export type ToolCatalogCatalogs = Map<string, readonly unknown[]>
-
 /** One assembled tool catalog's digest, computed from the row's own JSON encoding. */
 const toolCatalogKey = (tools: readonly unknown[]): string =>
   createHash('sha256').update(JSON.stringify(tools)).digest('hex')
+
+/**
+ * Tool catalogs this artifact already holds. A full catalog is hashed only once
+ * a later row names a digest, so a log without references never pays for it.
+ */
+export class ToolCatalogCatalogs {
+  private readonly unindexed: (readonly unknown[])[] = []
+  private readonly byDigest = new Map<string, readonly unknown[]>()
+
+  /** Remember one full catalog, in file order. */
+  hold(tools: readonly unknown[]): void {
+    this.unindexed.push(tools)
+  }
+
+  /** The catalog an earlier row wrote with this digest, if any. */
+  resolve(key: string): readonly unknown[] | undefined {
+    for (const tools of this.unindexed.splice(0)) this.byDigest.set(toolCatalogKey(tools), tools)
+    return this.byDigest.get(key)
+  }
+}
 
 const isJsonObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -101,12 +118,12 @@ export function rehydrateToolCatalog(row: unknown, catalogs: ToolCatalogCatalogs
   if (!isJsonObject(header)) return row
   const tools = header['tools']
   if (Array.isArray(tools)) {
-    catalogs.set(toolCatalogKey(tools), tools)
+    catalogs.hold(tools)
     return row
   }
   const key = toolCatalogReference(tools)
   if (key === undefined) return row
-  const catalog = catalogs.get(key)
+  const catalog = catalogs.resolve(key)
   if (catalog === undefined) {
     throw new Error(`tool catalog reference ${key} precedes the catalog it names`)
   }
@@ -540,7 +557,7 @@ export class SessionLogScanner {
   private eventLine = 0
   private issue: Error | undefined
   private finished = false
-  private readonly toolCatalogs: ToolCatalogCatalogs = new Map()
+  private readonly toolCatalogs = new ToolCatalogCatalogs()
 
   /**
    * Create an event scanner from exactly one newline-terminated header record.
