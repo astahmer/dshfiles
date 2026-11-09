@@ -111,18 +111,23 @@ export const HeaderThreadActions = ({
     () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceItems, sessions: Object.values(sessionState.byId) }),
     [sessionState.byId, workspaceItems],
   )
+  // Per Session-list change, not per header render: three mounted conversations each render this header.
+  const { actionThreads, targetIds, descendantRunning } = useMemo(() => {
+    const sessions = Object.values(sessionState.byId)
+    const actionThreads = sessions.filter(candidate => !candidate.blank)
+    const ids = ThreadChildrenModel.threadActionTargetIds({
+      threadId: sessionId,
+      threads: actionThreads,
+      cascadeToChildren: preferences.applyActionsToChildThreads,
+    })
+    return { actionThreads, targetIds: ids, descendantRunning: SidebarOrganization.hasRunningDescendantOfAny({ sessionIds: new Set(ids), sessions }) }
+  }, [preferences.applyActionsToChildThreads, sessionId, sessionState.byId])
   if (session === undefined || session.blank) return null
 
   const archived = archivedSessionIds.includes(sessionId)
   const pinned = pinnedSessionIds.includes(sessionId)
   const parked = preferences.parkedSessionIds.includes(sessionId)
   const muted = ThreadMuteModel.isSessionMuted(preferences.mutedThreads, sessionId, openedAt)
-  const actionThreads = Object.values(sessionState.byId).filter(candidate => !candidate.blank)
-  const targetIds = ThreadChildrenModel.threadActionTargetIds({
-    threadId: sessionId,
-    threads: actionThreads,
-    cascadeToChildren: preferences.applyActionsToChildThreads,
-  })
   const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
   const updateParked = (): void => {
     if (session.running) return
@@ -135,8 +140,7 @@ export const HeaderThreadActions = ({
     updatePreferences({ parkedSessionIds: [...parkedIds] })
   }
   const settled = preferences.settledSessionIds.includes(sessionId)
-  const settleDisabled =
-    session.running || targetIds.some(targetId => SidebarOrganization.hasRunningDescendant({ sessionId: targetId, sessions: Object.values(sessionState.byId) }))
+  const settleDisabled = session.running || descendantRunning
   const updateSettled = (): void => {
     setActionFailed(false)
     const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }

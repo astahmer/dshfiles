@@ -25,6 +25,28 @@ type SubagentCatalogSnapshot = Omit<SessionProjectionSnapshot, 'values' | 'state
 }
 type Catalogs = Readonly<Record<SessionId, SubagentCatalogSnapshot>>
 
+/** Child → catalog parent, folded once per projection snapshot: every mounted header asks on every list change. */
+class SubagentParentIndex {
+  private static readonly bySnapshot = new WeakMap<object, ReadonlyMap<string, SessionId>>()
+
+  static of(
+    projections: Readonly<Record<SessionId, { readonly values: { readonly subagentCatalog?: readonly { readonly id: string }[] } }>>,
+  ): ReadonlyMap<string, SessionId> {
+    const cached = SubagentParentIndex.bySnapshot.get(projections)
+    if (cached !== undefined) return cached
+    const parents = new Map<string, SessionId>()
+    for (const [parentId, snapshot] of Object.entries(projections)) {
+      for (const entry of snapshot.values.subagentCatalog ?? []) {
+        if (parents.has(entry.id)) continue
+        // SAFETY: projectionsBySession is keyed by SessionId; Object.entries widens keys to string.
+        parents.set(entry.id, parentId as SessionId)
+      }
+    }
+    SubagentParentIndex.bySnapshot.set(projections, parents)
+    return parents
+  }
+}
+
 /** Business actions supplied by the slot registration. */
 export interface SubagentCatalogInjected {
   openChild: (address: SubagentAddress) => void
@@ -752,12 +774,7 @@ export function SubagentHeaderLineage({
   const agentLabel = SubagentRouteLabelModel.displayedAgentRouteLabel(useProjection('threadSidebarModelRoute'), useProjection('subagent'))
   const parentId = useSessions(state => {
     if (address?.childSessionId === lineageSessionId) return address.parentSessionId
-    for (const [parentId, snapshot] of Object.entries(state.projectionsBySession)) {
-      if (!snapshot.values.subagentCatalog?.some(entry => entry.id === lineageSessionId)) continue
-      // SAFETY: projectionsBySession is keyed by SessionId; Object.entries widens keys to string.
-      return parentId as SessionId
-    }
-    return undefined
+    return SubagentParentIndex.of(state.projectionsBySession).get(lineageSessionId)
   })
   const shared = { useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, t }
   // Root sessions carry no breadcrumb; their descendant count lives in the
