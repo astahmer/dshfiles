@@ -54,9 +54,9 @@ export const jujutsuSettings = defineSettings({
       .default('focus')
       .description('What happens when a Jujutsu reference in chat is clicked.'),
     composerBarBase: Schema.string()
-      .default('main')
+      .default('project')
       .description(
-        'Default base of the composer bar: `main` (since the fork point with main), `parent` (working copy vs @-), `trunk` (since trunk()), a local bookmark, or a selected remote bookmark.',
+        'Default base of the composer bar: `project` (since the fork point with the project’s main branch, Settings › Projects; `main` without one), `parent` (working copy vs @-), `trunk` (since trunk()), a local bookmark such as `main`, or a selected remote bookmark.',
       ),
   }),
   applies: 'live',

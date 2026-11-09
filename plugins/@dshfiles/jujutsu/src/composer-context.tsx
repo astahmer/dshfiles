@@ -3,6 +3,7 @@ import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/clie
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { useProjectBookmark } from '@dshfiles/jj-integration/project-bookmark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -24,7 +25,7 @@ import { useAutoRefresh } from './auto-refresh.js'
 import { useOpenInEditor } from './open-in-editor.js'
 import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
 import type { FileStatus } from './api.js'
-import { ComposerContextModel, composerBaseFromSetting, composerBaseSetting } from './composer-context-core.js'
+import { ComposerContextModel, composerBaseSetting, PROJECT_BASE_SETTING } from './composer-context-core.js'
 import { composerSessionCwd } from './composer-context-session.js'
 import { ChatReferenceLinks } from './chat-reference-links.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
@@ -102,7 +103,11 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   const workspaces = useWorkspaceItems(props.jujutsu.workspaces)
   const cwd = useSessionCwd(props.jujutsu.sessions, workspaces, props.sessionId)
   const bases = storedBases.useValue()
-  const base: ComposerBase = composerBaseFromSetting((cwd === null ? undefined : bases[cwd]) ?? preferences.composerBarBase)
+  // `project` (the default) follows the project's main branch (Settings › Projects, via jj-integration).
+  const projectBookmark = useProjectBookmark(cwd, 'main')
+  const setting = (cwd === null ? undefined : bases[cwd]) ?? preferences.composerBarBase
+  const base: ComposerBase = ComposerContextModel.composerBaseForProject(setting, projectBookmark)
+  const choice = ComposerContextModel.composerBaseChoice(setting)
   const baseKey = composerBaseSetting(base)
   const api = useApi(composerContextApi)
   // Chat reference links read the repository's bookmarks to decide which inline code is a link, so the
@@ -118,8 +123,8 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
     ...refresh.queryOptions,
   })
   refetch.current = () => void query.refetch()
-  const chooseBase = (next: ComposerBase): void => {
-    if (cwd !== null) storedBases.set({ ...bases, [cwd]: composerBaseSetting(next) })
+  const chooseBase = (next: string): void => {
+    if (cwd !== null) storedBases.set({ ...bases, [cwd]: next })
   }
   const repository = query.isSuccess ? query.data.repository : null
   return {
@@ -127,6 +132,8 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
     cwd,
     base,
     baseKey,
+    choice,
+    projectBookmark,
     chooseBase,
     repository: preferences[surface] ? repository : null,
     bookmarks: repository?.localBookmarks ?? [],
@@ -147,7 +154,14 @@ const STATUS_CLASS = {
   M: 'dshx:text-muted-foreground',
 } satisfies Record<FileStatus, string>
 
-const BasePicker = (props: { readonly repository: ComposerRepository; readonly base: ComposerBase; readonly onChoose: (base: ComposerBase) => void }) => {
+const BasePicker = (props: {
+  readonly repository: ComposerRepository
+  /** The stored choice: `project`, `parent`, `trunk`, a bookmark or an encoded remote bookmark. */
+  readonly choice: string
+  /** The project's main branch the `project` choice compares against. */
+  readonly projectBookmark: string
+  readonly onChoose: (setting: string) => void
+}) => {
   const [filter, setFilter] = useState('')
   const bookmarks = props.repository.localBookmarks.filter(name => name.toLowerCase().includes(filter.toLowerCase())).slice(0, 40)
   const availableRemoteBookmarks = props.repository.remoteBookmarks ?? []
@@ -167,7 +181,10 @@ const BasePicker = (props: { readonly repository: ComposerRepository; readonly b
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx:max-h-80 dshx:w-64 dshx:overflow-y-auto">
         <DropdownMenuLabel className="dshx:text-xs">Diff and revision comparison base</DropdownMenuLabel>
-        <DropdownMenuRadioGroup onValueChange={value => props.onChoose(composerBaseFromSetting(value))} value={composerBaseSetting(props.base)}>
+        <DropdownMenuRadioGroup onValueChange={props.onChoose} value={props.choice}>
+          <DropdownMenuRadioItem value={PROJECT_BASE_SETTING}>
+            Main branch (<span className="dshx:font-mono!">{props.projectBookmark}</span>)
+          </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="parent">Parent (@-)</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="trunk">Trunk (trunk())</DropdownMenuRadioItem>
           {(props.repository.localBookmarks.length > 0 || availableRemoteBookmarks.length > 0) && <DropdownMenuSeparator />}
@@ -286,7 +303,8 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
             {revisionSummary}
           </button>
           <BasePicker
-            base={context.base}
+            choice={context.choice}
+            projectBookmark={context.projectBookmark}
             onChoose={next => {
               context.chooseBase(next)
               setExpanded(false)

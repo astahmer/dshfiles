@@ -276,6 +276,8 @@ export const jjRepositoryEffectSchema = Schema.Struct({
   repoRoot: Schema.String.check(Schema.isMaxLength(4096)),
   title: Schema.String.check(Schema.isMaxLength(512)),
   workspaceId: Schema.NullOr(Schema.String),
+  /** The project's main branch: what its threads start from and land on. Absent from a Host older than this field. */
+  bookmark: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(512))),
   bookmarks: Schema.Array(Schema.String.check(Schema.isMaxLength(512)))
     .check(Schema.isMaxLength(10_000))
     .pipe(Schema.withDecodingDefault(Effect.succeed([]))),

@@ -33,6 +33,7 @@ import { LegacyBacklogTables } from './legacy-tables.js'
 import { LeaseSweep } from './lease-sweep.js'
 import { LifecycleSignals } from './lifecycle-signals.js'
 import { GateWatch } from './gate-watch.js'
+import { BacklogMainBranch } from './main-branch.js'
 import { ScheduledRules } from './scheduled-rules.js'
 import { PullRequestState } from './pull-request-state.js'
 import { CaptureProjects } from './project-target.js'
@@ -115,7 +116,7 @@ const BacklogLive = Layer.mergeAll(
   BacklogAttention.layer,
   RemoteSyncLoop,
   BacklogPeers.loop,
-).pipe(Layer.provideMerge(backlogServices), Layer.provideMerge(hostEdges))
+).pipe(Layer.provideMerge(BacklogMainBranch.layer), Layer.provideMerge(backlogServices), Layer.provideMerge(hostEdges))
 
 /** No item has id 0, so a reference that names nothing reaches each verb as an id it answers `not-found` for. */
 const NO_ITEM = 0

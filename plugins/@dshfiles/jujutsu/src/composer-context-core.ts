@@ -25,8 +25,11 @@ export const COMPOSER_WORKSPACE_TEMPLATE = 'if(target.current_working_copy(), na
 
 export const COMPOSER_FILE_TEMPLATE = '"{\\"path\\":" ++ path.display().escape_json() ++ ",\\"status\\":" ++ status.escape_json() ++ "}\\n"'
 
-/** Settings store the base as one string: `main`, `parent`, `trunk`, or an encoded remote bookmark. */
+/** Settings store the base as one string: `project`, `parent`, `trunk`, a local bookmark, or an encoded remote bookmark. */
 const defaultComposerBase: ComposerBase = { kind: 'bookmark', name: 'main' }
+
+/** The stored base that follows the project's main branch (Settings › Projects) whatever its name; the default. */
+export const PROJECT_BASE_SETTING = 'project'
 const REMOTE_BASE_PREFIX = 'remote-base='
 
 export const composerBaseFromSetting = (value: JsonValue | undefined): ComposerBase => {
@@ -45,6 +48,24 @@ export const composerBaseFromSetting = (value: JsonValue | undefined): ComposerB
   const bookmark = SchemaHelpers.decodeSafe(composerBaseSchema, { kind: 'bookmark', name: parsed.data })
   return bookmark.success ? bookmark.data : defaultComposerBase
 }
+
+/** Whether a stored choice follows the project's main branch: `project`, or no choice at all. */
+const followsProject = (setting: JsonValue | undefined): boolean => setting === undefined || setting === '' || setting === PROJECT_BASE_SETTING
+
+/**
+ * The base a stored choice names. `project` (and no choice) is the project's main branch, so a repository whose main
+ * branch is `develop` compares against `develop` without a per-folder choice; `main` without jj-integration or on an
+ * older Host. Every other choice, a literal `main` included, stays exactly what was picked.
+ */
+const composerBaseForProject = (setting: JsonValue | undefined, projectBookmark: string | undefined): ComposerBase => {
+  if (!followsProject(setting)) return composerBaseFromSetting(setting)
+  const project = SchemaHelpers.decodeSafe(composerBaseSchema, { kind: 'bookmark', name: projectBookmark ?? 'main' })
+  return project.success ? project.data : defaultComposerBase
+}
+
+/** The picker's value for a stored choice: `project` stays `project`, anything else is the base it decodes to. */
+const composerBaseChoice = (setting: JsonValue | undefined): string =>
+  followsProject(setting) ? PROJECT_BASE_SETTING : composerBaseSetting(composerBaseFromSetting(setting))
 
 export const composerBaseSetting = (base: ComposerBase): string => {
   if (base.kind === 'remoteBookmark') return REMOTE_BASE_PREFIX + encodeURIComponent(JSON.stringify(base))
@@ -137,6 +158,8 @@ const parsePatchFileStats = (patch: string): { path: string; additions: number; 
 
 export class ComposerContextModel {
   static readonly composerBaseSetting = composerBaseSetting
+  static readonly composerBaseForProject = composerBaseForProject
+  static readonly composerBaseChoice = composerBaseChoice
   static readonly composerBaseTarget = composerBaseTarget
   static readonly composerDiffRange = composerDiffRange
   static readonly parseRevisionCount = parseRevisionCount

@@ -5,6 +5,7 @@ import { Duration, Effect, Layer, ManagedRuntime, Schema, Sink, Stream } from 'e
 import { type ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { Executables } from './executables-promise.js'
 import { jjSettingsTest } from './jj-settings.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepoLocks } from './repo-locks.js'
 import type { JjIntegrationSettings } from './settings.js'
 import { promiseThreads } from './threads-promise.js'
@@ -94,6 +95,7 @@ const spawnerFrom = (executor: JjExecutor) =>
 
 const threadWorkspacesLayer = (input: { readonly executor?: JjExecutor; readonly settings?: Partial<JjIntegrationSettings> } = {}) =>
   ThreadWorkspaces.layer.pipe(
+    Layer.provideMerge(ProjectBookmarks.layer),
     Layer.provideMerge(JjViewReads.layer),
     Layer.provideMerge(Jj.layerWith({ executable: jjExecutable, timeout: Duration.minutes(2), maxStdoutBytes: MAX_STDOUT_BYTES })),
     Layer.provideMerge(

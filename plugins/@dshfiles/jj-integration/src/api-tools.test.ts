@@ -18,6 +18,8 @@ describe('jj-integration tool exposure', () => {
     expect(tools.filter(tool => tool !== undefined).map(tool => tool.name)).toEqual([
       'jj_thread_destination',
       'jj_thread_projects',
+      'jj_project_bookmark',
+      'jj_set_project_bookmark',
       'jj_thread_repositories',
       'jj_thread_refresh_repositories',
       'jj_thread_isolate',
@@ -41,6 +43,7 @@ describe('jj-integration tool exposure', () => {
     expect(readOnly).toEqual([
       'jj_thread_destination',
       'jj_thread_projects',
+      'jj_project_bookmark',
       'jj_thread_repositories',
       'jj_thread_refresh_repositories',
       'jj_thread_review_history',

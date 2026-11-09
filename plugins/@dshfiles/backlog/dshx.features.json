@@ -839,7 +839,7 @@
           "kind": "host-test",
           "id": "backlog.lifecycle-jj",
           "file": "plugins/@dshfiles/backlog/src/signals.test.ts",
-          "testName": "reads closing references from jj log with the shipped template"
+          "testName": "reads closing references from the project's main branch with the shipped template, whatever it is called"
         },
         {
           "kind": "host-test",

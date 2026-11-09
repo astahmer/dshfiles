@@ -9,7 +9,7 @@ import { CleanupRunner, type CleanupReporter } from './cleanup-runner.js'
 import { filterCleanupTargets } from './cleanup-targets.js'
 import { ActivityLog, SessionReads, WorkspaceRegistry } from './host-edges-promise.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
-import { JjSettings } from './jj-settings.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
 import { MergedPullRequests } from './merged-pull-requests.js'
@@ -51,7 +51,7 @@ const make = Effect.gen(function* () {
   const activity = yield* SessionActivity
   const requests = yield* IntegrationRequests
   const isolated = yield* IsolatedSessions
-  const settings = yield* JjSettings
+  const projectBookmarks = yield* ProjectBookmarks
   const sync = yield* WorkspaceSync
   const log = yield* ActivityLog
   const path = yield* Path.Path
@@ -348,7 +348,7 @@ const make = Effect.gen(function* () {
           yield* isolated.forget(workspace.path)
           const correlationId = randomUUID()
           yield* log.emit({ type: 'workspace.discarded', summary: `Removed JJ workspace ${workspace.name}`, path: workspace.path, correlationId })
-          if (workspace.kind !== 'secondary') yield* sync.enqueue({ repoRoot, bookmark: (yield* settings.get).bookmark, correlationId })
+          if (workspace.kind !== 'secondary') yield* sync.enqueue({ repoRoot, bookmark: yield* projectBookmarks.bookmarkFor(repoRoot), correlationId })
           workspaces.push({ ...workspace, outcome: 'removed' })
           yield* report.settleItem('removed')
           continue

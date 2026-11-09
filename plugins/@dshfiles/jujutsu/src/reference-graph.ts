@@ -36,15 +36,19 @@ const referenceSchema = Schema.String.check(
   Schema.isPattern(/^(?:[A-Za-z0-9][A-Za-z0-9._/+:-]*|[k-z]{8,64}|[0-9a-f]{7,64})$/u),
 )
 
-/** The reference itself, its neighbourhood, and the landmarks a reader compares against. */
-const revset = (input: { readonly reference: string; readonly hasDefaultWorkspace: boolean }): string =>
+/**
+ * The reference itself, its neighbourhood, and the landmarks a reader compares against: the project's main branch
+ * (`main` unless jj-integration names another) and its origin copy. Exact bookmark revsets resolve to nothing when the
+ * branch is absent, and a name is always quoted, so it stays a name.
+ */
+const revset = (input: { readonly reference: string; readonly hasDefaultWorkspace: boolean; readonly bookmark?: string | undefined }): string =>
   [
     `(${input.reference})`,
     `ancestors(${input.reference}, ${String(NEIGHBOURHOOD)})`,
     `descendants(${input.reference}, ${String(NEIGHBOURHOOD)})`,
     '@',
-    'present(main)',
-    'present(main@origin)',
+    `bookmarks(exact:${JSON.stringify(input.bookmark ?? 'main')})`,
+    `remote_bookmarks(exact:${JSON.stringify(input.bookmark ?? 'main')}, exact:"origin")`,
     ...(input.hasDefaultWorkspace ? ['default@'] : []),
   ].join(' | ')
 
@@ -133,7 +137,7 @@ const collapseHidden = (input: { readonly revisions: readonly Revision[]; readon
   return [...kept.values()]
 }
 
-const readReferenceGraph = Effect.fnUntraced(function* (input: { readonly run: JjRun; readonly reference: string }) {
+const readReferenceGraph = Effect.fnUntraced(function* (input: { readonly run: JjRun; readonly reference: string; readonly bookmark?: string | undefined }) {
   const reference = JSON.stringify(
     yield* Schema.decodeUnknownEffect(referenceSchema)(input.reference).pipe(Effect.mapError(cause => new InvalidJjOutput({ cause }))),
   )
@@ -167,12 +171,21 @@ const readReferenceGraph = Effect.fnUntraced(function* (input: { readonly run: J
     '--limit',
     String(ROW_LIMIT),
     '-r',
-    revset({ reference, hasDefaultWorkspace }),
+    revset({ reference, hasDefaultWorkspace, bookmark: input.bookmark }),
     '-T',
     template({ commitId, defaultCommitId }),
   ])
   const listedCommitIds = rows(
-    yield* read(['log', '--no-graph', '--limit', String(ROW_LIMIT), '-r', revset({ reference, hasDefaultWorkspace }), '-T', 'commit_id ++ "\\n"']),
+    yield* read([
+      'log',
+      '--no-graph',
+      '--limit',
+      String(ROW_LIMIT),
+      '-r',
+      revset({ reference, hasDefaultWorkspace, bookmark: input.bookmark }),
+      '-T',
+      'commit_id ++ "\\n"',
+    ]),
   ).filter(isCommitId)
   const revisions =
     listedCommitIds.length === 0

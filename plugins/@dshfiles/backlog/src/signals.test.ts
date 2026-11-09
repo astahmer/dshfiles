@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { BacklogMainBranch } from './main-branch.js'
 import { BacklogSignals } from './signals.js'
 
 describe('signals', () => {
@@ -28,7 +29,7 @@ describe('signals', () => {
 })
 
 describe('signals against a real jj repository', () => {
-  it('reads closing references from jj log with the shipped template', async () => {
+  it("reads closing references from the project's main branch with the shipped template, whatever it is called", async () => {
     const { execFileSync } = await import('node:child_process')
     const { mkdtempSync, rmSync } = await import('node:fs')
     const { join } = await import('node:path')
@@ -44,12 +45,14 @@ describe('signals against a real jj repository', () => {
       jj('git', 'init')
       jj('describe', '-m', 'feat: first\n\nPart of b:1.')
       jj('new', '-m', 'fix: second\n\nCloses b:2 and b:3')
-      jj('bookmark', 'set', 'main', '-r', '@')
-      const revisions = BacklogSignals.parseLog(
-        jj('log', '--no-graph', '--ignore-working-copy', '-r', 'ancestors(main, 50) ~ root()', '-T', BacklogSignals.logTemplate),
-      )
+      jj('bookmark', 'set', 'develop', '-r', '@')
+      const readMain = (main: string) =>
+        BacklogSignals.parseLog(jj('log', '--no-graph', '--ignore-working-copy', '-r', `ancestors(${main}, 50) ~ root()`, '-T', BacklogSignals.logTemplate))
+      const revisions = readMain(BacklogMainBranch.bookmarkRevset('develop'))
       expect(revisions.flatMap(revision => BacklogSignals.closedBy(revision.description))).toEqual(['2', '3'])
       expect(revisions).toHaveLength(2)
+      // A repository without the branch has nothing on it, rather than failing the poll.
+      expect(readMain(BacklogMainBranch.bookmarkRevset('main'))).toEqual([])
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

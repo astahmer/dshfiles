@@ -8,9 +8,12 @@
 
 ![Integrate from the end of a turn](docs/screenshots/turn-end-integrate.png)
 
+![Choose a project's main branch](docs/screenshots/project-main-branch.png)
+
 Lets many agents work on one jj repository at once: a thread can run in its own
 jj workspace beside the repository, and **Integrate** moves its finished work
-into `main` by default. The integration page lets each ready workspace choose
+into the project's [main branch](#main-branch-per-project) (`main` unless the
+project names another). The integration page lets each ready workspace choose
 another local bookmark before integrating. Internally, jj rebases the thread
 revisions onto that bookmark's current tip, then advances it; existing ancestry
 stays intact.
@@ -33,7 +36,7 @@ A blank thread shows a destination bar above its composer:
 - **Folder**: a registered project, **No folder** (a scratch directory,
   `~/.dsh/no-folder`), or **Open folder…**.
 - **Bookmark** (jj repositories): the bookmark the thread starts from. With
-  default isolation enabled, this is the configured `bookmark` (`main` by default),
+  default isolation enabled, this is the project's [main branch](#main-branch-per-project),
   independently of the project checkout's current bookmark. Picking another
   starts the thread in its own workspace at that bookmark. Existing isolated
   destinations keep their selected bookmark; with isolation off the chip describes
@@ -228,6 +231,35 @@ same coordinator, reporting queued, validating and rebasing phases as they
 happen. A queue line names what is active, queued or failed. Behind-only work and
 revisions already integrated are never offered again, and a failed row keeps its
 **Retry** action.
+
+## Main branch per project
+
+Every project has one main branch: the bookmark (git: branch) its thread
+workspaces start from, **Integrate** advances, and the Jujutsu panel, Changes
+and pull requests compare against. The first of these decides it:
+
+1. The choice in **Settings › Projects › Main branch** (`repositoryBookmarks`),
+   kept in your profile, never in the repository.
+2. `bookmark` in the repository's `dsh.project.json`.
+3. Origin's default branch, when a local branch of that name exists: git's
+   `origin/HEAD`, or the `trunk()` alias `jj git clone` records (read only from a
+   jj repository with an `origin` remote, cached for two minutes).
+4. The global `bookmark` setting (`main`).
+
+`jj_project_bookmark` (API `projectBookmark`) reports the result and the layer
+that chose it; `jj_set_project_bookmark` (API `setProjectBookmark`) makes or
+removes (`bookmark: null`) the Settings › Projects choice. The Host writes it
+against the settings revision it read and retries a conflict, so two windows or
+an agent saving at once keep both projects' choices. Other plugins read it through the `@dshfiles/jj-integration/project-bookmark`
+client module: Jujutsu names its main landmarks, chat reference previews, trunk
+lane and **Rebase onto** item after it, and its composer bar's default
+**Main branch** base compares against it; pulls-review (panel, `/pulls` and
+`pulls_review`) starts a review without a base from it; pull-requests targets it
+when it is chosen or declared (otherwise the GitHub default branch); backlog's
+`Closes b:…` and revision gates count what reached it.
+
+Changing the choice drops the Host's cached repository and thread views at once,
+and Settings tells every open Jujutsu and Changes view to read the branch again.
 
 ## Integrating into main
 
@@ -562,7 +594,9 @@ the subagent is idle), or any rebase that keeps the revisions' ancestry — the 
 `jj workspace forget` leaves its folder for the opt-in `untracked` kind.
 [`agent-workspace-cleanup.integration.test.ts`](src/agent-workspace-cleanup.integration.test.ts) pins the flow.
 
-- `jj_thread_status`: this thread's revisions not yet on the target bookmark and whether it moved.
+- `jj_project_bookmark`: the main branch of the project holding a path, and which layer chose it.
+- `jj_set_project_bookmark`: choose that main branch, or `null` to go back to Automatic.
+- `jj_thread_status`: this thread's revisions not yet on the project's main branch and whether it moved.
 - `jj_thread_rebase`: rebase this thread's work onto the target bookmark.
 
 ## Settings (`jj-integration`)
@@ -572,7 +606,8 @@ the subagent is idle), or any rebase that keeps the revisions' ancestry — the 
 | `autoIntegrationScope`                | `none`    | `none` is manual; `isolated` auto-integrates uniquely owned thread workspaces; `all` also isolates new threads by default.                 |
 | `autoIntegrationExcludedRepositories` | empty     | Absolute repository paths that automatic integration never touches; manual Integrate still works.                                          |
 | `isolateByDefault`                    | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                                              |
-| `bookmark`                            | `main`    | Exact bookmark threads start from and Rebase advances.                                                                                     |
+| `bookmark`                            | `main`    | Fallback main branch for a project without its own; see [Main branch per project](#main-branch-per-project).                               |
+| `repositoryBookmarks`                 | empty     | `{ repository, bookmark }` per project, set in Settings › Projects; wins over `dsh.project.json` and origin's default branch.              |
 | `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                                           |
 | `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                                           |
 | `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                                |

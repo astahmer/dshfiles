@@ -23,7 +23,7 @@ const mountPanel = () => {
     staleTime: 60_000,
   })
   const landmarksOptions = (onScreen: boolean) =>
-    GraphLandmarksQuery.options({ root: ROOT, repoId: REPO_ID, refreshedAt: state.getCurrentResult().dataUpdatedAt, onScreen, read })
+    GraphLandmarksQuery.options({ root: ROOT, repoId: REPO_ID, refreshedAt: state.getCurrentResult().dataUpdatedAt, onScreen, bookmark: 'main', read })
   const state = new QueryObserver(client, stateOptions(true))
   const landmarks = new QueryObserver(client, landmarksOptions(true))
   const unsubscribe = [state.subscribe(() => undefined), landmarks.subscribe(() => undefined)]

@@ -324,6 +324,67 @@ When(
   },
 )
 
+When('a disposable jj repository with a {string} bookmark is chosen as the New thread project', async ({ page }: { page: Page }, bookmark: string) => {
+  const repository = await createRepository(page)
+  const inRepository = (args: readonly string[]) => jjAt(repository.repositoryPath, repository.temporaryRoot, args)
+  // Its own commit above main, so a workspace started from it is told apart from one started from main.
+  inRepository(['new', 'main'])
+  await writeFile(join(repository.repositoryPath, `${bookmark}.txt`), `${bookmark}\n`)
+  inRepository(['describe', '--message', `${bookmark} fixture`])
+  inRepository(['bookmark', 'create', bookmark, '--revision', '@'])
+  inRepository(['new', 'main'])
+  await chooseProjectPath(page, repository.repositoryPath)
+  await expect(projectButton(page)).toHaveText('repo')
+})
+
+/** Settings › Projects (workspace-folder-picker) with this scenario's project picked; jj-integration draws its Main branch region. */
+const projectMainBranchRegion = async (page: Page) => {
+  const settings = settingsPage(page)
+  if (!(await settings.isVisible())) await openSettingsDialog(page)
+  await settingsNavEntry(page, 'Projects').click()
+  const repository = repositoryFor(page)
+  await settings.getByRole('radiogroup', { name: 'Projects', exact: true }).getByRole('radio', { name: new RegExp(`^repo\\s*${repository.repositoryPath.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}$`, 'u') })
+    .check()
+  return settings.getByRole('region', { name: 'Main branch', exact: true })
+}
+
+When('{string} is chosen as the project\'s main branch in Settings › Projects', async ({ page }: { page: Page }, bookmark: string) => {
+  const region = await projectMainBranchRegion(page)
+  const choice = region.getByRole('combobox', { name: 'Main branch of repo', exact: true })
+  // The Host resolves the project's own default before the field is offered.
+  await expect(choice).toHaveText(/^Automatic \(main\)/u)
+  await expect(choice).toBeEnabled()
+  await choice.click()
+  await page.getByRole('option', { name: bookmark, exact: true }).click()
+})
+
+Then('Settings › Projects shows the project using {string}, chosen here', async ({ page }: { page: Page }, bookmark: string) => {
+  const region = await projectMainBranchRegion(page)
+  await recordAssertion(page, 'jj-integration-project-main-branch-chosen-in-settings', async () => {
+    await expect(region.getByRole('combobox', { name: 'Main branch of repo', exact: true })).toHaveText(bookmark)
+    await expect(region.getByText(`Using ${bookmark}`, { exact: true })).toBeVisible()
+    await expect(region.getByText('Chosen here', { exact: true })).toBeVisible()
+    await expect(region.getByRole('alert')).toHaveCount(0)
+  })
+})
+
+When('Settings › Projects is closed', async ({ page }: { page: Page }) => {
+  await closeSettings(page)
+})
+
+Then('the New thread workspace starts from the project\'s main branch {string}', async ({ page }: { page: Page }, bookmark: string) => {
+  const repository = repositoryFor(page)
+  const threadName = provisionedThreadName(page)
+  const expectedParent = commitIdOf(repository, bookmark)
+  await recordAssertion(page, 'jj-integration-project-main-branch-starts-new-thread-workspaces', async () => {
+    expect(expectedParent).not.toBe(repository.baseCommitId)
+    await expectOwnWorkspace(page, true, bookmark)
+    await expect.poll(() => workspaceNames(repository, [threadName])).toEqual(['default', threadName].sort())
+    expect(commitIdOf(repository, `${threadName}@-`)).toBe(expectedParent)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the {string} bookmark is picked in the destination bar and refused', async ({ page }: { page: Page }, bookmark: string) => {
   const refusal = page.getByText(`"${bookmark}" points at more than one revision, so no workspace was created.`, { exact: false })
   await workspaceToggle(page).click()

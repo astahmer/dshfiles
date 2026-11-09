@@ -31,9 +31,17 @@ describe('reference graph', () => {
     expect(revset).toContain('("main")')
     expect(revset).toContain('ancestors("main", 4)')
     expect(revset).toContain('descendants("main", 4)')
-    expect(revset).toContain('present(main@origin)')
+    expect(revset).toContain('bookmarks(exact:"main")')
+    expect(revset).toContain('remote_bookmarks(exact:"main", exact:"origin")')
     expect(revset).toContain('default@')
     expect(ReferenceGraphModel.revset({ reference: '"main"', hasDefaultWorkspace: false })).not.toContain('default@')
+  })
+
+  it("names the project's own main branch as the landmark instead of main", () => {
+    const revset = ReferenceGraphModel.revset({ reference: '"topic"', hasDefaultWorkspace: false, bookmark: 'develop' })
+    expect(revset).toContain('bookmarks(exact:"develop")')
+    expect(revset).toContain('remote_bookmarks(exact:"develop", exact:"origin")')
+    expect(revset).not.toContain('main')
   })
 
   it('marks the referenced revision and the working copy in each row', () => {

@@ -4,6 +4,7 @@ import { Jj } from '@dshfiles/jj-cli'
 import { projectChecksApi } from '@dshfiles/project-checks/api'
 import { Cause, Clock, Effect, Layer, Ref, Schedule } from 'effect'
 import type { BacklogSummaryView } from './api.js'
+import { BacklogMainBranch } from './main-branch.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogGates } from './gates.js'
 import { AutomationHost } from './peer-replication.js'
@@ -25,7 +26,7 @@ const revisionPattern = /^[0-9a-z]{4,64}$/
 
 /**
  * Resolves gates from what the Host already watches: pull requests through `@dshfiles/pull-requests`, revisions on
- * `main` with one jj read per repository, project-check receipts of the threads linked to the item, and the calendar
+ * the project's main branch with one jj read per repository, project-check receipts of the threads linked to the item, and the calendar
  * for date gates (derived on read, nothing to resolve). A linked pull request with relation `fixes` that merges moves
  * its item to done, unless you set the status by hand.
  */
@@ -35,6 +36,7 @@ export const GateWatch = Layer.effectDiscard(
     const settings = yield* BacklogSettingsTag
     const pulls = yield* PullRequestState
     const jj = yield* Jj
+    const mainBranch = yield* BacklogMainBranch
     const apis = yield* HostApis
     const checks = apis.client(projectChecksApi)
     const automation = yield* AutomationHost
@@ -65,17 +67,19 @@ export const GateWatch = Layer.effectDiscard(
     })
 
     const onMain = (repository: string, revision: string) =>
-      jj
-        .exec({
-          cwd: repository,
-          args: ['--ignore-working-copy', 'log', '--no-graph', '-r', `present(${revision}) & ::main`, '-T', 'commit_id'],
-          timeout: '20 seconds',
-          maxStdoutBytes: 4_000,
-        })
-        .pipe(
-          Effect.map(output => output.stdout.trim() !== ''),
-          Effect.orElseSucceed(() => false),
-        )
+      Effect.flatMap(mainBranch.revsetFor(repository), main =>
+        jj
+          .exec({
+            cwd: repository,
+            args: ['--ignore-working-copy', 'log', '--no-graph', '-r', `present(${revision}) & ::${main}`, '-T', 'commit_id'],
+            timeout: '20 seconds',
+            maxStdoutBytes: 4_000,
+          })
+          .pipe(
+            Effect.map(output => output.stdout.trim() !== ''),
+            Effect.orElseSucceed(() => false),
+          ),
+      )
 
     const resolveRevisions = Effect.fn('backlog gate revisions')(function* (items: readonly BacklogSummaryView[], extra: readonly string[]) {
       const gated = items.filter(item => item.gates.some(gate => gate.open && gate.kind === 'revision'))
