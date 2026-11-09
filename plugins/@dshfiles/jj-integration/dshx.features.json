@@ -5,7 +5,7 @@
     {
       "id": "thread-destination",
       "title": "New thread destination and workspace isolation",
-      "summary": "The Workspace segment of a new thread\u2019s run row: its own jj workspace (from a chosen bookmark) or in place in the project checkout, defaulting to the isolate-by-default setting; unsent drafts, attachments, and structured references follow workspace changes. A project that is not a Jujutsu repository yet says so in the same segment and offers Enable, which runs the guarded colocated init the folder picker uses; the segment becomes the real one when the Host reports a repository.",
+      "summary": "The Workspace segment of a new thread\u2019s run row: its own jj workspace (from a chosen bookmark, or from a remote bookmark such as main@origin that the Host fetches first) or in place in the project checkout, defaulting to the isolate-by-default setting; unsent drafts, attachments, and structured references follow workspace changes. A project that is not a Jujutsu repository yet says so in the same segment and offers Enable, which runs the guarded colocated init the folder picker uses; the segment becomes the real one when the Host reports a repository.",
       "reach": [
         "click button \"New session\"",
         "expect button \"Workspace: *\"",
@@ -64,6 +64,7 @@
         "A thread workspace with revisions to rebase is never removed by the sweep.",
         "A destination that names no revision or several (unknown name, ambiguous prefix, conflicted bookmark) is refused before jj creates anything, with the bar's recovery text, and retrying creates nothing.",
         "A failed `jj workspace add` removes what it registered, and a spare that cannot be claimed is replaced, so neither leaves a second workspace.",
+        "Starting from a remote bookmark (main@origin) fetches only that bookmark first, with a 45 s timeout; offline or refused, the thread starts from the last fetched position and the Host logs a warning. A spare kept for that base never stands in for the fetch.",
         "Enable is offered only while the Jujutsu bundle is loaded and jj is installed; nothing is initialized without the click, and a broken .jj is refused rather than repaired."
       ],
       "externalDependencies": [
@@ -133,6 +134,24 @@
         },
         {
           "kind": "unit-test",
+          "id": "jj-integration.remote-base-fetch",
+          "file": "plugins/@dshfiles/jj-integration/src/remote-base.integration.test.ts",
+          "testName": "fetches the remote bookmark first, so the thread starts from what the remote holds now"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.remote-base-offline",
+          "file": "plugins/@dshfiles/jj-integration/src/remote-base.integration.test.ts",
+          "testName": "starts from the last fetched position when the remote cannot be reached"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.remote-base-spare",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "provisions a workspace from a remote bookmark even when a spare was kept for it"
+        },
+        {
+          "kind": "unit-test",
           "id": "jj-integration.discard",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
           "testName": "discards an empty thread completely and refuses one with revisions to rebase"
@@ -193,6 +212,7 @@
         "A rebase the user left in progress in a thread is refused with git rebase --continue / --abort as the next step, never aborted; a failed abort is reported.",
         "Cleanup age uses the latest of the HEAD commit time, the worktree index and folder modification time, so a fresh thread cut from an old commit is not idle.",
         "A git worktree add failure names git worktree prune for a stale registration; an unresolvable bookmark names the branch check, fetch and the Settings bookmark.",
+        "Starting from a remote branch (origin/main) fetches only that branch into its remote-tracking ref first and never moves a local branch; offline, the worktree starts from the last fetched position.",
         "Snapshot refs stay bounded: the newest 200 per repository are kept, older ones are deleted 20 per snapshot, and undoing a pruned snapshot says so with git reflog as the fallback."
       ],
       "externalDependencies": [
@@ -219,6 +239,12 @@
           "id": "jj-integration.git-provision",
           "file": "plugins/@dshfiles/jj-integration/src/git-thread-workspaces.integration.test.ts",
           "testName": "provisions a git worktree on the bookmark and locates it as a git thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.git-remote-base",
+          "file": "plugins/@dshfiles/jj-integration/src/remote-base.integration.test.ts",
+          "testName": "offers origin/main and fetches it before starting the worktree"
         },
         {
           "kind": "unit-test",

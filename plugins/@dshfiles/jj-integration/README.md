@@ -6,6 +6,8 @@
 
 ![New thread destination and workspace isolation](docs/screenshots/thread-destination.png)
 
+![Start a thread workspace from a remote bookmark](docs/screenshots/thread-destination-remote.png)
+
 ![Integrate from the end of a turn](docs/screenshots/turn-end-integrate.png)
 
 ![Choose a project's main branch](docs/screenshots/project-main-branch.png)
@@ -41,6 +43,12 @@ A blank thread shows a destination bar above its composer:
   starts the thread in its own workspace at that bookmark. Existing isolated
   destinations keep their selected bookmark; with isolation off the chip describes
   the shared checkout instead.
+- **Start from remote**: the same menu lists fetched remote bookmarks
+  (`main@origin`; `origin/main` in a git repository), the main branch first.
+  Picking one fetches only that bookmark (45 s timeout), then starts the thread
+  workspace there, so it begins from what the remote holds now. Offline, it
+  starts from the last fetched position and the Host logs a warning. Local
+  bookmarks and branches never move.
 - **workspace** toggle: run the thread in its own jj workspace,
   `<repository>-threads/thread-<id>`, created with `jj workspace add -r <bookmark>`.
   The bookmark must name one revision: an unknown name, an ambiguous prefix or a

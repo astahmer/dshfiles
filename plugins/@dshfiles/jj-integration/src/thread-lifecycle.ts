@@ -66,8 +66,14 @@ const make = Effect.gen(function* () {
     readonly isolated: boolean
     readonly projectWorkspaceId: string | null
   }) {
-    const [bookmarks, vcs, targetBookmark] = yield* Effect.all(
-      [threads.bookmarks(input.root), threads.vcsAt(input.root), projectBookmarks.bookmarkFor(input.repoRoot)],
+    const [bookmarks, remoteBookmarks, vcs, targetBookmark] = yield* Effect.all(
+      [
+        threads.bookmarks(input.root),
+        // Only offers a choice: a repository whose remote listing fails still shows its local bookmarks.
+        threads.remoteBookmarks(input.root).pipe(Effect.orElseSucceed((): readonly string[] => [])),
+        threads.vcsAt(input.root),
+        projectBookmarks.bookmarkFor(input.repoRoot),
+      ],
       { concurrency: 'unbounded' },
     )
     return {
@@ -76,6 +82,7 @@ const make = Effect.gen(function* () {
       projectWorkspaceId: input.projectWorkspaceId,
       bookmark: bookmarks.current,
       bookmarks: [...bookmarks.names],
+      remoteBookmarks: [...remoteBookmarks],
       isolateByDefault: yield* isolateByDefault,
       targetBookmark,
     } satisfies DestinationView

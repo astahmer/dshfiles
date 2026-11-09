@@ -5,7 +5,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { CheckIcon, ChevronDownIcon, FolderIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, CloudDownloadIcon, FolderIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -377,20 +377,21 @@ export const DestinationBar = (props: {
   const defaultBookmark = current?.targetBookmark ?? settings?.bookmark
   const bookmark = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated, defaultBookmark })
   const [segmentOpen, setSegmentOpen] = useState(false)
+  const remoteBookmarks = current?.remoteBookmarks ?? []
   const move = (request: { readonly isolate: boolean; readonly base?: string }): void => {
     const leavingPath =
       current?.isolated === true ? services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)?.path : undefined
     const leavingName = threadNameOf(leavingPath)
-    toggle.toggle(
-      {
-        ...request,
-        projectWorkspaceId: projectId,
-        // Another thread's workspace is not a spare: only an unused one is kept for reuse.
-        leaving: workspaceId !== null && leavingName !== null && !occupied ? { workspaceId, name: leavingName } : null,
-        leavingBase: current?.bookmark ?? null,
-      },
-      newThreadId ?? undefined,
-    )
+    let toggleRequest: ToggleRequest = {
+      ...request,
+      projectWorkspaceId: projectId,
+      // Another thread's workspace is not a spare: only an unused one is kept for reuse.
+      leaving: workspaceId !== null && leavingName !== null && !occupied ? { workspaceId, name: leavingName } : null,
+      leavingBase: current?.bookmark ?? null,
+    }
+    // The Host fetches a remote bookmark before starting from it; no spare made earlier stands in.
+    if (request.isolate && request.base !== undefined && remoteBookmarks.includes(request.base)) toggleRequest = { ...toggleRequest, fetchesBase: true }
+    toggle.toggle(toggleRequest, newThreadId ?? undefined)
   }
   const chip = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-medium'
   const choose = (choice: WorkspaceChoice): void => {
@@ -496,6 +497,29 @@ export const DestinationBar = (props: {
                             }}
                           >
                             <GitBranchIcon className="dshx:size-3.5 dshx:text-muted-foreground" />
+                            <span className="dshx:flex-1 dshx:truncate dshx:font-mono! dshx:text-xs">{name}</span>
+                            {isolated && name === bookmark ? <CheckIcon className="dshx:size-3.5" aria-label="selected" /> : null}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </>
+                  )}
+                  {remoteBookmarks.length === 0 ? null : (
+                    <>
+                      <CommandSeparator />
+                      <CommandGroup heading={t('workspaceSegmentStartFromRemote')}>
+                        {remoteBookmarks.map(name => (
+                          <CommandItem
+                            key={name}
+                            value={`remote ${name}`}
+                            keywords={[t('workspaceSegmentRemoteKeyword')]}
+                            onSelect={() => {
+                              setSegmentOpen(false)
+                              setBranchOpen(false)
+                              move({ isolate: true, base: name })
+                            }}
+                          >
+                            <CloudDownloadIcon className="dshx:size-3.5 dshx:text-muted-foreground" />
                             <span className="dshx:flex-1 dshx:truncate dshx:font-mono! dshx:text-xs">{name}</span>
                             {isolated && name === bookmark ? <CheckIcon className="dshx:size-3.5" aria-label="selected" /> : null}
                           </CommandItem>

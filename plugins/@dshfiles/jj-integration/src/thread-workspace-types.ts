@@ -181,6 +181,11 @@ export interface ThreadWorkspacesBackend {
   readonly removeUntrackedEntry: (input: { readonly repoRoot: string; readonly name: string }) => Effect.Effect<void, ThreadWorkspaceError>
   /** Local bookmarks (git: branches), and the nearest one the workspace at `path` builds on. */
   readonly bookmarks: (target: string) => Effect.Effect<{ readonly current: string | null; readonly names: readonly string[] }, ThreadWorkspaceError>
+  /**
+   * Fetched remote bookmarks a thread can start from, written as `provision` takes them as a base (jj `main@origin`,
+   * git `origin/main`), the project's main branch first. `provision` fetches such a base before it starts from it.
+   */
+  readonly remoteBookmarks: (target: string) => Effect.Effect<readonly string[], ThreadWorkspaceError>
   readonly workingCopyCommitId: (target: string) => Effect.Effect<string, ThreadWorkspaceError>
   /** Record the workspace's files and return an opaque token `restoreFiles` accepts; moves nothing. */
   readonly snapshotFiles: (target: string) => Effect.Effect<string, ThreadWorkspaceError>

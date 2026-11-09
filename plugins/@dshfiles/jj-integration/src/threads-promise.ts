@@ -111,6 +111,7 @@ export const promiseThreads = (input: { readonly service: Service; readonly run:
     untrackedEntries: (repoRoot: string) => call(service.untrackedEntries(repoRoot)),
     removeUntrackedEntry: (target: { readonly repoRoot: string; readonly name: string }) => call(service.removeUntrackedEntry(target)),
     bookmarks: (path: string) => call(service.bookmarks(path)),
+    remoteBookmarks: (path: string) => call(service.remoteBookmarks(path)),
     workingCopyCommitId: (path: string, signal?: AbortSignal) => call(service.workingCopyCommitId(path), signal),
     snapshotFiles: (path: string, signal?: AbortSignal) => call(service.snapshotFiles(path), signal),
     snapshotRevision: (path: string, snapshot: string) => call(service.snapshotRevision(path, snapshot)),
