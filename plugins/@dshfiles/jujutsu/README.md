@@ -14,6 +14,8 @@
 
 ![Preview cleanup with a custom inactivity threshold](docs/screenshots/workspace-cleanup.png)
 
+![Keep a failed thread-workspace cleanup on its project's panel](docs/screenshots/workspace-cleanup-failure.png)
+
 ![Open Jujutsu revision links from chat](docs/screenshots/chat-references.png)
 
 A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built

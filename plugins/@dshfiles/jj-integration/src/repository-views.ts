@@ -69,6 +69,8 @@ export class RepositoryViews extends Context.Service<
     readonly locatedWorkspaces: Effect.Effect<readonly LocatedWorkspace[], HostCallFailed>
     /** The last scan, refreshing in the background when it is stale. */
     readonly snapshot: Effect.Effect<RepositoriesSnapshot>
+    /** The last scan as it is, never starting one: for reads polled often enough that a refresh would cost jj processes. */
+    readonly cached: Effect.Effect<readonly RepositoryView[]>
     /** Start a scan; false when one is already running. */
     readonly startRefresh: Effect.Effect<boolean>
     /** A fresh scan, shared with any scan already running. */
@@ -265,6 +267,7 @@ export class RepositoryViews extends Context.Service<
         forgetLocation: target => Cache.invalidate(locations, target),
         locatedWorkspaces,
         snapshot,
+        cached: Effect.map(SynchronizedRef.get(views), current => current.cached?.value ?? []),
         // An explicit refresh means "look again": a folder that became a repository since the last miss must be found,
         // so the memoized locations (including cached misses) are dropped with the views.
         startRefresh: Effect.flatMap(Cache.invalidateAll(locations), () => Effect.map(startScan, started => started.started)),

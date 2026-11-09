@@ -2107,7 +2107,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           </header>
 
-          <WorkspaceCleanupTrail onFinished={refreshRepository} />
+          <WorkspaceCleanupTrail onFinished={refreshRepository} onReview={() => setCleanupOpen(true)} path={state?.root} />
 
           {rowConfirmAnchorId === null && inlineConfirm !== null && <div className="dshx:border-b dshx:p-2">{inlineConfirm}</div>}
           {removalHidden && inlineRemoval !== null && <div className="dshx:border-b dshx:p-2">{inlineRemoval}</div>}

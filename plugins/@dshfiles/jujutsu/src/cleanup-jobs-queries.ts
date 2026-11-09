@@ -1,4 +1,4 @@
-import { isApiOwnerMissing, type ApiClient } from '@dshfiles/dshx/api'
+import { isApiError, isApiOwnerMissing, type ApiClient } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi, type CleanupJobView, type CleanupKindView, type CleanupResult, type CleanupTarget } from '@dshfiles/jj-integration/api'
 import { queryOptions, useQuery } from '@dshfiles/plugin-ui/query'
@@ -12,13 +12,44 @@ const CLEANUP_POLL_MS = 1_000
 /** A removal started from another window or an agent tool still shows up, without a one-second poll while idle. */
 const CLEANUP_IDLE_POLL_MS = 15_000
 
-/** The removal trail, newest first: the running job and the last one that settled. */
-export const useCleanupJobs = () => {
+/** The one verb the trail reads, typed from jj-integration's contract so a fake client cannot drift from it. */
+export type CleanupJobsClient = Pick<JjIntegrationClient, 'cleanupJobs'>
+
+/**
+ * Reads one project's trail when `path` is given (the Host traces a thread workspace to its project), the whole trail
+ * otherwise. A Host from before the filter rejects the field as a contract error: only then does the reader fall back
+ * to the whole trail, as that Host always showed, and stop asking for the filter until the page reloads (the Host only
+ * changes with a restart). Any other failure, a timeout or a Host error, is the query's to report and retry.
+ */
+export const createCleanupJobsReader = (
+  options: {
+    /** Whether a failure is the Host refusing the `path` field; tests stand in for dshx's private ApiError brand. */
+    readonly isRefusal?: (error: unknown) => boolean
+  } = {},
+) => {
+  const isRefusal = options.isRefusal ?? ((error: unknown) => isApiError(error) && error.kind === 'contract')
+  let pathFilterRefused = false
+  return async (api: CleanupJobsClient, path: string | undefined, signal: AbortSignal) => {
+    if (path === undefined || pathFilterRefused) return api.cleanupJobs({}, { signal })
+    try {
+      return await api.cleanupJobs({ path }, { signal })
+    } catch (error) {
+      if (!isRefusal(error)) throw error
+      pathFilterRefused = true
+      return api.cleanupJobs({}, { signal })
+    }
+  }
+}
+
+const readCleanupJobs = createCleanupJobsReader()
+
+/** The removal trail, newest first: the running job and the last one that settled; one project's when `path` is given. */
+export const useCleanupJobs = (path?: string) => {
   const api = useApi(jjIntegrationApi)
   return useQuery(
     queryOptions({
-      queryKey: cleanupJobsKey,
-      queryFn: ({ signal }) => api.cleanupJobs({}, { signal }),
+      queryKey: [...cleanupJobsKey, path ?? null],
+      queryFn: ({ signal }) => readCleanupJobs(api, path, signal),
       refetchInterval: query => (query.state.data?.jobs.some(CleanupJobTrailModel.isActive) === true ? CLEANUP_POLL_MS : CLEANUP_IDLE_POLL_MS),
       retry: false,
     }),
@@ -28,6 +59,36 @@ export const useCleanupJobs = () => {
 /** Labels and summaries for the trail; the Hook above owns the query, these own how a job reads. */
 export class CleanupJobTrailModel {
   static readonly isActive = (job: CleanupJobView): boolean => job.state === 'queued' || job.state === 'running'
+
+  /** The job stopped, or finished leaving a workspace or folder it could not remove. */
+  static readonly hasFailure = (job: CleanupJobView): boolean => job.state === 'failed' || (job.state === 'done' && job.progress.failed > 0)
+
+  /** What to do next about a failure: the Host's recovery, or the same guarded rerun from a Host that predates it. */
+  static readonly recovery = (job: CleanupJobView): string | null => {
+    if (!CleanupJobTrailModel.hasFailure(job)) return null
+    return (
+      job.recovery ??
+      'Fix what the error names, then run Clean up thread workspaces… again: its preview rechecks every workspace and never forces unlanded work.'
+    )
+  }
+
+  /**
+   * A failure in two short parts: what stayed (the headline names the workspace, never a path that truncates first) and
+   * why, as the Host reported it.
+   */
+  static readonly failure = (job: CleanupJobView): { readonly headline: string; readonly reason: string | null } | null => {
+    if (job.state === 'failed') return { headline: 'Cleanup failed', reason: job.error ?? 'The cleanup stopped without saying why.' }
+    if (!CleanupJobTrailModel.hasFailure(job)) return null
+    const rows = [...(job.result?.workspaces ?? []), ...(job.result?.untracked ?? [])].filter(row => row.outcome === 'failed')
+    const first = rows[0]
+    if (first === undefined)
+      return { headline: `Could not remove ${String(job.progress.failed)} workspace${job.progress.failed === 1 ? '' : 's'}`, reason: null }
+    const others = rows.length === 1 ? '' : ` and ${String(rows.length - 1)} more`
+    return { headline: `Could not remove ${first.name}${others}`, reason: first.message ?? null }
+  }
+
+  /** A job id restarts with the Host, so a dismissal remembers when the job started too. */
+  static readonly dismissKey = (job: CleanupJobView): string => `${job.id}@${String(job.startedAt)}`
 
   static readonly phaseLabel = (job: CleanupJobView): string => {
     if (job.state === 'queued') return 'Waiting for the removal already running'
