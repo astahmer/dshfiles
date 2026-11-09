@@ -10,6 +10,7 @@ const lintRoots = ['tooling/dshx/packages', 'plugins', 'scripts']
 // text into a value. Everything else imports the defining module directly.
 const astGrepBoundaries = [
   'plugins/@dshfiles/storage-json/src/host.ts',
+  'plugins/@dshfiles/session-persistence-jsonl/src/host.ts',
   'plugins/@dshfiles/storage-domain/src/native/index.ts',
   'plugins/@dshfiles/storage-domain/src/host.ts',
   'plugins/@dshfiles/session-log-window/src/index.ts',
@@ -63,6 +64,7 @@ const astGrepBoundaries = [
 const astGrepVendored = [
   'plugins/@dshfiles/storage-domain/src/native/**',
   'plugins/@dshfiles/storage-json/src/native/**',
+  'plugins/@dshfiles/session-persistence-jsonl/src/native/**',
   'plugins/@dshfiles/storage-domain/tests/**',
   'plugins/@dshfiles/storage-json/tests/**',
   'plugins/@dshfiles/model-selection/src/native/**',

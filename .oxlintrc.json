@@ -133,7 +133,8 @@
     "plugins/@dshfiles/settings-models/src/css-modules.d.ts",
     "plugins/@dshfiles/settings-web-search/src/native/**",
     "plugins/@dshfiles/settings-web-search/src/host.ts",
-    "plugins/@dshfiles/settings-web-search/src/css-modules.d.ts"
+    "plugins/@dshfiles/settings-web-search/src/css-modules.d.ts",
+    "plugins/@dshfiles/session-persistence-jsonl/src/native/**"
   ],
   "overrides": [
     {

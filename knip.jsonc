@@ -20,6 +20,9 @@
     "tooling/antislop/effect/repo-rules/fixtures/**",
     "plugins/@dshfiles/multi-host/tests/fixtures/**",
     "plugins/@dshfiles/thread-sidebar/src/restart-controller.ts",
+    // Vendored upstream test helper (src/native/testing/generation.ts) kept for byte-parity
+    // with the pinned package; `native-fork-diff` reports it missing if it is deleted.
+    "plugins/@dshfiles/session-persistence-jsonl/src/native/testing/**",
     "tooling/dshx/packages/dshx/bench/**",
     "tooling/antislop/effect/tests/oxlint/**",
     // Hand-run helpers and a hand-written boot fixture, loaded by path rather than imported: the pull-requests

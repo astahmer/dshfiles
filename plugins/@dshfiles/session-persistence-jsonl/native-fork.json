@@ -1,0 +1,17 @@
+{
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The only delta stores each Session's assembled request-header tool catalog once and writes a digest reference on every later request that repeats it, rehydrated inline by every read; the header line carries a marker so a harness without this fork refuses the artifact instead of reading a reference as an empty tool list. Every other physical format, migration, lock and write path is upstream byte-for-byte.",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-session-persistence-jsonl",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
+    "path": "packages/session/session-persistence-jsonl"
+  },
+  "files": [
+    {
+      "upstream": "src",
+      "local": "src/native"
+    }
+  ],
+  "delta": ["src/native/format.ts", "src/native/index.ts"]
+}
