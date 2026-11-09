@@ -4,12 +4,13 @@ export type Provider = 'tailscale-funnel' | 'tailscale-serve' | 'cloudflared' | 
 
 export interface PhoneSettings {
   readonly enabled: boolean
-  readonly provider: Provider
+  /** Omitted means "pick the best available": Tailscale first, then a public tunnel. */
+  readonly provider?: Provider
   /** Public origin for the manual provider, set by the user. */
   readonly origin?: string
 }
 
-const DEFAULT: PhoneSettings = { enabled: false, provider: 'tailscale-funnel' }
+const DEFAULT: PhoneSettings = { enabled: false }
 
 const isProvider = (value: unknown): value is Provider =>
   value === 'tailscale-funnel' || value === 'tailscale-serve' || value === 'cloudflared' || value === 'manual'

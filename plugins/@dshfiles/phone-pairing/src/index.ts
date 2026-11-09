@@ -7,7 +7,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { createPairingGateway } from './gateway.ts'
-import { detectProviders } from './providers.ts'
+import { resolveProvider } from './providers.ts'
 import { renderTerminalQr } from './qr.ts'
 import { PhoneAccessSettings } from './settings.ts'
 import { createPairingStore } from './store.ts'
@@ -64,10 +64,10 @@ export const apply = (ctx: Context, config: Config): void => {
   void (async () => {
     const { settings } = await PhoneAccessSettings.load(`${directory}/settings.json`)
     if (!settings.enabled) {
-      const options = await detectProviders()
-      const summary = options.map(option => `${option.provider}${option.available ? '' : ` (install: ${option.install ?? 'manual'})`}`).join(', ')
+      const { provider, availability } = await resolveProvider()
+      const summary = availability.map(option => `${option.provider}${option.available ? '' : ` (install: ${option.install ?? 'manual'})`}`).join(', ')
       console.log(
-        `phone-pairing: phone access is off. Enable it by writing {"enabled":true,"provider":"<provider>"} to ${directory}/settings.json and restarting, then DSH prints a one-time QR. Providers: ${summary}`,
+        `phone-pairing: phone access is off. Enable it by writing {"enabled":true} to ${directory}/settings.json and restarting, then DSH prints a one-time QR. Would use ${provider}; providers: ${summary}`,
       )
       return
     }
@@ -77,7 +77,8 @@ export const apply = (ctx: Context, config: Config): void => {
         deviceTtlMs: (config.deviceTtlDays ?? 365) * 24 * 3_600_000,
         offerTtlMs: (config.offerTtlSeconds ?? 300) * 1_000,
       })
-      const tunnel = settings.origin === undefined ? await startTunnel(gatewayPort, settings.provider) : undefined
+      const { provider } = await resolveProvider(settings.provider)
+      const tunnel = settings.origin === undefined ? await startTunnel(gatewayPort, provider) : undefined
       const publicOrigin = settings.origin ?? tunnel?.origin
       if (publicOrigin === undefined) {
         console.error(
@@ -96,7 +97,7 @@ export const apply = (ctx: Context, config: Config): void => {
       const offer = store.beginOffer()
       console.log(
         [
-          `phone pairing (${settings.provider}) — scan, or open ${publicOrigin}/pair and type ${offer.code}:`,
+          `phone pairing (${provider}) — scan, or open ${publicOrigin}/pair and type ${offer.code}:`,
           renderTerminalQr(`${publicOrigin}/pair#id=${offer.id}&secret=${offer.secret}`),
           '',
         ].join('\n'),

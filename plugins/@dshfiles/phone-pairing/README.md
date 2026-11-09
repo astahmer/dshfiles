@@ -6,10 +6,13 @@ Devices live in `$DSH_HOME/plugins/phone-pairing/devices.json` as SHA-256 hashes
 
 ## Flow
 
-1. Phone access is **off by default**. Enable it by writing
-   `{"enabled":true,"provider":"tailscale-funnel"}` to
+1. Phone access is **off by default**. Enable it by writing `{"enabled":true}` to
    `$DSH_HOME/plugins/phone-pairing/settings.json` and restarting DSH. The choice
    persists, so nothing is published on a later start unless it stays enabled.
+   The provider is auto-picked: **Tailscale first** (tailnet-only Serve, no public
+   URL), then a public `cloudflared` quick tunnel for machines without it. Set
+   `"provider"` explicitly to override (`tailscale-funnel`, `tailscale-serve`,
+   `cloudflared`, `manual` + `"origin"`).
 2. The plugin starts a loopback gateway on `gatewayPort` (default 3443).
 3. It provisions a tunnel for that provider: a signed-in Tailscale gets `tailscale funnel --bg --https=443`
    (public `https://<machine>.<tailnet>.ts.net`); otherwise an installed `cloudflared`

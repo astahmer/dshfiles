@@ -17,7 +17,7 @@ const which = (command: string): Promise<boolean> =>
 const platform = process.platform
 
 /** Install commands use the package manager of the machine, never a downloaded script. */
-export const installCommand = (provider: Provider): string | undefined => {
+const installCommand = (provider: Provider): string | undefined => {
   if (provider === 'manual') return undefined
   if (platform === 'darwin') return 'brew install tailscale cloudflared'
   return 'nix profile install nixpkgs#cloudflared nixpkgs#tailscale'
@@ -41,4 +41,15 @@ export const detectProviders = async (): Promise<Availability[]> => {
     entry({ provider: 'cloudflared', available: cloudflared }),
     entry({ provider: 'manual', available: true, setup: 'point your own HTTPS reverse proxy at the gateway port' }),
   ]
+}
+
+/** Tailscale when it is installed, otherwise the public OTP tunnel; the user's choice wins. */
+export const resolveProvider = async (preferred?: Provider): Promise<{ provider: Provider; availability: Availability[] }> => {
+  const availability = await detectProviders()
+  if (preferred !== undefined) return { provider: preferred, availability }
+  const tailscale = availability.find(option => option.provider === 'tailscale-serve' && option.available)
+  if (tailscale !== undefined) return { provider: 'tailscale-serve', availability }
+  const cloudflared = availability.find(option => option.provider === 'cloudflared' && option.available)
+  if (cloudflared !== undefined) return { provider: 'cloudflared', availability }
+  return { provider: 'manual', availability }
 }
