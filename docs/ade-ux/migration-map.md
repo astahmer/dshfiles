@@ -49,7 +49,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Memory | Knowledge | memory/batch-forget-notes → Knowledge (rowAction)<br>memory/memory-panel → Knowledge (destinationSection)<br>memory/usage-telemetry → Knowledge (destinationSection) |
 | Messages | Agents | agent-communication/agent-directory → Agents (destinationSection)<br>agent-communication/human-browser → Agents (destinationSection)<br>agent-communication/passive-messaging → Agents (destinationSection) |
 | Resource Packs: Resources | Knowledge | resource-packs/local-properties → Knowledge (destinationSection) |
-| Review | Thread panel | pulls-review/ai-scope-summaries → Thread panel (threadFacet)<br>pulls-review/batch-reviewed-marks → Thread panel (threadFacet)<br>pulls-review/thread-review-scopes → Thread panel (threadFacet) |
+| Review | Thread panel | diffs-review/ai-scope-summaries → Thread panel (threadFacet)<br>diffs-review/batch-reviewed-marks → Thread panel (threadFacet)<br>diffs-review/thread-review-scopes → Thread panel (threadFacet) |
 | Revision graph | Land, No place of its own | jujutsu/graph-navigation → Land (destinationSection)<br>jujutsu/panel-scopes → No place of its own (infrastructure)<br>jujutsu/previewed-revision-mutations → Land (rowAction)<br>jujutsu/review-selection → Land (destinationSection)<br>jujutsu/revision-detail-and-diff → Land (detail)<br>jujutsu/revision-graph → Land (destinationSection)<br>jujutsu/workspace-at-revision → Land (rowAction)<br>jujutsu/workspace-cleanup → Land (command)<br>jujutsu/workspace-overflow → Land (rowAction)<br>jujutsu/workspace-removal → Land (rowAction) |
 | Secrets | Settings | secret-catalog/alias-mutations → Settings (settingsSection)<br>secret-catalog/bounded-secret-reveal → Settings (settingsSection)<br>secret-catalog/inline-quick-add → Settings (settingsSection)<br>secret-catalog/scoped-alias-catalog → Settings (settingsSection) |
 | Source control | Land | jujutsu/source-control → Land (destinationSection) |
@@ -382,14 +382,14 @@ facets of the active thread; 29 features.
 | preview/preview-browser: Agent preview browser | threadFacet | agent tool: preview_open / preview_screenshot |
 | preview/thread-dev-servers: Thread dev servers | threadFacet | thread-header: Dev servers and previews |
 | project-checks/native-hook-receipts: Show native hook invocation records | threadFacet | composer: Project checks › hook events |
-| pulls-review/ai-scope-summaries: Summarize review scopes with the thread's own model | threadFacet | left-nav: Review › Summarize |
-| pulls-review/batch-reviewed-marks: Mark a selection of changed files reviewed | threadFacet | left-nav: Review › reviewed marks |
-| pulls-review/changes-facet: Review a thread's changes in its Changes facet | threadFacet | right-pane: Changes |
-| pulls-review/combined-revisions: Review several selected revisions together | threadFacet | right-pane: Changes › Revisions |
-| pulls-review/diff-line-comments: Comment on diff lines as chips in the next message | threadFacet | right-pane: Changes › diff line selection |
-| pulls-review/land-card: Land a thread from the top of its Changes facet | threadFacet | right-pane: Changes › Land |
-| pulls-review/thread-review-scopes: Review project and workspace changes by scope | threadFacet | left-nav: Review |
-| pulls-review/turn-card-opens-changes: A turn's Edited files card opens Changes on that turn | threadFacet | transcript: Edited N files card |
+| diffs-review/ai-scope-summaries: Summarize review scopes with the thread's own model | threadFacet | left-nav: Review › Summarize |
+| diffs-review/batch-reviewed-marks: Mark a selection of changed files reviewed | threadFacet | left-nav: Review › reviewed marks |
+| diffs-review/changes-facet: Review a thread's changes in its Changes facet | threadFacet | right-pane: Changes |
+| diffs-review/combined-revisions: Review several selected revisions together | threadFacet | right-pane: Changes › Revisions |
+| diffs-review/diff-line-comments: Comment on diff lines as chips in the next message | threadFacet | right-pane: Changes › diff line selection |
+| diffs-review/land-card: Land a thread from the top of its Changes facet | threadFacet | right-pane: Changes › Land |
+| diffs-review/thread-review-scopes: Review project and workspace changes by scope | threadFacet | left-nav: Review |
+| diffs-review/turn-card-opens-changes: A turn's Edited files card opens Changes on that turn | threadFacet | transcript: Edited N files card |
 | traces/span-cost: List-price cost on traces | threadFacet | conversation-view: Traces tab › cost |
 | traces/thread-traces-tab: Per-thread Traces tab | threadFacet | conversation-view: Traces / Requests tabs |
 | usage/thread-cost-facet: Thread panel Cost facet | threadFacet | workbench: Choose a view › Thread panels › Cost |
@@ -600,7 +600,7 @@ palette commands, status items, agent tools, infrastructure; 148 features.
 | preview/render-html: Offline HTML screenshots for other Host plugins | infrastructure | host: preview-render contract |
 | project-automations/project-automation-webhooks: Start threads from signed webhooks | infrastructure | host: /automations/webhook/<id> route |
 | project-checks/activity-projection: Project check receipts appear safely in the Activity Timeline | infrastructure | host: receipts into left-nav: Activity Timeline: Activity |
-| pulls-review/review-marks-migration: Move the Review page's marks into the one viewed-marks store | infrastructure | host: pulls-review reviewed record |
+| diffs-review/review-marks-migration: Move the Review page's marks into the one viewed-marks store | infrastructure | host: diffs-review reviewed record |
 | request-messages/dispatch-request-messages: Dispatch agent/request-messages on stock DSH | infrastructure | host: no UI |
 | rich-composer/composer-contract: Composer contract for other plugins | infrastructure | client: Composer contract |
 | rich-composer/workbench-conversation-views: Dock an independently bound Conversation view | infrastructure | workbench: docked Conversation views |
@@ -654,7 +654,7 @@ Where the plan reads two ways, the catalogs take this reading.
 | Features | Choice |
 | --- | --- |
 | agent-toolkit/agent-toolkit-page | Thread panel › Context facet, not the Agents destination: the page shows what the agent can use in one thread (§4.4 Context lists agent-toolkit). |
-| pulls-review/* | Thread panel › Changes facet scopes (§4.4), not a Land detail page; Land keeps the cross-thread queue and History. |
+| diffs-review/* | Thread panel › Changes facet scopes (§4.4), not a Land detail page; Land keeps the cross-thread queue and History. |
 | jujutsu/composer-context | Thread panel › Changes facet "vs main" scope, not a composer chip. |
 | jj-integration/thread-workspace-menu, jj-integration/rebase | Thread panel › Changes › Land card; the header keeps only the workspace state text (§4.4 header). |
 | ai-accounts/quota-auto-retry, thread-sidebar/usage-limit-group, thread-sidebar/interrupted-turn-threads | attentionProvider (Needs you with Resume verbs, §6 "Interrupted / quota-blocked shown twice"), not transcript cards; the inline continuation card is rendered from the same item. |

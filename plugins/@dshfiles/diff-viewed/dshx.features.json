@@ -171,7 +171,7 @@
         {
           "kind": "gherkin",
           "id": "diff-viewed.revision-range-marks",
-          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+          "featureFile": "tooling/dshx/e2e/features/diffs-review.feature"
         },
         {
           "kind": "unit-test",

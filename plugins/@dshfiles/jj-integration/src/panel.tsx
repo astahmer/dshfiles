@@ -380,7 +380,7 @@ const ThreadRow = (props: {
   readonly userMessagesBySession: ReadonlyMap<string, number>
   readonly sessions: ISessions
   readonly openSession: (sessionId: SessionSummary['id']) => void
-  /** Open the thread with its Changes facet, when a plugin provides it (pulls-review). */
+  /** Open the thread with its Changes facet, when a plugin provides it (diffs-review). */
   readonly openChanges: ((input: { readonly workspacePath: string; readonly sessionId: string }) => boolean) | undefined
   readonly t: JjIntegrationTranslate
   readonly bookmark: string

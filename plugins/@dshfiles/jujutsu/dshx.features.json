@@ -334,7 +334,7 @@
         {
           "kind": "gherkin",
           "id": "jujutsu.review-selection",
-          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+          "featureFile": "tooling/dshx/e2e/features/diffs-review.feature"
         },
         {
           "kind": "unit-test",

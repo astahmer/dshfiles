@@ -28,7 +28,7 @@ whole plugin.
 | What's new on Getting started (reads jj/git history)        | `dshfiles-onboarding.whatsNew`                                                                      | on             | nothing: live                                     | [onboarding](../plugins/@dshfiles/onboarding/README.md#whats-new)                    |
 | Usage suggestions on Getting started (reads Usage counts)   | `dshfiles-onboarding.suggestions`                                                                   | off            | nothing: live                                     | [onboarding](../plugins/@dshfiles/onboarding/README.md#suggestions)                  |
 | Try it demo thread on Getting started (spends tokens)       | `dshfiles-onboarding.tryIt`                                                                         | off            | nothing: live                                     | [onboarding](../plugins/@dshfiles/onboarding/README.md#try-it)                       |
-| AI review-scope summaries (one model call)                  | none needed: runs only on **Summarize**                                                             | —              | —                                                 | [pulls-review](../plugins/@dshfiles/pulls-review/README.md)                          |
+| AI review-scope summaries (one model call)                  | none needed: runs only on **Summarize**                                                             | —              | —                                                 | [diffs-review](../plugins/@dshfiles/diffs-review/README.md)                          |
 
 ### The DeepSeek account
 

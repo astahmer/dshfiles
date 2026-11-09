@@ -26,7 +26,7 @@ The rules that keep the list honest:
 
 ## Combined revision review
 
-Selecting revisions in the graph and choosing **Review together** is presentation state over one read, so the capability is `pulls_review_revisions` (pulls-review, read-only): each revision with its own files, ancestors first, with gaps and unresolved ids named. The selection itself and which panel opens are not tools. `jj_details` reads one revision's patch, and `changes_mark_viewed` writes a combined review's marks with the range `<commit>-` to `<commit>`.
+Selecting revisions in the graph and choosing **Review together** is presentation state over one read, so the capability is `diffs_review_revisions` (diffs-review, read-only): each revision with its own files, ancestors first, with gaps and unresolved ids named. The selection itself and which panel opens are not tools. `jj_details` reads one revision's patch, and `changes_mark_viewed` writes a combined review's marks with the range `<commit>-` to `<commit>`.
 
 ## Thread-local account handoff (DSH0.2.1-rc.2)
 

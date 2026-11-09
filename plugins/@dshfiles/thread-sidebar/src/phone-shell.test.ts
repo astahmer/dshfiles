@@ -5,7 +5,7 @@ import { PhoneTopBarModel, SETTINGS_PANEL_ID } from './phone-shell.js'
 const destinations = Destinations.resolve([
   { id: 'attention-inbox', label: 'Inbox', order: 1 },
   { id: 'jj-integration', label: 'JJ Integration: Thread integration', order: 2 },
-  { id: 'pulls-review', label: 'pulls.review: Reviews', order: 3 },
+  { id: 'diffs-review', label: 'pulls.review: Reviews', order: 3 },
   { id: 'dshfiles-memory-panel', label: 'Memory: Browser', order: 4 },
   { id: 'ai-accounts', label: 'AI Accounts: Accounts', order: 5 },
 ])
@@ -31,9 +31,9 @@ describe('PhoneTopBarModel', () => {
       back: { to: 'page', panelId: 'attention-inbox', label: 'Inbox' },
       thread: true,
     })
-    expect(PhoneTopBarModel.resolve({ ...base, selectedThreadId: 'session-1', origin: { panelId: 'pulls-review' } }).back).toEqual({
+    expect(PhoneTopBarModel.resolve({ ...base, selectedThreadId: 'session-1', origin: { panelId: 'diffs-review' } }).back).toEqual({
       to: 'page',
-      panelId: 'pulls-review',
+      panelId: 'diffs-review',
       label: 'Review',
     })
   })
@@ -44,7 +44,7 @@ describe('PhoneTopBarModel', () => {
   })
 
   it('returns from a page to its destination list, named after the section', () => {
-    expect(PhoneTopBarModel.resolve({ ...base, activePanelId: 'pulls-review' })).toEqual({
+    expect(PhoneTopBarModel.resolve({ ...base, activePanelId: 'diffs-review' })).toEqual({
       title: 'Review',
       back: { to: 'land', label: 'Land' },
       thread: false,

@@ -23,7 +23,7 @@ describe('Destinations', () => {
 
   it('places registered pages and leaves pages nobody registered out', () => {
     const resolved = Destinations.resolve([
-      { id: 'pulls-review', label: 'pulls.review: Reviews', order: 40 },
+      { id: 'diffs-review', label: 'pulls.review: Reviews', order: 40 },
       { id: 'dshfiles-usage', label: 'Usage: Analytics', order: 4 },
       { id: 'traces', label: 'Traces: Explorer', order: 4 },
     ])

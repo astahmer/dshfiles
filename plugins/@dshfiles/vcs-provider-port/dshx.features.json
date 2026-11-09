@@ -47,7 +47,7 @@
     {
       "id": "vcs-detection",
       "title": "Which VCS owns a path",
-      "summary": "VcsDetector (subpath ./detect) names jj or git for a path from the nearest .jj or .git above it, jj first when both exist, reading only the filesystem; jj-integration and pulls-review pick their jj or git adapter with it.",
+      "summary": "VcsDetector (subpath ./detect) names jj or git for a path from the nearest .jj or .git above it, jj first when both exist, reading only the filesystem; jj-integration and diffs-review pick their jj or git adapter with it.",
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: library",

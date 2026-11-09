@@ -587,7 +587,7 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
-  "@dshfiles/pulls-review": {
+  "@dshfiles/diffs-review": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
     "moduleState": 0,

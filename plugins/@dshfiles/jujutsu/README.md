@@ -180,8 +180,7 @@ node`) and the terminals it keeps (jj-integration `stopWorkspaceProcesses`).
   extends the selection across visible rows, and the revision menu offers
   **Select for review** for touch and keyboard. A plain click still opens the
   row. **Review together** hands the selection to the dshx `Changes` contract, so
-  the plugin that owns review opens it (pulls-review's
-  [combined review](../pulls-review/README.md#changes-facet)) and this plugin
+  the plugin that owns review opens it (diffs-review's [combined review](../diffs-review/README.md#changes-facet)) and this plugin
   depends on nothing new; without that plugin the gestures stay off. A filter or
   rewrite that hides a selected row drops it.
 - **Highlight path** dims unrelated text while preserving graph membership and
