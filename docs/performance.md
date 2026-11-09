@@ -861,3 +861,32 @@ sequential walk of all 793 project directories (75 ms idle, 1.7–2.9 s behind t
 first read behind the root-wide encoding walk); and a stored thread opened before this Host's first list merge was sent
 to `multi-host`'s ownership check. The sessions API transcript fallback read through `readSession`, which lists the
 whole corpus first; it now observes the one Session.
+
+## Thread switch main thread and requests (2026-11-09, U5/U8)
+
+Scratch Host on an APFS clone of the live home (`:3111`), headless Chromium, alternating two threads with history,
+CPU profile per click mapped through the combo bundle's source maps, every request mapped to its initiator. Load 3–7
+on 10 cores. Warm switch = a thread visited earlier in the same page.
+
+| Cost found per switch                                                                                                       | Owner fix                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| every `sessions.list` change rebuilt the workbench panel catalog and hex-encoded sessions × views ids (≈200 ms)             | rich-composer: catalog kept when ids/titles are equal; encoded ids cached                                  |
+| sidebar palette rows re-added one by one, each re-registering every palette action and re-diffing it per listener (≈110 ms) | command-palette: row groups replaced in one change, snapshot rebuilt only when dirty                       |
+| first click opened the notification `AudioContext` synchronously (≈120 ms)                                                  | thread-sidebar: unlock in idle time after the gesture                                                      |
+| each release rebuilt every list row, so every `sessions.list` subscriber deep-diffed the whole catalog                      | session-controller client: unchanged rows and projections keep their identity; no-op sets skipped          |
+| `ai-accounts/read` re-announced unchanged routes: 2 × `llm/adapters-updated` → 5 `session/modelCatalog` reads               | ai-accounts Host: announce only when the file, setup candidates or discovered models changed               |
+| header label and seat re-read `agentPresets/list`; picker re-read accounts, usage and `sessionRuntime` on mount             | agent-preset shared roster (60 s, cleared on roster change); picker reads accounts when open, catalog 30 s |
+| release retired the Session generation: switching back reopened `session/follow` and repaged history (`session/page`)       | session-controller client: last 3 released generations stay open (LRU), local drafts retire as before      |
+| seat ResizeObserver wrote then read layout; width controls rewrote unchanged custom properties                              | rich-composer fork: reads before writes, unchanged values not written                                      |
+
+| Warm switch | Before                      | After                       |
+| ----------- | --------------------------- | --------------------------- |
+| composer    | 610–732 ms                  | 221–333 ms                  |
+| history     | 714–758 ms                  | 225–337 ms                  |
+| long tasks  | 2–4, 548–690 ms, max 410 ms | 1–2, 121–219 ms, max 142 ms |
+| DOM nodes   | 1,740–3,026                 | 1,736–3,026                 |
+| requests    | 11–19                       | 3–4                         |
+
+Still above target: the new thread's React mount and its first layout (chat scroll restore, composer selection reveal,
+width measure) are ~100–200 ms of main thread; keeping the last views mounted needs a main-view retention contract
+that does not count hidden views as `mainView`, and transcript virtualization (U5) for the DOM budget.
