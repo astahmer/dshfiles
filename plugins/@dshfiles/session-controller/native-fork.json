@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The recorded commands/index deltas include guarded thread-local model selection; see README. Update with every upstream bump or delta change; the list delta recovers cold list metadata from the stored log in the background when a projection checkpoint is missing.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The recorded commands/index deltas include guarded thread-local model selection; see README. Update with every upstream bump or delta change; the list delta recovers cold list metadata from the stored log in the background when a projection checkpoint is missing, persists those answers by createdAt and log revision (added list-metadata-store.ts), cuts projection selections from one memoized full cold block, and patches the cached corpus on Session create/dispose; the history delta sizes each follower item once.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-api-session-controller",
@@ -17,7 +17,7 @@
       "local": "locale"
     }
   ],
-  "added": ["src/native/client/sessions/share-record.ts", "src/native/cold-reads.ts", "src/native/control.test.ts"],
+  "added": ["src/native/client/sessions/share-record.ts", "src/native/cold-reads.ts", "src/native/control.test.ts", "src/native/list-metadata-store.ts"],
   "delta": [
     "src/native/assistant-stream.ts",
     "src/native/catalog.ts",

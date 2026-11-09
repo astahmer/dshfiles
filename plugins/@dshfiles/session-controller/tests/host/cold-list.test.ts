@@ -6,6 +6,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { SessionRecord } from '@deepseek-ai/dsh-session-query'
 import { resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
+import type { RecoveredListMetadata } from '../../src/native/list-metadata-store.ts'
 import { ApiSessionList } from '../../src/native/list.ts'
 import type { SessionSummary } from '../../src/native/types.ts'
 
@@ -52,7 +53,10 @@ const storedEvent = (event: { readonly seq: number; readonly time: number; reado
   ({ data: {}, ...event }) as never
 
 /** A cold Session whose projection checkpoint has no row at all, so its list metadata has to come from its stored log. */
-const recoveryFixture = async (readLog: () => Promise<readonly SessionEvent[]>, sizeBytes = 2_048) => {
+const recoveryFixture = async (
+  readLog: () => Promise<readonly SessionEvent[]>,
+  { sizeBytes = 2_048, revision = 'r1', stored }: { readonly sizeBytes?: number; readonly revision?: string; readonly stored?: Map<string, unknown> } = {},
+) => {
   const ctx = new Context()
   contexts.add(ctx)
   await ctx.plugin(SessionStore)
@@ -75,13 +79,31 @@ const recoveryFixture = async (readLog: () => Promise<readonly SessionEvent[]>, 
     cachedSnapshot: () => undefined,
     cachedPredecessorTitle: () => undefined,
   } as never)
-  // SAFETY: recovery reads only the stored log's size before folding it.
-  ctx.provide('sessionPersistence', { stat: async () => ({ header: session.header, sizeBytes }) } as never)
+  const stats: string[] = []
+  // SAFETY: recovery reads only the stored log's size and revision before folding it.
+  ctx.provide('sessionPersistence', {
+    stat: async (sessionId: string) => {
+      stats.push(sessionId)
+      return { header: session.header, sizeBytes, revision }
+    },
+  } as never)
+  if (stored !== undefined) {
+    // SAFETY: the list metadata store opens one domain and reads and writes one snapshot key of one table.
+    ctx.provide('storageDomain', {
+      open: async () => ({
+        table: () => ({
+          get: (key: string) => stored.get(key),
+          put: async (key: string, value: Readonly<Record<string, RecoveredListMetadata>>) => { stored.set(key, structuredClone(value)) },
+        }),
+        close: async () => undefined,
+      }),
+    } as never)
+  }
   const pushed: SessionSummary[] = []
   ctx.on('api-session/added', summary => {
     pushed.push(summary)
   })
-  return { ctx, list, logReads, session, pushed }
+  return { ctx, list, logReads, stats, session, pushed }
 }
 
 it('pushes a checkpoint-less cold Session with no turn as blank instead of an untitled draft', async () => {
@@ -118,7 +140,7 @@ it('keeps a cold Session visible once its stored log proves a turn, dated by its
 })
 
 it('leaves a log too large to be an abandoned draft unread and visible', async () => {
-  const { list, logReads, pushed } = await recoveryFixture(async () => [], 300_000)
+  const { list, logReads, pushed } = await recoveryFixture(async () => [], { sizeBytes: 300_000 })
   await list.list()
   await new Promise(resolveTick => setTimeout(resolveTick, 20))
   expect((await list.list())[0]?.blank).toBe(false)
@@ -137,4 +159,57 @@ it('reads the log again once that Session attaches', async () => {
   ctx.emit('session/disposed', session)
   await list.list()
   await expect.poll(() => logReads).toEqual(['cold-recover', 'cold-recover'])
+})
+
+const abandonedDraft = async (): Promise<readonly SessionEvent[]> => [storedEvent({ seq: 0, time: 110, type: 'permission/preset' })]
+
+it('serves the stored answer on the next Host start without reading the unchanged log again', async () => {
+  const stored = new Map<string, unknown>()
+  const first = await recoveryFixture(abandonedDraft, { stored })
+  await first.list.list()
+  await expect.poll(() => stored.size).toBe(1)
+  expect(first.logReads).toEqual(['cold-recover'])
+
+  const next = await recoveryFixture(abandonedDraft, { stored })
+  expect((await next.list.list())[0]?.blank).toBe(true)
+  await expect.poll(() => next.stats).toEqual(['cold-recover'])
+  await new Promise(resolveTick => setTimeout(resolveTick, 20))
+  expect(next.logReads).toEqual([])
+  expect(next.pushed).toEqual([])
+})
+
+it('folds the log again when its persistence revision moved', async () => {
+  const stored = new Map<string, unknown>()
+  const first = await recoveryFixture(abandonedDraft, { stored })
+  await first.list.list()
+  await expect.poll(() => stored.size).toBe(1)
+
+  const next = await recoveryFixture(async () => [
+    storedEvent({ seq: 0, time: 200, type: 'user/message', data: { source: { kind: 'user' } } }),
+    storedEvent({ seq: 1, time: 210, type: 'turn/start' }),
+  ], { stored, revision: 'r2' })
+  expect((await next.list.list())[0]?.blank).toBe(true)
+  await expect.poll(() => next.pushed).toMatchObject([{ blank: false, updatedAt: 200 }])
+  expect(next.logReads).toEqual(['cold-recover'])
+})
+
+it('does not stat a log a previous Host start already found too large', async () => {
+  const stored = new Map<string, unknown>()
+  const first = await recoveryFixture(abandonedDraft, { stored, sizeBytes: 300_000 })
+  await first.list.list()
+  await expect.poll(() => stored.size).toBe(1)
+
+  const next = await recoveryFixture(abandonedDraft, { stored, sizeBytes: 300_000 })
+  await next.list.list()
+  await new Promise(resolveTick => setTimeout(resolveTick, 20))
+  expect(next.stats).toEqual([])
+  expect(next.logReads).toEqual([])
+})
+
+it('recovers from the logs when the stored answers are malformed', async () => {
+  const stored = new Map<string, unknown>([['entries', { 'cold-recover': { createdAt: 'yesterday' } }]])
+  const { list, logReads, pushed } = await recoveryFixture(abandonedDraft, { stored })
+  await list.list()
+  await expect.poll(() => pushed.map(summary => summary.blank)).toEqual([true])
+  expect(logReads).toEqual(['cold-recover'])
 })

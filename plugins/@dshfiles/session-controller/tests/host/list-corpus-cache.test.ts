@@ -34,7 +34,10 @@ const coldRecord = (ctx: Context, id: string): SessionRecord => {
   return { header: session.header, live: false, persisted: true }
 }
 
-it('reads the persisted Sessions once for many lists, until a Session is created', async () => {
+const fixtureSession = (ctx: Context, id: string) =>
+  ctx.sessions.prepare(SessionId(id), { meta: { createdAt: 100, cwd: resolve('cold-list-fixture') } })
+
+it('reads the persisted Sessions once for many lists', async () => {
   const ctx = await hostContext()
   const record = coldRecord(ctx, 'cold-shared')
   let reads = 0
@@ -51,10 +54,46 @@ it('reads the persisted Sessions once for many lists, until a Session is created
   await list.list()
   await list.list()
   expect(reads).toBe(1)
+})
 
-  ctx.emit('session/created', ctx.sessions.prepare(SessionId('cold-shared'), { meta: { createdAt: 100, cwd: resolve('cold-list-fixture') } }))
+it('adds a created Session and keeps a disposed one without reading the corpus again', async () => {
+  const ctx = await hostContext()
+  const record = coldRecord(ctx, 'cold-shared')
+  let reads = 0
+  // SAFETY: list() reads only listSessions from the query service.
+  ctx.provide('sessionQuery', {
+    listSessions: async () => {
+      reads += 1
+      return [record]
+    },
+  } as never)
+  const fresh = fixtureSession(ctx, 'fresh')
+  // SAFETY: a disposed Session is checked with stat alone.
+  ctx.provide('sessionPersistence', { stat: async () => ({ header: fresh.header, revision: 'r1' }) } as never)
+  const list = new ApiSessionList(ctx, 8)
   await list.list()
-  expect(reads).toBe(2)
+
+  ctx.emit('session/created', fresh)
+  expect((await list.list()).map(item => item.sessionId).sort()).toEqual(['cold-shared', 'fresh'])
+  ctx.emit('session/disposed', fresh)
+  await new Promise(resolve => setImmediate(resolve))
+  expect((await list.list()).map(item => item.sessionId).sort()).toEqual(['cold-shared', 'fresh'])
+  expect(reads).toBe(1)
+})
+
+it('drops a disposed Session persistence never stored', async () => {
+  const ctx = await hostContext()
+  const record = coldRecord(ctx, 'cold-shared')
+  ctx.provide('sessionQuery', { listSessions: async () => [record] } as never)
+  // SAFETY: a disposed Session is checked with stat alone.
+  ctx.provide('sessionPersistence', { stat: async () => undefined } as never)
+  const list = new ApiSessionList(ctx, 8)
+  await list.list()
+
+  const unstored = fixtureSession(ctx, 'unstored')
+  ctx.emit('session/created', unstored)
+  ctx.emit('session/disposed', unstored)
+  await expect.poll(async () => (await list.list()).map(item => item.sessionId)).toEqual(['cold-shared'])
 })
 
 it('records bounded corpus cache and invalidation diagnostics', async () => {
@@ -65,12 +104,12 @@ it('records bounded corpus cache and invalidation diagnostics', async () => {
   using recorder = recordSpans()
   await list.list()
   await list.list()
-  ctx.emit('session/created', ctx.sessions.prepare(SessionId('private-session-id'), { meta: { createdAt: 100, cwd: resolve('cold-list-fixture') } }))
+  ctx.emit('session/created', fixtureSession(ctx, 'private-session-id'))
   await list.list()
   const spans = recorder.named('session list read')
-  expect(spans.map(span => span.attributes['dshx.session-controller.corpus_cache'])).toEqual(['miss', 'hit', 'miss'])
+  expect(spans.map(span => span.attributes['dshx.session-controller.corpus_cache'])).toEqual(['miss', 'hit', 'hit'])
   expect(spans[2]?.attributes).toMatchObject({ 'dshx.session-controller.last_invalidation': 'created', 'dshx.session-controller.created_invalidations': 1 })
-  expect(recorder.named('session corpus read')).toHaveLength(2)
+  expect(recorder.named('session corpus read')).toHaveLength(1)
   expect(JSON.stringify(spans.map(span => span.attributes))).not.toContain('private-session-id')
 })
 
