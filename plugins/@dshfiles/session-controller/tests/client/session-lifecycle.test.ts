@@ -94,7 +94,10 @@ const createTransport = () => {
   return { $stream, streams }
 }
 
-const createSession = (journal = createJournal(), transport = createTransport()) => {
+type Journal = ReturnType<typeof createJournal>
+type JournalSource = Omit<Journal, 'follow'> & { readonly follow: (request: FollowRequest, signal: AbortSignal) => AsyncIterable<unknown> }
+
+const createSession = (journal: JournalSource = createJournal(), transport = createTransport()) => {
   const failure = () => new RemoteError('gateway/internal', 'journal failure', {})
   // SAFETY: the Gateway streams, journal and prompt method are the exact transport subset a Session reads.
   const remotes = {
@@ -195,5 +198,55 @@ describe('Session composer phase', () => {
     untouched.handleBlank(true)
     expect(lifecycle(untouched).blank).toBe(true)
     await untouched.dispose()
+  })
+})
+
+describe('Session live assistant chunks', () => {
+  it('keeps the Session snapshot identity while chunks only grow the event window', async () => {
+    const chunks = 5
+    const go = deferred<void>()
+    const streamed = deferred<void>()
+    const follow = async function* (_request: FollowRequest, signal: AbortSignal) {
+      yield {
+        type: 'snapshot',
+        cursor: OPENING_SEQ,
+        records: [{ type: 'event', event: { type: 'test/opening', seq: OPENING_SEQ, time: 1, data: {} } }],
+        hasMore: false,
+        projections: { values: {}, asOfSeq: OPENING_SEQ },
+        assistantStream: { revision: 0 },
+      }
+      await go.promise
+      yield { type: 'assistant-stream', frame: { type: 'start', attemptId: 'attempt-1', revision: 1, startedAfterSeq: OPENING_SEQ, turn: 1, step: 1 } }
+      for (let index = 0; index < chunks; index++) {
+        yield {
+          type: 'assistant-stream',
+          frame: { type: 'chunk', attemptId: 'attempt-1', revision: index + 2, index, time: 2, chunk: { type: 'text-delta', index: 0, text: `part ${index}` } },
+        }
+      }
+      streamed.resolve()
+      await new Promise<void>(resolve => {
+        signal.addEventListener('abort', () => resolve(), { once: true })
+      })
+    }
+    const { session, transport } = createSession({ ...createJournal(), follow })
+    let notifications = 0
+    session.subscribe(() => {
+      notifications += 1
+    })
+    await session.open()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const before = session.getSnapshot()
+    notifications = 0
+
+    go.resolve()
+    await streamed.promise
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(session.eventSource.getSnapshot().entries.filter(entry => entry.type === 'transient')).toHaveLength(chunks)
+    expect(session.getSnapshot()).toBe(before)
+    expect(notifications).toBe(0)
+    transport.streams.forEach(stream => {
+      stream.release()
+    })
+    await session.dispose()
   })
 })

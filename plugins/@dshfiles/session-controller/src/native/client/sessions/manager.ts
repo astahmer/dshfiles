@@ -204,6 +204,10 @@ export class SessionManager {
    *  must be recovered by value or every SessionListItem memo misses on every refresh. */
   private entryCache = new Map<SessionId, SessionListEntry>()
   private itemsCache: readonly SessionListEntry[] = []
+  /** Summaries `itemsCache` was flattened from: while unchanged, row order and lineage depth are unchanged too. */
+  private itemsSource: readonly SessionSummary[] | undefined
+  /** Per-row inputs besides the summary that each cached entry was built from. */
+  private readonly entryInputs = new WeakMap<SessionListEntry, { readonly values: unknown; readonly blank: boolean }>()
   private readonly notifier = new Notifier(() => {
     this.listSnapshotCache = this.buildListSnapshot()
   })
@@ -1039,24 +1043,61 @@ export class SessionManager {
     for (const parentSessionId of parents) void this.refreshProjections(parentSessionId)
   }
 
-  private buildListSnapshot(): SessionListSnapshot {
-    const merged: TitledSessionSummary[] = this.summaries.map((summary) => {
-      // List rows read the generic 'title' projection key (host-computed unit
-      // value; there is no dedicated title frame).
-      const projectionStore = this.projectionStores.get(summary.sessionId)
-      const title = projectionStore?.get('title')
-      const projectionValues = projectionStore?.values()
-      const metadata = projectionValues?.sessionListMetadata
-      return {
-        ...summary,
-        // Cached list hints can precede a history opening or control update.
-        blank: this.effectiveBlank(summary) && metadata?.blank !== false,
-        updatedAt: Math.max(summary.updatedAt, metadata?.lastPromptAt ?? 0),
-        ...(typeof title === 'string' && title !== '' ? { title } : {}),
-        ...(projectionValues === undefined ? {} : { projectionValues }),
-      }
+  private titledSummary(summary: SessionSummary): TitledSessionSummary {
+    // List rows read the generic 'title' projection key (host-computed unit
+    // value; there is no dedicated title frame).
+    const projectionStore = this.projectionStores.get(summary.sessionId)
+    const title = projectionStore?.get('title')
+    const projectionValues = projectionStore?.values()
+    const metadata = projectionValues?.sessionListMetadata
+    return {
+      ...summary,
+      // Cached list hints can precede a history opening or control update.
+      blank: this.effectiveBlank(summary) && metadata?.blank !== false,
+      updatedAt: Math.max(summary.updatedAt, metadata?.lastPromptAt ?? 0),
+      ...(typeof title === 'string' && title !== '' ? { title } : {}),
+      ...(projectionValues === undefined ? {} : { projectionValues }),
+    }
+  }
+
+  /**
+   * A projection frame for one Session leaves every other row's inputs untouched. While the summaries are the ones
+   * the cached rows were flattened from, rebuild only rows whose projection values or blank evidence moved, instead
+   * of re-merging and re-flattening the whole catalog (thousands of rows, several times per running turn).
+   * @returns the updated rows in the cached order, or undefined when the order or lineage may have changed.
+   */
+  private patchListItems(summaryById: ReadonlyMap<SessionId, SessionSummary>): SessionListEntry[] | undefined {
+    if (this.itemsSource !== this.summaries || this.itemsCache.length !== this.summaries.length) return undefined
+    return this.itemsCache.map((previous) => {
+      const summary = summaryById.get(previous.sessionId)
+      const inputs = this.entryInputs.get(previous)
+      if (summary === undefined || inputs === undefined) return this.rowEntry(previous, summary)
+      const values = this.projectionStores.get(summary.sessionId)?.values()
+      const blank = this.effectiveBlank(summary)
+      if (inputs.values === values && inputs.blank === blank) return previous
+      return this.rowEntry(previous, summary)
     })
-    const fresh = flattenLineage(merged)
+  }
+
+  private rowEntry(previous: SessionListEntry, summary: SessionSummary | undefined): SessionListEntry {
+    if (summary === undefined) return previous
+    const { agentAvailable: _agentAvailable, ...row } = this.titledSummary(summary)
+    return { ...row, depth: previous.depth }
+  }
+
+  private recordEntryInputs(entry: SessionListEntry, summary: SessionSummary | undefined): void {
+    if (summary === undefined) return
+    this.entryInputs.set(entry, {
+      values: this.projectionStores.get(entry.sessionId)?.values(),
+      blank: this.effectiveBlank(summary),
+    })
+  }
+
+  private buildListSnapshot(): SessionListSnapshot {
+    const summaryById = new Map<SessionId, SessionSummary>()
+    for (const summary of this.summaries) summaryById.set(summary.sessionId, summary)
+    const fresh = this.patchListItems(summaryById) ?? flattenLineage(this.summaries.map(summary => this.titledSummary(summary)))
+    this.itemsSource = this.summaries
     const items = fresh.map((entry) => {
       const prev = this.entryCache.get(entry.sessionId)
       if (
@@ -1066,8 +1107,12 @@ export class SessionManager {
         && prev.origin === entry.origin && prev.title === entry.title && prev.depth === entry.depth
         && prev.formatStatus === entry.formatStatus
         && prev.projectionValues === entry.projectionValues
-      ) return prev
+      ) {
+        this.recordEntryInputs(prev, summaryById.get(prev.sessionId))
+        return prev
+      }
       this.entryCache.set(entry.sessionId, entry)
+      this.recordEntryInputs(entry, summaryById.get(entry.sessionId))
       return entry
     })
     const itemIds = new Set(items.map(entry => entry.sessionId))

@@ -264,6 +264,8 @@ export class ClientSessions implements ISessions {
   private readonly parked = new Set<SessionId>()
   /** Rows whose retention changed since the list last published; one switch retains and releases several sources. */
   private readonly retentionDirty = new Set<SessionId>()
+  /** Last published summary per manager list entry; entries keep their identity while unchanged. */
+  private readonly summaryByEntry = new WeakMap<SessionListEntry, SessionSummary>()
   private readonly scopeDrops = new Set<Promise<void>>()
   private closed = false
   private readonly lifetime = new AbortController()
@@ -769,11 +771,19 @@ export class ClientSessions implements ISessions {
     const byId: Record<SessionId, SessionSummary> = {}
     for (const entry of items) {
       ids.push(entry.sessionId)
+      const retainedBy = this.retentionSnapshot(entry.sessionId).retainedBy
+      // The manager keeps an unchanged row's entry identity, so its summary is reused instead of rebuilt:
+      // a running turn republishes the whole list several times, and rebuilding ~3k rows each time costs a frame.
+      const cached = this.summaryByEntry.get(entry)
+      if (cached !== undefined && cached.retainedBy === retainedBy) {
+        byId[entry.sessionId] = cached
+        continue
+      }
       byId[entry.sessionId] = {
         id: entry.sessionId,
         displayTitle: displayTitleOf(entry.title, entry.cwd, entry.sessionId),
         running: entry.running,
-        retainedBy: this.retentionSnapshot(entry.sessionId).retainedBy,
+        retainedBy,
         blank: entry.blank,
         updatedAt: entry.updatedAt,
         ...(entry.createdAt === undefined ? {} : { createdAt: entry.createdAt }),
@@ -837,6 +847,10 @@ export class ClientSessions implements ISessions {
     // each streamed event re-render every list consumer. Share what did not change, and skip the set.
     const previous = this.list.getSnapshot()
     const next = shareListSnapshot(previous, { ids, byId, phase, projectionsBySession })
+    for (const entry of items) {
+      const summary = next.byId[entry.sessionId]
+      if (summary !== undefined) this.summaryByEntry.set(entry, summary)
+    }
     if (next !== previous) this.list.set(next)
     const { nonblank, hostIds } = this.manager.draftEvidence()
     this.drafts.reconcile(nonblank, hostIds)
