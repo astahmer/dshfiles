@@ -12,6 +12,7 @@ import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import * as Schema from 'effect/Schema'
+import { coldReads } from './cold-reads.ts'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
@@ -25,6 +26,12 @@ const SEARCH_PROVIDER_CALL_LIMIT = 100
 const SESSION_SEARCH_QUERY_MAX_CHARS = 500
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 const LIST_METADATA_KEY = 'sessionListMetadata'
+/**
+ * Only a log this small can be an abandoned draft worth folding. Measured on the live home (2026-11-09): of 1,890
+ * checkpoint-less logs, 647 were under 16 KiB and the median was 300 KB (largest 90 MB). A larger log already holds
+ * turns, so it keeps the visible fallback instead of being decoded on every Host start.
+ */
+const DRAFT_LOG_MAX_BYTES = 16 * 1024
 
 /** A caller's projection allowlist; `undefined` reads every registered column. */
 type ProjectionSelection = ReadonlySet<string> | undefined
@@ -97,6 +104,21 @@ export class ApiSessionList {
   private readonly coldProjections = new Map<string, SessionProjectionHints>()
 
   /**
+   * List metadata folded from the stored log of a cold row whose projection checkpoint has no row: an abandoned New
+   * thread or a start interrupted before its first turn. Without it such a row defaults to `blank: false` and sits in
+   * the sidebar as an untitled draft forever. `undefined` records a log that could not be read. Dropped on attach.
+   */
+  private readonly coldMetadata = new Map<string, SessionListMetadata | undefined>()
+
+  /**
+   * Cold rows waiting for that fold. A list never waits on it: reading every checkpoint-less log inline kept the first
+   * list of a 793-Session home (2.9 GB of logs) loading for minutes, so one background reader works through this queue
+   * and pushes each corrected row with `api-session/added`.
+   */
+  private readonly metadataQueue = new Map<string, SessionRecord>()
+  private metadataDrain: Promise<void> | undefined
+
+  /**
    * Persisted Session records, read once and kept until this Host creates or disposes a Session.
    * `sessionQuery.listSessions` re-enumerates every project directory and then reads each Session's header and stats
    * its log at a concurrency of three, so a 1 000-Session corpus costs thousands of filesystem round-trips per call
@@ -121,7 +143,10 @@ export class ApiSessionList {
    * @param workSliceMs - Resolved positive integral list-work budget in milliseconds.
    */
   constructor(private readonly ctx: Context, private readonly workSliceMs: number) {
-    const forgetProjections = (session: Session): void => { this.coldProjections.delete(session.id) }
+    const forgetProjections = (session: Session): void => {
+      this.coldProjections.delete(session.id)
+      this.coldMetadata.delete(session.id)
+    }
     ctx.on('session/created', session => {
       forgetProjections(session)
       this.invalidatePersisted('created')
@@ -268,7 +293,8 @@ export class ApiSessionList {
     this.persistedGeneration += 1
   }
 
-  private summarizeCold({ header, formatStatus }: SessionRecord, selection?: ProjectionSelection): SessionSummary {
+  private summarizeCold(record: SessionRecord, selection?: ProjectionSelection): SessionSummary {
+    const { header, formatStatus } = record
     const cached = this.coldProjections.get(header.id)
     const read = cached === undefined
       ? this.projectionsFor(header, undefined, selection)
@@ -278,18 +304,66 @@ export class ApiSessionList {
     if (cached === undefined && selection === undefined && read.projections !== undefined) {
       this.coldProjections.set(header.id, read.projections)
     }
-    const metadata = read.metadata
+    const metadata = read.metadata ?? this.recoveredMetadata(record)
     return {
       sessionId: header.id,
       updatedAt: updatedAt(header, metadata),
       agentAvailable: false,
       ...(formatStatus === undefined ? {} : { formatStatus }),
       running: false,
-      // A large, metadata-less, or inaccessible cache miss remains unknown and visible.
+      // Until its log is folded, or when it cannot be read, a metadata-less row stays unknown and visible.
       blank: metadata?.blank ?? false,
       ...listFields(header),
       ...(read.projections === undefined ? {} : { projections: read.projections }),
     }
+  }
+
+  private recoveredMetadata(record: SessionRecord): SessionListMetadata | undefined {
+    const id = record.header.id
+    if (this.coldMetadata.has(id)) return this.coldMetadata.get(id)
+    if (!this.metadataQueue.has(id)) this.metadataQueue.set(id, record)
+    this.metadataDrain ??= this.drainMetadataQueue()
+      .catch((error: unknown) => { this.ctx.logger.warn(`api-session.list: list metadata recovery stopped: ${String(error)}`) })
+      .finally(() => { this.metadataDrain = undefined })
+    return undefined
+  }
+
+  private async drainMetadataQueue(): Promise<void> {
+    await withSpan('session list metadata recovery', {}, async span => {
+      let skipped = 0
+      let folded = 0
+      let corrected = 0
+      // A Map iterator also visits rows queued while it runs, so one drain serves every list that arrives meanwhile.
+      for (const [id, record] of this.metadataQueue) {
+        this.metadataQueue.delete(id)
+        if (this.lifetime.signal.aborted) break
+        if (this.coldMetadata.has(id) || this.ctx.sessions.get(record.header.id) !== undefined) continue
+        let metadata: SessionListMetadata | undefined
+        try {
+          const stored = await this.ctx.get('sessionPersistence')?.stat(record.header.id, { signal: this.lifetime.signal })
+          if (stored?.sizeBytes === undefined || stored.sizeBytes > DRAFT_LOG_MAX_BYTES) {
+            this.coldMetadata.set(id, undefined)
+            skipped += 1
+            continue
+          }
+          const { events } = await coldReads.use(() => this.ctx.sessionQuery.readSession(record.header.id))
+          metadata = events.reduce(applySessionListMetadata, { blank: true, lastPromptAt: null })
+        } catch (error) {
+          this.ctx.logger.warn(
+            `api-session.list: the stored log of "${id}" could not be read; serving the row without its list metadata: ${String(error)}`,
+          )
+        }
+        await scheduler.yield()
+        // The Session attached while its log was read: it now owns a live projection cut, so this fold is stale.
+        if (this.lifetime.signal.aborted || this.ctx.sessions.get(record.header.id) !== undefined) continue
+        this.coldMetadata.set(id, metadata)
+        folded += 1
+        if (metadata === undefined || (!metadata.blank && metadata.lastPromptAt === null)) continue
+        corrected += 1
+        this.ctx.emit('api-session/added', this.summarizeCold(record))
+      }
+      span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { skipped, folded, corrected } }))
+    })
   }
 
   /**
