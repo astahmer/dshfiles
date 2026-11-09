@@ -6,6 +6,8 @@ type ComponentDecorator = <Component>(component: Component) => Component
 
 /** The Cordis context members the plugin runtime reads. */
 interface RuntimeHostContext {
+  /** Cordis clears a fiber's `uid` once it starts disposing; effects created after that throw. */
+  readonly fiber?: { readonly uid: number | null }
   effect?(execute: () => () => void, label?: string): unknown
   get(name: string): unknown
   on?(name: string, listener: () => void): () => boolean
@@ -42,6 +44,7 @@ const createPluginRuntime = (input: {
     owner: input.packageId,
     scope,
     prefixIds: input.prefixIds === true,
+    isActive: () => input.ctx.fiber?.uid !== null,
     slots: () => {
       const slots = input.ctx.get('slots')
       return isNativeSlots(slots) ? slots : undefined

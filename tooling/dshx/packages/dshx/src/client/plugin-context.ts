@@ -36,6 +36,8 @@ export interface PluginContextOptions {
   readonly scope: PluginScope
   /** Prefix item ids that do not start with `@` with `<owner>.`. */
   readonly prefixIds?: boolean
+  /** False once the owning Cordis fiber started disposing, before this plugin's scope is disposed with it. */
+  readonly isActive?: () => boolean
   readonly slots: () => NativeSlots | undefined
   readonly decorate: <Component>(component: Component) => Component
   readonly services: PluginServices
@@ -320,6 +322,9 @@ const createPluginContext = (options: PluginContextOptions): PluginContext => {
       }
       start(source.get())
       const unsubscribe = source.subscribe(() => {
+        // A provider withdrawn during the owner's own teardown notifies before the owner's scope is disposed; setup
+        // would then create effects on an inactive context. The scope's disposal ends this run right after.
+        if (options.isActive?.() === false) return
         const next = source.get()
         if (run !== undefined && equals(run.key as Parameters<typeof fn>[0], next)) return
         start(next)
