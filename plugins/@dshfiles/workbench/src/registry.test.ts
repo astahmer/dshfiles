@@ -40,6 +40,20 @@ describe('workbench panel registry', () => {
     expect(notified).toBe(1)
   })
 
+  it('notifies once for a batch of registrations and disposals', () => {
+    const registry = createWorkbenchPanelRegistry()
+    const disposeA = registry.register(panel('a'))
+    let notified = 0
+    registry.subscribe(() => (notified += 1))
+    registry.batch?.(() => {
+      for (const id of ['b', 'c', 'd']) registry.register(panel(id))
+      disposeA()
+      expect(registry.get('b')?.id).toBe('b')
+    })
+    expect(notified).toBe(1)
+    expect(registry.list().map(entry => entry.id)).toEqual(['b', 'c', 'd'])
+  })
+
   it('validates panel preference writes and persists visibility and ordering choices', () => {
     const registry = createWorkbenchPanelRegistry()
     registry.register({ ...panel('prefs-a'), showInContextMenu: true, showInEmptyState: true })

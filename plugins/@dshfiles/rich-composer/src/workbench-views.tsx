@@ -59,10 +59,22 @@ export interface ConversationWorkbenchSession {
 }
 
 /** Source identities and presentation registrations; the Controller remains the only Session owner. */
+const utf8 = new TextEncoder()
+const HEX_BYTES = Array.from({ length: 256 }, (_, byte) => byte.toString(16).padStart(2, '0'))
+/** Each session id is encoded once per view on every reload; a cached UTF-8 hex string keeps that pass cheap. */
+const hexCache = new Map<string, string>()
+const hexOf = (value: string): string => {
+  const cached = hexCache.get(value)
+  if (cached !== undefined) return cached
+  let hex = ''
+  for (const byte of utf8.encode(value)) hex += HEX_BYTES[byte] ?? ''
+  hexCache.set(value, hex)
+  return hex
+}
+
 export class ConversationWorkbenchSources {
   static id(sessionId: SessionId, viewId: string): string {
-    const encode = (value: string): string => Array.from(new TextEncoder().encode(value), byte => byte.toString(16).padStart(2, '0')).join('')
-    return `dshfiles-conversation.view/${encode(sessionId)}/${encode(viewId)}`
+    return `dshfiles-conversation.view/${hexOf(sessionId)}/${hexOf(viewId)}`
   }
 
   /** Whether two catalogs list the same Sessions, in order, under the same titles. */
@@ -71,7 +83,7 @@ export class ConversationWorkbenchSources {
   }
 
   static create(ports: {
-    readonly registry: Pick<WorkbenchPanelRegistry, 'register'>
+    readonly registry: Pick<WorkbenchPanelRegistry, 'register' | 'batch'>
     readonly sessions: ObservableSnapshot<readonly ConversationWorkbenchSession[]>
     readonly views: ObservableSnapshot<readonly ViewTab[]>
     readonly retain: (sessionId: SessionId) => SessionReference
@@ -119,7 +131,10 @@ export class ConversationWorkbenchSources {
         return <Provider session={state.reference}>{capability.renderSlot(WORKBENCH_VIEW_SLOT, { viewId })}</Provider>
       }
 
-    const sync = (): void => {
+    // One panel per session × view: workbench listeners re-read every source per notification, so the whole pass is
+    // one registry batch (a registry created by an older bundle has none and notifies per registration, as before).
+    const sync = (): void => (ports.registry.batch === undefined ? syncPanels() : ports.registry.batch(syncPanels))
+    const syncPanels = (): void => {
       const desired = new Set<string>()
       for (const session of ports.sessions.getSnapshot())
         for (const view of ports.views.getSnapshot()) {

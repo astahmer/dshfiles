@@ -85,6 +85,10 @@ const fixture = () => {
 }
 
 describe('owned conversation view panel sources', () => {
+  it('keeps the saved panel id format: UTF-8 hex of the session and view ids', () => {
+    expect(ConversationWorkbenchSources.id(SessionId('s-é'), 'trajectory')).toBe('dshfiles-conversation.view/732dc3a9/7472616a6563746f7279')
+  })
+
   it('registers actual view identities without retaining Sessions and preserves components across titles', () => {
     const f = fixture()
     expect([...f.definitions.values()].map(x => x.title)).toEqual(['Trajectory — A', 'Trajectory — B'])

@@ -249,7 +249,11 @@ export const createTabPanelAdapter = (input: {
         .map(source => [source.id, source.title]),
     )
   let sourceNames = readSourceNames()
+  let readFrom = input.registry.list()
   const unsubscribeNames = input.registry.subscribe(() => {
+    // Open requests notify too; only a changed definition list can rename a source.
+    if (input.registry.list() === readFrom) return
+    readFrom = input.registry.list()
     const next = readSourceNames()
     if (next.size === sourceNames.size && [...next].every(([id, title]) => sourceNames.get(id) === title)) return
     sourceNames = next
