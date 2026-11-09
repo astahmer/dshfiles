@@ -99,6 +99,7 @@ function buildOptions(project: ResolvedDshxConfig, compatibility: import('../com
         sourcemap: project.build.sourcemap,
         declarations: project.build.declarations ?? true,
         bundleDependencies: project.hostBundleDependencies ?? [],
+        ...(project.hostDshxRuntime !== undefined && { dshxRuntime: project.hostDshxRuntime }),
         ...(project.hostVitePlugins !== undefined && { vite: { plugins: project.hostVitePlugins } }),
         compatibility,
         ...(project.dev.hostHmr !== undefined && { generation: { hostContractVersion: project.dev.hostHmr.hostContractVersion } }),

@@ -41,6 +41,7 @@ import type { DshProjectCompatibilityAssessment } from '../compat/types.js'
 import { CliUsageError, type CliArgs } from './args.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { RuntimePluginStatus } from '../host/runtime-plugins.js'
+import type { RuntimeSnapshotOutcome } from '../compiler/host/runtime-store.js'
 import { createScratchProfile } from '../project/scratch-profile.js'
 
 import { CliOutput, type TerminalStyle } from './common.js'
@@ -274,6 +275,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
       sourcemap: project.build.sourcemap,
       declarations: project.build.declarations ?? true,
       bundleDependencies: project.hostBundleDependencies ?? [],
+      ...(project.hostDshxRuntime !== undefined && { dshxRuntime: project.hostDshxRuntime }),
       ...(project.hostVitePlugins !== undefined && { vite: { plugins: project.hostVitePlugins } }),
       compatibility,
     }),
@@ -329,6 +331,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   for (const item of typechecked?.diagnostics ?? []) printDiagnostic(io, item)
   let failed = hasErrors(typechecked?.diagnostics ?? [])
   const artifacts: string[] = []
+  let dshxRuntime: RuntimeSnapshotOutcome | undefined
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
       failed = true
@@ -338,7 +341,8 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
       return
     }
     const fallback = jobs[index]?.fallback
-    const output = result.value as { readonly output?: readonly { readonly fileName?: string }[] } | undefined
+    const output = result.value as { readonly output?: readonly { readonly fileName?: string }[]; readonly dshxRuntime?: RuntimeSnapshotOutcome } | undefined
+    dshxRuntime ??= output?.dshxRuntime
     const names = output?.output?.map(item => item.fileName).filter((name): name is string => typeof name === 'string' && name !== '') ?? []
     for (const name of names) artifacts.push(resolvePath(project.outDir, name))
     if (names.length === 0 && fallback !== undefined) artifacts.push(fallback)
@@ -356,6 +360,10 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   write(io.stdout, `  ${paint(io.stdout, 'gray', 'Output:')} ${paint(io.stdout, 'cyan', outputDirectory)}\n`)
   write(io.stdout, `  ${paint(io.stdout, 'gray', 'Artifacts:')} ${artifacts.length}\n`)
   for (const artifact of artifacts) write(io.stdout, `    ${paint(io.stdout, 'gray', '•')} ${relative(project.root, artifact) || artifact}\n`)
+  if (dshxRuntime !== undefined) {
+    const detail = dshxRuntime.mode === 'snapshot' ? `snapshot ${dshxRuntime.hash}` : `inline (${dshxRuntime.reason})`
+    write(io.stdout, `  ${paint(io.stdout, 'gray', 'DSHX runtime:')} ${detail}\n`)
+  }
   return 0
 }
 

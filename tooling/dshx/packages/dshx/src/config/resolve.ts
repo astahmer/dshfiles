@@ -12,8 +12,8 @@ const CONFIG_FILENAME = 'dshx.config.ts'
 const PACKAGE_FILENAME = 'package.json'
 const TOP_LEVEL_KEYS = new Set(['name', 'host', 'client', 'modules', 'profile', 'dev', 'build', 'compatibility'])
 const FACE_KEYS = new Set(['entry', 'vite'])
-const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies'])
-const CLIENT_FACE_KEYS = new Set([...HOST_FACE_KEYS, 'shared', 'sharedRuntime'])
+const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies', 'dshxRuntime'])
+const CLIENT_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies', 'shared', 'sharedRuntime'])
 const VITE_KEYS = new Set(['plugins'])
 
 const decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] | undefined =>
@@ -181,6 +181,12 @@ function checkConfig(value: unknown, file: string): DshxConfig {
     rejectUnknownKeys(candidate, field === 'client' ? CLIENT_FACE_KEYS : HOST_FACE_KEYS, field, file)
     optionalNonEmptyString(candidate.entry, `${field}.entry`, file)
     optionalPackageNames(candidate.bundleDependencies, `${field}.bundleDependencies`, file)
+    if (candidate.dshxRuntime !== undefined && candidate.dshxRuntime !== 'inline' && candidate.dshxRuntime !== 'snapshot') {
+      throw new DshxError('DSHX4004', 'host.dshxRuntime must be "inline" or "snapshot".', {
+        file,
+        hint: 'Use host: { dshxRuntime: "snapshot" } to share one immutable DSHX runtime between Host bundles.',
+      })
+    }
     if (candidate.vite !== undefined) {
       if (!isObject(candidate.vite)) {
         throw new DshxError('DSHX4004', `${field}.vite must be an object.`, {
@@ -428,6 +434,7 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     ...(hostEntry !== undefined && { hostEntry }),
     ...(clientEntry !== undefined && { clientEntry }),
     hostBundleDependencies,
+    ...(loaded.config.host !== false && loaded.config.host?.dshxRuntime !== undefined && { hostDshxRuntime: loaded.config.host.dshxRuntime }),
     ...(modules.length !== 0 && { modules }),
     clientBundleDependencies: loaded.config.client === false ? [] : (loaded.config.client?.bundleDependencies ?? []),
     ...(!(loaded.config.client === false || loaded.config.client?.shared === undefined) && { clientShared: loaded.config.client.shared }),

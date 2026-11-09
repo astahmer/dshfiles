@@ -154,6 +154,14 @@ describe('resolveDshxConfig', () => {
     })
   })
 
+  it('keeps the inline DSHX runtime unless a Host opts into the snapshot', async () => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/host.ts')
+    await expect(resolveDshxConfig({ cwd: root })).resolves.not.toHaveProperty('hostDshxRuntime')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { host: { dshxRuntime: 'snapshot' } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ hostDshxRuntime: 'snapshot' })
+  })
+
   it('rejects Host bundle subpaths, duplicates, and Cordis identity', async () => {
     for (const dependencies of ["['@test/local-core/subpath']", "['@test/local-core', '@test/local-core']", "['@deepseek-ai/cordis']"]) {
       const { root } = await temporaryProject()
@@ -291,6 +299,8 @@ describe('resolveDshxConfig', () => {
     ["export default { build: { minify: 'yes' } }\n", 'minify'],
     ["export default { compatibility: { allowUnsupported: 'yes' } }\n", 'allowUnsupported'],
     ['export default { host: { bundleDependencies: [7] } }\n', 'unique bare package roots'],
+    ["export default { host: { dshxRuntime: 'shared' } }\n", 'dshxRuntime'],
+    ["export default { client: { dshxRuntime: 'snapshot' } }\n", 'unknown field'],
     ["export default { client: { sharedRuntime: { provide: ['zod', 7] } } }\n", 'unique bare module specifiers'],
   ])('rejects invalid config: %s', async (config, message) => {
     const { root } = await temporaryProject()

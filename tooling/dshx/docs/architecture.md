@@ -36,7 +36,7 @@ Host-only Settings facets (`base`, `validate`, `setup`) remain in `src/host.ts`.
 2. Select one compatibility adapter from the installed DSH version and ensure the public peer range fits one generation.
 3. Run offline manifest, provider-edge, migration, and TypeScript checks.
 4. Build Host and Client with internal entry/browser guards first, native user Vite transformations next, and protocol/capability/artifact guards last.
-5. Inline DSHX helper implementations into the output while keeping official runtime packages governed by the adapter external policy.
+5. Inline DSHX helper implementations into the output while keeping official runtime packages governed by the adapter external policy. A Host with `host.dshxRuntime: 'snapshot'` imports them instead from an immutable, content-addressed `@dshfiles/dshx/runtime-store/<hash>/` copy shared by every Host built with the same DSHX, and falls back to inlining when the project could resolve any import differently.
 6. Enforce one Host ESM chunk and one lazy-CJS Client entry chunk. Each literal Client `import()` target that shares no module with the entry is built on its own into a self-contained lazy chunk `client.<name>.<hash>.js`, loaded through `require.async`; a target that shares a module or imports CSS stays inlined. Fold one standard Vite CSS asset into the entry factory and reject other chunks/assets/workers/WASM.
 7. Emit declarations for the actual `name`/`inject`/`Config`/`apply` module shape.
 

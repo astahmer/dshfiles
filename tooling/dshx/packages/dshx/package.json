@@ -166,6 +166,7 @@
       "types": "./dist/effect/host-prompt.d.ts",
       "default": "./dist/effect/host-prompt.js"
     },
+    "./runtime-store/*": "./runtime-store/*",
     "./scratch-registry": {
       "types": "./dist/scratch/registry.d.ts",
       "default": "./dist/scratch/registry.js"
