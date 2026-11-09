@@ -40,7 +40,7 @@ const scopeHint = (scope: ChangesScope, bookmark: string): string => {
   if (scope === 'turn') return 'What one turn wrote, from its own before and after snapshot.'
   if (scope === 'thread') return `Every change since this thread left ${bookmark}.`
   if (scope === 'uncommitted') return 'The working-copy revision only.'
-  if (scope === 'revisions') return 'The revisions selected in the graph, oldest first, each as its own change.'
+  if (scope === 'revisions') return 'The revisions selected in the graph, each as its own change, on the graph they form.'
   return `The workspace against the current tip of ${bookmark}, including what ${bookmark} gained since.`
 }
 

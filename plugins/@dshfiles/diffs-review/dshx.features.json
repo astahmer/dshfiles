@@ -408,7 +408,7 @@
     {
       "id": "combined-revisions",
       "title": "Review several selected revisions together",
-      "summary": "Revisions selected in the graph open as one combined review: every revision listed oldest first with its own files, one revision's diff on screen with Previous and Next, a viewed mark per file of each revision, and line comments that name their revision. Each revision stays its own change because jj cannot diff across a gap, so a selection with gaps says so. In a thread that owns the repository it is the Revisions scope of the Changes facet; otherwise it opens on the Review page. The diffs_review_revisions agent tool reads the same review.",
+      "summary": "Revisions selected in the graph open as one combined review: a small revision graph, newest first, with each revision's own files, state chips (working copy, conflict, divergent, empty, bookmarks) and viewed count, one revision's diff on screen with Previous and Next (j and k on the graph), a viewed mark per file of each revision, and line comments that name their revision. Each revision stays its own change because jj cannot diff across a gap, so a gap is a dashed lane with a row counting the revisions left out, and the graph ends on the base the selection sits on. In a thread that owns the repository it is the Revisions scope of the Changes facet; otherwise it opens on the Review page. The diffs_review_revisions agent tool reads the same review.",
       "surfaces": ["client", "api"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -416,7 +416,8 @@
       "configuration": [],
       "states": ["loading", "stack", "gaps", "partly-unresolved", "none-resolved", "truncated", "viewed", "failed", "page"],
       "failureModes": [
-        "A selection with gaps says that revisions between them are not part of the review.",
+        "A selection with gaps says that revisions between them are not part of the review, and counts them on the graph.",
+        "A selection whose history between revisions is too long for one bounded read links direct parents only and says the gaps were not counted.",
         "A revision that is gone or divergent is named and left out, and the rest is still reviewed; a divergent row is selected from the graph by its commit.",
         "A review too large for one read flags which revisions are partial and says to select fewer.",
         "A git-only repository is refused with the reason instead of an empty review."
@@ -468,6 +469,18 @@
           "id": "diffs-review.combined-revisions-unit-tool",
           "file": "plugins/@dshfiles/diffs-review/tests/revisions-review.spec.ts",
           "testName": "gives the agent the same review as text"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diffs-review.combined-revisions-unit-placements",
+          "file": "plugins/@dshfiles/diffs-review/tests/revision-placements.spec.ts",
+          "testName": "links a revision across left-out revisions and counts them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diffs-review.combined-revisions-unit-graph",
+          "file": "plugins/@dshfiles/diffs-review/src/review-graph.test.ts",
+          "testName": "lists newest first, links across a gap with one dashed edge, and ends on the base"
         }
       ],
       "telemetry": [

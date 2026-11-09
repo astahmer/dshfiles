@@ -239,7 +239,22 @@ export class ReviewWorkspace extends Context.Service<
           additions: grouped.additions,
           deletions: grouped.deletions,
           files: [...grouped.files],
+          bookmarks: input.revision.bookmarks,
+          immutable: input.revision.immutable,
+          conflict: input.revision.conflict,
+          divergent: input.revision.divergent,
+          empty: input.revision.empty,
+          workingCopy: input.revision.workingCopy,
         } satisfies RevisionReview
+      })
+
+      /** The revisions between and below the selection, for its graph; undefined when the read fails or is too large. */
+      const readGraph = Effect.fn('review revisions graph')(function* (input: { readonly path: string; readonly revisions: readonly ResolvedRevision[] }) {
+        if (input.revisions.length === 0) return undefined
+        const output = yield* jjReads
+          .read({ path: input.path, args: RevisionReviewModel.graphArgs(input.revisions.map(revision => revision.commitId)), outputLimit: 256_000 })
+          .pipe(Effect.option)
+        return Option.isNone(output) || output.value.truncated ? undefined : RevisionReviewModel.decodeGraph(output.value.stdout)
       })
 
       /** Every revision's own patch in one jj read; undefined when that read fails, is cut, or its framing is unusable, so the one-by-one reads still decide. */
@@ -287,7 +302,13 @@ export class ReviewWorkspace extends Context.Service<
 
       const readRevisions = Effect.fn('review revisions read')(function* (input: RevisionsReviewInput) {
         const { ordered, unresolved } = yield* selection(input)
-        const batched = yield* readPatches({ path: input.path, revisions: ordered })
+        const [batched, graph] = yield* Effect.all(
+          [readPatches({ path: input.path, revisions: ordered }), readGraph({ path: input.path, revisions: ordered })],
+          {
+            concurrency: 2,
+          },
+        )
+        const placed = RevisionReviewModel.placements(ordered, graph)
         const revisions: RevisionReview[] = []
         let budget = MAX_PATCH_CHARS
         // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- oldest first, each read takes what the earlier ones left of one patch budget.
@@ -295,7 +316,8 @@ export class ReviewWorkspace extends Context.Service<
           const batchedPatch = budget > 0 ? batched?.get(revision.commitId) : undefined
           const patch = batchedPatch !== undefined && batchedPatch.length <= budget ? batchedPatch : undefined
           const read = yield* readRevision({ path: input.path, revision, budget, ...(patch === undefined ? undefined : { patch }) })
-          revisions.push(read)
+          const placement = placed.get(revision.commitId)
+          revisions.push(placement === undefined ? read : { ...read, links: placement.links, base: placement.base })
           budget -= read.patch.length
         }
         return {
@@ -304,6 +326,7 @@ export class ReviewWorkspace extends Context.Service<
           revisions,
           unresolved,
           segments: RevisionReviewModel.segments(ordered),
+          graphComplete: graph !== undefined,
           truncated: revisions.some(revision => revision.truncated),
           fileCount: revisions.reduce((total, revision) => total + revision.fileCount, 0),
           additions: revisions.reduce((total, revision) => total + revision.additions, 0),
