@@ -19,7 +19,7 @@ import type {
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { SessionPayload, type EffectSessionSource } from '@dshfiles/session-source-port'
-import { Clock, Context, Effect, Fiber, FiberMap, Layer, Option, Ref, Stream } from 'effect'
+import { Clock, Context, Duration, Effect, Fiber, FiberHandle, Layer, Option, Ref, Stream } from 'effect'
 import { SessionOwnerMissing } from './errors.js'
 import { HostDirectory } from './host-directory.js'
 import { RemoteThreads, type RemoteThread } from './remote-threads.js'
@@ -31,6 +31,12 @@ const ownedSessionOf = (address: SessionAddress): SessionId => (address.kind ===
 const listCacheMillis = 2_000
 const maxRemembered = 20_000
 const followTimeout = 15_000
+/** Unknown ids refresh the remote listings in the background at most this often. */
+const refreshMillis = 10_000
+const listTimeout = Duration.seconds(15)
+/** A runtime whose listing failed is skipped for 30 s, doubling per failure up to 10 min. */
+const backoffStartMillis = 30_000
+const backoffMaxMillis = 600_000
 
 /** One runtime this Host can reach, as the Session source lists it. */
 interface RuntimeTarget {
@@ -61,8 +67,10 @@ export class RemoteSessions extends Context.Service<
       const pool = yield* RuntimePool
       const directory = yield* HostDirectory
       const threads = yield* RemoteThreads
-      const discoveries = yield* FiberMap.make<string, RuntimeTarget | undefined, never>()
       const remembered = yield* Ref.make(new Map<string, RuntimeTarget>())
+      const unreachable = yield* Ref.make(new Map<string, { readonly failures: number; readonly retryAt: number }>())
+      const lastRefreshAt = yield* Ref.make(Number.NEGATIVE_INFINITY)
+      const refreshing = yield* FiberHandle.make<void, never>()
       const recent = yield* Ref.make<{ readonly key: string; readonly at: number; readonly rows: readonly SessionSummary[] } | undefined>(undefined)
 
       const targets = directory.listRuntimes().pipe(
@@ -71,17 +79,20 @@ export class RemoteSessions extends Context.Service<
       )
       const recorded = threads.list.pipe(Effect.orElseSucceed((): readonly RemoteThread[] => []))
 
-      const remember = (sessionId: string, runtime: RuntimeTarget) =>
+      const rememberAll = (owned: readonly { readonly sessionId: string; readonly runtime: RuntimeTarget }[]) =>
         Ref.update(remembered, current => {
           const next = new Map(current)
-          next.delete(sessionId)
-          next.set(sessionId, runtime)
+          for (const { sessionId, runtime } of owned) {
+            next.delete(sessionId)
+            next.set(sessionId, runtime)
+          }
           for (const oldest of next.keys()) {
             if (next.size <= maxRemembered) break
             next.delete(oldest)
           }
           return next
         })
+      const remember = (sessionId: string, runtime: RuntimeTarget) => rememberAll([{ sessionId, runtime }])
 
       const forget = (sessionId: string) =>
         Ref.update(remembered, current => {
@@ -90,16 +101,67 @@ export class RemoteSessions extends Context.Service<
           return next
         })
 
-      /** One runtime's own `session/list` answer; a host that is down contributes no rows. */
-      const listed = (runtimeId: string, request: SessionListRequest | Record<string, never>) =>
-        pool
+      const markUnreachable = (runtimeId: string) =>
+        Effect.flatMap(Clock.currentTimeMillis, now =>
+          Ref.update(unreachable, current => {
+            const failures = (current.get(runtimeId)?.failures ?? 0) + 1
+            const delay = Math.min(backoffStartMillis * 2 ** (failures - 1), backoffMaxMillis)
+            return new Map(current).set(runtimeId, { failures, retryAt: now + delay })
+          }),
+        )
+      const markReachable = (runtimeId: string) =>
+        Ref.update(unreachable, current => {
+          if (!current.has(runtimeId)) return current
+          const next = new Map(current)
+          next.delete(runtimeId)
+          return next
+        })
+      // A connection opened by any other path proves the runtime is back, so its backoff ends early.
+      yield* Stream.runForEach(pool.connected, markReachable).pipe(Effect.forkScoped)
+
+      /**
+       * One runtime's own `session/list` answer; a host that is down contributes no rows. A runtime whose listing failed
+       * is not asked again until its backoff ends: an unreachable SSH host takes seconds to fail every time.
+       */
+      const listed = Effect.fnUntraced(function* (runtimeId: string, request: SessionListRequest | Record<string, never>) {
+        const now = yield* Clock.currentTimeMillis
+        if (((yield* Ref.get(unreachable)).get(runtimeId)?.retryAt ?? 0) > now) return []
+        return yield* pool
           .use(
             runtimeId,
             gateway => Effect.flatMap(gateway.run({ namespace: 'session', method: 'list', args: { _request: request } }), SessionPayload.summaries),
             { mutation: false },
           )
-          .pipe(Effect.orElseSucceed((): readonly SessionSummary[] => []))
+          .pipe(
+            Effect.timeout(listTimeout),
+            Effect.matchEffect({
+              onFailure: () => Effect.as(markUnreachable(runtimeId), []),
+              onSuccess: rows => Effect.as(markReachable(runtimeId), rows),
+            }),
+          )
+      })
 
+      /** Every runtime's listing, remembered for later lookups; it runs in the background, never under a request. */
+      const refresh = Effect.gen(function* () {
+        yield* Ref.set(lastRefreshAt, yield* Clock.currentTimeMillis)
+        const perRuntime = yield* Effect.forEach(
+          yield* targets,
+          runtime => Effect.map(listed(runtime.id, {}), rows => rows.map(row => ({ sessionId: String(row.sessionId), runtime }))),
+          { concurrency: 'unbounded' },
+        )
+        yield* rememberAll(perRuntime.flat())
+      })
+      const requestRefresh = Effect.gen(function* () {
+        const now = yield* Clock.currentTimeMillis
+        if (now - (yield* Ref.get(lastRefreshAt)) < refreshMillis) return
+        if (Option.isSome(FiberHandle.getUnsafe(refreshing))) return
+        yield* FiberHandle.run(refreshing, refresh, { onlyIfMissing: true })
+      })
+
+      /**
+       * The runtime owning a Session, from what this Host already knows: recorded threads and ids remembered from earlier
+       * listings. It never waits on a runtime; an unknown id (every New chat draft) asks for a background refresh instead.
+       */
       const lookup = Effect.fnUntraced(function* (sessionId: string) {
         const runtimes = yield* targets
         const record = (yield* recorded).find(thread => thread.sessionId === sessionId)
@@ -114,37 +176,12 @@ export class RemoteSessions extends Context.Service<
           if (stillRegistered !== undefined) return stillRegistered
           yield* forget(sessionId)
         }
-        // A Session owned by an unreachable runtime cannot authorize a routed operation, so a failing runtime is skipped.
-        const owner = yield* Effect.findFirst(runtimes, runtime =>
-          listed(runtime.id, {}).pipe(Effect.map(rows => rows.some(row => String(row.sessionId) === sessionId))),
-        )
-        if (Option.isNone(owner)) return undefined
-        yield* remember(sessionId, owner.value)
-        return owner.value
+        yield* requestRefresh
+        return undefined
       })
 
-      /**
-       * Concurrent lookups of one Session share a single discovery. `run` with `onlyIfMissing` hands a second caller an
-       * interrupted fiber rather than the running one, so the running discovery is looked up and joined first.
-       */
-      const runningDiscovery = (sessionId: string) => FiberMap.getUnsafe(discoveries, sessionId)
-      const runtimeFor = (sessionId: string) =>
-        Effect.flatMap(
-          Effect.suspend(() =>
-            Option.match(runningDiscovery(sessionId), {
-              onNone: () =>
-                Effect.map(FiberMap.run(discoveries, sessionId, lookup(sessionId), { onlyIfMissing: true }), started =>
-                  Option.getOrElse(runningDiscovery(sessionId), () => started),
-                ),
-              onSome: Effect.succeed,
-            }),
-          ),
-          Fiber.join,
-        )
       const requireRuntime = (sessionId: string) =>
-        Effect.flatMap(runtimeFor(sessionId), runtime =>
-          runtime === undefined ? Effect.fail(new SessionOwnerMissing({ sessionId })) : Effect.succeed(runtime),
-        )
+        Effect.flatMap(lookup(sessionId), runtime => (runtime === undefined ? Effect.fail(new SessionOwnerMissing({ sessionId })) : Effect.succeed(runtime)))
 
       const forward = <Value>(input: {
         readonly sessionId: string
@@ -203,7 +240,7 @@ export class RemoteSessions extends Context.Service<
           ),
         )
         const collected = perRuntime.flat()
-        yield* Effect.forEach(collected, ({ runtime, row }) => remember(String(row.sessionId), runtime))
+        yield* rememberAll(collected.map(({ runtime, row }) => ({ sessionId: String(row.sessionId), runtime })))
         const rows: readonly SessionSummary[] = collected.map(({ row }) => ({
           agentAvailable: row.agentAvailable,
           blank: row.blank,
@@ -230,8 +267,18 @@ export class RemoteSessions extends Context.Service<
         return Option.some(runtime.id)
       })
 
+      /** A mentioned remote Session may not be known yet, so a snapshot may wait for the refresh its lookup started. */
+      const awaitedLookup = Effect.fnUntraced(function* (sessionId: string) {
+        const known = yield* lookup(sessionId)
+        if (known !== undefined) return known
+        const running = FiberHandle.getUnsafe(refreshing)
+        if (Option.isNone(running)) return undefined
+        yield* Fiber.join(running.value)
+        return yield* lookup(sessionId)
+      })
+
       const snapshot = (input: { readonly sessionId: string; readonly maxMessages: number }) =>
-        Effect.flatMap(runtimeFor(input.sessionId), runtime =>
+        Effect.flatMap(awaitedLookup(input.sessionId), runtime =>
           runtime === undefined
             ? Effect.sync(() => undefined)
             : pool
@@ -252,7 +299,7 @@ export class RemoteSessions extends Context.Service<
         id: 'multi-host',
         label: 'Remote hosts',
         list,
-        owns: (sessionId: SessionId) => Effect.map(runtimeFor(sessionId), runtime => runtime !== undefined),
+        owns: (sessionId: SessionId) => Effect.map(lookup(sessionId), runtime => runtime !== undefined),
         runtimeIdForSession,
         follow: (request: SessionFollowRequest): Stream.Stream<SessionFollowFrame, unknown> =>
           Stream.flatMap(Stream.fromEffect(requireRuntime(ownedSessionOf(request.address))), runtime =>
