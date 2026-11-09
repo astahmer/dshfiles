@@ -77,13 +77,13 @@ and publishing is their call. Re-measure the tab after a refresh: open a dozen t
 Measured composition of a 610 MB Host with the web profile, no client attached. The rows come from different ablation
 boots (the sweep measured each owner by booting without it), so they are per-owner costs rather than one additive boot:
 
-| Owner                              | MB                            | Why it is there                                                                                                                                                                                                |
-| ---------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `session_projcache` storage domain | 252 before pruning, ~15 after | one derived checkpoint per Session; the owned `storage-domain` + `storage-json` forks hydrate a per-record domain one record at a time behind a 64-row LRU, and the 14-day prune keeps the directory at ~17 MB |
-| other JSON storage domains         | 67                            | the same contract for domains that never opt into per-record reads: `backlog_files`, `ai_accounts_usage`, …                                                                                                    |
-| plugin SQLite stores               | ~2                            | the shared `sqlite-store` layer defers a store to its first call; opened at activation each cost about 0.5 MB of heap                                                                                          |
-| Session corpus on disk             | 25                            | 2.9 GB of logs costs little until something decodes them                                                                                                                                                       |
-| core + 230 plugins + Effect + dshx | 263                           | module graph (~179 MB for 96 Host bundles) and per-activation layers; the SQLite row above sits inside this one                                                                                                |
+| Owner                              | MB                            | Why it is there                                                                                                                                                                                                                                     |
+| ---------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `session_projcache` storage domain | 252 before pruning, ~15 after | one derived checkpoint per Session; the owned `storage-domain` + `storage-json` forks hydrate a per-record domain one record at a time behind a 64-row LRU, so the heap no longer follows the record count. Only orphans are pruned (see Retention) |
+| other JSON storage domains         | 67                            | the same contract for domains that never opt into per-record reads: `backlog_files`, `ai_accounts_usage`, …                                                                                                                                         |
+| plugin SQLite stores               | ~2                            | the shared `sqlite-store` layer defers a store to its first call; opened at activation each cost about 0.5 MB of heap                                                                                                                               |
+| Session corpus on disk             | 25                            | 2.9 GB of logs costs little until something decodes them                                                                                                                                                                                            |
+| core + 230 plugins + Effect + dshx | 263                           | module graph (~179 MB for 96 Host bundles) and per-activation layers; the SQLite row above sits inside this one                                                                                                                                     |
 
 Effect is only **3.6 %** (~22 MB): schemas are built once per module and 4.1 has no separate compile step to
 exploit. The session-log corpus is not the problem either; the _caches_ that hold decoded logs are.
@@ -100,7 +100,10 @@ held by a blank tab after 20 threads. Those figures come from that single probe 
 - **A replacement frame needs no history.** A projection or rebuild frame supersedes the older one for the same
   cell, so a queue can coalesce and drop; a client that lags resyncs from a snapshot instead of the Host holding
   what it never read.
-- **Derived data gets retention.** Projection checkpoints (14 days, pruned hourly by `session-search`), job
+- **Derived data gets retention, unless it is the only cheap copy.** Projection checkpoints are kept for every stored
+  Session and pruned only when their Session is deleted (`session-search`, once per boot): a 14-day prune deleted the
+  checkpoints of idle threads, which never rewrite theirs, so 1,890 of 2,916 cold threads lost their title and list
+  metadata and each open read the whole log; a one-time pass rebuilt them. Job
   history (a day), quota history (30 days), usage requests (90 days hot, older rows in a cold archive the reports
   still read), traces (30 k spans, 60 k points). Nothing derived should live forever.
 - **Compact what deletes.** FTS5 keeps pruned postings in un-merged segments: 1.82 GB of a 2.01 GB index for
@@ -111,8 +114,8 @@ held by a blank tab after 20 threads. Those figures come from that single probe 
   245 MB database. `sqlite-store` sets 32 MB and an autocheckpoint, and the search worker's own index sets the same
   pair (its log had reached 225 MB beside a 291 MB index).
 - **Gate background work on demand.** An index pass is worth running when someone reads its panel. Usage,
-  agentsview and the job-history indexer stop after five minutes without a read; the projection-cache prune runs
-  hourly and no-ops when nothing is stale.
+  agentsview and the job-history indexer stop after five minutes without a read; the projection-cache orphan prune
+  runs once per boot, two minutes in.
 - **Workers get their own limits.** A plugin worker inherits the Host's 4 GB ceiling; the search worker declares
   512 MB and the fff worker 256 MB.
 - **Open stores on first use.** `sqlite-store`'s `deferred` layer builds the store inside the plugin scope on the

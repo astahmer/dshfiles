@@ -5,12 +5,13 @@
  * service, and silently leaves content search on the read path that freezes the Host.
  */
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
-import { pruneProjectionCache } from './projection-cache-prune.js'
 import { Api, DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer, Option, Schema, Stream } from 'effect'
 
 import { sessionSearchApi } from './api.js'
+import { ProjectionCachePrune } from './projection-cache-prune.js'
+import { ProjectionCacheRebuild } from './projection-cache-rebuild.js'
 import { SessionQueryOwnership } from './engine-registration-promise.js'
 import type { IndexHealth } from './protocol.js'
 import { SearchWorker } from './worker-client.js'
@@ -32,6 +33,10 @@ const persistenceConfig = Schema.decodeUnknownOption(Schema.Struct({ config: Sch
 
 /** A committed Session event wakes the ingest loop, coalesced so a busy turn does not wake it per event. */
 const NUDGE_DEBOUNCE = '500 millis'
+
+/** Projection checkpoint upkeep starts after the boot burst, and the rebuild pauses this long between logs. */
+const CHECKPOINT_UPKEEP_DELAY = '2 minutes'
+const CHECKPOINT_REBUILD_PAUSE = '2 seconds'
 
 const IDLE_HEALTH: IndexHealth = {
   sessions: 0,
@@ -55,7 +60,7 @@ const layer = (config: typeof rowConfig.Type) =>
         windowBytes: config?.windowBytes,
       }),
     ),
-    Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+    Layer.provideMerge(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
   )
 
 const main = Effect.gen(function* () {
@@ -86,14 +91,23 @@ const main = Effect.gen(function* () {
     yield* sendArchived()
     yield* Effect.forever(Effect.andThen(Effect.sleep('10 seconds'), sendArchived())).pipe(Effect.forkChild)
     yield* worker.startIngest(root).pipe(Effect.catchCause(cause => Effect.logWarning('session-search: ingest could not start', cause)))
-    // The projection cache is derived and the core domain loads all of it at boot, so a stale record costs heap for
-    // nothing; a Session opened again rebuilds its checkpoint from the log.
-    const pruneCheckpoints = Effect.sync(() => pruneProjectionCache({ now: Date.now() })).pipe(
-      Effect.tap(removed => (removed > 0 ? Effect.logInfo('session-search: dropped stale projection checkpoints', { removed }) : Effect.void)),
-      Effect.catchCause(cause => Effect.logWarning('session-search: projection checkpoints could not be pruned', cause)),
+    // Checkpoint upkeep waits out the boot burst; it lists every stored Session and the rebuild reads one log at a time.
+    yield* Effect.gen(function* () {
+      yield* Effect.sleep(CHECKPOINT_UPKEEP_DELAY)
+      const removed = yield* ProjectionCachePrune.orphans({ ctx: host.ctx }).pipe(
+        Effect.catchCause(cause => Effect.as(Effect.logWarning('session-search: orphan projection checkpoints could not be pruned', cause), 0)),
+      )
+      if (removed > 0) yield* Effect.logInfo('session-search: dropped orphan projection checkpoints', { removed })
+      const { rebuilt } = yield* ProjectionCacheRebuild.run({
+        ctx: host.ctx,
+        progressPath: dshHomePath('plugins', 'session-search', 'checkpoint-rebuild.json'),
+        pause: CHECKPOINT_REBUILD_PAUSE,
+      })
+      if (rebuilt > 0) yield* Effect.logInfo('session-search: rebuilt projection checkpoints', { rebuilt })
+    }).pipe(
+      Effect.catchCause(cause => Effect.logWarning('session-search: projection checkpoints could not be rebuilt', cause)),
+      Effect.forkChild,
     )
-    yield* pruneCheckpoints
-    yield* Effect.forever(Effect.andThen(Effect.sleep('1 hour'), pruneCheckpoints)).pipe(Effect.forkChild)
   }
   yield* HostEvents.stream('session/event').pipe(
     Stream.debounce(NUDGE_DEBOUNCE),

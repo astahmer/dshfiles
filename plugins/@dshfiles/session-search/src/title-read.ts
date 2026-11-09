@@ -7,7 +7,7 @@
  * caller keeps the whole-log fold.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+import { SessionLogOffset, type Session, type SessionEvent, type SessionHeader, type SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { foldSessionTitle, type SessionTitleSnapshot } from '@deepseek-ai/dsh-session-title'
 import { HEAD_WINDOW_BYTES, MIN_TAIL_BYTES, openLogHead, recentLogEvents, TailLog, type LogHead, type LogWindowMetrics } from '@dshfiles/session-log-window'
@@ -114,8 +114,27 @@ const checkpointCoversLogEnd = async (
 
 const withTitle = (title: SessionTitleSnapshot | undefined): { readonly title?: SessionTitleSnapshot } => (title === undefined ? {} : { title })
 
-/** The title a live Session's own events fold to; its log is never read because the events are already here. */
-export const readLiveTitle = (session: Session): BoundedTitleSnapshot => ({
-  session: structuredClone(session.header),
-  ...withTitle(foldSessionTitle(session.snapshotEvents())),
-})
+/** How many events one step of a live Session's first backward title scan copies. */
+const LIVE_SCAN_EVENTS = 512
+
+/**
+ * The newest title event each live Session folded to, and the cursor it folded through. A live log is append-only, so
+ * the next read folds only the events appended since; keyed by the Session object, a recreated id starts over.
+ */
+const liveTitleFolds = new WeakMap<Session, { readonly throughSeq: SessionLogOffset; readonly title: SessionTitleSnapshot | undefined }>()
+
+/**
+ * The title a live Session's own events fold to; its log is never read because the events are already here. The
+ * projection's `title` state holds only the text, not the event's seq, source and time, so this folds the events
+ * itself: backwards from the cursor on the first read, then only what was appended since.
+ */
+export const readLiveTitle = (session: Session): BoundedTitleSnapshot => {
+  const end = session.seq
+  const known = liveTitleFolds.get(session)
+  let title = known === undefined ? undefined : (foldSessionTitle(session.snapshotEvents(known.throughSeq, end)) ?? known.title)
+  for (let to: number = end; known === undefined && title === undefined && to > 0; to -= LIVE_SCAN_EVENTS) {
+    title = foldSessionTitle(session.snapshotEvents(SessionLogOffset(Math.max(0, to - LIVE_SCAN_EVENTS)), SessionLogOffset(to)))
+  }
+  liveTitleFolds.set(session, { throughSeq: end, title })
+  return { session: structuredClone(session.header), ...withTitle(title) }
+}

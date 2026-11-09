@@ -84,6 +84,15 @@ works with.
 Age is not the cutoff: every log here is younger than 60 days (2,294 of 2,406 within 30 days), so an age window would
 prune almost nothing while archived state is the user's own statement about what is cold.
 
+## Projection checkpoints
+
+The Host's projection cache keeps one checkpoint per Session under `storages/session_projcache/sessions/` and is the
+zero-I/O source of a cold Session's list metadata and title. Two minutes after boot this plugin removes only orphans
+(checkpoints whose Session persistence no longer stores), then runs a one-time rebuild for Sessions whose checkpoint a
+former 14-day prune deleted: one cold log of at most 8 MB at a time through the cache's own `coldSnapshot`, two seconds
+apart, skipping live Sessions. Progress lives in `plugins/session-search/checkpoint-rebuild.json`, so a restart resumes;
+once a pass completes it never runs again. Larger logs get their checkpoint when someone opens them.
+
 ## Current limitations
 
 - Refused filters are `text` event predicates and the session filters other than `id`; they raise

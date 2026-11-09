@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { zstdCompressSync } from 'node:zlib'
 import { afterEach, expect, it, vi } from 'vitest'
-import { readBoundedTitle } from './title-read.js'
+import { readBoundedTitle, readLiveTitle } from './title-read.js'
 
 const directories: string[] = []
 const contexts: Context[] = []
@@ -47,7 +47,8 @@ const largeLog = (() => {
 })()
 
 const renamedLog = (): Buffer => Buffer.concat([mediumLog(), zstdCompressSync(Buffer.from(titleRow(4, 'Renamed title')))])
-const smallLog = (): Buffer => Buffer.concat([`${JSON.stringify({ type: 'session', ...header })}\n`, titleRow(0, 'Early title')].map(text => zstdCompressSync(Buffer.from(text))))
+const smallLog = (): Buffer =>
+  Buffer.concat([`${JSON.stringify({ type: 'session', ...header })}\n`, titleRow(0, 'Early title')].map(text => zstdCompressSync(Buffer.from(text))))
 
 const openContext = async (bytes: Buffer, cache?: { readonly title: string | null; readonly asOfSeq: number }) => {
   const directory = mkdtempSync(join(tmpdir(), 'title-read-'))
@@ -116,3 +117,40 @@ it('folds the whole log when the window covers it', async () => {
   ] as never)
   expect(result?.title).toEqual(expected)
 }, 30_000)
+
+/** A live Session's event surface: its header, its cursor, and slices of its append-only log. */
+const liveSession = () => {
+  const log: unknown[] = [JSON.parse(titleRow(0, 'Early title'))]
+  for (let seq = 1; seq < 2_000; seq += 1) log.push({ seq, time: 1_000 + seq, type: 'user/message', data: { text: `turn ${seq}` } })
+  const slices: (readonly [number, number])[] = []
+  const snapshotEvents = (from = 0, to = log.length) => {
+    slices.push([from, to])
+    return log.slice(from, to)
+  }
+  // SAFETY: the live title read uses only the header, the cursor and `snapshotEvents`.
+  const session = {
+    header,
+    get seq() {
+      return log.length
+    },
+    snapshotEvents,
+  } as never
+  return { log, session, slices }
+}
+
+it('folds a live Session title from the events appended since its last read', () => {
+  const { log, session, slices } = liveSession()
+  expect(readLiveTitle(session).title).toEqual(foldSessionTitle(log as never))
+  const scanned = slices.reduce((sum, [from, to]) => sum + to - from, 0)
+  expect(scanned).toBe(log.length)
+
+  slices.splice(0)
+  log.push(JSON.parse(titleRow(2_000, 'Renamed title')), { seq: 2_001, time: 3_001, type: 'user/message', data: { text: 'after' } })
+  expect(readLiveTitle(session).title).toMatchObject({ title: 'Renamed title', eventSeq: 2_000 })
+  expect(slices).toEqual([[2_000, 2_002]])
+
+  slices.splice(0)
+  log.push({ seq: 2_002, time: 3_002, type: 'user/message', data: { text: 'later' } })
+  expect(readLiveTitle(session).title).toEqual(foldSessionTitle(log as never))
+  expect(slices).toEqual([[2_002, 2_003]])
+})
