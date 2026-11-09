@@ -1,0 +1,5 @@
+- id: ui-cordis
+  disabled: true
+- insert:
+    - id: dshfiles-cordis-cards
+      name: '@dshfiles/cordis-cards'

@@ -95,6 +95,11 @@ const astGrepVendored = [
   'plugins/@dshfiles/settings-subagent/src/native/**',
   'plugins/@dshfiles/settings-subagent/src/host.ts',
   'plugins/@dshfiles/settings-subagent/src/css-modules.d.ts',
+  'plugins/@dshfiles/cordis-client-runner/src/native/**',
+  'plugins/@dshfiles/cordis-client-runner/src/host.ts',
+  'plugins/@dshfiles/cordis-cards/src/native/**',
+  'plugins/@dshfiles/cordis-cards/src/host.ts',
+  'plugins/@dshfiles/cordis-cards/src/css-modules.d.ts',
 ]
 
 const ruleCapsSchema = Schema.Record(Schema.String, Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)))
