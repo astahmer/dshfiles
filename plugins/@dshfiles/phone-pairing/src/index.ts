@@ -8,7 +8,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
-import { createPairingGateway } from './gateway.ts'
+import { createPairingGateway, mintNativeCookie, type NativeCookie } from './gateway.ts'
 import { resolveProvider } from './providers.ts'
 import { renderTerminalQr } from './qr.ts'
 import { PhoneAccessSettings } from './settings.ts'
@@ -51,14 +51,13 @@ export const apply = (ctx: Context, config: Config): void => {
     void stopTunnel?.()
   })
 
-  const nativeCookie = async (): Promise<string | undefined> => {
+  const nativeCookie = async (): Promise<NativeCookie | undefined> => {
     // SAFETY: the plugin declares `connection` in `inject`, so it is the native connection service.
     const connection = ctx.get('connection') as NativeConnection | undefined
     const port = serverPort()
     if (connection?.authenticatedUrl === undefined || port === undefined) return undefined
     try {
-      const response = await fetch(connection.authenticatedUrl(`http://127.0.0.1:${port}`), { redirect: 'manual' })
-      return response.headers.get('set-cookie')?.split(';')[0]
+      return await mintNativeCookie(connection.authenticatedUrl(`http://127.0.0.1:${port}`))
     } catch {
       return undefined
     }

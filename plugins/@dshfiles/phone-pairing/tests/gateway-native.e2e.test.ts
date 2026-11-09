@@ -3,17 +3,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createPairingGateway } from '../src/gateway.ts'
+import { createPairingGateway, mintNativeCookie } from '../src/gateway.ts'
 import { createPairingStore } from '../src/store.ts'
 
 const origin = process.env.PAIRING_E2E_ORIGIN
 const token = process.env.PAIRING_E2E_TOKEN
 const enabled = origin !== undefined && token !== undefined
 
-const nativeCookie = async (): Promise<string | undefined> => {
-  const response = await fetch(`${origin}/?token=${token ?? ''}`, { redirect: 'manual' })
-  return response.headers.get('set-cookie')?.split(';')[0]
-}
+const nativeCookie = () => mintNativeCookie(`${origin}/?token=${token ?? ''}`)
 
 const freePort = async (): Promise<number> =>
   new Promise(resolve => {

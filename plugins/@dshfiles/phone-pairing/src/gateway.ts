@@ -1,4 +1,5 @@
 import http from 'node:http'
+import type { Duplex } from 'node:stream'
 
 const COOKIE = '__Host-dsh_phone'
 
@@ -39,6 +40,22 @@ const cookieOf = (header: string | undefined): string | undefined => {
   return only.slice(COOKIE.length + 1)
 }
 
+export interface NativeCookie {
+  readonly value: string
+  readonly expiresAt: number
+}
+
+/** Exchange the native launch URL for its session cookie; the redirect body is never read. */
+export const mintNativeCookie = async (url: string): Promise<NativeCookie | undefined> => {
+  const response = await fetch(url, { redirect: 'manual' })
+  await response.body?.cancel()
+  const header = response.headers.get('set-cookie')
+  const value = header?.split(';')[0]
+  if (header === null || value === undefined || value === '') return undefined
+  const maxAge = /;\s*max-age=(\d+)/i.exec(header)?.[1]
+  return { value, expiresAt: maxAge === undefined ? Number.POSITIVE_INFINITY : Date.now() + Number(maxAge) * 1_000 }
+}
+
 export interface GatewayOptions {
   /** Loopback port of the native listener. */
   readonly upstream: number
@@ -56,8 +73,8 @@ export interface GatewayOptions {
   }
   /** Public origin the phone uses, for cookie bounds and the landing redirect. */
   readonly publicOrigin?: string
-  /** The native listener needs its own authority-bound session cookie; refresh it on demand. */
-  readonly nativeCookie: () => Promise<string | undefined>
+  /** The native listener needs its own authority-bound session cookie; minted once, re-minted near expiry or on 401/403. */
+  readonly nativeCookie: () => Promise<NativeCookie | undefined>
 }
 
 /**
@@ -75,6 +92,24 @@ export const createPairingGateway = (options: GatewayOptions) => {
       for (const socket of entry.sockets) socket.destroy()
       active.delete(entry)
     }
+  }
+
+  let minted: NativeCookie | undefined
+  let minting: Promise<string | undefined> | undefined
+  const nativeCookie = (): Promise<string | undefined> => {
+    if (minted !== undefined && minted.expiresAt - 60_000 > Date.now()) return Promise.resolve(minted.value)
+    minting ??= options
+      .nativeCookie()
+      .catch(() => undefined)
+      .then(next => {
+        minted = next
+        minting = undefined
+        return next?.value
+      })
+    return minting
+  }
+  const rejectedBy = (status: number | undefined, cookie: string): void => {
+    if ((status === 401 || status === 403) && minted?.value === cookie) minted = undefined
   }
 
   const authorised = (request: http.IncomingMessage): string | undefined => {
@@ -165,7 +200,7 @@ export const createPairingGateway = (options: GatewayOptions) => {
       return
     }
 
-    void options.nativeCookie().then(cookie => {
+    void nativeCookie().then(cookie => {
       if (cookie === undefined) {
         respond(response, 503)
         return
@@ -176,6 +211,7 @@ export const createPairingGateway = (options: GatewayOptions) => {
       active.add(entry)
       response.once('close', () => active.delete(entry))
       const outgoing = http.request({ hostname: '127.0.0.1', port: options.upstream, method: request.method, path: request.url, headers }, incoming => {
+        rejectedBy(incoming.statusCode, cookie)
         const passthrough = { ...incoming.headers }
         delete passthrough['set-cookie']
         response.writeHead(incoming.statusCode ?? 502, passthrough)
@@ -198,21 +234,26 @@ export const createPairingGateway = (options: GatewayOptions) => {
     }
     const entry = { credential, sockets: new Set<{ destroy: () => void }>() }
     active.add(entry)
-    socket.once('close', () => active.delete(entry))
-    void options.nativeCookie().then(cookie => {
-      if (cookie === undefined) {
-        socket.destroy()
-        return
-      }
+    let closed = false
+    let upstream: Duplex | undefined
+    const teardown = (): void => {
+      if (closed) return
+      closed = true
+      active.delete(entry)
+      socket.destroy()
+      for (const peer of entry.sockets) peer.destroy()
+    }
+    socket.once('close', teardown)
+    socket.on('error', teardown)
+    socket.once('end', () => (upstream === undefined ? teardown() : upstream.end(teardown)))
+    void nativeCookie().then(cookie => {
+      if (cookie === undefined || closed) return teardown()
       const headers = rewrite(request.headers)
       headers.cookie = cookie
       const outgoing = http.request({ hostname: '127.0.0.1', port: options.upstream, method: request.method, path: request.url, headers })
       entry.sockets.add(outgoing)
-      attach(outgoing)
-    })
-
-    const attach = (outgoing: http.ClientRequest): void => {
       outgoing.on('upgrade', (incoming, upstreamSocket, upstreamHead) => {
+        upstream = upstreamSocket
         entry.sockets.add(upstreamSocket)
         const headers = Object.entries(incoming.headers)
           .flatMap(([name, value]) => (Array.isArray(value) ? value : [value]).map(item => `${name}: ${item}`))
@@ -221,14 +262,18 @@ export const createPairingGateway = (options: GatewayOptions) => {
         if (upstreamHead.length > 0) socket.write(upstreamHead)
         if (head.length > 0) upstreamSocket.write(head)
         upstreamSocket.pipe(socket).pipe(upstreamSocket)
-        upstreamSocket.on('error', () => socket.destroy())
-        upstreamSocket.on('close', () => socket.destroy())
+        upstreamSocket.once('close', teardown)
+        upstreamSocket.on('error', teardown)
+        upstreamSocket.once('end', () => socket.end(teardown))
       })
-      outgoing.on('response', () => socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n'))
-      outgoing.on('error', () => socket.destroy())
+      outgoing.on('response', incoming => {
+        rejectedBy(incoming.statusCode, cookie)
+        incoming.resume()
+        socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n')
+      })
+      outgoing.on('error', teardown)
       outgoing.end()
-    }
-    socket.on('error', () => entry.sockets.forEach(activeSocket => activeSocket.destroy()))
+    })
   })
 
   return {
