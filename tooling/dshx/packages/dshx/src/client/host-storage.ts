@@ -197,11 +197,16 @@ const createStorageService = (input: { readonly ctx: ContextLike; readonly names
 /**
  * Host-backed storage for one plugin, under its package id: the entries its Host half reads with `pluginStorage`, and
  * stores every browser connected to that Host shares. Pass the context `setup` received.
+ *
+ * A renamed plugin passes `formerId`, the package id it had before: the returned storage is that former namespace, and
+ * only that one, so the plugin reads what it kept there, moves it and removes it. Its new entries go through a second
+ * `hostStorage(api)` without the option, under its current id. Added for `@dshfiles/diffs-review`, formerly
+ * `@dshfiles/pulls-review`.
  */
-const hostStorage = (plugin: PluginContext): StorageService => {
+const hostStorage = (plugin: PluginContext, options: { readonly formerId?: string } = {}): StorageService => {
   const ctx = PluginRuntimeModel.hostOf(plugin)
   if (ctx === undefined) throw new TypeError('hostStorage needs the plugin context setup(api) received.')
-  return createStorageService({ ctx, namespace: plugin.id, signal: plugin.signal })
+  return createStorageService({ ctx, namespace: options.formerId ?? plugin.id, signal: plugin.signal })
 }
 
 export class HostStorageModel {

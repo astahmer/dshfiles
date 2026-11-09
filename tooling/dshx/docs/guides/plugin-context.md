@@ -345,6 +345,8 @@ await storage.list({ prefix: 'exports/', cursor: page.cursor ?? undefined })
 - `ready` rejects when the Host serves no plugin storage (the profile lacks the `@deepseek-ai/dsh-storage-domain` row,
   or no dshx Host with an API is loaded); the store keeps reading `initial`.
 - Host keys of a store are `store/<key>` (global) or `store/<key>/<scope>/<id>`, so the Host half can read them.
+- A renamed plugin reads what it stored under its former package id with `hostStorage(api, { formerId: '@acme/old' })`,
+  moves it, then clears it; everything it writes from then on goes through `hostStorage(api)` under its new id.
 
 ## Failures
 
