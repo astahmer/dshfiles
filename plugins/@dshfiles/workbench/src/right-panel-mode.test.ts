@@ -1,12 +1,10 @@
 import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { createDockPaneActions, migrateDockVisibility } from './right-panel-mode.js'
+import { createDockPaneActions, migrateDockVisibility, type RightPaneContents } from './right-panel-mode.js'
+import type { WorkbenchPanelIdentity } from './panel-close.js'
 
-const fixture = (
-  panels?: () => readonly { readonly id: string; readonly params: unknown }[],
-  close?: (panel: { readonly id: string; readonly params: unknown }) => void,
-) => {
+const fixture = (contents: RightPaneContents = { panels: () => [], close: () => {} }) => {
   const values = new Map<string, string>()
   const storage = () => ({
     getItem: (key: string) => values.get(key) ?? null,
@@ -18,7 +16,6 @@ const fixture = (
     },
   })
   const visibility = createStoredValue({ key: 'visibility', schema: Schema.NullOr(Schema.Boolean), fallback: null, storage })
-  const contents = panels === undefined || close === undefined ? undefined : { panels, close }
   return { visibility, actions: createDockPaneActions(visibility, contents), storage }
 }
 
@@ -60,12 +57,12 @@ describe('one tabbed right pane', () => {
 
   it('closes the only open panel instead of only hiding the pane', () => {
     const panel = { id: 'only', params: { sourceId: 'only' } }
-    const panels: { readonly id: string; readonly params: unknown }[] = [panel]
-    const close = vi.fn((closed: { readonly id: string; readonly params: unknown }) => {
+    const panels: WorkbenchPanelIdentity[] = [panel]
+    const close = vi.fn((closed: WorkbenchPanelIdentity) => {
       const index = panels.findIndex(candidate => candidate.id === closed.id)
       if (index !== -1) panels.splice(index, 1)
     })
-    const { actions } = fixture(() => panels, close)
+    const { actions } = fixture({ panels: () => panels, close })
     actions.open()
 
     actions.toggle()
@@ -73,6 +70,11 @@ describe('one tabbed right pane', () => {
     expect(close).toHaveBeenCalledOnce()
     expect(close).toHaveBeenCalledWith(panel)
     expect(panels).toHaveLength(0)
+    expect(actions.isOpen()).toBe(false)
+    actions.toggle()
+    expect(actions.isOpen()).toBe(true)
+    expect(panels).toHaveLength(0)
+    expect(close).toHaveBeenCalledOnce()
   })
 
   it('hides a pane holding several panels without closing any of them', () => {
@@ -81,7 +83,7 @@ describe('one tabbed right pane', () => {
       { id: 'b', params: { sourceId: 'b' } },
     ]
     const close = vi.fn()
-    const { actions } = fixture(() => panels, close)
+    const { actions } = fixture({ panels: () => panels, close })
     actions.open()
 
     actions.toggle()
@@ -94,7 +96,7 @@ describe('one tabbed right pane', () => {
   it('opens a closed pane holding one panel without closing it', () => {
     const panel = { id: 'only', params: { sourceId: 'only' } }
     const close = vi.fn()
-    const { actions } = fixture(() => [panel], close)
+    const { actions } = fixture({ panels: () => [panel], close })
 
     actions.toggle()
 

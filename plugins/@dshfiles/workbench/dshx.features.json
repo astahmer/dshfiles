@@ -1062,16 +1062,45 @@
           "testName": "renames in place, keeping the arrangement, and ignores an absent source"
         },
         {
+          "kind": "gherkin",
+          "id": "workbench.right-pane-toggle-lifetimes",
+          "featureFile": "tooling/dshx/e2e/features/workbench-right-close.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "workbench.global-dock-unit-toggle-sole-panel",
           "file": "plugins/@dshfiles/workbench/src/right-pane-toggle.test.tsx",
-          "testName": "closes the only open panel through its owning close path"
+          "testName": "retires a lone chooser and reopens with a fresh chooser"
         },
         {
           "kind": "unit-test",
           "id": "workbench.global-dock-unit-toggle-several-panels",
           "file": "plugins/@dshfiles/workbench/src/right-pane-toggle.test.tsx",
           "testName": "hides the pane and keeps every panel when several are open"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-toggle-live-panel",
+          "file": "plugins/@dshfiles/workbench/src/right-pane-toggle.test.tsx",
+          "testName": "hides and restores a lone %s without closing its owner or draft"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-toggle-pinned-tab",
+          "file": "plugins/@dshfiles/workbench/src/right-pane-toggle.test.tsx",
+          "testName": "keeps a genuinely pinned semantic tab and its draft through toggling"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-toggle-close-icon",
+          "file": "plugins/@dshfiles/workbench/src/right-pane-toggle.test.tsx",
+          "testName": "uses the same chooser-close rule from the pane icon"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-toggle-phone-chooser",
+          "file": "plugins/@dshfiles/workbench/src/right-pane-toggle.test.tsx",
+          "testName": "hides and restores the phone sheet without retiring its lone chooser"
         }
       ],
       "telemetry": [

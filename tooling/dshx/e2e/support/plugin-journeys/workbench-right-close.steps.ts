@@ -16,12 +16,55 @@ const choose = async (page: Page, name: string): Promise<void> => {
   await picker.getByRole('button', { name, exact: true }).click()
   await expect(picker).toBeHidden()
 }
+const toggleRight = async (page: Page): Promise<void> => {
+  await page.locator('[data-workbench-region="main"]').getByRole('button', { name: 'Pane options', exact: true }).first().focus()
+  const mac = await page.evaluate(() => (document.documentElement.dataset.platform ?? navigator.platform).toLowerCase().includes('mac'))
+  await page.keyboard.press(mac ? 'Meta+Shift+B' : 'Control+Shift+B')
+}
+
 const closeTab = async (page: Page, name: string): Promise<void> => {
   await right(page)
     .getByRole('tab', { name, exact: true })
     .getByRole('button', { name: `Close ${name}`, exact: true })
     .click()
 }
+
+Then('right-pane controls preserve the lone draft and discard only the empty chooser', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-right-toggle-preserves-live-draft', async () => {
+    await closeTab(page, 'New tab')
+    await expect(right(page).getByRole('tab')).toHaveCount(1)
+    const draft = right(page).getByRole('textbox', { name: 'Scratchpad', exact: true })
+    const original = await draft.elementHandle()
+    if (original === null) throw new Error('The Scratchpad draft did not mount.')
+    const text = await draft.inputValue()
+    for (const control of ['shortcut', 'icon']) {
+      if (control === 'shortcut') await toggleRight(page)
+      if (control === 'icon') await right(page).getByRole('button', { name: 'Close pane', exact: true }).click()
+      await expect(right(page)).toBeHidden()
+      expect(await original.evaluate(element => element.isConnected)).toBe(true)
+      await toggleRight(page)
+      await expect(draft).toHaveValue(text)
+      expect(await draft.evaluate((element, retained) => element === retained, original)).toBe(true)
+      await expect(right(page).getByTestId('mounts')).toHaveText('1')
+    }
+  })
+  await recordAssertion(page, 'workbench-right-toggle-retires-chooser', async () => {
+    await closeTab(page, 'Workbench: Scratchpad')
+    await openRight(page)
+    const chooser = right(page).getByRole('tab', { name: 'New tab', exact: true })
+    const originalId = await chooser.getAttribute('data-tab-panel-id')
+    await toggleRight(page)
+    await expect(right(page)).toBeHidden()
+    await expect(right(page).getByRole('tab', { includeHidden: true })).toHaveCount(0)
+    await toggleRight(page)
+    await expect(chooser).toBeVisible()
+    expect(await chooser.getAttribute('data-tab-panel-id')).not.toBe(originalId)
+    await right(page).getByRole('button', { name: 'Close pane', exact: true }).click()
+    await expect(right(page)).toBeHidden()
+    await expect(right(page).getByRole('tab', { includeHidden: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
 
 Then('closing one of two right tabs keeps the other view and closing the last hides the pane', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-right-last-close-not-chooser-repair', async () => {

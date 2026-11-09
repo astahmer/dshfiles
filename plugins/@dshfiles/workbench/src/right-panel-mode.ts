@@ -19,41 +19,33 @@ export const rightPaneVisibility = createStoredValue({
  */
 export interface RightPaneContents {
   readonly panels: () => readonly WorkbenchPanelIdentity[]
-  /** Close one panel through its owner's own close path. */
+  /** Retire a disposable chooser, preserving live views for reopening. */
   readonly close: (panel: WorkbenchPanelIdentity) => void
 }
 
-/**
- * The right pane's open state, driven by its toggle, its close control and its last-tab rule.
- *
- * A toggle closes the only panel it shows: there is nothing else the user could
- * mean by toggling it closed, and the pane's own last-panel rule then closes the
- * pane. With several panels open the toggle keeps the pane-level hide, so it
- * never closes a view the user did not name.
- */
-export const createDockPaneActions = (visibility: StoredValue<boolean | null, null> = rightPaneVisibility, contents?: RightPaneContents): DockPaneActions => ({
-  isOpen: () => visibility.get() === true,
-  open: () => {
-    visibility.set(true)
-  },
-  close: () => {
+export const createDockPaneActions = (visibility: StoredValue<boolean | null, null>, contents: RightPaneContents): DockPaneActions => {
+  const close = () => {
+    if (visibility.get() === true) {
+      const panels = contents.panels()
+      const only = panels.length === 1 ? panels[0] : undefined
+      if (only !== undefined) contents.close(only)
+    }
     visibility.set(false)
-  },
-  toggle: () => {
-    if (visibility.get() !== true) {
+  }
+  return {
+    isOpen: () => visibility.get() === true,
+    open: () => visibility.set(true),
+    close,
+    toggle: () => {
+      if (visibility.get() === true) {
+        close()
+        return
+      }
       visibility.set(true)
-      return
-    }
-    const open = contents?.panels() ?? []
-    const only = open.length === 1 ? open[0] : undefined
-    if (only !== undefined) {
-      contents?.close(only)
-      return
-    }
-    visibility.set(false)
-  },
-  subscribe: visibility.subscribe,
-})
+    },
+    subscribe: visibility.subscribe,
+  }
+}
 
 /** Migrate once; a deliberate new close must never be overridden by an old `dock` setting. */
 export const migrateDockVisibility = (legacy: 'native' | 'dock' | undefined, visibility: StoredValue<boolean | null, null> = rightPaneVisibility): void => {
