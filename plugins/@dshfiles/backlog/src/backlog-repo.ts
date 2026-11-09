@@ -639,6 +639,12 @@ export class BacklogRepo extends Context.Service<
         ).pipe(Effect.mapError(readFailed)),
         size: countOf('sync_mappings').pipe(Effect.mapError(readFailed)),
         put: (key, mapping) => putMapping(key, mapping).pipe(Effect.asVoid, Effect.mapError(writeFailed('put'))),
+        putMany: entries =>
+          entries.length === 0
+            ? Effect.void
+            : sql
+                .withTransaction(Effect.forEach(entries, ([key, mapping]) => putMapping(key, mapping), { discard: true }))
+                .pipe(Effect.mapError(writeFailed('put-many'))),
         delete: key =>
           Effect.map(
             SqlSchema.findAll({
