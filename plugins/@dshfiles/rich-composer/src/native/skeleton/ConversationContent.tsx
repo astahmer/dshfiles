@@ -76,11 +76,13 @@ export function ConversationContent(props: ConversationContentProps) {
     const scroller = seat?.parentElement ?? null
     if (seat === null || scroller === null) return
     seatObserver.current = new ResizeObserver(() => {
-      scroller.style.setProperty('--dsh-composer-height', `${seat.offsetHeight}px`)
-      scroller.style.setProperty(
-        '--dsh-conversation-viewport-height',
-        `${scroller.clientHeight}px`,
-      )
+      // Both reads before either write: a write between them forces a second layout of the whole conversation.
+      const seatHeight = `${seat.offsetHeight}px`
+      const viewportHeight = `${scroller.clientHeight}px`
+      if (scroller.style.getPropertyValue('--dsh-composer-height') !== seatHeight) scroller.style.setProperty('--dsh-composer-height', seatHeight)
+      if (scroller.style.getPropertyValue('--dsh-conversation-viewport-height') !== viewportHeight) {
+        scroller.style.setProperty('--dsh-conversation-viewport-height', viewportHeight)
+      }
     })
     seatObserver.current.observe(seat)
     seatObserver.current.observe(scroller)
