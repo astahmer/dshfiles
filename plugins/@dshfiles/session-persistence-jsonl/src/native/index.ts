@@ -66,6 +66,12 @@ export type { JsonlCompression } from './format.ts'
  * log, so the memo only needs the sessions in flight between those steps.
  */
 const COLD_LOG_MEMO_MAX_ENTRIES = 2
+/** A cold-read handoff completes within seconds; a forgotten entry stops pinning its decoded events after this. */
+const COLD_LOG_MEMO_TTL_MS = 30_000
+/** Above this on-disk size the decoded log costs hundreds of MB of heap. */
+const COLD_LOG_MEMO_LARGE_FILE_BYTES = 8 * 1024 * 1024
+/** A large log survives one observe→resume handoff only; hits never extend it, so a repeated reader cannot pin it. */
+const COLD_LOG_MEMO_LARGE_TTL_MS = 5_000
 
 const DEFAULT_COMPRESSION: JsonlCompression = 'zstd'
 /**
@@ -74,6 +80,39 @@ const DEFAULT_COMPRESSION: JsonlCompression = 'zstd'
  * remains an indivisible synchronous decode.
  */
 const ZSTD_DECODE_YIELD_INTERVAL_MS = 500
+
+/** Recency-ordered parsed logs with a time to live that only small logs extend on a hit. */
+class ColdLogMemo {
+  private readonly entries = new Map<SessionId, { stored: StoredLog, expiry: NodeJS.Timeout, large: boolean }>()
+
+  get(id: SessionId): StoredLog | undefined {
+    const entry = this.entries.get(id)
+    if (entry === undefined) return undefined
+    if (!entry.large) entry.expiry.refresh()
+    this.entries.delete(id)
+    this.entries.set(id, entry)
+    return entry.stored
+  }
+
+  set(id: SessionId, stored: StoredLog, fileBytes: number): void {
+    this.delete(id)
+    const large = fileBytes > COLD_LOG_MEMO_LARGE_FILE_BYTES
+    const expiry = setTimeout(() => this.entries.delete(id), large ? COLD_LOG_MEMO_LARGE_TTL_MS : COLD_LOG_MEMO_TTL_MS)
+    expiry.unref()
+    this.entries.set(id, { stored, expiry, large })
+    for (const oldest of this.entries.keys()) {
+      if (this.entries.size <= COLD_LOG_MEMO_MAX_ENTRIES) break
+      this.delete(oldest)
+    }
+  }
+
+  delete(id: SessionId): void {
+    const entry = this.entries.get(id)
+    if (entry === undefined) return
+    clearTimeout(entry.expiry)
+    this.entries.delete(id)
+  }
+}
 
 /** Assert that the independently decodable first frame contains only the header record. */
 function assertZstdHeaderFrame(plaintext: Buffer): void {
@@ -313,9 +352,9 @@ class JsonlSessionPersistence extends SessionPersistence {
    * guarded by the stat-derived revision, so an immediate cold-read handoff
    * (observation then resume) parses the artifact once. Every local mutation
    * for an id invalidates its entry; a foreign write misses through the
-   * revision guard.
+   * revision guard. Large logs expire sooner.
    */
-  private readonly coldLogMemo = new Map<SessionId, StoredLog>()
+  private readonly coldLogMemo = new ColdLogMemo()
   /** One joinable decode/migration operation per selected historical Session file revision. */
   private readonly migrationPreparations = new Map<SessionId, MigrationPreparation>()
   /**
@@ -625,11 +664,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     }
     const probe = fileRevision(await stat(selected.sourcePath, { bigint: true }))
     const memoized = this.coldLogMemo.get(id)
-    if (memoized?.status === 'current' && memoized.revision === probe) {
-      this.coldLogMemo.delete(id)
-      this.coldLogMemo.set(id, memoized)
-      return memoized
-    }
+    if (memoized?.status === 'current' && memoized.revision === probe) return memoized
     const current = await readStableJsonlFile(selected.sourcePath, signal)
     return this.decodeStoredLog(
       selected.sourcePath,
@@ -656,8 +691,6 @@ class JsonlSessionPersistence extends SessionPersistence {
         this.coldLogMemo.delete(id)
         throw this.generationFailure(id, selected, error)
       }
-      this.coldLogMemo.delete(id)
-      this.coldLogMemo.set(id, memoized)
       return memoized
     }
     return this.prepareStoredMigration(id, selected, signal)
@@ -748,7 +781,7 @@ class JsonlSessionPersistence extends SessionPersistence {
       revision: fileRevision(prepared.sourceIdentity),
       publication: { source: selected, value: prepared },
     }
-    this.memoizeStoredLog(id, stored)
+    this.coldLogMemo.set(id, stored, Number(prepared.sourceIdentity.size))
     return stored
   }
 
@@ -773,7 +806,7 @@ class JsonlSessionPersistence extends SessionPersistence {
       inheritedEventCount: stored.inheritedEventCount,
       revision: fileRevision(identity),
     }
-    this.memoizeStoredLog(id, published)
+    this.coldLogMemo.set(id, published, Number(identity.size))
     return published
   }
 
@@ -811,11 +844,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     signal?.throwIfAborted()
     const probe = fileRevision(await stat(path, { bigint: true }))
     const memoized = this.coldLogMemo.get(expectedId)
-    if (memoized?.status === 'current' && memoized.revision === probe) {
-      this.coldLogMemo.delete(expectedId)
-      this.coldLogMemo.set(expectedId, memoized)
-      return memoized
-    }
+    if (memoized?.status === 'current' && memoized.revision === probe) return memoized
     const { bytes, identity } = await readStableJsonlFile(path, signal)
     return this.decodeStoredLog(path, expectedId, bytes, fileRevision(identity), signal)
   }
@@ -876,18 +905,8 @@ class JsonlSessionPersistence extends SessionPersistence {
       ...freezeStoredEvents(events),
       revision,
     }
-    this.memoizeStoredLog(expectedId, stored)
+    this.coldLogMemo.set(expectedId, stored, buffer.byteLength)
     return stored
-  }
-
-  /** Insert one parsed log into the bounded handoff cache. */
-  private memoizeStoredLog(id: SessionId, stored: StoredLog): void {
-    this.coldLogMemo.delete(id)
-    this.coldLogMemo.set(id, stored)
-    for (const oldest of this.coldLogMemo.keys()) {
-      if (this.coldLogMemo.size <= COLD_LOG_MEMO_MAX_ENTRIES) break
-      this.coldLogMemo.delete(oldest)
-    }
   }
 
   /**
