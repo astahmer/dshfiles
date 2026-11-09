@@ -3488,7 +3488,7 @@
     {
       "id": "subagent-live-preview",
       "title": "Live subagent preview in the transcript and above the composer",
-      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation.",
+      "summary": "A delegation's row in the transcript is named after what the child does (the call's description or label, else its prompt's first line, clipped) and reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
@@ -3543,6 +3543,12 @@
           "id": "thread-sidebar.subagent-dock-working",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
           "testName": "lists working children only, and clears as they go idle"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-row-label",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-label.test.ts",
+          "testName": "falls back to a label, then to the first non-empty prompt line"
         }
       ],
       "telemetry": [

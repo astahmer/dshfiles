@@ -6,6 +6,10 @@
 
 ![Choose how widely Chat image previews can browse](docs/screenshots/image-gallery-scope.png)
 
+![Quote a message into the composer](docs/screenshots/quote-message.png)
+
+![Fold consecutive subagent rows into one block](docs/screenshots/subagent-runs.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.
@@ -36,7 +40,7 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/host.ts`                                   | exposes the gallery scope as a volatile setting that the client can read and update immediately                                                                                                                                                                                                                                                                                                                                                                  |
 | `src/native/apply.ts`                           | `apply` takes the dshx client decorator and hands it to the node-renderer registration, so a native node view can sit in this plugin's own client tree; it also wires the live image-gallery scope into Chat and its General settings row                                                                                                                                                                                                                        |
 | `src/native/chat/register-node-renderers.ts`    | applies that decorator to the `turn-error` node renderer only: the inline **Resume** button reads the interruption API through the plugin's API context, and the renderer declares the `conversation.chat.turnErrorAction` child seat                                                                                                                                                                                                                            |
-| `src/native/chat/MessageItem.tsx`               | `TurnErrorItem` renders the `action` node it is handed, which is where that **Resume** lands, plus the `extraActions` that seat contributes beside it                                                                                                                                                                                                                                                                                                            |
+| `src/native/chat/MessageItem.tsx`               | `TurnErrorItem` renders the `action` node it is handed, which is where that **Resume** lands, plus the `extraActions` that seat contributes beside it, all in one wrapping actions row under the message; the error code is a badge in its own grid cell that drops under the message below 28rem                                                                                                                                                                |
 | `src/native/contract/slots.ts`                  | declares `conversation.chat.turnErrorAction` through its own contract module, so a feature plugin can fill it without importing the whole Chat contract; exposes the live gallery-scope hook to Chat views                                                                                                                                                                                                                                                       |
 | `src/turn-error-action.ts`                      | new: the published `@dshfiles/chat/turn-error-action` contract — the seat's owner props and its `SlotMap` entry                                                                                                                                                                                                                                                                                                                                                  |
 | `src/native/chat/UserContent.tsx`               | hands every image position of one user message the whole message gallery, so the attachment row and the inline `[Image N]` references open one preview instead of one per image                                                                                                                                                                                                                                                                                  |
@@ -74,6 +78,29 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/code-fences.tsx`, `src/code-fence-transform.tsx`, `src/fenced-markdown.tsx`, `src/report-once.ts` | new: the published `@dshfiles/chat/code-fences` registry, the transform `InlineReferenceMarkdown` applies, the published `@dshfiles/chat/fenced-markdown` renderer (below), and the log-once reporter both registries use |
 | `src/native/chat/ReasoningContent.tsx`, `CompactionItem.tsx` | reasoning and the compaction summary render through `FencedMarkdown`, so a claimed fence renders there too |
 | `src/native/chat/AssistantMarkdown.tsx` (also), `UserContent.tsx`, `ChatView.tsx` (also) | text blocks render through `InlineReferenceMarkdown`, the Referenced-session line through `InlineReferenceText`, and the transcript sits in an `InlineReferenceScope` naming its Session |
+| `src/native/chat/MessageIconActions.tsx` (also), `MessageItem.tsx` (also), `TurnTailNodeView.tsx` (also), `src/native/locale.ts` (also) | a **Quote in composer** action beside Copy on durable user messages and completed assistant replies (below) |
+| `src/message-quote.ts` | new: the quote text (one `> ` per line, blank lines kept as `>`, an existing `>` nested one level), its source line and the selection scope of one message |
+| `src/native/chat/ChatGroupSeat.tsx` (also), `ChatGroupSeat.module.css`, `ChatFlow.tsx`, `src/native/locale.ts` (also) | two or more consecutive subagent rows in a process group sit under one count header (below); the flow hands the group `useSessionStatus` for the children's running state |
+| `src/native/chat/subagent-runs.ts` | new: which members are delegations (`subagent`, `subagent_*`), their child Session from `started subagent <id>`, the run segmentation and the working count |
+
+### Quote a message into the composer
+
+**Quote in composer** inserts the message at the composer caret as a Markdown blockquote, followed by a source line
+(`— Assistant · turn 3 · 14:05`) and an empty line for the reply, then focuses the composer. A selection inside that
+message (read on pointer-down, so a tap does not collapse it first) quotes only the selected text; a selection that
+reaches outside it quotes the whole message. Nothing is sent: the quote is ordinary draft text, editable and persisted
+like any draft. The write goes through the dshx `Composer` contract, so Chat imports nothing from Rich Composer and the
+action hides while no composer provides it. It has no agent tool: it only edits the user's own unsent draft, which
+AGENTS.md treats as presentation-only state; an agent that wants to quote writes the text in its own reply.
+
+### Subagent rows fold into one block
+
+Two or more consecutive subagent rows in one process group sit under one header, like the composer's queue dock:
+`3 subagents · 1 working` with the process chevron. The block is open by default while any delegation works (its call
+has not returned, or its child Session runs a turn) and folds once all have finished; the reader's own toggle wins from
+then on, and a focus request for a folded row (`chat-focus`) reveals it. A lone subagent row stays a plain row. The
+rows themselves, and the label each one shows, belong to thread-sidebar's subagent tool row. Open state is
+presentation-only, so the block has no agent tool.
 
 ### Focus a Turn, Step or tool call from another plugin
 

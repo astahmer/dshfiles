@@ -340,9 +340,62 @@
 @container (max-width: 560px) {
   .tools,
   .modes,
-  .trailing {
+  .trailing,
+  .standardControls {
     gap: 8px;
   }
+}
+
+/* Second collapse step (control-row-layout.ts): the expanded groups did not fit
+   one line, so the gaps between the 28px icon controls tighten before anything
+   wraps. Their hit areas are the controls themselves, so the gap is spacing
+   only. Enough for a ~420px split pane to keep every control on one line. */
+.row[data-model-compact] {
+  column-gap: 8px;
+}
+
+.row[data-model-compact] .tools,
+.row[data-model-compact] .modes,
+.row[data-model-compact] .trailing,
+.row[data-model-compact] .standardControls {
+  gap: 4px;
+}
+
+/* Last step, when even the compact groups overflow (phones): flatten the
+   groups and split the bar into two predictable lines instead of letting the
+   whole trailing group drop under a lone left group. Line 1 holds every icon
+   control (wrapping further only if it must); a full-basis break item ordered
+   between them sends the model and send (and stop) to line 2, together at the
+   trailing edge. Hidden groups keep display: none. */
+.row[data-controls-wrap] {
+  /* The break item is its own zero-height line, so two gaps sit between the
+     visible lines. */
+  row-gap: 4px;
+  justify-content: flex-start;
+}
+
+.row[data-controls-wrap]::after {
+  content: '';
+  order: 1;
+  flex-basis: 100%;
+  height: 0;
+}
+
+.row[data-controls-wrap] .tools:not([hidden]),
+.row[data-controls-wrap] .trailing:not(.trailingActive),
+.row[data-controls-wrap] .standardControls:not([hidden]) {
+  display: contents;
+}
+
+.row[data-controls-wrap] .modelSeat,
+.row[data-controls-wrap] .activity,
+.row[data-controls-wrap] .primary {
+  order: 2;
+}
+
+.row[data-controls-wrap] .modelSeat,
+.row[data-controls-wrap]:not(:has(.modelSeat)) .primary:first-of-type {
+  margin-left: auto;
 }
 
 /* Attach circle (figma + control): 28px, selector fill, primary glyph. */

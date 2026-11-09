@@ -136,16 +136,22 @@ function TurnErrorItem({ node, t, action, extraActions }: {
   extraActions?: ReactNode
   t: ChatViewSlotProps['t']
 }) {
+  // Fixed cells: dot, copy, code badge; every action (seat additions, then Resume) shares one wrapping row under the
+  // copy column. Loose children used to spill into the 10px dot column of the next grid row and clip the code badge.
   return (
-    <div className={css.turnErrorRow} role="status">
-      <StateDot state="error" className={css.turnErrorDot} />
-      <div className={css.turnErrorCopy}>
-        <span className={css.turnErrorTitle}>{node.code === 'ACCOUNT_SIGNED_OUT' || node.code === 'INTERRUPTED' ? t('message.taskStopped') : t('message.turnError')}</span>
-        <span className={css.turnErrorMessage}>{failureMessage(node.message, node.code, t)}</span>
+    <div className={css.turnErrorFrame}>
+      <div className={css.turnErrorRow} role="status">
+        <StateDot state="error" className={css.turnErrorDot} />
+        <div className={css.turnErrorCopy}>
+          <span className={css.turnErrorTitle}>{node.code === 'ACCOUNT_SIGNED_OUT' || node.code === 'INTERRUPTED' ? t('message.taskStopped') : t('message.turnError')}</span>
+          <span className={css.turnErrorMessage}>{failureMessage(node.message, node.code, t)}</span>
+        </div>
+        {node.code !== undefined && node.code !== 'INTERRUPTED' && <code className={css.turnErrorCode}>{node.code}</code>}
+        <div className={css.turnErrorActions}>
+          {extraActions}
+          {action}
+        </div>
       </div>
-      {extraActions}
-      {action}
-      {node.code !== undefined && node.code !== 'INTERRUPTED' && <code className={css.turnErrorCode}>{node.code}</code>}
     </div>
   )
 }
@@ -156,13 +162,15 @@ function TurnMaxTokensItem({ t, action }: {
   t: ChatViewSlotProps['t']
 }) {
   return (
-    <div className={css.turnErrorRow} role="status">
-      <StateDot state="warning" className={css.turnErrorDot} />
-      <div className={css.turnErrorCopy}>
-        <span className={css.maxTokensTitle}>{t('message.maxTokens')}</span>
-        <span className={css.turnErrorMessage}>{t('message.maxTokens.hint')}</span>
+    <div className={css.turnErrorFrame}>
+      <div className={css.turnErrorRow} role="status">
+        <StateDot state="warning" className={css.turnErrorDot} />
+        <div className={css.turnErrorCopy}>
+          <span className={css.maxTokensTitle}>{t('message.maxTokens')}</span>
+          <span className={css.turnErrorMessage}>{t('message.maxTokens.hint')}</span>
+        </div>
+        <div className={css.turnErrorActions}>{action}</div>
       </div>
-      {action}
     </div>
   )
 }
@@ -320,6 +328,10 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
           time={data.time}
           clock="start"
           className={css.actions}
+          quote={{
+            author: 'user',
+            turn: node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn.turn : undefined,
+          }}
           t={t}
         />
       )}

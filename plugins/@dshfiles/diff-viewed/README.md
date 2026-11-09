@@ -9,7 +9,10 @@ It hooks the `deliverables.review.file.actions` list slot that
 slot hands its entries an `actionUrl` carrying the Session, the announcing
 `workspace/changes` sequence and the file's summary index; the toggle reads the
 same `api/changes.summary` route the review tab reads to learn the file's path
-and the turn's file count.
+and the turn's file count. It reads each turn's summary once per page (it never
+changes) and takes a 404 as "no summary": the Host keeps summaries only while
+the Session's change recorder is loaded, and re-asking after a Host restart or an
+unloaded Session would only add a failed request to the browser console.
 
 A mark is keyed on Session, sequence and path. A turn's summary never changes
 while its Session lives, so a mark cannot outlive the diff it reviewed: a later

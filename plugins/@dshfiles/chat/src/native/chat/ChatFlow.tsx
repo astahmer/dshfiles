@@ -13,7 +13,7 @@ export const ChatFlow = memo(function ChatFlow({
   entries, pendingInputs, lastInputTurn, deferCollapse,
   useSession, useChat, useChatNode, useChatNodeBottom, useChatNodeProcess, useChatGroup, usePresentation,
   useStore, actions, renderSlot, renderFactorySlot, t, useGroupAction, useGroupHeaderAction,
-  cwd, openFile, inspectCall, forkAt, loadImage, useProjection, fileMentions,
+  cwd, openFile, inspectCall, forkAt, loadImage, useProjection, fileMentions, useSessionStatus,
 }: ChatFlowSlotProps) {
   const nodeStore = useChat(snapshot => snapshot.nodes)
   const running = useSession(snapshot => snapshot.running)
@@ -36,7 +36,7 @@ export const ChatFlow = memo(function ChatFlow({
           {...entry.groupPart === undefined ? {} : { groupPart: entry.groupPart }} />
       case 'group':
         return <ChatGroupSeat {...seatProps} key={chatRenderKey(entry)} groupKey={entry.key}
-          useChatGroup={useChatGroup} useGroupHeaderAction={useGroupHeaderAction} />
+          useChatGroup={useChatGroup} useGroupHeaderAction={useGroupHeaderAction} useSessionStatus={useSessionStatus} />
       default:
         return assertNever(entry)
     }

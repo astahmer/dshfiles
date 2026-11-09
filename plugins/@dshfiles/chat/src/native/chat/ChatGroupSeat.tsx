@@ -1,5 +1,9 @@
 /** Stable process container; display policy changes visibility, never member parents. */
-import { memo, useCallback, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import {
+  memo, useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode,
+} from 'react'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { UseSessionStatus } from '@deepseek-ai/dsh-client-ui-session/client'
 import {
   IconAgentPresetOutlineRegular, IconApiOutlineRegular, IconBrowseOutlineRegular, IconChevronDownOutlineRegular,
   IconChevronUpOutlineRegular, IconCodeOutlineRegular, IconEditOutlineRegular, IconGlobeOutlineRegular,
@@ -17,10 +21,15 @@ import { chatRenderKey } from './render-entry.ts'
 import { processTitle } from './step-process.ts'
 import { useDisclosure } from './use-disclosure.ts'
 import { useProcessScroll } from './use-process-scroll.ts'
+import {
+  decodeSubagentSignature, encodeSubagentSignature, segmentSubagentRuns, subagentCallOf, workingSubagents,
+  type SubagentCall,
+} from './subagent-runs.ts'
 import css from './ChatGroupSeat.module.css'
 
 type SeatProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey' | 'groupPart'>
 type ChatGroupSeatProps = SeatProps & {
+  readonly useSessionStatus: UseSessionStatus
   readonly groupKey: GroupKey
   readonly useChatGroup: ChatFlowSlotProps['useChatGroup']
   readonly useGroupHeaderAction: ChatFlowSlotProps['useGroupHeaderAction']
@@ -82,11 +91,73 @@ function useStableLiveProcessTitle(desired: LiveProcessTitle, active: boolean): 
 }
 
 
-const GroupMembers = memo(function GroupMembers({ members, ...props }: SeatProps & {
+const memberSeat = (props: SeatProps, member: NodeReference): ReactNode => (
+  <ChatNodeSeat {...props} key={chatRenderKey(member)} nodeKey={member.key}
+    {...member.groupPart === undefined ? {} : { groupPart: member.groupPart }} />
+)
+
+/** dshfiles: one primitive per member list, so a live tool chunk re-renders the list only when a delegation changes. */
+function useSubagentCalls(nodeStore: SeatProps['nodeStore'], members: readonly NodeReference[]): readonly (SubagentCall | undefined)[] {
+  const subscribe = useCallback((listener: () => void) => {
+    const stops = members.map(member => nodeStore.source(member.key).subscribe(listener))
+    return () => { for (const stop of stops) stop() }
+  }, [nodeStore, members])
+  const read = useCallback(() => encodeSubagentSignature(
+    members.map(member => member.groupPart === undefined ? subagentCallOf(nodeStore.get(member.key)) : undefined),
+  ), [nodeStore, members])
+  const signature = useSyncExternalStore(subscribe, read, read)
+  return decodeSubagentSignature(signature)
+}
+
+/**
+ * dshfiles: consecutive subagent rows fold into one block, like the queue dock's count header.
+ * Open by default while any delegation works and folded once all have finished; the reader's own
+ * toggle wins from then on. Presentation-only, so no agent tool.
+ */
+const SubagentRun = memo(function SubagentRun({ members, calls, useSessionStatus, ...props }: SeatProps & {
   readonly members: readonly NodeReference[]
+  readonly calls: readonly SubagentCall[]
+  readonly useSessionStatus: UseSessionStatus
 }) {
-  return members.map(member => <ChatNodeSeat {...props} key={chatRenderKey(member)} nodeKey={member.key}
-    {...member.groupPart === undefined ? {} : { groupPart: member.groupPart }} />)
+  const working = useSessionStatus(statuses => workingSubagents(calls, id => statuses.get(SessionId(id))?.running === true))
+  const [choice, setChoice] = useState<boolean | undefined>(undefined)
+  const open = choice ?? working > 0
+  const bodyId = useId()
+  const reveal = useCallback(() => { setChoice(true) }, [])
+  // A focus request for a folded row (chat-focus) reveals the block like any other group body.
+  const bodyRef = props.useGroupAction(!open, reveal)
+  const count = props.t(`message.turnProcess.subagents.${calls.length === 1 ? 'one' : 'other'}`, { count: calls.length })
+  const title = working === 0 ? count
+    : `${count}${props.t('message.turnProcess.separator')}${props.t('message.subagentRun.working', { count: working })}`
+  return (
+    <div className={css.root} data-subagent-run={calls.length} data-subagent-run-working={working}>
+      <button type="button" className={css.title} aria-expanded={open} aria-controls={bodyId}
+        data-process-activity="subagents" onClick={() => { setChoice(!open) }}>
+        <span className={css.leading} aria-hidden="true">
+          <span className={css.activityIcon}>{PROCESS_ICONS.subagents}</span>
+          <span className={css.chevron}>{open ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}</span>
+        </span>
+        <TextShimmer active={working > 0}>
+          <TextShimmer className={css.label}>{title}</TextShimmer>
+        </TextShimmer>
+      </button>
+      <div ref={bodyRef} id={bodyId} className={`${css.content} ${css.runBody}`} data-chat-flow="">
+        {members.map(member => memberSeat(props, member))}
+      </div>
+    </div>
+  )
+})
+
+/** Exported for the run-block render test; ChatGroupSeat is its only production caller. */
+export const GroupMembers = memo(function GroupMembers({ members, useSessionStatus, ...props }: SeatProps & {
+  readonly members: readonly NodeReference[]
+  readonly useSessionStatus: UseSessionStatus
+}) {
+  const calls = useSubagentCalls(props.nodeStore, members)
+  return segmentSubagentRuns(members, calls).map(segment => segment.kind === 'member'
+    ? memberSeat(props, segment.member)
+    : <SubagentRun {...props} key={`subagents:${chatRenderKey(segment.members[0] as NodeReference)}`}
+      members={segment.members} calls={segment.calls} useSessionStatus={useSessionStatus} />)
 })
 
 const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatGroup, usePresentation, t, open, bodyId, toggle }: {
@@ -129,7 +200,7 @@ const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatG
 })
 
 /** Render a process group with local disclosure and the existing outer-Turn visibility. */
-export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGroup, useGroupHeaderAction, ...props }: ChatGroupSeatProps) {
+export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGroup, useGroupHeaderAction, useSessionStatus, ...props }: ChatGroupSeatProps) {
   const members = useChatGroup(groupKey, group => group?.members)
   const turn = useChatGroup(groupKey, group => group?.data.turn)
   const closed = useChatGroup(groupKey, group => group?.data.closed)
@@ -198,7 +269,7 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
         data-scroll-up={edges.canScrollUp || undefined} data-scroll-down={edges.canScrollDown || undefined}
         {...events}>
         <div ref={contentRef} className={css.content} data-step-process-content data-chat-flow="">
-          {membersMounted && <GroupMembers {...props} members={members} />}
+          {membersMounted && <GroupMembers {...props} members={members} useSessionStatus={useSessionStatus} />}
         </div>
       </div>
     </div>

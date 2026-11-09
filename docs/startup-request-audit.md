@@ -150,6 +150,12 @@ just the slow polls above. Cadences observed:
 5. **`changes.summary` 7 × 404.** `@dshfiles/diff-viewed` asks `api/changes.summary` (a native route this Host
    does not serve) once per rendered turn action, and gets 404 every time. Small bytes, but it is a failed request
    per turn on every page load.
+   **Re-read 2026-11-09 (B10):** the route is served (`dsh-client-ui-deliverables` `handleChangesSummary`); it
+   answers 404 once the Host no longer holds that Session's in-memory change recorder, which a fresh start always
+   is. The per-turn loads on page load come from the native turn card (`Deliverables` loads every announced
+   turn's summary on mount), not from diff-viewed: its toggle only renders inside the review tab after the
+   native read succeeded. diff-viewed now reads a summary once per page and keeps a 404 as "no summary" instead of
+   re-asking on each file switch. The native per-turn 404 after a restart remains, owned by stock core.
 6. **`multi-host/sessionRuntime` 6 × (2 per Session), `session-undo/history` 6 ×.** Both are tiny payloads; the
    duplication is mount-time, not a growth pattern. Worth a `staleTime`, not a work package on its own.
 7. **Queueing, not server time.** 38 concurrent requests against a six-connection HTTP/1.1 origin turned a 1 ms

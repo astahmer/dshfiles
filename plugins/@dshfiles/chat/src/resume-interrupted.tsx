@@ -49,8 +49,8 @@ export const ResumeInterruptedAction = (
     ? { idle: 'Retry', pending: 'Retrying…', failed: 'Could not retry. Try again.' }
     : { idle: 'Resume', pending: 'Resuming…', failed: 'Could not resume. Try again.' }
   return (
-    <span className="dshx-root dshx:flex dshx:flex-col dshx:gap-1">
-      <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate()}>
+    <span className="dshx-root dshx:flex dshx:flex-col dshx:items-start dshx:gap-1">
+      <Button size="xs" disabled={resume.isPending} onClick={() => resume.mutate()}>
         {resume.isPending ? label.pending : label.idle}
       </Button>
       {resume.isError && (
