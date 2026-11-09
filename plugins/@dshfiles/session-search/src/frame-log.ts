@@ -4,7 +4,8 @@
  * what the log gained. That resume property is what makes incremental ingest possible; a one-shot decoder stops at the
  * first frame (measured: 208 bytes for a 26 MB log) and must not be used here.
  */
-import { open, readdir, stat } from 'node:fs/promises'
+import { readdirSync, statSync, type Dirent } from 'node:fs'
+import { open, readdir } from 'node:fs/promises'
 import { zstdDecompressSync } from 'node:zlib'
 import { decodeJson } from '@dshfiles/dshx/json'
 import { sessionHeaderSchema, type SessionHeaderRow } from './protocol.js'
@@ -147,24 +148,24 @@ export class FrameLog {
 
   /** The log generation the persistence backend reads for a session directory: the highest `session[.vN].jsonl[.zstd]`. */
   static async currentLog(sessionDirectory: string): Promise<string | undefined> {
-    let best: { readonly path: string; readonly version: number } | undefined
-    for (const name of await readdir(sessionDirectory).catch(() => [])) {
-      const match = LOG_NAME.exec(name)
-      if (match === null) continue
-      const version = Number(match[1] ?? 0)
-      if (best === undefined || version > best.version) best = { path: `${sessionDirectory}/${name}`, version }
-    }
-    return best?.path
+    return FrameLog.#bestLog(sessionDirectory, await readdir(sessionDirectory).catch(() => []))
   }
 
-  /** Walk `root/<project>/<session>/<current log>`; the shape the JSONL persistence store writes. */
+  /**
+   * Walk `root/<project>/<session>/<current log>`; the shape the JSONL persistence store writes.
+   *
+   * Synchronous on purpose: only the search worker calls it, and the walk repeats on every ingest pass for the life of
+   * the Host. On 2,800 Sessions the promise version spent 294 ms of CPU (366 ms wall) per idle pass on thread-pool
+   * round trips; the same walk with sync calls costs 50 ms CPU and 24 ms wall, which is also the longest a search
+   * waits behind it.
+   */
   static async list(root: string): Promise<readonly SessionLogFile[]> {
     const logs: SessionLogFile[] = []
-    for (const project of await FrameLog.#directories(root)) {
-      for (const sessionDirectory of await FrameLog.#directories(project)) {
-        const path = await FrameLog.currentLog(sessionDirectory)
+    for (const project of FrameLog.#directories(root)) {
+      for (const sessionDirectory of FrameLog.#directories(project)) {
+        const path = FrameLog.#currentLogSync(sessionDirectory)
         if (path === undefined) continue
-        const info = await stat(path, { bigint: true }).catch(() => undefined)
+        const info = statSync(path, { bigint: true, throwIfNoEntry: false })
         if (info === undefined) continue
         const name = sessionDirectory.slice(sessionDirectory.lastIndexOf('/') + 1)
         logs.push({
@@ -181,8 +182,35 @@ export class FrameLog {
     return logs
   }
 
-  static async #directories(path: string): Promise<readonly string[]> {
-    const entries = await readdir(path, { withFileTypes: true }).catch(() => [])
-    return entries.filter(entry => entry.isDirectory()).map(entry => `${path}/${entry.name}`)
+  static #currentLogSync(sessionDirectory: string): string | undefined {
+    return FrameLog.#bestLog(
+      sessionDirectory,
+      FrameLog.#entries(sessionDirectory).map(entry => entry.name),
+    )
+  }
+
+  static #bestLog(sessionDirectory: string, names: readonly string[]): string | undefined {
+    let best: { readonly path: string; readonly version: number } | undefined
+    for (const name of names) {
+      const match = LOG_NAME.exec(name)
+      if (match === null) continue
+      const version = Number(match[1] ?? 0)
+      if (best === undefined || version > best.version) best = { path: `${sessionDirectory}/${name}`, version }
+    }
+    return best?.path
+  }
+
+  static #entries(path: string): readonly Dirent[] {
+    try {
+      return readdirSync(path, { withFileTypes: true })
+    } catch {
+      return []
+    }
+  }
+
+  static #directories(path: string): readonly string[] {
+    return FrameLog.#entries(path)
+      .filter(entry => entry.isDirectory())
+      .map(entry => `${path}/${entry.name}`)
   }
 }

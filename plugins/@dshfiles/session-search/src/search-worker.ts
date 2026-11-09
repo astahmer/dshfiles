@@ -13,10 +13,11 @@ import { Clock, Duration, Effect, FiberHandle, Layer, Queue, Ref, Schema } from 
 import { RpcServer } from 'effect/rpc'
 
 import { SearchIndex } from './index-db.js'
-import { indexSessions, runIngestPass } from './ingest.js'
+import { IdleBackoff, indexSessions, runIngestPass } from './ingest.js'
+
+const IDLE_SLEEP = IdleBackoff.first
 import { SearchWorkerFailed, SearchWorkerRpcs, workerConfigSchema, type IndexHealth } from './protocol.js'
 
-const IDLE_SLEEP = Duration.seconds(5)
 const BUSY_SLEEP = Duration.millis(50)
 const BACKFILL_ROWIDS = 2_000
 
@@ -83,7 +84,9 @@ const Handlers = SearchWorkerRpcs.toLayer(
       }),
     )
 
-    const pause = (duration: Duration.Duration) => Effect.raceFirst(Effect.sleep(duration), Effect.asVoid(Queue.take(wake)))
+    // True when a wake ended the pause, false when the time ran out.
+    const pause = (duration: Duration.Duration) => Effect.raceFirst(Effect.as(Effect.sleep(duration), false), Effect.as(Queue.take(wake), true))
+    let idlePasses = 0
 
     const pass = (root: string) =>
       Effect.gen(function* () {
@@ -127,7 +130,9 @@ const Handlers = SearchWorkerRpcs.toLayer(
       Effect.gen(function* () {
         const root = (yield* Ref.get(progress)).root
         if (root === undefined) return yield* Effect.asVoid(Queue.take(wake))
-        yield* pause(yield* pass(root))
+        const next = yield* pass(root)
+        idlePasses = next === IDLE_SLEEP ? idlePasses + 1 : 0
+        if (yield* pause(next === IDLE_SLEEP ? IdleBackoff.after(idlePasses) : next)) idlePasses = 0
       }),
     )
 
