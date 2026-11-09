@@ -317,7 +317,7 @@ export class ReviewWorkspace extends Context.Service<
           const patch = batchedPatch !== undefined && batchedPatch.length <= budget ? batchedPatch : undefined
           const read = yield* readRevision({ path: input.path, revision, budget, ...(patch === undefined ? undefined : { patch }) })
           const placement = placed.get(revision.commitId)
-          revisions.push(placement === undefined ? read : { ...read, links: placement.links, base: placement.base })
+          revisions.push(placement === undefined ? read : { ...read, links: placement.links, base: placement.base, unplaced: placement.unplaced })
           budget -= read.patch.length
         }
         return {

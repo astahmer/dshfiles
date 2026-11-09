@@ -417,7 +417,7 @@
       "states": ["loading", "stack", "gaps", "partly-unresolved", "none-resolved", "truncated", "viewed", "failed", "page"],
       "failureModes": [
         "A selection with gaps says that revisions between them are not part of the review, and counts them on the graph.",
-        "A selection whose history between revisions is too long for one bounded read links direct parents only and says the gaps were not counted.",
+        "A selection whose history between revisions is too long for one bounded read links direct parents only, ends other edges in an open stub reading Earlier history not counted, and says to select fewer or closer revisions.",
         "A revision that is gone or divergent is named and left out, and the rest is still reviewed; a divergent row is selected from the graph by its commit.",
         "A review too large for one read flags which revisions are partial and says to select fewer.",
         "A git-only repository is refused with the reason instead of an empty review."

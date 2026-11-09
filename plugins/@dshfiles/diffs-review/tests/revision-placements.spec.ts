@@ -20,8 +20,8 @@ describe('revision placements', () => {
       ],
       history,
     )
-    expect(placed.get('d')).toEqual({ links: [{ commitId: 'a', hidden: 2 }], base: [] })
-    expect(placed.get('a')).toEqual({ links: [], base: [{ commitId: 'main', shortChangeId: 's-main', bookmarks: ['main'] }] })
+    expect(placed.get('d')).toEqual({ links: [{ commitId: 'a', hidden: 2 }], base: [], unplaced: [] })
+    expect(placed.get('a')).toEqual({ links: [], base: [{ commitId: 'main', shortChangeId: 's-main', bookmarks: ['main'] }], unplaced: [] })
   })
 
   it('stops at the nearest selected revision, so a stack links each to the one below', () => {
@@ -45,7 +45,19 @@ describe('revision placements', () => {
       ],
       [node('a', ['main']), node('x', ['main']), node('main', ['root'], ['main'])],
     )
-    expect(placed.get('x')).toEqual({ links: [], base: [{ commitId: 'main', shortChangeId: 's-main', bookmarks: ['main'] }] })
+    expect(placed.get('x')).toEqual({ links: [], base: [{ commitId: 'main', shortChangeId: 's-main', bookmarks: ['main'] }], unplaced: [] })
+  })
+
+  it('does not name the outside parent of a merge inside a gap as a base', () => {
+    // main ← a ← m ← d, where m also merges y from another branch; only a and d are reviewed.
+    const placed = RevisionReviewModel.placements(
+      [
+        { commitId: 'a', parents: ['main'] },
+        { commitId: 'd', parents: ['m'] },
+      ],
+      [node('d', ['m']), node('m', ['a', 'y']), node('a', ['main']), node('main', ['root'], ['main'])],
+    )
+    expect(placed.get('d')).toEqual({ links: [{ commitId: 'a', hidden: 1 }], base: [], unplaced: [] })
   })
 
   it('keeps a merge linked to both selected parents', () => {
@@ -63,7 +75,7 @@ describe('revision placements', () => {
     ])
   })
 
-  it('without a graph read links direct parents only and names the rest by commit', () => {
+  it('without a graph read links direct parents only and leaves the rest unplaced rather than call it a base', () => {
     const placed = RevisionReviewModel.placements(
       [
         { commitId: 'a', parents: ['main'] },
@@ -73,7 +85,8 @@ describe('revision placements', () => {
       undefined,
     )
     expect(placed.get('b')?.links).toEqual([{ commitId: 'a', hidden: 0 }])
-    expect(placed.get('d')).toEqual({ links: [], base: [{ commitId: 'c', shortChangeId: 'c', bookmarks: [] }] })
+    expect(placed.get('d')).toEqual({ links: [], base: [], unplaced: ['c'] })
+    expect(placed.get('a')).toEqual({ links: [], base: [], unplaced: ['main'] })
   })
 
   it('refuses a graph read that hit the limit', () => {

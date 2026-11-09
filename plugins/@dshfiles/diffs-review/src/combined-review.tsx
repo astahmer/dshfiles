@@ -109,7 +109,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
   const allViewed = allFiles.length > 0 && viewedCount === allFiles.length
   const show = (revision: RevisionReview, focusPath: string | null = null): void => setChosen({ commitId: revision.commitId, focusPath })
   /** The graph lists newest first, so j and ArrowDown go to the older revision, as in the Jujutsu panel. */
-  const step = (event: KeyboardEvent<HTMLOListElement>): void => {
+  const moveByKey = (event: KeyboardEvent<HTMLOListElement>): void => {
     const delta = event.key === 'j' || event.key === 'ArrowDown' ? -1 : event.key === 'k' || event.key === 'ArrowUp' ? 1 : 0
     if (delta === 0 || event.altKey || event.ctrlKey || event.metaKey) return
     const target = revisions[currentIndex + delta]
@@ -148,7 +148,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
       {result.segments > 1 ? (
         <p className={HINT} role="status">
           {result.graphComplete === false
-            ? 'These revisions are not adjacent, so each one is shown as its own change. The history between them is too long to count here.'
+            ? 'These revisions are not adjacent, so each one is shown as its own change. The history between them is too long to count here; select fewer or closer revisions to see the gaps.'
             : 'These revisions are not adjacent, so each one is shown as its own change. Dashed lines mark revisions between them that are not in this review.'}
         </p>
       ) : null}
@@ -175,7 +175,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
         aria-label="Reviewed revisions"
         className="dshx:flex dshx:flex-col dshx:rounded-md dshx:border dshx:border-border dshx:py-0.5"
         data-testid="combined-graph"
-        onKeyDown={step}
+        onKeyDown={moveByKey}
       >
         {graph.map(entry =>
           entry.kind === 'base' ? (
@@ -231,6 +231,13 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
                   </p>
                 </LaneFiller>
               )}
+              {entry.uncountedBelow ? (
+                <LaneFiller lanes={entry.layout.bottomLanes} width={graphWidth}>
+                  <p className="dshx:py-0.5 dshx:text-[11px] dshx:text-muted-foreground dshx:italic" data-testid="combined-uncounted">
+                    Earlier history not counted; select fewer or closer revisions to see it
+                  </p>
+                </LaneFiller>
+              ) : null}
             </li>
           ),
         )}
@@ -372,15 +379,16 @@ const RevisionRow = (props: {
 /** A parent the selection sits on outside the review: context only, named by its bookmark when it has one. */
 const BaseRow = (props: { readonly entry: Extract<ReviewGraphEntry, { kind: 'base' }>; readonly width: number }): JSX.Element => {
   const { base, node, layout } = props.entry
+  const label = ReviewGraphModel.isRoot(base) ? 'root()' : base.shortChangeId
   return (
     <li
-      aria-label={`Base ${base.bookmarks[0] ?? (ReviewGraphModel.isRoot(base) ? 'root()' : base.shortChangeId)}, not in this review`}
+      aria-label={`Base ${base.bookmarks[0] ?? label}, not in this review`}
       className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:pr-2 dshx:text-xs dshx:text-muted-foreground"
       data-testid="combined-base"
       style={{ height: METRICS.rowHeight }}
     >
       <RevisionGraphCell height={METRICS.rowHeight} layout={layout} metrics={METRICS} revision={node} width={props.width} />
-      <code className="dshx:shrink-0 dshx:font-mono! dshx:text-[11px]">{ReviewGraphModel.isRoot(base) ? 'root()' : base.shortChangeId}</code>
+      <code className="dshx:shrink-0 dshx:font-mono! dshx:text-[11px]">{label}</code>
       {base.bookmarks.slice(0, 2).map(bookmark => (
         <span className={cn(CHIP, 'dshx:max-w-24 dshx:truncate dshx:bg-muted dshx:text-muted-foreground')} key={bookmark}>
           {bookmark}

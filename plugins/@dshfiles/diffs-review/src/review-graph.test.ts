@@ -39,6 +39,13 @@ describe('review graph', () => {
     expect(rows.every(row => row.layout.outgoing.length === 0)).toBe(true)
   })
 
+  it('ends an unplaced parent in an open stub instead of a base row', () => {
+    const rows = ReviewGraphModel.entries([revision('a', { links: [], base: [], unplaced: ['p'] }), revision('d', { links: [], base: [], unplaced: ['c'] })])
+    expect(rows.map(row => row.kind)).toEqual(['revision', 'revision'])
+    expect(rows.every(row => row.kind === 'revision' && row.uncountedBelow)).toBe(true)
+    expect(rows.every(row => row.layout.outgoing.some(link => link.terminal))).toBe(true)
+  })
+
   it("names jj's root commit as a base", () => {
     expect(ReviewGraphModel.isRoot({ commitId: '0'.repeat(40) })).toBe(true)
     expect(ReviewGraphModel.isRoot({ commitId: '0a'.repeat(20) })).toBe(false)
