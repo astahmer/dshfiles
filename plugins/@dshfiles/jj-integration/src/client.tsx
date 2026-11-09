@@ -40,6 +40,7 @@ import { ThreadPreparation, ThreadWarmup } from './thread-warmup.js'
 import { awaitWorkspaceSetup, SETUP_WAIT_TIMEOUT_MS, setupWaitsForRun } from './workspace-setup-wait.js'
 import { WorkspaceSetupDock } from './workspace-setup-dock.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
+import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
@@ -401,20 +402,13 @@ export default defineClient({
       // The workspace's activity, not just this Session's: a sibling thread writing in the same workspace blocks
       // integration here exactly as it blocks the header control.
       const readWorkspaceRunning = useCallback(
-        (): boolean =>
-          Object.values(ctx.sessions.list.getSnapshot().byId).some(
-            session => session.running && (threadSessionIds.includes(String(session.id)) || (threadPath !== undefined && session.cwd === threadPath)),
-          ),
+        (): boolean => WorkspaceActivityIndex.isRunning({ byId: ctx.sessions.list.getSnapshot().byId, sessionIds: threadSessionIds, path: threadPath }),
         [threadSessionIds, threadPath],
       )
-      const readWorkspaceQuestion = useCallback((): boolean => {
-        const sessions = ctx.sessions.list.getSnapshot().byId
-        const asks = (session: SessionSummary | undefined): boolean => ThreadRebaseEligibilityModel.hasPendingUserQuestion(session?.projectionValues) === true
-        return (
-          threadSessionIds.some(sessionId => asks(sessions[SessionId(sessionId)])) ||
-          (threadPath !== undefined && Object.values(sessions).some(session => session.cwd === threadPath && asks(session)))
-        )
-      }, [threadSessionIds, threadPath])
+      const readWorkspaceQuestion = useCallback(
+        (): boolean => WorkspaceActivityIndex.hasQuestion({ byId: ctx.sessions.list.getSnapshot().byId, sessionIds: threadSessionIds, path: threadPath }),
+        [threadSessionIds, threadPath],
+      )
       const readClientCanRebase = useCallback(
         (): boolean | undefined =>
           ThreadRebaseEligibilityModel.canRebase(threadSessionIds, sessionId => {

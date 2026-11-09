@@ -22,6 +22,7 @@ import { announceRepositoryChange, describeLandResult } from './land-feedback.js
 import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
 import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { SessionLogDownloadRow, type SessionLogDownloadPort } from './session-log-download.js'
+import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { threadStatusPollMs } from './thread-status-poll.js'
 import { useToast } from './toast.js'
@@ -159,7 +160,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const current = thread.data?.thread
   const sessionIds = useMemo(() => current?.sessionIds ?? [props.sessionId], [current?.sessionIds, props.sessionId])
   const readSessionRunning = useCallback(
-    () => Object.values(props.sessions.list.getSnapshot().byId).some(session => session.cwd === current?.path && session.running),
+    () => WorkspaceActivityIndex.isRunning({ byId: props.sessions.list.getSnapshot().byId, sessionIds: [], path: current?.path }),
     [current?.path, props.sessions],
   )
   const readClientCanRebase = useCallback(() => {
@@ -173,13 +174,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   }, [props.sessions, sessionIds])
   const readClientQuestionPending = useCallback(() => {
     const sessions = props.sessions.list.getSnapshot().byId
-    return (
-      sessionIds.some(sessionId => ThreadRebaseEligibilityModel.hasPendingUserQuestion(sessions[SessionId(sessionId)]?.projectionValues) === true) ||
-      (current?.path !== undefined &&
-        Object.values(sessions).some(
-          session => session.cwd === current.path && ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) === true,
-        ))
-    )
+    return WorkspaceActivityIndex.hasQuestion({ byId: sessions, sessionIds, path: current?.path })
   }, [current?.path, props.sessions, sessionIds])
   const sessionRunning = useSyncExternalStore(subscribe, readSessionRunning, () => true)
   const clientCanRebase = useSyncExternalStore(subscribe, readClientCanRebase, () => false)
