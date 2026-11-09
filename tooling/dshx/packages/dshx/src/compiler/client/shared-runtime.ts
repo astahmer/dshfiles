@@ -28,6 +28,11 @@ export class SharedRuntime {
     return id.startsWith(SharedRuntime.facadePrefix)
   }
 
+  /** The facade id the consumer plugin loads for one supplier table key. */
+  static facadeId(key: string): string {
+    return `${SharedRuntime.facadePrefix}${key}`
+  }
+
   /** Supplier side: build the `sharedModules` table and record what it provides next to `client.js`. */
   static supplierPlugin(options: {
     readonly packageId: string
@@ -35,19 +40,30 @@ export class SharedRuntime {
     readonly provide: readonly string[]
     readonly outDir: string
     readonly cssHash: () => string | undefined
+    /** Modules served by key from a file rather than by specifier, such as stored DSHX Client runtime snapshots. */
+    readonly keyedModules?: () => Promise<readonly { readonly key: string; readonly file: string; readonly names: readonly string[] }[]>
   }): Plugin {
     let modules: Readonly<Record<string, readonly string[]>> = {}
+    let sources: readonly { readonly key: string; readonly request: string }[] = []
     return {
       name: 'dshx-shared-runtime-supplier',
       enforce: 'pre',
       async buildStart() {
-        modules = await SharedRuntime.exportNames(options.root, options.provide)
+        const keyed = (await options.keyedModules?.()) ?? []
+        modules = {
+          ...(await SharedRuntime.exportNames(options.root, options.provide)),
+          ...Object.fromEntries(keyed.map(module => [module.key, module.names])),
+        }
+        sources = [
+          ...options.provide.map(specifier => ({ key: specifier, request: specifier })),
+          ...keyed.map(module => ({ key: module.key, request: module.file })),
+        ]
       },
       resolveId: source => (source === SharedRuntime.supplierModule ? source : null),
       load(id) {
         if (id !== SharedRuntime.supplierModule) return null
-        const imports = options.provide.map((specifier, index) => `import * as module${index} from ${JSON.stringify(specifier)}`)
-        const entries = options.provide.map((specifier, index) => `  ${JSON.stringify(specifier)}: module${index},`)
+        const imports = sources.map((source, index) => `import * as module${index} from ${JSON.stringify(source.request)}`)
+        const entries = sources.map((source, index) => `  ${JSON.stringify(source.key)}: module${index},`)
         return [...imports, `export const ${SharedRuntime.exportName} = Object.freeze({`, ...entries, '})', ''].join('\n')
       },
       async writeBundle() {

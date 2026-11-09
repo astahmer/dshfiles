@@ -49,3 +49,10 @@ The supplier provides `@deepseek-ai/schemastery`, the radix primitives plugin-ui
 `@xstate/react`, `sonner`-style helpers, `clsx`, `tailwind-merge`, `class-variance-authority`, `cmdk`, `motion`,
 `aria-hidden`, `react-remove-scroll`, `zod` and `zod/mini`. React, React DOM and the `@deepseek-ai/*` runtime come
 from the page itself (see `tooling/dshx/docs/guides/build.md`), so they are never listed here.
+
+## DSHX Client runtime
+
+`client.sharedRuntime.dshxRuntime: true` would also serve, by content hash, the current DSHX Client runtime and every runtime a built sibling plugin's dist names, so
+consumers with `client.dshxRuntime: 'shared'` stop inlining ~90 KB of DSHX runtime each. It is off: turning it on
+adds ~106 KB per served hash to this bundle and needs every consumer rebuilt after it. See
+`tooling/dshx/DECISIONS.md` (2026-11-09, Client runtime by content hash).

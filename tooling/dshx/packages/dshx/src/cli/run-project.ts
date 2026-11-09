@@ -42,6 +42,7 @@ import { CliUsageError, type CliArgs } from './args.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { RuntimePluginStatus } from '../host/runtime-plugins.js'
 import type { RuntimeSnapshotOutcome } from '../compiler/host/runtime-store.js'
+import type { ClientRuntimeOutcome } from '../compiler/client/runtime-store.js'
 import { createScratchProfile } from '../project/scratch-profile.js'
 
 import { CliOutput, type TerminalStyle } from './common.js'
@@ -303,6 +304,8 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
         bundleDependencies: project.clientBundleDependencies ?? [],
         ...(project.clientShared !== undefined && { shared: project.clientShared }),
         ...(project.clientSharedRuntime !== undefined && { sharedRuntime: project.clientSharedRuntime }),
+        ...(project.clientSharedDshxRuntime === true && { sharedDshxRuntime: true }),
+        ...(project.clientDshxRuntime !== undefined && { dshxRuntime: project.clientDshxRuntime }),
         ...(project.clientVitePlugins !== undefined && { vite: { plugins: project.clientVitePlugins } }),
         external,
         inject,
@@ -332,6 +335,7 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   let failed = hasErrors(typechecked?.diagnostics ?? [])
   const artifacts: string[] = []
   let dshxRuntime: RuntimeSnapshotOutcome | undefined
+  let dshxClientRuntime: ClientRuntimeOutcome | undefined
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
       failed = true
@@ -341,8 +345,15 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
       return
     }
     const fallback = jobs[index]?.fallback
-    const output = result.value as { readonly output?: readonly { readonly fileName?: string }[]; readonly dshxRuntime?: RuntimeSnapshotOutcome } | undefined
+    const output = result.value as
+      | {
+          readonly output?: readonly { readonly fileName?: string }[]
+          readonly dshxRuntime?: RuntimeSnapshotOutcome
+          readonly dshxClientRuntime?: ClientRuntimeOutcome
+        }
+      | undefined
     dshxRuntime ??= output?.dshxRuntime
+    dshxClientRuntime ??= output?.dshxClientRuntime
     const names = output?.output?.map(item => item.fileName).filter((name): name is string => typeof name === 'string' && name !== '') ?? []
     for (const name of names) artifacts.push(resolvePath(project.outDir, name))
     if (names.length === 0 && fallback !== undefined) artifacts.push(fallback)
@@ -363,6 +374,10 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   if (dshxRuntime !== undefined) {
     const detail = dshxRuntime.mode === 'snapshot' ? `snapshot ${dshxRuntime.hash}` : `inline (${dshxRuntime.reason})`
     write(io.stdout, `  ${paint(io.stdout, 'gray', 'DSHX runtime:')} ${detail}\n`)
+  }
+  if (dshxClientRuntime !== undefined) {
+    const detail = dshxClientRuntime.mode === 'shared' ? `shared ${dshxClientRuntime.hash}` : `inline (${dshxClientRuntime.reason})`
+    write(io.stdout, `  ${paint(io.stdout, 'gray', 'DSHX client runtime:')} ${detail}\n`)
   }
   return 0
 }

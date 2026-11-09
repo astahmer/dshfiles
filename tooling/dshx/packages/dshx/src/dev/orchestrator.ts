@@ -117,6 +117,8 @@ function buildOptions(project: ResolvedDshxConfig, compatibility: import('../com
         bundleDependencies: project.clientBundleDependencies ?? [],
         ...(project.clientShared !== undefined && { shared: project.clientShared }),
         ...(project.clientSharedRuntime !== undefined && { sharedRuntime: project.clientSharedRuntime }),
+        ...(project.clientSharedDshxRuntime === true && { sharedDshxRuntime: true }),
+        ...(project.clientDshxRuntime !== undefined && { dshxRuntime: project.clientDshxRuntime }),
         ...(project.clientVitePlugins !== undefined && { vite: { plugins: project.clientVitePlugins } }),
         external: clientManifestArray(project, 'external'),
         inject: clientManifestArray(project, 'inject'),

@@ -12,6 +12,7 @@ import { CompilerKernel } from '../kernel.js'
 import type { BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
 import { clientCssPlugin } from './css.js'
 import { SharedRuntime } from './shared-runtime.js'
+import { ClientRuntimeStore, type ClientRuntimeOutcome, type ClientRuntimeSnapshot } from './runtime-store.js'
 import { CLIENT_SDK_PROVIDERS, CLIENT_SETUP_SERVICE_CAPABILITIES, ClientCapabilityAnalysis, type ClientAnalysisSession } from './capabilities.js'
 import { installedLocaleNamespaces } from './installed.js'
 import { LocaleNamespaceOwnershipModel } from './locale-ownership.js'
@@ -74,6 +75,41 @@ const SETTINGS_SECTION_ENTRIES_PATH = fileURLToPath(new URL('../../settings/sect
 const SETTINGS_WRITE_JOURNAL_PATH = fileURLToPath(new URL('../../settings/write-journal.js', import.meta.url))
 const SETTINGS_SECTION_ENTRIES_SCHEMA_PATH = fileURLToPath(new URL('../../settings/section-entries-schema.js', import.meta.url))
 const CONVERSATION_DEFINE_PATH = fileURLToPath(new URL('../../conversation/define.js', import.meta.url))
+const RUNTIME_ROOT = fileURLToPath(new URL('../../', import.meta.url))
+/** Every runtime module the Client entry and its public virtual modules import; their closure is one snapshot. */
+const CLIENT_RUNTIME_ENTRIES = [
+  CLIENT_RUNTIME_PATH,
+  CLIENT_DEFINE_PATH,
+  CLIENT_SDK_PATH,
+  CLIENT_LOCALE_PATH,
+  CLIENT_HOST_COMMANDS_PATH,
+  CLIENT_API_PATH,
+  CLIENT_BROKER_PATH,
+  CLIENT_APP_SERVICES_PATH,
+  CLIENT_APP_CONTRACTS_PATH,
+  CLIENT_LINKS_PATH,
+  CLIENT_COMMAND_CHORDS_PATH,
+  CLIENT_REGISTRIES_PATH,
+  CLIENT_STORE_PATH,
+  CLIENT_HOOKS_PATH,
+  CLIENT_PLUGIN_CONTEXT_PATH,
+  API_DEFINE_PATH,
+  API_RUNTIME_PATH,
+  API_CLIENT_EVENTS_PATH,
+  API_RESOURCE_PATH,
+  API_RESOURCE_STORE_PATH,
+  CLIENT_HOST_STORAGE_PATH,
+  CLIENT_PAGE_READ_PATH,
+  API_COMMON_PATH,
+  API_ZOD_VIEW_PATH,
+  SETTINGS_DEFINE_PATH,
+  SETTINGS_CLIENT_PATH,
+  SETTINGS_PAGE_RENDERER_PATH,
+  SETTINGS_SECTION_ENTRIES_PATH,
+  SETTINGS_WRITE_JOURNAL_PATH,
+  SETTINGS_SECTION_ENTRIES_SCHEMA_PATH,
+  CONVERSATION_DEFINE_PATH,
+]
 
 /** Options for producing one DSH-compatible lazy-CJS client bundle. */
 export interface BuildClientOptions {
@@ -92,6 +128,10 @@ export interface BuildClientOptions {
   readonly shared?: string
   /** Exact module specifiers this package supplies as a shared runtime. */
   readonly sharedRuntime?: readonly string[]
+  /** As a supplier, also serve every stored DSHX Client runtime snapshot by its content-hash key. */
+  readonly sharedDshxRuntime?: boolean
+  /** `shared` reads the DSHX Client runtime from the `shared` supplier when it serves this runtime's hash. */
+  readonly dshxRuntime?: 'inline' | 'shared'
   /** Package edges declared by dsh.client.inject. */
   readonly inject?: readonly string[]
   /**
@@ -103,7 +143,35 @@ export interface BuildClientOptions {
   readonly compatibility?: DshCompatibility
 }
 
-export type ClientBuildResult = BuildReport
+export type ClientBuildResult = BuildReport & { readonly dshxClientRuntime?: ClientRuntimeOutcome }
+
+interface ClientRuntimeChoice {
+  readonly outcome: ClientRuntimeOutcome
+  readonly snapshot?: ClientRuntimeSnapshot
+}
+
+/**
+ * Decide once per build whether this consumer reads the DSHX Client runtime from its supplier. Sharing must not change
+ * which instance any runtime import loads: every bare import the runtime makes must already reach this plugin through
+ * the page or the same supplier, never a private copy, or the shared runtime and the plugin would disagree on it.
+ */
+async function clientRuntimeChoice(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<ClientRuntimeChoice | undefined> {
+  if (options.dshxRuntime !== 'shared') return undefined
+  const inline = (reason: string): ClientRuntimeChoice => ({ outcome: { mode: 'inline', reason } })
+  if (options.shared === undefined) return inline('client.dshxRuntime "shared" needs a client.shared supplier')
+  const prepared = await ClientRuntimeStore.prepare({ runtimeRoot: RUNTIME_ROOT, entries: CLIENT_RUNTIME_ENTRIES })
+  if ('reason' in prepared) return inline(prepared.reason)
+  const supplier = await SharedRuntime.readSupplier({ root: paths.root, supplier: options.shared, external: options.external ?? [] })
+  if ([...prepared.keys.values()].some(key => !supplier.modules.has(key)))
+    return inline(`${options.shared} does not serve DSHX client runtime ${prepared.hash}; rebuild it with client.sharedRuntime.dshxRuntime, then this package`)
+  const compatibility = options.compatibility ?? DEFAULT_COMPATIBILITY
+  const page = new Set([...compatibility.client.platformModules, ...compatibility.client.preloadedExternals, ...(options.external ?? [])])
+  const bundled = (specifier: string): boolean =>
+    (options.bundleDependencies ?? []).some(dependency => specifier === dependency || specifier.startsWith(`${dependency}/`))
+  const unshared = [...prepared.bare].filter(specifier => bundled(specifier) || !(page.has(specifier) || supplier.modules.has(specifier)))
+  if (unshared.length > 0) return inline(`the runtime imports ${unshared.join(', ')}, which ${options.shared} does not share with this package`)
+  return { outcome: { mode: 'shared', hash: prepared.hash }, snapshot: prepared }
+}
 
 function isInside(parent: string, child: string): boolean {
   const path = relative(parent, child)
@@ -580,6 +648,7 @@ async function clientConfig(
   options: BuildClientOptions,
   watch: boolean,
   lazyState: LazyChunkState,
+  runtime: ClientRuntimeChoice | undefined,
   lazy?: LazyChunkTarget,
 ): Promise<InlineConfig> {
   const compatibility = options.compatibility ?? DEFAULT_COMPATIBILITY
@@ -605,7 +674,9 @@ async function clientConfig(
   const dshPackages = (specifiers: readonly string[] = []): readonly string[] => specifiers.filter(specifier => specifier.startsWith('@deepseek-ai/'))
   provide(dshPackages(options.inject), specifier => `the Host loads ${JSON.stringify(specifier)} first through dsh.client.inject`)
   provide(dshPackages(options.external), specifier => `the Host serves ${JSON.stringify(specifier)} through dsh.client.external`)
-  provide(supplier?.modules.keys() ?? [], specifier => `shared runtime ${JSON.stringify(options.shared)} provides ${JSON.stringify(specifier)}`)
+  // Runtime snapshot keys name DSHX modules a consumer reaches only through facades; DSHX itself stays bundleable.
+  const suppliedPackages = [...(supplier?.modules.keys() ?? [])].filter(specifier => !ClientRuntimeStore.isKey(specifier))
+  provide(suppliedPackages, specifier => `shared runtime ${JSON.stringify(options.shared)} provides ${JSON.stringify(specifier)}`)
   let sheetHash: string | undefined
   const assetsInlineLimit = (): boolean => true
   const input = lazy?.input ?? VIRTUAL_CLIENT_ENTRY
@@ -635,7 +706,13 @@ async function clientConfig(
   const consumer =
     supplier === undefined || options.shared === undefined
       ? []
-      : [SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies })]
+      : [
+          ...(runtime?.snapshot === undefined
+            ? []
+            : [ClientRuntimeStore.consumerPlugin({ snapshot: runtime.snapshot, runtimeRoot: RUNTIME_ROOT, facade: SharedRuntime.facadeId })]),
+          SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies }),
+        ]
+  const dshxRuntimeStore = options.sharedRuntime !== undefined && options.sharedDshxRuntime === true ? await realpath(resolve(RUNTIME_ROOT, '..')) : undefined
   // A lazy chunk keeps only module transforms and guards: the entry owns CSS, capabilities, declarations and manifests.
   const plugins =
     lazy === undefined
@@ -653,7 +730,7 @@ async function clientConfig(
                   sourcemap: sourcemap !== false,
                   watch,
                   buildChunk: async (chunkInput, fileName) => {
-                    const config = await clientConfig(paths, options, watch, lazyState, { input: chunkInput, fileName })
+                    const config = await clientConfig(paths, options, watch, lazyState, runtime, { input: chunkInput, fileName })
                     const result = await build({ ...config, build: { ...config.build, write: false, watch: null } })
                     const completed = Array.isArray(result) ? result[0] : result
                     if (completed === undefined || !('output' in completed)) throw new DshxError('DSHX1103', `Lazy chunk ${fileName} produced no output.`)
@@ -679,7 +756,20 @@ async function clientConfig(
                   provide: options.sharedRuntime,
                   outDir: paths.outDir,
                   cssHash: () => sheetHash,
+                  ...(dshxRuntimeStore !== undefined && {
+                    // Publish this DSHX's snapshot first, so a supplier built before its consumers already serves it.
+                    keyedModules: async () => {
+                      const current = await ClientRuntimeStore.prepare({ runtimeRoot: RUNTIME_ROOT, entries: CLIENT_RUNTIME_ENTRIES })
+                      const snapshots = await ClientRuntimeStore.served({
+                        packageRoot: dshxRuntimeStore,
+                        supplierRoot: paths.root,
+                        current: 'hash' in current ? current.hash : undefined,
+                      })
+                      return snapshots.flatMap(snapshot => snapshot.modules)
+                    },
+                  }),
                 }),
+                ...(dshxRuntimeStore === undefined ? [] : [ClientRuntimeStore.supplierPlugin({ root: paths.root, packageRoot: dshxRuntimeStore })]),
               ]),
           clientCssPlugin({
             packageId: options.packageId,
@@ -751,7 +841,7 @@ export async function watchClient(options: BuildClientOptions): Promise<BuildWat
   await validateLocaleProviderEdge(paths, options, session)
   await validateConversationProviderEdges(paths, options, session)
   await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options), session)
-  const config = await clientConfig(paths, options, true, ClientLazyChunks.state())
+  const config = await clientConfig(paths, options, true, ClientLazyChunks.state(), await clientRuntimeChoice(paths, options))
   return CompilerKernel.buildWatcher(
     await build({
       ...config,
@@ -774,15 +864,17 @@ export async function buildClient(options: BuildClientOptions): Promise<ClientBu
   await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options), session)
   const declarations = options.declarations ?? true
   const lazyState = ClientLazyChunks.state()
+  const runtime = await clientRuntimeChoice(paths, options)
   for (;;) {
-    const config = await clientConfig(paths, options, false, lazyState)
+    const config = await clientConfig(paths, options, false, lazyState, runtime)
     const logger = createLogger('error')
     const reportError = logger.error.bind(logger)
     logger.error = (message, errorOptions) => {
       if (!lazyState.retrying) reportError(message, errorOptions)
     }
     try {
-      return CompilerKernel.buildReport(await build({ ...config, customLogger: logger }), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')
+      const report = CompilerKernel.buildReport(await build({ ...config, customLogger: logger }), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')
+      return runtime === undefined ? report : { ...report, dshxClientRuntime: runtime.outcome }
     } catch (error) {
       // Each retry inlines at least one more target, so the loop ends once no import() target shares the entry.
       if (lazyState.retrying) continue

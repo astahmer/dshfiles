@@ -190,6 +190,13 @@ describe('resolveDshxConfig', () => {
     await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientShared: '@test/runtime' })
     await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { sharedRuntime: { provide: ['zod', 'radix-ui'] } } }\n")
     await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientSharedRuntime: ['zod', 'radix-ui'] })
+    await expect(resolveDshxConfig({ cwd: root })).resolves.not.toHaveProperty('clientSharedDshxRuntime')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { sharedRuntime: { provide: ['zod'], dshxRuntime: true } } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientSharedRuntime: ['zod'], clientSharedDshxRuntime: true })
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { shared: '@test/runtime' } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.not.toHaveProperty('clientDshxRuntime')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { shared: '@test/runtime', dshxRuntime: 'shared' } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientShared: '@test/runtime', clientDshxRuntime: 'shared' })
     for (const client of [
       "{ shared: 'Not A Package' }",
       "{ shared: '@test/runtime', sharedRuntime: { provide: ['zod'] } }",
@@ -300,7 +307,9 @@ describe('resolveDshxConfig', () => {
     ["export default { compatibility: { allowUnsupported: 'yes' } }\n", 'allowUnsupported'],
     ['export default { host: { bundleDependencies: [7] } }\n', 'unique bare package roots'],
     ["export default { host: { dshxRuntime: 'shared' } }\n", 'dshxRuntime'],
-    ["export default { client: { dshxRuntime: 'snapshot' } }\n", 'unknown field'],
+    ["export default { client: { dshxRuntime: 'snapshot' } }\n", 'client.dshxRuntime'],
+    ["export default { client: { dshxRuntime: 'shared' } }\n", 'requires client.shared'],
+    ["export default { client: { sharedRuntime: { provide: ['zod'], dshxRuntime: 'yes' } } }\n", 'client.sharedRuntime.dshxRuntime'],
     ["export default { client: { sharedRuntime: { provide: ['zod', 7] } } }\n", 'unique bare module specifiers'],
   ])('rejects invalid config: %s', async (config, message) => {
     const { root } = await temporaryProject()

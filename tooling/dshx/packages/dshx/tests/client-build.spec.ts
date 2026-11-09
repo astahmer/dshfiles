@@ -1207,6 +1207,12 @@ describe('client compiler', () => {
     }
     expect(manifest).toMatchObject({ supplier: '@dshx/shared-runtime', modules: { 'shared-lib': ['default', 'named'] } })
     expect(manifest.cssHash).toMatch(/^[0-9a-f]{16}$/)
+    // A supplier that also serves a DSHX Client runtime snapshot must not stop a consumer that inlines its own.
+    const runtimeKey = `@dshfiles/dshx/client-runtime/${'0'.repeat(20)}/client/define.js`
+    await writeFile(
+      resolve(supplierRoot, 'dist/shared-runtime.json'),
+      JSON.stringify({ ...manifest, modules: { ...manifest.modules, [runtimeKey]: ['ClientContributionModel'] } }),
+    )
 
     const consumerClient = [
       "import { defineClient } from '@dshfiles/dshx/client'",

@@ -34,17 +34,20 @@ export interface RuntimeSnapshot {
 
 export type RuntimeSnapshotOutcome = { readonly mode: 'snapshot'; readonly hash: string } | { readonly mode: 'inline'; readonly reason: string }
 
-interface ModuleGraph {
-  readonly modules: ReadonlyMap<string, string>
-  readonly staticBare: ReadonlySet<string>
-  readonly dynamicBare: ReadonlySet<string>
-  readonly vendored: ReadonlySet<string>
-}
-
 /** Names a runtime module exports itself, and the modules it re-exports with `export *`. */
 interface ModuleExports {
   readonly names: Set<string>
   readonly stars: string[]
+  /** Re-exports every name of a bare module, so its names are only known at run time. */
+  opaque: boolean
+}
+
+interface ModuleGraph {
+  readonly modules: ReadonlyMap<string, string>
+  readonly exports: ReadonlyMap<string, ModuleExports>
+  readonly staticBare: ReadonlySet<string>
+  readonly dynamicBare: ReadonlySet<string>
+  readonly vendored: ReadonlySet<string>
 }
 
 class SnapshotUnavailable extends Error {}
@@ -98,7 +101,7 @@ const moduleGraph = async (runtimeRoot: string, entries: readonly string[]): Pro
     if (parsed.errors.length > 0) unavailable(`runtime module ${file} does not parse: ${parsed.errors[0]?.message ?? 'unknown error'}`)
     if (parsed.module.importMetas.length > 0) unavailable(`runtime module ${file} reads import.meta, which would change meaning in a snapshot`)
     modules.set(file, source)
-    const exports: ModuleExports = { names: new Set(), stars: [] }
+    const exports: ModuleExports = { names: new Set(), stars: [], opaque: false }
     exportsOf.set(file, exports)
     const follow = (specifier: string, dynamic: boolean): string | undefined => {
       if (specifier.startsWith('.')) {
@@ -127,7 +130,10 @@ const moduleGraph = async (runtimeRoot: string, entries: readonly string[]): Pro
         const target = entry.moduleRequest === null ? undefined : follow(entry.moduleRequest.value, false)
         if (entry.exportName.kind === 'Name' && entry.exportName.name !== null) exports.names.add(entry.exportName.name)
         if (entry.exportName.kind === 'Default') exports.names.add('default')
-        if (target !== undefined && entry.exportName.kind === 'None' && entry.importName.kind === 'AllButDefault') exports.stars.push(target)
+        if (entry.exportName.kind === 'None' && entry.importName.kind === 'AllButDefault') {
+          if (target === undefined) exports.opaque = true
+          else exports.stars.push(target)
+        }
         if (target !== undefined && entry.importName.kind === 'Name' && entry.importName.name !== null)
           namedImports.push({ from: file, target, name: entry.importName.name })
       }
@@ -149,7 +155,22 @@ const moduleGraph = async (runtimeRoot: string, entries: readonly string[]): Pro
     if (!provides(link.target, link.name))
       unavailable(`${relative(runtimeRoot, link.from)} imports ${link.name} that ${relative(runtimeRoot, link.target)} does not export (dist mid-rebuild?)`)
   }
-  return { modules, staticBare, dynamicBare, vendored }
+  return { modules, exports: exportsOf, staticBare, dynamicBare, vendored }
+}
+
+/** Every name `file` exports, following its `export *` re-exports; undefined when a bare re-export hides some. */
+const exportedNames = (graph: ModuleGraph, file: string, seen: Set<string> = new Set()): ReadonlySet<string> | undefined => {
+  const exports = graph.exports.get(file)
+  if (exports === undefined || seen.has(file)) return new Set()
+  if (exports.opaque) return undefined
+  seen.add(file)
+  const names = new Set(exports.names)
+  for (const star of exports.stars) {
+    const starNames = exportedNames(graph, star, seen)
+    if (starNames === undefined) return undefined
+    for (const name of starNames) if (name !== 'default') names.add(name)
+  }
+  return names
 }
 
 /** Rewrite each vendored bare import to the relative path of its copy inside the snapshot. */
@@ -212,7 +233,12 @@ const contentHash = (files: readonly SnapshotFile[]): string => {
  * Write the snapshot once. An existing directory for the hash already holds these bytes, so it is never rewritten;
  * a new one is staged beside the store and renamed into place, so no reader ever sees a partial snapshot.
  */
-const publish = async (storeRoot: string, hash: string, files: readonly SnapshotFile[]): Promise<string> => {
+const publish = async (
+  storeRoot: string,
+  hash: string,
+  files: readonly SnapshotFile[],
+  manifest: { readonly exports?: Readonly<Record<string, readonly string[]>>; readonly bare?: readonly string[] } = {},
+): Promise<string> => {
   const directory = join(storeRoot, hash)
   if ((await readJson(StoreManifest, join(directory, SNAPSHOT_MANIFEST)))?.hash === hash) {
     const now = new Date()
@@ -227,9 +253,13 @@ const publish = async (storeRoot: string, hash: string, files: readonly Snapshot
       await writeFile(target, file.content, { encoding: 'utf8', flag: 'wx' })
       await chmod(target, 0o444)
     }
-    await writeFile(join(staging, SNAPSHOT_MANIFEST), `${JSON.stringify({ version: FORMAT_VERSION, hash, files: files.map(file => file.path) }, null, 2)}\n`, {
-      flag: 'wx',
-    })
+    await writeFile(
+      join(staging, SNAPSHOT_MANIFEST),
+      `${JSON.stringify({ version: FORMAT_VERSION, hash, files: files.map(file => file.path), ...manifest }, null, 2)}\n`,
+      {
+        flag: 'wx',
+      },
+    )
     await rename(staging, directory).catch(async (cause: unknown) => {
       // Another build published the same content first.
       if ((await readJson(StoreManifest, join(directory, SNAPSHOT_MANIFEST)))?.hash !== hash) throw cause
@@ -260,6 +290,28 @@ const resolutionMismatches = async (packageRoot: string, consumerRoot: string, g
   return mismatches.sort()
 }
 
+interface CapturedRuntime {
+  readonly packageRoot: string
+  readonly runtimeRoot: string
+  readonly graph: ModuleGraph
+  readonly files: readonly SnapshotFile[]
+  readonly hash: string
+}
+
+/** Read the built runtime modules reachable from `entries` and address them by content; throws SnapshotUnavailable. */
+const captureRuntime = async (options: { readonly runtimeRoot: string; readonly entries: readonly string[] }): Promise<CapturedRuntime> => {
+  const runtimeRoot = await realpath(options.runtimeRoot).catch(() => unavailable(`runtime root ${options.runtimeRoot} is missing`))
+  if (basename(runtimeRoot) !== 'dist') unavailable('dshx runs from source, not from its built dist')
+  const packageRoot = dirname(runtimeRoot)
+  const entries = await Promise.all(options.entries.map(entry => realpath(entry).catch(() => unavailable(`runtime entry ${entry} is missing`))))
+  const graph = await moduleGraph(runtimeRoot, entries)
+  const files = await snapshotFiles(packageRoot, runtimeRoot, graph)
+  return { packageRoot, runtimeRoot, graph, files, hash: contentHash(files) }
+}
+
+/** The bare-specifier path of one runtime module inside a published snapshot. */
+const modulePath = (runtimeRoot: string, file: string): string => relative(runtimeRoot, file).split(sep).join('/')
+
 /** Snapshot the runtime for one consumer, or explain why the consumer must keep inlining it. */
 const prepare = async (options: {
   readonly runtimeRoot: string
@@ -267,24 +319,19 @@ const prepare = async (options: {
   readonly consumerRoot: string
 }): Promise<RuntimeSnapshot | { readonly reason: string }> => {
   try {
-    const runtimeRoot = await realpath(options.runtimeRoot).catch(() => unavailable(`runtime root ${options.runtimeRoot} is missing`))
-    if (basename(runtimeRoot) !== 'dist') unavailable('dshx runs from source, not from its built dist')
-    const packageRoot = dirname(runtimeRoot)
-    if ((await readJson(DshxManifest, join(packageRoot, 'package.json'))) === undefined) {
-      unavailable(`${packageRoot} is not a ${PACKAGE_NAME} package exporting ./${STORE_DIRECTORY}/*`)
+    const captured = await captureRuntime(options)
+    if ((await readJson(DshxManifest, join(captured.packageRoot, 'package.json'))) === undefined) {
+      unavailable(`${captured.packageRoot} is not a ${PACKAGE_NAME} package exporting ./${STORE_DIRECTORY}/*`)
     }
     const consumerRoot = await realpath(options.consumerRoot)
-    if ((await resolvedPackage(PACKAGE_NAME, consumerRoot)) !== packageRoot)
-      unavailable(`${PACKAGE_NAME} does not resolve from ${consumerRoot} to ${packageRoot}`)
-    const entries = await Promise.all(options.entries.map(entry => realpath(entry).catch(() => unavailable(`runtime entry ${entry} is missing`))))
-    const graph = await moduleGraph(runtimeRoot, entries)
-    const mismatches = await resolutionMismatches(packageRoot, consumerRoot, graph)
+    if ((await resolvedPackage(PACKAGE_NAME, consumerRoot)) !== captured.packageRoot)
+      unavailable(`${PACKAGE_NAME} does not resolve from ${consumerRoot} to ${captured.packageRoot}`)
+    const mismatches = await resolutionMismatches(captured.packageRoot, consumerRoot, captured.graph)
     if (mismatches.length > 0) unavailable(`imports would load different packages: ${mismatches.join('; ')}`)
-    const files = await snapshotFiles(packageRoot, runtimeRoot, graph)
-    const hash = contentHash(files)
-    const directory = await publish(join(packageRoot, STORE_DIRECTORY), hash, files)
+    const hash = captured.hash
+    const directory = await publish(join(captured.packageRoot, STORE_DIRECTORY), hash, captured.files)
     const specifiers = new Map(
-      [...graph.modules.keys()].map(file => [file, `${PACKAGE_NAME}/${STORE_DIRECTORY}/${hash}/${relative(runtimeRoot, file).split(sep).join('/')}`]),
+      [...captured.graph.modules.keys()].map(file => [file, `${PACKAGE_NAME}/${STORE_DIRECTORY}/${hash}/${modulePath(captured.runtimeRoot, file)}`]),
     )
     return { hash, directory, specifiers }
   } catch (cause) {
@@ -293,9 +340,9 @@ const prepare = async (options: {
   }
 }
 
-const referencedHashes = async (roots: readonly string[]): Promise<ReadonlySet<string>> => {
+const referencedHashes = async (roots: readonly string[], storeDirectory: string): Promise<ReadonlySet<string>> => {
   const hashes = new Set<string>()
-  const pattern = new RegExp(`${PACKAGE_NAME}/${STORE_DIRECTORY}/([0-9a-f]{20})/`, 'gu')
+  const pattern = new RegExp(`${PACKAGE_NAME}/${storeDirectory}/([0-9a-f]{20})/`, 'gu')
   const visit = async (directory: string): Promise<void> => {
     const entries = await readdir(directory, { withFileTypes: true }).catch(() => [])
     await Promise.all(
@@ -324,7 +371,8 @@ const prune = async (options: {
   readonly graceMs?: number
   readonly now?: number
 }): Promise<{ readonly removed: readonly string[]; readonly kept: readonly string[] }> => {
-  const referenced = await referencedHashes(options.referenceRoots)
+  // A bundle names a snapshot by `<package>/<store directory>/<hash>/`, whichever store it is.
+  const referenced = await referencedHashes(options.referenceRoots, basename(options.storeRoot))
   const graceMs = options.graceMs ?? DEFAULT_PRUNE_GRACE_MS
   const now = options.now ?? Date.now()
   const removed: string[] = []
@@ -385,4 +433,17 @@ export class HostRuntimeStore {
   static readonly prepare = prepare
   static readonly prune = prune
   static readonly plugin = plugin
+}
+
+/** The store-agnostic snapshot steps the Client runtime store reuses: capture, export names, publish, prune. */
+export class RuntimeSnapshotKit {
+  static readonly packageName = PACKAGE_NAME
+  static readonly capture = captureRuntime
+  static readonly exportedNames = exportedNames
+  static readonly modulePath = modulePath
+  static readonly publish = publish
+  static readonly prune = prune
+  static readonly referencedHashes = referencedHashes
+  static readonly isUnavailable = (cause: unknown): cause is Error => cause instanceof SnapshotUnavailable
+  static readonly unavailable = unavailable
 }

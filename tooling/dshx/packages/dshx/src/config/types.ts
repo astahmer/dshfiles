@@ -30,9 +30,17 @@ export interface DshxClientConfig extends DshxFaceConfig {
    * private one; the supplier must be listed in `dsh.client.external` and built first.
    */
   readonly shared?: string
+  /**
+   * `shared` reads the DSHX Client runtime from the `shared` supplier, keyed by the content hash of the runtime this
+   * package is built with, instead of inlining a private copy. Falls back to `inline` when the supplier does not serve
+   * that hash or the runtime would resolve an import differently. Requires `shared`. Defaults to `inline`.
+   */
+  readonly dshxRuntime?: 'inline' | 'shared'
   /** Make this package a shared-runtime supplier for the listed exact module specifiers. */
   readonly sharedRuntime?: {
     readonly provide: readonly string[]
+    /** Also serve the current DSHX Client runtime and every snapshot a built sibling package names, by content hash. */
+    readonly dshxRuntime?: boolean
   }
 }
 
@@ -96,6 +104,8 @@ export interface ResolvedDshxConfig {
   readonly clientVitePlugins?: readonly PluginOption[]
   readonly clientShared?: string
   readonly clientSharedRuntime?: readonly string[]
+  readonly clientSharedDshxRuntime?: true
+  readonly clientDshxRuntime?: 'inline' | 'shared'
   readonly modules?: readonly DshxModuleEntry[]
   readonly outDir: string
   readonly profile: string
