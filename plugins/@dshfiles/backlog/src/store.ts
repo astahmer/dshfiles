@@ -346,8 +346,9 @@ const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchI
   const at = view.at
   const search = BacklogSearch.parse(query.query ?? '')
   // The index only narrows which items get scored; the scorer below still ranks them, so results match a full scan.
-  index?.sync(view.records)
-  const candidates = index?.candidates(search.terms) ?? null
+  const narrowing = index !== undefined && BacklogSearchIndex.narrows(search.terms)
+  if (narrowing) index.sync(view.records)
+  const candidates = narrowing ? index.candidates(search.terms) : null
   const pool = candidates === null ? [...view.records.values()] : [...candidates].flatMap(id => view.records.get(id) ?? [])
   const freshnessFilter = query.freshness ?? 'active'
   // A caller may still ask for the workspace an item was captured in; the item is filed under its project.
