@@ -17,6 +17,7 @@ import { toggleCollapsedGroup } from './collapsed-groups.js'
 import { threadDragMachine, type ThreadDragCommands } from './thread-drag-machine.js'
 import { ThreadRouteModel } from './thread-route.js'
 import { useNearViewport } from './use-near-viewport.js'
+import { VirtualThreadRows } from './virtual-thread-rows.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
 import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
@@ -1553,6 +1554,13 @@ type SidebarGroupedViewEntry = {
   readonly workspaceId: string | undefined
   readonly activityAt: number
 }
+
+const NO_GROUPED_THREADS: readonly SidebarGroupedThread[] = []
+
+const groupedThreadKey = (thread: SidebarGroupedThread): string =>
+  thread.kind === 'local' ? thread.session.id : `remote:${thread.remote.runtimeId}:${thread.remote.sessionId}`
+
+const groupedThreadId = (thread: SidebarGroupedThread): string => (thread.kind === 'local' ? thread.session.id : thread.remote.sessionId)
 
 const EMPTY_UNSENT_DRAFTS: Readonly<Record<string, SessionDraft>> = Object.freeze({})
 
@@ -3826,6 +3834,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     visibleThreadEntries,
     workspaceState.pinnedSessionIds,
   ])
+  // Built per list change, not per render: a section's merged and sorted rows are also the windowed list's input.
+  const sectionThreadsBySection = useMemo(() => {
+    const threads = new Map<SidebarSection, SidebarGroupedThread[]>()
+    for (const section of SIDEBAR_SECTIONS) {
+      const sectionRows: SidebarGroupedThread[] = [
+        ...(rowsBySection.get(section) ?? []).map((session): SidebarGroupedThread => ({
+          kind: 'local',
+          session,
+          updatedAt: activityAtBySessionId.get(session.id) ?? session.updatedAt,
+        })),
+        ...(remoteRowsBySection.get(section) ?? []).map((remote): SidebarGroupedThread => ({ kind: 'remote', remote, updatedAt: remote.updatedAt })),
+      ]
+      if (section !== 'pinned') sectionRows.sort((left, right) => right.updatedAt - left.updatedAt)
+      threads.set(section, sectionRows)
+    }
+    return threads
+  }, [activityAtBySessionId, remoteRowsBySection, rowsBySection])
   // Empty sections fold away rather than render a header, so a drag only reorders the ones on screen.
   const shownSections = useMemo(
     () =>
@@ -4555,6 +4580,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     setThreadSelection(EMPTY_THREAD_SELECTION)
   }
 
+  // A child target reveals its parent row: the child list is part of that row once it is mounted.
+  const revealThreadId = useMemo(() => {
+    if (threadToScrollTo === null) return undefined
+    for (const [rootId, children] of threadTree.childrenByRoot) if (children.some(child => child.id === threadToScrollTo)) return rootId
+    return threadToScrollTo
+  }, [threadToScrollTo, threadTree])
+  const virtualRowsProps = {
+    scrollElement: scrollAreaRef,
+    // The open thread stays mounted wherever it moved, so arrow-key switching can put focus back on it.
+    pinnedThreadIds: [activeRowDrag?.sessionId, selectedSession?.id],
+    revealThreadId,
+    estimateSize: rowStyle.density === 'compact' ? 34 : 50,
+    enabled: !isBoard,
+  }
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel'], section?: SidebarSection): JSX.Element => {
     const lineage = SidebarOrganization.sessionLineage(session, sessionState.byId)
     const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
@@ -5428,17 +5467,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       />
                     )
                   }
-                  const rows = rowsBySection.get(section) ?? []
-                  const remoteRows = remoteRowsBySection.get(section) ?? []
-                  const sectionRows: SidebarGroupedThread[] = [
-                    ...rows.map((session): SidebarGroupedThread => ({
-                      kind: 'local',
-                      session,
-                      updatedAt: activityAtBySessionId.get(session.id) ?? session.updatedAt,
-                    })),
-                    ...remoteRows.map((remote): SidebarGroupedThread => ({ kind: 'remote', remote, updatedAt: remote.updatedAt })),
-                  ]
-                  if (section !== 'pinned') sectionRows.sort((left, right) => right.updatedAt - left.updatedAt)
+                  const sectionRows = sectionThreadsBySection.get(section) ?? NO_GROUPED_THREADS
                   const collapsed = collapsedSections.includes(section)
                   return (
                     <section
@@ -5523,11 +5552,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
                         </span>
                       </button>
-                      {!collapsed
-                        ? sectionRows.map(entry =>
-                            entry.kind === 'local' ? renderThreadRow(entry.session, undefined, section) : renderRemoteThreadRow(entry.remote, section),
-                          )
-                        : null}
+                      {!collapsed ? (
+                        <VirtualThreadRows
+                          entries={sectionRows}
+                          keyOf={groupedThreadKey}
+                          threadIdOf={groupedThreadId}
+                          render={entry =>
+                            entry.kind === 'local' ? renderThreadRow(entry.session, undefined, section) : renderRemoteThreadRow(entry.remote, section)
+                          }
+                          {...virtualRowsProps}
+                        />
+                      ) : null}
                     </section>
                   )
                 })
@@ -5588,11 +5623,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           }
                         />
                       ) : null}
-                      {groupCollapsed
-                        ? null
-                        : group.threads.map(entry =>
-                            entry.kind === 'local' ? renderThreadRow(entry.session, undefined) : renderRemoteThreadRow(entry.remote),
-                          )}
+                      {groupCollapsed ? null : (
+                        <VirtualThreadRows
+                          entries={group.threads}
+                          keyOf={groupedThreadKey}
+                          threadIdOf={groupedThreadId}
+                          render={entry => (entry.kind === 'local' ? renderThreadRow(entry.session, undefined) : renderRemoteThreadRow(entry.remote))}
+                          {...virtualRowsProps}
+                        />
+                      )}
                     </section>
                   )
                 })}
