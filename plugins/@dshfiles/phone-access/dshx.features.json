@@ -5,17 +5,17 @@
     {
       "id": "phone-sign-in-qr",
       "title": "Print a phone sign-in QR for a trusted HTTPS origin",
-      "summary": "At startup the Host prints one scannable QR per configured HTTPS origin and runs a loopback rewrite proxy so a TLS-terminating tunnel (Tailscale Serve or Funnel) can forward the public authority to the loopback DSH listener without a trustedHosts setting.",
+      "summary": "At startup the Host runs a loopback rewrite proxy so a TLS-terminating tunnel (Tailscale Serve) can reach the native listener without a trustedHosts setting, detects the tailnet hostname, points Serve at that proxy, and prints one scannable sign-in QR. Configured https origins skip detection.",
       "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: startup terminal output",
       "configuration": [],
-      "states": ["proxy-listening", "qr-printed", "origin-rejected"],
+      "states": ["proxy-listening", "tailnet-detected", "qr-printed", "origin-rejected"],
       "failureModes": [
         "A non-HTTPS, credentialed, or non-absolute origin is ignored instead of printed.",
         "A busy proxy port is reported on the terminal and leaves the rest of DSH running.",
-        "Nothing is printed when the loader or Connection service is unavailable."
+        "Missing Tailscale, or Serve failing to start, prints no auto-detected QR and never guesses an origin."
       ],
       "externalDependencies": [],
       "verification": [
@@ -38,6 +38,18 @@
           "testName": "records one bounded listen span without addresses"
         },
         {
+          "kind": "unit-test",
+          "id": "phone-access.tailnet-name",
+          "file": "plugins/@dshfiles/phone-access/tests/tailnet.test.ts",
+          "testName": "accepts a tailnet DNS name and strips the trailing dot"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-access.tailnet-span",
+          "file": "plugins/@dshfiles/phone-access/tests/tailnet.test.ts",
+          "testName": "records one bounded span even when Tailscale is absent"
+        },
+        {
           "kind": "not-applicable",
           "id": "phone-access.no-browser-surface",
           "reason": "The Host prints to the terminal and renders no UI; the scratch Host boot check verifies the bundle loads and prints."
@@ -49,6 +61,18 @@
           "span": "phone access proxy listen",
           "file": "plugins/@dshfiles/phone-access/tests/rewrite-proxy.test.ts",
           "testName": "records one bounded listen span without addresses"
+        },
+        {
+          "kind": "custom",
+          "span": "phone access tailnet",
+          "file": "plugins/@dshfiles/phone-access/tests/tailnet.test.ts",
+          "testName": "records one bounded span even when Tailscale is absent"
+        },
+        {
+          "kind": "custom",
+          "span": "phone access serve",
+          "file": "plugins/@dshfiles/phone-access/tests/tailnet.test.ts",
+          "testName": "records one bounded span even when Tailscale is absent"
         }
       ]
     }

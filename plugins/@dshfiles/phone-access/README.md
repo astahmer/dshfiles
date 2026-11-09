@@ -1,13 +1,13 @@
 # Phone access QR
 
-Two clicks for anyone on Tailscale: run `pnpm dsh:phone`, scan the QR with the phone.
-No certificate authority, no `trustedHosts` edit, no per-device setup.
+Just `dsh web`: at startup the Host prints a QR. Scan it with the phone, install from the
+browser menu. No certificate authority, no `trustedHosts` edit, no extra command.
 
 ## What it does
 
 1. The Host starts a loopback rewrite proxy on `127.0.0.1:3443` (`proxyPort`).
-2. `scripts/dsh-phone.ts` detects the tailnet DNS name, points
-   `tailscale serve --https=443` at that proxy, and prints a QR for
+2. With no configured origin it asks Tailscale for the tailnet DNS name, points
+   `tailscale serve --https=443` at that proxy (`autoServe`), and prints a QR for
    `https://<machine>.<tailnet>.ts.net/?token=…`.
 3. The phone scans it once. Tailscale terminates TLS with a publicly trusted
    certificate, the proxy rewrites `Host`/`Origin` to the loopback authority, and the
@@ -18,6 +18,10 @@ The proxy exists because the native listener authenticates by authority: a tunne
 forwards the public `Host`, which the loopback listener rejects, and the cookie name
 encodes that authority. Rewriting both keeps the browser on the public origin, so a
 fresh profile needs no `connection.trustedHosts` entry at all.
+
+`autoServe` rewrites the machine's Serve config, and says so with the undo command
+(`tailscale serve --https=443 off`). Set `autoServe: false` to leave Serve alone and
+print the QR for a tunnel you configured yourself.
 
 ## Why this shape
 
@@ -37,12 +41,12 @@ token then is the only gate, so treat that QR like a password.
     origins:
       - https://m4-work.tail140263.ts.net
     proxyPort: 3443
+    autoServe: true
 ```
 
 `DSH_PHONE_ORIGINS` (comma separated) sets origins without editing the patch;
-configured origins win. Only absolute `https:` origins without credentials, query or
-fragment are printed. With no origin configured the proxy still runs, so
-`pnpm dsh:phone` can print the QR on demand.
+configured origins win and skip detection. Only absolute `https:` origins without
+credentials, query or fragment are printed.
 
 ## Security model
 

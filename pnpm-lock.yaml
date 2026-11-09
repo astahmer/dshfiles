@@ -4848,6 +4848,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 3.18.5
         version: 3.18.5
+      '@dshfiles/dshx':
+        specifier: workspace:*
+        version: link:../../../tooling/dshx/packages/dshx
       '@nuintun/qrcode':
         specifier: 5.1.0
         version: 5.1.0
@@ -4858,9 +4861,6 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(3f5772702fd6c5e570aeb57c54994b9f)
-      '@dshfiles/dshx':
-        specifier: workspace:*
-        version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20
