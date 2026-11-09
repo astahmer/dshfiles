@@ -15,7 +15,7 @@ import {
 } from '@deepseek-ai/dsh-session-format-catalog'
 import { readdirSync, type Dirent } from 'node:fs'
 import { open, mkdir, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
 import { createHash, randomBytes } from 'node:crypto'
@@ -129,6 +129,20 @@ export const JsonlCompressionSchema: z<JsonlCompression> = z.union([
 
 /** Default maximum listing filesystem operations in flight per backend. */
 const DEFAULT_LIST_CONCURRENCY = 3
+
+/**
+ * dshfiles delta: project directories probed at once when an id is in no known directory. The probe walked all of them
+ * one after the other (793 here: three filesystem calls each), 75 ms idle and 2.9 s behind a boot listing, for every
+ * lookup of a Session that is stored nowhere, such as a browser draft.
+ */
+const MISSING_LOOKUP_CONCURRENCY = 16
+
+/**
+ * dshfiles delta: how long a complete listing answers a read that its Session is stored nowhere. Every listing reads
+ * every Session directory, so an id absent from a fresh one has no log here; only another process writing the same root
+ * can add one meanwhile, and the owned session-search listing already accepts the same minute of staleness for that.
+ */
+const LISTED_ABSENCE_MS = 60_000
 
 /** Plugin config for the JSONL backend's root, physical encoding, and listing concurrency. */
 export interface Config {
@@ -346,6 +360,11 @@ class JsonlSessionPersistence extends SessionPersistence {
    */
   private readonly listLimit: LimitFunction
   private rootEncodingCheck: Promise<void> | undefined
+  /** dshfiles delta: why the root-wide encoding walk refused the root, once it has. */
+  private rootEncodingFailure: { readonly error: unknown } | undefined
+  private readonly missingLookupLimit: LimitFunction = pLimit(MISSING_LOOKUP_CONCURRENCY)
+  /** dshfiles delta: the Session directory names the last complete listing saw, and when that listing started. */
+  private listedSessionDirs: { readonly names: ReadonlySet<string>; readonly startedAt: number } | undefined
   private readonly generationFormat: Omit<JsonlGenerationFormatAdapter, 'createRestore'>
   /**
    * Bounded LRU of parsed, validated stored logs keyed by session id and
@@ -452,7 +471,8 @@ class JsonlSessionPersistence extends SessionPersistence {
    */
   async open(id: SessionId, access: SessionAccess, options?: SessionPersistenceOpenOptions): Promise<SessionHandle> {
     options?.signal?.throwIfAborted()
-    await this.ensureRootEncoding()
+    if (access === 'read') this.rootEncodingForRead()
+    else await this.ensureRootEncoding()
     options?.signal?.throwIfAborted()
     const pending = this.tracker.pendingOf(id)
     if (access === 'read') {
@@ -461,10 +481,10 @@ class JsonlSessionPersistence extends SessionPersistence {
       }
       let stored: StoredLog
       try {
-        stored = await this.requireStoredLog(id, options?.signal)
+        stored = await this.requireStoredLog(id, options?.signal, true)
       } catch (error: unknown) {
         if (!(error instanceof JsonlGenerationSourceChangedError)) throw error
-        stored = await this.requireStoredLog(id, options?.signal)
+        stored = await this.requireStoredLog(id, options?.signal, true)
       }
       let state: StorageHandleState
       if (stored.status === 'prepared') {
@@ -550,13 +570,12 @@ class JsonlSessionPersistence extends SessionPersistence {
     options?: SessionPersistenceStatOptions,
   ): Promise<SessionPersistenceSnapshot | undefined> {
     options?.signal?.throwIfAborted()
-    await this.ensureRootEncoding()
-    options?.signal?.throwIfAborted()
+    this.rootEncodingForRead()
     const pending = this.tracker.pendingOf(id)
     if (pending !== undefined) {
       return { header: pending.header, revision: pending.revision }
     }
-    const selected = await this.findLog(id, options?.signal)
+    const selected = await this.findLog(id, options?.signal, true)
     if (selected === undefined) return undefined
     const metadata = await this.readGenerationHeader(selected, id, options?.signal)
     if (metadata === undefined) return undefined
@@ -614,8 +633,8 @@ class JsonlSessionPersistence extends SessionPersistence {
   // --- handle-facing storage internals (package-private via the handle class below) ---
 
   /** Resolve and read one stored log, refusing loudly when the artifact is absent. */
-  private async requireStoredLog(id: SessionId, signal?: AbortSignal): Promise<StoredLog> {
-    const selected = await this.findLog(id, signal)
+  private async requireStoredLog(id: SessionId, signal?: AbortSignal, trustListing = false): Promise<StoredLog> {
+    const selected = await this.findLog(id, signal, trustListing)
     if (selected === undefined) throw new SessionPersistenceNotFoundError(id)
     if (selected.sourceVersion < SESSION_FORMAT_VERSION) {
       const sourceRevision = fileRevision(await stat(selected.sourcePath, { bigint: true }))
@@ -916,9 +935,9 @@ class JsonlSessionPersistence extends SessionPersistence {
    * @returns the current artifact path, or `undefined` while only a historical generation exists.
    */
   async resolveCurrentLog(id: SessionId, signal?: AbortSignal): Promise<string | undefined> {
-    await this.ensureRootEncoding()
+    this.rootEncodingForRead()
     signal?.throwIfAborted()
-    const selected = await this.findLog(id, signal)
+    const selected = await this.findLog(id, signal, true)
     if (selected === undefined) return undefined
     if (selected.sourceVersion === SESSION_FORMAT_VERSION) return selected.sourcePath
     if (selected.sourceVersion < SESSION_FORMAT_VERSION) return undefined
@@ -1170,6 +1189,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     signal?.throwIfAborted()
     await this.ensureRootEncoding()
     signal?.throwIfAborted()
+    const startedAt = Date.now()
     const generations = await this.listGenerations(signal)
     const headers = await settleLimited(this.listLimit, generations, async (selected) => {
       signal?.throwIfAborted()
@@ -1202,6 +1222,7 @@ class JsonlSessionPersistence extends SessionPersistence {
       if (!ids.has(id)) this.sessionDirs.delete(id)
     }
     for (const artifact of artifacts) this.sessionDirs.set(artifact.header.id, dirname(artifact.path))
+    this.listedSessionDirs = { names: new Set(generations.map(selected => basename(dirname(selected.sourcePath)))), startedAt }
     signal?.throwIfAborted()
     return artifacts
   }
@@ -1651,22 +1672,25 @@ class JsonlSessionPersistence extends SessionPersistence {
   }
 
   /** Find the unique authoritative generation for an id across project directories. */
-  private async findLog(id: SessionId, signal?: AbortSignal): Promise<ResolvedJsonlGeneration | undefined> {
+  private async findLog(id: SessionId, signal?: AbortSignal, trustListing = false): Promise<ResolvedJsonlGeneration | undefined> {
     const known = this.sessionDirs.get(id)
     if (known !== undefined) {
       const selected = await this.resolveGenerationInDirectory(known, signal)
       if (selected !== undefined) return selected
       this.sessionDirs.delete(id)
     }
-    const matches: ResolvedJsonlGeneration[] = []
-    for (const project of await this.listProjectDirs(signal)) {
+    // dshfiles delta: a read of an id that a fresh complete listing did not see answers absent without the walk below.
+    const listed = this.listedSessionDirs
+    if (trustListing && known === undefined && listed !== undefined && Date.now() - listed.startedAt < LISTED_ABSENCE_MS
+      && !listed.names.has(encodeSegment(id))) return undefined
+    // dshfiles delta: the projects are probed concurrently; the first failure in project order still wins.
+    const probes = await settleLimited(this.missingLookupLimit, await this.listProjectDirs(signal), async (project) => {
       signal?.throwIfAborted()
       await this.rejectLegacyFlatArtifact(project, id, signal)
       signal?.throwIfAborted()
-      const dir = join(project, encodeSegment(id))
-      const selected = await this.resolveGenerationInDirectory(dir, signal)
-      if (selected !== undefined) matches.push(selected)
-    }
+      return this.resolveGenerationInDirectory(join(project, encodeSegment(id)), signal)
+    })
+    const matches = settledValues(probes).filter(selected => selected !== undefined)
     if (matches.length > 1) {
       throw new Error(`duplicate JSONL session id "${id}" appears in multiple project directories`)
     }
@@ -1781,8 +1805,21 @@ class JsonlSessionPersistence extends SessionPersistence {
 
   /** Reject a root that already belongs to the other physical encoding. */
   private ensureRootEncoding(): Promise<void> {
-    this.rootEncodingCheck ??= this.checkRootEncoding()
+    this.rootEncodingCheck ??= this.checkRootEncoding().catch((error: unknown) => {
+      this.rootEncodingFailure = { error }
+      throw error
+    })
     return this.rootEncodingCheck
+  }
+
+  /**
+   * dshfiles delta: a read of one Session does not wait for the root-wide encoding walk (every Session directory; it
+   * held a cold read 2.9 s behind the boot listing). That read already refuses an opposite artifact in its own
+   * directory, the walk still starts here for writes and listings, and a root the walk refused keeps refusing reads.
+   */
+  private rootEncodingForRead(): void {
+    if (this.rootEncodingFailure !== undefined) throw this.rootEncodingFailure.error
+    this.ensureRootEncoding().catch(() => undefined)
   }
 
   private async checkRootEncoding(): Promise<void> {

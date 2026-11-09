@@ -9,15 +9,32 @@ import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import * as ForkedJsonl from '../src/host.ts'
 import { logPath } from '../src/native/format.ts'
 
-const fsCalls = vi.hoisted(() => ({ readdir: [] as string[], open: [] as string[] }))
+const fsCalls = vi.hoisted(() => {
+  const calls: {
+    readdir: string[]
+    open: string[]
+    inFlight: number
+    maxInFlight: number
+    /** A directory whose listing waits until the test releases it. */
+    held: { readonly path: string; readonly released: Promise<void> } | undefined
+  } = { readdir: [], open: [], inFlight: 0, maxInFlight: 0, held: undefined }
+  return calls
+})
 
 vi.mock('node:fs/promises', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
-    readdir: ((path: string, ...rest: []) => {
+    readdir: (async (path: string, ...rest: []) => {
       fsCalls.readdir.push(String(path))
-      return actual.readdir(path, ...rest)
+      fsCalls.inFlight += 1
+      fsCalls.maxInFlight = Math.max(fsCalls.maxInFlight, fsCalls.inFlight)
+      try {
+        if (fsCalls.held?.path === String(path)) await fsCalls.held.released
+        return await actual.readdir(path, ...rest)
+      } finally {
+        fsCalls.inFlight -= 1
+      }
     }) as typeof actual.readdir,
     open: ((path: string, ...rest: []) => {
       fsCalls.open.push(String(path))
@@ -32,6 +49,8 @@ const disposers: (() => Promise<void>)[] = []
 beforeEach(() => {
   fsCalls.readdir.length = 0
   fsCalls.open.length = 0
+  fsCalls.maxInFlight = 0
+  fsCalls.held = undefined
 })
 
 afterEach(async () => {
@@ -98,6 +117,75 @@ describe('session lookup', () => {
     fsCalls.readdir.length = 0
     expect((await persistence.stat(SessionId('session-moved')))?.header.cwd).toBe('/tmp/project-b')
     expect(fsCalls.readdir).toContain(root)
+  })
+})
+
+describe('lookup of one Session', () => {
+  it('answers before the root-wide encoding walk has finished', async () => {
+    const root = await makeRoot()
+    const writer = await backend(ForkedJsonl, root)
+    await writeSession(writer, 'session-read', '/tmp/project-read')
+    await writeSession(writer, 'session-other', '/tmp/project-other')
+    let release = (): void => undefined
+    fsCalls.held = {
+      path: dirname(logPath(root, '/tmp/project-other', SessionId('session-other'), 'zstd')),
+      released: new Promise<void>(resolve => {
+        release = resolve
+      }),
+    }
+    const reader = await backend(ForkedJsonl, root)
+    try {
+      const answered = await Promise.race([
+        reader.stat(SessionId('session-read')).then(snapshot => snapshot?.header.cwd),
+        new Promise(resolve => setTimeout(() => resolve('still waiting for the walk'), 1_000)),
+      ])
+      expect(answered).toBe('/tmp/project-read')
+      await expect(reader.stat(SessionId('session-draft'))).resolves.toBeUndefined()
+    } finally {
+      release()
+    }
+  })
+
+  it('probes project directories concurrently for a Session stored nowhere', async () => {
+    const root = await makeRoot()
+    const persistence = await backend(ForkedJsonl, root)
+    for (let index = 0; index < 24; index += 1) await writeSession(persistence, `session-${index}`, `/tmp/project-${index}`)
+    // A backend that has walked its root for the encoding check but never listed: the lookup has to probe.
+    const reader = await backend(ForkedJsonl, root)
+    await writeSession(reader, 'session-reader', '/tmp/project-reader')
+    fsCalls.maxInFlight = 0
+    expect(await reader.stat(SessionId('session-draft'))).toBeUndefined()
+    expect(fsCalls.maxInFlight).toBeGreaterThan(1)
+  })
+})
+
+describe('absent Session', () => {
+  it('answers a read absent from a fresh listing without probing any project directory', async () => {
+    const root = await makeRoot()
+    const persistence = await backend(ForkedJsonl, root)
+    for (let index = 0; index < 4; index += 1) await writeSession(persistence, `session-${index}`, `/tmp/project-${index}`)
+    await persistence.list()
+    fsCalls.readdir.length = 0
+    expect(await persistence.stat(SessionId('session-draft'))).toBeUndefined()
+    await expect(persistence.open(SessionId('session-draft'), 'read')).rejects.toThrow()
+    expect(fsCalls.readdir).toEqual([])
+  })
+
+  it('finds a Session another process stored after the listing once that listing is a minute old', async () => {
+    const root = await makeRoot()
+    const persistence = await backend(ForkedJsonl, root)
+    await writeSession(persistence, 'session-local', '/tmp/project-local')
+    const listedAt = Date.now()
+    vi.useFakeTimers({ toFake: ['Date'], now: listedAt })
+    try {
+      await persistence.list()
+      await writeSession(await backend(ForkedJsonl, root), 'session-elsewhere', '/tmp/project-elsewhere')
+      expect(await persistence.stat(SessionId('session-elsewhere'))).toBeUndefined()
+      vi.setSystemTime(listedAt + 60_000)
+      expect((await persistence.stat(SessionId('session-elsewhere')))?.header.cwd).toBe('/tmp/project-elsewhere')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
