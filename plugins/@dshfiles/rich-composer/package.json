@@ -34,8 +34,9 @@
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/session-controller": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
@@ -83,7 +84,6 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "clsx": "catalog:",
-    "effect": "catalog:",
     "jsdom": "catalog:",
     "lexical": "catalog:",
     "react": "catalog:",
@@ -150,7 +150,8 @@
         "@deepseek-ai/dsh-plan-mode/types",
         "@deepseek-ai/dsh-token-meter/client",
         "@deepseek-ai/dsh-tool-todo/client",
-        "@deepseek-ai/dsh-workspace/types"
+        "@deepseek-ai/dsh-workspace/types",
+        "@dshfiles/shared-runtime"
       ],
       "immediately": false
     }

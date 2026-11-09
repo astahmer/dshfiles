@@ -2,12 +2,14 @@ import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { Context, Effect, FileSystem, Layer, Option, Path } from 'effect'
+import { loadProjectConfig } from '@dshfiles/workspace-folder-picker/project-config'
 import type { DestinationView } from './api.js'
 import { AgentOnly, NoPath, NotARepository, NotAThread, WorkspaceFilesFailed, WorkspaceNotFound } from './errors.js'
 import { ActivityLog, WorkspaceRegistry } from './host-edges-promise.js'
 import { IsolatedSessions } from './integration-requests.js'
 import { JjSettings } from './jj-settings.js'
 import { Landing, LandingMessages } from './landing.js'
+import { NoFolderWorkspace } from './no-folder.js'
 import { registeredProjects } from './registered-projects.js'
 import { RepositoryViews } from './repository-views.js'
 import { isolatesNewThreadsByDefault } from './settings.js'
@@ -42,6 +44,17 @@ const make = Effect.gen(function* () {
 
   const exists = (target: string) => fileSystem.exists(target).pipe(Effect.orElseSucceed(() => false))
   const isolateByDefault = Effect.map(settings.get, isolatesNewThreadsByDefault)
+  /**
+   * Where this repository starts new threads: `dsh.project.json` can declare it, and the profile setting decides when
+   * it does not. Only `isolate: true` at a call site outranks both.
+   */
+  const isolationFor = (repoRoot: string) =>
+    Effect.gen(function* () {
+      const loaded = yield* loadProjectConfig(fileSystem, repoRoot)
+      const declared = loaded.config?.defaultThreadWorkspace
+      if (declared === undefined) return yield* isolateByDefault
+      return declared === 'isolated'
+    })
   const titleFor = (input: { readonly project: { readonly title: string } | undefined; readonly repoRoot: string; readonly name: string }) =>
     `${input.project?.title ?? path.basename(input.repoRoot)} · ${input.name}`
 
@@ -69,7 +82,7 @@ const make = Effect.gen(function* () {
     if (Option.isNone(location)) return { workspaceId: source.id, isolated: false, destination: noDestination(yield* isolateByDefault) }
     const repoRoot = location.value.repoRoot
     const project = yield* registry.resolveByPath(repoRoot)
-    if (!(input.isolate ?? (yield* isolateByDefault)))
+    if (!(input.isolate ?? (yield* isolationFor(repoRoot))))
       return {
         workspaceId: project?.id ?? source.id,
         isolated: false,
@@ -181,13 +194,38 @@ const make = Effect.gen(function* () {
     return { projects: [...registered.projects], workspaces: [...registered.workspaces] }
   }).pipe(Effect.withSpan('thread lifecycle projects'))
 
+  /** One fresh scratch folder name: the date, then six random hex digits, like a dated scratch directory. */
+  const scratchFolderName = (): string => {
+    const today = new Date()
+    const pad = (value: number) => String(value).padStart(2, '0')
+    const date = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+    return `${date}-${randomUUID().replaceAll('-', '').slice(0, 6)}`
+  }
+
   const noFolder = Effect.gen(function* () {
-    const directory = path.join(homedir(), '.dsh', 'no-folder')
-    yield* fileSystem
-      .makeDirectory(directory, { recursive: true })
-      .pipe(Effect.mapError(cause => new WorkspaceFilesFailed({ detail: `Could not create ${directory}.`, cause })))
+    const root = path.join(homedir(), NoFolderWorkspace.pathMarker)
+    const create = (directory: string) =>
+      fileSystem
+        .makeDirectory(directory, { recursive: true })
+        .pipe(Effect.mapError(cause => new WorkspaceFilesFailed({ detail: `Could not create ${directory}.`, cause })))
+    yield* create(root)
+    // One folder per scratch thread, so turning one into a project groups only that thread. A scratch folder no Session
+    // was accounted to is reused instead of growing the list on every New thread click.
+    const workspaces = yield* registry.list
+    const present = yield* Effect.forEach(workspaces, workspace => exists(workspace.path).pipe(Effect.map(present => ({ path: workspace.path, present }))), {
+      concurrency: 'unbounded',
+    })
+    let directory = NoFolderWorkspace.reusablePath({
+      root,
+      workspaces,
+      presentPaths: new Set(present.filter(entry => entry.present).map(entry => entry.path)),
+    })
+    if (directory === undefined) {
+      directory = path.join(root, scratchFolderName())
+      yield* create(directory)
+    }
     const existing = yield* registry.resolveByPath(directory)
-    return { workspaceId: (existing ?? (yield* registry.create({ path: directory, title: 'No folder' }))).id }
+    return { workspaceId: (existing ?? (yield* registry.create({ path: directory, title: NoFolderWorkspace.workspaceTitle }))).id }
   }).pipe(Effect.withSpan('thread lifecycle no folder'))
 
   const threadAt = Effect.fn('thread lifecycle thread at')(function* (input: { readonly path: string; readonly sessionId?: string | undefined }) {

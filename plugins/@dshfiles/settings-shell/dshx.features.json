@@ -142,7 +142,7 @@
     {
       "id": "settings-tab",
       "title": "One Settings page in the stage",
-      "summary": "Settings has one place: a page in the stage (plans/ade-ux §4.6). The rail, the gear, the palette, Mod+, and other plugins' open requests all open it; the former dialog, expanded dialog and side-panel presentations are gone, and a request that still names one opens the page. With main-tabs it gets a tab like any other page; picking that tab or reloading onto it reopens Settings, leaving it closes Settings.",
+      "summary": "Settings has one place: a page in the stage (docs/ade-ux §4.6). The rail, the gear, the palette, Mod+, and other plugins' open requests all open it; the former dialog, expanded dialog and side-panel presentations are gone, and a request that still names one opens the page. With main-tabs it gets a tab like any other page; picking that tab or reloading onto it reopens Settings, leaving it closes Settings.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",

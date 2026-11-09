@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/deepseek-ai/dsh-superagent-prototype",
+  "commit": "8c32a9dc5d72c033816c6a8110b37f40cf94fba4",
+  "package": "dsh-superagent",
+  "version": "0.1.0",
+  "license": "MIT",
+  "enginesDsh": "^0.2.1-alpha.2",
+  "verifiedWithDsh": "0.2.1-rc.2"
+}

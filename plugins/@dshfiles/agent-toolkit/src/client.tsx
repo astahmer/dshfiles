@@ -13,6 +13,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore } from 'react'
 import { ContextFacet } from './context-facet.js'
 import { AGENT_TOOLKIT_LOCALE_NAMESPACE, agentToolkitLocale, type AgentToolkitKey } from './locales.js'
+import { sameThreadRows } from './thread-projection.js'
 import { AgentToolkitPanel, type ToolkitThread } from './toolkit-panel.js'
 
 const PANEL_ID = 'dshfiles-agent-toolkit'
@@ -63,12 +64,14 @@ export default defineClient({
 
     const Panel = decorate((props: PropsRuntime<'main'>) => {
       const threadId = useSyncExternalStore(focusedThread.subscribe, focusedThread.getSnapshot)
-      const threads = props.useSessions(state =>
-        state.ids
-          .flatMap(id => state.byId[id] ?? [])
-          .filter(session => !session.blank && !session.title?.startsWith('btw · '))
-          .toSorted((left, right) => right.updatedAt - left.updatedAt)
-          .slice(0, THREAD_OPTIONS),
+      const threads = props.useSessions(
+        state =>
+          state.ids
+            .flatMap(id => state.byId[id] ?? [])
+            .filter(session => !session.blank && !session.title?.startsWith('btw · '))
+            .toSorted((left, right) => right.updatedAt - left.updatedAt)
+            .slice(0, THREAD_OPTIONS),
+        sameThreadRows,
       )
       const options: readonly ToolkitThread[] = threads.map(session => ({ id: session.id, title: session.displayTitle, cwd: session.cwd || undefined }))
       return (

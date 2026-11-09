@@ -10,7 +10,12 @@ writes exactly once. That removes two failure classes at the root: the missing
 read receipt and the version mismatch between a read and a later write. Anchors
 are retried with every whitespace run widened, which finds a reindented or
 rewrapped block; an ambiguous or missing anchor fails before writing and names
-the candidate lines.
+the candidate lines, quoting their text so one retry can copy a real anchor.
+
+Read the exact target immediately before patching and keep each anchor unique. A
+shell or script edit (`sed`, `python`, `node -e`) invalidates the native read
+snapshot, so re-read before a native `write` instead of mixing writers — the
+native refusal is the guard, not a bug.
 
 It never creates a file and never runs when the agent has no working directory,
 so the native `write` tool stays the only way to create one.

@@ -34,6 +34,29 @@ export const registerWorkspaceFolder = async (page: Page, path: string, open: (p
   }).toPass({ timeout: 20_000 })
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
   await expect(picker).toBeHidden()
+  await confirmFolderSetupStep(page, path)
+}
+
+/**
+ * The step between choosing a folder and adding it now says what the folder is. A journey that only needs the project
+ * takes the plain choice; a repository keeps its own "Add project", and a Git checkout with Jujutsu available
+ * additionally offers to enable it, which is not this helper's decision to make.
+ */
+export const confirmFolderSetupStep = async (page: Page, path: string): Promise<void> => {
+  const setup = page.getByRole('dialog', { name: `Add ${basename(path)}`, exact: true })
+  await expect(setup).toBeVisible({ timeout: 30_000 })
+  // The inspection is async: before it lands the footer still holds a disabled "Add project", so wait until one of the
+  // choices its real kind offers is enabled instead of racing that placeholder.
+  await expect(async () => {
+    for (const name of ['Add project', 'Add without a repository', 'Enable Jujutsu and add']) {
+      const button = setup.getByRole('button', { name, exact: true })
+      if ((await button.count()) === 0 || !(await button.isEnabled())) continue
+      await button.click()
+      return
+    }
+    throw new Error(`The setup step for ${path} is still inspecting.`)
+  }).toPass({ timeout: 20_000 })
+  await expect(setup).toBeHidden()
 }
 
 /** Send a message from whichever composer is on screen and wait until that turn settles. */
@@ -60,7 +83,10 @@ export const selectModelForNewThread = async (page: Page, model: string): Promis
 
 /** Start a New thread in a project or register an absolute folder path, then choose its model. */
 export const startThreadWithModel = async (page: Page, input: { readonly project: string; readonly model: string }): Promise<void> => {
-  await page.getByRole('button', { name: /^New (session|thread)$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^New (session|thread)$/ })
+    .first()
+    .click()
   await expect(page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })).toBeVisible()
   const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
   const expectedProject = input.project.startsWith('/') ? basename(input.project) : input.project
@@ -89,3 +115,5 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
   await expect(projectButton).toHaveText(expectedProject)
   await selectModelForNewThread(page, input.model)
 }
+
+// marker-1794103637

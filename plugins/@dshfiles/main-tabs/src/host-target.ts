@@ -21,7 +21,7 @@ const THREADS_DIRECTORY_SUFFIX = '-threads'
 
 /** jj-integration puts a thread's own workspace at `<project>-threads/<name>`; thread-sidebar files it under `<project>`. */
 const owningProject = (workspace: WorkspaceRow, byPath: ReadonlyMap<string, WorkspaceRow>): WorkspaceRow => {
-  const parent = workspace.path.slice(0, workspace.path.lastIndexOf('/'))
+  const parent = workspace.path.slice(0, Math.max(workspace.path.lastIndexOf('/'), workspace.path.lastIndexOf('\\')))
   if (!parent.endsWith(THREADS_DIRECTORY_SUFFIX)) return workspace
   return byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)) ?? workspace
 }

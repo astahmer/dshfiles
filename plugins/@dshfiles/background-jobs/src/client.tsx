@@ -19,7 +19,7 @@ import { PROCESSES_JOBS_TAB, ProcessesNavigation, ProcessViews } from './process
 import { BACKGROUND_JOBS_LOCALE_NAMESPACE, backgroundJobsLocale } from './locales.js'
 
 const PANEL_ID = 'dshfiles-background-jobs'
-/** The thread panel's Jobs facet (plans/ade-ux §4.4): a page tab type of the right pane. */
+/** The thread panel's Jobs facet (docs/ade-ux §4.4): a page tab type of the right pane. */
 const JOBS_FACET_ID = 'dshfiles-background-jobs-thread'
 
 const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
@@ -63,7 +63,7 @@ export default defineClient({
         decorate(ProcessesGlyph),
       ),
     )
-    // Observe › Processes (plans/ade-ux §6): this page is Jobs, Dev servers and RAM; the former RAM page and saved tabs
+    // Observe › Processes (docs/ade-ux §6): this page is Jobs, Dev servers and RAM; the former RAM page and saved tabs
     // land on its tabs through this contract.
     const openProcesses = (tab: string = PROCESSES_JOBS_TAB): void => {
       Processes.select(tab)

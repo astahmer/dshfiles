@@ -1,5 +1,5 @@
 /**
- * The one mention and entity registry (plan `plans/ade-ux` §5 `entityProvider`, §6 "7 `@` sources, 3 preview overlays").
+ * The one mention and entity registry (plan `docs/ade-ux` §5 `entityProvider`, §6 "7 `@` sources, 3 preview overlays").
  *
  * Every plugin that knows a kind of thing a user can mention or reference (an agent, a backlog item, a memory note, an
  * MCP server, a skill, a thread or file) adds one `EntityKinds` item. Input-trigger, which owns the `@` engine every
@@ -125,6 +125,7 @@ export type EntityAnchorMeasurement =
   | { readonly kind: 'gone' }
 
 const PREVIEW_EVENT = 'dshfiles:entity-preview'
+const DISMISS_EVENT = 'dshfiles:entity-preview-dismiss'
 const ANCHOR_ATTRIBUTE = 'data-dshfiles-entity-anchor'
 const MAX_ID_CHARS = 512
 const MAX_KIND_CHARS = 64
@@ -202,9 +203,16 @@ const request = (input: { readonly kind: string; readonly id: string; readonly r
   return true
 }
 
+/** Hide the open card after its grace period; a link that loses the pointer or focus asks for this. */
+const dismiss = (): void => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(DISMISS_EVENT))
+}
+
 /** The shared reference-preview card's page protocol: providers request, input-trigger's overlay listens. */
 export class EntityPreview {
   static readonly event = PREVIEW_EVENT
+  static readonly dismissEvent = DISMISS_EVENT
   /** The attribute the shared card marks its root with; link installers skip text inside it. */
   static readonly cardAttribute = 'data-dshfiles-entity-preview'
   static readonly anchorAttribute = ANCHOR_ATTRIBUTE
@@ -212,4 +220,5 @@ export class EntityPreview {
   static readonly measure = measure
   static readonly decodeRequest = decodeRequest
   static readonly request = request
+  static readonly dismiss = dismiss
 }

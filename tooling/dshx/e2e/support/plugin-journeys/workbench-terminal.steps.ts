@@ -4,7 +4,7 @@ import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { After, Then, When } from '../bdd.js'
 import { recordAssertion } from '../steps.js'
-import { createScratchDirectory } from '../threads.js'
+import { confirmFolderSetupStep, createScratchDirectory } from '../threads.js'
 
 const regions = ['main', 'right', 'left', 'bottom'] as const
 type Region = (typeof regions)[number]
@@ -97,6 +97,7 @@ When('a disposable terminal workspace has a selected real conversation', async (
   await picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true }).fill(workspace)
   await picker.getByRole('button', { name: 'Register project', exact: true }).first().click()
   await expect(picker).toBeHidden()
+  await confirmFolderSetupStep(page, workspace)
   await expect.poll(() => new URL(page.url()).searchParams.get('thread')).not.toBeNull()
   const sessionId = new URL(page.url()).searchParams.get('thread')
   if (sessionId === null) throw new Error('The actual terminal Session was not created')

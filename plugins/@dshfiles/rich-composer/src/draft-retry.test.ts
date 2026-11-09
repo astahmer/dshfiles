@@ -59,6 +59,7 @@ function fixture() {
     track: () => undefined,
     arbitrate: () => 'pass',
     onSpace: () => false,
+    restoreReferences: () => [],
     serializeReference,
     adjudicate: async () => undefined,
     resolveClaim: async () => undefined,

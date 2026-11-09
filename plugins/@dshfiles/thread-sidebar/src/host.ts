@@ -37,6 +37,10 @@ import { SessionEvents, attentionRecorder, inflightTracker } from './session-eve
 import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
 import { threadSidebarSettings } from './settings.js'
 import { underSettledSession } from './settled-gate.js'
+import { ThreadSubscriptionActions } from './subscription-actions.js'
+import { subscriptionChangeEvents, subscriptionNoticeHostLayer, subscriptionNoticer } from './subscription-notices-host.js'
+import { threadSubscriptionsApi } from './subscriptions-api.js'
+import { ThreadSubscriptions } from './subscriptions-store.js'
 import { SidebarHost } from './sidebar-host-promise.js'
 import { SidebarSettings } from './sidebar-settings.js'
 import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
@@ -102,6 +106,8 @@ const threads = threadCommandsLayer.pipe(Layer.provideMerge(Layer.mergeAll(Threa
 
 const services = Layer.mergeAll(
   ThreadAttention.layer,
+  subscriptionNoticeHostLayer,
+  ThreadSubscriptionActions.layer.pipe(Layer.provideMerge(ThreadSubscriptions.layer)),
   restart,
   autoSettle,
   threads,
@@ -115,6 +121,8 @@ const workers = Layer.mergeAll(
   bootRecovery,
   settledGate,
   modelRouteProjection,
+  subscriptionNoticer,
+  subscriptionChangeEvents,
   FinishedTurnAttention.layer.pipe(Layer.provide(HostApis.layer)),
 )
 
@@ -203,7 +211,15 @@ export default DshxPlugin.make({
     Api.bind(threadActionsApi, {
       list: (input, call) => ThreadActions.use(actions => actions.list({ input, caller: call.caller })),
       references: (input, call) => ThreadActions.use(actions => actions.references({ input, caller: call.caller })),
-      archive: (input, call) => ThreadActions.use(actions => actions.archive({ input, caller: call.caller })),
+      archive: (input, call) =>
+        ThreadActions.use(actions => actions.archive({ input, caller: call.caller })).pipe(
+          // An archived thread neither notifies nor is notified: drop its edges with the archive, not at the next notice.
+          Effect.tap(result =>
+            result.status === 'archived'
+              ? ThreadSubscriptions.use(subscriptions => subscriptions.prune(new Set([result.sessionId]))).pipe(Effect.ignore)
+              : Effect.void,
+          ),
+        ),
       unarchive: (input, call) => ThreadActions.use(actions => actions.unarchive({ input, caller: call.caller })),
       settle: (input, call) => ThreadActions.use(actions => actions.settle({ input, caller: call.caller })),
       unsettle: (input, call) => ThreadActions.use(actions => actions.unsettle({ input, caller: call.caller })),
@@ -233,6 +249,11 @@ export default DshxPlugin.make({
       delete: input => ThreadViews.use(views => views.delete(input)),
       move: input => ThreadViews.use(views => views.move(input)),
       select: input => ThreadViews.use(views => views.select(input)),
+    }),
+    Api.bind(threadSubscriptionsApi, {
+      state: (input, call) => ThreadSubscriptionActions.use(actions => actions.state(input, call.caller)),
+      subscribe: (input, call) => ThreadSubscriptionActions.use(actions => actions.subscribe(input, call.caller)),
+      unsubscribe: (input, call) => ThreadSubscriptionActions.use(actions => actions.unsubscribe(input, call.caller)),
     }),
     Api.bind(threadSidebarAutoSettleApi, {
       status: () => AutoSettle.use(autoSettle => autoSettle.status),

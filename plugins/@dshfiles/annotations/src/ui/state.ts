@@ -26,6 +26,9 @@ interface PickOrigin {
 
 const initialState: AnnotationsUiState = { scope: null, owner: null, pickMode: false, mode: 'element', picked: null }
 
+/** Each action keeps its own composer draft writer; the overlay looks it up by owner so it never calls a stale one. */
+const draftWriters = new Map<string, (text: string) => boolean>()
+
 let state: AnnotationsUiState = initialState
 const listeners = new Set<() => void>()
 
@@ -44,6 +47,11 @@ const snapshot = (): AnnotationsUiState => state
 
 export const annotationsUi = {
   snapshot,
+  registerDraftWriter: ({ owner, insertText }: { readonly owner: string; readonly insertText: (text: string) => boolean }): void => {
+    draftWriters.set(owner, insertText)
+  },
+  /** Insert through the owning composer's latest writer; false when it is gone or refuses the text. */
+  insertIntoDraft: ({ owner, text }: { readonly owner: string; readonly text: string }): boolean => draftWriters.get(owner)?.(text) ?? false,
   beginPick: ({ scope, owner, mode }: PickOrigin & { readonly mode: PickMode }): void => {
     state = { scope, owner, pickMode: true, mode, picked: null }
     emit()
@@ -69,6 +77,7 @@ export const annotationsUi = {
   },
   /** Drop a pick when the action running it leaves; a pick another composer started is not this one's to end. */
   release: (owner: string): void => {
+    draftWriters.delete(owner)
     if (state.owner !== owner) return
     state = initialState
     emit()

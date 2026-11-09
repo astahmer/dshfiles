@@ -58,11 +58,18 @@ const draftAttachmentApiShape = Schema.Struct({
 })
 
 const sessionInputShape = Schema.Struct({ input: Schema.Struct({ for: anyFunctionSchema }) })
+/** The composer's chip-restore verb; absent on a client bundle older than the composer that added it. */
+const restoreReferencesShape = Schema.Struct({ restoreReferences: anyFunctionSchema })
 
 // Only the shape is checked; callers keep the original object, whose methods rely on their own `this`.
 const hasDraftAttachmentApi = (value: unknown): value is DraftAttachmentApi => Option.isSome(Schema.decodeUnknownOption(draftAttachmentApiShape)(value))
 
 const hasSessionInput = (value: unknown): value is ConversationWithInput => Option.isSome(Schema.decodeUnknownOption(sessionInputShape)(value))
+
+const restoreComposerReferences = (composer: SessionInput): void => {
+  const parsed = Schema.decodeUnknownOption(restoreReferencesShape)(composer)
+  if (Option.isSome(parsed)) parsed.value.restoreReferences()
+}
 
 const isAttachmentId = (value: string): value is AttachmentIdType => value.length > 0
 const isReceiptId = (value: string): value is ReceiptId => value.length > 0
@@ -188,6 +195,7 @@ const createEditor = (input: {
   readonly session: SessionFace
   readonly composer: SessionInput
   readonly drafts: DraftAttachmentApi
+  readonly canRestoreReferences: boolean
 }): QueueEditor => {
   const inbox = input.session.projections.faceOf('inbox')
   const key: string = input.sessionId
@@ -216,6 +224,9 @@ const createEditor = (input: {
       subscribe: listener => input.composer.state.subscribe(listener),
       setDraft: text => input.composer.setDraft(text),
       addAttachments: ids => input.composer.addAttachments(ids),
+      restoreReferences: () => {
+        restoreComposerReferences(input.composer)
+      },
       removeAttachment: id => {
         input.composer.removeAttachment(id)
       },
@@ -260,7 +271,13 @@ const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['sessionId']): 
   existing?.editor.dispose()
   const conversation = scoped.get('conversation')
   if (!hasDraftAttachmentApi(conversation) || !hasSessionInput(conversation)) return undefined
-  const editor = createEditor({ sessionId, session: binding.session, composer: conversation.input.for(scoped), drafts: conversation })
+  const editor = createEditor({
+    sessionId,
+    session: binding.session,
+    composer: conversation.input.for(scoped),
+    drafts: conversation,
+    canRestoreReferences: ctx.get('inputTriggers') !== undefined,
+  })
   let reference: { release(): void } | undefined
   const retainWhileEditing = (): void => {
     const editing = QueueEditModel.retainsSession(editor.getSnapshot())

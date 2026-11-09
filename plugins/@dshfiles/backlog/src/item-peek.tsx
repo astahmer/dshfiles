@@ -1198,7 +1198,7 @@ const PeekBody = (props: {
   }, [item.id])
   const captured = item.events.find(event => event.kind === 'created')?.detail.trim() ?? ''
   const showCapture = captured !== '' && captured !== `${item.title}\n${item.body}`.trim() && captured !== item.title.trim()
-  const relationshipLinks = BacklogItems.uniqueLinks(item.links)
+  const relationshipLinks = BacklogItems.uniqueLinks(item.links).filter(link => link.type !== 'thread' || BacklogItems.isSessionId(link.target))
   const threadsById = new Map(props.threads.map(thread => [thread.id, thread]))
   const threadTitleCounts = new Map<string, number>()
   for (const link of relationshipLinks) {

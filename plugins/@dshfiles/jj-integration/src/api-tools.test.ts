@@ -24,6 +24,8 @@ describe('jj-integration tool exposure', () => {
       'jj_thread_review_history',
       'jj_thread_status',
       'jj_thread_rebase',
+      'jj_workspace_setup',
+      'jj_cancel_workspace_setup',
       'jj_thread_workspace_sync',
       'jj_thread_discard',
       'jj_thread_discard_many',

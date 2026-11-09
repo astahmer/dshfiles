@@ -27,6 +27,7 @@
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
+    "@dshfiles/session-log-window": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
@@ -35,7 +36,11 @@
     "@deepseek-ai/dsh": "0.2.1-rc.2",
     "@deepseek-ai/dsh-home-paths": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
+    "@deepseek-ai/dsh-session-persistence": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-session-projection": "catalog:",
+    "@deepseek-ai/dsh-session-projection-cache": "0.2.1-rc.2",
     "@deepseek-ai/dsh-session-query": "catalog:",
+    "@deepseek-ai/dsh-session-title": "0.2.1-rc.2",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",
@@ -47,7 +52,11 @@
     "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-home-paths": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-session": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session-persistence": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session-projection": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session-projection-cache": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-session-query": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session-title": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0"
   },
   "dsh": {

@@ -137,7 +137,12 @@ function BoardsBody(props: {
     return (
       <Alert variant="warning">
         <AlertTitle>The whiteboard Host plugin is not running</AlertTitle>
-        <AlertDescription>Restart DSH so the updated @dshfiles/whiteboard Host bundle loads, then reload this page.</AlertDescription>
+        <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          Retry once DSH is back; if it keeps failing, restart DSH so the updated @dshfiles/whiteboard Host bundle loads, then reload this page.
+          <Button variant="outline" size="sm" onClick={() => void list.refetch()}>
+            Retry
+          </Button>
+        </AlertDescription>
       </Alert>
     )
   if (list.isError)

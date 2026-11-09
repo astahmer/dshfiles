@@ -95,7 +95,37 @@ export class SessionReads extends Context.Service<
         return result
       })
 
-      const recent = yield* Cache.makeWith(read, { capacity: 4, timeToLive: exit => (exit._tag === 'Success' ? Duration.infinity : Duration.zero) })
+      /**
+       * The last few threads recall read whole, so one search does not decode the same log twice. Each entry is a full
+       * decoded log — the largest here is 283 MB compressed — so the table is small, expires, and skips a log too big to
+       * keep: four infinite-lived entries were holding gigabytes of a 3 GB Host heap.
+       */
+      const RECENT_CAPACITY = 2
+      const RECENT_TTL_MS = 5 * 60_000
+      const RECENT_MAX_EVENTS = 5_000
+      const recent = new Map<string, { readonly log: SessionLog; readonly at: number }>()
+      const readRecent = (sessionId: string) =>
+        Effect.suspend(() => {
+          const kept = recent.get(sessionId)
+          if (kept !== undefined && Date.now() - kept.at < RECENT_TTL_MS) {
+            recent.delete(sessionId)
+            recent.set(sessionId, kept)
+            return Effect.succeed(kept.log)
+          }
+          return read(sessionId).pipe(
+            Effect.tap(log =>
+              Effect.sync(() => {
+                if (log.events.length > RECENT_MAX_EVENTS) return
+                recent.delete(sessionId)
+                recent.set(sessionId, { log, at: Date.now() })
+                for (const key of recent.keys()) {
+                  if (recent.size <= RECENT_CAPACITY) break
+                  recent.delete(key)
+                }
+              }),
+            ),
+          )
+        })
 
       const listAll = Effect.gen(function* () {
         const sessionQuery = currentHostService('sessionQuery')
@@ -180,7 +210,7 @@ export class SessionReads extends Context.Service<
 
       return SessionReads.of({
         read,
-        readRecent: sessionId => Cache.get(recent, sessionId),
+        readRecent,
         list: Cache.get(listed, 'sessions'),
         titles,
         searchContent,

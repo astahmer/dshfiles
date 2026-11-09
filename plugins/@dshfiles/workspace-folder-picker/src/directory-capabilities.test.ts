@@ -6,6 +6,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 import plugin from './host.js'
+import { projectLifecycleApi } from './project-lifecycle-api.js'
 import { ProjectFolderPickerModel } from './picker/project-folder-picker-model.js'
 
 let nativePicks = 0
@@ -23,7 +24,10 @@ class CountingNativePicker extends DirectoryPicker {
   }
 }
 
-const mountedPicker = (backend: 'native' | 'browse' | 'none') =>
+const mountedPicker = (
+  backend: 'native' | 'browse' | 'none',
+  workspaces: readonly { readonly id: string; readonly title: string; readonly path: string }[] = [],
+) =>
   Effect.gen(function* () {
     nativePicks = 0
     const host = yield* Effect.acquireRelease(
@@ -31,7 +35,11 @@ const mountedPicker = (backend: 'native' | 'browse' | 'none') =>
       created => Effect.promise(() => created.dispose()),
     )
     // SAFETY: capability reads and folder listing never call the project services this plugin injects.
-    const releaseServices = [host.ctx.provide('subprocess', {} as never), host.ctx.provide('workspaceController', {} as never)]
+    const releaseServices = [
+      host.ctx.provide('subprocess', {} as never),
+      host.ctx.provide('workspaceController', {} as never),
+      host.ctx.provide('workspaceRegistry', { list: () => workspaces } as never),
+    ]
     yield* Effect.addFinalizer(() => Effect.sync(() => releaseServices.forEach(release => release())))
     const picker =
       backend === 'none'
@@ -40,7 +48,11 @@ const mountedPicker = (backend: 'native' | 'browse' | 'none') =>
             backend === 'native' ? host.ctx.plugin(CountingNativePicker) : host.ctx.plugin(BrowseDirectoryPicker, { maxEntries: 10 }),
           )
     yield* Effect.promise(() => host.mount(plugin, { packageId: '@dshfiles/workspace-folder-picker' }))
-    return { picker, api: createHostApiClient(host.ctx, workspaceFolderBrowserApi, '@test/capabilities') }
+    return {
+      picker,
+      api: createHostApiClient(host.ctx, workspaceFolderBrowserApi, '@test/capabilities'),
+      lifecycle: createHostApiClient(host.ctx, projectLifecycleApi, '@test/lifecycle'),
+    }
   })
 
 describe('directory picker capabilities', () => {
@@ -88,6 +100,19 @@ describe('directory picker capabilities', () => {
   it.effect('exposes the capability read as a read-only agent tool', () =>
     Effect.sync(() => {
       expect(workspaceFolderBrowserApi.methods.capabilities.tool).toMatchObject({ name: 'workspace_folder_browser_capabilities', readOnly: true })
+    }),
+  )
+
+  it.live('lists registered projects and leaves jj thread workspaces out', () =>
+    Effect.gen(function* () {
+      const { lifecycle } = yield* mountedPicker('none', [
+        { id: 'project-1', title: 'dshfiles', path: '/Users/me/dev/dshfiles' },
+        { id: 'thread-1', title: 'thread', path: '/Users/me/dev/dshfiles-threads/thread-7ce777' },
+      ])
+      expect(yield* Effect.promise(() => lifecycle.projects({}))).toEqual({
+        projects: [{ workspaceId: 'project-1', title: 'dshfiles', path: '/Users/me/dev/dshfiles' }],
+      })
+      expect(projectLifecycleApi.methods.projects.tool).toMatchObject({ name: 'project_projects', readOnly: true })
     }),
   )
 })

@@ -17,11 +17,11 @@ export class ProviderCredentials extends Context.Service<
     readonly resolve: (input: {
       readonly provider: string
       readonly connection: Pick<ProviderConnection, 'credential'>
-                readonly environmentVariables: readonly string[]
-          readonly fallback?: Effect.Effect<Option.Option<Redacted.Redacted>> | undefined
-          /** How to sign the fallback tool in, named in the failure so the message is actionable. */
-          readonly fallbackHint?: string | undefined
-        }) => Effect.Effect<ResolvedCredential, BacklogProviderFailed>
+      readonly environmentVariables: readonly string[]
+      readonly fallback?: Effect.Effect<Option.Option<Redacted.Redacted>> | undefined
+      /** How to sign the fallback tool in, named in the failure so the message is actionable. */
+      readonly fallbackHint?: string | undefined
+    }) => Effect.Effect<ResolvedCredential, BacklogProviderFailed>
   }
 >()('@dshfiles/backlog/ProviderCredentials') {
   static readonly layer = Layer.effect(

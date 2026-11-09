@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { availableParallelism } from 'node:os'
 import { turboCacheDir } from './turbo-cache.mjs'
 
@@ -10,7 +11,9 @@ const concurrency = process.env.TURBO_CONCURRENCY ?? (inCi ? '1' : String(Math.m
 
 // Package scripts and the supervisor start turbo through here so every JJ workspace shares one cache, inside or
 // outside the Nix dev shell; a thread workspace with its own empty cache rebuilds everything once.
-const child = spawn('turbo', process.argv.slice(2), {
+// Windows only has turbo.cmd/.ps1 shims, which spawn cannot run without a shell; run the package's JS entry instead.
+const [command, prefix] = process.platform === 'win32' ? [process.execPath, [createRequire(import.meta.url).resolve('turbo/bin/turbo')]] : ['turbo', []]
+const child = spawn(command, [...prefix, ...process.argv.slice(2)], {
   stdio: 'inherit',
   env: { ...process.env, TURBO_CACHE_DIR: turboCacheDir(), TURBO_CONCURRENCY: concurrency },
 })

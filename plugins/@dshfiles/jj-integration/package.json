@@ -21,6 +21,14 @@
     "./settings": {
       "types": "./src/settings.ts",
       "default": "./dist/settings.js"
+    },
+    "./merged-pull-requests": {
+      "types": "./src/merged-pull-requests.ts",
+      "default": "./dist/merged-pull-requests.js"
+    },
+    "./no-folder": {
+      "types": "./src/no-folder.ts",
+      "default": "./dist/no-folder.js"
     }
   },
   "scripts": {

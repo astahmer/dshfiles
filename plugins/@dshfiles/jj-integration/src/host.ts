@@ -26,6 +26,7 @@ import { jjIntegrationSettings } from './settings.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { ThreadWorkspaces } from './thread-workspaces.js'
 import { WorkspaceSync } from './workspace-sync.js'
+import { WorkspaceSetupService } from './workspace-setup.js'
 
 const JJ_TIMEOUT = Duration.minutes(2)
 const JJ_PROVIDER_PRIORITY = 100
@@ -46,7 +47,7 @@ const BaseLive = Layer.mergeAll(
 )
 
 const JjIntegrationLive = Layer.mergeAll(MaintenanceLive, HostHooksLive, IntegrationQueue.layer).pipe(
-  Layer.provideMerge(Layer.mergeAll(AutoIntegration.layer, Cleanup.layer, ThreadLifecycle.layer, LandAttention.layer)),
+  Layer.provideMerge(Layer.mergeAll(AutoIntegration.layer, Cleanup.layer, ThreadLifecycle.layer, LandAttention.layer, WorkspaceSetupService.layer)),
   Layer.provideMerge(Landing.layer),
   Layer.provideMerge(Layer.mergeAll(RepositoryViews.layer, WorkspaceSync.layer)),
   Layer.provideMerge(SessionActivity.layer),
@@ -83,6 +84,8 @@ const handlers = Api.handlers(jjIntegrationApi, {
   threadStatus: (input, call) => ThreadLifecycle.use(lifecycle => lifecycle.threadStatus(input, call.caller)),
   landThread: (input, call) => ThreadLifecycle.use(lifecycle => lifecycle.landThread(input, call.caller)),
   workspaceSync: () => WorkspaceSync.use(sync => Effect.map(sync.current, current => ({ sync: current }))),
+  workspaceSetup: input => WorkspaceSetupService.use(setup => setup.ensure(input)),
+  cancelWorkspaceSetup: input => WorkspaceSetupService.use(setup => setup.cancel(input)),
   discard: input => ThreadLifecycle.use(lifecycle => lifecycle.discard(input)),
   discardMany: input => ThreadLifecycle.use(lifecycle => lifecycle.discardMany(input)),
   cleanupWorkspaces: input =>

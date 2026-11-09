@@ -1,5 +1,5 @@
 /**
- * One status per thread row, in the ADE vocabulary (plan `plans/ade-ux` §4.7), and the groups the default thread list
+ * One status per thread row, in the ADE vocabulary (plan `docs/ade-ux` §4.7), and the groups the default thread list
  * shows: Pinned on top, then Needs you · Working · Ready · Idle · Done.
  *
  * "Needs you" and "Failed" are a projection of the inbox (§4.8): an open inbox item about the thread (subject kind

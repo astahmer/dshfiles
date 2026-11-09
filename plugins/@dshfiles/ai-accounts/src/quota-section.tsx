@@ -30,7 +30,7 @@ export const QuotaSection = (props: { readonly state: AccountsPanelState }): JSX
       }
       heading="Quota"
     >
-      <UsageRefreshNotice failure={failure} hasReading={usage !== null} onRetry={() => void refresh()} refreshing={refreshing} />
+      <UsageRefreshNotice failure={failure} onRetry={() => void refresh()} refreshing={refreshing} />
       <UsageCardView
         history={history}
         now={usage?.readAt ?? 0}

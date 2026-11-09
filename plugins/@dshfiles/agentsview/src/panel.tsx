@@ -12,7 +12,7 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ArrowLeftIcon, CopyIcon, RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { type JSX, useMemo, useState } from 'react'
+import { type JSX, memo, useCallback, useMemo, useState } from 'react'
 import { agentSessionsApi } from './api.js'
 import { SessionFormat } from './format.js'
 import { AgentLogs } from './parsers.js'
@@ -79,49 +79,57 @@ const TokenLine = (props: { readonly session: SessionSummary; readonly t: Agents
   )
 }
 
-const SessionRow = (props: {
-  readonly session: SessionSummary
-  readonly selected: boolean
-  readonly snippet?: string | undefined
-  readonly now: number
-  readonly t: AgentsviewTranslate
-  readonly onOpen: () => void
-}): JSX.Element => {
-  const { session, t } = props
-  return (
-    <li>
-      <button
-        type="button"
-        data-agent-session={session.key}
-        aria-current={props.selected ? 'true' : undefined}
-        onClick={props.onOpen}
-        className={cn(
-          'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-transparent dshx:px-3 dshx:py-2 dshx:text-left dshx:hover:bg-accent',
-          props.selected && 'dshx:border-border dshx:bg-accent',
-        )}
-      >
-        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-          <Badge variant="outline" className="dshx:shrink-0">
-            {AgentLogs.label(session.agent)}
-          </Badge>
-          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium">{session.title}</span>
-          <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{ageOf(session.updatedAt, props.now, t)}</span>
-        </span>
-        {props.snippet === undefined ? null : <span className="dshx:line-clamp-2 dshx:text-xs dshx:text-foreground/80">{props.snippet}</span>}
-        <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:gap-x-3 dshx:gap-y-0.5 dshx:text-xs dshx:text-muted-foreground">
-          {session.cwd === null ? null : <span className="dshx:min-w-0 dshx:truncate dshx:font-mono!">{SessionFormat.shortPath(session.cwd)}</span>}
-          <span className="dshx:tabular-nums">
-            {session.userMessages === 1 ? t('promptCountOne') : t('promptCount', { count: session.userMessages })} ·{' '}
-            {session.toolCalls === 1 ? t('toolCountOne') : t('toolCount', { count: session.toolCalls })}
-          </span>
-          <span className="dshx:@max-pane-narrow:hidden">
-            <TokenLine session={session} t={t} />
-          </span>
-        </span>
-      </button>
-    </li>
-  )
+interface SessionSelection {
+  readonly key: string
+  readonly startAt: number | null
 }
+
+const SessionRow = memo(
+  (props: {
+    readonly session: SessionSummary
+    readonly selected: boolean
+    readonly snippet?: string | undefined
+    readonly startAt?: number | null
+    readonly now: number
+    readonly t: AgentsviewTranslate
+    readonly onOpen: (selection: SessionSelection) => void
+  }): JSX.Element => {
+    const { session, t } = props
+    return (
+      <li>
+        <button
+          type="button"
+          data-agent-session={session.key}
+          aria-current={props.selected ? 'true' : undefined}
+          onClick={() => props.onOpen({ key: session.key, startAt: props.startAt ?? null })}
+          className={cn(
+            'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-transparent dshx:px-3 dshx:py-2 dshx:text-left dshx:hover:bg-accent',
+            props.selected && 'dshx:border-border dshx:bg-accent',
+          )}
+        >
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+            <Badge variant="outline" className="dshx:shrink-0">
+              {AgentLogs.label(session.agent)}
+            </Badge>
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium">{session.title}</span>
+            <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{ageOf(session.updatedAt, props.now, t)}</span>
+          </span>
+          {props.snippet === undefined ? null : <span className="dshx:line-clamp-2 dshx:text-xs dshx:text-foreground/80">{props.snippet}</span>}
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:gap-x-3 dshx:gap-y-0.5 dshx:text-xs dshx:text-muted-foreground">
+            {session.cwd === null ? null : <span className="dshx:min-w-0 dshx:truncate dshx:font-mono!">{SessionFormat.shortPath(session.cwd)}</span>}
+            <span className="dshx:tabular-nums">
+              {session.userMessages === 1 ? t('promptCountOne') : t('promptCount', { count: session.userMessages })} ·{' '}
+              {session.toolCalls === 1 ? t('toolCountOne') : t('toolCount', { count: session.toolCalls })}
+            </span>
+            <span className="dshx:@max-pane-narrow:hidden">
+              <TokenLine session={session} t={t} />
+            </span>
+          </span>
+        </button>
+      </li>
+    )
+  },
+)
 
 const ItemCard = (props: { readonly item: TranscriptItem; readonly t: AgentsviewTranslate }): JSX.Element => {
   const { item, t } = props
@@ -299,7 +307,8 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
   const [text, setText] = useState('')
   const [submitted, setSubmitted] = useState<string | null>(null)
   const [limit, setLimit] = useState(PAGE)
-  const [selected, setSelected] = useState<{ readonly key: string; readonly startAt: number | null } | null>(null)
+  const [selected, setSelected] = useState<SessionSelection | null>(null)
+  const openSession = useCallback((selection: SessionSelection) => setSelected(selection), [])
   const filter = useDebouncedValue({ value: text.trim(), delayMs: 200 })
 
   const sources = useQuery({
@@ -371,9 +380,10 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
                 session={hit.session}
                 snippet={hit.itemIndex === null ? `${t('matchInTitle')}: ${hit.snippet}` : `${t(KIND_KEY[hit.kind ?? 'user'])}: ${hit.snippet}`}
                 selected={selected?.key === hit.session.key}
+                startAt={hit.itemIndex}
                 now={now}
                 t={t}
-                onOpen={() => setSelected({ key: hit.session.key, startAt: hit.itemIndex })}
+                onOpen={openSession}
               />
             ))}
           </ul>
@@ -403,14 +413,7 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
         {rows.length === 0 && !noSources ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noSessions')}</p> : null}
         <ul aria-label={t('title')} className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto">
           {rows.map(session => (
-            <SessionRow
-              key={session.key}
-              session={session}
-              selected={selected?.key === session.key}
-              now={now}
-              t={t}
-              onOpen={() => setSelected({ key: session.key, startAt: null })}
-            />
+            <SessionRow key={session.key} session={session} selected={selected?.key === session.key} now={now} t={t} onOpen={openSession} />
           ))}
         </ul>
         {rows.length < list.data.total ? (

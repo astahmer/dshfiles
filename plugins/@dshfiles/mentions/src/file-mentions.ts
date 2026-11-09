@@ -10,6 +10,17 @@ const sessionFileAddress = (sessionId: string, path: string): string => {
   return `${FILE_ADDRESS_PREFIX}session/${encodeSegment(sessionId)}/${normalized.split('/').map(encodeSegment).join('/')}`
 }
 
+/** One `@path` token already written in plain text. */
+export interface FileMentionMatch {
+  /** Offset of the leading `@`. */
+  readonly start: number
+  readonly end: number
+  /** The exact mention spelling, quotes included. */
+  readonly mention: string
+  readonly path: string
+  readonly kind: 'file' | 'directory'
+}
+
 /** The `@path` grammar the native reference chips, send-time serialization and the model prompt agree on. */
 export class FileMentions {
   /** `@path`, `@"path with spaces"`, or an open `@"dir/` for a quoted directory; undefined for a path the editor cannot hold. */
@@ -46,5 +57,37 @@ export class FileMentions {
     if (root !== '' && normalized === root) return sessionFileAddress(input.sessionId, '')
     if (root !== '' && normalized.startsWith(`${root}/`)) return sessionFileAddress(input.sessionId, normalized.slice(root.length + 1))
     return sessionFileAddress(input.sessionId, normalized)
+  }
+
+  /**
+   * Every file mention a written text still names: a quoted `@"path"` always, and an unquoted `@path` when the path
+   * looks like one (a separator or an extension) and is not another mention scope such as `@agent:` or `@{luna}`.
+   */
+  static matches(text: string): readonly FileMentionMatch[] {
+    const matches: FileMentionMatch[] = []
+    for (const quoted of text.matchAll(/@"([^"\n]*)"/gu)) {
+      const path = quoted[1]
+      if (path === undefined || path === '') continue
+      const start = quoted.index ?? 0
+      matches.push({ start, end: start + quoted[0].length, mention: quoted[0], path, kind: /[\\/]$/u.test(path) ? 'directory' : 'file' })
+    }
+    // A quoted directory keeps its quote open until the writer types the closing one or moves on.
+    const open = /@"([^"\n]*)$/u.exec(text)
+    const openPath = open?.[1]
+    if (open !== null && openPath !== undefined && openPath !== '' && /[\\/]$/u.test(openPath)) {
+      const start = open.index
+      matches.push({ start, end: start + open[0].length, mention: open[0], path: openPath, kind: 'directory' })
+    }
+    // A Windows Host writes absolute mentions as `@C:\repo\a.ts`: the drive's colon is part of the path there.
+    for (const bare of text.matchAll(/(?<![\w@/"])(@(?:[A-Za-z]:[\\/])?[^\s"',;:()]+)/gu)) {
+      const raw = bare[1]?.slice(1)
+      if (raw === undefined) continue
+      const path = raw.replace(/[.,;:!?]+$/u, '')
+      if (path === '' || path.startsWith('{') || !(/[\\/]/u.test(path) || /\.[\w-]+$/u.test(path))) continue
+      const start = bare.index ?? 0
+      const mention = `@${path}`
+      matches.push({ start, end: start + mention.length, mention, path, kind: 'file' })
+    }
+    return matches.sort((left, right) => left.start - right.start)
   }
 }

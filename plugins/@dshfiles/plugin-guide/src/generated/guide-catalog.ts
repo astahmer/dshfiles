@@ -894,7 +894,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "InlineReferences",
       "importFrom": "@dshfiles/chat/inline-references",
       "owner": "@dshfiles/chat",
-      "source": "plugins/@dshfiles/chat/src/inline-references.tsx:94",
+      "source": "plugins/@dshfiles/chat/src/inline-references.tsx:95",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/chat.inline-reference",
@@ -916,7 +916,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/chat/inline-reference-markdown",
       "kind": "module",
       "title": "@dshfiles/chat/inline-reference-markdown",
-      "summary": "The native Markdown renderer with the inline-reference registry applied (see `./inline-references.tsx`). A separate module so a provider that only defines references never loads the native renderer.",
+      "summary": "The native Markdown renderer with the inline-reference registry (see `./inline-references.tsx`) and the code-fence registry (see `./code-fences.tsx`) applied. A separate module so a provider that only defines references or fences never loads the native renderer.",
       "publicSymbol": "InlineReferenceMarkdown",
       "importFrom": "@dshfiles/chat/inline-reference-markdown",
       "owner": "@dshfiles/chat",
@@ -929,6 +929,48 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/chat/src/inline-reference-markdown.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "CodeFences",
+      "importFrom": "@dshfiles/chat/code-fences",
+      "owner": "@dshfiles/chat",
+      "source": "plugins/@dshfiles/chat/src/code-fences.tsx:37",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/chat.code-fence",
+      "kind": "registry",
+      "title": "CodeFences",
+      "summary": "Add one with `plugin.add(CodeFences, { id, languages: ['mermaid'], Component })`.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(CodeFences, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/chat renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/chat.code-fence"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/chat/fenced-markdown",
+      "kind": "module",
+      "title": "@dshfiles/chat/fenced-markdown",
+      "summary": "The native Markdown renderer with only the code-fence registry applied (see `./code-fences.tsx`): for Markdown that is not an assistant answer (reasoning, compaction summaries, question text) and should not grow inline-reference links, yet should show a ```` ```mermaid ```` fence the way the answer does.",
+      "publicSymbol": "FencedMarkdown",
+      "importFrom": "@dshfiles/chat/fenced-markdown",
+      "owner": "@dshfiles/chat",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/chat/src/fenced-markdown.tsx",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1106,6 +1148,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/input-trigger/entity-reference",
+      "kind": "module",
+      "title": "@dshfiles/input-trigger/entity-reference",
+      "summary": "One hover-to-preview wrapper for every reference kind: a dwell opens the shared entity card under the element, focus opens it at once, and leaving or blurring dismisses it after the card's own grace period. Providers keep their own activation gesture; this only owns the preview lifecycle, so each kind shows the same c…",
+      "publicSymbol": "ReferencePreviewAnchorProps, ReferencePreviewAnchor",
+      "importFrom": "@dshfiles/input-trigger/entity-reference",
+      "owner": "@dshfiles/input-trigger",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/input-trigger/src/entity-reference.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/input-trigger/image-attachment-contract",
       "kind": "module",
       "title": "@dshfiles/input-trigger/image-attachment-contract",
@@ -1129,7 +1191,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:190",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:199",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -1142,8 +1204,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/jj-integration owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: ownWorkspaceFor, provision, destination, classifyWorkspaces, projects, noFolder, repositories, refreshRepositories, threadAt, revisionGraph, isolate, land, queueLand, cancelQueuedLand, integrationProgress, reviewHistory, threadStatus, landThread, workspaceSync, discard, discardMany, cleanupWorkspaces, startCleanup, cleanupJobs",
-        "Agent tools: jj_thread_destination (read-only), jj_thread_projects (read-only), jj_thread_repositories (read-only), jj_thread_refresh_repositories (read-only), jj_thread_isolate, jj_thread_review_history (read-only), jj_thread_status (read-only), jj_thread_rebase, jj_thread_workspace_sync (read-only), jj_thread_discard, jj_thread_discard_many, jj_thread_cleanup, jj_thread_cleanup_jobs (read-only)"
+        "Methods: ownWorkspaceFor, provision, destination, classifyWorkspaces, projects, noFolder, repositories, refreshRepositories, threadAt, revisionGraph, isolate, land, queueLand, cancelQueuedLand, integrationProgress, reviewHistory, threadStatus, landThread, workspaceSetup, cancelWorkspaceSetup, workspaceSync, discard, discardMany, cleanupWorkspaces, startCleanup, cleanupJobs",
+        "Agent tools: jj_thread_destination (read-only), jj_thread_projects (read-only), jj_thread_repositories (read-only), jj_thread_refresh_repositories (read-only), jj_thread_isolate, jj_thread_review_history (read-only), jj_thread_status (read-only), jj_thread_rebase, jj_workspace_setup, jj_cancel_workspace_setup, jj_thread_workspace_sync (read-only), jj_thread_discard, jj_thread_discard_many, jj_thread_cleanup, jj_thread_cleanup_jobs (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1167,6 +1229,46 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "Also exports: RepositoryAutoIntegration, mayAutoIntegrateWorkspace"
       ],
       "source": "plugins/@dshfiles/jj-integration/src/settings.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/jj-integration/merged-pull-requests",
+      "kind": "module",
+      "title": "@dshfiles/jj-integration/merged-pull-requests",
+      "summary": "Merged pull requests for a set of thread Sessions. Published as the `@dshfiles/jj-integration/merged-pull-requests` dshx module. Jujutsu integration owns the cleanup that wants this state, and `@dshfiles/pull-requests` already depends on it, so this plugin declares the contract and that one provides it: importing the…",
+      "publicSymbol": "MergedPullRequestMethods, MergedPullRequests",
+      "importFrom": "@dshfiles/jj-integration/merged-pull-requests",
+      "owner": "@dshfiles/jj-integration",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/jj-integration/src/merged-pull-requests.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/jj-integration/no-folder",
+      "kind": "module",
+      "title": "@dshfiles/jj-integration/no-folder",
+      "summary": "The scratch workspace every \"No folder\" thread starts in. Shared with the thread sidebar, which offers to promote one into a project, so both halves agree on the folder marker and on the title a scratch workspace still carries.",
+      "publicSymbol": "NoFolderWorkspace",
+      "importFrom": "@dshfiles/jj-integration/no-folder",
+      "owner": "@dshfiles/jj-integration",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/jj-integration/src/no-folder.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1391,7 +1493,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "projectChecksApi",
       "importFrom": "@dshfiles/project-checks/api",
       "owner": "@dshfiles/project-checks",
-      "source": "plugins/@dshfiles/project-checks/src/api.ts:135",
+      "source": "plugins/@dshfiles/project-checks/src/api.ts:152",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/project-checks:project-checks",
@@ -1404,8 +1506,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/project-checks owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: actions, receipts, hookEvents, run, dispatch, tasks, cancelTask, retryTask, assertVerifiedCompletion, verifyCandidate",
-        "Agent tools: project_checks_actions (read-only), project_checks_receipts (read-only), project_checks_hook_events (read-only), project_checks_run, project_checks_dispatch, project_checks_tasks (read-only), project_checks_cancel, project_checks_retry"
+        "Methods: actions, receipts, hookEvents, run, setupActions, dispatch, tasks, cancelTask, retryTask, assertVerifiedCompletion, verifyCandidate",
+        "Agent tools: project_checks_actions (read-only), project_checks_receipts (read-only), project_checks_hook_events (read-only), project_checks_run, project_checks_setup_actions (read-only), project_checks_dispatch, project_checks_tasks (read-only), project_checks_cancel, project_checks_retry"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1427,6 +1529,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/project-checks/src/completion-event.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/project-checks/workspace-setup",
+      "kind": "module",
+      "title": "@dshfiles/project-checks/workspace-setup",
+      "summary": "How a dispatched setup action reads: whether it still holds the first turn, and whether the card has anything to say. Client-safe (no node: imports): `@dshfiles/jj-integration` imports this module in both halves to render the same view.",
+      "publicSymbol": "SetupTaskStatus, SetupTaskView, isSetupOpen, setupView",
+      "importFrom": "@dshfiles/project-checks/workspace-setup",
+      "owner": "@dshfiles/project-checks",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/project-checks/src/workspace-setup.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1801,7 +1923,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadActionsApi",
       "importFrom": "@dshfiles/thread-sidebar/thread-actions-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:70",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:71",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-actions",
@@ -2296,7 +2418,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "projectLifecycleApi",
       "importFrom": "@dshfiles/workspace-folder-picker/project-lifecycle-api",
       "owner": "@dshfiles/workspace-folder-picker",
-      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:74",
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:131",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/workspace-folder-picker:workspace-folder-picker.project-lifecycle",
@@ -2309,10 +2431,30 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/workspace-folder-picker owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: tools, startClone, cloneJobs, cancelClone, createProject, removeProject",
-        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_create"
+        "Methods: tools, startClone, cloneJobs, cancelClone, retryClone, createProject, inspect, initProject, readProjectConfig, projects, projectIdentities, icon, publishProject, removeProject",
+        "Agent tools: project_tools_status (read-only), project_clone, project_clone_jobs (read-only), project_clone_cancel, project_clone_retry, project_create, project_inspect (read-only), project_init, project_config_read (read-only), project_projects (read-only), project_identities (read-only), project_icon (read-only), project_publish"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/project-folder-setup",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-folder-setup",
+      "summary": "Public module of @dshfiles/workspace-folder-picker.",
+      "publicSymbol": "ProjectFolderSetup",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-folder-setup",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-folder-setup.tsx",
+      "docs": "docs/plugin-boundaries.md",
       "command": null
     },
     {
@@ -2332,6 +2474,68 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/workspace-folder-picker/src/picker/index.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/project-icon-view",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-icon-view",
+      "summary": "A project's mark, wherever a project is named: the icon its repository ships (declared in `dsh.project.json` or found at a conventional path), else a stable monogram. The Host resolves and caches it, so a row never scans a checkout.",
+      "publicSymbol": "ProjectIcon",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-icon-view",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-icon-view.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/project-config",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-config",
+      "summary": "`dsh.project.json` at a repository root: the checked-in settings a repository can declare about how it is worked in. Published as the `@dshfiles/workspace-folder-picker/project-config` dshx module, so both the project lifecycle and the Jujutsu bundle read one schema. Only non-executable settings live here: a script is…",
+      "publicSymbol": "PROJECT_CONFIG_FILE, projectConfigScriptSchema, projectConfigSchema, ProjectConfig, LoadedProjectConfig, loadProjectConfig",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-config",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-config.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "RepositorySetup",
+      "importFrom": "@dshfiles/workspace-folder-picker/repository-setup-contract",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/repository-setup-contract.ts:13",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/workspace-folder-picker.repository-setup",
+      "kind": "contract",
+      "title": "RepositorySetup",
+      "summary": "Client service contract provided by @dshfiles/workspace-folder-picker.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(RepositorySetup) to consume; only @dshfiles/workspace-folder-picker provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/workspace-folder-picker's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/workspace-folder-picker.repository-setup"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2462,10 +2666,11 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Catalog metadata only; features:check validates the surface/destination pair.",
       "occupancy": "static",
       "occupants": [
-        "@dshfiles/multi-host › logical-project-grouping"
+        "@dshfiles/multi-host › logical-project-grouping",
+        "@dshfiles/thread-sidebar › thread-subscriptions"
       ],
       "details": [
-        "Used by 1 catalog feature(s)",
+        "Used by 2 catalog feature(s)",
         "Destinations in use: threads"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2493,7 +2698,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › inline-title-edit"
       ],
       "details": [
-        "Used by 30 catalog feature(s)",
+        "Used by 31 catalog feature(s)",
         "Destinations in use: inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2521,7 +2726,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 25 catalog feature(s)",
+        "Used by 26 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2549,7 +2754,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agents › agent-mentions"
       ],
       "details": [
-        "Used by 56 catalog feature(s)",
+        "Used by 59 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2605,7 +2810,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 52 catalog feature(s)",
+        "Used by 53 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2711,13 +2916,13 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Catalog metadata only; features:check validates the surface/destination pair.",
       "occupancy": "static",
       "occupants": [
+        "@dshfiles/agent-loop › settled-stream-size",
         "@dshfiles/agent-telemetry › agent-turn-spans",
         "@dshfiles/agent-telemetry › nested-tool-spans",
-        "@dshfiles/agent-telemetry › subagent-traces",
-        "@dshfiles/agent-telemetry › auxiliary-and-wait-spans"
+        "@dshfiles/agent-telemetry › subagent-traces"
       ],
       "details": [
-        "Used by 99 catalog feature(s)",
+        "Used by 104 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

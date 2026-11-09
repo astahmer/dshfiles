@@ -87,7 +87,11 @@ export const jjIntegrationSettings = defineSettings({
           'Also remove a thread workspace as soon as its last thread is settled or archived, without waiting for the interval or the hours above. The kinds above still apply.',
         ),
     }).description(
-      'Remove idle thread workspaces automatically, through the same cleanup job as the manual button. A workspace with unlanded revisions, a working or waiting thread, a thread whose activity cannot be read, or a queued integration is always kept.',
+      [
+        'Remove idle thread workspaces automatically, through the same cleanup job as the manual button.',
+        'Protection tiers, strongest first: revisions that are not on the bookmark and not held by another bookmark; a thread that is running, asks a question or cannot be read; an integration queued for the workspace; a secondary checkout with uncommitted or unverifiable state; and any workspace used more recently than the age above.',
+        'Merged pull requests are a manual choice only: they need the pull-request links read, which an automatic run never does.',
+      ].join(' '),
     ),
     autoFetch: Schema.object({
       enabled: Schema.boolean().default(false).description('Run `jj git fetch` in every registered jj repository on the interval below.'),

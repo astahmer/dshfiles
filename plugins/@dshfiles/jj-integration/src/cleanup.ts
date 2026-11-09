@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Clock, Context, Effect, FileSystem, Layer, Option, Path } from 'effect'
+import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { CleanupKindView, CleanupResult, CleanupTarget } from './api.js'
 import { CleanupJobModel, type CleanupJobRequest, type CleanupJobView, type CleanupTrigger } from './cleanup-jobs.js'
 import { CleanupOwnership } from './cleanup-ownership.js'
@@ -10,6 +12,7 @@ import { IntegrationRequests, IsolatedSessions } from './integration-requests.js
 import { JjSettings } from './jj-settings.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
+import { MergedPullRequests } from './merged-pull-requests.js'
 import { ThreadWorkspaces } from './thread-workspaces.js'
 import { WorkspaceCleanupModel } from './workspace-cleanup.js'
 import { WorkspaceSessionPath } from './workspace-session-path.js'
@@ -55,6 +58,7 @@ const make = Effect.gen(function* () {
   const log = yield* ActivityLog
   const path = yield* Path.Path
   const fileSystem = yield* FileSystem.FileSystem
+  const hostApis = yield* HostApis
 
   const warnAndSkip = (what: string, repoRoot: string) => (error: { readonly message: string }) =>
     Effect.as(Effect.logWarning(`jj-integration: could not ${what} in ${repoRoot}: ${error.message}`), [])
@@ -97,6 +101,30 @@ const make = Effect.gen(function* () {
     return CleanupOwnership.ownerFromJobs({ path, jobs: yield* recorded, target })
   })
 
+  /**
+   * Merged pull requests per thread Session, asked of every served provider of this plugin's own contract. A Host
+   * without the provider (pull-requests not installed) simply marks nothing as merged, so those workspaces fall back to
+   * `integrated` and are never removed for a reason nobody could verify.
+   */
+  const mergedPullRequestsBySession = Effect.fn('cleanup merged pull requests')(function* (input: {
+    readonly trigger: CleanupTrigger
+    readonly kinds: readonly CleanupKindView[]
+    readonly sessionIds: readonly string[]
+  }) {
+    const found = new Map<string, string[]>()
+    if (input.trigger !== 'manual' || !input.kinds.includes('merged') || input.sessionIds.length === 0) return found
+    const owners = (yield* hostApis.list).filter(api => api.id === MergedPullRequests.apiId).map(api => api.owner)
+    for (const owner of owners) {
+      const answer = yield* hostApis
+        .client(MergedPullRequests.contract(owner))
+        .merged({ sessionIds: [...new Set(input.sessionIds)] })
+        .pipe(Effect.option)
+      if (Option.isNone(answer)) continue
+      for (const entry of answer.value.merged) found.set(entry.sessionId, [...(found.get(entry.sessionId) ?? []), entry.label])
+    }
+    return found
+  })
+
   const scan = Effect.fn('cleanup scan')(function* (
     input: CleanupRequest & { readonly apply: boolean; readonly trigger: CleanupTrigger; readonly report?: CleanupReporter | undefined },
   ) {
@@ -134,6 +162,11 @@ const make = Effect.gen(function* () {
             },
           ]
     const archived = yield* registry.archivedSessionIds
+    const mergedPullRequests = yield* mergedPullRequestsBySession({
+      trigger: input.trigger,
+      kinds,
+      sessionIds: repositories.flatMap(repository => repository.threads.flatMap(thread => thread.sessionIds)),
+    })
     const now = yield* Clock.currentTimeMillis
     const olderThanMs = input.olderThanHours * HOUR_MS
     const repoRoots: string[] = []
@@ -159,6 +192,7 @@ const make = Effect.gen(function* () {
             integratedInto: bookmarks,
             rebasedAt: thread.rebasedAt,
             sessionIds: thread.sessionIds,
+            mergedPullRequests: [...new Set(thread.sessionIds.flatMap(sessionId => mergedPullRequests.get(sessionId) ?? []))],
             integrationQueued: (yield* requests.get(thread.path)) !== undefined,
             usedAt: [changedAt.get(thread.name), thread.rebasedAt, createdAt === undefined ? undefined : Date.parse(createdAt)],
           },
@@ -169,7 +203,12 @@ const make = Effect.gen(function* () {
           kinds,
         })
         if (decision.action === 'skip') {
-          skipped.push({ repoRoot: repository.repoRoot, name: thread.name, reason: decision.reason })
+          skipped.push({
+            repoRoot: repository.repoRoot,
+            name: thread.name,
+            reason: decision.reason,
+            message: WorkspaceCleanupModel.skipReasonMessage(decision.reason),
+          })
           continue
         }
         workspaces.push({
@@ -186,10 +225,15 @@ const make = Effect.gen(function* () {
         const secondary = yield* threads
           .secondaryWorkspaces(repository.repoRoot)
           .pipe(Effect.catch(warnAndSkip('list secondary workspaces', repository.repoRoot)))
+        // The registry canonicalizes the path it is given, so a workspace whose checkout folder is gone cannot be
+        // resolved by path; matching the recorded one keeps that row cleanable instead of failing the whole scan.
+        // jj and the registry may spell one Windows folder with a different drive-letter case or separator.
+        const pathKey = (candidate: string): string => (path.sep === '\\' ? candidate.replaceAll('/', '\\').toLowerCase() : candidate)
+        const registeredByPath = new Map<string, Workspace>((yield* registry.list).map(workspace => [pathKey(workspace.path), workspace]))
         // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- secondary workspaces are few and each registry read is a map lookup.
         for (const workspace of secondary) {
-          const resolved = yield* registry.resolveByPath(workspace.path)
-          const registered = resolved?.path === workspace.path ? resolved : undefined
+          const resolved = workspace.missing ? registeredByPath.get(pathKey(workspace.path)) : yield* registry.resolveByPath(workspace.path)
+          const registered = resolved !== undefined && pathKey(resolved.path) === pathKey(workspace.path) ? resolved : undefined
           workspaceIds.set(workspace.path, registered?.id ?? null)
           const sessionCwds = yield* Effect.filter(sessionRecords ?? [], record =>
             WorkspaceSessionPath.includes({ fileSystem, path, sessionCwd: record.cwd, workspacePath: workspace.path }),
@@ -215,7 +259,12 @@ const make = Effect.gen(function* () {
             kinds,
           })
           if (decision.action === 'skip') {
-            skipped.push({ repoRoot: repository.repoRoot, name: workspace.name, reason: decision.reason })
+            skipped.push({
+              repoRoot: repository.repoRoot,
+              name: workspace.name,
+              reason: decision.reason,
+              message: WorkspaceCleanupModel.skipReasonMessage(decision.reason),
+            })
             continue
           }
           workspaces.push({

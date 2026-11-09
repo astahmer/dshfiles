@@ -107,7 +107,7 @@ environment directly" (t3code/Codex); DSH's one-browser-to-one-Host architecture
 maps to bb's.
 
 Full notes, with the files and URLs read for each product, are in
-[docs/research/remote-thread-composer](../../../../docs/research/remote-thread-composer/).
+[remote-thread-composer research](research/remote-thread-composer/).
 
 ## Lessons we adopt
 

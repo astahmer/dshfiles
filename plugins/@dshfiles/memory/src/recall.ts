@@ -454,22 +454,22 @@ export class Recall extends Context.Service<
           ),
           Effect.withSpan('thread finder resolve projects', finderSpan),
         )
-        const records = yield* Effect.forEach(listed, (session, index) =>
-          Effect.map(repo.thread(session.header.id), (digest): ThreadFinderRecord => {
-            const title = titles.get(session.header.id)
-            return {
-              sessionId: session.header.id,
-              title: title?.title ?? digest?.title ?? '',
-              createdAt: session.header.createdAt,
-              updatedAt: Math.max(session.header.createdAt, title?.updatedAt ?? 0, digest?.updatedAt ?? 0),
-              cwd: session.header.cwd ?? null,
-              project: projectList[index] ?? 'unknown',
-              live: session.live,
-              persisted: session.persisted,
-              parentSessionId: session.header.parentSession ?? null,
-            }
-          }),
-        )
+        const digests = new Map((yield* repo.threadsByIds(listed.map(session => session.header.id))).map(digest => [digest.id, digest] as const))
+        const records = listed.map((session, index): ThreadFinderRecord => {
+          const digest = digests.get(session.header.id)
+          const title = titles.get(session.header.id)
+          return {
+            sessionId: session.header.id,
+            title: title?.title ?? digest?.title ?? '',
+            createdAt: session.header.createdAt,
+            updatedAt: Math.max(session.header.createdAt, title?.updatedAt ?? 0, digest?.updatedAt ?? 0),
+            cwd: session.header.cwd ?? null,
+            project: projectList[index] ?? 'unknown',
+            live: session.live,
+            persisted: session.persisted,
+            parentSessionId: session.header.parentSession ?? null,
+          }
+        })
         yield* Effect.annotateCurrentSpan('dshx.memory.finder.record_count', records.length)
         return records
       }).pipe(Effect.withSpan('thread finder prepare records', finderSpan))

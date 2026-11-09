@@ -168,7 +168,7 @@
         {
           "kind": "not-applicable",
           "id": "plugin-ui.touch-targets-browser",
-          "reason": "Pointer media queries need a touch browser: the WebKit iPhone audit plans/ade-ux/phase6/capture/audit.mjs measures each control's hit area (drawn box plus ::after) and reports any under 44px."
+          "reason": "Pointer media queries need a touch browser: the WebKit iPhone audit docs/ade-ux/phase6/capture/audit.mjs measures each control's hit area (drawn box plus ::after) and reports any under 44px."
         }
       ],
       "telemetry": [

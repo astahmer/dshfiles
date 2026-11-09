@@ -31,6 +31,23 @@ describe('Policies.denying', () => {
     expect(Policies.denying(rules, { name: 'write', arguments: {} })).toBeUndefined()
   })
 
+  it('keeps a glob’s regex metacharacters literal across repeated checks', () => {
+    const rules = [rule({ name: 'literal', tool: 'a.b+c(d)[e]|f^$' })]
+    expect(Policies.denying(rules, { name: 'a.b+c(d)[e]|f^$', arguments: {} })?.name).toBe('literal')
+    expect(Policies.denying(rules, { name: 'axbxc(d)[e]|f^$', arguments: {} })).toBeUndefined()
+    expect(Policies.denying(rules, { name: 'a.b+c(d)[e]|f^$', arguments: { again: true } })?.name).toBe('literal')
+  })
+
+  it('does not serialize the arguments when no rule covers the tool', () => {
+    const unserializable = {
+      toJSON: () => {
+        throw new Error('arguments were serialized')
+      },
+    }
+    expect(Policies.denying([rule({ tool: 'read' })], { name: 'bash', arguments: unserializable })).toBeUndefined()
+    expect(Policies.denying([rule({ name: 'block', tool: 'bash' })], { name: 'bash', arguments: unserializable })?.name).toBe('block')
+  })
+
   it('tells the agent the refusal is final and where the user changes it', () => {
     const text = Policies.refusal(rule({ name: 'no force push', reason: 'main is protected' }))
     expect(text).toContain('Denied by policy “no force push”: main is protected.')

@@ -4,13 +4,14 @@ import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
-import type { ImageAttachmentLimits } from '@deepseek-ai/dsh-attachment'
 import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type { ProjectionSnapshot, SessionProjectionMap } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { SessionQueryError, type SessionRecord, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { z } from 'zod'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
+import * as Schema from 'effect/Schema'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
@@ -34,19 +35,21 @@ interface ProjectionRead {
   readonly metadata?: SessionListMetadata
 }
 
-const sessionListMetadataSchema: z.ZodType<SessionListMetadata> = z.object({
-  blank: z.boolean(),
-  lastPromptAt: z.number().nullable(),
-})
+const sessionListMetadataSchema = zodSchemaFromEffect(Schema.Struct({
+  blank: Schema.Boolean,
+  lastPromptAt: Schema.NullOr(Schema.Finite),
+}))
 
-const imageLimitsSchema = z.object({
-  maxImageBytes: z.number().int().positive(),
-  maxImagesPerMessage: z.number().int().positive(),
-  maxMessageImageBytes: z.number().int().positive(),
-  maxImagePixels: z.number().int().positive(),
-  maxImageDimension: z.number().int().positive(),
-  mediaTypes: z.array(z.string()),
-}) as unknown as z.ZodType<ImageAttachmentLimits>
+const positiveInt = Schema.Int.check(Schema.isGreaterThan(0))
+
+const imageLimitsSchema = zodSchemaFromEffect(Schema.Struct({
+  maxImageBytes: positiveInt,
+  maxImagesPerMessage: positiveInt,
+  maxMessageImageBytes: positiveInt,
+  maxImagePixels: positiveInt,
+  maxImageDimension: positiveInt,
+  mediaTypes: Schema.Array(Schema.Literals(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])),
+}))
 
 /**
  * Advance the Session-list metadata projection by one committed event.
@@ -107,6 +110,9 @@ export class ApiSessionList {
 
   /** Bumped on every invalidation so a read that started earlier cannot cache a corpus it predates. */
   private persistedGeneration = 0
+  private lastInvalidation: 'none' | 'created' | 'disposed' = 'none'
+  private createdInvalidations = 0
+  private disposedInvalidations = 0
 
   private readonly lifetime = new AbortController()
 
@@ -116,13 +122,15 @@ export class ApiSessionList {
    */
   constructor(private readonly ctx: Context, private readonly workSliceMs: number) {
     const forgetProjections = (session: Session): void => { this.coldProjections.delete(session.id) }
-    const forgetSession = (session: Session): void => {
+    ctx.on('session/created', session => {
       forgetProjections(session)
-      this.invalidatePersisted()
-    }
-    ctx.on('session/created', forgetSession)
+      this.invalidatePersisted('created')
+    })
     ctx.on('session/event', forgetProjections)
-    ctx.on('session/disposed', forgetSession)
+    ctx.on('session/disposed', session => {
+      forgetProjections(session)
+      this.invalidatePersisted('disposed')
+    })
     ctx.effect(() => () => { this.lifetime.abort() }, 'session-controller.list: stop a background corpus read')
     ctx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
@@ -135,7 +143,7 @@ export class ApiSessionList {
     ctx.inject(['attachments'], (attachmentCtx) => {
       ctx.sessionProjections.register<'imageLimits', null>({
         key: 'imageLimits',
-        stateSchema: z.null(),
+        stateSchema: zodSchemaFromEffect(Schema.Null),
         init: () => null,
         apply: state => state,
         wire: {
@@ -174,6 +182,14 @@ export class ApiSessionList {
    * @returns visible Session summaries ordered by activity.
    */
   async list(request: SessionListRequest = {}, signal?: AbortSignal): Promise<SessionSummary[]> {
+    return withSpan('session list read', {}, async span => {
+    const cache = this.persisted !== undefined ? 'hit' : this.persistedRead !== undefined ? 'shared' : 'miss'
+    span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: {
+      corpus_cache: cache,
+      last_invalidation: this.lastInvalidation,
+      created_invalidations: this.createdInvalidations,
+      disposed_invalidations: this.disposedInvalidations,
+    } }))
     const selection = projectionSelectionOf(request.projections)
     signal?.throwIfAborted()
     const records = await this.persistedSessions(signal)
@@ -206,7 +222,9 @@ export class ApiSessionList {
     }
     signal?.throwIfAborted()
     items.sort((left, right) => right.updatedAt - left.updatedAt)
+    span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { records: records.length, cold_records: cold.length } }))
     return items
+    })
   }
 
   /**
@@ -224,19 +242,27 @@ export class ApiSessionList {
 
   private startPersistedRead(): Promise<readonly SessionRecord[]> {
     const generation = this.persistedGeneration
-    const read = this.ctx.sessionQuery.listSessions(this.lifetime.signal).then(records => {
-      if (this.persistedGeneration === generation) this.persisted = records
+    const read = withSpan('session corpus read', {}, async span => {
+      const records = await this.ctx.sessionQuery.listSessions(this.lifetime.signal)
+      const current = this.persistedGeneration === generation
+      if (current) this.persisted = records
+      span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { records: records.length, current } }))
       return records
     })
     this.persistedRead = read
     const settle = (): void => {
       if (this.persistedRead === read) this.persistedRead = undefined
     }
-    void read.then(settle, settle)
+    // The read is a Promise the caller already awaits; settling only drops the shared handle, so its rejection is the
+    // caller's to observe and this chain stays silent.
+    read.then(settle, settle).catch(() => undefined)
     return read
   }
 
-  private invalidatePersisted(): void {
+  private invalidatePersisted(reason: 'created' | 'disposed'): void {
+    this.lastInvalidation = reason
+    if (reason === 'created') this.createdInvalidations += 1
+    else this.disposedInvalidations += 1
     this.persisted = undefined
     this.persistedRead = undefined
     this.persistedGeneration += 1

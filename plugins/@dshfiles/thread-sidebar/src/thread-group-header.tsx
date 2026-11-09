@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -14,9 +15,27 @@ interface ThreadGroupHeaderProps {
   readonly onToggle: () => void
   readonly startProjectSession: (projectId: string) => void
   readonly t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
+  /** A group-wide verb (Needs you offers Resume all); it sits beside the toggle, not inside it. */
+  readonly action?: ReactNode
+  /** The project's own mark, before its name; absent for groups that are not a project. */
+  readonly icon?: ReactNode
+  /** Local checkouts this row stands for; above one, the row names the repository rather than a path. */
+  readonly checkoutCount?: number
 }
 
-export const ThreadGroupHeader = ({ label, count, collapsed, projectId, className, onToggle, startProjectSession, t }: ThreadGroupHeaderProps) => {
+export const ThreadGroupHeader = ({
+  label,
+  count,
+  collapsed,
+  projectId,
+  className,
+  onToggle,
+  startProjectSession,
+  t,
+  action,
+  icon,
+  checkoutCount,
+}: ThreadGroupHeaderProps) => {
   const createLabel = t('threadSidebarNewChatInProject', { project: label })
   return (
     <div className={cn(className, 'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-2.5')}>
@@ -27,13 +46,20 @@ export const ThreadGroupHeader = ({ label, count, collapsed, projectId, classNam
         aria-expanded={!collapsed}
         onClick={onToggle}
       >
+        {icon}
         <span className="dshx:min-w-0 dshx:truncate">{label}</span>
+        {checkoutCount === undefined || checkoutCount < 2 ? null : (
+          <span className="dshx:shrink-0 dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:text-[10px] dshx:font-medium dshx:text-muted-foreground">
+            {checkoutCount} checkouts
+          </span>
+        )}
         <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums">({count})</span>
         <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
         <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
           {collapsed ? <ChevronDownIcon size={12} /> : <ChevronUpIcon size={12} />}
         </span>
       </button>
+      {action}
       {projectId === undefined ? null : (
         <Tooltip>
           <TooltipTrigger asChild>

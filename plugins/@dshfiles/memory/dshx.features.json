@@ -431,7 +431,7 @@
     {
       "id": "memory-reference-preview",
       "title": "Preview cited memory inline",
-      "summary": "Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens a compact, scrollable inline card that mirrors the Memory panel — tone and status badges, the note as its title, Source & evidence with the source thread, the Metadata grid, and Related and History tabs — with Copy and an Open in Memory button that takes the same item to the Memory page (a note opens its detail, a digest opens its row). Digests and bounded message excerpts use the same card, and a reference that no longer exists shows a dashed not-found state. Preview reads do not create synthetic memory-tool usage records.",
+      "summary": "Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens a compact, scrollable inline card that mirrors the Memory panel \u2014 tone and status badges, the note as its title, Source & evidence with the source thread, the Metadata grid, and Related and History tabs \u2014 with Copy and an Open in Memory button that takes the same item to the Memory page (a note opens its detail, a digest opens its row). Digests and bounded message excerpts use the same card, and a reference that no longer exists shows a dashed not-found state. Preview reads do not create synthetic memory-tool usage records.",
       "surfaces": ["client", "api"],
       "surface": "entityProvider",
       "destination": "knowledge",
@@ -477,8 +477,8 @@
         "seed tool-call-thread",
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"memory: n:1\"",
         "press Enter",
-        "expect link \"Preview memory n:1\"",
-        "click link \"Preview memory n:1\"",
+        "expect button \"Preview memory n:1\"",
+        "click button \"Preview memory n:1\"",
         "expect text \"Not found\"",
         "expect text \"Nothing stored for n:1\"",
         "expect text \"No valid note n:1*\"",
@@ -488,11 +488,11 @@
     {
       "id": "usage-telemetry",
       "title": "Show what memory costs and whether it holds up",
-      "summary": "Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the user correcting, an answer that cited memory. Cited memories can be rated 👍/👎. The Memory page's Analytics tab and the dshfiles-memory API (usage, citations, rateCitation) expose it.",
+      "summary": "Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the user correcting, an answer that cited memory. Cited memories can be rated \ud83d\udc4d/\ud83d\udc4e. The Memory page's Analytics tab and the dshfiles-memory API (usage, citations, rateCitation) expose it.",
       "surfaces": ["client", "storage"],
       "surface": "destinationSection",
       "destination": "knowledge",
-      "currentSurface": "left-nav: Memory › Analytics",
+      "currentSurface": "left-nav: Memory \u203a Analytics",
       "configuration": [],
       "states": ["no-activity", "counted", "priced", "unpriced", "rated"],
       "failureModes": [
@@ -540,7 +540,7 @@
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "knowledge",
-      "currentSurface": "left-nav: Memory › Select notes",
+      "currentSurface": "left-nav: Memory \u203a Select notes",
       "configuration": [],
       "states": ["unselected", "range-selected", "confirmed", "partially-forgotten"],
       "failureModes": [

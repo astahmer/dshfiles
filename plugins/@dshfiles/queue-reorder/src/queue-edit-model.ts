@@ -135,6 +135,41 @@ export interface ComposerSnapshot<DraftId extends string> {
   readonly idle: boolean
 }
 
+/** One queued image token located in the composer's plain-text document. */
+export interface ImageReferenceToken<DraftId extends string> {
+  readonly id: DraftId
+  readonly label: string
+  readonly offset: number
+  readonly length: number
+}
+
+/** Pair each [Image N] token with the image attachment that produced it, in document order. */
+const imageReferenceTokens = <DraftId extends string>(input: {
+  readonly text: string
+  readonly imageIds: readonly DraftId[]
+}): readonly ImageReferenceToken<DraftId>[] => {
+  const tokens = [...input.text.matchAll(/\[Image (\d+)\]/gu)]
+  return tokens.flatMap((token, index) => {
+    const id = input.imageIds[index]
+    if (id === undefined) return []
+    return [{ id, label: `Image ${token[1]}`, offset: token.index, length: token[0].length }]
+  })
+}
+
+/** The hydrated ids of a row's image blocks, in attachment order. */
+const imageIdsForBlocks = <DraftId extends string>(input: {
+  readonly blocks: readonly QueuedBlock[]
+  readonly attachmentIds: readonly DraftId[]
+}): readonly DraftId[] => {
+  let attachmentIndex = 0
+  return input.blocks.flatMap(block => {
+    if (block.type === 'text') return []
+    const id = input.attachmentIds[attachmentIndex]
+    attachmentIndex += 1
+    return block.type === 'image' && id !== undefined ? [id] : []
+  })
+}
+
 /** Everything the editor touches, so a test can supply a working in-memory world. */
 export interface QueueEditPorts<DraftId extends string, Attachment> {
   readonly queue: Observable<readonly QueuedRow[]>
@@ -142,6 +177,8 @@ export interface QueueEditPorts<DraftId extends string, Attachment> {
   readonly composer: Observable<ComposerSnapshot<DraftId>> & {
     setDraft(text: string): void
     addAttachments(ids: readonly DraftId[]): boolean
+    /** Rebuild the reference chips the queued text's serialized references still name. */
+    restoreReferences(): void
     removeAttachment(id: DraftId): void
     submit(): void
     focus(): void
@@ -210,6 +247,8 @@ export class QueueEditModel {
   static readonly restoredIndex = restoredIndex
   static readonly promptPartsFor = promptPartsFor
   static readonly textOf = textOf
+  static readonly imageReferenceTokens = imageReferenceTokens
+  static readonly imageIdsForBlocks = imageIdsForBlocks
   static readonly messageOf = messageOf
   static readonly retainsSession = (view: QueueEditView): boolean => view.loading || view.record !== null
 }

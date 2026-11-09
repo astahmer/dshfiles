@@ -39,6 +39,7 @@ interface FakeWorld {
   started: RawRow[]
   pending: string[]
   composer: { draft: string; attachmentIds: string[]; idle: boolean }
+  references: { label: string; clipboardText: string }[]
   drafts: Map<string, File>
   released: string[]
   stored: Map<string, File>
@@ -67,6 +68,7 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
     started,
     pending,
     composer: { draft: '', attachmentIds, idle: true },
+    references: [],
     drafts: new Map<string, File>(),
     released,
     stored: new Map<string, File>(),
@@ -105,6 +107,14 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
         world.composer = { ...world.composer, attachmentIds: [...world.composer.attachmentIds, ...ids] }
         composerSubject.notify()
         return true
+      },
+      // The real composer asks its trigger sources; this world only proves the editor calls the verb on the right text.
+      restoreReferences: () => {
+        world.references = [...world.composer.draft.matchAll(/\[Image (\d+)\]/gu)].map(token => ({
+          label: `Image ${token[1]}`,
+          clipboardText: token[0],
+        }))
+        composerSubject.notify()
       },
       removeAttachment: (id: string) => {
         world.composer = { ...world.composer, attachmentIds: world.composer.attachmentIds.filter(candidate => candidate !== id) }
@@ -280,6 +290,23 @@ test('Edit moves the text and attachments into the composer and keeps the user d
   assert.equal(QueueEditModel.restoredIndex({ rows: rowsOf(world), before: record?.before ?? [] }), 1)
 })
 
+test('Edit rebuilds the reference chips a queued message carried, without changing its text', async () => {
+  const { world, enqueueRow, editor } = createWorld()
+  enqueueRow([text('look at [Image 1]'), image('shot.png')])
+  const queueEditor = editor()
+  const row = rowsOf(world)[0]
+  assert.ok(row)
+
+  await queueEditor.begin(row)
+
+  assert.equal(world.composer.draft, 'look at [Image 1]')
+  assert.deepEqual(world.references, [{ label: 'Image 1', clipboardText: '[Image 1]' }])
+  assert.deepEqual(
+    world.composer.attachmentIds.map(id => world.drafts.get(id)?.name),
+    ['shot.png'],
+  )
+})
+
 test('Submit queues the edited message, with its attachments, back at the same position', async () => {
   const { world, enqueueRow, editor } = createWorld()
   enqueueRow([text('first')])
@@ -406,7 +433,7 @@ test('A rejected submit keeps the edit open with the draft in the composer', asy
 test('After a reload the saved record still offers Cancel, which restores the original once', async () => {
   const { world, ports, enqueueRow, editor } = createWorld()
   enqueueRow([text('first')])
-  enqueueRow([text('original'), image('shot.png')])
+  enqueueRow([text('original [Image 1]'), image('shot.png')])
   const first = editor()
   const row = rowsOf(world)[1]
   assert.ok(row)
@@ -415,7 +442,7 @@ test('After a reload the saved record still offers Cancel, which restores the or
 
   // A reload keeps the persisted draft text and record, but not the page-owned draft attachments.
   world.drafts.clear()
-  world.composer = { draft: 'original', attachmentIds: [], idle: true }
+  world.composer = { draft: 'original [Image 1]', attachmentIds: [], idle: true }
   const reloaded = createQueueEditor(ports)
   await settle()
   assert.equal(reloaded.getSnapshot().record?.status, 'editing')
@@ -423,13 +450,34 @@ test('After a reload the saved record still offers Cancel, which restores the or
     world.composer.attachmentIds.map(id => world.drafts.get(id)?.name),
     ['shot.png'],
   )
+  assert.deepEqual(world.references, [{ label: 'Image 1', clipboardText: '[Image 1]' }])
 
   await reloaded.cancel()
   await reloaded.cancel()
   await settle()
 
-  assert.deepEqual(textsOf(world), ['first', 'original [shot.png]'])
+  assert.deepEqual(textsOf(world), ['first', 'original [Image 1] [shot.png]'])
   assert.equal(world.records, null)
+})
+
+test('A reload whose stored attachment is gone explains why it could not reload it', async () => {
+  const { world, ports, enqueueRow, editor } = createWorld()
+  enqueueRow([text('original [Image 1]'), image('shot.png')])
+  const first = editor()
+  const row = rowsOf(world)[0]
+  assert.ok(row)
+  await first.begin(row)
+  first.dispose()
+
+  // The Host no longer holds the queued file the record points at.
+  world.drafts.clear()
+  world.stored.clear()
+  world.composer = { draft: 'original [Image 1]', attachmentIds: [], idle: true }
+  const reloaded = createQueueEditor(ports)
+  await settle()
+
+  assert.equal(reloaded.getSnapshot().record?.status, 'editing')
+  assert.match(reloaded.getSnapshot().notice ?? '', /Could not reload this message's attachments into the composer \(missing image\)/u)
 })
 
 test('A reload while a submission was settling still puts the message back in its place', async () => {

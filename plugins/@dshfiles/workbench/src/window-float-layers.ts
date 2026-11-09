@@ -1,4 +1,4 @@
-import type { DockviewApi } from 'dockview-react'
+import type { DockviewApi, DockviewGroupPanel } from 'dockview-react'
 
 const LAYER = 'data-workbench-window-layer'
 const RANK = '--dshfiles-workbench-window-rank'
@@ -66,21 +66,29 @@ export const createWindowFloatLayers = (document: Document): WindowFloatLayers =
         const shell = root.querySelector(':scope > div > .dv-shell')
         const host = shell?.querySelector(':scope > .dv-floating-overlay-host')
         const next = new Map<HTMLElement, Set<HTMLElement>>()
-        const bodies = new Map<string, HTMLElement>()
-        for (const panel of root.querySelectorAll<HTMLElement>('[data-workbench-panel-id]')) {
-          const body = panel.closest<HTMLElement>('.dv-render-overlay')
-          const id = panel.dataset.workbenchPanelId
-          if (id !== undefined && body?.parentElement === shell) bodies.set(id, body)
-        }
+        const floats: Array<{ readonly chrome: HTMLElement; readonly group: DockviewGroupPanel }> = []
         for (const group of api.groups) {
           if (group.api.location.type !== 'floating') continue
           const chrome = group.element.closest<HTMLElement>('.dv-resize-container')
           if (chrome === null || chrome.parentElement !== host) continue
-          const members = next.get(chrome) ?? new Set<HTMLElement>()
-          next.set(chrome, members)
-          for (const panel of group.panels) {
-            const body = bodies.get(panel.id)
-            if (body !== undefined) members.add(body)
+          floats.push({ chrome, group })
+          next.set(chrome, new Set())
+        }
+        // Only a floating window owns a panel body, so no window means no reason to walk every panel's content.
+        if (floats.length > 0) {
+          const bodies = new Map<string, HTMLElement>()
+          for (const panel of root.querySelectorAll<HTMLElement>('[data-workbench-panel-id]')) {
+            const body = panel.closest<HTMLElement>('.dv-render-overlay')
+            const id = panel.dataset.workbenchPanelId
+            if (id !== undefined && body?.parentElement === shell) bodies.set(id, body)
+          }
+          for (const { chrome, group } of floats) {
+            const members = next.get(chrome)
+            if (members === undefined) continue
+            for (const panel of group.panels) {
+              const body = bodies.get(panel.id)
+              if (body !== undefined) members.add(body)
+            }
           }
         }
         for (const window of owned) {

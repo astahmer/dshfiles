@@ -1,6 +1,7 @@
 import { encodeSessionReferenceUri } from '@deepseek-ai/dsh-session-reference'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import type { FolderInspection } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { Effect, Option, Schedule, Schema } from 'effect'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
@@ -68,6 +69,8 @@ export interface ThreadActionDeps {
     readonly model: string
     readonly reasoningEffort?: string
   }) => HostEffect<{ readonly provider: string; readonly model: string; readonly reasoningEffort?: string }>
+  /** What the folder is before it is registered, so no surface adds a project blind; null without the picker's read. */
+  readonly inspectProject: (path: string) => HostEffect<FolderInspection | null>
   readonly registerProject: (
     path: string,
     title: string | undefined,
@@ -318,19 +321,20 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
 
     const includeArchived = input.includeArchived === true
     const recent = [...sessions].sort((left, right) => right.updatedAt - left.updatedAt).slice(0, TITLE_BUDGET)
-    const titles = yield* attempt(
-      deps.readTitles(recent.filter(summary => includeArchived || !archived.has(summary.sessionId)).map(summary => summary.sessionId)),
-      'Could not read thread titles.',
-    )
+    const listed = recent.filter(summary => includeArchived || !archived.has(summary.sessionId))
+    const query = input.query?.trim().toLowerCase() ?? ''
+    const searched = query.length > 0
+    const limit = Math.min(input.limit ?? DEFAULT_LIMIT, listed.length)
+    // A title is a fold over that session's whole log, so a page nothing searches reads only the rows it returns.
+    const titled = searched ? listed : listed.slice(0, limit)
+    const titles = yield* attempt(deps.readTitles(titled.map(summary => summary.sessionId)), 'Could not read thread titles.')
 
-    const query = input.query?.trim().toLowerCase()
     const rows: ThreadListRow[] = []
-    for (const summary of recent) {
+    for (const summary of titled) {
       const isArchived = archived.has(summary.sessionId)
-      if (isArchived && !includeArchived) continue
       const title = titles.get(summary.sessionId)
       const project = projectOf.get(summary.sessionId)
-      if (query !== undefined && query.length > 0 && !matches(query, summary, title, project)) continue
+      if (searched && !matches(query, summary, title, project)) continue
       rows.push({
         sessionId: summary.sessionId,
         ...(title === undefined ? undefined : { title }),
@@ -345,8 +349,9 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
       })
     }
 
-    const limit = Math.min(input.limit ?? DEFAULT_LIMIT, rows.length)
-    return { threads: rows.slice(0, limit), total: rows.length, truncated: rows.length > limit }
+    const threads = rows.slice(0, limit)
+    const total = searched ? rows.length : listed.length
+    return { threads, total, truncated: total > threads.length }
   }),
 
   references: Effect.fn('thread actions references')(function* ({ input, caller }: ThreadActionContext<ThreadReferencesInput>) {
@@ -583,7 +588,9 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     })).pipe(Effect.withSpan('thread actions project list')),
 
   projectRegister: Effect.fn('thread actions project register')(function* ({ input }: ThreadActionContext<ProjectRegisterInput>) {
-    return yield* attempt(deps.registerProject(input.path, input.title), `Could not register ${input.path} as a project.`)
+    const inspection = yield* Effect.option(attempt(deps.inspectProject(input.path), `Could not inspect ${input.path}.`))
+    const registered = yield* attempt(deps.registerProject(input.path, input.title), `Could not register ${input.path} as a project.`)
+    return { ...registered, inspection: Option.getOrNull(inspection) }
   }),
 
   projectRename: Effect.fn('thread actions project rename')(function* ({ input }: ThreadActionContext<ProjectRenameInput>) {

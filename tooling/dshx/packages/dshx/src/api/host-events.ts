@@ -43,32 +43,39 @@ const eventsRoute = (registry: ApiRegistry): { readonly route: ConnectionFetchRo
     requestBody: 'buffered',
     fetch: async request => {
       const encoder = new TextEncoder()
-      const body = new ReadableStream<Uint8Array>({
-        start: controller => {
-          let closed = false
-          const stream: ApiEventStream = {
-            write: chunk => {
-              if (!closed) controller.enqueue(encoder.encode(chunk))
-            },
-            close: () => {
-              if (closed) return
-              closed = true
-              streamsOf(registry).delete(stream)
-              opened.delete(stream)
+      // Every published event is a poke: a browser that stops reading re-reads the current state on reconnect, so this
+      // queue is byte-bounded instead of growing without limit. A half-open tab used to keep an unbounded queue here.
+      const body = new ReadableStream<Uint8Array>(
+        {
+          start: controller => {
+            let closed = false
+            const stream: ApiEventStream = {
+              write: chunk => {
+                if (closed) return
+                if ((controller.desiredSize ?? 0) <= 0) return
+                controller.enqueue(encoder.encode(chunk))
+              },
+              close: () => {
+                if (closed) return
+                closed = true
+                streamsOf(registry).delete(stream)
+                opened.delete(stream)
+                controller.close()
+              },
+            }
+            if (request.signal.aborted) {
               controller.close()
-            },
-          }
-          if (request.signal.aborted) {
-            controller.close()
-            return
-          }
-          streamsOf(registry).add(stream)
-          opened.add(stream)
-          request.signal.addEventListener('abort', stream.close, { once: true })
-          stream.write(': connected\n\n')
-          stream.write(catalogFrame(registry))
+              return
+            }
+            streamsOf(registry).add(stream)
+            opened.add(stream)
+            request.signal.addEventListener('abort', stream.close, { once: true })
+            stream.write(': connected\n\n')
+            stream.write(catalogFrame(registry))
+          },
         },
-      })
+        new ByteLengthQueuingStrategy({ highWaterMark: 1_048_576 }),
+      )
       return new Response(body, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } })
     },
   }

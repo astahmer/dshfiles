@@ -51,7 +51,7 @@ The reusable board page is **Thread Sidebar: Board** (Threads › Board in the r
 
 **Multi-model fan-out.** `thread_fan_out` creates two to six independent threads for one prompt. Each thread is created blank, assigned its requested provider/model (and optional reasoning effort), titled `<prompt prefix> · <model>`, then receives the prompt. Creations run at concurrency two; each result reports its thread ID or failure without cancelling sibling work. With jj-integration isolation enabled, every thread is created in its own workspace.
 
-**Status grouping (default).** **All threads** groups rows by the ADE status vocabulary (plan `plans/ade-ux` §4.3,
+**Status grouping (default).** **All threads** groups rows by the ADE status vocabulary (plan `docs/ade-ux` §4.3,
 §4.7; `src/thread-status.ts`): **Pinned** on top, then **Needs you**, **Working**, **Ready**, **Idle** and **Done**.
 Done starts folded, and a thread nobody touched for 72 hours folds into it on its own unless it is pinned. Within a
 group the newest return to you comes first: the time the thread entered its group (the inbox item's opening, the
@@ -61,7 +61,11 @@ projection of the inbox: an open `@dshfiles/activity-timeline/attention-api` ite
 classifies. Each row shows the kit's `StatusGlyph` (Working spins without colour; only Needs you, Failed and Ready
 draw the eye), the title, a muted second line with why it needs you, the agent preset, project and host, the elapsed
 time, and one inline verb when it needs you: **Answer** and **Approve** open the thread, where the card is answered in
-place; **Retry**, **Resume** and **Land** on an inbox item run that item's own verb through the inbox's `act`.
+place; **Retry**, **Resume** and **Land** on an inbox item run that item's own verb through the inbox's `act`. The
+hover-action strip opens to the left of that verb and never over it, so the visible verb stays clickable. The Needs you
+group header offers **Resume all**: every row whose verb is Resume moves at once (three requests at a time), whether it
+stopped on a usage limit, on an interrupted turn or on a provider's own resumable item, and a mixed group still reports
+one combined result.
 Subagents stay nested one level under their parent and roll up into it ("2 subagents need you", "waiting on 1
 subagent"), so a parent never looks finished while a child waits or failed. **Group › Arrange manually** brings back
 the drag-to-arrange sections below; a saved view keeps whatever grouping it was saved with, so only a new profile
@@ -78,9 +82,10 @@ so the row's unread dot clears too. Done on an older turn's item leaves a newer 
 above the sidebar footer into the strip's Quota item; free docking still seats it there.
 
 **Fixed layout and destinations (default).** The left column is a labelled rail of eight destinations (plan
-`plans/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread
-list with **Search threads**, the Sidebar settings gear and its sections (Board); every other destination lists its
-sections, and choosing one opens that page in the stage. A destination with a single page (the Inbox) opens it at once.
+`docs/ade-ux` §4.2): Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings. Threads shows this thread
+list with **Search threads**, the Sidebar settings gear and an icon for each of its sections beside them (Board);
+every other destination lists its sections, and choosing one opens that page in the stage. A destination with a
+single page (the Inbox) opens it at once.
 The former Navigation pages are sections now, labelled without their plugin name; the table lives in the
 `@dshfiles/thread-sidebar/destinations` dshx module (`KNOWN_SECTIONS`), plugins add later pages through its
 `DestinationSections` registry, and a page nobody mapped is listed under **Settings › Other pages**. The Inbox entry
@@ -378,15 +383,17 @@ list does not move, and the notice offers an immediate undo before it disappears
 Clicking an archived row restores it and then opens it, because DSH drops an
 archived Session from the main view on every list change; a refused restore
 reports the failure and leaves the thread archived. An open archived thread
-blocks its composer behind a **Restore to reply** banner. Persistent warnings —
-storage failures and restart requests — stay in the list flow instead.
+blocks its composer behind an **Archived** banner whose **Restore** action
+reopens it. Persistent warnings — storage failures and restart requests — stay
+in the list flow instead.
 
 **Settled composer.** A settled thread opens normally and reads as history: the
-composer carries a **This thread is settled.** banner
-(`src/settled-thread-dock.tsx`), one compact card beside the jj rebase notice
-with the settle age once it stops reading "now" and the archive deadline in the
-sidebar's own relative buckets, an **Archive** button and **Unsettle to reply**,
-because the Host rejects the next model step while the thread is settled. The
+composer carries a **Settled** status strip
+(`src/settled-thread-dock.tsx`), one compact line beside the jj rebase notice
+titled with the settle age once it stops reading "now", the archive deadline
+in the sidebar's own relative buckets beside it, and an **Archive** button next
+to the primary **Unsettle** that lifts the block, because the Host
+rejects the next model step while the thread is settled. The
 rejection is a `agent/pre-step` listener in `src/host.ts` over
 `src/settled-gate.ts`: a settled
 Session, or a subagent descendant of one, runs no model step until it is
@@ -594,7 +601,8 @@ records every `turn/start` in a small durable in-flight file and clears it on
 that never closed; it promotes those ids into the same recovery store at boot,
 marked `interrupted` instead of `restart`, and clears the file so one exit is
 reported once. Both groups show explicit **Resume** and dismiss actions, and each
-offers **Resume all** (up to three requests at once). Resume sends a new
+offers **Resume all** (up to three requests at once). The status-grouped **Needs you** group and the **Usage limit**
+group offer the same verb, so every list of blocked threads can resume them together. Resume sends a new
 continuation prompt that directs the agent to inspect its transcript and
 workspace before continuing; it does not replay the interrupted model/tool call.
 A row leaves its group as soon as that thread runs again, and dismissing drops it
@@ -871,6 +879,33 @@ references this thread" when it could not look. The same rows drive the
 **Referenced by** submenu of a thread row's context menu and of the conversation
 header's `...` menu, which is why the client tolerates a Host that predates the
 method (it shows one muted line instead of the rows).
+
+`thread_subscribe`, `thread_unsubscribe` and `thread_subscriptions` (API
+`thread-subscriptions`, `src/subscriptions-api.ts`) are the opt-in completion
+notices b:eqtb asked for. A thread that intends to end its turn while it waits on
+another thread — typically one it started with `thread_create` / `thread_fork`,
+which is a root thread and never resumes its creator — calls
+`thread_subscribe { sessionId }` first: the edge is stored durably in the
+`thread_subscriptions` storage domain (`src/subscriptions-store.ts`), and from
+then on that target's `turn/end` queues ONE compact notice into the subscriber
+and wakes it when it is idle. The notice carries the status (`finished`,
+`failed`, `blocked`, `stopped`, `truncated`, or `waiting-on-question` when the
+target stopped on a question, which outranks its finish reason) plus a
+320-character preview of its newest answer — never the transcript, never tool
+output — and says that quoted text is data, not instructions. Delivery is
+session-controller's `sessions.message` with `wake: true`, the same inbox path a
+native subagent settlement uses (`src/subscription-notices-host.ts`); the
+watcher only listens to the public `session/event` stream. Nothing is delivered
+without an edge, so the default stays silent: a created thread does not wake its
+creator. A thread cannot watch itself and a pair cannot watch itself in both
+directions (two threads that wake each other would keep each other running); an
+archived subscriber or target ends the edge — at once through this plugin's own
+archive path, and on the next notice pass for an archive made elsewhere — and a
+subscriber the Host no longer resolves loses its edge instead of retrying. The
+same state is the **Notify “…” when this thread finishes** checkbox in a thread
+row's context menu (checked while the open thread watches that row) and the
+`N notified` badge on a row that has subscribers; both read the one Host
+snapshot, refreshed by the API's `changed` event.
 
 `thread_queue_remove`, `thread_queue_steer` and `thread_queue_edit` act on one
 queued message through the Session controller's `updateQueue`, the verb the queue

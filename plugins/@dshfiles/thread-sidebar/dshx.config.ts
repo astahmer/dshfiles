@@ -16,7 +16,7 @@ export default defineConfig({
     'thread-views-api': 'src/thread-views-api.ts',
     snapshots: 'src/snapshots.ts',
     'thread-mention': 'src/thread-mention.ts',
-    // The shell's rail destinations and the section registry plugins add their pages to (plans/ade-ux §4.2).
+    // The shell's rail destinations and the section registry plugins add their pages to (docs/ade-ux §4.2).
     destinations: 'src/destinations.ts',
     'thread-row-actions': 'src/thread-row-actions.ts',
     // Updates other plugins know only a Host restart applies, shown in thread-sidebar's one restart status item.

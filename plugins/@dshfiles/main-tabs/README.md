@@ -11,7 +11,7 @@
 
 Tab semantics for DSH's main view. Every thread or global panel the main view shows (for example **History**, **AI accounts**, **Usage**, **Memory** and **Workspaces**) opens or focuses a tab; picking a tab shows it again.
 
-Tab titles name the page, never its plugin (plan [`plans/ade-ux`](../../../plans/ade-ux/README.md) §5): a page the
+Tab titles name the page, never its plugin (plan [`docs/ade-ux`](../../../docs/ade-ux/README.md) §5): a page the
 shell lists as a destination section takes that section's label from `@dshfiles/thread-sidebar/destinations`
 (`Jujutsu: Revision graph` → **History**), any other page its navigation label without the `Plugin: ` prefix. The
 Start page still finds a page by its former names. main-tabs also provides those labels to Workbench's `PanelTitles`

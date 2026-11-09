@@ -83,31 +83,24 @@ export type AttachmentReference =
     }
   | { readonly kind: 'file'; readonly attachmentId: string; readonly name: string; readonly bytes: number }
 
-const imageReference = Schema.Struct({
-  attachmentId: Schema.String.check(Schema.isMinLength(1)),
-  mediaType: Schema.String.check(Schema.isStartingWith('image/')),
-  bytes: Schema.Number,
-  width: Schema.Number,
-  height: Schema.Number,
-  name: Schema.optional(Schema.String),
-})
-const fileReference = Schema.Struct({ attachmentId: Schema.String.check(Schema.isMinLength(1)), name: Schema.String, bytes: Schema.Number })
-
 type JsonObject = { readonly [key: string]: JsonValue }
 
 /** Session events arrive as parsed JSON (a stored log or a decoded bundle), so every object in them is a JSON object. */
 const isRecord = (value: unknown): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
 
+/** Structural rather than Schema-based: this runs once per object of every event, so a decoder per object dominates a long export. */
 const asReference = (value: JsonValue): AttachmentReference | undefined => {
-  const image = Schema.decodeUnknownOption(imageReference)(value)
-  if (Option.isSome(image)) {
-    const { attachmentId, mediaType, bytes, width, height, name } = image.value
-    const reference: AttachmentReference = { kind: 'image', attachmentId, mediaType, bytes, width, height }
-    return name === undefined ? reference : { ...reference, name }
-  }
-  const file = Schema.decodeUnknownOption(fileReference)(value)
-  if (Option.isSome(file) && isRecord(value) && !('mediaType' in value)) return { kind: 'file', ...file.value }
-  return undefined
+  if (!isRecord(value)) return undefined
+  const { attachmentId, bytes, name } = value
+  if (typeof attachmentId !== 'string' || attachmentId.length === 0) return undefined
+  if (typeof bytes !== 'number') return undefined
+  if (!('mediaType' in value)) return typeof name === 'string' ? { kind: 'file', attachmentId, name, bytes } : undefined
+  const { mediaType, width, height } = value
+  if (typeof mediaType !== 'string' || !mediaType.startsWith('image/')) return undefined
+  if (typeof width !== 'number' || typeof height !== 'number') return undefined
+  if (name !== undefined && typeof name !== 'string') return undefined
+  const reference: AttachmentReference = { kind: 'image', attachmentId, mediaType, bytes, width, height }
+  return name === undefined ? reference : { ...reference, name }
 }
 
 /** Visit every object nested in a JSON value, depth first. */

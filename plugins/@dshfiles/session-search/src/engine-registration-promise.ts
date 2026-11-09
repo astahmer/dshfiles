@@ -25,28 +25,37 @@ export class SessionQueryOwnership extends Context.Service<
     readonly started: boolean
   }
 >()('@dshfiles/session-search/SessionQueryOwnership') {
-  static readonly layer = Layer.effect(
-    SessionQueryOwnership,
-    Effect.gen(function* () {
-      const host = yield* HostContext
-      const worker = yield* SearchWorker
-      const port = new SearchWorkerPort({
-        searchSessions: yield* DshxPlugin.callback(worker.searchSessions),
-        searchEvents: yield* DshxPlugin.callback(worker.searchEvents),
-        health: yield* DshxPlugin.callback(() => worker.health),
-      })
-      const engine = yield* Effect.acquireRelease(
-        Effect.tryPromise({ try: () => host.ctx.plugin(SessionSearchEngine, { client: port }), catch: cause => new EngineStartFailed({ cause }) }),
-        registered => Effect.sync(() => registered.dispose()),
-      ).pipe(
-        Effect.as(true),
-        Effect.catchTag('EngineStartFailed', error => Effect.logError('session-search: the owned search backend did not start', error).pipe(Effect.as(false))),
-      )
-      const owned = Effect.sync(() => {
-        const service = host.ctx.get('sessionQuery')
-        return service instanceof SessionSearchEngine && service._client === port
-      })
-      return SessionQueryOwnership.of({ owned, started: engine })
-    }),
-  )
+  static readonly layer = (options: { readonly preparedSessionCacheSize?: number } = {}) =>
+    Layer.effect(
+      SessionQueryOwnership,
+      Effect.gen(function* () {
+        const host = yield* HostContext
+        const worker = yield* SearchWorker
+        const port = new SearchWorkerPort({
+          searchSessions: yield* DshxPlugin.callback(worker.searchSessions),
+          searchEvents: yield* DshxPlugin.callback(worker.searchEvents),
+          health: yield* DshxPlugin.callback(() => worker.health),
+        })
+        const cacheSize = options.preparedSessionCacheSize
+        const engineOptions: { readonly client: SearchWorkerPort; readonly preparedSessionCacheSize?: number } =
+          cacheSize === undefined ? { client: port } : { client: port, preparedSessionCacheSize: cacheSize }
+        const engine = yield* Effect.acquireRelease(
+          Effect.tryPromise({
+            try: () => host.ctx.plugin(SessionSearchEngine, engineOptions),
+            catch: cause => new EngineStartFailed({ cause }),
+          }),
+          registered => Effect.sync(() => registered.dispose()),
+        ).pipe(
+          Effect.as(true),
+          Effect.catchTag('EngineStartFailed', error =>
+            Effect.logError('session-search: the owned search backend did not start', error).pipe(Effect.as(false)),
+          ),
+        )
+        const owned = Effect.sync(() => {
+          const service = host.ctx.get('sessionQuery')
+          return service instanceof SessionSearchEngine && service._client === port
+        })
+        return SessionQueryOwnership.of({ owned, started: engine })
+      }),
+    )
 }

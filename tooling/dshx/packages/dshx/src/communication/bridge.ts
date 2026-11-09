@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
 import * as Schema from 'effect/Schema'
 import { chmod, lstat, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { homedir, tmpdir } from 'node:os'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { createServer, type Server, type Socket } from 'node:net'
 import { JsonLineTransport, JsonLineTransportError } from '../bridge/json-line.js'
+import { isOwnerOnly, LocalEndpoint, type LocalEndpointAddress } from '../bridge/local-endpoint.js'
 import { decodeJson, jsonValueSchema } from '../json.js'
 import type { JsonObject, JsonValue } from '../json.js'
 import { CommunicationError, CommunicationService } from './service.js'
@@ -117,9 +118,9 @@ const homeDirectory = (stateHome?: string): string => {
 
 const bridgePaths = (stateHome?: string) => {
   const directory = homeDirectory(stateHome)
-  const longSocket = join(directory, 'host.sock')
-  const socketPath = longSocket.length > 90 ? join(tmpdir(), `dshx-comm-${createHash('sha256').update(directory).digest('hex').slice(0, 20)}.sock`) : longSocket
-  return { directory, socketPath, metadataPath: join(directory, 'host.json') }
+  const digest = createHash('sha256').update(directory).digest('hex').slice(0, 20)
+  const address = { socketPath: join(directory, 'host.sock'), shortName: `dshx-comm-${digest}` } satisfies LocalEndpointAddress
+  return { directory, metadataPath: join(directory, 'host.json'), address }
 }
 
 const isRecord = (value: unknown): value is JsonObject => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -142,14 +143,14 @@ const responseError = (requestId: string, code: string, message: string) => ({
 const readMetadata = async (stateHome?: string): Promise<Schema.Schema.Type<typeof bridgeMetadataSchema>> => {
   const location = bridgePaths(stateHome)
   const metadataStat = await lstat(location.metadataPath).catch(() => undefined)
-  if (!metadataStat?.isFile() || metadataStat.isSymbolicLink() || metadataStat.size > 4_096 || (metadataStat.mode & 0o077) !== 0) {
+  if (!metadataStat?.isFile() || metadataStat.isSymbolicLink() || metadataStat.size > 4_096 || !isOwnerOnly(metadataStat)) {
     throw new CommunicationError('host-unavailable', 'DSHX Communication Host bridge is unavailable or has unsafe metadata permissions.')
   }
   if (typeof process.getuid === 'function' && metadataStat.uid !== process.getuid()) {
     throw new CommunicationError('host-unavailable', 'DSHX Communication Host bridge belongs to a different user.')
   }
   const directoryStat = await lstat(dirname(location.metadataPath)).catch(() => undefined)
-  if (!directoryStat?.isDirectory() || directoryStat.isSymbolicLink() || (directoryStat.mode & 0o077) !== 0) {
+  if (!directoryStat?.isDirectory() || directoryStat.isSymbolicLink() || !isOwnerOnly(directoryStat)) {
     throw new CommunicationError('host-unavailable', 'DSHX Communication Host bridge directory has unsafe permissions.')
   }
   if (typeof process.getuid === 'function' && directoryStat.uid !== process.getuid()) {
@@ -284,7 +285,7 @@ const writeResponse = (socket: Socket, requestId: string, value: CommunicationOp
   )
 }
 
-const removeStaleEndpoint = async (location: ReturnType<typeof bridgePaths>): Promise<void> => {
+const removeStaleEndpoint = async (location: { readonly metadataPath: string; readonly socketPath: string }): Promise<void> => {
   const metadata = await readFile(location.metadataPath, 'utf8').catch(() => undefined)
   if (metadata !== undefined) {
     try {
@@ -302,7 +303,7 @@ const removeStaleEndpoint = async (location: ReturnType<typeof bridgePaths>): Pr
       if (error instanceof CommunicationError && error.code === 'host-already-active') throw error
     }
   }
-  await rm(location.socketPath, { force: true })
+  await LocalEndpoint.remove(location.socketPath)
   await rm(location.metadataPath, { force: true })
 }
 
@@ -310,7 +311,8 @@ export const startHostCommunicationBridge = async (
   service: CommunicationService,
   options: { readonly stateHome?: string; readonly listAgents: () => readonly CommunicationAgent[] | Promise<readonly CommunicationAgent[]> },
 ): Promise<HostCommunicationBridgeHandle> => {
-  const location = bridgePaths(options.stateHome)
+  const paths = bridgePaths(options.stateHome)
+  const location = { ...paths, socketPath: LocalEndpoint.listenPath(paths.address) }
   const token = randomUUID()
   await mkdir(location.directory, { recursive: true, mode: 0o700 })
   const directoryInfo = await lstat(location.directory)
@@ -365,14 +367,14 @@ export const startHostCommunicationBridge = async (
         resolve()
       })
     })
-    await chmod(location.socketPath, 0o600)
+    await LocalEndpoint.restrict(location.socketPath)
     await writeFile(location.metadataPath, `${JSON.stringify({ version: PROTOCOL_VERSION, pid: process.pid, socketPath: location.socketPath, token })}\n`, {
       mode: 0o600,
     })
     await chmod(location.metadataPath, 0o600)
   } catch (error) {
     await new Promise<void>(resolve => server.close(() => resolve())).catch(() => undefined)
-    await rm(location.socketPath, { force: true })
+    await LocalEndpoint.remove(location.socketPath)
     await rm(location.metadataPath, { force: true })
     throw error
   }
@@ -393,7 +395,7 @@ export const startHostCommunicationBridge = async (
       }
     }
     if (stillOwned) {
-      await rm(location.socketPath, { force: true })
+      await LocalEndpoint.remove(location.socketPath)
       await rm(location.metadataPath, { force: true })
     }
   }

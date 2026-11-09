@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process'
-import { access } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { access, mkdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import type { DshxDiagnostic } from '../diagnostics.js'
 
 export interface ProjectTypecheckResult {
@@ -11,6 +12,23 @@ export interface ProjectTypecheckResult {
 }
 
 const compiler = resolve(createRequire(import.meta.url).resolve('typescript/package.json'), '..', 'bin/tsc')
+
+/**
+ * Incremental state lives under `node_modules/.cache`, so a rebuild re-reads only what changed
+ * while an edited tsconfig still invalidates the run through TypeScript's own options fingerprint.
+ * Undefined means the project cannot own that cache (a read-only install); the run stays correct
+ * and simply does full work.
+ */
+const typecheckCacheFile = async (root: string, configFile: string): Promise<string | undefined> => {
+  const directory = resolve(root, 'node_modules', '.cache', 'dshx', 'typecheck')
+  try {
+    await mkdir(directory, { recursive: true })
+  } catch {
+    return undefined
+  }
+  const identity = createHash('sha256').update(configFile).digest('hex').slice(0, 12)
+  return resolve(directory, `${basename(root)}-${identity}.tsbuildinfo`)
+}
 
 export const typecheckProject = async (root: string): Promise<ProjectTypecheckResult> => {
   const configFile = resolve(root, 'tsconfig.json')
@@ -31,10 +49,12 @@ export const typecheckProject = async (root: string): Promise<ProjectTypecheckRe
       ],
     }
   }
+  const buildInfoFile = await typecheckCacheFile(root, configFile)
+  const incrementalArgs = buildInfoFile === undefined ? ['--incremental', 'false'] : ['--incremental', '--tsBuildInfoFile', buildInfoFile]
   const result = await new Promise<{ output: string; failed: boolean }>(resolveResult => {
     execFile(
       process.execPath,
-      [compiler, '--project', configFile, '--noEmit', '--incremental', 'false', '--composite', 'false', '--pretty', 'false'],
+      [compiler, '--project', configFile, '--noEmit', ...incrementalArgs, '--composite', 'false', '--pretty', 'false'],
       { cwd: root, timeout: 120_000, maxBuffer: 8 * 1024 * 1024 },
       (error, stdout, stderr) => {
         resolveResult({ output: [stdout, stderr].filter(Boolean).join('\n'), failed: error !== null })

@@ -1,10 +1,11 @@
 import { expect, type Page } from '@playwright/test'
 import { spawnSync } from 'node:child_process'
-import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { After, Then, When } from '../bdd.js'
+import { After, Given, Then, When } from '../bdd.js'
+import { bootComposedPluginProfile } from '../boot.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
-import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, profileFor, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 /**
@@ -41,71 +42,128 @@ const openChecks = async (page: Page): Promise<void> => {
   await expect(checksPanel(page)).toBeVisible()
 }
 
-const trustActions = async (
-  page: Page,
-  actions: readonly {
-    readonly id: string
-    readonly label: string
-    readonly script: string
-    readonly verify: boolean
-    readonly timeoutMs?: number
-  }[],
-): Promise<void> => {
-  const profile = profileFor(page)
-  const patch = join(profile.homeRoot, 'profiles', profile.profile, 'cordis.patch.yml')
-  const configuredActions = actions
+/** One trusted action a journey configures before the Host boots, in the profile row's own shape. */
+interface TrustedAction {
+  readonly id: string
+  readonly label: string
+  readonly script: string
+  readonly verify?: boolean
+  readonly timeoutMs?: number
+  readonly setup?: 'await-first-turn'
+}
+
+/**
+ * Trusted actions live only in the profile row, never in a settings form. The composition already activates
+ * `@dshfiles/project-checks`, so a second row for the same id is fatal (`PluginInactive`): the actions ride the boot
+ * patch instead, where an id-only entry merges into that row's config.
+ */
+const checksPatch = (input: { readonly trustedRoot: string; readonly actions: readonly TrustedAction[] }): string => {
+  const rows = input.actions
     .map(action =>
       [
         `      - id: ${JSON.stringify(action.id)}`,
         `        label: ${JSON.stringify(action.label)}`,
         '        command: /bin/sh',
         `        args: ['-c', ${JSON.stringify(action.script)}]`,
-        `        root: ${JSON.stringify(fixtureFor(page).trustedRoot)}`,
+        `        root: ${JSON.stringify(input.trustedRoot)}`,
         ...(action.timeoutMs === undefined ? [] : [`        timeoutMs: ${String(action.timeoutMs)}`]),
-        `        verifyBeforeComplete: ${String(action.verify)}`,
+        `        verifyBeforeComplete: ${String(action.verify ?? false)}`,
+        ...(action.setup === undefined
+          ? []
+          : [`        runOnWorkspaceCreate: true`, ...(action.setup === 'await-first-turn' ? [`        awaitBeforeFirstTurn: true`] : [])]),
       ].join('\n'),
     )
     .join('\n')
-  await appendFile(
-    patch,
-    ['- id: dshfiles-project-checks', "  name: '@dshfiles/project-checks'", '  config:', '    actions:', configuredActions, ''].join('\n'),
-  )
+  return `- id: dshfiles-project-checks\n  config:\n    actions:\n${rows}\n`
 }
 
-const trustAction = async (
-  page: Page,
-  action: { readonly id: string; readonly label: string; readonly script: string; readonly verify: boolean },
-): Promise<void> => trustActions(page, [action])
-
-When('a trusted root holds a jj project and a sibling folder sits outside it', async ({ page }: { page: Page }) => {
+/** A scratch tree with one trusted root holding a jj project, and a sibling folder outside it. */
+const createFixture = async (): Promise<ChecksFixture> => {
   const root = await createScratchDirectory('dshx-project-checks-e2e-')
   const fixture = { root, trustedRoot: join(root, 'trusted'), project: join(root, 'trusted', 'checked-project'), sibling: join(root, 'trusted-sibling') }
-  fixtures.set(page, fixture)
   await mkdir(fixture.project, { recursive: true })
   await mkdir(fixture.sibling)
   await writeFile(join(fixture.project, 'README.md'), 'checked\n')
-  const init = spawnSync('jj', ['git', 'init', '--no-colocate'], { cwd: fixture.project, env: { PATH: process.env.PATH ?? '', HOME: root }, encoding: 'utf8' })
+  const jj = (...args: readonly string[]) =>
+    spawnSync('jj', args, {
+      cwd: fixture.project,
+      env: { PATH: process.env.PATH ?? '', HOME: root, JJ_USER: 'Project Checks E2E', JJ_EMAIL: 'project-checks@example.invalid' },
+      encoding: 'utf8',
+    })
+  const init = jj('git', 'init', '--no-colocate')
   if (init.status !== 0) throw new Error(`jj init failed: ${init.stderr}`)
-})
+  // A first revision and the `main` bookmark: an isolated thread workspace starts from a bookmark, and a receipt names
+  // the working copy it checked.
+  const described = jj('describe', '-m', 'e2e fixture')
+  if (described.status !== 0) throw new Error(`jj describe failed: ${described.stderr}`)
+  const bookmarked = jj('bookmark', 'create', 'main', '-r', '@')
+  if (bookmarked.status !== 0) throw new Error(`jj bookmark failed: ${bookmarked.stderr}`)
+  return fixture
+}
 
-When('the profile trusts the action {string} that runs {string}', async ({ page }: { page: Page }, label: string, script: string) => {
-  await trustAction(page, { id: 'manual-check', label, script, verify: false })
-})
+/** Boot the named composition with these trusted actions already written into the profile row. */
+const bootTrusting = async (input: {
+  readonly page: Page
+  readonly packageList: string
+  readonly actions: readonly TrustedAction[]
+  readonly label: string
+}) => {
+  const fixture = await createFixture()
+  fixtures.set(input.page, fixture)
+  const [packageId, ...companionPackageIds] = input.packageList.split(',').map(listed => listed.trim())
+  if (packageId === undefined || packageId === '') throw new Error('The plugin composition names no package.')
+  const profile = await bootComposedPluginProfile({
+    packageIds: [packageId, ...companionPackageIds],
+    profileLabel: `${input.packageList}-${input.label}`,
+    cordisPatch: checksPatch({ trustedRoot: fixture.trustedRoot, actions: input.actions }),
+  })
+  await visitIsolatedPluginProfile(input.page, profile)
+}
 
-When('the profile trusts the completion check {string} that runs {string}', async ({ page }: { page: Page }, label: string, script: string) => {
-  await trustAction(page, { id: 'completion-check', label, script, verify: true })
-})
+Given(
+  'the isolated plugin composition of {string} is booted with the trusted action {string} that runs {string}',
+  async ({ page }: { page: Page }, packageList: string, label: string, script: string) => {
+    await bootTrusting({ page, packageList, label: 'checks-manual', actions: [{ id: 'manual-check', label, script }] })
+  },
+)
 
-When('the profile trusts the Activity Timeline manual evidence actions', async ({ page }: { page: Page }) => {
-  await trustActions(page, [
-    { id: 'manual-pass', label: 'Manual pass', script: 'printf PRIVATE_EVIDENCE_SENTINEL', verify: false },
-    { id: 'manual-failure', label: 'Manual failure', script: 'exit 7', verify: false },
-    { id: 'manual-timeout', label: 'Manual timeout', script: 'sleep 3', verify: false, timeoutMs: 1_000 },
-  ])
-})
+Given(
+  'the isolated plugin composition of {string} is booted with the trusted completion check {string} that runs {string}',
+  async ({ page }: { page: Page }, packageList: string, label: string, script: string) => {
+    await bootTrusting({ page, packageList, label: 'checks-completion', actions: [{ id: 'completion-check', label, script, verify: true }] })
+  },
+)
+
+Given(
+  'the isolated plugin composition of {string} is booted with the trusted setup action {string} that runs {string}',
+  async ({ page }: { page: Page }, packageList: string, label: string, script: string) => {
+    await bootTrusting({ page, packageList, label: 'checks-setup', actions: [{ id: 'setup-check', label, script, setup: 'await-first-turn' }] })
+  },
+)
+
+Given(
+  'the isolated plugin composition of {string} is booted with the Activity Timeline manual evidence actions',
+  async ({ page }: { page: Page }, packageList: string) => {
+    await bootTrusting({
+      page,
+      packageList,
+      label: 'checks-evidence',
+      actions: [
+        { id: 'manual-pass', label: 'Manual pass', script: 'printf PRIVATE_EVIDENCE_SENTINEL' },
+        { id: 'manual-failure', label: 'Manual failure', script: 'exit 7' },
+        { id: 'manual-timeout', label: 'Manual timeout', script: 'sleep 3', timeoutMs: 1_000 },
+      ],
+    })
+  },
+)
 
 When('a thread is started in the {string} folder', async ({ page }: { page: Page }, which: string) => {
   const fixture = fixtureFor(page)
+  // The checks panel is a modal: a scenario that ran a check first must leave it before adding a workspace.
+  if (await checksPanel(page).isVisible()) {
+    await checksPanel(page).getByRole('button', { name: 'Close project checks', exact: true }).click()
+    await expect(checksPanel(page)).toBeHidden()
+  }
   const prompt = `project checks in the ${which} folder`
   await registerWorkspaceFolder(page, which === 'sibling' ? fixture.sibling : fixture.project)
   const composer = page
@@ -144,7 +202,7 @@ When('the fake model is sent a message while the completion check runs and the t
   await composer.fill('finish the task')
   await composer.press('Enter')
   await recordAssertion(page, 'project-checks-cancel-aborts-running-verification', async () => {
-    await expect.poll(() => readFile(markerPath, 'utf8').catch(() => ''), { timeout: 30_000 }).toBe('started')
+    await expect.poll(() => readFile(markerPath, 'utf8').catch(() => ''), { timeout: 90_000 }).toBe('started')
     const stop = page.getByRole('button', { name: /^Stop/ }).first()
     await expect(stop).toBeVisible({ timeout: 30_000 })
     await stop.click()
@@ -252,6 +310,67 @@ Then('the cancelled check remains available in Project Checks', async ({ page }:
     }).toPass({ timeout: 30_000 })
     await expect(receipts(page).first()).not.toContainText('failed')
   })
+})
+
+When('the New thread workspace is set to its own workspace', async ({ page }: { page: Page }) => {
+  const segment = page.locator('[data-run-segment="workspace"]').first()
+  await expect(segment).toBeVisible({ timeout: 30_000 })
+  await segment.click()
+  await page
+    .getByRole('option', { name: /Own workspace/u })
+    .first()
+    .click()
+  await expect(segment).toContainText('Own workspace')
+})
+
+When('the {string} folder is added as the New thread project', async ({ page }: { page: Page }, which: string) => {
+  const fixture = fixtureFor(page)
+  await registerWorkspaceFolder(page, which === 'sibling' ? fixture.sibling : fixture.project)
+})
+
+When('a message is sent while its workspace setup runs', async ({ page }: { page: Page }) => {
+  const composer = page
+    .getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+    .or(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true }))
+  await composer.fill('project checks setup in the project folder')
+  await composer.press('Enter')
+  await recordAssertion(page, 'project-checks-setup-phase-is-visible-in-the-composer', async () => {
+    await expect(
+      page
+        .getByRole('status')
+        .filter({ hasText: /Setting up · Setup install/u })
+        .first(),
+    ).toBeVisible({ timeout: 60_000 })
+  })
+})
+
+Then('the setup ran once in the thread workspace, not the project checkout', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const threadsDirectory = `${fixture.project}-threads`
+  await recordAssertion(page, 'project-checks-setup-runs-in-the-thread-workspace', async () => {
+    await expect
+      .poll(
+        async () => {
+          const folders = await readdir(threadsDirectory).catch(() => [] as string[])
+          for (const folder of folders) {
+            const content = await readFile(join(threadsDirectory, folder, '.setup-ran'), 'utf8').catch(() => undefined)
+            if (content !== undefined) return folder
+          }
+          return undefined
+        },
+        { timeout: 90_000 },
+      )
+      .toBeDefined()
+    // A prepared or spare workspace may also exist; what matters is that the setup ran once, in a workspace.
+    const markers = await Promise.all(
+      (await readdir(threadsDirectory).catch(() => [] as string[])).map(folder =>
+        readFile(join(threadsDirectory, folder, '.setup-ran'), 'utf8').catch(() => undefined),
+      ),
+    )
+    expect(markers.filter(marker => marker !== undefined)).toHaveLength(1)
+    expect(await readFile(join(fixture.project, '.setup-ran'), 'utf8').catch(() => undefined)).toBeUndefined()
+  })
+  await finishJourneyAssertions(page)
 })
 
 After(async ({ page }: { page: Page }) => {

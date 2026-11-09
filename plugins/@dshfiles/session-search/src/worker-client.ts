@@ -57,6 +57,8 @@ export class SearchWorker extends Context.Service<
     /** Wake the ingest loop now, for example after a Session event was committed. */
     readonly nudge: WorkerCall<IndexHealth>
     readonly startIngest: (root: string) => WorkerCall<IndexHealth>
+    /** Replace the archived set: those Sessions are cold, so the ingest pass drops their documents. */
+    readonly setArchived: (archivedSessionIds: readonly string[]) => WorkerCall<IndexHealth>
   }
 >()('@dshfiles/session-search/SearchWorker') {
   /** The worker spawns on the first call and terminates when the layer's scope closes. */
@@ -86,6 +88,7 @@ export class SearchWorker extends Context.Service<
           health: call(client.Health()),
           nudge: call(client.Nudge()),
           startIngest: root => call(client.StartIngest({ root })),
+          setArchived: archivedSessionIds => call(client.SetArchived({ archivedSessionIds: [...archivedSessionIds] })),
         })
       }),
     ).pipe(
@@ -95,7 +98,16 @@ export class SearchWorker extends Context.Service<
           Effect.gen(function* () {
             const entry = options.workerUrl === undefined ? yield* workerEntry(import.meta.url) : { url: options.workerUrl, execArgv: noArgs }
             const workerData = { indexPath: options.indexPath, ...(options.windowBytes !== undefined && { windowBytes: options.windowBytes }) }
-            return NodeWorker.layer(() => new Worker(entry.url, { workerData, ...(entry.execArgv.length > 0 && { execArgv: [...entry.execArgv] }) }))
+            // The worker decodes bounded 2 MB windows into documents; 512 MB is far above that peak and keeps a runaway
+            // index pass from growing its own isolate to the Host's 4 GB limit.
+            return NodeWorker.layer(
+              () =>
+                new Worker(entry.url, {
+                  workerData,
+                  resourceLimits: { maxOldGenerationSizeMb: 512, maxYoungGenerationSizeMb: 32 },
+                  ...(entry.execArgv.length > 0 && { execArgv: [...entry.execArgv] }),
+                }),
+            )
           }),
         ),
       ),

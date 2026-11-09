@@ -224,7 +224,7 @@ export const workbenchPanels = (): WorkbenchPanelRegistry => (globalThis.dshfile
 
 /**
  * A person's name for one main panel's tab, without the "Plugin: View" prefix its navigation label carries
- * (plan `plans/ade-ux` §5: labels never show plugin names). The workbench owns the tab titles, so it declares the
+ * (plan `docs/ade-ux` §5: labels never show plugin names). The workbench owns the tab titles, so it declares the
  * registry (`@dshfiles/workbench/panel-titles`); a plugin that knows better names (main-tabs, from the shell's
  * destination sections) provides entries. Without an entry the title is the navigation label with any `Plugin: `
  * prefix removed.

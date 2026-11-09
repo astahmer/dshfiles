@@ -49,10 +49,11 @@ API: `hmr_gate_status` returns `{ deferred: [{ id, reason }], watched }`.
 
 ## Where the user sees it
 
-Settings → Plugins gains an **HMR updates** row (the `plugins.item` seat). Its
-summary line names how many plugins wait for a Host restart; its page lists them
-and says what a restart applies. This is the notice, not a gate bypass: the
-browser keeps running the last-good code either way.
+Settings → Plugins gains an **HMR updates** row (the `plugins.item` seat), and
+thread-sidebar's restart status item lists the same packages with its restart
+verbs. The row's summary line names how many plugins wait for a Host restart; its
+page lists them and says what a restart applies. This is the notice, not a gate
+bypass: the browser keeps running the last-good code either way.
 
 ![Plugins → HMR updates, one plugin waiting for a Host restart](docs/screenshots/plugins-row-deferred.png)
 
@@ -65,7 +66,11 @@ artifact on disk matches the loaded one again:
 
 - The browser half uses a same-origin `EventSource` on `plugins/events`. A shell
   that exposes only `__DSH_TRANSPORT__.fetch` (no same-origin EventSource) would
-  need the fetch path the stock client also carries.
+  need the fetch path the stock client also carries for the `graph` and `rebuilt`
+  frames. The notice itself re-reads the list without a reload: when the page
+  loads or comes back into focus, it opens one short-lived stream whose connect
+  frames carry the Host's current list, so a slept tab or a reset stream cannot
+  leave a stale (or empty) notice behind.
 - This replaces the stock row, so `webWork` profile composition must disable
   `client-hmr`; the bundled `cordis.patch.yml` does that.
 - It gates _announcements_, not Host loading: a Host restart is still the only way

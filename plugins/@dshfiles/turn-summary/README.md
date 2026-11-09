@@ -2,7 +2,7 @@
 
 ![A summary line under each finished turn](docs/screenshots/turn-summary-line.png)
 
-![A walkthrough card after a turn that changed code](docs/screenshots/turn-walkthrough.png)
+![A walkthrough opened under a turn that changed code](docs/screenshots/turn-walkthrough.png)
 
 A footer under each finished turn that says what the agent did with tools:
 
@@ -14,10 +14,10 @@ A footer under each finished turn that says what the agent did with tools:
 - The red **failure count** opens the failed commands and how each ended: `exit 1`, `signal SIGKILL`, `no exit code`, or `error` when the tool rejected the call.
 - **Duration** is the turn's wall time, from `turn/start` to `turn/end`.
 
-After a turn that edited files, a **walkthrough card** (plugin-ui `ActivityDock` with `DockChanges`) lists the changed
-files by folder, each folder with a one-line summary (`Edited 2 files · +40 −3`), and **Review in Changes** opens that
-turn's changed-files review in the right pane: pulls-review's Changes facet when it is loaded, else the native review
-tab. Its icon folds it to one button.
+After a turn that edited files, a **Walkthrough** row opens a grouped view of the changed files by folder, each folder
+with a one-line summary (`Edited 2 files · +40 −3`); every file row opens that file in the editor, and **Review in
+Changes** opens that turn's changed-files review in the right pane: pulls-review's Changes facet when it is loaded, else
+the native review tab. It is a row in the turn footer, closed by default, so nothing floats above the composer.
 
 Built with dshx (no port). Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 
@@ -34,7 +34,7 @@ All apply live.
 | `testResults`  | `true`  | Show passed / total tests from the last test-runner summary.   |
 | `duration`     | `true`  | Show how long the turn took.                                   |
 | `openLists`    | `true`  | Let the edited-file and command counts open their lists.       |
-| `walkthrough`  | `true`  | Show the walkthrough card after a turn that edited files.      |
+| `walkthrough`  | `true`  | Show the walkthrough row after a turn that edited files.       |
 
 ## How it works
 

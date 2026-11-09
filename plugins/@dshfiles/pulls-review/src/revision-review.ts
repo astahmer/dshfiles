@@ -57,6 +57,71 @@ const orderArgs = (commitIds: readonly string[]): readonly string[] => [
 /** One revision's own change. `jj diff -r` also compares a merge against its merged parents, which `--from` would not. */
 const diffArgs = (commitId: string): readonly string[] => ['diff', '--git', '-r', commitId]
 
+const PATCH_SEPARATOR = '\u0000'
+
+/** Every selected revision's own patch in one read: each commit id sits between two NULs, its patch right after. */
+const patchesArgs = (commitIds: readonly string[]): readonly string[] => [
+  'log',
+  '-r',
+  commitIds.join(' | '),
+  '--git',
+  '--patch',
+  '--no-graph',
+  '-T',
+  `"\\0" ++ commit_id.short(64) ++ "\\0"`,
+]
+
+const COMMIT_ID = /^[0-9a-f]{40,64}$/u
+
+/** Every requested id's revision in one read, ancestors first: the ordering read is the describe read. */
+const describeManyArgs = (revisions: readonly string[]): readonly string[] => [
+  'log',
+  '-r',
+  revisions.join(' | '),
+  '--reversed',
+  '--no-graph',
+  '-T',
+  REVISION_TEMPLATE,
+]
+
+/**
+ * The revisions one `jj log --reversed` printed, each tagged with the requested id that names it; undefined unless every
+ * requested id names exactly one returned revision, so an ambiguous or missing id still takes the one-at-a-time path.
+ */
+const decodeSelection = (requested: readonly string[], stdout: string): readonly ResolvedRevision[] | undefined => {
+  const matchedBy = new Map<string, number>()
+  const found = new Map<string, ResolvedRevision>()
+  for (const line of stdout.split('\n').filter(text => text.length > 0)) {
+    const decoded = decodeRevisionLine(line)
+    if (Option.isNone(decoded)) return undefined
+    const matching = requested.filter(id => decoded.value.commitId.startsWith(id) || decoded.value.changeId.startsWith(id))
+    const match = matching[0]
+    if (match === undefined || matching.length > 1) return undefined
+    matchedBy.set(match, (matchedBy.get(match) ?? 0) + 1)
+    const revision: ResolvedRevision = {
+      requested: match,
+      ...decoded.value,
+      description: decoded.value.description.slice(0, MAX_DESCRIPTION_CHARS),
+    }
+    if (!found.has(revision.commitId)) found.set(revision.commitId, revision)
+  }
+  const everyRequestedFound = requested.every(id => matchedBy.get(id) === 1)
+  return everyRequestedFound ? [...found.values()] : undefined
+}
+
+/** The patches one `jj log --patch` printed, by commit id; undefined when the framing is not exactly one id and one patch per revision. */
+const decodePatches = (stdout: string): Map<string, string> | undefined => {
+  const parts = stdout.split(PATCH_SEPARATOR)
+  if (parts.length < 3 || parts.length % 2 === 0 || parts[0] !== '') return undefined
+  const patches = new Map<string, string>()
+  for (let index = 1; index + 1 < parts.length; index += 2) {
+    const commitId = parts[index] ?? ''
+    if (!COMMIT_ID.test(commitId)) return undefined
+    patches.set(commitId, parts[index + 1] ?? '')
+  }
+  return patches
+}
+
 /** Put `resolved` in jj's order; a revision jj left out of the ordering read stays, last, rather than vanishing. */
 const inOrder = (resolved: readonly ResolvedRevision[], stdout: string): readonly ResolvedRevision[] => {
   const position = new Map(
@@ -108,4 +173,17 @@ const reportText = (result: RevisionsReviewResult): string => {
   return lines.join('\n')
 }
 
-export const RevisionReviewModel = { decodeResolved, describeArgs, orderArgs, diffArgs, inOrder, segments, failure, reportText }
+export const RevisionReviewModel = {
+  decodeResolved,
+  decodeSelection,
+  describeArgs,
+  describeManyArgs,
+  orderArgs,
+  diffArgs,
+  patchesArgs,
+  decodePatches,
+  inOrder,
+  segments,
+  failure,
+  reportText,
+}

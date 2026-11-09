@@ -17,8 +17,28 @@ describe('applyEdits', () => {
     const result = applyEdits({ content: repeated, edits: [{ old: 'x', new: 'z' }] })
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.error).toEqual({ kind: 'ambiguous', edit: 0, lines: [1, 3] })
+    expect(result.error).toEqual({
+      kind: 'ambiguous',
+      edit: 0,
+      lines: [1, 3],
+      candidates: [
+        { line: 1, text: 'x' },
+        { line: 3, text: 'x' },
+      ],
+    })
     expect(describeEditsFailure(result.error)).toContain('lines 1, 3')
+    expect(describeEditsFailure(result.error)).toContain('closest: line 1 "x"')
+  })
+
+  it('names the closest lines when the anchor is absent', () => {
+    const source = ['export const first = 1', 'export function resumeAttention() {', '  return ready', '}', ''].join('\n')
+    const result = applyEdits({ content: source, edits: [{ old: 'export function resumeAttentoin() {', new: 'x' }] })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.kind).toBe('missing')
+    if (result.error.kind !== 'missing') return
+    expect(result.error.candidates[0]).toEqual({ line: 2, text: 'export function resumeAttention() {' })
+    expect(describeEditsFailure(result.error)).toContain('closest: line 2 "export function resumeAttention() {"')
   })
 
   it('replaces every occurrence when replaceAll is set', () => {

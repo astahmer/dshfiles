@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "lazy-per-record-reads",
+      "title": "Read one stored JSON record without loading the whole unit",
+      "summary": "Owned fork of the native JSON storage backend: the per-record unit additionally answers synchronous per-record reads (listKeysSync, getRecordSync, getGlobalSync) so the owned storage-domain fork can hydrate one record on first read instead of materializing every record at open. The on-disk format, the atomic publish protocol, the legacy whole-unit bootstrap, and every write path are upstream byte-for-byte; the sync reads apply the same parse and version rules the open-time loadAll applies.",
+      "surfaces": ["host", "storage"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: no UI",
+      "configuration": [
+        {
+          "key": "root",
+          "defaultValue": "(required)",
+          "constraints": "Absolute directory holding one `<unit>.json` file or `<unit>/` tree per unit; restated from the stock row because a patch replaces whole configs.",
+          "coveredBy": ["storage-json.root-config"]
+        }
+      ],
+      "states": ["indexed-only", "hydrated", "foreign-document", "closed"],
+      "failureModes": [
+        "A record document that is malformed or stamped with an unaccepted version reads as absent, exactly as loadAll reports it.",
+        "A sync read after close rejects with the backend's `closed` StorageError.",
+        "Every other behaviour is the pinned upstream code; drift is checked with scripts/native-fork-diff.mjs."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "storage-json.indexes-keys",
+          "file": "plugins/@dshfiles/storage-json/tests/lazy-reads.test.ts",
+          "testName": "indexes stored document keys without reading a record"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-json.foreign-document",
+          "file": "plugins/@dshfiles/storage-json/tests/lazy-reads.test.ts",
+          "testName": "reports a foreign document as absent, exactly like loadAll does"
+        },
+        {
+          "kind": "unit-test",
+          "id": "storage-json.root-config",
+          "file": "plugins/@dshfiles/storage-json/tests/lazy-reads.test.ts",
+          "testName": "reads a record the stock backend wrote and writes one it reads back"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "In-process file reads under the opener's existing request span: a storage unit has no network, socket, or job of its own."
+        }
+      ]
+    }
+  ]
+}

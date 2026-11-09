@@ -2,6 +2,7 @@ import { chmod, copyFile, lstat, mkdir, readFile, readdir, readlink, rm, symlink
 import { userInfo } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { AccountCredentialHomeWork } from './account-credential-home-work.js'
+import { ShellCommand } from './shell-command.js'
 
 /**
  * Codex home layout, ported from T3 Code's `CodexHomeLayout.ts`.
@@ -159,7 +160,7 @@ export const materializeCodexShadowHome = (layout: CodexHomeLayout): Promise<Cod
     : Promise.resolve(layout)
 
 /** The command that writes the next login for this instance. */
-const codexLoginHint = (layout: CodexHomeLayout): string => `CODEX_HOME='${layout.effectiveHomePath.replaceAll("'", "'\\''")}' codex login`
+const codexLoginHint = (layout: CodexHomeLayout): string => ShellCommand.withEnvironment('CODEX_HOME', layout.effectiveHomePath, 'codex login')
 
 const authJsonPath = (layout: CodexHomeLayout): string => join(layout.effectiveHomePath, 'auth.json')
 

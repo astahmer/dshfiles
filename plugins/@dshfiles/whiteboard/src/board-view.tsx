@@ -54,18 +54,28 @@ function BoardEditor(props: {
   })
   const [title, setTitle] = useState(board.board.title)
   const [renaming, setRenaming] = useState(false)
+  const [leaveNotice, setLeaveNotice] = useState<string | null>(null)
   const state = String(snapshot.value)
 
   useEffect(() => {
     const saved = actor.on('saved', () => void queryClient.invalidateQueries({ queryKey: WhiteboardUi.keys.list(board.board.project) }))
     const adopted = actor.on('adopted', event => setTitle(event.title))
     const left = actor.on('left', () => onBack())
+    // The back button reports a save it cannot finish here instead of silently staying on the board.
+    const blocked = actor.on('leaveBlocked', () =>
+      setLeaveNotice('This board has unsaved changes the Host has not accepted yet. Use the controls below, then press Boards again.'),
+    )
     return () => {
       saved.unsubscribe()
       adopted.unsubscribe()
       left.unsubscribe()
+      blocked.unsubscribe()
     }
   }, [actor, board.board.project, onBack, queryClient])
+
+  useEffect(() => {
+    if (state !== 'conflict' && state !== 'failed') setLeaveNotice(null)
+  }, [state])
 
   // A write by an agent or another tab: the machine adopts it while nothing local is unsaved, else the next save reports a conflict.
   const summary = useQuery({
@@ -156,6 +166,11 @@ function BoardEditor(props: {
         ) : null}
       </header>
 
+      {leaveNotice === null ? null : (
+        <Alert variant="warning" className="dshx:rounded-none dshx:border-x-0 dshx:border-t-0">
+          <AlertDescription>{leaveNotice}</AlertDescription>
+        </Alert>
+      )}
       {state === 'conflict' ? (
         <Alert variant="warning" className="dshx:rounded-none dshx:border-x-0 dshx:border-t-0">
           <AlertTitle>This board was changed elsewhere</AlertTitle>

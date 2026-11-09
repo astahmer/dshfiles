@@ -19,7 +19,7 @@ import type {
 import { PublishEventError } from './api.js'
 import { effectClient } from './client.js'
 import { PluginActivationError } from './plugin.js'
-import { makeActivationSlot, PluginInactive, type PluginRuntime, runtimeOf } from './plugin-runtime.js'
+import { inactiveError, makeActivationSlot, PluginInactive, type PluginRuntime, runtimeOf } from './plugin-runtime.js'
 import { processEnvConfig } from './process-env-config.js'
 import { tracerLayer } from './tracer.js'
 import { thrownForApi } from './wire-error.js'
@@ -45,7 +45,7 @@ const legacyRegistration = <const Methods extends Record<string, AnyApiMethodDef
   for (const [method, handler] of Object.entries<(context: ApiHandlerContext<never>) => Effect.Effect<unknown, unknown, R>>(handlers)) {
     promised[method] = async context => {
       const runtime = await runtimeFor({ signal: context.signal, ctx: context.ctx }).catch((cause: unknown) => {
-        if (cause instanceof PluginInactive) throw ApiProtocolModel.error('unavailable', cause.message, contract.id, method, true, cause)
+        if (cause instanceof PluginInactive) throw inactiveError({ cause, apiId: contract.id, method })
         throw cause
       })
       const exit = await runtime.run(handler(context), { signal: context.signal })

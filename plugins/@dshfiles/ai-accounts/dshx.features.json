@@ -1027,11 +1027,12 @@
           "coveredBy": ["ai-accounts.failure-policy-ladder", "ai-accounts.failure-recovery-pool"]
         }
       ],
-      "states": ["retrying", "luna-reserve", "failed-over", "waiting", "shrunk", "given-up"],
+      "states": ["retrying", "luna-reserve", "failed-over", "waiting", "shrunk", "given-up", "subagent-skipped"],
       "failureModes": [
         "A fail-over never crosses provider kinds, skips hidden accounts and accounts without the model.",
         "A recovered account takes its conversations back after its cooldown.",
-        "Settings written before failure recovery keep loading with defaults."
+        "Settings written before failure recovery keep loading with defaults.",
+        "A subagent's stopped turn is stored as no recovery at all: its parent thread is the one the user continues, and a boot retires a recovery an earlier build stored for a subagent Session."
       ],
       "externalDependencies": [],
       "verification": [
@@ -1060,6 +1061,18 @@
           "testName": "records a spent plan even though fail-over is on by default"
         },
         {
+          "kind": "unit-test",
+          "id": "ai-accounts.subagent-no-recovery",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-continuation-service.test.ts",
+          "testName": "does not offer a recovery for a subagent's stopped turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.subagent-recovery-retired",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-continuation-service.test.ts",
+          "testName": "retires a recovery an earlier build stored for a subagent's Session"
+        },
+        {
           "kind": "gherkin",
           "id": "ai-accounts.failure-recovery",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
@@ -1079,7 +1092,7 @@
     {
       "id": "quota-auto-retry",
       "title": "Retry exhausted quota when its reset arrives",
-      "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset from a checkbox beside Resume, on by default and overridable per thread.",
+      "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and auto-resume one minute after a known reset — or on a 30 s to 10 min growing backoff when the provider names none — from a checkbox beside Resume, on by default and overridable per thread.",
       "surfaces": ["client", "host", "settings", "storage"],
       "surface": "attentionProvider",
       "destination": "inbox",
@@ -1102,7 +1115,8 @@
       ],
       "states": ["quota-exhausted", "route-selection", "waiting-for-reset", "resume-queued", "reset-unknown"],
       "failureModes": [
-        "Automatic resume is on by default for a known reset and cannot be enabled without one; it queues one minute after reset.",
+        "Automatic resume is on by default and never needs a provider-declared reset: a known reset queues one minute after it, and an unknown one retries on a 30 s, 1 min, 3 min, 5 min, then every 10 min backoff.",
+        "A recovery that already ran and hit the same quota wall again takes the next backoff rung, so an unannounced reset is not re-tried every 30 seconds forever.",
         "A thread keeps the choice made for its earlier recovery, so the global default cannot silently undo it.",
         "Changing one turn's choice creates or removes only that turn's scheduled recovery.",
         "The beside-Resume choice only renders for a thread whose lost turn stored a recovery.",
@@ -1148,6 +1162,18 @@
           "id": "ai-accounts.quota-recovery-notice-visibility",
           "file": "plugins/@dshfiles/ai-accounts/src/quota-recovery-notice.test.ts",
           "testName": "appears with failover on only when the ladder still stored a recovery to act on"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-unknown-reset-backoff",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-retry-backoff.test.ts",
+          "testName": "backs off 30 s, 1 min, 3 min, 5 min, then every 10 min"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-unknown-reset-escalates",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-continuation-service.test.ts",
+          "testName": "backs an unknown-reset thread off one rung further after a recovery that already ran"
         },
         {
           "kind": "gherkin",
@@ -1220,17 +1246,18 @@
     {
       "id": "quota-inbox-items",
       "title": "Quota-blocked threads in the Inbox, resumable in place",
-      "summary": "Every waiting quota continuation (a turn stopped by an exhausted account limit) is a blocking Inbox item about its thread, with when the quota resets and whether it resumes by itself. Resume runs the same stored continuation as the Usage page's Resume, only when the user chooses it; Open goes to the thread to switch account or model first. The item resolves once the continuation is resumed, dismissed or superseded.",
+      "summary": "Every waiting quota continuation (a turn stopped by an exhausted account limit) is a blocking Inbox item about its thread, with when the quota resets and whether it resumes by itself. Resume runs the same stored continuation as the Usage page's Resume, only when the user chooses it; Open goes to the thread to switch account or model first. Done dismisses the stored continuation with the item, and a boot retires one an earlier build left waiting under a done item, so no thread keeps offering a Resume for a recovery the user set aside. The item resolves once the continuation is resumed, dismissed or superseded.",
       "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
       "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › ai-accounts.quota-continuation",
       "configuration": [],
-      "states": ["waiting", "resumed-from-inbox", "resumed-elsewhere", "dismissed", "newer-work", "inbox-absent"],
+      "states": ["waiting", "resumed-from-inbox", "resumed-elsewhere", "dismissed", "done-in-inbox", "newer-work", "inbox-absent"],
       "failureModes": [
         "Without the inbox (activity-timeline) loaded, quota recovery works exactly as before; the provider reconciles when the inbox announces it is ready.",
         "Resume on a continuation that has newer work, was dismissed or whose Session is unavailable is refused with how to continue the thread instead.",
+        "Done in the Inbox dismisses the continuation too, so a thread never keeps a Resume button for a recovery the user already set aside; a boot repairs a done item that an earlier build left with a waiting continuation.",
         "Before the accounts Host has started its recovery service, the provider states nothing and Resume asks to try again in a moment."
       ],
       "externalDependencies": [
@@ -1251,7 +1278,7 @@
           "kind": "unit-test",
           "id": "ai-accounts.inbox-quota-round-trip",
           "file": "plugins/@dshfiles/ai-accounts/src/quota-attention.test.ts",
-          "testName": "lists a quota-blocked thread in the inbox, resumes it on Resume, and resolves a dismissed one"
+          "testName": "lists a quota-blocked thread in the inbox, resumes it on Resume, retires it on Done, and repairs a done item an earlier boot left waiting"
         },
         {
           "kind": "not-applicable",

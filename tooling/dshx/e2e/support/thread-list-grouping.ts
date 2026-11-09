@@ -6,7 +6,7 @@ const threadsRegion = (page: Page): Locator => page.getByRole('region', { name: 
 const sidebarNavigation = (page: Page): Locator => page.getByRole('navigation', { name: 'Sidebar navigation', exact: true })
 
 /**
- * All threads ships grouped by status (Needs you, Working, Ready, Idle, Done; plans/ade-ux §4.3). A journey that asserts
+ * All threads ships grouped by status (Needs you, Working, Ready, Idle, Done; docs/ade-ux §4.3). A journey that asserts
  * the older Active, Parked, Pinned, Settled or Archived section headers picks those drag-to-arrange sections first,
  * through the Group menu, as a user would. Idempotent: a list already arranged manually is left alone.
  */
@@ -23,6 +23,22 @@ const arrangeManually = async (page: Page, scope: Locator = threadsRegion(page))
 }
 
 /**
+ * A journey about the inline status verb needs the shipping status grouping: the verb exists only there, because the
+ * manual sections keep the older rows. Arranged manually earlier in the same journey, this goes back through the Group
+ * menu as a user would.
+ */
+const groupByStatus = async (page: Page, scope: Locator = threadsRegion(page)): Promise<void> => {
+  const railThreads = page.getByRole('tab', { name: 'Threads', exact: true })
+  if ((await railThreads.count()) > 0 && (await railThreads.first().getAttribute('aria-selected')) !== 'true') await railThreads.first().click()
+  const status = scope.getByRole('button', { name: 'Group: Status', exact: true })
+  if ((await status.count()) === 0) {
+    await scope.getByRole('button', { name: /^Group: /u }).first().click()
+    await page.getByRole('menuitemradio', { name: 'Status', exact: true }).click()
+  }
+  await expect(status).toBeVisible()
+}
+
+/**
  * The sidebar's New thread button, wherever the layout seats it: the header row beside the history arrows (fixed
  * layout, expanded), the top of the rail (fixed layout, collapsed) or the `Sidebar navigation` header (free docking).
  * Only one of them is visible at a time.
@@ -30,7 +46,7 @@ const arrangeManually = async (page: Page, scope: Locator = threadsRegion(page))
 const newThreadButton = (page: Page): Locator => page.getByRole('button', { name: 'New thread', exact: true }).filter({ visible: true }).first()
 
 /**
- * The fixed rail layout is the default (plans/ade-ux §4.1). A journey about the older Dockview sidebar — its header
+ * The fixed rail layout is the default (docs/ade-ux §4.1). A journey about the older Dockview sidebar — its header
  * destinations, header and footer More menus, overflow modes, Workbench Threads panel — switches to Settings › Layout ›
  * Free docking first, as a user would. Idempotent: a page already docking is left alone.
  */
@@ -58,6 +74,7 @@ const useFreeDocking = async (page: Page): Promise<void> => {
 
 export class ThreadSidebarJourney {
   static readonly arrangeManually = arrangeManually
+  static readonly groupByStatus = groupByStatus
   static readonly newThreadButton = newThreadButton
   static readonly useFreeDocking = useFreeDocking
   static readonly sidebarNavigation = sidebarNavigation

@@ -10,7 +10,7 @@ import { createScratchDirectory, registerWorkspaceFolder } from '../threads.js'
 const STORAGE_KEY = 'dshfiles.main-tabs.v1'
 
 const strip = (page: Page) => page.getByRole('tablist', { name: 'Open views', exact: true })
-// Tab titles name the page, never its plugin (plans/ade-ux Phase 3b): the rail section label ("History"), else the
+// Tab titles name the page, never its plugin (docs/ade-ux Phase 3b): the rail section label ("History"), else the
 // navigation label without its "Plugin: " prefix. Native core page titles stay as they are.
 const nativeTabName = (name: string): string | RegExp =>
   name === 'Plugins' || name === 'Automation tasks' || name === 'Settings' ? name : viewNamePattern(name)
@@ -107,6 +107,14 @@ When('a disposable native-tabs workspace is selected', async ({ page }: { page: 
     await expect(picker.getByRole('listbox', { name: 'Folders', exact: true })).toHaveAttribute('aria-busy', 'false')
     await picker.getByRole('button', { name: 'Register project', exact: true }).first().click()
     await expect(picker).toBeHidden()
+    // Registering now opens the folder-inspection dialog; keep the scratch folder plain so this journey only cares
+    // about the strip's tabs.
+    const setup = page.getByRole('dialog', { name: `Add ${basename(root)}`, exact: true })
+    const asked = await setup.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)
+    if (asked) {
+      await setup.getByRole('button', { name: 'Add without a repository', exact: true }).click()
+      await expect(setup).toBeHidden()
+    }
   }
   await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(basename(root))
 })

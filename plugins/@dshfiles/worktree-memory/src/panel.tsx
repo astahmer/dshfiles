@@ -41,7 +41,7 @@ import {
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 const snapshotKey = ['worktree-memory', 'snapshot'] as const
-const POLL_MS = 5_000
+const POLL_MS = 15_000
 // The stop API refuses more than 200 targets, so a page-wide stop continues in batches until every listed tree is asked for.
 const STOP_BATCH_SIZE = 200
 // The sidebar badge is always mounted, so it polls far less often than the open panel; both share one cache entry.

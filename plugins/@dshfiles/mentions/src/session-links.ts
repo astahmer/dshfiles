@@ -12,7 +12,18 @@ const recallEventSchema = Schema.Struct({
 
 // `dsh-session:` + base64url(JSON.stringify(sessionId)), as @deepseek-ai/dsh-session-reference encodes it.
 const SESSION_URI = /dsh-session:([A-Za-z0-9_-]+)/u
+const SESSION_MENTION = /@\[([^\]\n]+)\]\(dsh-session:[A-Za-z0-9_-]+\)/gu
 const PLAIN_JSON_STRING = /^"([^"\\]+)"$/u
+
+/** One canonical session mention already written in plain text. */
+export interface SessionMentionMatch {
+  /** Offset of the leading `@`. */
+  readonly start: number
+  readonly end: number
+  /** The exact `@[label](dsh-session:…)` spelling. */
+  readonly mention: string
+  readonly label: string
+}
 
 /** How a rendered session reference finds the session it names. */
 export class SessionLinks {
@@ -26,6 +37,16 @@ export class SessionLinks {
     } catch {
       return undefined
     }
+  }
+
+  /** Every canonical session mention a written text still names. */
+  static matches(text: string): readonly SessionMentionMatch[] {
+    return [...text.matchAll(SESSION_MENTION)].flatMap(match => {
+      const label = match[1]
+      if (label === undefined) return []
+      const start = match.index ?? 0
+      return [{ start, end: start + match[0].length, mention: match[0], label }]
+    })
   }
 
   /**

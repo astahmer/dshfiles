@@ -12,6 +12,11 @@ export class Notifier {
   private scheduled: 'none' | 'microtask' | 'frame' = 'none'
   private scheduleGeneration = 0
 
+  /** Mounted views holding this snapshot; a Session with none is a candidate for release. */
+  get listenerCount(): number {
+    return this.listeners.size
+  }
+
   /** @param rebuild - snapshot rebuild function injected by the owner (writes the owner's snapshotCache). */
   constructor(private readonly rebuild: () => void) {}
 

@@ -182,6 +182,32 @@ describe('shared model directory', () => {
     expect(operations).toEqual(['select'])
   })
 
+  it('ignores a malformed context pressure projection', async () => {
+    const { compact, directory, operations, pressure, projected } = fixture(false)
+    await directory.load()
+    projected.set({ lastUsed: null, next: initial })
+    // SAFETY: the projection payload is exactly what the decode under test rejects.
+    pressure.set({ contextWindow: '1_000_000', projectedTokens: 110_000 } as unknown as ContextPressureProjection)
+
+    await directory.select(chosen)
+
+    expect(compact).not.toHaveBeenCalled()
+    expect(operations).toEqual(['select'])
+  })
+
+  it('strips properties the context pressure projection does not declare', async () => {
+    const { compact, directory, operations, pressure, projected } = fixture(false)
+    await directory.load()
+    projected.set({ lastUsed: null, next: initial })
+    // SAFETY: the extra property is exactly what the decode under test strips.
+    pressure.set({ contextWindow: 1_000_000, projectedTokens: 110_000, sampledAt: 1_700_000_000_000 } as unknown as ContextPressureProjection)
+
+    await directory.select(chosen)
+
+    expect(compact).toHaveBeenCalledExactlyOnceWith()
+    expect(operations).toEqual(['compact', 'select'])
+  })
+
   it('keeps native selection behavior when route capacity is unknown', async () => {
     const { compact, directory, operations, pressure, projected, resolveContextWindow } = fixture(false)
     await directory.load()

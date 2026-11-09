@@ -291,7 +291,7 @@ export default defineClient({
           }),
         'thread-sidebar: working status item',
       )
-      // The one restart notice (plans/ade-ux §4.1 R5): Host files changed on disk plus other plugins' pending updates,
+      // The one restart notice (docs/ade-ux §4.1 R5): Host files changed on disk plus other plugins' pending updates,
       // with the restart verbs the sidebar shell guards.
       const RestartItem = (props: StatusItemProps): JSX.Element | null => (
         <RestartStatusItem
@@ -1078,6 +1078,8 @@ export default defineClient({
         if (project !== undefined) ctx.uiWorkspace.startSession(project.workspaceId)
       },
       continueInProject,
+      projectRegister: (input: { readonly path: string; readonly title: string }) =>
+        createApiClient(ctx, threadActionsApi).projectRegister({ path: input.path, title: input.title }),
       open: openThread,
       openLinkedSession: (sessionId: SessionSummary['id']) => {
         const activePanelId = ctx.layout.panelInfo.getSnapshot().activePanelId

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createTestHost } from '@dshfiles/dshx/testing'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { Schema } from 'effect'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import agentsviewHost from './host.js'
@@ -48,6 +49,29 @@ describe('agentsview Host', () => {
       else process.env[name] = value
     }
     rmSync(root, { recursive: true, force: true })
+  })
+
+  it('registers its agent tools from the manifest and builds its layer on the first call', async () => {
+    const recorder = recordSpans()
+    const host = await createTestHost()
+    try {
+      await host.mount(agentsviewHost, { packageId: '@dshfiles/agentsview' })
+      expect(TOOLS.map(name => host.tools.get(name)?.name)).toEqual(TOOLS)
+      expect(recorder.named('plugin activate')).toHaveLength(0)
+      const listed = await host.tools.execute({
+        callId: 'call-1' as never,
+        name: 'agent_sessions_sources',
+        arguments: {},
+        signal: new AbortController().signal,
+      })
+      expect(listed).toMatchObject({ isError: false })
+      await host.connection.requestApi({ packageId: '@dshfiles/agentsview', apiId: 'agentsview', method: 'list', version: 1, input: {} })
+      expect(recorder.named('plugin activate')).toHaveLength(1)
+      expect(recorder.span('plugin activate').attributes).toMatchObject({ 'dshx.plugin.lazy': true })
+    } finally {
+      recorder.stop()
+      await host.dispose()
+    }
   })
 
   it('serves the agent-sessions API from HOME and registers a read-only agent tool per user capability', async () => {

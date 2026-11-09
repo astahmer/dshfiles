@@ -10,7 +10,7 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { CopyIcon, MessageSquarePlusIcon, TriangleAlertIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { pluginGuideApi } from './api.js'
 import { GUIDE_KINDS, KIND_LABEL, PluginGuide, RISK_LABEL, type GuideCatalog, type GuideEntry, type GuideKind } from './catalog-model.js'
 
@@ -101,12 +101,30 @@ const Detail = (props: { readonly entry: GuideEntry; readonly catalog: GuideCata
   )
 }
 
+const GuideSearch = ({ onQuery }: { readonly onQuery: (query: string) => void }): ReactNode => {
+  const [search, setSearch] = useState('')
+  const debouncedQuery = useDebouncedValue({ value: search, delayMs: 150 })
+  useEffect(() => {
+    onQuery(debouncedQuery)
+  }, [onQuery, debouncedQuery])
+  return (
+    <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+      <SearchInput
+        aria-label="Search extension surfaces"
+        className="dshx:w-72 dshx:max-w-full"
+        onChange={event => setSearch(event.target.value)}
+        placeholder="Search slots, registries, APIs…"
+        value={search}
+      />
+    </div>
+  )
+}
+
 export const PluginGuidePanel = (props: PluginGuidePanelProps): ReactNode => {
   const api = useApi(pluginGuideApi)
   const guide = useQuery({ queryKey: ['plugin-guide', 'catalog'], queryFn: ({ signal }) => api.catalog({}, { signal }), staleTime: Infinity, retry: false })
   const [kind, setKind] = useState<GuideKind | 'all'>('all')
-  const [search, setSearch] = useState('')
-  const query = useDebouncedValue({ value: search, delayMs: 150 })
+  const [query, setQuery] = useState('')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
   const catalog = guide.data?.catalog
@@ -149,15 +167,7 @@ export const PluginGuidePanel = (props: PluginGuidePanelProps): ReactNode => {
           Occupancy is a build-time snapshot or unavailable, never live. For a running DSH use{' '}
           <code className="dshx:font-mono">dshx inspect slots --root &lt;slot&gt;</code>.
         </p>
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          <SearchInput
-            aria-label="Search extension surfaces"
-            className="dshx:w-72 dshx:max-w-full"
-            onChange={event => setSearch(event.target.value)}
-            placeholder="Search slots, registries, APIs…"
-            value={search}
-          />
-        </div>
+        <GuideSearch onQuery={setQuery} />
         <div
           aria-label="Surface kinds"
           className="dshx:flex dshx:flex-wrap dshx:gap-1.5 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto"

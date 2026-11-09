@@ -1,5 +1,5 @@
 /**
- * Observe › Processes (plans/ade-ux §6 "Processes in 3 boards"): one page for what runs on this host on behalf of
+ * Observe › Processes (docs/ade-ux §6 "Processes in 3 boards"): one page for what runs on this host on behalf of
  * threads. background-jobs owns the page and its Jobs tab; other plugins add a tab through `ProcessViews` and, when
  * they can filter to one thread, the matching part of the thread panel's Jobs facet.
  *
@@ -27,7 +27,7 @@ export interface ProcessThreadViewProps {
 export interface ProcessView {
   /** Stable tab value (`dev-servers`, `ram`). */
   readonly id: string
-  /** Tab label, sentence case. "RAM" names process memory; "Memory" is agent knowledge (plans/ade-ux glossary). */
+  /** Tab label, sentence case. "RAM" names process memory; "Memory" is agent knowledge (docs/ade-ux glossary). */
   readonly label: string
   /** Lower first, after Jobs; ties keep registration order. */
   readonly order?: number

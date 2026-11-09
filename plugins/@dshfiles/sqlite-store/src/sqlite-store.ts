@@ -1,8 +1,8 @@
 import { SqliteClient, SqliteMigrator } from '@effect/sql-sqlite-node'
-import { type Context, Duration, Effect, FileSystem, Layer, Path, Schema, Semaphore } from 'effect'
+import { Context, Duration, Effect, Exit, FileSystem, Layer, Path, Schema, Scope, Semaphore } from 'effect'
 import { Reactivity } from 'effect/reactivity'
 import { Migrator, SqlClient, SqlSchema } from 'effect/sql'
-import { SqliteMigrationFailed, SqliteStoreOpenFailed, type SqliteStoreError, SqliteStoreVersionUnsupported } from './errors.ts'
+import { DeferredStoreMemberMissing, SqliteMigrationFailed, SqliteStoreOpenFailed, type SqliteStoreError, SqliteStoreVersionUnsupported } from './errors.ts'
 import { untracedSqlClient } from './untraced-sql-client.ts'
 
 /** Migration effects keyed `<id>_<name>`, e.g. `0001_init`; ids are positive integers and `1..legacyUserVersion` map to the old `user_version` steps. */
@@ -61,10 +61,20 @@ const restrictFiles = Effect.fnUntraced(function* (input: { readonly fs: FileSys
   for (const file of sidecarsOf(input.filename)) if (yield* input.fs.exists(file)) yield* input.fs.chmod(file, privateFileMode)
 })
 
+/**
+ * A WAL that no connection checkpoints grows with every write: measured 246 MB beside a 245 MB usage
+ * database, 160 MB beside traces and 102 MB beside memory. The limit keeps it at 32 MB and an automatic
+ * checkpoint folds it back into the database.
+ */
+const WAL_SIZE_LIMIT_BYTES = 32 * 1024 * 1024
+const WAL_AUTOCHECKPOINT_PAGES = 1_000
+
 const pragmaStatements = (pragmas: SqliteStorePragmas): ReadonlyArray<string> => [
   ...(pragmas.journalMode === 'delete' ? ['PRAGMA journal_mode = DELETE'] : []),
   `PRAGMA synchronous = ${(pragmas.synchronous ?? 'normal').toUpperCase()}`,
   ...(pragmas.foreignKeys === undefined ? [] : [`PRAGMA foreign_keys = ${pragmas.foreignKeys ? 'ON' : 'OFF'}`]),
+  `PRAGMA journal_size_limit = ${String(WAL_SIZE_LIMIT_BYTES)}`,
+  `PRAGMA wal_autocheckpoint = ${String(WAL_AUTOCHECKPOINT_PAGES)}`,
 ]
 
 type MigrationStepError = Migrator.MigrationError | { readonly _tag: 'SqlError' | 'SchemaError' | 'NoSuchElementError' }
@@ -169,6 +179,41 @@ const layerAs = <Self>(
 const layer = (options: SqliteStoreOptions): Layer.Layer<SqlClient.SqlClient, SqliteStoreError, FileSystem.FileSystem | Path.Path> =>
   layerAs(SqlClient.SqlClient, options)
 
+/**
+ * Defers one store on a plugin's own service until the first call needs it. `layer` opens the SQLite file, migrates
+ * it and builds the service; building that layer one activation earlier is what costs the Host its store heap before
+ * anything reads it. The deferred layer builds it inside the plugin's scope, so the connection closes when the plugin
+ * unloads, and a failed build is retried on the next call instead of caching the failure.
+ *
+ * The service must expose methods only: a property read cannot start the build, and a non-method property dies with
+ * a message naming it rather than silently resolving to a wrapper function.
+ */
+const deferred = <Self, Shape extends object, E, R>(service: Context.Service<Self, Shape>, layer: Layer.Layer<Self, E, R>): Layer.Layer<Self, E, R> =>
+  Layer.effect(
+    service,
+    Effect.gen(function* () {
+      const scope = yield* Effect.scope
+      const built = yield* Effect.cachedWithTTL(Layer.build(layer).pipe(Scope.provide(scope)), exit =>
+        Exit.isSuccess(exit) ? Duration.infinity : Duration.zero,
+      )
+      return new Proxy({} as Shape, {
+        get:
+          (_target, key) =>
+          (...args: ReadonlyArray<unknown>) =>
+            Effect.flatMap(built, context => {
+              const instance = Context.get(context, service)
+              // SAFETY: the proxy only forwards calls; a member that is not a function cannot start the build, so it
+              // reports a named failure instead of resolving to a wrapper.
+              const member = (instance as Record<PropertyKey, unknown>)[key]
+              if (typeof member !== 'function')
+                return Effect.die(new DeferredStoreMemberMissing({ service: service.key, member: String(key) }))
+              // SAFETY: typeof proved the member is a callable method of this service.
+              return (member as (...values: Array<unknown>) => Effect.Effect<unknown, E>).apply(instance, [...args])
+            }),
+      }) as Shape
+    }),
+  )
+
 export const SqliteStore = {
   /** Open, configure and migrate one SQLite file; the connection closes with the surrounding scope. */
   make,
@@ -176,4 +221,6 @@ export const SqliteStore = {
   layer,
   /** Provide the store under a plugin-owned service key, so one plugin can hold several databases. */
   layerAs,
+  /** Build a plugin's store service on the first call that needs it, instead of at activation. */
+  deferred,
 } as const

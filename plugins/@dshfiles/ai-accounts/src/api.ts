@@ -9,6 +9,7 @@ import { quotaContinuationSummarySchema } from './quota-continuation-model.js'
 import { fastModeUsageHistorySchema } from './fast-mode-usage-model.js'
 import { extraUsageSchema } from './extra-usage-schema.js'
 import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } from './usage-history-model.js'
+import { ShellCommand } from './shell-command.js'
 
 /**
  * Wire contract for the accounts page.
@@ -70,7 +71,13 @@ export class AccountsRules {
   }
 }
 
-const isPlainHomePath = (path: string): boolean => (path.startsWith('/') || path.startsWith('~/')) && !path.includes('\0') && !path.split('/').includes('..')
+// A Windows Host's homes are drive-absolute (`C:\Users\…`) and split on either separator; this schema also runs in the
+// browser, so no node:path. A POSIX path keeps its `/`-only rules.
+const isPlainHomePath = (path: string): boolean => {
+  if (path.includes('\0')) return false
+  if (ShellCommand.isWindowsAbsolutePath(path)) return !path.split(/[\\/]/u).includes('..')
+  return (path.startsWith('/') || path.startsWith('~/')) && !path.split('/').includes('..')
+}
 
 const isModelText = (maximum: number) => Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(maximum))
 
@@ -812,7 +819,7 @@ export const aiAccountsApi = defineApi({
         render: output => (output.accepted ? 'Queued the stored continuation.' : 'The Host did not accept the continuation.'),
       },
     }),
-    /** Change whether a waiting quota-blocked turn resumes automatically at its known reset. */
+    /** Change whether a waiting quota-blocked turn resumes automatically at its reset, or on a growing backoff when the provider named none. */
     setQuotaContinuationAutoRetry: method({
       input: Schema.Struct({
         continuationId: Schema.String.check(Schema.isUUID()),
@@ -820,7 +827,8 @@ export const aiAccountsApi = defineApi({
         enabled: Schema.Boolean,
       }),
       output: Schema.Struct({ updated: Schema.Boolean }),
-      description: 'Change whether one quota-blocked turn resumes automatically at its known reset. Call only when the user asked for that.',
+      description:
+        'Change whether one quota-blocked turn resumes automatically at its reset, or on a growing backoff when the provider named none. Call only when the user asked for that.',
       tool: {
         name: 'ai_accounts_set_auto_retry',
         render: output => (output.updated ? 'Updated automatic retry for that continuation.' : 'That continuation was not found.'),

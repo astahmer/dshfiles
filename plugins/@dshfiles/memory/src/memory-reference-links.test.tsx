@@ -57,11 +57,15 @@ describe('memory inline references', () => {
     window.addEventListener(EntityPreview.event, onRequest)
     renderTree(createElement('p', null, 'Memory: t:9356abc7.'))
     const link = document.querySelector('[data-dshfiles-memory-reference]')
-    act(() => void link?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })))
-    act(() => void link?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
-    expect(requests.map(request => request.id)).toEqual(['t:9356abc7', 't:9356abc7'])
+    const chip = link?.querySelector('button')
+    act(() => void chip?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })))
+    expect(requests.map(request => request.id)).toEqual(['t:9356abc7'])
     // The request carries the anchor the card re-measures when the page scrolls.
-    expect(document.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
+    expect(
+      document
+        .querySelector(`[data-dshfiles-memory-reference]`)
+        ?.contains(document.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)),
+    ).toBe(true)
     window.removeEventListener(EntityPreview.event, onRequest)
   })
 

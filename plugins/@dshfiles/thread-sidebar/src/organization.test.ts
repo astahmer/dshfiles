@@ -205,6 +205,35 @@ test('dropping a row into a section plans exactly the statuses that section mean
   }
 })
 
+test('a remote row reaches the sections whose drop plan writes no Host verb', () => {
+  // Pinned and Archived are Host verbs on the runtime owning the Session, and a remote row never unpins.
+  assert.deepEqual(SidebarOrganization.remoteDropSections, ['active', 'parked', 'inactive', 'settled'])
+  assert.equal(SidebarOrganization.remoteSectionDropPlan('pinned'), null)
+  assert.equal(SidebarOrganization.remoteSectionDropPlan('archived'), null)
+  assert.deepEqual(SidebarOrganization.remoteSectionDropPlan('settled'), {
+    archive: false,
+    unarchive: false,
+    pin: false,
+    unpin: false,
+    park: false,
+    unpark: true,
+    settle: true,
+    unsettle: false,
+    idleOverride: null,
+  })
+  assert.deepEqual(SidebarOrganization.remoteSectionDropPlan('active'), {
+    archive: false,
+    unarchive: false,
+    pin: false,
+    unpin: false,
+    park: false,
+    unpark: true,
+    settle: false,
+    unsettle: true,
+    idleOverride: 'active',
+  })
+})
+
 test('a dropped Active or Inactive override outranks idleness only until the thread changes', () => {
   const classify = (session: SessionSummary, idleSectionOverrides?: SidebarPreferences['idleSectionOverrides']) =>
     SidebarOrganization.sectionForSession({

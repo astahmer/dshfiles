@@ -5,7 +5,7 @@
     {
       "id": "thread-destination",
       "title": "New thread destination and workspace isolation",
-      "summary": "The Workspace segment of a new thread’s run row: its own jj workspace (from a chosen bookmark) or in place in the project checkout, defaulting to the isolate-by-default setting; unsent drafts, attachments, and structured references follow workspace changes.",
+      "summary": "The Workspace segment of a new thread\u2019s run row: its own jj workspace (from a chosen bookmark) or in place in the project checkout, defaulting to the isolate-by-default setting; unsent drafts, attachments, and structured references follow workspace changes. A project that is not a Jujutsu repository yet says so in the same segment and offers Enable, which runs the guarded colocated init the folder picker uses; the segment becomes the real one when the Host reports a repository.",
       "reach": [
         "click button \"New session\"",
         "expect button \"Workspace: *\"",
@@ -17,7 +17,7 @@
         "click button \"Workspace: *\"",
         "click option \"Own workspace*\"",
         "expect status \"thread-*\"",
-        "expect text \"sample · thread-*\"",
+        "expect text \"sample \u00b7 thread-*\"",
         "expect text \"Keep this draft\"",
         "expect button \"Remove image red.png\"",
         "expect button \"Remove file note.txt\"",
@@ -58,12 +58,13 @@
           "coveredBy": ["jj-integration.discard"]
         }
       ],
-      "states": ["shared-checkout", "isolated", "finished", "missing"],
+      "states": ["shared-checkout", "isolated", "finished", "missing", "not-a-repository", "enabling-jujutsu"],
       "failureModes": [
         "A folder outside a jj or git repository offers no bookmark or isolation.",
         "A thread workspace with revisions to rebase is never removed by the sweep.",
         "A destination that names no revision or several (unknown name, ambiguous prefix, conflicted bookmark) is refused before jj creates anything, with the bar's recovery text, and retrying creates nothing.",
-        "A failed `jj workspace add` removes what it registered, and a spare that cannot be claimed is replaced, so neither leaves a second workspace."
+        "A failed `jj workspace add` removes what it registered, and a spare that cannot be claimed is replaced, so neither leaves a second workspace.",
+        "Enable is offered only while the Jujutsu bundle is loaded and jj is installed; nothing is initialized without the click, and a broken .jj is refused rather than repaired."
       ],
       "externalDependencies": [
         {
@@ -73,6 +74,16 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.project-icon-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.not-a-repository-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
         {
           "kind": "gherkin",
           "id": "jj-integration.destination-browser-journey",
@@ -152,11 +163,8 @@
       "summary": "The same isolate, status, rebase, discard, cleanup, snapshot and review-history flows run in a repository without .jj: a VCS backend port routes each call to the jj adapter when .jj exists (also colocated) and to a git adapter otherwise, which keeps one git worktree per thread on a dsh/<name> branch and lands by rebase plus a forward-only branch move. Automatic fetch runs git fetch there, with the same opt-in fast-forward.",
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: new-thread destination bar",
-      "surfaces": ["host", "client", "tool", "integration"],
-      "surface": "composerContribution",
-      "destination": "composer",
       "currentSurface": "composer: run row Workspace segment",
+      "surfaces": ["host", "client", "tool", "integration"],
       "configuration": [
         {
           "key": "bookmark",
@@ -357,7 +365,7 @@
         "expect button \"Workspace: *\"",
         "click button \"Workspace: *\"",
         "click option \"Own workspace*\"",
-        "expect text \"sample · thread-*\"",
+        "expect text \"sample \u00b7 thread-*\"",
         "expect button \"Workspace: Own workspace*\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"previous workspace thread\"",
         "press Enter",
@@ -696,7 +704,7 @@
       "surfaces": ["host", "tool", "command", "client", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "thread-header: Current thread workspace › Integrate",
+      "currentSurface": "thread-header: Current thread workspace \u203a Integrate",
       "configuration": [
         {
           "key": "askAgentToFixLanding",
@@ -861,23 +869,31 @@
     {
       "id": "turn-end-integrate",
       "title": "Integrate from the end of a turn",
-      "summary": "The newest completed turn of an isolated thread workspace offers the same integration one click from the answer: a row beside the answer names the pending revisions and its button lands them. It appears only while the workspace is ready — described, conflict-free revisions with no Session writing and no question waiting — and disappears once the work lands, a queue waits, or a Session works again. The header control stays the permanent entry point.",
+      "summary": "The newest completed turn of an isolated thread workspace offers the same integration one click from the answer: a row beside the answer names the pending revisions and its button lands them. The row expands in place to list those revisions \u2014 change id, description and any conflict \u2014 in a bounded scroll region, so a one-revision thread and a forty-revision thread both read at a glance, and the disclosure is a button instead of a hover-only layer so the keyboard can open it. It appears only while the workspace is ready \u2014 described, conflict-free revisions with no Session writing and no question waiting \u2014 and disappears once the work lands, a queue waits, or a Session works again. The header control stays the permanent entry point.",
       "reach": [
         "seed rebase-ready-thread",
         "expect button \"Land on main\"",
-        "click button \"Land on main\"",
-        "click button \"Current thread workspace: thread-*\"",
-        "expect text \"Nothing to land\""
+        "click button \"1 revision(s) ready to land on main.*\"",
+        "expect text \"Seeded work to rebase\""
       ],
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: turn tail › Land on main",
+      "currentSurface": "transcript: turn tail \u203a Land on main \u203a revisions",
       "configuration": [],
-      "states": ["offer-shown", "offer-hidden-without-work", "offer-hidden-blocked", "offer-hidden-queued", "landing-from-turn-end"],
+      "states": [
+        "offer-shown",
+        "revisions-collapsed",
+        "revisions-expanded",
+        "offer-hidden-without-work",
+        "offer-hidden-blocked",
+        "offer-hidden-queued",
+        "landing-from-turn-end"
+      ],
       "failureModes": [
         "Only the newest completed turn offers it; older turns keep their dated notices, so a long thread never grows a column of stale buttons.",
         "A shared checkout, an archived thread, a queued or running integration, an unverified activity check, or work the control center calls blocked never shows the row.",
+        "A long revision list scrolls inside the card instead of growing the transcript entry, and a long description is clamped to two lines.",
         "It runs the header control's own land action: a refused integration reports the same toast and leaves the bookmark where it was."
       ],
       "externalDependencies": [
@@ -1015,7 +1031,7 @@
           "kind": "unit-test",
           "id": "jj-integration.pending-is-not-behind",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
-          "testName": "never counts a thread’s own pending revisions as being behind the bookmark"
+          "testName": "never counts a thread\u2019s own pending revisions as being behind the bookmark"
         },
         {
           "kind": "unit-test",
@@ -1080,7 +1096,7 @@
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: Land › Needs you",
+      "currentSurface": "left-nav: Land \u203a Needs you",
       "configuration": [],
       "states": ["attention-default", "all-view", "completed-count", "lifecycle-filter"],
       "failureModes": [
@@ -1125,7 +1141,7 @@
       "surfaces": ["client"],
       "surface": "detail",
       "destination": "land",
-      "currentSurface": "left-nav: Land › row details",
+      "currentSurface": "left-nav: Land \u203a row details",
       "configuration": [],
       "states": ["details-collapsed", "details-expanded", "single-blocker", "multiple-blockers", "preview-open"],
       "failureModes": [
@@ -1162,7 +1178,7 @@
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "land",
-      "currentSurface": "left-nav: Land › empty state",
+      "currentSurface": "left-nav: Land \u203a empty state",
       "configuration": [],
       "states": ["no-threads", "no-filter-bar"],
       "failureModes": ["An empty project still renders group cards or a ready banner instead of one sentence."],
@@ -1184,7 +1200,7 @@
     {
       "id": "new-thread-project-picker",
       "title": "Pick a New-thread project",
-      "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces lists only thread workspaces whose folders still exist. A pasted absolute path registers that folder (also a drive or UNC path on a Windows Host), and Browse… registers the folder chosen in the Host's native dialog when it has one.",
+      "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces lists only thread workspaces whose folders still exist. A pasted absolute path, Register project and Browse\u2026 (also a drive or UNC path on a Windows Host) open the folder setup step before registering, so the folder is inspected and a Git checkout can Enable Jujutsu first.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"New session\"",
@@ -1201,7 +1217,7 @@
       "failureModes": [
         "Removed thread workspaces whose folders are gone are listed as projects.",
         "Thread workspaces are listed on the default Projects tab.",
-        "A Host without a native directory picker hides Browse… while absolute-path registration stays available."
+        "A Host without a native directory picker hides Browse\u2026 while absolute-path registration stays available."
       ],
       "externalDependencies": [],
       "verification": [
@@ -1238,7 +1254,7 @@
       "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land",
+      "currentSurface": "left-nav: Inbox \u203a jj-integration.land-blocked / jj-integration.ready-to-land",
       "configuration": [],
       "states": ["conflicted", "queued-land-failed", "ready-to-land", "busy", "queued", "landed", "inbox-absent"],
       "failureModes": [
@@ -1305,6 +1321,84 @@
         {
           "kind": "automatic",
           "source": "jj"
+        }
+      ]
+    },
+    {
+      "id": "workspace-setup",
+      "title": "Prepare a new thread workspace with trusted setup actions",
+      "summary": "A project can flag profile-trusted project-checks actions to prepare a fresh thread workspace (runOnWorkspaceCreate), optionally holding the first turn until one finishes (awaitBeforeFirstTurn), and actions to run when a thread settles (onSettle). jj-integration dispatches them through Project Checks durable task queue after the workspace exists, so a reload or a second tab reuses the same run, and renders each action above the composer as a live phase with a cancel control. Nothing from dsh.project.json may add or run an action, and an action only qualifies when its trusted root spans both the checkout and the thread workspace, so the rule never widens a root.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"setup my workspace\"",
+        "expect text \"Setting up\""
+      ],
+      "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: above the input bar",
+      "configuration": [],
+      "states": ["queued", "running", "cancel-requested", "succeeded", "failed", "cancelled", "timeout"],
+      "failureModes": [
+        "Only profile-trusted project-checks actions flagged for the trigger can run; dsh.project.json declares checks by id and never commands.",
+        "An action whose trusted root does not span both the checkout and the thread workspace is never dispatched there; the rule refuses rather than widening the root.",
+        "Dispatch is idempotent per workspace and action, so a reloaded page, a second tab or a lost response reuses the durable task instead of starting another run.",
+        "A cancelled setup reports cancelled only after its process group exits, and effects applied before cancellation are not undone.",
+        "Holding the first turn is bounded: after five minutes the message is sent anyway, the card says so, and the task keeps running until cancelled.",
+        "A Host without the setup read, or a project that flags nothing, changes nothing: the composer looks exactly as it did before."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/project-checks",
+          "boundary": "Durable task dispatch, phases, cancellation and the trusted-root rule.",
+          "deterministicFake": "A fake project-checks provider that records dispatches and answers a scripted task trail."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.workspace-setup-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-setup-unit-selection",
+          "file": "plugins/@dshfiles/project-checks/src/workspace-setup-selection.test.ts",
+          "testName": "refuses an action rooted at the checkout alone instead of widening its trusted root"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-setup-unit-view",
+          "file": "plugins/@dshfiles/project-checks/src/workspace-setup.test.ts",
+          "testName": "reports open work while anything is still queued or running"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-setup-unit-wait-flag",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-setup-wait.test.ts",
+          "testName": "waits only when a selected action asked to hold the first turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-setup-unit-wait-settles",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-setup-wait.test.ts",
+          "testName": "keeps polling while the action runs, then settles"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-setup-unit-wait-bound",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-setup-wait.test.ts",
+          "testName": "gives up after the bound instead of holding the turn forever"
         }
       ]
     }

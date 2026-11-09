@@ -14,6 +14,7 @@ beforeAll(() => {
     unobserve(): void {}
     disconnect(): void {}
   }
+  HTMLElement.prototype.scrollIntoView ??= () => {}
 })
 const disposers: Array<() => void> = []
 afterEach(() => {
@@ -109,6 +110,30 @@ const fixture = (
 }
 
 describe('workbench semantic tab chrome', () => {
+  it('reveals the active tab once React has laid out its final width', () => {
+    const reveal = vi.spyOn(HTMLElement.prototype, 'scrollIntoView')
+    const tab = fixture()
+    expect(reveal).toHaveBeenCalled()
+    reveal.mockClear()
+    tab.update({ title: 'Thread A with a much longer title than the placeholder' })
+    expect(reveal).toHaveBeenCalled()
+    reveal.mockRestore()
+  })
+
+  it('does not move the strip while another tab is active', () => {
+    const reveal = vi.spyOn(HTMLElement.prototype, 'scrollIntoView')
+    const tab = fixture()
+    let second: IDockviewPanel | undefined
+    act(() => {
+      second = tab.api.addPanel({ id: 'panel-b', component: 'body' })
+    })
+    act(() => second?.api.setActive())
+    reveal.mockClear()
+    tab.update({ title: 'Thread A with a much longer title than the placeholder' })
+    expect(reveal).not.toHaveBeenCalled()
+    reveal.mockRestore()
+  })
+
   it('defaults missing close-button metadata to the right of the Workbench tab title, VS Code style', () => {
     const tab = fixture()
     const closeButton = screen.getByRole('button', { name: 'Close Thread A' })

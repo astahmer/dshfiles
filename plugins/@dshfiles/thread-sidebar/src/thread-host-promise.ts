@@ -7,12 +7,15 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { HostCommands } from '@dshfiles/dshx/effect/host-commands'
 import { createHostApiClient, type CommandResult } from '@dshfiles/dshx/host'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { NoFolderWorkspace } from '@dshfiles/jj-integration/no-folder'
+import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { continuationApi } from '@dshfiles/session-controller/continuation-api'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
 import { Context, Effect, Layer } from 'effect'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { SidebarSettings } from './sidebar-settings.js'
 import { createThreadActions, type HostEffect, type ThreadActionDeps, type ThreadActionSet } from './thread-actions.js'
+import { uniqueProjectTitle } from './project-titles.js'
 
 const PROMPT_TIMEOUT_MS = 15_000
 
@@ -29,6 +32,7 @@ export class ThreadActions extends Context.Service<ThreadActions, ThreadActionSe
       const sessions = createHostApiClient(ctx, sessionsApi, packageId)
       const continuation = createHostApiClient(ctx, continuationApi, packageId)
       const jj = createHostApiClient(ctx, jjIntegrationApi, packageId)
+      const picker = createHostApiClient(ctx, projectLifecycleApi, packageId)
 
       const unpin = (sessionId: string) => host(() => ctx.workspaceController.unpinSession({ sessionId: SessionId(sessionId) }))
 
@@ -149,14 +153,32 @@ export class ThreadActions extends Context.Service<ThreadActions, ThreadActionSe
               ...(selected.reasoningEffort === undefined ? undefined : { reasoningEffort: selected.reasoningEffort }),
             })),
           ),
+        inspectProject: path =>
+          host(signal => picker.inspect({ path }, { signal })).pipe(
+            // A Host without the folder picker still registers; the caller then gets no inspection instead of a failure.
+            Effect.catchTag('ThreadHostCallFailed', error =>
+              error.cause instanceof Error && isApiOwnerMissing(error.cause) ? Effect.succeed(null) : Effect.fail(error),
+            ),
+          ),
         registerProject: (path, title) =>
           host(async () => {
             const created = await ctx.workspaceController.create({ path })
             const workspace = created.workspace
-            if (!created.created || title === undefined || title === workspace.title) {
+            const desired = title?.trim()
+            // A scratch thread's folder is already registered, and promoting it is exactly the rename; every other
+            // existing project keeps its title when a caller only registers its folder again.
+            if ((!created.created && !NoFolderWorkspace.isScratchWorkspace(workspace)) || desired === undefined || desired.length === 0) {
               return { projectId: workspace.workspaceId, title: workspace.title, path: workspace.path, created: created.created }
             }
-            const renamed = await ctx.workspaceController.rename({ workspaceId: workspace.workspaceId, title })
+            const unique = uniqueProjectTitle({
+              desired,
+              taken: ctx.workspaceRegistry
+                .list()
+                .filter(candidate => candidate.id !== workspace.workspaceId)
+                .map(candidate => candidate.title),
+            })
+            if (unique === workspace.title) return { projectId: workspace.workspaceId, title: workspace.title, path: workspace.path, created: created.created }
+            const renamed = await ctx.workspaceController.rename({ workspaceId: workspace.workspaceId, title: unique })
             return { projectId: renamed.workspace.workspaceId, title: renamed.workspace.title, path: renamed.workspace.path, created: true }
           }),
         renameProject: (projectId, title) =>

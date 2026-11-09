@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from 'react'
+import { act, type ReactNode, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createEditor } from 'lexical'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore, type SnapshotSelectorHook, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ComposerBarProps, ConversationContentProps, ConversationSessionHeaderSlotProps, ConversationSessionSlotProps } from './native/contract/slots.ts'
 import { ConversationSessionHeader } from './native/skeleton/ConversationSession.tsx'
 import type { InputState } from './native/contract/input.ts'
+import type { InputZone } from './native/contract/slots.ts'
 import { EMPTY_CONVERSATION_SNAPSHOT } from './native/contract/snapshot.ts'
 import { ConversationContent } from './native/skeleton/ConversationContent.tsx'
 import { ConversationWidthControls } from './native/skeleton/ConversationWidthControls.tsx'
@@ -43,7 +44,17 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const fixture = (id: string, initialView = 'chat') => {
+interface FixtureOptions {
+  readonly inputStore?: SnapshotStore<InputState>
+  readonly renderView?: () => ReactNode
+}
+
+const storeBackedInput =
+  (store: SnapshotStore<InputState>): SnapshotSelectorHook<InputState> =>
+  <S,>(selector: (state: InputState) => S): S =>
+    useSyncExternalStore(store.subscribe, () => selector(store.getSnapshot()))
+
+const fixture = (id: string, initialView = 'chat', fixtureOptions: FixtureOptions = {}) => {
   const sessionId = SessionId(id)
   const editor = createEditor({
     namespace: id,
@@ -78,7 +89,7 @@ const fixture = (id: string, initialView = 'chat') => {
   const shared = {
     sessionId,
     useSession: selected(session),
-    useInput: selected(input),
+    useInput: fixtureOptions.inputStore === undefined ? selected(input) : storeBackedInput(fixtureOptions.inputStore),
     useChat: vi.fn(),
     useConversation: selected(EMPTY_CONVERSATION_SNAPSHOT),
     useSessions: selected({
@@ -121,7 +132,12 @@ const fixture = (id: string, initialView = 'chat') => {
     useInspectCall: selected(undefined),
     bindDraftPersistence: () => () => undefined,
     openView: vi.fn(),
-    renderSlot: (_name, _owner, options) => <output data-chat-session={sessionId}>{options?.only}</output>,
+    renderSlot: (name, _owner, options) =>
+      name === 'conversation.view' && fixtureOptions.renderView !== undefined ? (
+        fixtureOptions.renderView()
+      ) : (
+        <output data-chat-session={sessionId}>{options?.only}</output>
+      ),
     SessionProvider: props => props.children,
   }
   const barProps: ComposerBarProps = {
@@ -350,5 +366,57 @@ describe('fixed Conversation content factory composition', () => {
     expect(element.querySelectorAll('[data-composer-input]')).toHaveLength(2)
     expect(a.props.inputActions?.persistDraft).toHaveBeenCalledTimes(1)
     expect(b.props.inputActions?.persistDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('publishes a draft to the dock without re-rendering the Conversation view', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    )
+    Object.defineProperty(document, 'fonts', { configurable: true, value: new EventTarget() })
+    const inputStore = createSnapshotStore<InputState>({
+      draft: '',
+      attachmentIds: [],
+      draftRev: 0,
+      phase: 'plain',
+      occurrences: [],
+      queue: [],
+    })
+    const viewRenders = { count: 0 }
+    const CountingView = () => {
+      viewRenders.count += 1
+      return <output data-chat-session="dock-live" />
+    }
+    const { props } = fixture('dock-live', 'chat', { inputStore, renderView: () => <CountingView /> })
+    const dockDrafts: string[] = []
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() =>
+      root.render(
+        <ConversationContent
+          {...props}
+          renderSlot={(name, owner) => {
+            if (name !== 'conversation.input.dock' || !('input' in owner)) return null
+            // SAFETY: the slot map declares `conversation.input.dock` with one owner shape, `InputZone`; the name check above is that correlation.
+            const draft = (owner as unknown as InputZone).input.draft
+            dockDrafts.push(draft)
+            return <output data-dock-draft={draft} />
+          }}
+        />,
+      ),
+    )
+    const mountedViewRenders = viewRenders.count
+    expect(dockDrafts.at(-1)).toBe('')
+    act(() => inputStore.set({ ...inputStore.getSnapshot(), draft: 'typed', draftRev: 1 }))
+    expect(dockDrafts.at(-1)).toBe('typed')
+    expect(element.querySelector('[data-dock-draft]')?.getAttribute('data-dock-draft')).toBe('typed')
+    // The composer publishes on every content change; a draft keystroke must not
+    // reach the Conversation body, whose View re-render costs the transcript.
+    expect(viewRenders.count).toBe(mountedViewRenders)
   })
 })

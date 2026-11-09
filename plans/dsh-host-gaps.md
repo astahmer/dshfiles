@@ -17,7 +17,7 @@ owning plugin's README — this file is only the decision register.
 
 ## Workbench compatibility boundary
 
-The [slot inventory](../docs/workbench-slot-inventory.md) records exact declarers and owner props. Generic arbitrary
+The [slot inventory](../plugins/@dshfiles/workbench/docs/slot-inventory.md) records exact declarers and owner props. Generic arbitrary
 foreign-child rendering remains unavailable without declarer cooperation (WB-SLOT-01): metadata enumeration does not
 grant render authority or fabricate valid message/turn/file/approval owner data (WB-PROPS-01). Keep those contributions
 inside their existing parent assembly; direct panels require an opt-in registration or an owned declarer replacement.
@@ -130,6 +130,9 @@ resources use the supported plugin-owned route in row 65.
 | 97 | Settings writes re-send the whole document | core settings (`settings/mutate`, `settings/describe`), native `ui-settings`, `ui-settings-models` | host | upstream | Fresh-load HAR 2026-11-06: each `settings/mutate` answers 302 KB and its `settings/document-updated` makes native `ui-settings` re-run `settings/describe` (406 KB) and, once the Models store has loaded (the `deepseek-official` onboarding step loads it on a blank main view), `ui-settings-models` re-read `llm/listProviders` + `llm/listConfigurableProviders` + `credentials/describe` once per invalidation event, uncoalesced. Owned trigger: thread-sidebar's load-time preference writes (expired-mute cleanup, legacy migrations), legitimate one-off writes. No owned caller re-describes. Upstream ask: per-namespace patches in the mutate answer and the event, or a revision-only answer. Owned part done: `@dshfiles/settings-models` forks that row and refreshes once per 50 ms burst, only while the Models section or the onboarding step shows the store (plans/data-fetching P0-5). Left upstream: the payload (`settings/describe` 281 KB per read on a scratch profile, two per load, see row 99). |
 | 98 | Carry plugin API calls over the `/api/remote.mux` WebSocket | dshx (data-fetching P2) | host | upstream | Fresh-load HAR 2026-11-06 (`plans/data-fetching`): 158 requests in 143 s (148 POST RPC) on HTTP/1.1, **99 % of request time queued**, first request left the browser queue after **115.6 s**, while the Host answered in 5 ms (p50). Owned mitigation shipped in P2: dshx batches page reads into one streamed POST (`/api/dshx-batch`), so a load needs one socket per 8 ms window instead of one per read. Escaping the six-socket budget entirely needs the mux, and no supported plugin surface reaches it (spike 2026-11-06, DSH 0.2.1-rc.2): `connection.fetch.register` routes take GET/HEAD/POST only (no upgrade, so no plugin-owned socket); the browser `ClientConnectionRpc` has no `open` (only worker-local carriers do); mux streams belong to Typert `@Remote({ mode: 'stream' })` endpoints with generated descriptors from `ctx.typert.local`, and the client `$mount` refuses contributions without strict generated codecs; even `ctx.remote` unary calls go over HTTP `rpc.call`. A plugin endpoint would rely on Gateway SRC mode (documented as a development fallback) and an undocumented contribution format. Ask: a supported way for a plugin to open a logical stream on the mux from the browser (e.g. `rpc.open` on web carriers for an exact registered endpoint), or carry unary `rpc.call` over the connected mux. |
 | 99 | The first connection re-announces `connection/reset` after `apply` reads | core client connection carrier; native `ui-settings`, `ui-cordis`; forks `agent-preset`, `model-selection` | host | upstream | Every native store reads once in `apply` and again on `connection/reset`, which the first connection also emits a few hundred ms later (`ui-settings` documents it: "startup normally costs two reads", budgeted in its `startup-rpc-budget` e2e). Scratch fresh load 2026-11-06: `settings/describe` ×2 (281 KB each), `dynamicCordisRunner/inventory` ×2, plus one extra `session/modelCatalog` and `agentPresets/list`. The second read is the only guard against an invalidation lost before the event stream connected, so a store cannot drop it safely. Upstream ask: a connection generation on the context (or no reset for the first connection), so a store whose `apply` read already belongs to the current connection skips the duplicate. |
+| 100 | Teach the exit in `send_message`'s parent refusal | thread-sidebar (contract), native `dsh-tool-subagent-control` | host | upstream | b:22t4: `send_message` on a thread started with `thread_create` refuses with `subagent "<id>" belongs to another parent session`. The refusal is correct — a created thread is a root thread, not a child — but it names no working channel, so the Agent guesses; no plugin can rewrite another tool's error text. Workaround shipped: the `AGENTS.md` waiting table and `docs/agent-tool-parity.md` now name the channel per relation (`thread_prompt` for a thread you started, `dshx_comm_send` for any other top-level thread). Upstream ask: append that alternative to the refusal. |
+| 101 | Opt-in completion notices between threads | thread-sidebar | host | own | b:eqtb: nothing wakes an Agent for a thread it started with `thread_create`/`thread_fork`, so it stalls unless it polls or arms a reminder. No native verb subscribes one thread to another's completion. Plugin-owned implementation shipped in `@dshfiles/thread-sidebar`: durable `thread_subscriptions` storage domain, `thread_subscribe`/`thread_unsubscribe`/`thread_subscriptions` tools plus a thread-menu toggle and row badge, and a watcher over the public `session/event` stream that classifies `turn/end` and delivers ONE compact notice through session-controller's `sessions.message` with `wake: true` (the same inbox path native subagent settlement uses). Nothing is delivered without an edge, so the default stays silent. Residual, owned: no Host event publishes archive/unarchive, so an edge whose endpoint is archived elsewhere is dropped on the next delivery pass or by the archive path this plugin performs, not at the archive instant; notices also mirror completion classification and answer previews the Host has no subscription contract for, so a native subscription verb would remove that duplication. |
+| 102 | Byte-bounded prepared-session cache | session-search | host | upstream | The core `SessionQueryEngine` retains up to `preparedSessionCacheSize` (default 5) restored cold Sessions, and each prepared Session holds that Session's whole decoded log: five of them retained 1,376 MB of the live Host's heap (sampled at `SessionLogScanner.write`, 2026-11-08). The owned backend can only lower the entry count — `profiles/web` now runs 1 — while bounding by retained bytes, or streaming one page from the log instead of materialising the Session, needs the core engine. |
 
 ### Row 76 detail — answered native question form flashes back
 
@@ -280,7 +283,7 @@ before filing a new one; add a comment with our measurement when it is additive.
 ## Upstream asks we still have to file
 
 Rows marked `upstream` with no discussion above: 1, 5, 13, 14, 16, 17, 18, 19, 21,
-24, 28, 33, 34, 35, 40, 47, 48, 52, 56, 57, 59, 60, 61, 62, 75, 76, 78, 79, 80, 81, 82, 85. File the smallest of them with a
+24, 28, 33, 34, 35, 40, 47, 48, 52, 56, 57, 59, 60, 61, 62, 75, 76, 78, 79, 80, 81, 82, 85, 100. File the smallest of them with a
 measurement, not a feature wish.
 
 ### Drafts ready to file: tracing (rows 78–82, 85)
@@ -305,6 +308,20 @@ hook, the payload, and what a plugin does with it today. Filing is a public post
 6. **`traceparent` on native requests (row 85).** Let the browser Connection forward a `traceparent` header (or
    envelope field) on every RPC, and have native controllers (`session/follow`, `session/create`, `session/prompt`)
    expose it to plugin listeners, so a browser interaction and the Host work it starts are one trace.
+
+### Draft ready to file: session replay retention
+
+One ask, with the 2026-11-09 measurement in [RAM usage](../docs/ram-usage.md#what-the-memory-is):
+
+1. **Trim settled attempt streams.** A restarted Host with 6 attached clients holds a 2.82 GB live heap; 2.03 GB of it
+   is strings under `assistant/message → data.stream[] → chunk.replayState.blocks[] → thinkingSignature` for the live
+   Sessions. Dropping the _duplicate_ stream copy is now done locally by the
+   [`@dshfiles/agent-loop` fork](../plugins/@dshfiles/agent-loop/README.md), measured at 433 KB per 760 messages
+   (~9.5 % of `assistant/message` bytes) — useful, but it does not explain a multi-GB heap. What is left to ask upstream
+   is the real question: a supported _retention_ bound for decoded Session events (per-client replay copies, the
+   `request/header` tool catalog repeated per request group), or a documented "safe to drop after settle" guarantee for
+   the whole embedded stream so older settled attempts can be trimmed. A client-side per-thread bound is the matching
+   ask for the browser tab, measured at 3.3 GB in one renderer. Not filed: publishing is the user's call.
 
 ## Triage, 2026-10-19
 

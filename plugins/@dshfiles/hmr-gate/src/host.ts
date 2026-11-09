@@ -82,9 +82,17 @@ const registerGate = (ctx: Context): GateRuntime => {
     }
   }, 'hmr-gate: inbox provider')
 
+  /**
+   * A browser that stops reading must not make the Host queue frames for it: `write` reports backpressure through
+   * `writableNeedDrain`, and the graph frame is a replacement, so skipping a write costs a re-read on the next
+   * rebuild rather than correctness.
+   */
   const broadcast = (value: ServerFrame): void => {
     const line = frame(value)
-    for (const response of connections) response.write(line)
+    for (const response of connections) {
+      if (response.writableNeedDrain) continue
+      response.write(line)
+    }
   }
 
   const publishDeferred = (): void => {

@@ -242,7 +242,7 @@
         {
           "kind": "not-applicable",
           "id": "frame-layout.phone-navigation-seat",
-          "reason": "A CSS media rule with no logic to unit-test; verified by the scratch WebKit 390x844 screenshots of the thread sidebar's phone tab bar (plans/ade-ux Phase 3a)."
+          "reason": "A CSS media rule with no logic to unit-test; verified by the scratch WebKit 390x844 screenshots of the thread sidebar's phone tab bar (docs/ade-ux Phase 3a)."
         }
       ],
       "telemetry": [
@@ -255,7 +255,7 @@
     {
       "id": "status-strip",
       "title": "One status strip at the bottom of the frame",
-      "summary": "A thin row under every column where plugins add at most one text-first item each through the @dshfiles/frame-layout/status-strip registry: global items on the left, items about the open thread on the right. It stays empty (zero height) until an item is added, an item that throws hides only itself, and on a phone-width frame it collapses to one Status chip that opens the items as a list; with the phone shell present (plans/ade-ux §8 phase 6) that chip is a 44px dot in the top bar's trailing corner and the list drops below the bar, so no strip row sits between the stage and the tab bar.",
+      "summary": "A thin row under every column where plugins add at most one text-first item each through the @dshfiles/frame-layout/status-strip registry: global items on the left, items about the open thread on the right. It stays empty (zero height) until an item is added, an item that throws hides only itself, and on a phone-width frame it collapses to one Status chip that opens the items as a list; with the phone shell present (docs/ade-ux §8 phase 6) that chip is a 44px dot in the top bar's trailing corner and the list drops below the bar, so no strip row sits between the stage and the tab bar.",
       "reach": ["expect region \"Threads\""],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
@@ -284,7 +284,7 @@
         {
           "kind": "not-applicable",
           "id": "frame-layout.status-strip-browser",
-          "reason": "Captured at desktop 1440x900 and WebKit 390x844 in a scratch DSH with the quota, working and restart items (plans/ade-ux/phase3b); no Gherkin scenario yet."
+          "reason": "Captured at desktop 1440x900 and WebKit 390x844 in a scratch DSH with the quota, working and restart items (docs/ade-ux/phase3b); no Gherkin scenario yet."
         }
       ],
       "telemetry": [

@@ -28,7 +28,7 @@ export const SETTINGS_PANEL_ID = 'dshfiles-settings'
 const ROOTS: ReadonlySet<DestinationId> = new Set(['threads', 'inbox'])
 
 /**
- * The phone stack (plans/ade-ux §8 phase 6, prior-art §3.2 rule 1): tab root → list → stage. The top bar names the
+ * The phone stack (docs/ade-ux §8 phase 6, prior-art §3.2 rule 1): tab root → list → stage. The top bar names the
  * level on screen and Back pops one level: a thread returns to Threads, a page to its destination's list, a
  * destination opened from More to More. The Inbox page is the Inbox tab's root, so it has no Back.
  */

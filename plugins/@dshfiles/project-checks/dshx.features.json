@@ -4,7 +4,7 @@
     {
       "id": "trusted-actions",
       "title": "Run trusted project checks",
-      "summary": "Run configured fixed-argv actions inside canonical trusted roots, retain receipts, and expose an opt-in durable local task lifecycle without exposing child output.",
+      "summary": "Run configured fixed-argv actions inside canonical trusted roots, including trusted actions flagged to prepare a new thread workspace (optionally holding its first turn) or to run when a thread settles, retain receipts, and expose an opt-in durable local task lifecycle without exposing child output.",
       "surfaces": ["client", "host", "command", "settings", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -183,6 +183,27 @@
           "defaultValue": "60000",
           "constraints": "Integer from 1000 to 600000 milliseconds; skips a peer that just failed.",
           "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "actions[].runOnWorkspaceCreate",
+          "defaultValue": "false",
+          "constraints": "Boolean; run this action once in a new thread workspace of this project through the durable queue. Its root must contain the checkout and the thread workspaces.",
+          "choices": ["true", "false"],
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "actions[].awaitBeforeFirstTurn",
+          "defaultValue": "false",
+          "constraints": "Boolean; hold the first send of a new thread until this action finishes. Requires runOnWorkspaceCreate.",
+          "choices": ["true", "false"],
+          "coveredBy": ["project-checks.trusted-root"]
+        },
+        {
+          "key": "actions[].onSettle",
+          "defaultValue": "false",
+          "constraints": "Boolean; run this action when a thread of this project settles.",
+          "choices": ["true", "false"],
+          "coveredBy": ["project-checks.trusted-root"]
         }
       ],
       "states": [
@@ -205,7 +226,8 @@
         "An interrupted attempt without its attempt-specific receipt remains unknown unless the exact profile action is explicitly declared read-only.",
         "Same-process duplicate dispatch is idempotent; multiple Host processes sharing one storage home are outside the guarantee.",
         "A peer that cannot publish, check out, install or run falls back to local execution unless the policy asks for failure.",
-        "A peer revision that differs from the local working copy is reported, never trusted."
+        "A peer revision that differs from the local working copy is reported, never trusted.",
+        "A setup action qualifies only when its trusted root contains both the project checkout and the thread workspace; an action rooted at the checkout alone is never run there."
       ],
       "externalDependencies": [
         {
@@ -366,6 +388,18 @@
           "id": "project-checks.durable-task-api-tools",
           "file": "plugins/@dshfiles/project-checks/src/api-tools.test.ts",
           "testName": "retry requires an explicit acknowledgement that effects may repeat"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-workspace-setup-selection",
+          "file": "plugins/@dshfiles/project-checks/src/workspace-setup-selection.test.ts",
+          "testName": "refuses an action rooted at the checkout alone instead of widening its trusted root"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.trusted-actions-unit-workspace-setup-view",
+          "file": "plugins/@dshfiles/project-checks/src/workspace-setup.test.ts",
+          "testName": "reports open work while anything is still queued or running"
         }
       ],
       "telemetry": [
@@ -388,7 +422,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "composer: Project checks › hook events",
+      "currentSurface": "composer: Project checks \u203a hook events",
       "configuration": [],
       "states": ["invoked", "passed", "failed", "not-reported"],
       "failureModes": ["A missing native event remains not-reported rather than being inferred as skipped."],

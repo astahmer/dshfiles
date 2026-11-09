@@ -57,12 +57,10 @@
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "immer": "10.1.1",
     "jsdom": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "zustand": "4.4.7"
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { IconFolderOpenRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
-import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
+import type { ConversationContentProps, ConversationViewsProps } from '../contract/slots.ts'
 import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import { ConversationWidthControls } from './ConversationWidthControls.tsx'
 import { confirmedRemoteWorkspaceCwd } from '../../remote-workspace-context.ts'
@@ -15,6 +16,23 @@ function ConversationSessionView({ renderSlot }: ConversationViewsProps) {
 
 function NoConversationWidthControls() {
   return null
+}
+
+interface ComposerInputDockProps {
+  readonly session: SessionSnapshot
+  readonly useInput: ConversationContentProps['useInput']
+  readonly renderSlot: ConversationContentProps['renderSlot']
+}
+
+/**
+ * The dock seats' live InputZone. Subscribing to the input state here keeps a
+ * composer publication (every draft keystroke) from re-rendering the
+ * Conversation body and the View it holds.
+ */
+const ComposerInputDock = ({ session, useInput, renderSlot }: ComposerInputDockProps): ReactNode => {
+  const inputState = useInput(state => state)
+  if (inputState === undefined) return null
+  return renderSlot('conversation.input.dock', { session, input: inputState })
 }
 
 /**
@@ -34,7 +52,6 @@ export function ConversationContent(props: ConversationContentProps) {
   const [body, setBody] = useState<HTMLDivElement | null>(null)
   const pendingInteraction = useSessionStatus(snapshot =>
     sessionId === undefined ? undefined : snapshot.get(sessionId)?.pendingInteraction)
-  const inputState = useInput(s => s)
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
   const workspaces = useWorkspaces(s => s)
   // A plugin this package cannot import (ui-model-selection) says this session cannot
@@ -89,9 +106,6 @@ export function ConversationContent(props: ConversationContentProps) {
     }
   }, [pendingWorkspaceId, sessionWorkspace?.workspaceId, workspaces.phase, pendingWorkspace])
 
-  const zone: InputZone | undefined =
-    session === undefined || inputState === undefined ? undefined : { session, input: inputState }
-
   useEffect(() => {
     if (
       !hero || sessionId === undefined || sessionWorkspace !== undefined || cwd === undefined || cwd === '' ||
@@ -119,7 +133,7 @@ export function ConversationContent(props: ConversationContentProps) {
     ? undefined
     : workspaceDisplayTitle(storedChipTitle, t('workspace.defaultName'))
 
-  // The run row's leading segments (plans/ade-ux §4.5): project · host · workspace (the hero.workspace occupant, which
+  // The run row's leading segments (docs/ade-ux §4.5): project · host · workspace (the hero.workspace occupant, which
   // leads with its host chip) · agent mode · plugin options. The bar appends File access and Model + account. Each
   // owner keeps its own state; this row only places their slots, so a missing owner just drops its segment.
   const heroWorkspaceRow = (
@@ -198,7 +212,7 @@ export function ConversationContent(props: ConversationContentProps) {
   const composerBar = (
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
       {hero && <HeroShell t={t} renderSlot={renderSlot} />}
-      {zone !== undefined && renderSlot('conversation.input.dock', zone)}
+      {session !== undefined && <ComposerInputDock session={session} useInput={useInput} renderSlot={renderSlot} />}
       {inputBar}
     </div>
   )

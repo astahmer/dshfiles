@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, Schema } from 'effect'
-import { describeTool, failureResult, mcpTools, type McpProjects, type McpSessions } from './mcp-tools.js'
+import { describedMcpTools, failureResult, mcpTools, type McpProjects, type McpSessions } from './mcp-tools.js'
 
 /** The MCP SDK failed to connect or serve one request after it was admitted. */
 export class McpTransportFailed extends Schema.TaggedError<McpTransportFailed>()('McpTransportFailed', {
@@ -37,7 +37,7 @@ export class McpServers extends Context.Service<
       const runTool = Effect.runPromiseWith(yield* DshxPlugin.detachedContext<McpSessions | McpProjects>())
       const createServer = (version: string) => {
         const server = new Server({ name: 'dsh', version }, { capabilities: { tools: {} } })
-        server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: mcpTools.map(describeTool) }))
+        server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: describedMcpTools }))
         server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
           const tool = mcpTools.find(candidate => candidate.name === request.params.name)
           if (tool === undefined) return failureResult(`No MCP tool is named ${request.params.name}. List the tools again to read the available names.`)

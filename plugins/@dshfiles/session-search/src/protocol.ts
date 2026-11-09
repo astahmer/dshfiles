@@ -121,6 +121,7 @@ export class SearchWorkerRpcs extends RpcGroup.make(
   Rpc.make('SearchSessions', { payload: sessionSearchRequestSchema, success: searchSessionsResultSchema, error: SearchWorkerFailed }),
   Rpc.make('SearchEvents', { payload: sessionEventSearchRequestSchema, success: searchEventsResultSchema, error: SearchWorkerFailed }),
   Rpc.make('StartIngest', { payload: { root: Schema.String.check(Schema.isMinLength(1)) }, success: indexHealthSchema, error: SearchWorkerFailed }),
+  Rpc.make('SetArchived', { payload: { archivedSessionIds: Schema.Array(Schema.String) }, success: indexHealthSchema, error: SearchWorkerFailed }),
   Rpc.make('Health', { success: indexHealthSchema, error: SearchWorkerFailed }),
   Rpc.make('Nudge', { success: indexHealthSchema, error: SearchWorkerFailed }),
 ) {}

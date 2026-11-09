@@ -89,8 +89,9 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
         <ItemGroup className="dshx:gap-1.5">
           {visible.map(item => {
             const busy = busyId === item.continuationId
-            const targetTime = Math.max(item.resetAt ?? 0, item.snoozedUntil ?? 0) + 60_000
-            const resetStatus = item.resetAt === null ? 'Reset time unknown.' : `Known reset ${formatTime(item.resetAt)}.`
+            const targetTime = Math.max(item.resetAt ?? item.retryAt ?? 0, item.snoozedUntil ?? 0) + (item.resetAt === null ? 0 : 60_000)
+            const resetStatus =
+              item.resetAt === null ? `Reset time unknown; retries back off up to every 10 minutes.` : `Known reset ${formatTime(item.resetAt)}.`
             const scheduleStatus = item.scheduled
               ? `Automatic resume expected ${formatTime(targetTime)}.`
               : scheduleAvailable
@@ -114,7 +115,7 @@ export const QuotaContinuations = (props: { readonly accountId: string | null })
                       {item.state === 'queued'
                         ? 'Recovery prompt queued.'
                         : item.ready
-                          ? 'Reset time passed; ready for manual recovery.'
+                          ? 'Recovery time passed; ready for manual recovery.'
                           : 'Quota-blocked turn.'}
                     </Badge>
                     <span>{resetStatus}</span>

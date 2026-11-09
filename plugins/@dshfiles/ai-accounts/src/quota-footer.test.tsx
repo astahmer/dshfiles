@@ -313,6 +313,11 @@ describe('usage popover refresh', () => {
     await click(quotaButton('Work'))
     expect(overviewCard('Work').textContent).toContain('Updated just now')
     expect(overviewCard('Home').textContent).toContain('Updated 12m ago')
+    const workTime = overviewCard('Work').querySelector('time')
+    const homeTime = overviewCard('Home').querySelector('time')
+    expect(workTime?.dateTime).toBe(new Date(now).toISOString())
+    expect(workTime?.textContent).toBe(new Date(now).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' }))
+    expect(homeTime?.dateTime).toBe(new Date(now - 12 * 60_000).toISOString())
   })
 
   it('keeps the reading through a failed refresh, explains it, and recovers from Retry', async () => {
@@ -325,9 +330,8 @@ describe('usage popover refresh', () => {
     await click(refreshButton())
     const notice = overview().querySelector<HTMLElement>('[role="alert"]')
     if (notice === null) throw new Error('Missing refresh failure notice')
-    expect(notice.textContent).toContain('Usage could not be refreshed')
+    expect(notice.textContent).toContain('Refresh failed')
     expect(notice.textContent).toContain('Account usage read timed out after 30000 ms.')
-    expect(notice.textContent).toContain('last successful read')
     expect(overviewCard('Work').textContent).toContain('42% left')
 
     host.refreshUsage.mockResolvedValueOnce(snapshot([healthy('work', 'Work', 30)]))

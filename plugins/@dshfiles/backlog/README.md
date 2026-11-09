@@ -40,7 +40,7 @@ One capture feed for notes, tasks, bugs, ideas and questions, shared by the user
 replaces a "TODO" chat channel: adding something costs one line, the feed stays ordered by activity so
 idle things sink, and the tracker parts (status, actors, links, search, board) come for free.
 
-Plan and open steps: [plans/backlog](../../../plans/backlog/README.md).
+Plan and open steps: [plans/backlog](../../../plans/backlog/README.md). Shipped design: [docs/redesign.md](docs/redesign.md).
 
 Open the reusable **Backlog** view from navigation or the Workbench chooser. Items, Board, Projects, Shipped, Ready and Inbox remain the page’s own view controls.
 
@@ -285,9 +285,10 @@ reference; a new item's number is never shown and `b:<number>` never names it.
 
 ## References in a conversation
 
-An Agent writes `b:<ref>` in its markdown, the way `jj:<rev>` marks a revision: prose and inline code become
-links, while fenced code, existing links and words that merely contain the token stay as written. Clicking
-one opens an inline card with the item's title, kind, status, project and body. Image attachments appear as
+A written `b:<ref>`, the way `jj:<rev>` marks a revision, becomes the item's chip in an answer, a comment and
+a sent message — the same chip the composer inserts. Prose and inline code are read; fenced code, existing links
+and words that merely contain the token stay as written. Hovering the chip (or clicking it, or pressing Enter)
+opens the shared card with the item's title, kind, status, project and body. Image attachments appear as
 thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. **Open in Backlog**
 selects that item in the panel. An item that no longer exists says so in the card instead of failing the
 conversation.

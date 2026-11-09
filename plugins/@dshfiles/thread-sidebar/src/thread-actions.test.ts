@@ -54,6 +54,7 @@ const effectDeps = (deps: FixtureDeps): ThreadActionDeps => ({
   ownWorkspaceFor: hostVerb(deps.ownWorkspaceFor),
   stop: hostVerb(deps.stop),
   selectModel: hostVerb(deps.selectModel),
+  inspectProject: hostVerb(deps.inspectProject),
   registerProject: hostVerb(deps.registerProject),
   renameProject: hostVerb(deps.renameProject),
   deleteProject: hostVerb(deps.deleteProject),
@@ -116,6 +117,17 @@ const createDeps = (overrides: Partial<FixtureDeps> = {}): FixtureDeps => ({
   ownWorkspaceFor: async projectId => projectId,
   stop: async () => undefined,
   selectModel: async input => ({ provider: input.provider, model: input.model }),
+  inspectProject: async path => ({
+    path,
+    kind: 'git',
+    repositoryRoot: path,
+    remoteUrl: 'https://example.test/repo.git',
+    defaultBranch: 'main',
+    gitAbove: false,
+    brokenJjMetadata: false,
+    canEnableJujutsu: true,
+    reason: null,
+  }),
   registerProject: async (path, title) => ({ projectId: 'project-1', title: title ?? path, path, created: true }),
   renameProject: async (projectId, title) => ({ projectId, title }),
   deleteProject: async () => undefined,
@@ -228,6 +240,46 @@ describe('thread actions: list', () => {
 
     expect(result.threads.map(thread => thread.sessionId)).toEqual(['session-c'])
     expect(result.total).toBe(1)
+  })
+
+  test('folds titles only for the rows a plain page returns', async () => {
+    const folded: string[][] = []
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [0, 1, 2, 3, 4].map(index => summary(`session-${String(index)}`, { updatedAt: 100 - index })),
+        readTitles: async ids => {
+          folded.push([...ids])
+          return new Map(ids.map(id => [id, `title ${id}`]))
+        },
+      }),
+    )
+
+    const result = await actions.list({ input: { limit: 2 }, caller: agent('session-a'), signal })
+
+    expect(folded).toEqual([['session-0', 'session-1']])
+    expect(result.threads.map(thread => thread.title)).toEqual(['title session-0', 'title session-1'])
+    expect(result.total).toBe(5)
+    expect(result.truncated).toBe(true)
+  })
+
+  test('still folds every candidate title when a query can match past the page', async () => {
+    const folded: string[][] = []
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [0, 1, 2].map(index => summary(`session-${String(index)}`, { updatedAt: 100 - index })),
+        readTitles: async ids => {
+          folded.push([...ids])
+          return new Map(ids.map(id => [id, id === 'session-2' ? 'needle' : `title ${id}`]))
+        },
+      }),
+    )
+
+    const result = await actions.list({ input: { query: 'needle', limit: 1 }, caller: agent('session-a'), signal })
+
+    expect(folded).toEqual([['session-0', 'session-1', 'session-2']])
+    expect(result.threads.map(thread => thread.sessionId)).toEqual(['session-2'])
+    expect(result.total).toBe(1)
+    expect(result.truncated).toBe(false)
   })
 })
 
@@ -603,6 +655,17 @@ describe('thread actions: projects', () => {
       title: 'New',
       path: '/work/new',
       created: true,
+      inspection: {
+        path: '/work/new',
+        kind: 'git',
+        repositoryRoot: '/work/new',
+        remoteUrl: 'https://example.test/repo.git',
+        defaultBranch: 'main',
+        gitAbove: false,
+        brokenJjMetadata: false,
+        canEnableJujutsu: true,
+        reason: null,
+      },
     })
     expect(await actions.projectRename({ input: { projectId: 'project-1', title: 'Renamed' }, caller: agent('session-a'), signal })).toEqual({
       projectId: 'project-1',

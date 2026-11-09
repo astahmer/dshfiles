@@ -37,6 +37,12 @@ const projectActionSchema = Schema.Struct({
   timeoutMs: intBetween(1_000, 300_000).pipe(Schema.withDecodingDefaultKey(Effect.succeed(60_000))),
   verifyBeforeComplete: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   replayPolicy: Schema.Literals(['manual', 'read-only']).pipe(Schema.withDecodingDefaultKey(Effect.succeed('manual'))),
+  /** Run this action once in a new thread workspace of this project, through the durable task queue. */
+  runOnWorkspaceCreate: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  /** Hold the first send of a new thread until this action finishes; only meaningful with `runOnWorkspaceCreate`. */
+  awaitBeforeFirstTurn: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  /** Run this action when a thread of this project settles. */
+  onSettle: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   execution: executionPolicySchema,
 })
 
@@ -90,6 +96,18 @@ const configCheck = Schema.makeFilter((value: typeof projectChecksConfigShape.Ty
     }
     if (policy.target === 'remote' && policy.remote === undefined && value.remotes.every(remote => !remote.enabled)) {
       issues.push({ path: ['actions', index, 'execution', 'target'], issue: 'A remote execution target needs at least one enabled remote.' })
+    }
+    if (action.awaitBeforeFirstTurn && !action.runOnWorkspaceCreate) {
+      issues.push({
+        path: ['actions', index, 'awaitBeforeFirstTurn'],
+        issue: 'Waiting before the first turn needs runOnWorkspaceCreate: nothing else would start this action.',
+      })
+    }
+    if ((action.runOnWorkspaceCreate || action.onSettle) && action.execution.target !== 'local') {
+      issues.push({
+        path: ['actions', index, 'runOnWorkspaceCreate'],
+        issue: 'A setup action runs through the durable local queue; set execution.target to local.',
+      })
     }
   })
   return issues

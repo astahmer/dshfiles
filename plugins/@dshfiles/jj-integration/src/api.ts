@@ -32,6 +32,10 @@ import {
   reviewHistoryOutputSchema,
   revisionGraphOutputSchema,
   startedOutputSchema,
+  workspaceSetupInputSchema,
+  workspaceSetupSchema,
+  workspaceSetupTaskSchema,
+  cancelWorkspaceSetupInputSchema,
   workspaceSyncOutputSchema,
   workspaceSyncSchema,
 } from './api-effect-schemas.js'
@@ -65,6 +69,8 @@ const landResultSchema = Schema.Struct({
 export type LandResult = typeof landResultSchema.Type
 
 export type WorkspaceSyncView = typeof workspaceSyncSchema.Type
+export type WorkspaceSetupTask = typeof workspaceSetupTaskSchema.Type
+export type WorkspaceSetup = typeof workspaceSetupSchema.Type
 export type DestinationView = typeof destinationSchema.Type
 
 export const threadWorkspaceNameEffect = Schema.String.check(Schema.isPattern(/^thread-[0-9a-f]{6}$/u))
@@ -74,7 +80,7 @@ export const threadWorkspaceName = threadWorkspaceNameEffect
 const cleanupRequestSchema = Schema.Struct({
   path: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   olderThanHours: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(24 * 90)),
-  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(4)),
+  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(5)),
   targets: Schema.optional(Schema.Array(cleanupTargetSchema).check(Schema.isMaxLength(500))),
 })
 
@@ -91,7 +97,7 @@ const cleanupWorkspaceSchema = Schema.Struct({
   repoRoot: Schema.String,
   name: Schema.String,
   path: Schema.String,
-  kind: Schema.Literals(['empty', 'integrated', 'secondary']),
+  kind: Schema.Literals(['empty', 'integrated', 'merged', 'secondary']),
   lastUsedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   missing: Schema.Boolean,
   /** Other bookmarks that each hold all of this workspace's work: why a workspace with revisions is removable. */
@@ -104,6 +110,8 @@ const cleanupSkippedSchema = Schema.Struct({
   repoRoot: Schema.String,
   name: Schema.String,
   reason: Schema.Literals(['has-work', 'busy', 'activity-unknown', 'queued', 'too-recent', 'kind-excluded', 'working-copy-dirty', 'workspace-state-unknown']),
+  /** The same reason in words, so a report says why one workspace was kept without decoding an enum. */
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
 })
 
 const cleanupUntrackedSchema = Schema.Struct({
@@ -181,6 +189,7 @@ const renderCleanup = (output: CleanupResult): string => {
       ? undefined
       : `${verb} ${String(output.untracked.length)} untracked entr(ies): ${output.untracked.map(entry => (entry.outcome === 'failed' ? `${entry.name} (failed)` : entry.name)).join(', ')}.`,
     `${output.applied ? 'Abandoned' : 'Would abandon'} ${String(output.emptyRevisions.length)} dangling empty revision(s).`,
+    ...output.skipped.slice(0, 12).map(row => `${row.name}: ${row.message ?? row.reason}`),
     CleanupJobModel.skippedSummary(output),
   ]
     .filter(line => line !== undefined)
@@ -378,6 +387,26 @@ export const jjIntegrationApi = defineApi({
       description:
         'Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',
       tool: { name: 'jj_thread_rebase', render: output => output.summary },
+    }),
+    workspaceSetup: method({
+      input: workspaceSetupInputSchema,
+      output: workspaceSetupSchema,
+      description:
+        'Prepare a new thread workspace with the trusted setup actions this project flags: dispatch each once through the durable project-check queue and report their phases. Runs nothing outside a thread workspace of a local repository, and nothing from dsh.project.json. Call only when the user asked to start that setup.',
+      tool: {
+        name: 'jj_workspace_setup',
+        render: output =>
+          output.tasks.length === 0
+            ? 'No trusted setup action is flagged for a new workspace of this project.'
+            : output.tasks.map(task => `${task.label}: ${task.status} (${task.phase})`).join('\n'),
+      },
+    }),
+    cancelWorkspaceSetup: method({
+      input: cancelWorkspaceSetupInputSchema,
+      output: workspaceSetupSchema,
+      description:
+        'Cancel one queued or running setup action of a thread workspace. The durable task reports cancelled only after its process group exits, and effects applied before cancellation are not undone. Call only when the user asked to stop it.',
+      tool: { name: 'jj_cancel_workspace_setup', render: output => output.tasks.map(task => `${task.label}: ${task.status}`).join('\n') },
     }),
     workspaceSync: method({
       input: emptyInputSchema,

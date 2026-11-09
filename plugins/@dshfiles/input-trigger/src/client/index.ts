@@ -34,6 +34,7 @@ export type {
   InputTriggerCrumb,
   InputTriggerPick,
   InputTriggerSource,
+  RestoredReference,
   SubmitEnvelope,
   TriggerChar,
   TriggerGuard,

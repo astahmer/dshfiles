@@ -1,0 +1,16 @@
+# Replaces the stock storage-domain row with this fork: a domain whose records
+# are individually disposable hydrates one record on first read behind a small
+# LRU instead of materializing the whole unit at open. Every other domain
+# (single-layout, or per-record over authoritative records) keeps the upstream
+# open-time `loadAll`. The native row is disabled, never patched in place — DSH
+# core stays untouched.
+#
+# A patch replaces a row's whole `config`, so the inserted row restates the
+# value the base composition ships (`storage-domain.backend`).
+- id: storage-domain
+  disabled: true
+- insert:
+    - id: dshfiles-storage-domain
+      name: '@dshfiles/storage-domain'
+      config:
+        backend: json

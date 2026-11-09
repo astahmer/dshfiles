@@ -268,7 +268,9 @@ export class RepositoryViews extends Context.Service<
         locatedWorkspaces,
         snapshot,
         cached: Effect.map(SynchronizedRef.get(views), current => current.cached?.value ?? []),
-        startRefresh: Effect.map(startScan, started => started.started),
+        // An explicit refresh means "look again": a folder that became a repository since the last miss must be found,
+        // so the memoized locations (including cached misses) are dropped with the views.
+        startRefresh: Effect.flatMap(Cache.invalidateAll(locations), () => Effect.map(startScan, started => started.started)),
         list: Effect.flatMap(startScan, started => Fiber.join(started.fiber)),
         invalidateViews,
         invalidate: Effect.all([invalidateViews, Cache.invalidateAll(statuses), activity.reset], { discard: true }),

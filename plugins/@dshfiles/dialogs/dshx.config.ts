@@ -4,9 +4,6 @@ import { defineConfig } from '@dshfiles/dshx'
 export default defineConfig({
   name: '@dshfiles/dialogs',
   host: false,
-  client: {
-    entry: 'src/client.tsx',
-    vite: { plugins: [pluginUiVite()] },
-  },
+  client: { shared: '@dshfiles/shared-runtime', entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

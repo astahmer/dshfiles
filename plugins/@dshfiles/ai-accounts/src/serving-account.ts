@@ -1,8 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
+import { toStorageSchema } from '@dshfiles/dshx/host'
 import * as Schema from 'effect/Schema'
-import { asZodSchema } from './effect-zod-schema.js'
 import {
   accountAttemptSchema,
   successfulAccountSchema,
@@ -18,7 +18,7 @@ const servingAccountDomain = defineDomain({
   version: 1,
   layout: 'per-record',
   invalidRecords: 'backup-and-skip',
-  tables: { successful: { valueSchema: asZodSchema(successfulAccountSchema), __key: 'sessionId' } },
+  tables: { successful: { valueSchema: toStorageSchema(successfulAccountSchema), __key: 'sessionId' } },
 })
 
 /** Cohesive attribution policies; the service factory below owns injected storage and lifecycle. */

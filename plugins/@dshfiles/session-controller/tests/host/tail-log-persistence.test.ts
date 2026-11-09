@@ -35,7 +35,7 @@ const turn = (index: number, firstSeq: number): SessionEvent[] => {
 }
 
 /** A 1 MB+ current-format log: ten turns per durable append, one zstd frame each, as a busy Agent's batches are. */
-const writeLargeLog = async (sessionId: string) => {
+const writeLargeLog = async (sessionId: string, batches = 32) => {
   const root = mkdtempSync(join(tmpdir(), 'tail-log-jsonl-'))
   directories.push(root)
   const ctx = new Context()
@@ -43,7 +43,7 @@ const writeLargeLog = async (sessionId: string) => {
   await ctx.plugin(JsonlPersistence, { root })
   const header: SessionHeader = { id: SessionId(sessionId), createdAt: 1, cwd: root, isSeeded: false, delegationDepth: 0, version: 4 } as never
   const writer = await ctx.sessionPersistence.create(header)
-  for (let batch = 0; batch < 32; batch += 1) {
+  for (let batch = 0; batch < batches; batch += 1) {
     await writer.append(Array.from({ length: 10 }, (_, offset) => turn(batch * 10 + offset + 1, (batch * 10 + offset) * 3)).flat())
   }
   await writer.close()
@@ -67,6 +67,29 @@ it('decodes the same events as the JSONL backend, from the newest frames back to
   expect(tail.events).toEqual(stored)
 }, 30_000)
 
+it('serves a log larger than the window from its newest bytes only', async () => {
+  const { ctx, header } = await writeLargeLog('session-tail-window', 160)
+  const reader = await ctx.sessionPersistence.open(header.id, 'read')
+  const stored = (await reader.read()).events
+  await reader.close()
+  const stat = await ctx.sessionPersistence.stat(header.id)
+  using recorder = recordSpans()
+  const tail = await TailLog.open({ ctx, sessionId: header.id, signal: new AbortController().signal })
+  if (tail === undefined) throw new Error('expected a window of the 4 MB+ log to open')
+
+  expect(tail.before(1)).toEqual(stored.slice(-30))
+  expect(tail.complete).toBe(false)
+  const span = recorder.span('session tail read')
+  expect(span.attributes).toMatchObject({ 'dshx.session-controller.served': true, 'dshx.session-controller.windowed': true })
+  expect(span.attributes['dshx.session-controller.bytes']).toBeLessThan(stat?.sizeBytes ?? 0)
+
+  tail.before(1_000_000)
+  expect(tail.complete).toBe(false)
+  expect(tail.events.length).toBeGreaterThan(0)
+  expect(tail.events.length).toBeLessThan(stored.length)
+  expect(tail.events.at(-1)).toEqual(stored.at(-1))
+}, 60_000)
+
 it('records a session tail read span with the thread, bytes and frames it read', async () => {
   const { ctx, header } = await writeLargeLog('session-tail-span')
   using recorder = recordSpans()
@@ -79,7 +102,7 @@ it('records a session tail read span with the thread, bytes and frames it read',
     'dshx.session-controller.cache_hit': false,
   })
   expect(span.attributes['dshx.session-controller.bytes']).toBeGreaterThan(1_000_000)
-  for (const phase of ['stat_ms', 'lookup_ms', 'identity_ms', 'read_ms', 'scan_ms', 'decode_ms']) {
+  for (const phase of ['stat_ms', 'lookup_ms', 'identity_ms', 'size_ms', 'read_ms', 'scan_ms', 'decode_ms']) {
     expect(span.attributes[`dshx.session-controller.${phase}`]).toEqual(expect.any(Number))
   }
   await TailLog.open({ ctx, sessionId: header.id, signal: new AbortController().signal })

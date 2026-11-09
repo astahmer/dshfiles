@@ -1,7 +1,7 @@
 // jj-integration cuts a thread workspace at `<repository>-threads/<name>`; older ones are `<repository>-<hash>`.
 const THREADS_DIRECTORY_SUFFIX = '-threads'
 
-const normalize = (path: string): string => path.replace(/\/+$/u, '')
+const normalize = (path: string): string => path.replace(/[\\/]+$/u, '')
 
 /** The display name of a workspace checkout, accepting paths from either platform. */
 export const workspaceName = (path: string): string | undefined => {
@@ -19,7 +19,7 @@ export class WorkspacePaths {
    */
   static projectPathOf(path: string): string {
     const normalized = normalize(path)
-    const separator = normalized.lastIndexOf('/')
+    const separator = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'))
     if (separator < 0) return normalized
     const parent = normalized.slice(0, separator)
     if (parent.length <= THREADS_DIRECTORY_SUFFIX.length || !parent.endsWith(THREADS_DIRECTORY_SUFFIX)) return normalized

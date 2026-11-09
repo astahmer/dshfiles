@@ -55,6 +55,36 @@ const entryOf = (event: SessionEvent): TranscriptEntry | undefined => {
 
 /** The last `limit` user and assistant messages of a Session event log, oldest first. */
 export const recentTranscript = (input: { readonly events: readonly SessionEvent[]; readonly limit: number }) => {
-  const entries = input.events.flatMap(event => entryOf(event) ?? [])
-  return { entries: entries.slice(-input.limit), truncated: entries.length > input.limit }
+  const newestFirst: TranscriptEntry[] = []
+  for (let index = input.events.length - 1; index >= 0 && newestFirst.length <= input.limit; index -= 1) {
+    const event = input.events[index]
+    if (event === undefined) continue
+    const entry = entryOf(event)
+    if (entry !== undefined) newestFirst.push(entry)
+  }
+  return {
+    entries: newestFirst.slice(0, input.limit).reverse(),
+    truncated: newestFirst.length > input.limit,
+  }
+}
+
+/** The log tail a cold transcript read decodes, as `TailLog` serves it. */
+export interface TranscriptTail {
+  before(frames: number): readonly SessionEvent[]
+  readonly complete: boolean
+  readonly decodedFrames: number
+}
+
+/**
+ * The newest `limit` entries of a cold log, decoding the frames the count needs instead of the whole transcript.
+ * `undefined` when the tail cannot reach back far enough, so the caller falls back to the full read.
+ */
+export const recentTranscriptFromTail = (input: { readonly tail: TranscriptTail; readonly limit: number }) => {
+  for (let frames = 8; ; frames *= 2) {
+    const decoded = input.tail.decodedFrames
+    const transcript = recentTranscript({ events: input.tail.before(frames), limit: input.limit })
+    if (transcript.truncated || input.tail.complete) return transcript
+    // A window that decoded its first frame holds nothing further back.
+    if (input.tail.decodedFrames === decoded) return undefined
+  }
 }

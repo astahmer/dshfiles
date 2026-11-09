@@ -3,7 +3,12 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/jj-integration',
-  modules: { api: 'src/api.ts', settings: 'src/settings.ts' },
+  modules: {
+    api: 'src/api.ts',
+    settings: 'src/settings.ts',
+    'merged-pull-requests': 'src/merged-pull-requests.ts',
+    'no-folder': 'src/no-folder.ts',
+  },
   host: { entry: 'src/host.ts', bundleDependencies: ['@dshfiles/vcs-provider-port', '@dshfiles/jj-cli', '@dshfiles/git-cli'] },
   client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },

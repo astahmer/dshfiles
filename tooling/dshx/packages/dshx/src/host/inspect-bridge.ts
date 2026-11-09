@@ -1,11 +1,13 @@
-import { randomUUID, createHash } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:net'
-import { homedir, tmpdir } from 'node:os'
+import { homedir } from 'node:os'
 import process from 'node:process'
 import { join, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { JsonLineTransport } from '../bridge/json-line.js'
+import { LocalEndpoint } from '../bridge/local-endpoint.js'
+import { inspectEndpoint } from '../inspect/endpoint.js'
 import { InspectRequestFibers } from './inspect-requests-promise.js'
 import type { RuntimePluginStatus } from './runtime-plugins.js'
 import * as Result from 'effect/Result'
@@ -79,20 +81,10 @@ function runtimeHome(): string {
   return configured === undefined || configured.trim() === '' ? join(homedir(), '.dsh') : resolve(configured)
 }
 
-function bridgeName(packageId: string): string {
-  return createHash('sha256').update(packageId).digest('hex').slice(0, 20)
-}
-
+/** Metadata stays in DSH_HOME; the endpoint is a socket file there (or a short temp path), or a per-run Windows pipe. */
 function paths(packageId: string) {
-  const home = runtimeHome()
-  const directory = join(home, 'runtime', 'dshx', 'inspect')
-  const name = bridgeName(packageId)
-  const regularSocket = join(directory, `${name}.sock`)
-  // macOS limits AF_UNIX paths to roughly 104 bytes. Keep metadata in DSH_HOME
-  // but use a deterministic short socket path when an isolated home is deep.
-  const socketPath =
-    regularSocket.length > 90 ? join(tmpdir(), `dshx-${createHash('sha256').update(`${home}:${packageId}`).digest('hex').slice(0, 24)}.sock`) : regularSocket
-  return { directory, socketPath, metadataPath: join(directory, `${name}.json`) }
+  const location = inspectEndpoint(runtimeHome(), packageId)
+  return { directory: location.directory, metadataPath: location.metadataPath, socketPath: LocalEndpoint.listenPath(location.address) }
 }
 
 async function removeStaleEndpoint(location: { socketPath: string; metadataPath: string }): Promise<void> {
@@ -111,7 +103,7 @@ async function removeStaleEndpoint(location: { socketPath: string; metadataPath:
       if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
     }
   }
-  await rm(location.socketPath, { force: true })
+  await LocalEndpoint.remove(location.socketPath)
   await rm(location.metadataPath, { force: true })
 }
 
@@ -344,7 +336,7 @@ const startHostInspectBridge = async (ctx: Context, metadata: HostInspectBridgeM
         resolve()
       })
     })
-    await chmod(location.socketPath, 0o600)
+    await LocalEndpoint.restrict(location.socketPath)
     await writeFile(
       location.metadataPath,
       JSON.stringify({ version: PROTOCOL_VERSION, ...metadata, pid: runtimeProcess()?.pid ?? 0, socketPath: location.socketPath, token }) + '\n',
@@ -354,7 +346,7 @@ const startHostInspectBridge = async (ctx: Context, metadata: HostInspectBridgeM
   } catch (error) {
     await new Promise<void>(resolve => server.close(() => resolve())).catch(() => undefined)
     await closeRequests()
-    await rm(location.socketPath, { force: true })
+    await LocalEndpoint.remove(location.socketPath)
     await rm(location.metadataPath, { force: true })
     throw error
   }
@@ -365,7 +357,7 @@ const startHostInspectBridge = async (ctx: Context, metadata: HostInspectBridgeM
     closed = true
     await new Promise<void>(resolve => server.close(() => resolve()))
     await closeRequests()
-    await rm(location.socketPath, { force: true })
+    await LocalEndpoint.remove(location.socketPath)
     await rm(location.metadataPath, { force: true })
   }
   return { metadataPath: location.metadataPath, socketPath: location.socketPath, close }

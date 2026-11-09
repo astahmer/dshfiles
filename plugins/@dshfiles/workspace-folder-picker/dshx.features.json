@@ -5,7 +5,7 @@
     {
       "id": "workspace-folder-add-flow",
       "title": "Add workspaces from the folder browser",
-      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it.",
+      "summary": "The header and sidebar Add workspace flows open directly in the Host-backed folder explorer without offering registered projects; one unique typed folder match browses automatically. Browse… opens the Host's native folder dialog when its directory picker is native, and the workspace_folder_browser_capabilities agent tool reports that, with the Host's path style, without opening it. Choosing a folder first reports what it is: no repository, a Git checkout with its origin and default branch, or a Jujutsu repository. A Git checkout offers Enable Jujutsu and add, which runs the same guarded colocated init the graph uses; a folder without a repository offers Initialize repository, which starts Jujutsu in place and keeps the files already in it. The project_inspect and project_init agent tools drive the same read and write. A repository can also check in dsh.project.json, read by project_config_read: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts, where a missing or invalid file is reported instead of thrown. A repository with no origin says so and offers Publish privately or Publish publicly, which creates the GitHub repository, adds it as origin and pushes the bookmark. Settings › Projects shows the same file for a registered project: the declared values, the tier that wins for each key, and a Copy entry button per suggested script, which copies the trusted project-checks profile entry because nothing is imported automatically.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
@@ -17,16 +17,40 @@
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace",
       "configuration": [],
-      "states": ["closed", "browsing", "native-available", "native-unavailable", "native-cancelled", "native-failed", "selected", "busy"],
+      "states": [
+        "closed",
+        "browsing",
+        "native-available",
+        "native-unavailable",
+        "native-cancelled",
+        "native-failed",
+        "selected",
+        "busy",
+        "inspecting",
+        "enabling",
+        "initializing"
+      ],
       "failureModes": [
         "Directory listing and folder creation use an authenticated Host API; workspace registration stays behind the workspace Remote API.",
         "Ambiguous or truncated path matches do not auto-browse.",
         "The add flow does not expose registered project choices or project registration actions.",
         "A Host without a native directory picker, or one too old to answer the capability read, hides Browse… and keeps absolute-path entry and the in-app browser.",
-        "Cancelling the native dialog changes nothing; a failed dialog keeps absolute-path entry and offers Browse… again."
+        "Cancelling the native dialog changes nothing; a failed dialog keeps absolute-path entry and offers Browse… again.",
+        "The setup step never initializes a repository by itself: every write follows an explicit click.",
+        "A folder already inside a checkout is reported with that checkout's root, and adding it registers the folder you chose.",
+        "Enable Jujutsu is offered only while the Jujutsu bundle is loaded and jj is installed; otherwise the panel offers the plain add and says why.",
+        "A folder with broken .jj metadata is reported as broken and is never repaired or replaced.",
+        "Initialize repository refuses a folder that is already a repository or sits inside one, naming the checkout to add instead.",
+        "Only non-executable settings from dsh.project.json are honoured: a script runs only after the user imports it into the profile-trusted project checks.",
+        "The project settings section only reads dsh.project.json: it never imports a script or runs a command from the file."
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.publish-entry",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
         {
           "kind": "unit-test",
           "id": "workspace-folder-picker.native-capability",
@@ -53,6 +77,47 @@
           "kind": "gherkin",
           "id": "workspace-folder-picker.sidebar-folder-mode",
           "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.inspect-repository-kinds",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/folder-inspection.test.ts",
+          "testName": "reads a Git checkout with its root, origin and default branch, and offers Jujutsu"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.inspect-nested-folder",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/folder-inspection.test.ts",
+          "testName": "reports a nested folder as part of the checkout above it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.initialize-folder",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "turns an existing folder into a project in place and keeps its files"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.folder-setup",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.project-config-missing",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-config.test.ts",
+          "testName": "treats a missing file as absent and never fails"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.project-config-valid",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-config.test.ts",
+          "testName": "reads the declared settings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.project-config-invalid",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-config.test.ts",
+          "testName": "reports an invalid file instead of throwing or applying half of it"
         }
       ],
       "telemetry": [
@@ -69,7 +134,7 @@
     {
       "id": "project-clone",
       "title": "Add a project by cloning a repository",
-      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git progress and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. The project_clone, project_clone_jobs and project_clone_cancel agent tools drive the same jobs.",
+      "summary": "New → Clone repository… in the Add workspace flow clones an https, ssh or file:// repository into a new folder in the background with git stage progress (connecting, counting, receiving, resolving, checkout) and a Cancel button, colocates jj when it is installed, registers the clone as a project and selects it. A failed or cancelled job can be retried into the same folder as a new job; a clone that failed after git started checking files out keeps that partial tree, and its retry clears it first. Closing the dialog does not hide a running or failed clone: a shell overlaid notice keeps its phase, Cancel and Retry on screen. The project_clone, project_clone_jobs, project_clone_cancel and project_clone_retry agent tools drive the same jobs.",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
@@ -83,10 +148,10 @@
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace › Clone repository",
       "configuration": [],
-      "states": ["form", "cloning", "colocating", "registering", "succeeded", "failed", "cancelled"],
+      "states": ["form", "cloning", "colocating", "registering", "succeeded", "failed", "cancelled", "retrying"],
       "failureModes": [
         "An existing destination folder is refused before anything runs; a second start for the same folder returns the running job.",
-        "A failed or cancelled clone deletes the folder it created and registers nothing; a failed jj colocation keeps the clone and names the command to finish it.",
+        "A failed clone before git checks files out deletes the folder it created and registers nothing; a clone that failed during or after checkout keeps its partial tree and names the retry that clears it, and a failed jj colocation keeps the clone and names the command to finish it.",
         "Clone jobs live in Host memory: a Host restart drops the trail, and a clone it interrupted leaves its partial folder."
       ],
       "externalDependencies": [
@@ -113,6 +178,24 @@
           "kind": "gherkin",
           "id": "workspace-folder-picker.clone-repository",
           "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.clone-retry",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "retries a failed clone into the same destination as a new job and refuses other states"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.clone-keeps-partial-checkout",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "keeps a checkout that failed after it started, then retries clean into the same folder"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.clone-notice",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/clone-jobs-notice.test.ts",
+          "testName": "announces running and undismissed failed clones, newest first and at most three"
         }
       ],
       "telemetry": [
@@ -166,7 +249,7 @@
     {
       "id": "project-create",
       "title": "Create a new project",
-      "summary": "New → New project… in the Add workspace flow creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs.",
+      "summary": "New → New project… in the Add workspace flow creates <parent>/<name> with a colocated jj repository, a README, a described first commit on main, registers it as a project and selects it. Opting in to a private GitHub repository runs gh repo create --private and pushes main when the GitHub CLI is installed. The project_create agent tool takes the same explicit inputs. The same remote creation is available for an existing checkout through project_publish: it refuses no-repository, an existing origin, and a repository without commits, then pushes the bookmark with jj (git for a plain checkout).",
       "reach": [
         "click button \"New session\"",
         "click button \"Choose workspace\"",
@@ -215,6 +298,18 @@
           "kind": "gherkin",
           "id": "workspace-folder-picker.new-project",
           "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.publish-repository",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "publishes a local jj checkout that has no origin and pushes its bookmark"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.publish-refusals",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle.test.ts",
+          "testName": "refuses to publish a folder without a repository, a repository with an origin, and one without commits"
         }
       ],
       "telemetry": [
@@ -405,6 +500,105 @@
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "Hosts › Add folder (directory-only picker)"
+    },
+    {
+      "id": "workspace-folder-setup",
+      "title": "Inspect a folder before adding it",
+      "summary": "Choosing a folder opens a step that says what it is — no repository, a Git checkout with its origin, or a Jujutsu repository, and whether its .jj metadata is broken — before anything is registered. A Git checkout offers Enable Jujutsu and add, a plain folder offers Initialize repository or Add without a repository, and a repository with no origin offers Publish privately or Publish publicly. Nothing is written without the click, and the plain add stays available for every folder.",
+      "reach": [
+        "click button \"Add workspace\"",
+        "fill textbox \"Enter a folder path\" \"~/projects/sample\"",
+        "press Enter",
+        "click button \"Select this folder\"",
+        "expect text \"Jujutsu repository*\""
+      ],
+      "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "Add workspace › setup step",
+      "configuration": [],
+      "states": ["inspecting", "none", "git", "jujutsu", "broken-metadata", "enabling", "initializing", "publishing"],
+      "failureModes": [
+        "The step never initializes or enables anything by itself: every write follows an explicit click.",
+        "A folder with broken .jj metadata is reported and never repaired or replaced.",
+        "A folder inside another checkout is reported with that checkout root; adding still registers the folder chosen.",
+        "Enable Jujutsu is offered only while the Jujutsu bundle is loaded and jj is installed.",
+        "Publishing needs the GitHub CLI; a refusal names the missing tool or the next command instead of failing silently."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/jujutsu",
+          "boundary": "Colocated Jujutsu init behind the repository-setup contract.",
+          "deterministicFake": "A fake provider returning a fixed root."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workspace-folder-picker.setup-panel",
+          "featureFile": "tooling/dshx/e2e/features/workspace-folder-picker.feature"
+        }
+      ]
+    },
+    {
+      "id": "project-settings-section",
+      "title": "Read a project's declared settings",
+      "summary": "Settings › Projects lists the Host's registered projects, leaving out jj thread workspaces, and reads the chosen project's dsh.project.json. Each declared key shows its value and the tier that wins: the file when it declares the key, the profile setting for the new-thread workspace and bookmark, and a built-in default otherwise. A missing or invalid file is reported without changing anything. Each suggested script offers Copy entry, which puts the exact trusted project-checks profile entry on the clipboard for an operator to paste; nothing is imported automatically and the file never runs a command. The project_projects agent tool lists the same projects.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings\"", "click button \"Projects\"", "expect text \"dsh.project.json\""],
+      "surfaces": ["client", "host", "tool"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Projects",
+      "configuration": [],
+      "states": ["loading", "listed", "empty", "config-absent", "config-invalid", "copying", "read-error"],
+      "failureModes": [
+        "The section only reads: it imports no script and runs no command from dsh.project.json.",
+        "A missing file shows the profile and built-in tiers instead of an error; an invalid file is reported and changes nothing.",
+        "A command line that cannot be split into an executable and its arguments is reported and its copy button stays disabled.",
+        "An old Host without the projects method shows the read failure with a retry instead of an empty project list."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.project-setting-tiers",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-settings.test.ts",
+          "testName": "falls back to the profile for the keys the profile owns and to built-in defaults otherwise"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.project-check-snippet",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/project-settings.test.ts",
+          "testName": "builds the trusted profile entry from a command line, keeping quoted arguments whole"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workspace-folder-picker.project-list-host-read",
+          "file": "plugins/@dshfiles/workspace-folder-picker/src/directory-capabilities.test.ts",
+          "testName": "lists registered projects and leaves jj thread workspaces out"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "workspace-folder-picker.project-settings-browser",
+          "reason": "The section renders the unit-tested read model inside the settings shell over the same read-only projects and project_config_read methods the picker journeys boot; it starts no Host work of its own, so a browser journey would re-walk the settings shell rather than this section."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
     }
   ]
 }

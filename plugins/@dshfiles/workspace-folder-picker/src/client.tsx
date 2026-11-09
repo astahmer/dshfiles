@@ -12,31 +12,51 @@ import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts, ProjectFolderPicker, type DirectoryPickerPort, type WorkspacePickerPorts } from './picker/index.js'
 import { useState } from 'react'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
+import { CloneJobsNoticeHost } from './clone-jobs-notice.js'
 import { ProjectCloneDialog } from './project-clone-dialog.js'
 import { ProjectCreateDialog } from './project-create-dialog.js'
+import { ProjectFolderSetup } from './project-folder-setup.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
+import { ProjectSettingsSection } from './project-settings-section.js'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
 
 const directoryFlowLabels = { heading: 'Add workspace' } satisfies { readonly heading: string }
 
-type DirectoryFlowView = 'browse' | 'clone' | 'create'
+type DirectoryFlowView = 'browse' | 'clone' | 'create' | 'inspect'
 
 const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): JSX.Element => {
   const browserApi = useApi(workspaceFolderBrowserApi)
   const lifecycleApi = useApi(projectLifecycleApi)
   const [view, setView] = useState<DirectoryFlowView>('browse')
+  const [candidate, setCandidate] = useState<string | null>(null)
   const tools = useQuery({ queryKey: ['workspace-folder-picker', 'project-tools'], queryFn: () => lifecycleApi.tools({}), retry: false, staleTime: 60_000 })
   const pickerCapabilities = useQuery({
     queryKey: ['workspace-folder-picker', 'capabilities'],
     queryFn: ({ signal }) => browserApi.capabilities({}, { signal }),
     retry: false,
     staleTime: 60_000,
+    // The flow mounts again on every opening, and a read that failed on the previous one must not hide Browse… for the
+    // rest of the session: it is dropped with the mount instead of being cached.
+    gcTime: 0,
   })
   const directoryPicker: DirectoryPickerPort = {
     pick: signal => props.directoryPicker.pick(signal),
     list: (path, signal) => browserApi.list(path === undefined ? {} : { path }, { signal }),
     createDirectory: (path, name) => browserApi.createDirectory({ path, name }),
+  }
+  if (view === 'inspect' && candidate !== null) {
+    return (
+      <ProjectFolderSetup
+        api={lifecycleApi}
+        path={candidate}
+        onAdded={path => props.onPicked(path)}
+        onClose={() => {
+          setCandidate(null)
+          setView('browse')
+        }}
+      />
+    )
   }
   if (view === 'clone') {
     return <ProjectCloneDialog api={lifecycleApi} home={tools.data?.home} onClose={() => setView('browse')} onCloned={path => props.onPicked(path)} />
@@ -83,8 +103,18 @@ const DirectoryFlowContent = (props: DirectoryFlowOwnerProps & WorkspacePickerPo
       pathStyle={pickerCapabilities.data?.pathStyle}
       onClose={props.onCancel}
       onRegisterWorkspace={props.registerWorkspace}
-      onUseAbsolutePath={props.onPicked}
-      onSelect={selection => props.onPicked(selection.canonicalPath)}
+      onUseAbsolutePath={path => {
+        setCandidate(path)
+        setView('inspect')
+      }}
+      onSelect={selection =>
+        selection.kind === 'workspace'
+          ? props.onPicked(selection.canonicalPath)
+          : (() => {
+              setCandidate(selection.canonicalPath)
+              setView('inspect')
+            })()
+      }
       placeholder="Browse for a workspace folder…"
       projects={[]}
     />
@@ -105,6 +135,33 @@ export default defineClient({
   inject: ['slots', 'remote', 'remote.directoryPicker', 'remote.workspace'],
   setup(ctx, decorate) {
     const ports = createWorkspacePickerPorts(ctx.remote)
+    // A clone outlives the dialog that started it; the shell overlay keeps its phase and retry on screen.
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'dshfiles-workspace-folder-picker-clones', order: 118 },
+        decorate(() => (
+          <PluginQueryProvider>
+            <CloneJobsNoticeHost />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('settings.section', () =>
+      ctx.slots.register(
+        {
+          name: 'settings.section',
+          registrant: '@dshfiles/workspace-folder-picker',
+          id: 'dshfiles-workspace-folder-picker-projects',
+          order: 34,
+          label: () => 'Projects',
+        },
+        decorate(() => (
+          <PluginQueryProvider>
+            <ProjectSettingsSection />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     for (const name of directoryFlowSlotNames) {
       ctx.slots.inject(name, () =>
         ctx.slots.register(

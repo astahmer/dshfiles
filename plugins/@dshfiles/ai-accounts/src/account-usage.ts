@@ -9,13 +9,16 @@ import { readCursorUsage } from './cursor-account.js'
 import { MistralAccountModel } from './mistral-account.js'
 import { ProviderUsageModel, readCodexUsage, readOpenCodeUsage } from './usage.js'
 
+/** The stored half of a profile this read needs; the observed fields a card shows are never read here. */
+type UsageReadAccount = Pick<AccountProfile, 'instanceId' | 'kind' | 'homePath' | 'shadowHomePath' | 'apiKeyEnv' | 'authSource' | 'apiBaseUrl'>
+
 /**
  * One account's live quota, read with that account's own credential. The page,
  * the footer and the history recorder all go through here, so a provider is
  * read one way everywhere.
  */
 export const readAccountUsage = async (input: {
-  readonly account: AccountProfile
+  readonly account: UsageReadAccount
   /** The file's shadow root: an account with no explicit shadow home reads the one its route uses. */
   readonly shadowRoot: string
   readonly signal?: AbortSignal | undefined

@@ -1,5 +1,6 @@
 import { Effect, Effectable } from 'effect'
-import type { SqlClient, SqlError, Statement } from 'effect/sql'
+import { Statement } from 'effect/sql'
+import type { SqlClient, SqlError } from 'effect/sql'
 
 const withoutTracer = Effect.withTracerEnabled(false)
 
@@ -9,6 +10,8 @@ const withoutTracer = Effect.withTracerEnabled(false)
  */
 class UntracedStatement<A> extends Effectable.Class<ReadonlyArray<A>, SqlError.SqlError> implements Statement.Statement<A> {
   readonly '~effect/sql/Statement/Fragment' = '~effect/sql/Statement/Fragment'
+  // Effect 4.1.2 requires the fragment brand on a Statement; the wrapped statement carries it already.
+  readonly [Statement.FragmentTypeId]: Statement.FragmentTypeId = Statement.FragmentTypeId
   readonly #statement: Statement.Statement<A>
 
   constructor(statement: Statement.Statement<A>) {

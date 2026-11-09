@@ -633,6 +633,11 @@ export class Session implements SessionFace {
     return this.notifier.subscribe(listener)
   }
 
+  /** True while a mounted view renders this Session; an unsubscribed Session holds history nobody reads. */
+  get mounted(): boolean {
+    return this.notifier.listenerCount > 0
+  }
+
   /**
    * Cached Session snapshot (rebuilt lazily when dirty with no listeners).
    * @returns the cached reference (stable until the next flush).

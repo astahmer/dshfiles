@@ -167,7 +167,7 @@ for (const plugin of packages) {
       }
     } else if (missingPresentation.length > 0) {
       featureIssues.push(
-        `feature ${feature.id} must declare ${missingPresentation.join(', ')} (presentation surface, shell destination and where it lives today; see plans/ade-ux/README.md §5)`,
+        `feature ${feature.id} must declare ${missingPresentation.join(', ')} (presentation surface, shell destination and where it lives today; see docs/ade-ux/README.md §5)`,
       )
     }
     const kinds = new Set(feature.verification.map(item => item.kind))

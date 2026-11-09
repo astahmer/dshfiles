@@ -30,6 +30,7 @@ import { MainSurfaceGuard } from './main-surface-guard.js'
 import { WindowFloatingGeometry } from './window-floating.js'
 import { GroupMinimums } from './group-minimums.js'
 import { TabRows } from './tab-row-visibility.js'
+import { TabReveal } from './tab-reveal.js'
 import { HiddenTabRowRestore, TabRowVoidMenu, type TabRowMenuTarget } from './tab-row-controls.js'
 
 /** Variables live in the injected dockview sheet (`dockview-theme.css`), mapped to the Host `--dsw-*` tokens. */
@@ -257,6 +258,11 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
       unregister?.()
     }
   }, [api, props.region, registry, store, permanentCentre])
+
+  useEffect(() => {
+    if (api === null) return
+    return TabReveal.retain(api)
+  }, [api])
 
   const emptyPane = useRef({ visible: props.visible, onClose: props.onClose })
   emptyPane.current = { visible: props.visible, onClose: props.onClose }

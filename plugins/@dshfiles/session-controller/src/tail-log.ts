@@ -1,98 +1,23 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { SessionLogOffset, type SessionEvent, type SessionHeader, type SessionId } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-session-persistence'
-import type { ProjectionCheckpoint, ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
-import type {} from '@deepseek-ai/dsh-session-projection-cache'
-import { readFile, stat } from 'node:fs/promises'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
-import { zstdDecompressSync } from 'node:zlib'
-import { Schema } from 'effect'
+import { TailLog as LogTail, type LogWindowMetrics } from '@dshfiles/session-log-window'
 
-const ZSTD_MAGIC = 0xfd2fb528
-/** Below this a log decodes whole about as fast as its tail (median 155 ms vs 170 ms measured), so it keeps the full read. */
-const MIN_TAIL_BYTES = 1_000_000
-/** Opened tails kept for the opening's next pages; each holds its log's bytes. */
-const KEPT_TAILS = 3
-const KEPT_TAIL_MS = 120_000
-
-const cacheRecordSchema = Schema.Struct({ rows: Schema.Record(Schema.String, Schema.Unknown) })
-const logPathSchema = Schema.String.check(Schema.isEndingWith('.zstd'))
-const rowSchema = Schema.Record(Schema.String, Schema.Unknown)
-const nonNegativeInt = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
-const eventRowSchema = Schema.Struct({
-  seq: nonNegativeInt,
-  type: Schema.String,
-  time: Schema.Number,
-  sourceEventSeqs: Schema.optional(
-    Schema.Array(Schema.Union([nonNegativeInt, Schema.Tuple([Schema.Number.check(Schema.isInt()), Schema.Number.check(Schema.isInt())])])),
-  ),
-})
-
-/** The JSONL backend's log lookup, public on its class but absent from the persistence contract. */
-interface JsonlLogLookup {
-  resolveCurrentLog(id: SessionId, signal?: AbortSignal): Promise<string | undefined>
-}
-
-/** The projection cache's in-memory record table, private to its class. */
-interface ProjectionCacheTable {
-  requireTable(): { get(id: SessionId): object | undefined }
-}
-
-const isJsonlLogLookup = (value: unknown): value is JsonlLogLookup =>
-  typeof value === 'object' && value !== null && 'resolveCurrentLog' in value && typeof value.resolveCurrentLog === 'function'
-
-const isProjectionCacheTable = (value: unknown): boolean =>
-  typeof value === 'object' && value !== null && 'requireTable' in value && typeof value.requireTable === 'function'
-
-interface FrameRange {
-  readonly start: number
-  readonly end: number
-}
-
-type TailReadPhase = 'stat_ms' | 'lookup_ms' | 'identity_ms' | 'read_ms' | 'scan_ms' | 'decode_ms'
-type TailReadMetrics = Partial<Record<TailReadPhase, number>> & {
-  cache_hit?: boolean
-  fallback_reason?: string
-}
-
-const measureTailPhase = async <Value>(metrics: TailReadMetrics, phase: TailReadPhase, work: () => Value | Promise<Value>): Promise<Value> => {
-  const startedAt = performance.now()
-  try {
-    return await work()
-  } finally {
-    metrics[phase] = Math.round(performance.now() - startedAt)
-  }
-}
+/** The tail of one cold Session log, as the shared bounded window read serves it. */
+export type TailLog = LogTail
 
 /**
- * The end of one cold Session log, decoded without reading the rest. The JSONL backend writes a header frame and then
- * one independently decodable Zstandard frame per durable append, so the frames nearest the end hold the newest
- * events. `before()` decodes further back on demand; `restore` folds the projection checkpoint over the decoded tail.
+ * Open the end of a cold Session log through the shared bounded window read, recording what the window cost.
+ * `undefined` sends the caller to the full read: another backend or encoding, a forked or subagent Session, a torn
+ * last frame, or a log below the tail threshold.
  */
-export class TailLog {
-  private static readonly kept = new Map<SessionId, { readonly path: string; readonly identity: string; readonly tail: TailLog; timer: NodeJS.Timeout }>()
-  private readonly texts = new Map<number, string>()
-  private firstFrame: number
-  private decoded: readonly SessionEvent[] = []
-
-  private constructor(
-    readonly header: SessionHeader,
-    private readonly bytes: Buffer,
-    private readonly frames: readonly FrameRange[],
-  ) {
-    this.firstFrame = frames.length
-  }
-
-  /**
-   * Open the tail of a cold, unforked, current-format zstd log, or `undefined` when only the full read can serve it:
-   * another backend or encoding, a forked or subagent Session, a torn last frame.
-   */
-  static open(input: { readonly ctx: Context; readonly sessionId: SessionId; readonly signal: AbortSignal }): Promise<TailLog | undefined> {
-    return withSpan('session tail read', { attributes: { 'dsh.session.id': input.sessionId } }, async span => {
-      const metrics: TailReadMetrics = { cache_hit: false }
+export const TailLog = {
+  open: (input: { readonly ctx: Context; readonly sessionId: SessionId; readonly signal: AbortSignal }): Promise<TailLog | undefined> =>
+    withSpan('session tail read', { attributes: { 'dsh.session.id': input.sessionId } }, async span => {
+      const metrics: LogWindowMetrics = { cache_hit: false }
       let tail: TailLog | undefined
       try {
-        tail = await TailLog.openUntraced(input, metrics)
+        tail = await LogTail.open({ ...input, metrics })
       } catch (error) {
         metrics.fallback_reason = input.signal.aborted ? 'aborted' : 'error'
         span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { served: false, ...metrics } }))
@@ -101,226 +26,15 @@ export class TailLog {
       span.setAttributes(
         pluginAttributes({
           plugin: 'session-controller',
-          attributes: { served: tail !== undefined, bytes: tail?.bytes.length, frames: tail?.frames.length, ...metrics },
+          attributes: {
+            served: tail !== undefined,
+            bytes: tail?.windowBytes,
+            frames: tail?.frameCount,
+            windowed: tail?.windowed,
+            ...metrics,
+          },
         }),
       )
       return tail
-    })
-  }
-
-  private static async openUntraced(
-    input: { readonly ctx: Context; readonly sessionId: SessionId; readonly signal: AbortSignal },
-    metrics: TailReadMetrics,
-  ): Promise<TailLog | undefined> {
-    const kept = TailLog.kept.get(input.sessionId)
-    if (kept !== undefined) {
-      // An unchanged file is the same log, already scanned and partly decoded.
-      const identity = await measureTailPhase(metrics, 'identity_ms', () => TailLog.identityOf(kept.path))
-      if (identity === kept.identity) {
-        metrics.cache_hit = true
-        kept.timer.refresh()
-        return kept.tail
-      }
-      TailLog.forget(input.sessionId)
-    }
-    const persistence = input.ctx.get('sessionPersistence')
-    if (persistence === undefined || !isJsonlLogLookup(persistence)) {
-      metrics.fallback_reason = 'persistence-unavailable'
-      return undefined
-    }
-    const stat = await measureTailPhase(metrics, 'stat_ms', () => persistence.stat(input.sessionId, { signal: input.signal }))
-    if (stat === undefined) {
-      metrics.fallback_reason = 'stat-missing'
-      return undefined
-    }
-    if (stat.formatStatus !== 'current') {
-      metrics.fallback_reason = 'unsupported-format'
-      return undefined
-    }
-    if ((stat.sizeBytes ?? 0) < MIN_TAIL_BYTES) {
-      metrics.fallback_reason = 'below-tail-size-threshold'
-      return undefined
-    }
-    const header = stat.header
-    if (header.cwd === undefined || header.isSeeded || header.origin === 'subagent') {
-      metrics.fallback_reason = 'ineligible-session'
-      return undefined
-    }
-    const currentPath = await measureTailPhase(metrics, 'lookup_ms', () => persistence.resolveCurrentLog(input.sessionId, input.signal))
-    const path = Schema.decodeUnknownResult(logPathSchema)(currentPath)
-    if (path._tag === 'Failure') {
-      metrics.fallback_reason = 'log-path-unavailable'
-      return undefined
-    }
-    const identity = await measureTailPhase(metrics, 'identity_ms', () => TailLog.identityOf(path.success))
-    if (identity === undefined) {
-      metrics.fallback_reason = 'log-identity-unavailable'
-      return undefined
-    }
-    const bytes = await measureTailPhase(metrics, 'read_ms', () => readFile(path.success, { signal: input.signal }))
-    const frames = await measureTailPhase(metrics, 'scan_ms', () => TailLog.scan(bytes))
-    if (frames === undefined || frames.length < 2) {
-      metrics.fallback_reason = 'invalid-zstd-frames'
-      return undefined
-    }
-    const tail = new TailLog(header, bytes, frames)
-    const finalLineComplete = await measureTailPhase(metrics, 'decode_ms', () => tail.textOf(frames.length - 1).endsWith('\n'))
-    if (!finalLineComplete) {
-      metrics.fallback_reason = 'incomplete-final-line'
-      return undefined
-    }
-    TailLog.keep(input.sessionId, { path: path.success, identity, tail })
-    return tail
-  }
-
-  private static keep(sessionId: SessionId, entry: { readonly path: string; readonly identity: string; readonly tail: TailLog }): void {
-    TailLog.forget(sessionId)
-    for (const oldest of TailLog.kept.keys()) {
-      if (TailLog.kept.size < KEPT_TAILS) break
-      TailLog.forget(oldest)
-    }
-    const timer = setTimeout(() => {
-      TailLog.forget(sessionId)
-    }, KEPT_TAIL_MS)
-    timer.unref()
-    TailLog.kept.set(sessionId, { ...entry, timer })
-  }
-
-  private static forget(sessionId: SessionId): void {
-    const kept = TailLog.kept.get(sessionId)
-    if (kept === undefined) return
-    clearTimeout(kept.timer)
-    TailLog.kept.delete(sessionId)
-  }
-
-  /** Size, modification time and inode: an append or a rewrite changes it, so a kept tail is never served stale. */
-  private static async identityOf(path: string): Promise<string | undefined> {
-    const info = await stat(path, { bigint: true }).catch(() => undefined)
-    return info === undefined ? undefined : `${String(info.ino)}:${String(info.size)}:${String(info.mtimeNs)}`
-  }
-
-  /** Complete frame ranges, or `undefined` when the file ends inside a frame (a torn append the full read repairs). */
-  static scan(buffer: Buffer): readonly FrameRange[] | undefined {
-    const frames: FrameRange[] = []
-    let offset = 0
-    while (offset < buffer.length) {
-      // oxlint-disable-next-line antislop/no-passthrough-variable -- The frame start stays fixed while `offset` walks the frame.
-      const start = offset
-      if (buffer.length - offset < 5 || buffer.readUInt32LE(offset) !== ZSTD_MAGIC) return undefined
-      offset += 4
-      const descriptor = buffer.readUInt8(offset)
-      offset += 1
-      if ((descriptor & 24) !== 0) return undefined
-      const contentSizeFlag = descriptor >>> 6
-      const singleSegment = (descriptor & 32) !== 0
-      const dictionaryFlag = descriptor & 3
-      offset += (singleSegment ? 0 : 1) + (dictionaryFlag === 3 ? 4 : dictionaryFlag) + (contentSizeFlag === 0 ? (singleSegment ? 1 : 0) : 1 << contentSizeFlag)
-      for (;;) {
-        if (buffer.length - offset < 3) return undefined
-        const blockHeader = buffer.readUIntLE(offset, 3)
-        offset += 3
-        const blockType = (blockHeader >>> 1) & 3
-        if (blockType === 3) return undefined
-        offset += blockType === 1 ? 1 : blockHeader >>> 3
-        if (offset > buffer.length) return undefined
-        if ((blockHeader & 1) !== 0) break
-      }
-      if ((descriptor & 4) !== 0) offset += 4
-      if (offset > buffer.length) return undefined
-      frames.push({ start, end: offset })
-    }
-    return frames
-  }
-
-  /** Whether the decoded events already start at the first event of the log. */
-  get complete(): boolean {
-    return this.firstFrame <= 1
-  }
-
-  /** Seq of the first decoded event. */
-  get base(): number {
-    return this.decoded[0]?.seq ?? 0
-  }
-
-  /** The decoded newest events, contiguous through the end of the log. */
-  get events(): readonly SessionEvent[] {
-    return this.decoded
-  }
-
-  /**
-   * Decode at least `frames` more frames, extended back to a line boundary (the writer may split one record across
-   * appends), and return every decoded event.
-   */
-  before(frames: number): readonly SessionEvent[] {
-    let first = Math.max(1, this.firstFrame - frames)
-    while (first > 1 && !this.textOf(first - 1).endsWith('\n')) first -= 1
-    if (first === this.firstFrame) return this.decoded
-    // Frame `firstFrame - 1` ends a record (checked when `firstFrame` was chosen), so only the new frames are parsed.
-    const parts: string[] = []
-    for (let frame = first; frame < this.firstFrame; frame += 1) {
-      parts.push(this.textOf(frame))
-      this.texts.delete(frame)
-    }
-    const added = parts
-      .join('')
-      .split('\n')
-      .filter(line => line !== '')
-      .map(line => TailLog.eventOf(line))
-    const events = [...added, ...this.decoded]
-    for (let index = 1; index <= added.length && index < events.length; index += 1) {
-      if (events[index]?.seq !== (events[index - 1]?.seq ?? -2) + 1) throw new Error(`session "${this.header.id}" log tail has a seq gap`)
-    }
-    this.firstFrame = first
-    this.decoded = events
-    return events
-  }
-
-  /**
-   * Fold the cached projection checkpoint over the decoded tail through the registry's cold-read path. `undefined`
-   * when no checkpoint of this lifecycle exists or the tail does not reach back to its watermark.
-   */
-  restore(ctx: Context): ProjectionSnapshot | undefined {
-    const cache = ctx.get('sessionProjectionCache')
-    const registry = ctx.get('sessionProjections')
-    if (cache === undefined || registry === undefined) return undefined
-    // The public listing read proves this lifecycle owns the stored record before its rows seed a fold.
-    if (cache.cachedSnapshot(this.header) === undefined || !isProjectionCacheTable(cache)) return undefined
-    // SAFETY: the check above proved the cache keeps its rows behind requireTable(); its record is validated below.
-    const table = (cache as unknown as ProjectionCacheTable).requireTable()
-    const record = Schema.decodeUnknownResult(cacheRecordSchema)(table.get(this.header.id))
-    if (record._tag === 'Failure') return undefined
-    // SAFETY: rows came from the cache's own checkpoint table; restore validates each row's version and watermark.
-    const checkpoint = record.success.rows as ProjectionCheckpoint
-    const floor = registry.restoreFloor(checkpoint)
-    if (floor === undefined || floor < this.base) return undefined
-    const suffix = this.decoded.slice(floor - this.base)
-    try {
-      return registry.restore(checkpoint, suffix, SessionLogOffset(floor), this.header, SessionLogOffset(0)).snapshot
-    } catch {
-      return undefined
-    }
-  }
-
-  /** Plaintext of one frame; kept only until `before()` parses it, so decoded text is never held twice. */
-  private textOf(frame: number): string {
-    const cached = this.texts.get(frame)
-    if (cached !== undefined) return cached
-    const range = this.frames[frame]
-    if (range === undefined) throw new Error(`session "${this.header.id}" log has no frame ${String(frame)}`)
-    const text = zstdDecompressSync(this.bytes.subarray(range.start, range.end)).toString('utf8')
-    this.texts.set(frame, text)
-    return text
-  }
-
-  /** A stored row is its event, except `sourceEventSeqs`, which the writer compresses into `[start, end]` ranges. */
-  private static eventOf(line: string): SessionEvent {
-    // The row itself is returned, not the schema's output, which would move the declared keys first: the browser copy
-    // must match the full read byte for byte.
-    const record = Schema.decodeUnknownSync(rowSchema)(JSON.parse(line))
-    const sources = Schema.decodeUnknownSync(eventRowSchema)(record).sourceEventSeqs?.flatMap(entry =>
-      typeof entry === 'number' ? [entry] : Array.from({ length: entry[1] - entry[0] + 1 }, (_, index) => entry[0] + index),
-    )
-    // SAFETY: the JSONL backend wrote this row from a validated SessionEvent; only the seq ranges differ on disk.
-    return (sources === undefined ? record : { ...record, sourceEventSeqs: sources }) as unknown as SessionEvent
-  }
+    }),
 }

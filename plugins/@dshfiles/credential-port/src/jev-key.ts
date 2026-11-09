@@ -1,5 +1,5 @@
 /**
- * The one TypeSafe Jev key (plan `plans/ade-ux` §4.6, "Jev key once"). Settings › Tools & MCP › Jev stores a single
+ * The one TypeSafe Jev key (plan `docs/ade-ux` §4.6, "Jev key once"). Settings › Tools & MCP › Jev stores a single
  * `secret:ALIAS` reference in settings-shell's namespace; backlog and memory used to keep one each. Every reader uses
  * the same rules, so the move loses nothing:
  *

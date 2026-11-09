@@ -53,7 +53,7 @@ const seedBacklogJevEnabled = async (page: Page, timeoutMs: number): Promise<voi
 }
 
 /**
- * Open a former left-nav page through the thread sidebar's fixed rail (plans/ade-ux Phase 3a): the destination tab,
+ * Open a former left-nav page through the thread sidebar's fixed rail (docs/ade-ux Phase 3a): the destination tab,
  * then its section in the list. Resolves false when the rail is absent (free docking, native sidebar), so the caller
  * keeps its older path.
  */

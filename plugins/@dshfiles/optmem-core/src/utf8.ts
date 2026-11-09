@@ -56,7 +56,8 @@ export class Utf8 {
 
   /** Deterministic cut to `maxBytes` including a trailing ellipsis. */
   static clip(text: string, maxBytes: number): string {
-    if (Utf8.byteLength(text) <= maxBytes) return text
+    // `head` stops at the budget, so this decides "fits" without byte-counting the whole text.
+    if (maxBytes >= 0 && Utf8.head(text, maxBytes).length === text.length) return text
     return Utf8.head(text, maxBytes - Utf8.byteLength(Utf8.ellipsis)) + Utf8.ellipsis
   }
 

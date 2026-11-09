@@ -19,11 +19,21 @@ type CatalogModel = CatalogGroup['models'][number]
 type FastModeRoute = { readonly sessionId: string; readonly provider: string; readonly model: string }
 
 /**
- * Mounted with every row so its answer is already there when a pointer arrives; the row reveals the switch on hover
- * and keeps it visible while Fast mode is on.
+ * Reads its route once the row is pointed at or focused, and keeps the answer while the row stays mounted: a big
+ * catalog would otherwise ask the Host about every model on open, though only a few routes support Fast mode.
  */
-const FastModeToggle = ({ input, modelName, busy }: { readonly input: FastModeRoute; readonly modelName: string; readonly busy: boolean }) => {
-  const state = useApiQuery(aiAccountsFastModeApi, 'status', { input })
+const FastModeToggle = ({
+  input,
+  modelName,
+  busy,
+  revealed,
+}: {
+  readonly input: FastModeRoute
+  readonly modelName: string
+  readonly busy: boolean
+  readonly revealed: boolean
+}) => {
+  const state = useApiQuery(aiAccountsFastModeApi, 'status', { enabled: revealed, input })
   const api = useApi(aiAccountsFastModeApi)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -151,6 +161,7 @@ export const ModelRow = (props: {
   readonly onInspect: () => void
   readonly onEffort: (selection: ModelSelection) => void
 }) => {
+  const [revealed, setRevealed] = useState(false)
   const efforts = props.model.reasoning?.efforts ?? []
   const selectedEffort = props.active ? (props.current?.reasoningEffort ?? props.model.reasoning?.defaultEffort) : props.model.reasoning?.defaultEffort
   const effortIndex = Math.max(
@@ -168,6 +179,8 @@ export const ModelRow = (props: {
         props.active && 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/60',
       )}
       data-model-picker-row
+      onFocus={() => setRevealed(true)}
+      onPointerEnter={() => setRevealed(true)}
     >
       <button
         aria-label={`Use ${name}${props.providerLabel === undefined ? '' : ` via ${props.providerLabel}`} (${props.group.name})`}
@@ -223,7 +236,12 @@ export const ModelRow = (props: {
         onClick={event => event.stopPropagation()}
         onPointerDown={event => event.stopPropagation()}
       >
-        <FastModeToggle busy={props.busy} input={{ sessionId: props.sessionId, model: props.model.id, provider: props.group.id }} modelName={name} />
+        <FastModeToggle
+          busy={props.busy}
+          input={{ sessionId: props.sessionId, model: props.model.id, provider: props.group.id }}
+          modelName={name}
+          revealed={revealed}
+        />
       </span>
       <button
         aria-label={`Details for ${name}`}

@@ -84,6 +84,36 @@ describe('Host API events', () => {
     expect(await next()).toBeUndefined()
   })
 
+  it('drops events instead of buffering without bound for a browser that stops reading', async () => {
+    const fixture = hostFixture()
+    const bigApi = defineApi({
+      id: 'big',
+      version: 1,
+      owner: '@acme/big',
+      methods: {},
+      events: { changed: event({ schema: Schema.Struct({ text: Schema.String }), description: 'A large payload.' }) },
+    })
+    await registerApi(fixture.context as never, '@acme/big', bigApi.host({}))
+    await vi.waitFor(() => expect(fixture.routes.has(ApiChannelModel.eventsPath)).toBe(true))
+    const controller = new AbortController()
+    const response = await fixture.routes.get(ApiChannelModel.eventsPath)!.fetch(new Request('http://localhost/api/dshx-events', { signal: controller.signal }))
+    const reader = response.body!.getReader()
+    // The catalog frame is read; from here the browser stops reading while events keep arriving.
+    await reader.read()
+    const text = 'x'.repeat(100_000)
+    for (let index = 0; index < 40; index += 1) await HostApiEventsModel.publish(fixture.context as never, bigApi, 'changed', { text })
+    let received = 0
+    for (;;) {
+      const next = await Promise.race([reader.read(), new Promise<'idle'>(resolve => setTimeout(() => resolve('idle'), 250))])
+      if (next === 'idle' || next.done === true) break
+      received += next.value.byteLength
+      if (received > 4_000_000) break
+    }
+    controller.abort()
+    // 40 x 100 KB would be 4 MB buffered; the byte budget keeps roughly one window instead.
+    expect(received).toBeLessThan(2_500_000)
+  })
+
   it('rejects a payload its schema refuses, and an event the contract does not declare', async () => {
     const fixture = hostFixture()
     await registerApi(fixture.context as never, '@acme/jobs', jobsApi.host({ board: () => ({ rows: 0 }) }))

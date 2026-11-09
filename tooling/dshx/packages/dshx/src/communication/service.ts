@@ -47,6 +47,7 @@ import {
   type CommunicationSubscription,
   type CommunicationTopic,
 } from './types.js'
+import { isOwnerOnly } from '../bridge/local-endpoint.js'
 
 const MESSAGE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 const MAX_MESSAGES = 5_000
@@ -951,7 +952,7 @@ export class CommunicationService {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return undefined
       throw new CommunicationError('state-unreadable', 'Communication state directory is invalid or unreadable; it was left untouched.')
     })
-    if (directoryInfo !== undefined && (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink() || (directoryInfo.mode & 0o077) !== 0)) {
+    if (directoryInfo !== undefined && (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink() || !isOwnerOnly(directoryInfo))) {
       throw new CommunicationError('state-directory-permissions', 'Communication state directory must be a private directory with no group or other access.')
     }
     if (directoryInfo !== undefined && typeof process.getuid === 'function' && directoryInfo.uid !== process.getuid()) {
@@ -962,7 +963,7 @@ export class CommunicationService {
       throw new CommunicationError('state-unreadable', 'Communication state is invalid or unreadable; it was left untouched.')
     })
     if (fileInfo === undefined) return initialState()
-    if (!fileInfo.isFile() || fileInfo.isSymbolicLink() || (fileInfo.mode & 0o077) !== 0) {
+    if (!fileInfo.isFile() || fileInfo.isSymbolicLink() || !isOwnerOnly(fileInfo)) {
       throw new CommunicationError('state-permissions', 'Communication state must be a private regular file.')
     }
     if (typeof process.getuid === 'function' && fileInfo.uid !== process.getuid()) {
@@ -1005,7 +1006,7 @@ export class CommunicationService {
       const stateDirectory = dirname(this.#statePath)
       await mkdir(stateDirectory, { recursive: true, mode: 0o700 })
       const directoryInfo = await lstat(stateDirectory)
-      if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink() || (directoryInfo.mode & 0o077) !== 0) {
+      if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink() || !isOwnerOnly(directoryInfo)) {
         throw new CommunicationError('state-directory-permissions', 'Communication state directory must be a private directory with no group or other access.')
       }
       if (typeof process.getuid === 'function' && directoryInfo.uid !== process.getuid()) {

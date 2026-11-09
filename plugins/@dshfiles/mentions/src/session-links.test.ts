@@ -45,4 +45,14 @@ describe('SessionLinks', () => {
     expect(SessionLinks.labelAt({ text, offset: 2, labels })).toBeUndefined()
     expect(SessionLinks.labelAt({ text: 'Referenced session · Docs', offset: 0, labels })).toBe('Docs')
   })
+
+  it('lists every canonical mention a written text still names', () => {
+    const first = mention('Fix deploy', 'session-a')
+    const second = mention('Docs', 'session-b')
+    const text = `see ${first}, then @[Docs](https://example.com/docs) and ${second}.`
+    const matches = SessionLinks.matches(text)
+    expect(matches.map(match => match.mention)).toEqual([first, second])
+    expect(matches.map(match => match.label)).toEqual(['Fix deploy', 'Docs'])
+    expect(matches.map(match => match.start)).toEqual([text.indexOf(first), text.indexOf(second)])
+  })
 })

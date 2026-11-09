@@ -10,8 +10,8 @@ import { DockNotice } from './dock-notice.js'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 
 /**
- * Above an archived thread's composer: a "Restore to reply" notice, while the composer itself is blocked so the
- * thread reads as history until it is restored. Same dock card as the settled notice beside it.
+ * Above an archived thread's composer: an "Archived" notice while the composer itself is blocked, so the thread reads
+ * as history until it is restored. Same dock strip as the settled notice beside it.
  */
 export const ArchivedThreadDock = (props: {
   readonly sessionId: SessionSummary['id']
@@ -33,10 +33,12 @@ export const ArchivedThreadDock = (props: {
   return (
     <DockNotice
       label={t('threadSidebarArchivedBanner')}
-      icon={<ArchiveIcon className="dshx:size-4 dshx:shrink-0" aria-hidden />}
+      heading={t('threadSidebarArchived')}
+      icon={<ArchiveIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden />}
+      actionLabel={t('threadSidebarThreadActions')}
       actions={
-        <Button size="sm" variant="outline" disabled={restore.isPending} onClick={() => restore.mutate()}>
-          {t('threadSidebarRestoreToReply')}
+        <Button size="sm" variant="default" disabled={restore.isPending} onClick={() => restore.mutate()}>
+          {t('threadSidebarRestore')}
         </Button>
       }
     />

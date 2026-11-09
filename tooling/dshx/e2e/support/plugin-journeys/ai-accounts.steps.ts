@@ -188,7 +188,7 @@ Given('the isolated AI Accounts profile with the status strip is booted', async 
 
 Given('the isolated AI Accounts and thread account controller profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
-    // Quota lives in frame-layout's status strip (plans/ade-ux §4.1 R5); without the frame there is no usage strip.
+    // Quota lives in frame-layout's status strip (docs/ade-ux §4.1 R5); without the frame there is no usage strip.
     packageIds: ['@dshfiles/ai-accounts', '@dshfiles/session-controller', '@dshfiles/frame-layout'],
     profileLabel: 'ai-accounts-thread-account-controller',
     seedHome: seedAiAccountsWorkspace,

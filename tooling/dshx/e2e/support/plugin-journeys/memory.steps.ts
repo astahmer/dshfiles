@@ -88,7 +88,7 @@ Given(
 
 const openReference = async (page: Page, id: string, range?: string): Promise<void> => {
   const name = `Preview memory ${id}${range === undefined ? '' : ` #${range}`}`
-  const reference = page.getByRole('link', { name, exact: true }).last()
+  const reference = page.getByRole('button', { name, exact: true }).last()
   await expect(reference).toBeVisible()
   const preview = page.locator('[data-dshfiles-memory-preview]')
   await expect(async () => {

@@ -43,14 +43,14 @@ Observed HTTP API requests had no failures, pending-at-ready requests or request
 live Host CPU/event-loop attribution are not measured by this comparison; the deployment-after cells above remain
 unverified. The setup also freshly proves that Plugins stays selected after replacing the second thread preview.
 
-[Full redacted measurements](workbench-switch-performance-2026-10-26.json). Reproduce with the pinned raw-core and
+[Full redacted measurements](../plugins/@dshfiles/workbench/docs/evidence/workbench-switch-performance-2026-10-26.json). Reproduce with the pinned raw-core and
 system-Chromium overrides from `verify-dsh`, built artifacts, `DSHX_E2E_PREWARM=0`, and Playwright's
 `workbench-performance.feature.spec.js` target. Full run receipt:
 `.dsh-e2e-evidence/1793034685726-c9d93c3c-9cb3-430b-8010-50178a2a3899/manifest.json`.
 
 The final source was measured again at `4a1f4c76`: Native p50 **115.3 ms**, p95/max **123.5 ms**; Workbench p50
 **33.2 ms**, p95/max **36.8 ms**. Both modes retained the same 757/901 median DOM counts. All twelve interactions and
-observed HTTP API requests stayed below 250 ms. [Repeated redacted measurements](workbench-switch-performance-2026-10-26-final.json).
+observed HTTP API requests stayed below 250 ms. [Repeated redacted measurements](../plugins/@dshfiles/workbench/docs/evidence/workbench-switch-performance-2026-10-26-final.json).
 This confirms the controlled result, not a production or large-history after-deployment claim.
 
 ## Scratch switch audit (2026-11-04)
@@ -149,11 +149,11 @@ event names with async `stat`, plus a 10 s safety re-read ([bundle-watcher.ts](.
 Scratch benchmark, not the live Host (Node 22.23.3, 170 bundle files in temp directories, 20 s idle after a 1 s
 settle, two runs each):
 
-| Mode                     | Bundle reads | Sync main-thread `stat` | Process CPU |
-| ------------------------ | ------------ | ----------------------- | ----------- |
-| No watcher (baseline)    | 0            | 0 ms                    | 37–51 ms    |
-| Old: 500 ms `statSync`   | 6,800        | 53–56 ms                | 121–123 ms  |
-| New: `fs.watch` + 10 s   | 340 (async)  | 0 ms                    | 67–95 ms    |
+| Mode                   | Bundle reads | Sync main-thread `stat` | Process CPU |
+| ---------------------- | ------------ | ----------------------- | ----------- |
+| No watcher (baseline)  | 0            | 0 ms                    | 37–51 ms    |
+| Old: 500 ms `statSync` | 6,800        | 53–56 ms                | 121–123 ms  |
+| New: `fs.watch` + 10 s | 340 (async)  | 0 ms                    | 67–95 ms    |
 
 A live 20 s Host profile after deployment is still pending; the Host half changes, so it needs a user-approved restart.
 
@@ -512,14 +512,14 @@ The optimization now uses an existing session-source ownership claim instead of 
 
 The unavailable-status failure backoff and map-level usage-registry snapshot optimization are already on the candidate line; the rows below record only additional work from this workspace.
 
-| Follow-up                      | Change                                                                                                                                                                                                                                                                                                                       | Proof and remaining limit                                                                                                                                                                                                            |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| JJ repository inventory        | [`repository-views-cache.ts`](../plugins/@dshfiles/jj-integration/src/repository-views-cache.ts) serves last-good inventory immediately, coalesces background refreshes, and preserves explicit fresh scans for cleanup. One pre-change trace spent 10.1 s in 68 `jj log` calls.                                             | 10 focused cache/API tests pass. Live Host still runs the old bundle; no after number yet.                                                                                                                                           |
-| Worktree snapshot              | [`host.ts`](../plugins/@dshfiles/worktree-memory/src/host.ts) now decouples process inventory and stop from Session metadata; cached labels refresh in the background. The pre-change snapshot waited 8.073 s on metadata.                                                                                                   | 15 worktree-memory tests, typecheck/build/Host import passed. Live after-measurement is unavailable; one old cold SSH probe took 1.207 s, so this path can still exceed 300 ms; PID/startedAt identity validation remains unchanged. |
-| Remote runtime status          | [`runtime-status-snapshot-cache.ts`](../plugins/@dshfiles/multi-host/src/runtime-status-snapshot-cache.ts) adds last-good/pending responses and coalesced background refresh; its 45 s failure TTL matches the candidate policy instead of adding a longer cooldown. The query polls every 5 s only while refresh is active. | Snapshot/API tests pass. Explicit reconnect still performs network work synchronously; live requests are not remeasured.                                                                                                             |
-| Cold history tail              | [`tail-log.ts`](../plugins/@dshfiles/session-controller/src/tail-log.ts) adds bounded fallback reasons and stat/lookup/identity/read/scan/decode durations to the existing span; prior reads reached 6.33–7.33 s for a 1.24 MB/254-frame log.                                                                                | The tail persistence test asserts these fields and cached-open behavior. No algorithmic change yet: use live phase data to choose one safely.                                                                                        |
-| Partial usage-registry changes | [`store.ts`](../plugins/@dshfiles/usage/src/store.ts) updates only tool rows whose category or owner differs, complementing the candidate's whole-snapshot no-op guard and retaining the skill-row exclusion.                                                                                                                | Trigger-based regression test proves unchanged rows do not update and changed metadata still applies; live CPU savings are unmeasured.                                                                                               |
-| Trace pruning                  | [`store.ts`](../plugins/@dshfiles/traces/src/store.ts) skips the empty expired-trace transaction.                                                                                                                                                                                                                            | 15 trace-store tests pass; there is no evidence this guard materially changes CPU.                                                                                                                                                   |
+| Follow-up                      | Change                                                                                                                                                                                                                                                                                         | Proof and remaining limit                                                                                                                                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| JJ repository inventory        | [`repository-views.ts`](../plugins/@dshfiles/jj-integration/src/repository-views.ts) serves last-good inventory immediately, coalesces background refreshes, and preserves explicit fresh scans for cleanup. One pre-change trace spent 10.1 s in 68 `jj log` calls.                           | 10 focused cache/API tests pass. Live Host still runs the old bundle; no after number yet.                                                                                                                                           |
+| Worktree snapshot              | [`host.ts`](../plugins/@dshfiles/worktree-memory/src/host.ts) now decouples process inventory and stop from Session metadata; cached labels refresh in the background. The pre-change snapshot waited 8.073 s on metadata.                                                                     | 15 worktree-memory tests, typecheck/build/Host import passed. Live after-measurement is unavailable; one old cold SSH probe took 1.207 s, so this path can still exceed 300 ms; PID/startedAt identity validation remains unchanged. |
+| Remote runtime status          | [`runtime-status.ts`](../plugins/@dshfiles/multi-host/src/runtime-status.ts) adds last-good/pending responses and coalesced background refresh; its 45 s failure TTL matches the candidate policy instead of adding a longer cooldown. The query polls every 5 s only while refresh is active. | Snapshot/API tests pass. Explicit reconnect still performs network work synchronously; live requests are not remeasured.                                                                                                             |
+| Cold history tail              | [`tail-log.ts`](../plugins/@dshfiles/session-controller/src/tail-log.ts) adds bounded fallback reasons and stat/lookup/identity/read/scan/decode durations to the existing span; prior reads reached 6.33–7.33 s for a 1.24 MB/254-frame log.                                                  | The tail persistence test asserts these fields and cached-open behavior. No algorithmic change yet: use live phase data to choose one safely.                                                                                        |
+| Partial usage-registry changes | [`trace-repo.ts`](../plugins/@dshfiles/usage/src/store.ts) updates only tool rows whose category or owner differs, complementing the candidate's whole-snapshot no-op guard and retaining the skill-row exclusion.                                                                             | Trigger-based regression test proves unchanged rows do not update and changed metadata still applies; live CPU savings are unmeasured.                                                                                               |
+| Trace pruning                  | [`trace-repo.ts`](../plugins/@dshfiles/traces/src/trace-repo.ts) skips the empty expired-trace transaction.                                                                                                                                                                                    | 15 trace-store tests pass; there is no evidence this guard materially changes CPU.                                                                                                                                                   |
 
 Other workspace polling changes stop question/quota retries after errors and avoid remote status lookups when no started-here thread needs them. Focused checks pass, but none of these workspace changes are delivered to the live Host: the client HMR watcher is absent, and Host changes require the user to restart. Re-measure only after deployment, under normal machine load, with the same probes.
 
@@ -548,7 +548,7 @@ One hour of stored dshx spans on the live Host (`traces.db`, `dshx.api.caller = 
 | `jj-threads/threadAt` (658)              | 11.0/min, 51ms each, never unmounts                       | 5s poll of a status that only local mutations change                            | 2s queued / 60s idle, turn-end and mutations still invalidate ([thread-status-poll.ts](../plugins/@dshfiles/jj-integration/src/thread-status-poll.ts))                                 |
 | `jujutsu/registerRepository` (118)       | 2/min but 9 calls in one 100ms, 47 errors                 | one call per project path from the reference preview                            | one `registerRepositories` batch, bounded concurrency, per-path null rows ([repository-batch.ts](../plugins/@dshfiles/jujutsu/src/repository-batch.ts))                                |
 | `worktree-memory/snapshot` (108)         | 1.8/min, 8.8s each, **934s = 26% of Host handler time/h** | 30s badge poll ran the full process probe                                       | cheap `pressure` method for the dot, full snapshot every 180s for the detached pill ([panel.tsx](../plugins/@dshfiles/worktree-memory/src/panel.tsx))                                  |
-| `jujutsu-composer/context` (80)          | 64/80 failed, every 60s                                   | remote bookmarks decoded as JSON lines                                          | plain-line decoder plus regression test ([composer-context-host.test.ts](../plugins/@dshfiles/jujutsu/src/composer-context-host.test.ts))                                              |
+| `jujutsu-composer/context` (80)          | 64/80 failed, every 60s                                   | remote bookmarks decoded as JSON lines                                          | plain-line decoder plus regression test ([composer-context-core.test.ts](../plugins/@dshfiles/jujutsu/src/composer-context-core.test.ts))                                              |
 | every `useApiQuery` mount                | no cache; one cache per plugin bundle                     | completed reads were thrown away on unmount                                     | page-wide 30s completed-read cache, manual refetch/reconnect always fetches ([query-cache.ts](../tooling/dshx/packages/dshx/src/api/query-cache.ts))                                   |
 | plugin updates, multi-host polls         | 60s builds check, 15s thread list, 30s status             | fixed cadences for rarely changing facts                                        | 300s build check, 30s thread list, 60s status ([sidebar-shell.tsx](../plugins/@dshfiles/thread-sidebar/src/sidebar-shell.tsx))                                                         |
 
@@ -666,6 +666,94 @@ run: `prepareMs`, `spawnToFirstOutputMs`, `spawnToUrlMs`, `spawnToReadyMs`),
 workspace has no `bench/effect-tracer.mjs`, so that one file was copied there temporarily and removed after the run.
 Launch URLs are secrets and are not recorded here.
 
+## Plugin performance sweep validated on the live GUI (2026-11-08)
+
+Method: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) probes against the running
+Host, after it was restarted onto `jj:main` @ `836ef334` (the plugin sweep). Host `pid 44684`, started 12:58:21, 286
+plugins / 230 active, checkout `/Users/astahmer/dev/dshfiles`. Machine: 10 logical CPUs, load average 4.8–7.5, no build
+or e2e run of ours in flight. Probes: `host-lag.mjs`, `switch-probe.mjs` plus a by-title variant (the sidebar shows three
+rows and a cross-project click re-renders the list, so index-based clicking walks off the end), the `thread switch`
+interaction spans and per-plugin spans already stored by the traces plugin, and direct calls through the agent tools
+(`thread_list`, `find_threads`, `grep`, `list_thread_questions`).
+
+Host health, settled (60 s, 560 samples): p50 3 ms, p90 9 ms, p99 65 ms, max 150 ms, no stall. The first minute after the
+restart still had p99 97 ms / max 806 ms with two stalls; one coincides with `preview/devServers` running its `lsof`/`ps`
+port probes for 2.6–3.0 s, the other had no span of that length (unspanned native work during warm-up).
+
+### Recorded wins, re-measured
+
+| Interaction                                         | Sweep record                                 | Live now (same Host, 2026-11-08)                                                                                                      | Verdict                                                                                                                      |
+| --------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `thread-actions/list` (sidebar page, `thread_list`) | 5,751 → 1,151 ms model; 250 → 50 title folds | cold 14,312 ms; warm 3,532 ms at `limit 50`, 2,540 ms at `limit 5`                                                                    | folds reduced as claimed (the limit only costs ~22 ms per folded title), but a fixed ~2.5 s remains: the native Session list |
+| New thread                                          | not in the sweep                             | composer ready 633 ms, one 533 ms long task, 15 requests, none >250 ms                                                                | over budget; client render, not RPC                                                                                          |
+| Thread switch (sidebar click)                       | 5,751 → 1,151 ms of sidebar fold work        | n=7 interaction spans: p50 1,073 ms, range 801–3,235 ms; 1–2 long tasks of 497–1,352 ms each                                          | over budget; see attribution below                                                                                           |
+| Memory finder (`find_threads`)                      | 1,402–1,679 → 4–5 ms for the digest loop     | end-to-end 2,576 ms = native Session list 1,580 ms + titles 678 ms + project resolve 219 ms; the fixed loop is not measurable (≤5 ms) | loop win holds; the finder is still slow at the native list                                                                  |
+| Prompt stash keystroke                              | 1,058 → 1.57 ms at the 50 × 8,800-char cap   | live library holds 3 prompts: 33–42 ms wall per keystroke including driver overhead, 0 long tasks                                     | cap case not reachable live — unproven end-to-end                                                                            |
+| fff-search single-file `grep`                       | 1,515 → 0.88 ms (root-level file, one match) | root-level file: 2.4 ms (2 matches), 3.0 ms; 14.4 ms for a no-match file                                                              | holds — the whole-tree scan is gone                                                                                          |
+| session-undo guard read                             | 318 → 0.051 ms                               | `session undo history read` p50 0.063 ms, p90 0.18 ms, max 1.27 ms (n=295)                                                            | holds                                                                                                                        |
+| agent-questions `listTargets` (60 s reconcile)      | 422 → 0.014 ms                               | per-minute reconcile spans 0.06–0.56 ms; `list_thread_questions` reports `nativeSessionsScanned: 5` instead of the persisted corpus   | holds                                                                                                                        |
+
+### Attribution of interactions over 250 ms
+
+Read from the `thread switch` interaction traces (one per sidebar click) and the spans under them:
+
+- **A 0.5–1.4 s main-thread long task starts at click time**, before any request leaves the browser. It is client render
+  work on composer mount; the fan-out below only runs after it. This is the largest single term in a switch and it is
+  not Host time.
+- **Mount-time RPC fan-out queues behind the six HTTP/1.1 sockets.** Every one of these shows a client duration far above
+  its server duration: `ai-accounts-serving-account/snapshot` 504–752 ms client vs 6–7 ms server, `ai-accounts/read`
+  484 ms vs 242–260 ms (a 82–148 ms keychain read inside), `preview/devServers` 285 ms vs 7 ms (3.0 s when it runs the
+  port probes), `ai-accounts-model-fast-mode/status` 281 ms vs 6 ms, `ai-accounts/usage` 281 ms vs 7 ms,
+  `multi-host/sessionRuntime` 390 ms vs 173 ms, `annotations/list` 399 ms vs 5 ms, `session-undo/history` 399 ms vs 5 ms.
+- **Host-side costs that are over budget and have an owner:** `jujutsu-composer/context` 509–2,167 ms (a `jj workspace
+root` of 337 ms and a `jj log` of 554 ms inside), `jujutsu/referenceTitles` 605 ms (two `jj root` calls plus a `jj log`),
+  `secret-catalog-setup/referenceStatus` 727 ms (external `secret` CLI: `print` 358 ms + `get` 312 ms), `ai-accounts/read`
+  242–260 ms (keychain).
+- **Errors seen in the same traces:** `ai-accounts/quoteRoutes` fails with `LegacyHandlerFailed` (`dshx.defect: true`),
+  and `jj-threads/destination` aborts when the switch supersedes it. Filed separately; neither is a perf regression.
+- `session/page` still reaches 255–906 ms per switch, and 8.8 s once on a cold page load, without a matching server span —
+  same unresolved ownership as the note below.
+
+### What this does and does not prove
+
+Proven: the fold-reduction wins (thread titles, memory digest loop, fff single-file scope, session-undo guard,
+agent-questions targets) are live, and none of them is what a user waits for any more. Not proven: the two client-side
+wins at their benchmark scale — prompt stash has 3 prompts in this profile, so its cap case never runs, and the 0.5–1.4 s
+composer-mount long task is not attributed to a single owned plugin without a browser CPU profile.
+
+## Idle indexing and first-build disk writes (2026-11-08; scratch, not live GUI)
+
+A scratch Host with the full web composition (94 bundles) on a synthetic 2,800-Session corpus, DSH 0.2.1-rc.2,
+Node 22.23.3, 4 cores. Every number is taken after 110 s of settle, over a 120 s idle window, from `/proc/<host>/stat`,
+`/io` and `/status` (worker threads included). Probe: boot, seed `<home>/sessions`, settle, sample; the per-pass numbers
+come from `session-search/tests/idle-pass.bench.spec.ts` (`IDLE_BENCH=1`).
+
+| Measure (idle Host, 2,800 Sessions) | Before                | After            |
+| ----------------------------------- | --------------------- | ---------------- |
+| Host CPU                            | 6.53 % of a core      | 0.23 %           |
+| syscalls (read + write)             | 2,086 /s              | 19 /s            |
+| bytes read / written                | 489 / 489 KB per min  | 4 / 4 KB per min |
+| settled RSS                         | 541 MB                | 526 MB           |
+
+The owner was the session-search worker's ingest loop, which re-walked the whole corpus every 5 s even when nothing
+changed:
+
+| Cost                        | Before                                  | After                                            | Why                                                                                                     |
+| --------------------------- | --------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| one idle pass               | 354 ms CPU / 462 ms wall                | 33 ms / 30 ms                                    | the log walk used promise fs calls (294 ms of thread-pool round trips); the worker owns its thread, so sync calls; one cursor query per pass instead of two per Session |
+| idle poll                   | every 5 s                               | 5 s doubling to 60 s, back to 5 s on any wake    | every committed Session event already nudges the worker, so the poll only catches outside writers       |
+| first build                 | 10.6 s, 285 MB written for an 8.6 MB index | 4.2 s, 42 MB written for 8.3 MB              | Sessions commit in groups (64 or 250 ms, a savepoint each) instead of one FTS5 segment per transaction; read buffers sized to the file instead of a zero-filled 2 MiB window (13 % of build CPU); constant SQL prepared once |
+
+Boot, same scratch Host (`--cpu-prof` through `NODE_OPTIONS`, 2,800 Sessions): about 8.3 s of main-thread CPU before
+the Host settles, and no owned plugin reaches the top 30 self-time owners. Node internals and module compilation
+(`compileSourceTextModule` 1.3 s) lead, then cordis, Effect, zod, `dsh-app-boot` and the JSONL persistence reading
+every Session header (`readGenerationHeader`, zstd). That is core work, and the launcher already sets
+`NODE_COMPILE_CACHE` (`scripts/launcher-config.mjs`), so there is no plugin-side lever left at boot. The session-search
+worker's first build of the same corpus costs about 3.7 s of CPU on its own thread.
+
+Ruled out: marking a new index's backfills done changes nothing, because the worker's first backfill runs before any
+document exists and finishes at once (285.1 MB written either way).
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
@@ -677,3 +765,56 @@ Launch URLs are secrets and are not recorded here.
 - `session/page` reached 4.9–12.4 s in noisy browser switch probes without matching server spans. That is not isolated
   Host time, so leave ownership unresolved pending a clean capture rather than declaring a core gap.
 - Main-thread work on open is ~0.6 s spread over many small tasks; no single leaf above 80 ms.
+- The sidebar list's fixed ~2.5 s is the native Session list, not the plugin: `thread-actions/list` costs 2,540 ms at
+  `limit 5` and 3,532 ms at `limit 50`, so the fold count is no longer the lever (same owner as Host gap `b:17rs`).
+- The 0.5–1.4 s composer-mount long task behind thread switch and New thread is unowned: attribute it with a browser CPU
+  profile before changing a plugin, rather than guessing from the plugin list.
+
+## RAM sweep (2026-11-08)
+
+Measured on the live Host (pid changes per restart; `heapUsed` after a full GC via SIGUSR1 + CDP on 127.0.0.1:9229)
+and on scratch Hosts booted from a copy of the same home. A scratch read before ~100 s of settle scatters ±90 MB, so
+every number below is taken after 110 s.
+
+| Change                                             | Before                            | After                                                               | Where                                                                                                                                                  |
+| -------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| session-search index (un-merged FTS5 postings)     | 2,010 MB                          | 182 MB after a compaction, compacted hourly on bloat                | `optimize` + VACUUM in the worker; searches 15–47 ms → 1–2 ms. The index re-bloats as Sessions are archived, so the size between compactions is higher |
+| projection cache (derived per-Session checkpoints) | 325 MB / 202.8 MB heap            | 17 MB / ~15 MB heap                                                 | 14-day prune at startup and hourly                                                                                                                     |
+| WAL beside usage / traces / memory                 | 246 / 160 / 102 MB                | ≤ 32 MB each                                                        | `journal_size_limit` + `wal_autocheckpoint` in sqlite-store                                                                                            |
+| job history index                                  | 20,000 rows / 13.2 MB             | 1 day / 8.9 MB                                                      | settled jobs leave after 24 h                                                                                                                          |
+| quota history JSON                                 | 12.6 MB, 90 days                  | ~4 MB, 30 days                                                      | the panel's longest window                                                                                                                             |
+| raw usage requests                                 | unbounded, +7.3 MB/day            | 90 days hot, older rows cold                                        | `requests_archive`, reports read both                                                                                                                  |
+| traces spans / metric points                       | 100 k / 200 k                     | 30 k / 60 k                                                         | defaults lowered; the 72 h window was unreachable                                                                                                      |
+| per-client stream buffers                          | unbounded (650 k chunks retained) | 4,096 frames + 8 MB follower, 1 MB events, 4,096 chunks per attempt | control queue, `follow()`, dshx events, assistant attempt, hmr-gate backpressure                                                                       |
+| worker isolates                                    | Host's 4 GB limit                 | 512 MB search, 256 MB fff                                           | `resourceLimits`                                                                                                                                       |
+| browser query cache                                | 5 min                             | 1 min                                                               | +133 MB across 20 threads measured before                                                                                                              |
+| `~/.dsh`                                           | 11 GB                             | 4.3 GB                                                              | all of the above plus 874 MB dead index and 570 MB fff stores                                                                                          |
+
+What the measurement ruled out: Effect schemas are 3.6 % of the fixed heap (~22 MB) and 4.1 has no compile step to
+exploit; the session-log corpus is only 25 MB of the fixed heap; more transcript virtualisation is not a lever (the
+DOM is already windowed); hidden plugin panels are 300–700 nodes.
+
+Still open, with the measured size: lazy hydration for the storage domains whose core specs never declare per-record
+reads (67 MB; the `storage-domain` and `storage-json` forks shipped and the per-record ones already hydrate lazily),
+per-session client state LRU (100–110 MB per tab), lazy Host halves for panel rows (80 MB, needs a dshx primitive or the
+plugin-manager facade), and one shared Effect `HostContext` per activation (20–40 MB, est.).
+
+### Plugin SQLite opens, measured (2026-11-08)
+
+The 60.9 MB attributed to lazy plugin SQLite does not reproduce as opening the files. Opening one store in isolation,
+with the same `@dshfiles/sqlite-store` layer, its migrations and its repository construction, costs **0.5 MB of heap**
+and 1.4–1.6 MB of RSS per store on this corpus: usage 0.5, traces 0.5, alerts 0.5, backlog 0.9 (including its item
+hydration), and the 173 MB session-search index 0.1 MB of heap / 1.1 MB of RSS because `node:sqlite` keeps its pages
+in native memory. Scratch boots from a pristine copy of the same 3.6 GB home agree: traces off 597 MB, usage off
+587 MB, backlog off 590 MB against 586 MB all on — inside the ±15 MB boot-to-boot noise.
+
+`session-search` is the only one of the four whose activation moves the needle: 495 MB of heap with it disabled against
+586 MB all on. That is **not** its SQLite store: the Host bundle (`dist/index.js`) contains no `node:sqlite` import and
+no `DatabaseSync`, and only `dist/search-worker.js` opens `index.sqlite`. The 90 MB is what registering the
+`sessionQuery` engine enables downstream, so attribute that separately before treating it as a store cost.
+
+`usage` is the one target whose store opened at activation with nothing reading it, so its repo now builds the store on
+the first read (`SqliteStore.deferred`, `usage/src/store.ts`): activation dropped from 0.5 MB to 0.1 MB of heap, and the
+first read pays 0.6 MB. `traces` stays eager on purpose: `RetentionWorker` prunes at boot, a write that needs the
+store. `backlog` hydrates every item, alias and lease into its in-memory view at activation (`BacklogStore.layer`), and
+`session-search`'s Host half never opens its index at all.

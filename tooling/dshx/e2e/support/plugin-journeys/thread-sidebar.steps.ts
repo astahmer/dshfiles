@@ -1,13 +1,15 @@
-import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
-import { openGlobalPanel, reusableViewName, viewNamePattern } from '../plugin-view-names.js'
+import { expect, type Locator, type Page, type Request, type Response, type TestInfo } from '@playwright/test'
+import { openGlobalPanel, viewNamePattern } from '../plugin-view-names.js'
 import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
-import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join, sep } from 'node:path'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, reloadPastProviderSetup, settingsPage, settingsNavEntry } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
+import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 import { materializeNonblankThread } from '../thread-composer.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
@@ -467,7 +469,7 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     await expect(targetRow).toHaveCount(1)
     const banner = page.getByRole('status', { name: 'This thread is settled.' })
     await expect(banner).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Unsettle to reply', exact: true })).toBeVisible()
+    await expect(banner.getByRole('button', { name: 'Unsettle', exact: true })).toBeVisible()
   })
   await recordAssertion(page, 'thread-sidebar-settled-stays-out-of-finished-turns', async () => {
     // A settled thread is storage, like an archived one: a view that lists finished turns never lists it.
@@ -479,8 +481,8 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
   })
   await recordAssertion(page, 'thread-sidebar-settled-banner-carries-actions', async () => {
     const banner = page.getByRole('status', { name: 'This thread is settled.' })
-    // The label already says settled, so a freshly settled thread shows no redundant "Settled now" age; no archive
-    // delay is set here, so the banner carries no date at all.
+    // The banner is already titled "Settled", so a freshly settled thread shows no redundant "Settled now" age; no
+    // archive delay is set here, so the banner carries no date at all.
     await expect(banner).not.toContainText('Settled now')
     await expect(banner.getByRole('button', { name: 'Archive', exact: true })).toBeVisible()
     // The banner reads like the jj rebase notice: capped and centred, never the dock's full width.
@@ -490,7 +492,7 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     expect(Number.isFinite(maxWidth)).toBe(true)
     expect(bounds.width).toBeLessThanOrEqual(maxWidth + 1)
   })
-  await page.getByRole('button', { name: 'Unsettle to reply', exact: true }).click()
+  await page.getByRole('status', { name: 'This thread is settled.' }).getByRole('button', { name: 'Unsettle', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-unsettle-restores-the-composer', async () => {
     await expect(page.getByRole('status', { name: 'This thread is settled.' })).toHaveCount(0, { timeout: 15_000 })
     // A settled Composer refuses input; a fill that lands and an enabled Send button prove it is live.
@@ -573,6 +575,106 @@ Then('the continuation opens in that project with the conversation and the origi
   await finishJourneyAssertions(page)
 })
 
+interface PromotedThreadJourney {
+  readonly threadId: string
+  readonly projectTitle: string
+  readonly projectPath: string
+}
+
+const promotedThreadJourneys = new WeakMap<Page, PromotedThreadJourney>()
+
+/** The thread-actions API as the browser's own Host serves it, for the project a promoted thread now belongs to. */
+const promotedProjectOf = async (page: Page, threadId: string): Promise<PromotedThreadJourney> => {
+  const call = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/thread-sidebar', apiId: 'thread-actions', version: 1 })
+  const listed = Schema.decodeUnknownSync(
+    Schema.Struct({ threads: Schema.Array(Schema.Struct({ sessionId: Schema.String, projectId: Schema.optional(Schema.String) })) }),
+  )(await call('list', {}))
+  const projectId = listed.threads.find(thread => thread.sessionId === threadId)?.projectId
+  if (projectId === undefined) throw new Error('The promoted thread has no project.')
+  const projects = Schema.decodeUnknownSync(
+    Schema.Struct({ projects: Schema.Array(Schema.Struct({ projectId: Schema.String, title: Schema.String, path: Schema.String })) }),
+  )(await call('projectList', {}))
+  const project = projects.projects.find(candidate => candidate.projectId === projectId)
+  if (project === undefined) throw new Error('The promoted thread names a project the project list does not hold.')
+  return { threadId, projectTitle: project.title, projectPath: project.path }
+}
+
+When('a No folder thread is started and turned into a project from its row menu', async ({ page }: { page: Page }) => {
+  await page
+    .getByRole('button', { name: /^New (session|thread)$/ })
+    .first()
+    .click()
+  const composer = page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands/ })
+  await expect(composer).toBeVisible()
+  const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
+  // The composer's picker and the jj-integration replacement mount a moment apart; a click during the hand-off can open
+  // a picker without No folder. Close and reopen until the replacement is the one answering.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+    const noFolder = picker.getByRole('option', { name: /^No folder/ }).first()
+    if (!(await noFolder.isVisible({ timeout: 2_000 }).catch(() => false))) {
+      await page.keyboard.press('Escape')
+      throw new Error('The New-thread picker has no No folder entry yet.')
+    }
+    await noFolder.click()
+  }).toPass({ timeout: 45_000 })
+  await expect(picker).toBeHidden()
+  // Choosing a project swaps the composer a moment after the chip changes; a draft filled too early is dropped, and the
+  // send stays disabled. A draft that survives the swap is in the composer the send will use.
+  await expect(async () => {
+    await composer.fill('thread sidebar promotion e2e target')
+    await page.waitForTimeout(750)
+    await expect(composer).toContainText('thread sidebar promotion e2e target', { timeout: 1_000 })
+  }).toPass({ timeout: 20_000 })
+  await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+  await expect.poll(() => currentThreadId(page)).not.toBeNull()
+  const threadId = currentThreadId(page)
+  if (threadId === null) throw new Error('The No folder thread did not materialize.')
+  const row = threadRow(page, threadId)
+  await expect(row).toBeVisible()
+  // The turn that materialized the thread can still be settling, which remounts the row and closes its menu; reopen
+  // until the promotion verb the row now carries is on screen.
+  const turnIntoProject = page.getByRole('menuitem', { name: 'Turn into project', exact: true })
+  await expect(async () => {
+    if (!(await turnIntoProject.isVisible())) await openThreadRowMenu(row)
+    await expect(turnIntoProject).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
+  await recordAssertion(page, 'no-folder-row-offers-turn-into-project', () => expect(turnIntoProject).toBeVisible())
+  await turnIntoProject.click()
+  await recordAssertion(page, 'promotion-confirms-in-a-notice', () =>
+    expect(
+      threadSidebar(page)
+        .getByText(/Turned into project/u)
+        .first(),
+    ).toBeVisible(),
+  )
+  promotedThreadJourneys.set(page, await promotedProjectOf(page, threadId))
+})
+
+Then('the thread sits under its own project and its scratch folder exists', async ({ page }: { page: Page }) => {
+  const journey = promotedThreadJourneys.get(page)
+  if (journey === undefined) throw new Error('No promoted thread journey was recorded.')
+  await recordAssertion(page, 'promoted-thread-keeps-its-scratch-folder', async () => {
+    expect(journey.projectPath).toContain(`${sep}no-folder${sep}`)
+    expect(existsSync(journey.projectPath)).toBe(true)
+  })
+  await recordAssertion(page, 'promoted-thread-groups-under-its-own-project', async () => {
+    const groupButton = threadSidebar(page)
+      .getByRole('button', { name: /^Group: /u })
+      .first()
+    await expect(groupButton).toBeVisible()
+    await groupButton.click()
+    await page.getByRole('menuitemradio', { name: 'Project', exact: true }).click()
+    const group = threadSidebar(page).getByRole('region', { name: journey.projectTitle, exact: true })
+    await expect(group.locator(`article[data-thread-id="${journey.threadId}"]`)).toHaveCount(1)
+    await expect(
+      threadSidebar(page).getByRole('region', { name: 'No folder', exact: true }).locator(`article[data-thread-id="${journey.threadId}"]`),
+    ).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('an archived thread and a settled thread fill the bottom sections', async ({ page }: { page: Page }) => {
   await showThreadsByStatus(page)
   // Both threads are created while a workspace is still selected: the picker resets once the only
@@ -643,6 +745,112 @@ Then('separate remote grouping is opt-in, reorderable and persists across reload
     await separateRemoteThreads.uncheck()
     await threadSidebar(page).getByRole('button', { name: 'Thread list settings', exact: true }).click()
     await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
+  })
+  await finishJourneyAssertions(page)
+})
+
+const REMOTE_ROW_RUNTIME_ID = '10000000-0000-4000-8000-0000000d5e11'
+const REMOTE_ROW_SESSION_ID = 'session-remote-row-e2e'
+
+/** The row this scenario's peer runtime started, drawn in the sidebar's status list. */
+const remoteRow = (page: Page): Locator => threadSidebar(page).locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)
+
+/**
+ * A host and a thread multi-host already recorded, written as its own files: no short UI path mirrors a peer runtime
+ * into this profile, and the row only needs the inventory the sidebar reads. The runtime stays unreachable, so the
+ * row comes from the started-here list with its host name.
+ */
+const seedRemoteThread = async (page: Page): Promise<void> => {
+  const createdAt = new Date().toISOString()
+  const directory = {
+    schemaVersion: 2,
+    hosts: [{ schemaVersion: 2, id: 'peer', name: 'Peer machine', connector: { kind: 'local' }, hidden: false, position: 0, createdAt }],
+    runtimes: [
+      {
+        schemaVersion: 2,
+        id: REMOTE_ROW_RUNTIME_ID,
+        hostId: 'peer',
+        name: 'Peer machine',
+        locator: { kind: 'local', launchUrl: 'http://127.0.0.1:1/?token=dshx-e2e-remote-row' },
+        identity: null,
+        originPort: 43_401,
+        createdAt,
+      },
+    ],
+    retiredPorts: [],
+  }
+  const threads = {
+    schemaVersion: 1,
+    threads: [{ runtimeId: REMOTE_ROW_RUNTIME_ID, sessionId: REMOTE_ROW_SESSION_ID, cwd: '/peer/dev/sample', title: 'Peer parser fix', createdAt }],
+  }
+  const dataDirectory = join(profileFor(page).homeRoot, 'plugins', 'multi-host')
+  await mkdir(dataDirectory, { recursive: true, mode: 0o700 })
+  await writeFile(join(dataDirectory, 'directory.json'), `${JSON.stringify(directory, null, 2)}\n`, { mode: 0o600 })
+  await writeFile(join(dataDirectory, 'threads.json'), `${JSON.stringify(threads, null, 2)}\n`, { mode: 0o600 })
+}
+
+When('a peer runtime thread is seeded into the status list', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
+  await seedRemoteThread(page)
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await expect(remoteRow(page)).toHaveCount(1, { timeout: 30_000 })
+  await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
+})
+
+/** Sections open folded once they hold a row, so a row assertion opens the section it landed in first. */
+const expandSection = async (page: Page, section: string): Promise<void> => {
+  const header = sectionOfSidebar(page, section).locator('[data-thread-section-header]')
+  if ((await header.getAttribute('aria-expanded')) === 'false') await header.click()
+  await expect(header).toHaveAttribute('aria-expanded', 'true')
+}
+
+/**
+ * The host tooltip a hovered remote row shows sits over the menu its right-click just opened, so a pointer click on an
+ * item never becomes actionable; the keyboard walks the same items.
+ */
+const pressRemoteRowMenuItem = async (page: Page, item: string): Promise<void> => {
+  const menu = page.getByRole('menu', { name: 'Thread actions', exact: true })
+  await expect(menu).toBeVisible()
+  const labels = await menu.getByRole('menuitem').evaluateAll(items => items.map(element => element.textContent?.trim() ?? ''))
+  const index = labels.indexOf(item)
+  if (index < 0) throw new Error(`The remote row menu has no ${item}: ${labels.join(', ')}`)
+  for (let step = 0; step <= index; step += 1) await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+}
+
+Then("the remote row offers the sidebar's own verbs and no Host verb", async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-remote-row-menu-omits-host-verbs', async () => {
+    await openThreadRowMenu(remoteRow(page))
+    const menu = page.getByRole('menu', { name: 'Thread actions', exact: true })
+    await expect(menu).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Settle', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Park', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Copy thread ID', exact: true })).toBeVisible()
+    // Archive, pin and rename run on the runtime that owns the Session, so a mirrored row never offers them.
+    await expect(menu.getByRole('menuitem', { name: 'Archive', exact: true })).toHaveCount(0)
+    await expect(menu.getByRole('menuitem', { name: /Pin/u })).toHaveCount(0)
+    await expect(menu.getByRole('menuitem', { name: 'Rename thread', exact: true })).toHaveCount(0)
+    await pressRemoteRowMenuItem(page, 'Settle')
+    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
+    await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(0)
+    await expandSection(page, 'settled')
+    await expect(sectionOfSidebar(page, 'settled').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
+  })
+})
+
+Then('dragging the remote row onto the Active header keeps it there across a reload', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-remote-row-drags-into-a-section', async () => {
+    await expandSection(page, 'settled')
+    await dragRowToSectionHeader(page, remoteRow(page), sectionOfSidebar(page, 'active').locator('[data-thread-section-header]'))
+    await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toHaveCount(0)
+  })
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await recordAssertion(page, 'thread-sidebar-remote-row-drag-survives-reload', async () => {
+    await expect(sectionOfSidebar(page, 'active').locator(`article[data-remote-thread-id="${REMOTE_ROW_RUNTIME_ID}:${REMOTE_ROW_SESSION_ID}"]`)).toHaveCount(1)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -2225,13 +2433,31 @@ const sidebarExpandControl = (page: Page) => page.getByRole('button', { name: /^
 
 const jjInventoryRequests = new WeakMap<Page, { count: number }>()
 
+/** The inventory read as the transport names it: batched entries carry its per-channel route, a retry its own path. */
+const JJ_INVENTORY_ENDPOINT = `${ApiChannelModel.apiChannel('@dshfiles/jj-integration', 'jj-threads').slice(1)}/repositories`
+const JJ_INVENTORY_PATH = `/api/${JJ_INVENTORY_ENDPOINT}`
+const batchReadsSchema = Schema.Struct({
+  entries: Schema.Array(Schema.Struct({ endpoint: Schema.String })),
+})
+
+/** Reads share the one `/api/dshx-batch` route, one NDJSON line per entry, so the endpoint is in the body, not the URL. */
+const batchedInventoryReads = (request: Request): number => {
+  if (!request.url().endsWith('/api/dshx-batch')) return 0
+  const body = request.postData()
+  if (body === null) return 0
+  const batch = Schema.decodeUnknownOption(Schema.fromJsonString(batchReadsSchema))(body)
+  if (Option.isNone(batch)) return 0
+  return batch.value.entries.filter(entry => entry.endpoint === JJ_INVENTORY_ENDPOINT).length
+}
+
 /** Counts the JJ inventory reads the page makes, so a journey can prove a hidden surface bought none. */
 const countJjInventoryRequests = (page: Page): { count: number } => {
   const existing = jjInventoryRequests.get(page)
   if (existing !== undefined) return existing
   const entry = { count: 0 }
   page.on('request', request => {
-    if (/\/api\/dshx-[0-9a-f]+\/repositories$/.test(new URL(request.url()).pathname)) entry.count += 1
+    entry.count += batchedInventoryReads(request)
+    if (new URL(request.url()).pathname === JJ_INVENTORY_PATH) entry.count += 1
   })
   jjInventoryRequests.set(page, entry)
   return entry
@@ -2307,6 +2533,39 @@ Then('the blocked session is listed only in the Usage limit group when grouped b
     await expect(group.locator(`[data-thread-id="${sessionId}"]`)).toBeVisible()
     // A usage-limit row is a bare button, a list row an article: count the main action both carry.
     await expect(threadSidebar(page).locator(`[data-thread-main-action][data-thread-id="${sessionId}"]`)).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the blocked row keeps its Resume verb clear of the hover actions', async ({ page }: { page: Page }) => {
+  await ThreadSidebarJourney.groupByStatus(page)
+  await expect.poll(() => currentThreadId(page), { timeout: 30_000 }).not.toBeNull()
+  const sessionId = currentThreadId(page)
+  if (sessionId === null) throw new Error('The blocked thread is not selected.')
+  const row = threadRow(page, sessionId)
+  const verb = row.getByTestId('thread-row-verb')
+  const actions = row.getByTestId('thread-row-actions')
+  await recordAssertion(page, 'thread-sidebar-row-verb-clear-of-hover-actions', async () => {
+    // The recovery state arrives after the failed turn settles, so the row can still read Idle when the seed returns.
+    await expect(verb).toHaveText('Resume', { timeout: 45_000 })
+    const rowBounds = await row.boundingBox()
+    if (rowBounds === null) throw new Error('The blocked thread row has no layout box.')
+    await page.mouse.move(rowBounds.x + 8, rowBounds.y + rowBounds.height / 2)
+    await expect.poll(() => actions.evaluate(element => getComputedStyle(element).pointerEvents)).toBe('auto')
+    await expect.poll(() => actions.evaluate(element => getComputedStyle(element).opacity)).toBe('1')
+    const geometry = await row.evaluate(element => {
+      const verbBox = element.querySelector('[data-testid="thread-row-verb"]')?.getBoundingClientRect()
+      const actionsBox = element.querySelector('[data-testid="thread-row-actions"]')?.getBoundingClientRect()
+      if (verbBox === undefined || actionsBox === undefined) return null
+      const hit = document.elementFromPoint(verbBox.left + verbBox.width / 2, verbBox.top + verbBox.height / 2)
+      return {
+        overlaps: verbBox.left < actionsBox.right && actionsBox.left < verbBox.right && verbBox.top < actionsBox.bottom && actionsBox.top < verbBox.bottom,
+        hitIsVerb: hit !== null && hit.closest('[data-testid="thread-row-verb"]') !== null,
+      }
+    })
+    expect(geometry).not.toBeNull()
+    expect(geometry?.overlaps).toBe(false)
+    expect(geometry?.hitIsVerb).toBe(true)
   })
   await finishJourneyAssertions(page)
 })
@@ -2481,7 +2740,10 @@ When('a thread delegates a long command to a subagent', async ({ page }: { page:
   const root = await createScratchDirectory('dshx-thread-sidebar-subagent-')
   const workspace = join(root, 'subagent-preview-project')
   await mkdir(workspace)
-  await page.getByRole('button', { name: /^New (thread|session)$/ }).first().click()
+  await page
+    .getByRole('button', { name: /^New (thread|session)$/ })
+    .first()
+    .click()
   await registerWorkspaceFolder(page, workspace, openNewThreadAddWorkspace)
   await startThreadWithModel(page, { project: 'subagent-preview-project', model: 'commandcode_work/gpt-6-luna' })
   const composer = page.getByRole('textbox', { name: /(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions/ })
@@ -2513,7 +2775,10 @@ Then('stopping the subagent from the dock takes a confirmation', async ({ page }
 
 Then("the transcript row opens the subagent's thread", async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-subagent-preview-owner-link', async () => {
-    await page.getByText(/^Completed in /).first().click()
+    await page
+      .getByText(/^Completed in /)
+      .first()
+      .click()
     await page.getByText('Coordinated subagents', { exact: true }).first().click()
     const row = page.locator('[data-dshfiles-live-preview="agent"]').first()
     await expect(row).toHaveAttribute('data-state', /^(interrupted|idle)$/, { timeout: 30_000 })

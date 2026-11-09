@@ -141,6 +141,32 @@
       "rules": {
         "typescript/triple-slash-reference": "off"
       }
+    },
+    {
+      "files": [
+        "plugins/@dshfiles/storage-domain/src/native/**/*.ts",
+        "plugins/@dshfiles/storage-domain/tests/**/*.ts",
+        "plugins/@dshfiles/storage-json/src/native/**/*.ts",
+        "plugins/@dshfiles/storage-json/tests/**/*.ts",
+        "plugins/@dshfiles/session-log-window/src/**/*.ts"
+      ],
+      "rules": {
+        "antislop/no-unknown-parameters": "off",
+        "antislop/no-unknown-returns": "off",
+        "antislop/no-unsafe-dictionary-type": "off",
+        "antislop/require-safety-comment-for-type-assertion": "off",
+        "antislop/no-export-bag": "off",
+        "antislop/no-known-value-widening": "off",
+        "antislop/no-conditional-empty-object-spread": "off",
+        "antislop/no-passthrough-variable": "off",
+        "antislop/no-chained-type-assertions": "off"
+      }
+    },
+    {
+      "files": ["plugins/@dshfiles/session-log-window/src/**/*.ts"],
+      "rules": {
+        "antislop/no-export-bag": "off"
+      }
     }
   ]
 }

@@ -34,6 +34,8 @@ import {
 import { ResourceValidation } from './validation.js'
 
 type Input<Method extends keyof typeof resourcePacksApi.methods> = ApiHostInput<(typeof resourcePacksApi.methods)[Method]>
+/** One decoded pack per id for the length of a single read, so a page of resources does not re-decode a shared pack per attachment. */
+type PackCache = Map<string, StoredPack>
 type ResourceCatalog = ApiHostOutput<typeof resourcePacksApi.methods.catalog>
 type Request<Method extends keyof typeof resourcePacksApi.methods> = { readonly input: Input<Method>; readonly caller: ApiCaller }
 export type ResourceStoreError = ResourceDomainError | ResourceStoreFailed
@@ -233,14 +235,18 @@ export class ResourceStore extends Context.Service<
         return pack
       })
 
-      const packOf = Effect.fnUntraced(function* (id: string) {
-        const row = yield* findPackJson(id)
+      const packOf = Effect.fnUntraced(function* (request: { readonly id: string; readonly cache: PackCache | null }) {
+        const cached = request.cache?.get(request.id)
+        if (cached !== undefined) return cached
+        const row = yield* findPackJson(request.id)
         if (Option.isNone(row)) return yield* new PackNotFound()
-        return yield* readPack(row.value.json)
+        const pack = yield* readPack(row.value.json)
+        request.cache?.set(request.id, pack)
+        return pack
       })
 
-      const attachmentRecord = Effect.fnUntraced(function* (attachment: typeof AttachmentRow.Type) {
-        const pack = yield* packOf(attachment.pack_id)
+      const attachmentRecord = Effect.fnUntraced(function* (attachment: typeof AttachmentRow.Type, cache: PackCache | null) {
+        const pack = yield* packOf({ id: attachment.pack_id, cache })
         const values = yield* ResourceValidation.readPersistedValues({ definition: pack.definition, json: attachment.values_json })
         const record: ResourceAttachment = {
           packId: attachment.pack_id,
@@ -250,8 +256,8 @@ export class ResourceStore extends Context.Service<
         return record
       })
 
-      const resourceOf = Effect.fnUntraced(function* (id: string) {
-        const found = yield* findResourceRow(id)
+      const resourceOf = Effect.fnUntraced(function* (request: { readonly id: string; readonly cache: PackCache | null }) {
+        const found = yield* findResourceRow(request.id)
         if (Option.isNone(found)) return yield* new ResourceNotFound()
         const row = found.value
         const resource: ResourceRecord = {
@@ -259,7 +265,7 @@ export class ResourceStore extends Context.Service<
           ref: { provider: row.provider, kind: row.kind, id: row.native_id },
           label: row.label,
           revision: row.revision,
-          attachments: yield* Effect.forEach(yield* attachmentRows(id), attachmentRecord),
+          attachments: yield* Effect.forEach(yield* attachmentRows(request.id), attachment => attachmentRecord(attachment, request.cache)),
           createdAt: row.created_at,
           updatedAt: row.updated_at,
         }
@@ -302,7 +308,7 @@ export class ResourceStore extends Context.Service<
             yield* savePack({ id: definition.id, json: yield* encodeStoredPack(pack) })
             // Added null fields must not inflate an existing attached or detached resource beyond its budget.
             if (previous !== undefined && previous.definition.properties.length !== definition.properties.length) {
-              yield* Effect.forEach(yield* attachedResourceIds(definition.id), attached => resourceOf(attached.id), { discard: true })
+              yield* Effect.forEach(yield* attachedResourceIds(definition.id), attached => resourceOf({ id: attached.id, cache: null }), { discard: true })
             }
             return pack
           }),
@@ -317,14 +323,14 @@ export class ResourceStore extends Context.Service<
       }) {
         return yield* sql.withTransaction(
           Effect.gen(function* () {
-            const resource = yield* resourceOf(change.input.resourceId)
+            const resource = yield* resourceOf({ id: change.input.resourceId, cache: null })
             if (resource.revision !== change.input.expectedRevision) return yield* new StaleResourceRevision()
-            const pack = yield* packOf(change.input.packId)
+            const pack = yield* packOf({ id: change.input.packId, cache: null })
             if (!(yield* change.update(resource, pack))) return resource
             const now = yield* Clock.currentTimeMillis
             const bumped = yield* bumpRevision({ id: resource.id, expectedRevision: change.input.expectedRevision, now })
             if (bumped.length !== 1) return yield* new StaleResourceRevision()
-            const updated = yield* resourceOf(resource.id)
+            const updated = yield* resourceOf({ id: resource.id, cache: null })
             yield* recordEvent({ resource: updated, caller: change.caller, action: change.action, packId: pack.definition.id })
             return updated
           }),
@@ -344,16 +350,17 @@ export class ResourceStore extends Context.Service<
           const filter = { query: input.query ?? null, kind: input.kind ?? null, packId: input.packId ?? null }
           return yield* sql.withTransaction(
             Effect.gen(function* () {
+              const cache: PackCache = new Map()
               const counted = yield* countResources(filter)
               const ids = yield* pageResourceIds({ ...filter, limit: input.limit ?? 200 })
-              return { total: counted.total, resources: yield* Effect.forEach(ids, row => resourceOf(row.id)) }
+              return { total: counted.total, resources: yield* Effect.forEach(ids, row => resourceOf({ id: row.id, cache })) }
             }),
           )
         }, storeFailure('list')),
         get: Effect.fn('resource-packs get')(function* (input: Input<'get'>) {
           return yield* sql.withTransaction(
             Effect.gen(function* () {
-              const resource = yield* resourceOf(input.resourceId)
+              const resource = yield* resourceOf({ id: input.resourceId, cache: new Map() })
               const events = yield* Effect.forEach(yield* recentEventJson(input.resourceId), row => decodeEvent(row.json))
               return { resource, events }
             }),
@@ -365,7 +372,7 @@ export class ResourceStore extends Context.Service<
           return yield* sql.withTransaction(
             Effect.gen(function* () {
               const existing = yield* findResourceIdByRef(ref)
-              if (Option.isSome(existing)) return yield* resourceOf(existing.value.id)
+              if (Option.isSome(existing)) return yield* resourceOf({ id: existing.value.id, cache: new Map() })
               const now = yield* Clock.currentTimeMillis
               const resource: ResourceRecord = {
                 id: randomUUID(),

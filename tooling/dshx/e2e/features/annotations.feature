@@ -12,10 +12,9 @@ Feature: Element annotations in the composer
     When the element picker starts and the composer is picked
     Then the comment form describes the picked element
     When the annotation note "the tab strip overlaps the sidebar" is added
+    Then the composer draft holds the annotation block
     Then the annotation is listed with the note "the tab strip overlaps the sidebar"
     And the annotation is linked to its source file
-    When the annotations are added to the draft
-    Then the composer draft holds the annotation block
 
   @scenario:annotations.backlog-reply
   Scenario: Annotate from a Backlog discussion and send it as a reply

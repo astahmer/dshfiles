@@ -17,7 +17,7 @@ const PANEL_ID = 'dshfiles-worktree-memory'
 const RAM_TAB = 'ram'
 
 /**
- * RAM is a tab of Observe › Processes (plans/ade-ux §6), owned by @dshfiles/background-jobs: this plugin adds the tab and
+ * RAM is a tab of Observe › Processes (docs/ade-ux §6), owned by @dshfiles/background-jobs: this plugin adds the tab and
  * its part of the thread panel's Jobs facet, and no navigation entry of its own. The former page stays a main panel so
  * saved tabs keep working: it redirects to the tab while background-jobs runs, and is the full page without it.
  */

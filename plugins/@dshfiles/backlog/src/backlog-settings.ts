@@ -11,7 +11,7 @@ export const backlogSettingsLayer = Settings.layer(backlogSettings)
 export const backlogSettingsTestLayer = (overrides: Partial<BacklogSettings> = {}) =>
   Settings.layerTest<BacklogSettings>(backlogSettings.namespace, { ...backlogSettings.schema({}), ...overrides })
 
-/** Settings-shell's namespace, which holds the one Jev key every Jev reader shares (plans/ade-ux §4.6). */
+/** Settings-shell's namespace, which holds the one Jev key every Jev reader shares (docs/ade-ux §4.6). */
 export const SharedJevSettingsTag = Settings.Tag<SettingsShellSettings>(settingsShellSettings.namespace)
 
 /** The live shared key; schema defaults (an empty key) until settings-shell's namespace loads. */

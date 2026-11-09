@@ -3,7 +3,13 @@
  * continuations are Promise calls, and the inbox act event is a Cordis serial handler.
  */
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
-import { attentionApi, type AttentionActOutcome, type AttentionActRequest, type AttentionDraft } from '@dshfiles/activity-timeline/attention-api'
+import {
+  attentionApi,
+  type AttentionActOutcome,
+  type AttentionActRequest,
+  type AttentionDraft,
+  type AttentionItem,
+} from '@dshfiles/activity-timeline/attention-api'
 import { DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Effect, Layer, Queue, Stream } from 'effect'
@@ -28,11 +34,11 @@ const routeOf = (summary: QuotaContinuationSummary): string =>
 const detailOf = (summary: QuotaContinuationSummary): string => {
   const reset =
     summary.resetAt === null
-      ? 'The account did not report when its quota resets.'
+      ? `The account did not report when its quota resets, so the thread retries on a growing backoff from 30 seconds up to every 10 minutes.`
       : summary.ready
         ? 'The quota window has reset.'
         : `The quota resets at ${new Date(summary.resetAt).toISOString()}.`
-  const retry = summary.autoRetry && summary.resetAt !== null ? ' It resumes by itself then.' : ''
+  const retry = summary.autoRetry ? ' It resumes by itself then.' : ''
   return `${reset}${retry} Resume continues the stopped turn now; open the thread to switch it to another account or model first.`
 }
 
@@ -50,6 +56,10 @@ const draftOf = (summary: QuotaContinuationSummary): AttentionDraft => ({
 const openDrafts = (continuations: readonly QuotaContinuationSummary[]): readonly AttentionDraft[] =>
   continuations.filter(continuation => continuation.state === 'waiting').map(draftOf)
 
+/** Inbox items the user already set aside, whose continuation must therefore leave the waiting set. */
+const doneContinuationKeys = (items: readonly AttentionItem[]): readonly string[] =>
+  items.filter(item => item.source === QUOTA_CONTINUATION_SOURCE && item.doneAt !== null && item.resolvedAt === null).map(item => item.dedupeKey)
+
 const refused = (message: string): AttentionActOutcome => ({ ok: false, message })
 
 /** The live continuation service, which the imperative accounts Host starts after this layer is built. */
@@ -61,8 +71,25 @@ const make = (read: ServiceRead) =>
     const apis = yield* HostApis
     const inbox = apis.client(attentionApi)
     const pokes = yield* Queue.sliding<void>(1)
+    let repairedDone = false
+
+    /**
+     * Done in the inbox is durable, so one boot retires continuations an earlier build left waiting under a done item:
+     * otherwise their thread keeps a Needs you row with a Resume the user already set aside.
+     */
+    const repairDoneContinuations = Effect.fn('ai-accounts attention repair done')(function* () {
+      const service = read(host.ctx)
+      if (service === undefined || !(yield* apis.isServed(attentionApi))) return
+      const closed = yield* inbox.list({ view: 'closed', limit: 200 })
+      const keys = doneContinuationKeys(closed.items)
+      for (const key of keys) yield* Effect.promise(() => service.dismiss(key))
+      repairedDone = true
+      yield* Effect.annotateCurrentSpan({ 'quota.done_repaired': keys.length })
+    })
 
     const reconcile = Effect.fn('ai-accounts attention reconcile')(function* () {
+      if (!repairedDone)
+        yield* repairDoneContinuations().pipe(Effect.catchCause(cause => Effect.logWarning('ai-accounts: done quota items were not repaired', cause)))
       const service = read(host.ctx)
       if (service === undefined || !(yield* apis.isServed(attentionApi))) return
       const listed = yield* Effect.promise(() => service.list())
@@ -82,6 +109,26 @@ const make = (read: ServiceRead) =>
         ? { ok: true, message: 'Resumed: the stopped turn is queued on its thread.' }
         : refused('This thread cannot resume from here: it has newer work, was dismissed, or its Session is unavailable. Open the thread to continue it.')
     })
+
+    /**
+     * Done in the inbox says the user does not want this recovery (plan §4.8, both ways): the continuation is
+     * dismissed too, so the thread stops showing a Resume the usage-limit row would otherwise keep offering.
+     */
+    const dismissOnDone = Effect.fn('ai-accounts attention done')(function* (item: AttentionItem) {
+      if (item.source !== QUOTA_CONTINUATION_SOURCE) return
+      const service = read(host.ctx)
+      if (service === undefined) return
+      const outcome = yield* Effect.promise(() => service.dismiss(item.dedupeKey))
+      yield* Effect.annotateCurrentSpan({ 'quota.dismissed': outcome.dismissed })
+      if (outcome.dismissed) yield* Queue.offer(pokes, undefined)
+    })
+    yield* HostEvents.stream('dshfiles/attention/done').pipe(
+      Stream.runForEach(([payload]) =>
+        dismissOnDone(payload.item).pipe(Effect.catchCause(cause => Effect.logWarning('ai-accounts: inbox done not applied', cause))),
+      ),
+      DshxPlugin.detached,
+      Effect.forkScoped,
+    )
 
     const services = yield* Effect.context<never>()
     const runAct = Effect.runPromiseWith(services)

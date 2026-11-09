@@ -76,7 +76,7 @@
       "surfaces": ["client", "host"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: queued messages › edit",
+      "currentSurface": "composer: queued messages \u203a edit",
       "configuration": [],
       "states": ["viewing", "loading", "editing", "submitting", "restoring", "failed"],
       "failureModes": [
@@ -92,6 +92,12 @@
           "kind": "gherkin",
           "id": "queue-reorder.busy-locks",
           "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-image-reference",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "Edit rebuilds the reference chips a queued message carried, without changing its text"
         },
         {
           "kind": "unit-test",
@@ -152,6 +158,12 @@
           "id": "queue-reorder.composer-message-editing-unit-decode",
           "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
           "testName": "decodeQueuedRows tolerates malformed rows and marks unknown blocks as not editable"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.composer-message-editing-unit-restore-references",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-edit.test.ts",
+          "testName": "Edit rebuilds the reference chips a queued message carried, without changing its text"
         }
       ],
       "telemetry": [
@@ -168,7 +180,7 @@
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: queued messages › preview",
+      "currentSurface": "composer: queued messages \u203a preview",
       "configuration": [
         {
           "key": "previewLength",
@@ -233,7 +245,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: queued messages › Move to thread",
+      "currentSurface": "composer: queued messages \u203a Move to thread",
       "configuration": [],
       "states": ["idle", "picking", "loading", "removing", "delivering", "restoring", "settled"],
       "failureModes": [
@@ -314,7 +326,7 @@
       "surfaces": ["client", "settings"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: queued messages › attachment previews",
+      "currentSurface": "composer: queued messages \u203a attachment previews",
       "configuration": [
         {
           "key": "attachmentPreviews",

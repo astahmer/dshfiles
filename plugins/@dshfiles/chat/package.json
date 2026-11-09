@@ -46,6 +46,14 @@
     "./inline-reference-markdown": {
       "types": "./src/inline-reference-markdown.tsx",
       "default": "./dist/inline-reference-markdown.js"
+    },
+    "./code-fences": {
+      "types": "./src/code-fences.tsx",
+      "default": "./dist/code-fences.js"
+    },
+    "./fenced-markdown": {
+      "types": "./src/fenced-markdown.tsx",
+      "default": "./dist/fenced-markdown.js"
     }
   },
   "scripts": {
@@ -55,7 +63,9 @@
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@dshfiles/shared-runtime": "workspace:*"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
@@ -150,7 +160,8 @@
       ],
       "external": [
         "@deepseek-ai/dsh-client-store",
-        "@tanstack/react-virtual"
+        "@tanstack/react-virtual",
+        "@dshfiles/shared-runtime"
       ],
       "immediately": false
     }

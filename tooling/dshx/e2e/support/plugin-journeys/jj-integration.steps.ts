@@ -8,7 +8,7 @@ import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry, settingsPage } from '../steps.js'
-import { selectModelForNewThread } from '../threads.js'
+import { confirmFolderSetupStep, createScratchDirectory, selectModelForNewThread } from '../threads.js'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
@@ -28,6 +28,7 @@ interface HeldDestinationLookup {
 }
 
 const repositories = new WeakMap<Page, ThreadRepository>()
+const plainFolders = new WeakMap<Page, string>()
 const divergentCheckouts = new WeakMap<Page, { readonly checkoutCommitId: string; readonly featureCommitId: string }>()
 const existingSharedThreads = new WeakMap<Page, string>()
 const configuredBaseThreads = new WeakMap<Page, { readonly name: string; readonly commitId: string }>()
@@ -299,6 +300,7 @@ const chooseProjectPath = async (page: Page, path: string): Promise<void> => {
   await search.press('Enter')
   await expect(picker.locator('p').filter({ hasText: path }).first()).toBeVisible()
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await confirmFolderSetupStep(page, path)
   await expect(picker).toBeHidden()
 }
 
@@ -566,6 +568,7 @@ When('a disposable jj repository is chosen by its home-relative path', async ({ 
   await search.press('Enter')
   await expect(picker.locator('p').filter({ hasText: homeRelativeRepositoryPath }).first()).toBeVisible()
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await confirmFolderSetupStep(page, homeRelativeRepositoryPath)
   await expect(picker).toBeHidden()
   await expect(projectButton(page)).toHaveText('repo')
 })
@@ -1054,6 +1057,65 @@ Then('the blank new thread returns to the owning project checkout', async ({ pag
   await finishJourneyAssertions(page)
 })
 
+When('a disposable jj repository with an asset icon is chosen as the New thread project', async ({ page }: { page: Page }) => {
+  const repository = await createRepository(page)
+  await mkdir(join(repository.repositoryPath, 'assets'), { recursive: true })
+  await writeFile(
+    join(repository.repositoryPath, 'assets', 'icon.svg'),
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="#3b82f6"/></svg>',
+  )
+  await chooseProjectPath(page, repository.repositoryPath)
+  await expect(projectButton(page)).toHaveText('repo')
+})
+
+Then('the project row shows the icon the repository ships', async ({ page }: { page: Page }) => {
+  // Project rows only exist while the thread list groups by project.
+  await page.getByRole('button', { name: /^Group: /u }).click()
+  await page
+    .getByRole('menuitemradio', { name: /^Project$/u })
+    .or(page.getByRole('option', { name: /^Project$/u }))
+    .first()
+    .click()
+  await recordAssertion(page, 'jj-integration-project-icon-comes-from-the-repository', async () => {
+    await expect(page.locator('[data-project-icon-source="assets/icon.svg"]')).toBeVisible({ timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a plain folder is chosen as the New thread project', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-jj-not-a-repository-')
+  const folder = join(root, 'plain-project')
+  await mkdir(folder, { recursive: true })
+  await writeFile(join(folder, 'README.md'), 'plain folder\n')
+  plainFolders.set(page, folder)
+  await chooseProjectPath(page, folder)
+  await expect(projectButton(page)).toHaveText('plain-project')
+})
+
+Then('the destination bar offers Initialize repository instead of a workspace toggle', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-not-a-repository-offers-initialize', async () => {
+    const destination = page.getByLabel('New thread destination', { exact: true })
+    await expect(destination.getByText('Not a Jujutsu repository', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(destination.getByRole('button', { name: 'Initialize repository', exact: true })).toBeVisible()
+  })
+})
+
+When('Initialize repository is clicked in the destination bar', async ({ page }: { page: Page }) => {
+  await page.getByLabel('New thread destination', { exact: true }).getByRole('button', { name: 'Initialize repository', exact: true }).click()
+})
+
+Then('the opened project becomes a Jujutsu repository', async ({ page }: { page: Page }) => {
+  const folder = plainFolders.get(page)
+  if (folder === undefined) throw new Error('The plain-folder fixture was not created for this scenario.')
+  await recordAssertion(page, 'jj-integration-enable-jujutsu-initializes-in-place', async () => {
+    await expect.poll(() => existsSync(join(folder, '.jj')), { timeout: 60_000 }).toBe(true)
+    const destination = page.getByLabel('New thread destination', { exact: true })
+    await expect(destination.getByText('Not a Jujutsu repository', { exact: true })).toHaveCount(0, { timeout: 30_000 })
+    await expect(workspaceToggle(page)).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the destination bar offers the main bookmark in the shared checkout', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   await recordAssertion(page, 'jj-integration-destination-names-the-local-host', () =>
@@ -1200,6 +1262,10 @@ Then('the end of the turn offers one revision to integrate into main', async ({ 
     await expect(offer).toBeVisible({ timeout: 20_000 })
     await expect(offer).toContainText('1 revision(s) ready to land on main.')
     await expect(offer.getByRole('button', { name: 'Land on main', exact: true })).toBeEnabled()
+    // The offer names the exact revisions the button moves, so landing is never blind.
+    await offer.getByRole('button', { name: 'Show the revisions that will land' }).click()
+    await expect(offer.getByRole('list', { name: 'Revisions landing on main' })).toContainText('One click work')
+    await expect(offer.getByRole('button', { name: 'Hide the revisions that will land' })).toHaveAttribute('aria-expanded', 'true')
   })
   // One click away means inside the reading flow: above the composer, not hidden in the header.
   const offerBounds = await offer.boundingBox()

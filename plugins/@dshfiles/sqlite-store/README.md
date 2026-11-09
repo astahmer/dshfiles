@@ -48,6 +48,25 @@ Errors are `Schema.TaggedError`s that keep the underlying `cause`: `SqliteStoreO
 `prepare-files | open | pragmas | restrict-files`), `SqliteMigrationFailed` (`kind`: the `MigrationError` kind or
 `Sql`/`BadState`), `SqliteStoreVersionUnsupported` (`source`: `user-version | migrations`).
 
+### Opening on the first use
+
+`layer` and `layerAs` open when the layer is built, so a plugin that provides one at activation pays for the
+connection, the pragmas and the migration check before anything reads the file (measured at 0.5 MB of Host heap per
+store). When a plugin's first read or write genuinely comes later, wrap its own service layer in
+`SqliteStore.deferred(Service, layer)`: it builds that layer on the first call to the service, inside the plugin's
+scope, and retries a failed build on the next call instead of caching the failure.
+
+The service must expose methods only: a property read cannot start the build, and a non-method property dies with a
+message naming it. `usage` wires its repo that way, so an unopened usage panel costs the Host no store heap:
+
+```ts
+static readonly layerAt = (filename: string) =>
+  SqliteStore.deferred(
+    UsageRepo,
+    Layer.effect(UsageRepo, open(filename)).pipe(Layer.provide(Reactivity.layer), Layer.provide(platform)),
+  )
+```
+
 ### Statement spans
 
 `effect/sql` opens a client span for every statement from the calling fiber's tracer, and the client has no option to

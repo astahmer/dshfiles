@@ -3,7 +3,6 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session-query'
 import { MessageId, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
@@ -12,7 +11,8 @@ import { Effect, Schema } from 'effect'
 import { definePromptSection, generate, pluginStorage } from '@dshfiles/dshx/host'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionRequestId } from './native/types.ts'
-import { recentTranscript } from './session-transcript.ts'
+import { recentTranscript, recentTranscriptFromTail } from './session-transcript.ts'
+import { TailLog } from './tail-log.ts'
 import { sessionsApi } from './sessions-api.ts'
 import {
   AgentPresetsUnavailable,
@@ -190,13 +190,30 @@ const standardSchemaOf = (jsonSchema: Record<string, Schema.Schema.Type<typeof S
   }
 }
 
-const eventsOf = async (runtime: typeof SessionControllerHostRuntime.Service, id: SessionId): Promise<readonly SessionEvent[]> => {
+const tailOf = async (runtime: typeof SessionControllerHostRuntime.Service, id: SessionId, signal: AbortSignal): Promise<TailLog | undefined> => {
+  try {
+    return await TailLog.open({ ctx: runtime.ctx, sessionId: id, signal })
+  } catch (error: unknown) {
+    if (signal.aborted) throw error
+    runtime.ctx.logger.warn(`session-controller: tail read of "${id}" fell back to the full read: ${String(error)}`)
+    return undefined
+  }
+}
+
+/**
+ * The newest spoken entries of one Session: a live Session folds its resident events, and a cold log decodes only the
+ * frames the count needs. Anything the tail cannot serve exactly reads the whole log, as before.
+ */
+const transcriptOf = async (runtime: typeof SessionControllerHostRuntime.Service, id: SessionId, limit: number, signal: AbortSignal) => {
   const live = runtime.ctx.agents.get(id)
-  if (live !== undefined) return live.session.snapshotEvents()
+  if (live !== undefined) return recentTranscript({ events: live.session.snapshotEvents(), limit })
+  const tail = await tailOf(runtime, id, signal)
+  const fromTail = tail === undefined ? undefined : recentTranscriptFromTail({ tail, limit })
+  if (fromTail !== undefined) return fromTail
   const query = runtime.sessionQuery
   if (query === undefined) throw notFound()
   try {
-    return (await query.readSession(id)).events
+    return recentTranscript({ events: (await query.readSession(id)).events, limit })
   } catch (error) {
     if (isSessionQueryNotFound(error)) throw notFound()
     throw error
@@ -240,11 +257,11 @@ export const sessionsHost = sessionControllerHostApi(sessionsApi, {
       }),
     ),
   ),
-  messages: Effect.fn('sessions messages read')(({ input }) =>
+  messages: Effect.fn('sessions messages read')(({ input, signal }) =>
     SessionControllerHostRuntime.use(runtime =>
       trySessionControllerOperation('sessions API operation', async () => {
         const id = allowed(runtime, input.sessionId)
-        const transcript = recentTranscript({ events: await eventsOf(runtime, id), limit: input.limit })
+        const transcript = await transcriptOf(runtime, id, input.limit, signal)
         const agent = runtime.ctx.agents.get(id)
         return { sessionId: id, running: agent !== undefined && isBusy(agent), ...transcript }
       }),

@@ -4,7 +4,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 
 /**
- * AI accounts in the status strip (plan `plans/ade-ux` §4.1 R5, §6 "Quota in the status strip; sidebar footer cards
+ * AI accounts in the status strip (plan `docs/ade-ux` §4.1 R5, §6 "Quota in the status strip; sidebar footer cards
  * removed"). The item is the same usage strip the sidebar footer used to seat, squeezed to the strip's one line on
  * desktop and left to wrap inside the phone chip list. frame-layout owns the strip; this file is the whole provider.
  */

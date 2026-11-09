@@ -1,24 +1,26 @@
 #!/usr/bin/env node
 // Print every xstate v5 machine a module exports as Mermaid.
 //
-//   pnpm --dir plugins/@dshfiles/whiteboard run machine-diagram -- plugins/@dshfiles/editor/src/editor-save-machine.ts
-//   pnpm --dir plugins/@dshfiles/whiteboard run machine-diagram -- <module.ts> --format state --export saveMachine
+//   pnpm --dir plugins/@dshfiles/whiteboard run machine-diagram plugins/@dshfiles/editor/src/editor-save-machine.ts
+//   pnpm --dir plugins/@dshfiles/whiteboard run machine-diagram --format state plugins/@dshfiles/whiteboard/src/board-sync-machine.ts
 //
-// `--format flowchart` (default) is what whiteboard_write({ mermaid }) turns into editable Excalidraw shapes;
-// `--format state` is a stateDiagram-v2 for Markdown. Paths resolve against the directory pnpm was started from.
-// Vite's module runner loads the TypeScript source, so the machine's own imports resolve as in its plugin.
+// Options come before the path: everything after `--` is positional, so `-- <path> --format state` would silently keep
+// the flowchart format. `--format flowchart` (default) is what whiteboard_write({ mermaid }) turns into editable
+// Excalidraw shapes; `--format state` is a stateDiagram-v2 for Markdown. Paths resolve against the directory pnpm was
+// started from. Vite's module runner loads the TypeScript source, so the machine's own imports resolve as in its plugin.
 import { isAbsolute, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { runnerImport } from 'vite'
 
+const usage = 'Usage: machine-diagram [--format flowchart|state] [--export <name>] <module.ts>'
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: { format: { type: 'string', default: 'flowchart' }, export: { type: 'string' } },
 })
 const [target] = positionals
-if (target === undefined || (values.format !== 'flowchart' && values.format !== 'state')) {
-  console.error('Usage: machine-diagram <module.ts> [--format flowchart|state] [--export <name>]')
+if (target === undefined || positionals.length > 1 || (values.format !== 'flowchart' && values.format !== 'state')) {
+  console.error(`${usage}\nPass options before the path: a flag after \`--\` is read as another path, not an option.`)
   process.exit(2)
 }
 const base = process.env.INIT_CWD ?? process.cwd()

@@ -30,8 +30,24 @@
       "types": "./src/picker/index.ts",
       "default": "./dist/picker.js"
     },
+    "./repository-setup-contract": {
+      "types": "./src/repository-setup-contract.ts",
+      "default": "./dist/repository-setup-contract.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./project-config": {
+      "types": "./src/project-config.ts",
+      "default": "./dist/project-config.js"
+    },
+    "./project-icon-view": {
+      "types": "./src/project-icon-view.tsx",
+      "default": "./dist/project-icon-view.js"
+    },
+    "./project-folder-setup": {
+      "types": "./src/project-folder-setup.tsx",
+      "default": "./dist/project-folder-setup.js"
+    }
   },
   "scripts": {
     "check": "dshx check && pnpm lint && pnpm fmt:check",
@@ -47,6 +63,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
@@ -108,7 +125,9 @@
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-api-workspace-controller"
       ],
-      "external": [],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ],
       "immediately": false
     }
   },

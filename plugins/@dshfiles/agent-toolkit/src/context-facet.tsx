@@ -1,5 +1,5 @@
 /**
- * The thread panel's **Context** facet (plan `plans/ade-ux` §4.4): what is loaded into this thread's model context and
+ * The thread panel's **Context** facet (plan `docs/ade-ux` §4.4): what is loaded into this thread's model context and
  * roughly what it costs. Read-only; every number comes from the owner's existing Host API (DSH's instruction loader
  * through agent-toolkit, skills and tools from the dshx registry, MCP servers, memory's start block, references, the
  * thread's agent). An owner that is not loaded leaves its section out instead of failing the facet.

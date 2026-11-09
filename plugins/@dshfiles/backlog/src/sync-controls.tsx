@@ -369,12 +369,7 @@ const createThrough = (actions: ReturnType<typeof useSyncActions>, input: { read
   )
 
 /** A create that failed where it was clicked: the reason, how to fix the key, and a retry, instead of a toast. */
-const CreateFailure = (props: {
-  readonly providerKind: string
-  readonly text: string
-  readonly retry: () => void
-  readonly pending: boolean
-}): JSX.Element => {
+const CreateFailure = (props: { readonly providerKind: string; readonly text: string; readonly retry: () => void; readonly pending: boolean }): JSX.Element => {
   const hint = signInHintOf(props.providerKind)
   const [copied, setCopied] = useState(false)
   return (
@@ -479,12 +474,7 @@ const SyncChips = (props: { readonly itemId: number; readonly itemLabel: string;
                   </Button>
                 </div>
                 {createFailure?.bindingId === view.binding.id ? (
-                  <CreateFailure
-                    providerKind={view.providerKind}
-                    text={createFailure.text}
-                    pending={actions.linkRemote.isPending}
-                    retry={() => create(view)}
-                  />
+                  <CreateFailure providerKind={view.providerKind} text={createFailure.text} pending={actions.linkRemote.isPending} retry={() => create(view)} />
                 ) : null}
               </div>
             ))}

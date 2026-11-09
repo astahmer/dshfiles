@@ -68,7 +68,6 @@ export default defineConfig({
         'tailwind-merge',
         'xstate',
         'zod',
-        'zod/mini',
       ],
     },
   },

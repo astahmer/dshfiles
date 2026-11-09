@@ -158,6 +158,12 @@
           "id": "rich-composer.image-attachment-references",
           "file": "plugins/@dshfiles/rich-composer/src/native/image-attachment-references.test.ts",
           "testName": "inserts ordered inline labels tied to each image attachment"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.queued-image-reference-restore",
+          "file": "plugins/@dshfiles/rich-composer/src/image-attachment-reference-restore.test.ts",
+          "testName": "renders it as the same attachment reference a normal composer message shows"
         }
       ],
       "telemetry": [
@@ -401,7 +407,7 @@
     {
       "id": "composer-run-row",
       "title": "Run row and meter line",
-      "summary": "A new thread shows one run row above its input: project · host · workspace · agent mode · file access · model and account. Each segment is the owner plugin’s own control placed through the composer’s slots, with its jargon explained in a tooltip; defaults come from each owner: host, agent mode and model from their last choice, the workspace from the project’s isolate-by-default setting. Once the thread has started the row collapses to one summary chip that leads the meter line under the input (context % · cost and activity readings · N queued); model and file access stay changeable in the toolbar. At phone width the row is one sideways-scrolling line.",
+      "summary": "A new thread shows one run row above its input: project \u00b7 host \u00b7 workspace \u00b7 agent mode \u00b7 file access \u00b7 model and account. Each segment is the owner plugin\u2019s own control placed through the composer\u2019s slots, with its jargon explained in a tooltip; defaults come from each owner: host, agent mode and model from their last choice, the workspace from the project\u2019s isolate-by-default setting. Once the thread has started the row collapses to one summary chip that leads the meter line under the input (context % \u00b7 cost and activity readings \u00b7 N queued); model and file access stay changeable in the toolbar. At phone width the row is one sideways-scrolling line.",
       "reach": [
         "click button \"New session\"",
         "expect group \"Run settings\"",
@@ -442,7 +448,44 @@
       "telemetry": [
         {
           "kind": "not-applicable",
-          "reason": "Client-only: the run row places other owners’ controls and starts no Host work of its own."
+          "reason": "Client-only: the run row places other owners\u2019 controls and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "draft-reference-restore",
+      "title": "Restore draft reference chips from plain text",
+      "summary": "A queued message comes back into the composer as plain text; every trigger source's own restore grammar turns the serialized references it still names back into the chips the composer sent, without changing the draft text.",
+      "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: restored draft references",
+      "configuration": [],
+      "states": ["composer-ready", "draft-restored", "references-restored"],
+      "failureModes": [
+        "No source declares a restore grammar for the text, so the draft stays plain text.",
+        "A span no longer matches its clipboard projection, so only that reference stays text.",
+        "A source throws while restoring, so the other sources still restore their references.",
+        "The draft already holds chips, so nothing is restored over it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.draft-reference-restore",
+          "file": "plugins/@dshfiles/rich-composer/src/native/input/editor/restore-draft-references.test.ts",
+          "testName": "rebuilds a reference span as a chip without changing the clipboard text"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "rich-composer.draft-reference-restore-browser",
+          "reason": "Restoring chips only runs for a message already queued; a browser walk would need a busy thread whose turn then ends. The editor re-import is covered by its unit test and the queue edit path by queue-reorder."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-side draft composition: restoring chips re-imports the existing draft text in the composer editor, with no new Host work."
         }
       ]
     }

@@ -5,6 +5,7 @@
  * service, and silently leaves content search on the read path that freezes the Host.
  */
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
+import { pruneProjectionCache } from './projection-cache-prune.js'
 import { Api, DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer, Option, Schema, Stream } from 'effect'
@@ -19,6 +20,8 @@ const rowConfig = Schema.UndefinedOr(
   Schema.Struct({
     indexPath: Schema.optionalKey(Schema.String.check(Schema.isMinLength(1))),
     windowBytes: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
+    // Each prepared cold Session holds its whole decoded log, so this is the profile's memory knob for search.
+    preparedSessionCacheSize: Schema.optionalKey(Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))),
   }),
 )
 
@@ -45,7 +48,7 @@ const IDLE_HEALTH: IndexHealth = {
 }
 
 const layer = (config: typeof rowConfig.Type) =>
-  SessionQueryOwnership.layer.pipe(
+  SessionQueryOwnership.layer(config?.preparedSessionCacheSize === undefined ? {} : { preparedSessionCacheSize: config.preparedSessionCacheSize }).pipe(
     Layer.provideMerge(
       SearchWorker.layer({
         indexPath: config?.indexPath ?? dshHomePath('plugins', 'session-search', 'index.sqlite'),
@@ -69,7 +72,28 @@ const main = Effect.gen(function* () {
       onNone: () => dshHomePath('sessions'),
       onSome: persistence => persistence.config.root,
     })
+    // Archived Sessions are cold: the index keeps no documents for them and reads one back only for a targeted search.
+    let lastArchived = ''
+    const sendArchived = () =>
+      Effect.gen(function* () {
+        const registry = host.ctx.get('workspaceRegistry')
+        const archived = (registry?.archivedSessionIds ?? []).map(String)
+        const signature = archived.join('\u0000')
+        if (signature === lastArchived) return
+        lastArchived = signature
+        yield* worker.setArchived(archived)
+      }).pipe(Effect.catchCause(cause => Effect.logWarning('session-search: archived Sessions could not be sent', cause)))
+    yield* sendArchived()
+    yield* Effect.forever(Effect.andThen(Effect.sleep('10 seconds'), sendArchived())).pipe(Effect.forkChild)
     yield* worker.startIngest(root).pipe(Effect.catchCause(cause => Effect.logWarning('session-search: ingest could not start', cause)))
+    // The projection cache is derived and the core domain loads all of it at boot, so a stale record costs heap for
+    // nothing; a Session opened again rebuilds its checkpoint from the log.
+    const pruneCheckpoints = Effect.sync(() => pruneProjectionCache({ now: Date.now() })).pipe(
+      Effect.tap(removed => (removed > 0 ? Effect.logInfo('session-search: dropped stale projection checkpoints', { removed }) : Effect.void)),
+      Effect.catchCause(cause => Effect.logWarning('session-search: projection checkpoints could not be pruned', cause)),
+    )
+    yield* pruneCheckpoints
+    yield* Effect.forever(Effect.andThen(Effect.sleep('1 hour'), pruneCheckpoints)).pipe(Effect.forkChild)
   }
   yield* HostEvents.stream('session/event').pipe(
     Stream.debounce(NUDGE_DEBOUNCE),

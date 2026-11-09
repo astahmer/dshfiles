@@ -5,6 +5,7 @@ import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { NoFolderWorkspace } from '@dshfiles/jj-integration/no-folder'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
@@ -17,9 +18,11 @@ import { threadDragMachine, type ThreadDragCommands } from './thread-drag-machin
 import { ThreadRouteModel } from './thread-route.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { threadSurfaceOf, type ThreadSidebarSurface } from './thread-surface.js'
+import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
+import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
-import { RemoteThreadItem, RemoteThreadsSection } from './remote-threads-section.js'
+import { RemoteThreadItem, RemoteThreadsSection, type RemoteThreadRowLabels } from './remote-threads-section.js'
 import { RemoteThreadInventoryModel, useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
@@ -27,6 +30,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
 import { useApi, useApiQuery, usePlugin, useRegistry } from '@dshfiles/dshx/client'
+import { useThreadSubscriptions } from './subscriptions-client.js'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ThreadRowActions, type ThreadRowActionTarget } from './thread-row-actions.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -55,6 +59,7 @@ import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuLabel,
@@ -159,6 +164,7 @@ import { restartRecoveryRefetchInterval } from './restart-recovery-poll.js'
 import { selectRecoveryRows } from './restart-recovery-rows.js'
 import type { RecoveryReason } from './restart-recovery.js'
 import { UsageLimitRowsModel, type QuotaContinuation, type UsageLimitRow } from './usage-limit-rows.js'
+import { ResumeAttentionModel } from './resume-attention.js'
 import { usageLimitRefetchInterval } from './usage-limit-poll.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
@@ -269,6 +275,8 @@ type InjectedActions = {
     sessionId: SessionSummary['id'],
     projectId: string,
   ) => Promise<{ readonly continuedSessionId: SessionSummary['id']; readonly settled: boolean }>
+  /** Register one scratch thread's folder as a project; resolves to the title it actually got. */
+  projectRegister: (input: { readonly path: string; readonly title: string }) => Promise<{ readonly title: string }>
 }
 
 /** The slot runtime's global selector hooks, the one part of the props a `main` panel mount supplies itself. */
@@ -493,12 +501,16 @@ interface RowActions {
   readonly markUnread: (sessionId: SessionSummary['id']) => void
   readonly followUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
   readonly continueIn: (sessionId: SessionSummary['id'], projectId: string) => void
+  /** Turn a scratch thread's own folder into a project, so the thread stops being a No folder thread. */
+  readonly turnIntoProject: (session: SessionSummary, folder: string | undefined) => void
   readonly resume: (sessionId: SessionSummary['id']) => void
   readonly dismissRecovery: (sessionId: SessionSummary['id']) => void
   readonly beginRename: (sessionId: SessionSummary['id']) => void
   readonly rename: (sessionId: SessionSummary['id'], title: string) => void
   readonly cancelRename: () => void
   readonly setAutoSettleOverride: (sessionId: SessionSummary['id'], override: AutoSettleOverride) => void
+  /** Opt-in completion notices: the open thread is told when the target thread finishes. */
+  readonly toggleNotify: (input: ThreadNotifyTarget) => void
   /** The row's one inline verb (plan §4.3): an inbox item's provider verb, a sidebar Resume, or open the thread. */
   readonly actOnStatus: (sessionId: SessionSummary['id'], status: ThreadStatus) => void
   readonly translate: ThreadSidebarTranslate
@@ -518,6 +530,14 @@ interface RowStyle {
   readonly maxChildren: number
 }
 
+/** The open thread as a row offers to subscribe it to that row's completions. */
+export interface ThreadNotifyTarget {
+  readonly subscriberSessionId: string
+  readonly subscriberTitle: string
+  readonly targetSessionId: string
+  readonly subscribed: boolean
+}
+
 interface ThreadRowProps {
   readonly session: SessionSummary
   readonly unread: boolean
@@ -535,6 +555,8 @@ interface ThreadRowProps {
   readonly parentTitle: string | undefined
   readonly workspaceId: string | undefined
   readonly workspaceTitle: string | undefined
+  /** The project folder behind the workspace id, for a thread whose Session summary carries no cwd. */
+  readonly workspacePath: string | undefined
   readonly workspaceName: string | undefined
   readonly machine: string | undefined
   readonly age: string
@@ -567,6 +589,10 @@ interface ThreadRowProps {
   readonly childStatuses?: ReadonlyMap<SessionSummary['id'], ThreadStatus> | undefined
   /** The `@handle` of the agent that started the thread, else the agent preset it runs, shown as a muted chip. */
   readonly agent?: string | undefined
+  /** Set when another thread is open: this row offers to notify that thread when this one finishes. */
+  readonly notifyTarget?: ThreadNotifyTarget | undefined
+  /** How many threads are notified when this one finishes; 0 or undefined hides the badge. */
+  readonly subscriberCount?: number | undefined
 }
 
 const workStatusLabelKeys = {
@@ -789,7 +815,20 @@ const ChildThreadList = (props: {
 
 type ThreadContextMenuProps = Pick<
   ThreadRowProps,
-  'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'section' | 'workspaceId' | 'actions'
+  | 'session'
+  | 'unread'
+  | 'autoSettleOverride'
+  | 'mute'
+  | 'archived'
+  | 'pinned'
+  | 'parked'
+  | 'settled'
+  | 'section'
+  | 'workspaceId'
+  | 'workspaceTitle'
+  | 'workspacePath'
+  | 'actions'
+  | 'notifyTarget'
 > & { readonly children: JSX.Element }
 
 /** One menu for the whole batch: every verb applies to each selected thread the verb can still change. */
@@ -859,8 +898,12 @@ const RegisteredThreadRowActions = (props: { readonly target: ThreadRowActionTar
   )
 }
 
+/** A scratch thread's own folder is its Session cwd, or its project folder when the summary carries none. */
+const scratchThread = (session: SessionSummary, workspacePath: string | undefined, workspaceTitle: string | undefined): boolean =>
+  NoFolderWorkspace.isScratchWorkspace({ path: session.cwd ?? workspacePath ?? '', title: workspaceTitle ?? '' })
+
 const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
-  const { session, unread, archived, pinned, parked, settled } = props
+  const { session, unread, archived, pinned, parked, settled, notifyTarget } = props
   const t = props.actions.translate
   const openAside = useAsideOpen()
   const registry = workbenchPanels()
@@ -886,6 +929,9 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           </ContextMenuSubContent>
         </ContextMenuSub>
       )}
+      {scratchThread(session, props.workspacePath, props.workspaceTitle) ? (
+        <ContextMenuItem onSelect={() => props.actions.turnIntoProject(session, props.workspacePath)}>{t('threadSidebarTurnIntoProject')}</ContextMenuItem>
+      ) : null}
       <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuSub>
@@ -920,6 +966,11 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
       </ContextMenuSub>
       <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />
       <ContextMenuSeparator />
+      {notifyTarget === undefined ? null : (
+        <ContextMenuCheckboxItem checked={notifyTarget.subscribed} onSelect={() => props.actions.toggleNotify(notifyTarget)}>
+          {t('threadSidebarNotifyOnFinish', { title: notifyTarget.subscriberTitle })}
+        </ContextMenuCheckboxItem>
+      )}
       <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
         {t('threadSidebarMarkUnread')}
       </ContextMenuItem>
@@ -1057,7 +1108,13 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       ? undefined
       : (workStatus.detail ?? t(workStatusLabelKeys[workStatus.status]))
   const metaLine = showProject || showMachine || showPath || childCount > 0 || showAgent || statusDetail !== undefined
-  const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.rebasedAt !== undefined || props.integrationQueuedAt !== undefined
+  const headLine =
+    rowStyle.title ||
+    rowStyle.time ||
+    rowStyle.statusDot ||
+    props.rebasedAt !== undefined ||
+    props.integrationQueuedAt !== undefined ||
+    (props.subscriberCount ?? 0) > 0
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
@@ -1187,7 +1244,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       settled={settled}
       section={props.section}
       workspaceId={props.workspaceId}
+      workspaceTitle={props.workspaceTitle}
+      workspacePath={props.workspacePath}
       actions={props.actions}
+      notifyTarget={props.notifyTarget}
     >
       <article
         ref={rowRef}
@@ -1280,6 +1340,18 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {t('threadSidebarRebased')}
                     </Badge>
                   )}
+                  {props.subscriberCount === undefined || props.subscriberCount === 0
+                    ? null
+                    : withTooltip(
+                        t('threadSidebarNotifySubscribersHint', { count: props.subscriberCount }),
+                        <Badge
+                          variant="secondary"
+                          aria-label={t('threadSidebarNotifySubscribersHint', { count: props.subscriberCount })}
+                          data-testid="thread-sidebar-subscribers-tag"
+                        >
+                          {t('threadSidebarNotifySubscribers', { count: props.subscriberCount })}
+                        </Badge>,
+                      )}
                   {rowStyle.time && inlineVerb === undefined ? (
                     <span
                       className={cn(
@@ -1389,29 +1461,45 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
             </button>
           ) : null}
-          {inlineVerb === undefined || workStatus === undefined || props.renaming ? null : (
-            <Button
-              type="button"
-              size="xs"
-              variant={workStatus.status === 'ready' ? 'outline' : 'default'}
-              className="dshx:absolute dshx:top-1.5 dshx:right-1.5 dshx:h-6 dshx:px-2 dshx:pointer-coarse:right-10"
-              data-testid="thread-row-verb"
-              data-verb={inlineVerb}
-              onClick={() => props.actions.actOnStatus(session.id, workStatus)}
-            >
-              {t(inlineVerbLabelKeys[inlineVerb])}
-            </Button>
-          )}
-          {nearViewport && !props.renaming ? (
+          {props.renaming || (inlineVerb === undefined && !nearViewport) ? null : (
+            // The inline verb and the hover strip share one corner: the strip opens to the left of the verb, so
+            // neither ever covers the other (the verb is the row's visible action, not a hover affordance).
             <div
-              data-testid="thread-row-actions"
-              className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden"
+              data-testid="thread-row-overlay"
+              className={cn(
+                'dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:items-center',
+                // Touch: the row's actions menu button takes the top-right corner, so the verb moves left of it.
+                inlineVerb !== undefined && 'dshx:pointer-coarse:right-10',
+              )}
             >
-              {props.rowActions.map(action => (
-                <Fragment key={action}>{renderRowAction(action)}</Fragment>
-              ))}
+              {inlineVerb === undefined || workStatus === undefined ? null : (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant={workStatus.status === 'ready' ? 'outline' : 'default'}
+                  className="dshx:h-6 dshx:px-2"
+                  data-testid="thread-row-verb"
+                  data-verb={inlineVerb}
+                  onClick={() => props.actions.actOnStatus(session.id, workStatus)}
+                >
+                  {t(inlineVerbLabelKeys[inlineVerb])}
+                </Button>
+              )}
+              {nearViewport ? (
+                <div
+                  data-testid="thread-row-actions"
+                  className={cn(
+                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
+                    inlineVerb === undefined ? 'dshx:top-0 dshx:right-0' : 'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2',
+                  )}
+                >
+                  {props.rowActions.map(action => (
+                    <Fragment key={action}>{renderRowAction(action)}</Fragment>
+                  ))}
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          )}
           {nearViewport && !props.renaming ? (
             // Touch has no hover and iOS WebKit fires no contextmenu on a long press: this button opens the row's own
             // actions menu (the right-click menu, which also holds every hover action) at the button.
@@ -1628,6 +1716,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [workspaceState.items],
   )
   const remoteThreads = useRemoteSidebarThreads(props.wide !== false, localProjectsForRemoteThreads)
+  const remoteRunningSessionIds = useMemo(
+    () => new Set(remoteThreads.filter(thread => thread.running).map(thread => SessionId(thread.sessionId))),
+    [remoteThreads],
+  )
   const [now, setNow] = useState(() => Date.now())
   // The render path reads `now`; gestures and notices stamp with this reader instead, outside render.
   const readNow = useCallback(() => Date.now(), [])
@@ -1669,6 +1761,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       openThreadRef.current(continued.continuedSessionId)
     } catch {
       setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarContinueInFailure') })
+    }
+  }
+  /**
+   * A scratch thread's own folder becomes a project: the Session already lives there, so registering it gives the row a
+   * project title of its own instead of the shared No folder label. The Host chooses a title no other project holds.
+   */
+  const turnThreadIntoProject = async (session: SessionSummary, folder: string | undefined): Promise<void> => {
+    const cwd = session.cwd ?? folder
+    if (cwd === undefined) return
+    try {
+      const project = await props.projectRegister({ path: cwd, title: session.title?.trim() || session.displayTitle })
+      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarTurnedIntoProject', { title: project.title }) })
+      void queryClient.invalidateQueries({ queryKey: ['workspace-folder-picker'] })
+      void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'projects'] })
+    } catch {
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarTurnIntoProjectFailure') })
     }
   }
   useEffect(() => {
@@ -1721,6 +1829,32 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       })),
     [defaultProjectTitle, workspaceState.items],
   )
+  /** Project folder per workspace id: the project row's icon is resolved from it on the Host. */
+  const workspacePathById = useMemo(
+    () => new Map<string, string>(workspaceState.items.map(workspace => [workspace.workspaceId, workspace.path])),
+    [workspaceState.items],
+  )
+  const identityPaths = useMemo(() => [...new Set([...workspacePathById.values()])].sort(), [workspacePathById])
+  const lifecycleApi = useApi(projectLifecycleApi)
+  const projectIdentities = useQuery({
+    queryKey: ['workspace-folder-picker', 'project-identities', identityPaths.join('\n')],
+    enabled: identityPaths.length > 0,
+    queryFn: ({ signal }) => lifecycleApi.projectIdentities({ paths: identityPaths }, { signal }),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+  /**
+   * Repository identity per workspace id, so two checkouts of one repository are one project row. The Host answers from
+   * a cached inspection; a workspace the read does not know falls back to its own id and stays its own row.
+   */
+  const projectKeys = useMemo(() => {
+    const keys = new Map<string, string>()
+    for (const identity of projectIdentities.data?.identities ?? []) {
+      const workspace = workspaceState.items.find(item => item.path === identity.path)
+      if (workspace !== undefined) keys.set(workspace.workspaceId, identity.key)
+    }
+    return keys
+  }, [projectIdentities.data, workspaceState.items])
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
   const workspaceNameById = useMemo(
@@ -1848,6 +1982,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const currentSessionId = useSyncExternalStore(currentSessionSource.subscribe, currentSessionSource.getSnapshot, currentSessionSource.getSnapshot)
   const selectedSession = useMemo(() => HostSnapshotsModel.currentSessionOf(sessions, currentSessionId), [sessions, currentSessionId])
   const selectedSessionId = selectedSession?.id
+  const subscriptions = useThreadSubscriptions()
   /**
    * Abandoned New threads. DSH mints the Session (and, when isolation is the default, a whole thread workspace) before
    * the first prompt, so an abandoned attempt leaves an untitled idle thread whose folder name becomes its row title.
@@ -1931,7 +2066,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [allUsageLimitRows, threadView.sourceFilter],
   )
   const allUsageLimitSessionIds = useMemo(() => new Set(allUsageLimitRows.map(row => row.session.id)), [allUsageLimitRows])
-  const sessionIdByContinuationId = useMemo(() => new Map(usageLimitRows.map(row => [row.continuation.continuationId, row.session.id])), [usageLimitRows])
   const recoverySettled = (settled: RecoveryOperationsSettled): void => {
     void queryClient.invalidateQueries({ queryKey: restartRecoveryQueryKey })
     const failedSessionIds = settled.results
@@ -1963,6 +2097,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             openThread,
           }),
     )
+    // A batch may have resumed quota continuations, whose group reads its own durable list.
+    void queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
   }
   const usageLimitSettled = (settled: RecoveryOperationsSettled): void => {
     void queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
@@ -1972,34 +2108,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
       return
     }
-    if (settled.tag === 'usage-limit-row') {
-      if (failedKeys.length === 0) setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) })
-      else if (settled.results[0]?.status === 'rejected') setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarUsageLimitSuperseded') })
-      else setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
-      return
-    }
-    if (failedKeys.length === 0) {
-      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: settled.results.length }) })
-      return
-    }
-    setNotice(
-      failedResumeNotice({
-        message: props.tSidebar('threadSidebarResumePartial', { sent: settled.results.length - failedKeys.length, failed: failedKeys.length }),
-        actionLabel: props.tSidebar('threadSidebarOpenFailedResume'),
-        failedSessionIds: failedKeys.flatMap(key => {
-          const sessionId = sessionIdByContinuationId.get(key)
-          return sessionId === undefined ? [] : [sessionId]
-        }),
-        openThread,
-      }),
-    )
+    if (failedKeys.length === 0) setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) })
+    else if (settled.results[0]?.status === 'rejected') setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarUsageLimitSuperseded') })
+    else setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
   }
   const usageLimitOperations = useRecoveryOperations({ onSettled: usageLimitSettled })
   const recoveryOperations = useRecoveryOperations({ onSettled: recoverySettled })
-  const usageLimitBusyIds = usageLimitOperations.busyKeys
-  const usageLimitResumeAllBusy = usageLimitOperations.running
   const resumeBusySessionIds = recoveryOperations.busyKeys
   const resumeAllBusy = recoveryOperations.running
+  const continuationBySessionId = useMemo(() => new Map(usageLimitRows.map(row => [row.session.id, row.continuation])), [usageLimitRows])
+  const usageLimitBusyIds = useMemo(() => {
+    const busy = new Set(usageLimitOperations.busyKeys)
+    for (const row of usageLimitRows) if (resumeBusySessionIds.has(row.session.id)) busy.add(row.continuation.continuationId)
+    return busy
+  }, [resumeBusySessionIds, usageLimitOperations.busyKeys, usageLimitRows])
   const resumeUsageLimitThread = (input: { readonly continuationId: string }): void => {
     usageLimitOperations.run({
       tag: 'usage-limit-row',
@@ -2040,15 +2162,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       ],
     })
   }
-  const resumeAllUsageLimits = (): void => {
-    usageLimitOperations.run({
-      tag: 'usage-limit-batch',
-      operations: usageLimitRows.map(row => ({
-        key: row.continuation.continuationId,
-        run: ({ signal }) => accountsApi.resumeQuotaContinuation({ continuationId: row.continuation.continuationId }, { signal }),
-      })),
-    })
-  }
   const resumeRecoverySession = (sessionId: SessionSummary['id']): void => {
     recoveryOperations.run({
       tag: 'recovery-row',
@@ -2059,12 +2172,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     recoveryOperations.run({
       tag: 'recovery-dismiss',
       operations: [{ key: `dismiss:${sessionId}`, run: ({ signal }) => recoveryApi.dismiss({ sessionId }, { signal }).then(() => ({ accepted: true })) }],
-    })
-  }
-  const resumeAllRecoveries = (rows: readonly SessionSummary[]): void => {
-    recoveryOperations.run({
-      tag: 'recovery-batch',
-      operations: rows.map(row => ({ key: row.id, run: ({ signal }) => recoveryApi.resume({ sessionId: row.id }, { signal }) })),
     })
   }
   const unreadSessionIds = useStableValue(
@@ -2645,6 +2752,33 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   /**
+   * Settle or unsettle one remote row. A mirrored Session's settled state is this sidebar's own preference, so only
+   * its sets change: settling a local thread also unpins it, and that Host verb belongs to the owning runtime.
+   */
+  const applyRemoteSettled = (sessionId: SessionSummary['id'], shouldSettle: boolean): void => {
+    if (shouldSettle && remoteRunningSessionIds.has(sessionId)) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    if (shouldSettle) {
+      changePreferences(
+        SettledThreadsModel.settleAndUnpark({
+          status,
+          parkedSessionIds: preferences.parkedSessionIds,
+          sessionIds: [sessionId],
+          now: readNow(),
+        }),
+      )
+    } else changePreferences(SettledThreadsModel.unsettle(status, [sessionId]))
+    setNotice(shouldSettle ? { tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') } : null)
+  }
+
+  const toggleRemoteSettled = (sessionId: SessionSummary['id']): void => {
+    applyRemoteSettled(sessionId, !settledSessionIds.has(sessionId))
+  }
+
+  /**
    * Drop a row into another status section. A section is a status, so entering one sets it and clears
    * the statuses that outrank it: dragging a settled thread out unsettles it and dragging an archived
    * thread out restores it. Active and Inactive are derived from idleness, so those drops record an
@@ -2696,6 +2830,36 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     changePreferences(isBoard ? nextPreferences : { ...nextPreferences, collapsedSections: [...nextCollapsedSections] })
     if (failed) setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
     else if (!plan.archive) setNotice(null)
+  }
+
+  /**
+   * Drop a remote row into another status section. A mirrored Session answers the preference half of the same plan a
+   * local drop uses — parked, settled and the idle override key by Session id — while pin, unpin and archive stay on
+   * the runtime that owns it, which is why only the sections that plan reaches are offered.
+   */
+  const moveRemoteThreadToSection = (sessionId: SessionSummary['id'], section: SidebarSection): void => {
+    const plan = SidebarOrganization.remoteSectionDropPlan(section)
+    if (plan === null) return
+    if ((plan.park || plan.settle) && remoteRunningSessionIds.has(sessionId)) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    const nextParked = new Set(preferences.parkedSessionIds)
+    if (plan.park) nextParked.add(sessionId)
+    if (plan.unpark) nextParked.delete(sessionId)
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    const idleSectionOverrides = { ...preferences.idleSectionOverrides }
+    if (plan.idleOverride === null) delete idleSectionOverrides[sessionId]
+    else idleSectionOverrides[sessionId] = { section: plan.idleOverride, at: readNow() }
+    const nextCollapsedSections = collapsedSections.filter(item => item !== section)
+    const nextPreferences = {
+      parkedSessionIds: [...nextParked],
+      ...(plan.settle ? SettledThreadsModel.settle(status, [sessionId], readNow()) : plan.unsettle ? SettledThreadsModel.unsettle(status, [sessionId]) : {}),
+      idleSectionOverrides,
+    }
+    if (isBoard) storedThreadBoardView.set(ThreadBoardViewModel.update(boardViewSettings, { collapsedSections: nextCollapsedSections }))
+    changePreferences(isBoard ? nextPreferences : { ...nextPreferences, collapsedSections: [...nextCollapsedSections] })
+    setNotice(null)
   }
 
   /**
@@ -3165,6 +3329,27 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // sidebar already classifies, with subagents rolled up into their parent.
   const stateGrouping = threadView.groupBy === 'state'
   const inbox = useInboxThreadSignals({ enabled: stateGrouping && sessionState.phase === 'ready' })
+  /**
+   * Resume one row however it stopped: its inbox verb (quota, another provider), its stored quota continuation when the
+   * inbox is absent, or the turn a previous Host process left open.
+   */
+  const resumeAttentionSession = async (sessionId: SessionSummary['id'], abortSignal: AbortSignal): Promise<{ readonly accepted: boolean }> => {
+    const target = ResumeAttentionModel.targetOf({
+      sessionId,
+      signal: inbox.signals.get(sessionId),
+      continuation: continuationBySessionId.get(sessionId),
+    })
+    if (target.kind === 'inbox') return inbox.act(target.itemId, 'Resume').then(outcome => ({ accepted: outcome.ok }))
+    if (target.kind === 'quota') return accountsApi.resumeQuotaContinuation({ continuationId: target.continuationId }, { signal: abortSignal })
+    return recoveryApi.resume({ sessionId: target.sessionId }, { signal: abortSignal })
+  }
+  /** Every Resume all in the list: one batch keyed by thread, so a mixed Needs you group resumes in one notice. */
+  const resumeAllAttention = (rows: readonly SessionSummary[]): void => {
+    recoveryOperations.run({
+      tag: 'recovery-batch',
+      operations: rows.map(row => ({ key: row.id, run: ({ signal }) => resumeAttentionSession(row.id, signal) })),
+    })
+  }
   const childStatusById = useMemo(() => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
     if (!stateGrouping) return statuses
@@ -3586,6 +3771,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         pinnedSessionIds,
         parkedSessionIds,
         settledSessionIds,
+        idleSectionOverrides: preferences.idleSectionOverrides,
         now,
         idleMinutes: preferences.idleMinutes,
       })
@@ -3593,7 +3779,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     for (const entries of rows.values()) entries.sort((left, right) => right.updatedAt - left.updatedAt)
     return rows
-  }, [archivedSessionIds, now, parkedSessionIds, pinnedSessionIds, preferences.idleMinutes, settledSessionIds, visibleRemoteThreads])
+  }, [
+    archivedSessionIds,
+    now,
+    parkedSessionIds,
+    pinnedSessionIds,
+    preferences.idleMinutes,
+    preferences.idleSectionOverrides,
+    settledSessionIds,
+    visibleRemoteThreads,
+  ])
   const activityAtBySessionId = useMemo(() => new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt])), [visibleThreadEntries])
   const rowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, SessionSummary[]>(SIDEBAR_SECTIONS.map(section => [section, []]))
@@ -3651,7 +3846,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // The machine is created once, so its commands read the handlers of the latest render through one holder.
   const dragCommands = useRef<ThreadDragCommands>({ moveToSection: () => undefined, commitSectionOrder: () => undefined })
   dragCommands.current = {
-    moveToSection: input => void moveThreadsToSection(SessionId(input.sessionId), input.section),
+    moveToSection: input => {
+      if (input.kind === 'remote') moveRemoteThreadToSection(SessionId(input.sessionId), input.section)
+      else void moveThreadsToSection(SessionId(input.sessionId), input.section)
+    },
     commitSectionOrder: input => commitSectionOrder(input.from, input.to),
   }
   const [drag, sendDrag, dragActor] = useMachine(threadDragMachine, {
@@ -3694,20 +3892,30 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return isSidebarSection(section) ? { element, section } : null
     }
     const draggingRow = (): boolean => dragActor.getSnapshot().matches('rows')
+    /** The section a landing row may enter: a remote row only reaches the sections whose drop plan is preference-only. */
+    const dropSectionFor = (section: SidebarSection): SidebarSection | null => {
+      const row = dragActor.getSnapshot().context.row
+      if (row === null || row.kind === 'local') return section
+      return SidebarOrganization.remoteSectionDropPlan(section) === null ? null : section
+    }
     const onDragStart = (event: DragEvent): void => {
       const target = event.target
       if (!(target instanceof Element)) return
-      const row = target.closest<HTMLElement>('article[data-thread-id][data-thread-section-row]')
+      const remoteRow = target.closest<HTMLElement>('article[data-remote-thread-id][data-remote-thread-section-row]')
+      const row = remoteRow ?? target.closest<HTMLElement>('article[data-thread-id][data-thread-section-row]')
       if (row === null || threadSurfaceOf(row) !== surface) return
       const section = row.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection
-      const threadId = row.dataset.threadId
-      if (!isSidebarSection(section) || threadId === undefined) return
-      sendDrag({ type: 'row.start', row: { sessionId: SessionId(threadId), section } })
+      const sessionId = remoteRow === null ? row.dataset.threadId : remoteRow.dataset.remoteThreadSessionId
+      if (!isSidebarSection(section) || sessionId === undefined) return
+      // A remote row gets no mention drag: its id resolves on the runtime that owns the Session, not in this composer.
+      if (remoteRow !== null && event.dataTransfer !== null) event.dataTransfer.effectAllowed = 'move'
+      sendDrag({ type: 'row.start', row: { kind: remoteRow === null ? 'local' : 'remote', sessionId: SessionId(sessionId), section } })
     }
     const onDragOver = (event: DragEvent): void => {
       if (!draggingRow()) return
       const target = sectionAt(event.clientX, event.clientY)
-      const next = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
+      const landing = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
+      const next = landing === null ? null : dropSectionFor(landing)
       if (next === null) {
         sendDrag({ type: 'row.over', section: null })
         return
@@ -3720,7 +3928,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const onDrop = (event: DragEvent): void => {
       if (!draggingRow()) return
       const target = sectionAt(event.clientX, event.clientY)
-      const droppedOn = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
+      const landing = target !== null && threadSurfaceOf(target.element) === surface ? target.section : null
+      const droppedOn = landing === null ? null : dropSectionFor(landing)
       if (droppedOn === null) {
         sendDrag({ type: 'row.end' })
         return
@@ -3786,6 +3995,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         label: tSidebar(statusGroupLabelKeys[group.group]),
         showHeader: true,
         projectId: undefined,
+        checkoutCount: 1,
         threads: group.threads,
       }))
     }
@@ -3797,6 +4007,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       groupBy: threadView.groupBy,
       entries,
       workspaceTitles,
+      projectKeys,
       localProjectIds: new Set(displayWorkspaces.map(workspace => workspace.id)),
       unassignedTitle: tSidebar('threadSidebarUnassigned'),
       dateTitles: {
@@ -3813,6 +4024,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     displayWorkspaces,
     now,
     pinnedSessionIds,
+    projectKeys,
     tSidebar,
     threadStatusById,
     threadView.groupBy,
@@ -3820,6 +4032,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     visibleThreadEntries,
     workspaceState.pinnedSessionIds,
   ])
+  /** Rows of a status group whose inline verb is Resume, so the group header can offer one bulk verb. */
+  const statusGroupResumableSessions = useMemo(() => {
+    const byGroupKey = new Map<string, readonly SessionSummary[]>()
+    if (threadView.groupBy !== 'state') return byGroupKey
+    for (const group of groupedThreadEntries) {
+      if (group.threads.length === 0) continue
+      const resumable = ResumeAttentionModel.resumableRowsOf({
+        rows: group.threads.flatMap(entry => (entry.kind === 'local' ? [entry.session] : [])),
+        statusOf: session => threadStatusById.get(session.id) ?? childStatusById.get(session.id),
+      })
+      if (resumable.length > 0) byGroupKey.set(group.key, resumable)
+    }
+    return byGroupKey
+  }, [childStatusById, groupedThreadEntries, threadStatusById, threadView.groupBy])
 
   const rowStyle = useMemo<RowStyle>(
     () => ({
@@ -3992,7 +4218,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     markAttentionUnread: attention.markUnread,
     startFollowUp: props.startFollowUp,
     continueThreadIn,
+    turnThreadIntoProject,
     notifyThread,
+    toggleSubscription: (target: ThreadNotifyTarget) =>
+      subscriptions.setSubscription({
+        subscriberSessionId: target.subscriberSessionId,
+        targetSessionId: target.targetSessionId,
+        subscribed: !target.subscribed,
+      }),
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -4027,7 +4260,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     markAttentionUnread: attention.markUnread,
     startFollowUp: props.startFollowUp,
     continueThreadIn,
+    turnThreadIntoProject,
     notifyThread,
+    toggleSubscription: (target: ThreadNotifyTarget) =>
+      subscriptions.setSubscription({
+        subscriberSessionId: target.subscriberSessionId,
+        targetSessionId: target.targetSessionId,
+        subscribed: !target.subscribed,
+      }),
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -4162,6 +4402,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       },
       followUp: (sessionId, workspaceId) => latestRowActions.current.startFollowUp(sessionId, workspaceId),
       continueIn: (sessionId, projectId) => void latestRowActions.current.continueThreadIn(sessionId, projectId),
+      turnIntoProject: (session, folder) => void latestRowActions.current.turnThreadIntoProject(session, folder),
       resume: sessionId => void latestRowActions.current.resumeRecoverySession(sessionId),
       dismissRecovery: sessionId => void latestRowActions.current.dismissRecoverySession(sessionId),
       beginRename: sessionId => latestRowActions.current.beginRename(sessionId),
@@ -4176,6 +4417,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         })
       },
       actOnStatus: (sessionId, status) => latestRowActions.current.actOnStatus(sessionId, status),
+      toggleNotify: target => latestRowActions.current.toggleSubscription(target),
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
   }, [])
@@ -4344,6 +4586,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         parentTitle={lineage.parentTitle}
         workspaceId={workspaceId}
         workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
+        workspacePath={workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)}
         workspaceName={realWorkspaceId === undefined || realWorkspaceId === workspaceId ? undefined : workspaceNameById.get(realWorkspaceId)}
         machine={machine}
         age={formatAge(session.updatedAt)}
@@ -4366,21 +4609,71 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         workStatus={stateGrouping ? (threadStatusById.get(session.id) ?? childStatusById.get(session.id)) : undefined}
         childStatuses={stateGrouping ? childStatusById : undefined}
         agent={stateGrouping ? (agentHandleOf(session.id) ?? agentPresetOf(session)) : undefined}
+        notifyTarget={
+          !subscriptions.available || selectedSession === undefined || selectedSession.id === session.id
+            ? undefined
+            : {
+                subscriberSessionId: selectedSession.id,
+                subscriberTitle: selectedSession.displayTitle,
+                targetSessionId: session.id,
+                subscribed: subscriptions.isSubscribed({ subscriberSessionId: selectedSession.id, targetSessionId: session.id }),
+              }
+        }
+        subscriberCount={subscriptions.available ? subscriptions.notifiersOf(session.id).length : undefined}
       />
     )
   }
-  const renderRemoteThreadRow = (thread: RemoteSidebarThread): JSX.Element => (
-    <RemoteThreadItem
-      key={`${thread.runtimeId}:${thread.sessionId}`}
-      runtimeId={thread.runtimeId}
-      sessionId={thread.sessionId}
-      label={thread.title}
-      cwd={thread.cwd}
-      hostName={thread.hostName}
-      connected={thread.connected}
-      onOpen={() => (props.openRemoteSession === undefined ? props.openRemoteThreads?.() : props.openRemoteSession(thread.sessionId))}
-    />
+  const remoteThreadRowLabels = useMemo(
+    (): RemoteThreadRowLabels => ({
+      settle: tSidebar('threadSidebarSettle'),
+      unsettle: tSidebar('threadSidebarUnsettle'),
+      park: tSidebar('threadSidebarPark'),
+      unpark: tSidebar('threadSidebarUnpark'),
+      moveToSection: tSidebar('threadSidebarMoveToSection'),
+      copyId: tSidebar('threadSidebarCopyId'),
+      contextMenu: tSidebar('threadSidebarContextMenu'),
+      sectionLabels: {
+        pinned: tSidebar(sectionLabels.pinned),
+        active: tSidebar(sectionLabels.active),
+        parked: tSidebar(sectionLabels.parked),
+        settled: tSidebar(sectionLabels.settled),
+        inactive: tSidebar(sectionLabels.inactive),
+        archived: tSidebar(sectionLabels.archived),
+      },
+    }),
+    [tSidebar],
   )
+  const renderRemoteThreadRow = (thread: RemoteSidebarThread, section?: SidebarSection): JSX.Element => {
+    const sessionId = SessionId(thread.sessionId)
+    return (
+      <RemoteThreadItem
+        key={`${thread.runtimeId}:${thread.sessionId}`}
+        runtimeId={thread.runtimeId}
+        sessionId={thread.sessionId}
+        label={thread.title}
+        cwd={thread.cwd}
+        hostName={thread.hostName}
+        workspaceTitle={thread.workspaceTitle}
+        connected={thread.connected}
+        running={thread.running}
+        settled={settledSessionIds.has(sessionId)}
+        parked={parkedSessionIds.has(sessionId)}
+        selected={selectedSession?.id === sessionId}
+        compact={rowStyle.density === 'compact'}
+        age={formatAge(thread.updatedAt)}
+        section={section}
+        dropSections={SidebarOrganization.remoteDropSections}
+        labels={remoteThreadRowLabels}
+        dragging={activeRowDrag?.kind === 'remote' && activeRowDrag.sessionId === sessionId}
+        onOpen={() => (props.openRemoteSession === undefined ? props.openRemoteThreads?.() : props.openRemoteSession(thread.sessionId))}
+        onToggleSettled={() => toggleRemoteSettled(sessionId)}
+        onToggleParked={() => toggleParked(sessionId)}
+        onMoveToSection={next => moveRemoteThreadToSection(sessionId, next)}
+        // The copied id names the Session on its own runtime; a link built here would point at this origin and drop the host.
+        onCopyId={() => void rowActions.copy(thread.sessionId, props.tSidebar('threadSidebarIdCopied'))}
+      />
+    )
+  }
 
   useEffect(() => {
     if (!isPrimarySurface || sessionState.phase !== 'ready') return
@@ -4957,7 +5250,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({hoistedInterruptedRows.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllRecoveries(hoistedInterruptedRows)}>
+                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedInterruptedRows)}>
                   {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
                   {props.tSidebar('threadSidebarResumeAll')}
                 </Button>
@@ -4979,7 +5272,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({hoistedNeedsResumeRows.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllRecoveries(hoistedNeedsResumeRows)}>
+                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedNeedsResumeRows)}>
                   {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
                   {props.tSidebar('threadSidebarResumeAll')}
                 </Button>
@@ -4993,30 +5286,36 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             onAutoRetry={input => void changeUsageLimitRecovery(input)}
             onDismiss={input => void changeUsageLimitRecovery({ continuationId: input.continuationId, dismiss: true })}
             onResume={input => void resumeUsageLimitThread(input)}
-            onResumeAll={() => void resumeAllUsageLimits()}
+            onResumeAll={() => void resumeAllAttention(hoistedUsageLimitRows.map(row => row.session))}
             onSnooze={input => void changeUsageLimitRecovery(input)}
             open={openThread}
             selectedSessionId={selectedSessionId}
-            resumeAllBusy={usageLimitResumeAllBusy}
+            resumeAllBusy={resumeAllBusy}
             rows={hoistedUsageLimitRows}
             translate={props.tSidebar}
-            withThreadMenu={(session, row) => (
-              <ThreadContextMenu
-                key={session.id}
-                session={session}
-                unread={unreadSessionIds.has(session.id)}
-                autoSettleOverride={SidebarOrganization.autoSettleOverrideForSession(preferences, session.id)}
-                mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
-                archived={archivedSessionIds.has(session.id)}
-                pinned={pinnedSessionIds.has(session.id)}
-                parked={parkedSessionIds.has(session.id)}
-                settled={settledSessionIds.has(session.id)}
-                workspaceId={realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)}
-                actions={rowActions}
-              >
-                {row}
-              </ThreadContextMenu>
-            )}
+            withThreadMenu={(session, row) => {
+              const workspaceId =
+                realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
+              return (
+                <ThreadContextMenu
+                  key={session.id}
+                  session={session}
+                  unread={unreadSessionIds.has(session.id)}
+                  autoSettleOverride={SidebarOrganization.autoSettleOverrideForSession(preferences, session.id)}
+                  mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
+                  archived={archivedSessionIds.has(session.id)}
+                  pinned={pinnedSessionIds.has(session.id)}
+                  parked={parkedSessionIds.has(session.id)}
+                  settled={settledSessionIds.has(session.id)}
+                  workspaceId={workspaceId}
+                  workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
+                  workspacePath={workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)}
+                  actions={rowActions}
+                >
+                  {row}
+                </ThreadContextMenu>
+              )
+            }}
           />
           {groupedAttentionRows.approvalNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarApprovalNeeded')}>
@@ -5078,8 +5377,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         key="remote"
                         threads={filteredRemoteThreads}
                         headerClassName={stickyHeaderClass}
+                        renderRow={renderRemoteThreadRow}
                         onOpen={props.openRemoteThreads}
-                        onOpenSession={props.openRemoteSession}
                         hint={props.tSidebar('threadSidebarSectionReorderHint')}
                         keepEmpty
                         onHeaderRef={element => {
@@ -5226,7 +5525,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       </button>
                       {!collapsed
                         ? sectionRows.map(entry =>
-                            entry.kind === 'local' ? renderThreadRow(entry.session, undefined, section) : renderRemoteThreadRow(entry.remote),
+                            entry.kind === 'local' ? renderThreadRow(entry.session, undefined, section) : renderRemoteThreadRow(entry.remote, section),
                           )
                         : null}
                     </section>
@@ -5243,6 +5542,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     (group.key.startsWith(STATUS_GROUP_KEY_PREFIX)
                       ? ThreadStatusModel.isCollapsed(group.key, collapsedGroups)
                       : collapsedGroups.includes(group.key))
+                  const resumableSessions = statusGroupResumableSessions.get(group.key) ?? []
                   return (
                     <section
                       className={cn(
@@ -5255,6 +5555,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     >
                       {showHeader ? (
                         <ThreadGroupHeader
+                          icon={
+                            group.projectId === undefined
+                              ? undefined
+                              : (() => {
+                                  const projectPath = workspacePathById.get(group.projectId)
+                                  return projectPath === undefined ? undefined : <ProjectIcon path={projectPath} label={groupLabel} />
+                                })()
+                          }
+                          checkoutCount={group.checkoutCount}
                           label={groupLabel}
                           count={group.threads.length}
                           collapsed={groupCollapsed}
@@ -5263,6 +5572,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           onToggle={() => toggleGroup(group.key)}
                           startProjectSession={props.startProjectSession}
                           t={props.tSidebar}
+                          action={
+                            resumableSessions.length === 0 ? undefined : (
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="outline"
+                                disabled={resumeAllBusy}
+                                onClick={() => void resumeAllAttention(resumableSessions)}
+                              >
+                                {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
+                                {props.tSidebar('threadSidebarResumeAll')}
+                              </Button>
+                            )
+                          }
                         />
                       ) : null}
                       {groupCollapsed
@@ -5332,9 +5655,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {threadView.groupBy !== 'status' && separatesRemoteThreads && props.openRemoteThreads !== undefined ? (
             <RemoteThreadsSection
               threads={filteredRemoteThreads}
+              renderRow={renderRemoteThreadRow}
               headerClassName={stickyHeaderClass}
               onOpen={props.openRemoteThreads}
-              onOpenSession={props.openRemoteSession}
             />
           ) : null}
           {isBoard || draftSessions.length === 0 ? null : (

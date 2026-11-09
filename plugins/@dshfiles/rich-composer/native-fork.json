@@ -40,7 +40,8 @@
     "src/native/skeleton/ConversationContent.tsx",
     "src/native/skeleton/ConversationRoot.module.css",
     "src/native/queue/QueueDock.tsx",
-    "src/native/service.ts"
+    "src/native/service.ts",
+    "src/native/draft.ts"
   ],
   "added": [
     "src/native/conversation/live-bindings.test.ts",
@@ -51,8 +52,10 @@
     "src/native/input/detached-sends.ts",
     "src/native/input/editor/keymap.test.ts",
     "src/native/input/editor/reference-activation.test.ts",
+    "src/native/input/editor/restore-draft-references.test.ts",
     "src/native/input/machine.test.ts",
     "src/native/input/retained-send.test.ts",
-    "src/native/input/retained-send.ts"
+    "src/native/input/retained-send.ts",
+    "src/native/skeleton/run-row-placement.ts"
   ]
 }

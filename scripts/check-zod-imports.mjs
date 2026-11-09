@@ -28,16 +28,11 @@ const zodImport = /^\s*(?:import|export)\b[^'"]*from\s*['"]zod(?:\/[^'"]*)?['"]/
 /** Every remaining zod import, with the reason it stays. */
 const bridges = new Map([
   ['tooling/dshx/packages/dshx/src/api/zod-view.ts', 'Effect → zod bridge: dsh-storage-domain and createStoredValue take a ZodType'],
+  ['plugins/@dshfiles/storage-domain/src/native/spec.ts', 'vendored native contract: the storage domain takes a ZodType from the core'],
+  ['plugins/@dshfiles/storage-domain/src/native/domain.ts', 'vendored native contract: the storage domain takes a ZodType from the core'],
+  ['plugins/@dshfiles/storage-domain/tests/lazy-hydration.test.ts', 'test boundary: exercises the vendored contract with a ZodType'],
+  ['plugins/@dshfiles/storage-domain/tests/lazy-json-backend.test.ts', 'test boundary: exercises the vendored contract with a ZodType'],
   ['tooling/dshx/packages/dshx/tests/api-zod-schema.spec.ts', 'the bridge spec'],
-  ['plugins/@dshfiles/ai-accounts/src/effect-zod-schema.ts', 'the bridge the AI Accounts store writes through'],
-  ['plugins/@dshfiles/goal-tool/src/native/authority.ts', 'vendored native fork, out of migration scope'],
-  ['plugins/@dshfiles/rich-composer/src/native/draft.ts', 'vendored native fork, out of migration scope'],
-  ['plugins/@dshfiles/sidebar-right/src/native/client/persistence.ts', 'vendored native fork, out of migration scope'],
-  ['plugins/@dshfiles/model-selection/src/native/directory.ts', 'vendored native fork, out of migration scope'],
-  ['plugins/@dshfiles/model-selection/src/native/service.ts', 'vendored native fork, out of migration scope'],
-  ['plugins/@dshfiles/session-controller/src/native/list.ts', 'vendored native fork, out of migration scope'],
-  ['plugins/@dshfiles/session-controller/src/native/model-selection-projection.ts', 'vendored native fork, out of migration scope'],
-  ['plugins/@dshfiles/hmr-gate/src/client.tsx', 'reimplements the vendored upstream HMR transport; keep shape-equal to upstream'],
   ['plugins/@dshfiles/session-controller/typert/host.js', 'derived by scripts/derive-typert.mjs from the native package, not hand-written'],
 ])
 

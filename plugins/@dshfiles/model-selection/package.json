@@ -30,6 +30,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
+  "dependencies": {
+    "@dshfiles/shared-runtime": "workspace:*",
+    "effect": "catalog:"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
@@ -58,8 +62,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "zod": "catalog:"
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
@@ -88,7 +91,8 @@
         "@dshfiles/session-controller"
       ],
       "external": [
-        "@deepseek-ai/dsh-client-store"
+        "@deepseek-ai/dsh-client-store",
+        "@dshfiles/shared-runtime"
       ]
     }
   },

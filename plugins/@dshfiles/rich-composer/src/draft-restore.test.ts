@@ -36,6 +36,7 @@ function fixture(sink: (text: string) => Promise<SubmitOutcome>) {
     track: () => undefined,
     arbitrate: () => 'pass',
     onSpace: () => false,
+    restoreReferences: () => [],
     serializeReference: async () => '',
     adjudicate: async () => undefined,
     resolveClaim: token => {

@@ -39,11 +39,24 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is continued in another registered project from its context menu
     Then the continuation opens in that project with the conversation and the original thread is settled
 
+  @scenario:thread-sidebar.turn-into-project
+  Scenario: Turn a No folder thread into its own project
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker" is booted
+    When a No folder thread is started and turned into a project from its row menu
+    Then the thread sits under its own project and its scratch folder exists
+
   @scenario:thread-sidebar.section-order
   Scenario: Keep remote threads with view groups by default or separate them
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host" is booted
     When an archived thread and a settled thread fill the bottom sections
     Then separate remote grouping is opt-in, reorderable and persists across reloads
+
+  @scenario:thread-sidebar.remote-row-verbs
+  Scenario: A remote row offers this sidebar's own verbs and drags between status sections
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/multi-host" is booted
+    When a peer runtime thread is seeded into the status list
+    Then the remote row offers the sidebar's own verbs and no Host verb
+    And dragging the remote row onto the Active header keeps it there across a reload
 
   @scenario:thread-sidebar.settled-auto-archive
   Scenario: A settled thread archives itself once its archive delay has passed
@@ -261,7 +274,7 @@ Feature: Thread sidebar journeys
 
   @scenario:thread-sidebar.jj-inventory-pauses-while-collapsed
   Scenario: A collapsed sidebar stops reading the JJ inventory
-    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/jj-integration" is booted
     And the provider onboarding prompt is dismissed
     And the browser counts JJ inventory requests
     When the sidebar inventory pane is collapsed

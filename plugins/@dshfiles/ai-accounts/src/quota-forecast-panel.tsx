@@ -93,12 +93,7 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void; readonl
       }}
       bodyClassName="dshx:mx-auto dshx:w-full dshx:max-w-[1500px]"
     >
-      <UsageRefreshNotice
-        failure={failure ?? UsageOverviewModel.staleSummary(usage)}
-        hasReading={usage !== null}
-        onRetry={() => void refresh()}
-        refreshing={refreshing}
-      />
+      <UsageRefreshNotice failure={failure ?? UsageOverviewModel.staleSummary(usage)} onRetry={() => void refresh()} refreshing={refreshing} />
       {usage === null ? null : <UsageUpdatedAt readAt={UsageOverviewModel.oldestReadAt(usage)} />}
       {(() => {
         if (loading && board.accounts.length === 0) {

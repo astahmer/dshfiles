@@ -10,8 +10,11 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { createActor, useSelector, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
-import { useQuery, type QueryClient } from '@dshfiles/plugin-ui/query'
-import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { useQuery, useQueryClient, type QueryClient } from '@dshfiles/plugin-ui/query'
+import { useApi, useContract, useSettings } from '@dshfiles/dshx/client'
+import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view'
+import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
+import { RepositorySetup } from '@dshfiles/workspace-folder-picker/repository-setup-contract'
 import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
@@ -65,7 +68,7 @@ const randomThreadName = (): string => {
 }
 
 const threadNameOf = (path: string | undefined): string | null => {
-  const name = path?.split('/').at(-1)
+  const name = path?.split(/[\\/]/u).at(-1)
   return name !== undefined && Schema.is(threadWorkspaceNameEffect)(name) ? name : null
 }
 
@@ -185,6 +188,87 @@ const useComposerWorkspace = (services: DestinationBarServices, selectedWorkspac
 }
 
 /**
+ * A project that is not a Jujutsu repository yet: the composer's workspace segment has nothing to offer, so it says so
+ * and offers the same guarded writes the folder picker does — colocated init for a Git checkout, init in place for a
+ * plain folder. Nothing is initialized without the click, and the segment turns into the real one once the Host reports
+ * a repository.
+ */
+const NotARepository = (props: { readonly t: JjIntegrationTranslate; readonly path: string | undefined; readonly onEnabled: () => void }) => {
+  const setup = useContract(RepositorySetup)
+  const lifecycle = useApi(projectLifecycleApi)
+  const inspection = useQuery({
+    queryKey: ['jj-integration', 'inspect-not-a-repository', props.path ?? ''],
+    enabled: props.path !== undefined,
+    queryFn: () => lifecycle.inspect({ path: props.path ?? '' }),
+    retry: false,
+    staleTime: 30_000,
+  })
+  const [enabling, setEnabling] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+  const found = inspection.data
+  let verb: 'enable' | 'initialize' | null = null
+  if (found?.kind === 'none') verb = 'initialize'
+  else if (found?.kind === 'git' && found.canEnableJujutsu) verb = 'enable'
+  const run = async (): Promise<void> => {
+    if (props.path === undefined || verb === null) return
+    setEnabling(true)
+    setFailure(null)
+    try {
+      if (verb === 'enable') {
+        if (setup.status !== 'active') return
+        await setup.value.enableJujutsu({ path: props.path })
+      } else {
+        await lifecycle.initProject({ path: props.path })
+      }
+      props.onEnabled()
+    } catch (cause) {
+      setFailure(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setEnabling(false)
+    }
+  }
+  const label = verb === 'initialize' ? props.t('initializeRepository') : props.t('enableJujutsu')
+  const hint = verb === 'initialize' ? props.t('initializeRepositoryHint') : props.t('enableJujutsuHint')
+  const unavailable = verb === 'enable' && setup.status !== 'active'
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            tabIndex={0}
+            data-run-segment="workspace"
+            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:text-muted-foreground"
+          >
+            <FolderIcon className="dshx:size-3.5" />
+            {props.t('notJjRepository')}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="dshx:max-w-72">{found?.reason ?? props.t('workspaceSegmentNoVcs')}</TooltipContent>
+      </Tooltip>
+      {verb === null || unavailable ? null : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm"
+              data-enable-jujutsu=""
+              disabled={enabling}
+              onClick={() => void run()}
+            >
+              {enabling ? <Spinner className="dshx:size-3.5" /> : null}
+              {enabling ? props.t('enableJujutsuRunning') : label}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="dshx:max-w-72">{hint}</TooltipContent>
+        </Tooltip>
+      )}
+      {failure === null ? null : <span className="dshx:text-xs dshx:text-destructive">{props.t('enableJujutsuFailed', { message: failure })}</span>}
+    </>
+  )
+}
+
+/**
  * Where a new thread runs on this machine, chosen before its first message: the jj bookmark it starts from and
  * whether it gets its own jj workspace, rendered in the native New thread row beside its project chip after the host chip.
  * The toggle flips at once and names the thread workspace while the Host creates it; a Send waits only if submitted before it is ready.
@@ -198,6 +282,7 @@ export const DestinationBar = (props: {
   const { t, services } = props
   const api = useApi(jjIntegrationApi)
   const [branchOpen, setBranchOpen] = useState(false)
+  const queryClient = useQueryClient()
   const composerWorkspace = useComposerWorkspace(services, props.workspaceId)
   const toggle = useWorkspaceToggle(props.toggle, composerWorkspace?.sessionId)
   const workspaceId = props.workspaceId ?? composerWorkspace?.workspaceId ?? null
@@ -324,6 +409,11 @@ export const DestinationBar = (props: {
     <TooltipProvider>
       <div className="dshx-root dshx:contents" aria-label={t('destination')}>
         <HostChipSlot localProjectPath={localProjectPath} />
+        {localProjectPath === undefined ? null : (
+          <span className="dshx:inline-flex">
+            <ProjectIcon path={localProjectPath} />
+          </span>
+        )}
         {toggle.busy ? (
           // Order 0 keeps it right after the native folder chip, which it stands in for until the switch lands.
           <span
@@ -416,19 +506,25 @@ export const DestinationBar = (props: {
             </PopoverContent>
           </Popover>
         ) : current?.vcs === 'none' ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                tabIndex={0}
-                data-run-segment="workspace"
-                className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:text-muted-foreground"
-              >
-                <FolderIcon className="dshx:size-3.5" />
-                {t('workspaceSegmentInPlace')}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent className="dshx:max-w-72">{t('workspaceSegmentNoVcs')}</TooltipContent>
-          </Tooltip>
+          <NotARepository
+            t={t}
+            path={localProjectPath}
+            onEnabled={() => {
+              // The repository cache and the destination both learned "no repository" a moment ago: drop the cached
+              // location and ask again, so the segment becomes the real one without a reload.
+              void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'repositories'] })
+              // The Host caches repository locations, so ask it for a fresh scan before asking again.
+              const rescan = async (): Promise<void> => {
+                try {
+                  await runHostRequest({ timeoutMs: 120_000, request: signal => api.refreshRepositories({}, { signal }) })
+                } catch {
+                  // The segment refetches either way: a failed rescan still shows the next scan's answer.
+                }
+                for (const delay of [0, 750, 2_000]) setTimeout(() => void destination.refetch(), delay)
+              }
+              void rescan()
+            }}
+          />
         ) : null}
         {newThreadId !== null && destination.isError ? (
           <span role="alert" className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-destructive">

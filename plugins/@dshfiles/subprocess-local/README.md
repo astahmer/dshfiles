@@ -13,14 +13,19 @@ shell command, terminal and background job an agent runs goes through it.
 that probe walks the process table (about 2 ms), and a job an agent detaches (`nohup … &`) keeps its group alive for
 hours. One such group cost the live Host 9.6 s of CPU per 70 s, slowing every request, thread creation included.
 
+`inspectForeground` backs the terminal readiness probe, which `@deepseek-ai/dsh-terminal-bash` runs every 50 ms while a send
+is active, and it refreshed teardown evidence with a whole-table `/bin/ps` fork whose result it discarded (about 40 ms of
+blocked event loop on a loaded host).
+
 ## Local delta
 
 Every other vendored file is byte-identical to the pinned revision. The whole delta is:
 
-| File                  | Change                                                                                       |
-| --------------------- | -------------------------------------------------------------------------------------------- |
-| `src/native/spawn.ts` | the group-exit poll backs off from 15 ms to 500 ms; a short-lived tree is still seen at once |
-| `src/host.ts`         | new: Loader entry that mounts the native Service unchanged                                   |
+| File                     | Change                                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `src/native/spawn.ts`    | the group-exit poll backs off from 15 ms to 500 ms; a short-lived tree is still seen at once              |
+| `src/native/terminal.ts` | the readiness probe refreshes its descendant evidence at most once per second; teardown still scans fresh |
+| `src/host.ts`            | new: Loader entry that mounts the native Service unchanged                                                |
 
 The runner process the service launches is still the stock package's `@deepseek-ai/dsh-subprocess-local/runner`.
 

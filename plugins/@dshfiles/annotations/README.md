@@ -32,9 +32,11 @@ preview and extension halves here reuse their _ideas_ (instrumented renderer,
 - **Note**: the popover collects the note plus an optional intent (`fix`,
   `change`, `question`, `approve`) and severity (`blocking`, `important`,
   `suggestion`).
-- **Insert**: the panel lists the annotations of this thread, or of this Backlog
-  item or capture box, and adds them to the draft at the composer cursor. `Annotated UI feedback (n)` is plain text: it
-  stays editable and is only sent when you send the message.
+- **Insert**: `Add` puts the annotation's block into the draft at the composer
+  cursor right away; `Add & pick another` does the same and starts the next pick.
+  The panel also lists the annotations of this thread, or of this Backlog item or
+  capture box, so `Add N to draft` can re-add them. `Annotated UI feedback (n)` is
+  plain text: it stays editable and is only sent when you send the message.
 - **Scope**: `ComposerTool` hands the tool a `scope`, and the Host's `sessionId`
   field stores it opaquely: a Session id, `backlog:item:<id>` or
   `backlog:capture:<key>`. Nothing closes a Backlog annotation on its own, because

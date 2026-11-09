@@ -118,7 +118,7 @@ light and dark) and expressed through one kit, `@dshfiles/plugin-ui` (shadcn/ui 
 prefix). Plugins never bring their own chrome, palette or header style; they fill one page template. Density is
 "BB density": 13px body text, 28–32px controls, 6px radius.
 
-The plan behind this file is [plans/ade-ux/README.md](plans/ade-ux/README.md); its §3 glossary governs copy and
+The plan behind this file is [docs/ade-ux/README.md](docs/ade-ux/README.md); its §3 glossary governs copy and
 §4.7 the status vocabulary below.
 
 **Key characteristics:**
@@ -244,7 +244,7 @@ card with hairline dividers. In narrow panes meta wraps under the title and trai
 - **Do** build every page from `Page` → `PageSection` → `EntityList`/form/table → `EmptyState`.
 - **Do** map plugin states onto the six `WorkStatus` values; put nuance in the detail text.
 - **Do** use the glossary: thread, project, workspace, host, land, done, agent, Needs you, usage, memory
-  ([plan §3](plans/ade-ux/README.md#glossary-enforced-in-copy)). `node --run check:copy` ratchets banned terms.
+  ([plan §3](docs/ade-ux/README.md#glossary-enforced-in-copy)). `node --run check:copy` ratchets banned terms.
 - **Don't** colour working or healthy states; don't add a second attention colour.
 - **Don't** put plugin names in labels ("pulls.review: Reviews", "Thread Sidebar: Navigation").
 - **Don't** use a blue primary button, an icon-tile header, underline page tabs or ALL-CAPS labels.

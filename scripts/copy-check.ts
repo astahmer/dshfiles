@@ -1,6 +1,6 @@
 // Copy check: banned glossary terms in user-facing plugin labels, as a ratchet.
 //
-// The ADE plan glossary (plans/ade-ux/README.md §3) names one word per concept: thread (not session, chat or
+// The ADE plan glossary (docs/ade-ux/README.md §3) names one word per concept: thread (not session, chat or
 // conversation), land (not integrate), done (not settle), and labels never carry a plugin name. This script scans
 // client copy — string literals and JSX text in plugin `.tsx` files, locale tables, and the UI labels quoted in
 // `dshx.features.json` `reach` steps — and counts findings per term. It fails only when a term's count rises above
@@ -280,7 +280,7 @@ const main = (): void => {
   const use = new Map(copyTerms.map(term => [term.id, term.use]))
   use.set('plugin-prefix', 'the view name alone')
   if (increased.length > 0) {
-    console.error('copy-check: banned glossary terms increased in UI copy (plans/ade-ux/README.md §3 Glossary):')
+    console.error('copy-check: banned glossary terms increased in UI copy (docs/ade-ux/README.md §3 Glossary):')
     for (const line of increased) console.error(`  ${line} — use "${use.get(line.split(':')[0] ?? '') ?? ''}"`)
     console.error('Run `node --run check:copy -- --report` to list findings and fix the new copy.')
     process.exitCode = 1

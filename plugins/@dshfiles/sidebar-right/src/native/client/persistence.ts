@@ -1,60 +1,71 @@
 /** Validated current-layout snapshots; undo history belongs to the live window. */
-import { z } from 'zod'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import * as Schema from 'effect/Schema'
+import { Effect } from 'effect'
+import type { Branded } from '@deepseek-ai/dsh-brand'
 import { EMPTY_HISTORY, type PaneId, type SplitId, type TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { SurfaceState } from './stores.ts'
 
 const persistencePrefix = 'dsh.sidebar-right.v1'
+const paneIdPattern = /^(?:pane|float)[1-9][0-9]*$/u
+const splitIdPattern = /^split[1-9][0-9]*$/u
+const tabIdPattern = /^tab[1-9][0-9]*$/u
+const nodeIdPattern = /^(?:pane|float|split)[1-9][0-9]*$/u
+const rejectsInvalidReferences = 'Invalid saved sidebar layout references'
 
-const paneId = z
-  .string()
-  .regex(/^(?:pane|float)[1-9][0-9]*$/u)
-  .transform(id => brandString<PaneId>(id))
-const splitId = z
-  .string()
-  .regex(/^split[1-9][0-9]*$/u)
-  .transform(id => brandString<SplitId>(id))
-const tabId = z
-  .string()
-  .regex(/^tab[1-9][0-9]*$/u)
-  .transform(id => brandString<TabId>(id))
-const nodeId = z.union([paneId, splitId])
-const rectangle = z.object({ x: z.number(), y: z.number(), width: z.number().positive(), height: z.number().positive() })
-const node = z.discriminatedUnion('kind', [
-  z
-    .object({
-      kind: z.literal('pane'),
-      id: paneId,
-      host: z.enum(['dock', 'float']),
-      tabs: z.array(tabId),
-      activeTabId: tabId.optional(),
-      rect: rectangle.optional(),
-    })
-    .transform(pane => ({ ...pane, activeTabId: pane.activeTabId, rect: pane.rect })),
-  z.object({
-    kind: z.literal('split'),
-    id: splitId,
-    axis: z.enum(['row', 'column']),
-    children: z.array(nodeId).min(2),
-    sizes: z.array(z.number().positive()).min(2),
-  }),
-])
-const layout = z.object({
-  nodes: z.record(nodeId, node),
-  tabs: z.record(tabId, z.object({ id: tabId, kind: z.string().min(1), contentId: z.string().min(1), title: z.string() })),
-  rootId: nodeId,
-  floats: z.array(paneId),
-  activePaneId: paneId,
-  expanded: z.boolean(),
-  mode: z.enum(['push', 'fullscreen']),
+/** A compile-time brand applied after the pattern already admitted the value. */
+const brandedId = <Id extends Branded<string>>(pattern: RegExp): Schema.Codec<Id, string> =>
+  Schema.String.check(Schema.isPattern(pattern)).pipe(Schema.decodeTo(Schema.declare<Id>((value): value is Id => typeof value === 'string')))
+
+const paneId = brandedId<PaneId>(paneIdPattern)
+const splitId = brandedId<SplitId>(splitIdPattern)
+const tabId = brandedId<TabId>(tabIdPattern)
+const nodeId = Schema.Union([paneId, splitId])
+const positiveNumber = Schema.Finite.check(Schema.isGreaterThan(0))
+const rectangle = Schema.Struct({ x: Schema.Finite, y: Schema.Finite, width: positiveNumber, height: positiveNumber })
+const absentOrUndefined = <ValueSchema extends Schema.Constraint>(schema: ValueSchema) =>
+  Schema.UndefinedOr(schema).pipe(Schema.withDecodingDefaultKey(Effect.succeed(undefined)))
+const pane = Schema.Struct({
+  kind: Schema.Literal('pane'),
+  id: paneId,
+  host: Schema.Literals(['dock', 'float']),
+  tabs: Schema.Array(tabId),
+  activeTabId: absentOrUndefined(tabId),
+  rect: absentOrUndefined(rectangle),
 })
-const surface = z.object({ layout, minted: z.int().nonnegative() })
-const envelope = z.object({ bySession: z.record(z.string(), z.unknown()) })
+const split = Schema.Struct({
+  kind: Schema.Literal('split'),
+  id: splitId,
+  axis: Schema.Literals(['row', 'column']),
+  children: Schema.Array(nodeId).check(Schema.isMinLength(2)),
+  sizes: Schema.Array(positiveNumber).check(Schema.isMinLength(2)),
+})
+const node = Schema.Union([pane, split])
+const tab = Schema.Struct({
+  id: tabId,
+  kind: Schema.NonEmptyString,
+  contentId: Schema.NonEmptyString,
+  title: Schema.String,
+})
+const layout = Schema.Struct({
+  nodes: Schema.Record(Schema.String, node).check(
+    Schema.makeFilter(nodes => (Object.keys(nodes).every(key => nodeIdPattern.test(key)) ? true : rejectsInvalidReferences)),
+  ),
+  tabs: Schema.Record(Schema.String, tab).check(
+    Schema.makeFilter(tabs => (Object.keys(tabs).every(key => tabIdPattern.test(key)) ? true : rejectsInvalidReferences)),
+  ),
+  rootId: nodeId,
+  floats: Schema.Array(paneId),
+  activePaneId: paneId,
+  expanded: Schema.Boolean,
+  mode: Schema.Literals(['push', 'fullscreen']),
+})
+const surface = Schema.Struct({ layout, minted: Schema.Natural })
+const envelope = Schema.Struct({ bySession: Schema.Record(Schema.String, Schema.Unknown) })
 
-function validateReferences(value: z.infer<typeof surface>): void {
+function validateReferences(value: typeof surface.Type): void {
   const { layout, minted } = value
   const reject: () => never = () => {
-    throw new Error('Invalid saved sidebar layout references')
+    throw new Error(rejectsInvalidReferences)
   }
   const visited = new Set<string>()
   const usedTabs = new Set<string>()
@@ -113,9 +124,9 @@ export class SidebarLayoutStorage {
     }
     if (raw === null) return undefined
     try {
-      const saved = envelope.parse(JSON.parse(raw)).bySession[sessionId]
+      const saved = Schema.decodeUnknownSync(envelope)(JSON.parse(raw)).bySession[sessionId]
       if (saved === undefined) return undefined
-      const parsed = surface.parse(saved)
+      const parsed = Schema.decodeUnknownSync(surface)(saved)
       validateReferences(parsed)
       return { layout: parsed.layout, minted: parsed.minted, history: EMPTY_HISTORY }
     } catch {

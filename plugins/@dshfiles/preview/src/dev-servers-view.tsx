@@ -12,7 +12,7 @@ import { DevServerPoll } from './dev-server-poll.js'
 import { PreviewOpener } from './preview-opener.js'
 
 /**
- * Dev servers in Observe › Processes and in the thread panel's Jobs facet (plans/ade-ux §6 "Processes in 3 boards").
+ * Dev servers in Observe › Processes and in the thread panel's Jobs facet (docs/ade-ux §6 "Processes in 3 boards").
  * The thread header chip stays the quick view; these list the same `devServers` reads with the same Open and Stop.
  */
 const ServerRows = (props: { readonly sessionId: string; readonly servers: readonly DevServerView[] }): JSX.Element => {

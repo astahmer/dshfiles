@@ -1,6 +1,6 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
+import { toStorageSchema } from '@dshfiles/dshx/host'
 import * as Schema from 'effect/Schema'
-import { asZodSchema } from './effect-zod-schema.js'
 import {
   fallbackChainSchema,
   fallbackReturnPolicySchema,
@@ -30,10 +30,10 @@ export const modelFallbackDomain = defineDomain({
   version: 1,
   tables: {
     /** `default` plus one row per thread that overrides it. */
-    chains: { valueSchema: asZodSchema(chainRecordSchema), __key: 'chains' },
+    chains: { valueSchema: toStorageSchema(chainRecordSchema), __key: 'chains' },
     /** Threads a fallback is serving instead of their selected model. */
-    active: { valueSchema: asZodSchema(activeRecordSchema), __key: 'active' },
-    preferences: { valueSchema: asZodSchema(preferenceRecordSchema), __key: 'preferences' },
+    active: { valueSchema: toStorageSchema(activeRecordSchema), __key: 'active' },
+    preferences: { valueSchema: toStorageSchema(preferenceRecordSchema), __key: 'preferences' },
   },
 })
 

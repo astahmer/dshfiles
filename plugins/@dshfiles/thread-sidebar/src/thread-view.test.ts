@@ -31,6 +31,37 @@ describe('thread view grouping', () => {
     ])
   })
 
+  it('groups two checkouts of one repository as one project with a checkout count', () => {
+    const groups = ThreadViewModel.groupEntries({
+      groupBy: 'project',
+      entries: [
+        { thread: { id: 'in-main', updatedAt: 10 }, workspaceId: 'main-checkout' },
+        { thread: { id: 'in-copy', updatedAt: 20 }, workspaceId: 'second-checkout' },
+        { thread: { id: 'elsewhere', updatedAt: 15 }, workspaceId: 'other-repo' },
+      ],
+      workspaceTitles: new Map([
+        ['main-checkout', 'repo'],
+        ['second-checkout', 'repo-copy'],
+        ['other-repo', 'other'],
+      ]),
+      projectKeys: new Map([
+        ['main-checkout', 'https://example.invalid/owner/repo.git'],
+        ['second-checkout', 'https://example.invalid/owner/repo.git'],
+        ['other-repo', 'https://example.invalid/owner/other.git'],
+      ]),
+      localProjectIds: new Set(['main-checkout', 'second-checkout', 'other-repo']),
+      unassignedTitle: 'Unassigned',
+      dateTitles: { today: 'Today', yesterday: 'Yesterday', lastSevenDays: 'Last 7 days', older: 'Older' },
+      now: 100,
+    })
+
+    const repository = groups.find(group => group.projectId === 'main-checkout')
+    expect(repository?.checkoutCount).toBe(2)
+    expect(repository?.threads.map(thread => thread.id)).toEqual(['in-copy', 'in-main'])
+    expect(groups.find(group => group.projectId === 'other-repo')?.checkoutCount).toBe(1)
+    expect(groups).toHaveLength(2)
+  })
+
   it('keeps creation targets by registered project identity, not duplicate display titles', () => {
     const groups = ThreadViewModel.groupEntries({
       groupBy: 'project',

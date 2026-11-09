@@ -22,6 +22,10 @@
     "./completion-event": {
       "types": "./src/completion-event.ts",
       "default": "./dist/completion-event.js"
+    },
+    "./workspace-setup": {
+      "types": "./src/workspace-setup.ts",
+      "default": "./dist/workspace-setup.js"
     }
   },
   "scripts": {
@@ -33,6 +37,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/session-log-window": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/sqlite-store": "workspace:*",
     "@effect/platform-node": "catalog:",

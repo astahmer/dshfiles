@@ -42,7 +42,12 @@ export class FffIndexWorker extends Context.Service<FffIndexWorker, { readonly a
       }
 
       const spawn = () => {
-        const spawned = new Worker(entry, { workerData: { stateRoot: dshHomePath('plugins', 'fff-search') } })
+        // The index itself is the native finder; the worker's own JS only shuttles queries, so a small isolate is enough
+        // and a runaway cannot grow to the Host's default limit.
+        const spawned = new Worker(entry, {
+          workerData: { stateRoot: dshHomePath('plugins', 'fff-search') },
+          resourceLimits: { maxOldGenerationSizeMb: 256, maxYoungGenerationSizeMb: 32 },
+        })
         // oxlint-disable-next-line antislop/no-unknown-parameters -- The worker message boundary; `workerReply` decoding runs on the next line.
         spawned.on('message', (raw: unknown) => {
           const reply = decodeReply(raw)

@@ -22,6 +22,19 @@ Feature: Workspace folder picker
     Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted
     Then native folder selection supports cancellation, recovery and registration
 
+  @scenario:workspace-folder-picker.folder-setup
+  @scenario:workspace-folder-picker.setup-panel
+  Scenario: Inspect an existing Git checkout before adding it
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker" is booted
+    When the header workspace Add workspace action is opened
+    Then an existing Git checkout reports its repository and offers Jujutsu before it is added
+
+  @scenario:workspace-folder-picker.publish-entry
+  Scenario: A local checkout without an origin offers to publish it
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker" is booted
+    When the header workspace Add workspace action is opened
+    Then a Git checkout without an origin offers to publish it
+
   @scenario:workspace-folder-picker.clone-repository
   Scenario: Clone a local repository as a project
     Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted

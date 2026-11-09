@@ -81,7 +81,15 @@ describe('DestinationShell', () => {
         .map(tab => tab.textContent),
     ).toEqual(['Threads', 'Inbox', 'Land', 'Work', 'Agents', 'Observe', 'Knowledge', 'Settings'])
     expect(screen.getByText('Thread list')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Board' })).toBeTruthy()
+    const threadPages = screen.getByRole('navigation', { name: 'Threads pages' })
+    expect(
+      within(threadPages)
+        .getAllByRole('button')
+        .map(button => button.getAttribute('aria-label')),
+    ).toEqual(['Board'])
+    fireEvent.click(within(threadPages).getByRole('button', { name: 'Board' }))
+    expect(shell.selectPanel).toHaveBeenCalledWith('dshfiles-thread-board')
+    expect(shell.record).toHaveBeenCalledWith({ destination: 'threads', section: 'dshfiles-thread-board', surface: 'index' })
     expect(screen.queryByRole('button', { name: 'New thread' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Search threads' }))
     expect(shell.searchThreads).toHaveBeenCalled()
@@ -165,8 +173,8 @@ describe('MovedToDialog', () => {
     act(() => MovedTo.open())
     expect(screen.getByRole('heading', { name: 'Where did a page go?' })).toBeTruthy()
     expect(screen.getAllByText('Not installed').length).toBeGreaterThan(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Open Usage: Analytics in Observe › Usage' }))
-    expect(openEntry).toHaveBeenCalledWith(expect.objectContaining({ entry: 'Usage: Analytics', panelId: 'dshfiles-usage', destination: 'observe' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Usage in Observe › Usage' }))
+    expect(openEntry).toHaveBeenCalledWith(expect.objectContaining({ entry: 'Usage', panelId: 'dshfiles-usage', destination: 'observe' }))
     expect(screen.queryByRole('heading', { name: 'Where did a page go?' })).toBeNull()
   })
 })

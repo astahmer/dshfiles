@@ -10,7 +10,7 @@ import {
   type TokenBuckets,
 } from './cost-estimate.js'
 import { AiAccountsSchema } from './effect-schema.js'
-import { asZodSchema } from './effect-zod-schema.js'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 
 /**
  * Per-session token usage grouped by route and context band, folded from the
@@ -180,12 +180,12 @@ const STATE_VERSION = 2
 const costProjectionDefinition = {
   key: SESSION_COST_PROJECTION_KEY,
   stateVersion: STATE_VERSION,
-  // `ctx.sessionProjections` still declares its schema as a Zod schema and calls `.parse` on it.
-  stateSchema: asZodSchema(stateSchema),
+  // `ctx.sessionProjections` still defines its schema as a Zod schema and calls `.parse` on it.
+  stateSchema: zodSchemaFromEffect(stateSchema),
   init: CostProjectionModel.initialState,
   apply: CostProjectionModel.applyEvent,
   wire: {
-    viewSchema: asZodSchema(sessionCostViewSchema),
+    viewSchema: zodSchemaFromEffect(sessionCostViewSchema),
     // The state keeps the view object, so a selection-only change publishes nothing.
     view: (state: CostState): SessionCostView => state.view,
   },
