@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "phone-sign-in-qr",
+      "title": "Print a phone sign-in QR for a trusted HTTPS origin",
+      "summary": "At startup the Host prints one scannable QR per configured HTTPS origin, carrying the process launch token so a phone can exchange it for a persistent browser cookie.",
+      "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: startup terminal output",
+      "configuration": [],
+      "states": ["printed", "origin-rejected"],
+      "failureModes": [
+        "A non-HTTPS, credentialed, or non-absolute origin is ignored instead of printed.",
+        "Nothing is printed when the loader or Connection service is unavailable."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "phone-access.secure-origin-filter",
+          "file": "plugins/@dshfiles/phone-access/tests/qr.test.ts",
+          "testName": "renders a scannable square matrix"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "phone-access.no-browser-surface",
+          "reason": "The Host prints to the terminal and renders no UI; the scratch Host boot check verifies the bundle loads and prints."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Printing to the already-open terminal is not a work unit; the plugin opens no network connection and spawns nothing."
+        }
+      ]
+    }
+  ]
+}

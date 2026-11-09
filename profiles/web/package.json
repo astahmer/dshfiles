@@ -48,6 +48,7 @@
     "@dshfiles/model-effort-picker": "link:../../plugins/@dshfiles/model-effort-picker",
     "@dshfiles/model-selection": "link:../../plugins/@dshfiles/model-selection",
     "@dshfiles/multi-host": "link:../../plugins/@dshfiles/multi-host",
+    "@dshfiles/phone-access": "link:../../plugins/@dshfiles/phone-access",
     "@dshfiles/plugin-guide": "link:../../plugins/@dshfiles/plugin-guide",
     "@dshfiles/policies": "link:../../plugins/@dshfiles/policies",
     "@dshfiles/preview": "link:../../plugins/@dshfiles/preview",
@@ -195,7 +196,8 @@
         "@dshfiles/web-fetch-readable",
         "@dshfiles/component-gallery",
         "@dshfiles/thread-transfer",
-        "@dshfiles/whiteboard"
+        "@dshfiles/whiteboard",
+        "@dshfiles/phone-access"
       ]
     }
   }
