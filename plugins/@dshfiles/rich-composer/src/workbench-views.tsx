@@ -65,6 +65,11 @@ export class ConversationWorkbenchSources {
     return `dshfiles-conversation.view/${encode(sessionId)}/${encode(viewId)}`
   }
 
+  /** Whether two catalogs list the same Sessions, in order, under the same titles. */
+  static sameCatalog(left: readonly ConversationWorkbenchSession[], right: readonly ConversationWorkbenchSession[]): boolean {
+    return left.length === right.length && left.every((session, index) => session.id === right[index]?.id && session.title === right[index]?.title)
+  }
+
   static create(ports: {
     readonly registry: Pick<WorkbenchPanelRegistry, 'register'>
     readonly sessions: ObservableSnapshot<readonly ConversationWorkbenchSession[]>
