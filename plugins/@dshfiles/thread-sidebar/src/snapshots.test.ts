@@ -131,3 +131,37 @@ test('the status selector keeps the caller value type and its snapshot identity'
   assert.equal(first.get(SessionId('a'))?.running, true)
   assert.equal(second, first)
 })
+
+test('a publish whose unchanged rows already kept their identity reuses the incoming record without a copy', () => {
+  const a = summary('a')
+  const first = HostSnapshotsModel.stabilizeSessionListState(null, state([a, summary('b')]))
+  const next = state([a, summary('b', { updatedAt: 2_000 })])
+  const second = HostSnapshotsModel.stabilizeSessionListState(first, next)
+  assert.equal(second.byId, next.byId)
+  assert.equal(second.projectionsBySession, first.projectionsBySession)
+})
+
+test('an equal projection value arriving as a new object keeps the previous projection', () => {
+  const projection = {
+    state: 'ready' as const,
+    error: null,
+    values: { subagentCatalog: [{ id: SessionId('c'), mode: 'continuable' as const, label: 'c', createdAt: 1 }] },
+  }
+  const first = HostSnapshotsModel.stabilizeSessionListState(null, { ...state([summary('a')]), projectionsBySession: { [SessionId('a')]: projection } })
+  const second = HostSnapshotsModel.stabilizeSessionListState(first, {
+    ...state([summary('a', { updatedAt: 2_000 })]),
+    projectionsBySession: { [SessionId('a')]: structuredClone(projection) },
+  })
+  assert.equal(second.projectionsBySession, first.projectionsBySession)
+})
+
+test('rows compared on the fields a consumer reads ignore a streaming turn touching other fields', () => {
+  const sameFolder = (left: SessionSummary, right: SessionSummary): boolean => left.cwd === right.cwd
+  const before = state([summary('a', { cwd: '/p' }), summary('b')]).byId
+  assert.equal(
+    HostSnapshotsModel.sameRowsBy(before, state([summary('a', { cwd: '/p', updatedAt: 9_000, running: true }), summary('b')]).byId, sameFolder),
+    true,
+  )
+  assert.equal(HostSnapshotsModel.sameRowsBy(before, state([summary('a', { cwd: '/q' }), summary('b')]).byId, sameFolder), false)
+  assert.equal(HostSnapshotsModel.sameRowsBy(before, state([summary('a', { cwd: '/p' })]).byId, sameFolder), false)
+})

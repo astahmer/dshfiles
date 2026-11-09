@@ -391,10 +391,20 @@ const workspaceForLineage = (
   byId: Readonly<Record<string, SessionSummary>>,
   workspaceBySession: ReadonlyMap<string, string>,
 ): string | undefined => {
+  // Called per listed row on every list publish: the visited set exists only past a direct parent.
   let cursor: string | undefined = session.id
-  const visited = new Set<string>()
-  while (cursor !== undefined && !visited.has(cursor)) {
-    visited.add(cursor)
+  let parentId: string | undefined
+  let visited: Set<string> | undefined
+  for (let hop = 0; cursor !== undefined; hop += 1) {
+    if (hop === 1) {
+      if (cursor === session.id) return undefined
+      parentId = cursor
+    }
+    if (hop >= 2) {
+      visited ??= new Set([session.id, parentId ?? session.id])
+      if (visited.has(cursor)) return undefined
+      visited.add(cursor)
+    }
     const workspaceId = workspaceBySession.get(cursor)
     if (workspaceId !== undefined) return workspaceId
     cursor = byId[cursor]?.parentId

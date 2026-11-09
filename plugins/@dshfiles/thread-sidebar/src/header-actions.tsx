@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ import { ThreadUrlModel } from './thread-url.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { SettledThreadsModel } from './settled-threads.js'
+import { useStableValue } from './stable-value.js'
 
 interface HeaderThreadActionsInjected {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -45,6 +47,11 @@ type HeaderThreadActionsProps = Pick<PropsRuntime<'conversation.session.header.u
   HeaderThreadActionsInjected
 
 // Read at the click, outside render.
+const sameActionRow = (left: SessionSummary, right: SessionSummary): boolean =>
+  left.parentId === right.parentId && left.blank === right.blank && left.running === right.running && left.cwd === right.cwd
+const sameActionRows = (left: Readonly<Record<SessionId, SessionSummary>>, right: Readonly<Record<SessionId, SessionSummary>>): boolean =>
+  HostSnapshotsModel.sameRowsBy(left, right, sameActionRow)
+
 const muteUntilNow = (option: ThreadMuteOption): number | null => ThreadMuteModel.muteUntil(option, Date.now())
 const settleAtNow = (): number => Date.now()
 
@@ -97,7 +104,7 @@ export const HeaderThreadActions = ({
 }: HeaderThreadActionsProps) => {
   const sessionState = useSessions(HostSnapshotsModel.selectStableSessionListState)
   const session = sessionState.byId[sessionId]
-  const workspaceItems = useWorkspaces(state => state.items)
+  const workspaceItems = useWorkspaces(state => HostSnapshotsModel.selectStableWorkspaceItems(state.items))
   const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
   const pinnedSessionIds = useWorkspaces(state => state.pinnedSessionIds)
   const { preferences, updatePreferences } = usePreferences()
@@ -107,21 +114,22 @@ export const HeaderThreadActions = ({
   // Expired mutes are pruned by the sidebar's own clock; this header only needs the moment it opened.
   const [openedAt] = useState(() => Date.now())
   const crowded = useCrowdedHeader(bar)
+  // Only lineage, blankness, running and folder feed the derivations below; a streaming turn republishes the list
+  // several times a second with none of them changed, and three mounted conversations each render this header.
+  const actionRowsById = useStableValue(sessionState.byId, sameActionRows)
   const workspaceBySession = useMemo(
-    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceItems, sessions: Object.values(sessionState.byId) }),
-    [sessionState.byId, workspaceItems],
+    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceItems, sessions: Object.values(actionRowsById) }),
+    [actionRowsById, workspaceItems],
   )
-  // Per Session-list change, not per header render: three mounted conversations each render this header.
-  const { actionThreads, targetIds, descendantRunning } = useMemo(() => {
-    const sessions = Object.values(sessionState.byId)
-    const actionThreads = sessions.filter(candidate => !candidate.blank)
+  const { targetIds, descendantRunning } = useMemo(() => {
+    const sessions = Object.values(actionRowsById)
     const ids = ThreadChildrenModel.threadActionTargetIds({
       threadId: sessionId,
-      threads: actionThreads,
+      threads: sessions.filter(candidate => !candidate.blank),
       cascadeToChildren: preferences.applyActionsToChildThreads,
     })
-    return { actionThreads, targetIds: ids, descendantRunning: SidebarOrganization.hasRunningDescendantOfAny({ sessionIds: new Set(ids), sessions }) }
-  }, [preferences.applyActionsToChildThreads, sessionId, sessionState.byId])
+    return { targetIds: ids, descendantRunning: SidebarOrganization.hasRunningDescendantOfAny({ sessionIds: new Set(ids), sessions }) }
+  }, [preferences.applyActionsToChildThreads, sessionId, actionRowsById])
   if (session === undefined || session.blank) return null
 
   const archived = archivedSessionIds.includes(sessionId)
@@ -181,7 +189,10 @@ export const HeaderThreadActions = ({
     updatePreferences({
       mutedThreads: ThreadMuteModel.muteSessions({
         mutes: preferences.mutedThreads,
-        sessions: actionThreads.filter(thread => targetIds.includes(thread.id)),
+        sessions: targetIds.flatMap(targetId => {
+          const target = sessionState.byId[targetId]
+          return target === undefined || target.blank ? [] : [target]
+        }),
         until: muteUntilNow(option),
       }),
     })

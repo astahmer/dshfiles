@@ -10,7 +10,7 @@ import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
 import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/draft-client'
-import { isListedUnsentThread, presentUnsentThread } from './unsent-threads.js'
+import { isListedUnsentThread, presentUnsentRows } from './unsent-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
 import { DEFAULT_THREAD_BOARD_VIEW, storedThreadBoardView, ThreadBoardViewModel } from './thread-board-view.js'
 import { toggleCollapsedGroup } from './collapsed-groups.js'
@@ -180,7 +180,7 @@ import {
   type ThreadSelectionState,
 } from './thread-selection.js'
 import { workingThreadIds } from './working-threads.js'
-import { indexRebasedThreadSessions } from './rebased-threads.js'
+import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
 import { SettledThreadsModel, type SettledSessionState } from './settled-threads.js'
 import { answerSettleRequests } from './settle-request.js'
@@ -443,6 +443,9 @@ const sessionsForAutoArchive = (ids: readonly SessionSummary['id'][], byId: Read
     const session = byId[sessionId]
     return session === undefined ? [] : [session]
   })
+
+const sameFolderRows = (left: Readonly<Record<SessionId, SessionSummary>>, right: Readonly<Record<SessionId, SessionSummary>>): boolean =>
+  HostSnapshotsModel.sameRowsBy(left, right, (before, after) => before.cwd === after.cwd)
 
 const keepThreadTab = (sessionId: string): void => {
   window.dispatchEvent(new CustomEvent('dshfiles:main-tabs:keep-thread', { detail: { sessionId } }))
@@ -1565,6 +1568,7 @@ const groupedThreadId = (thread: SidebarGroupedThread): string => (thread.kind =
 const EMPTY_UNSENT_DRAFTS: Readonly<Record<string, SessionDraft>> = Object.freeze({})
 
 const EMPTY_HOISTED_SESSIONS: readonly SessionSummary[] = []
+const NO_VIEW_MENU_THREAD_IDS: readonly string[] = []
 const EMPTY_HOISTED_USAGE_LIMIT_ROWS: readonly UsageLimitRow<SessionSummary>[] = []
 const ABSENT_CURRENT_SESSION_ID: ObservableSnapshot<string | undefined> = {
   getSnapshot: () => undefined,
@@ -1583,25 +1587,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const readDrafts = useCallback(() => props.drafts?.getSnapshot() ?? EMPTY_UNSENT_DRAFTS, [props.drafts])
   const unsentDrafts = useSyncExternalStore(subscribeDrafts, readDrafts, readDrafts)
   const translateDraft = props.tSidebar
-  const sessionState = useMemo(
-    () => ({
-      ...hostSessionState,
-      byId: Object.fromEntries(
-        Object.values(hostSessionState.byId).map(session => [
-          session.id,
-          presentUnsentThread({
-            session,
-            draft: unsentDrafts[session.id],
-            newChatLabel: translateDraft('threadSidebarNewChat'),
-            draftLabel: preview => translateDraft('threadSidebarUnsentDraft', { preview }),
-          }),
-        ]),
-      ),
-    }),
-    [hostSessionState, unsentDrafts, translateDraft],
-  )
-  const sessionStatus = props.useSessionStatus(state => state)
+  const presentedUnsentRows = useRef(new WeakMap<SessionSummary, SessionSummary>())
+  const sessionState = useMemo(() => {
+    const byId = presentUnsentRows({
+      byId: hostSessionState.byId,
+      drafts: unsentDrafts,
+      newChatLabel: translateDraft('threadSidebarNewChat'),
+      draftLabel: preview => translateDraft('threadSidebarUnsentDraft', { preview }),
+      presented: presentedUnsentRows.current,
+    })
+    return byId === hostSessionState.byId ? hostSessionState : { ...hostSessionState, byId }
+  }, [hostSessionState, unsentDrafts, translateDraft])
+  const sessionStatus = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
   const workspaceState = props.useWorkspaces(state => state)
+  // Every workspace frame re-emits all items and id lists as new objects; derivations key on content.
+  const workspaceItems = HostSnapshotsModel.selectStableWorkspaceItems(workspaceState.items)
+  const archivedIdList = useStableValue(workspaceState.archivedSessionIds, HostSnapshotsModel.sameIds)
+  const pinnedIdList = useStableValue(workspaceState.pinnedSessionIds, HostSnapshotsModel.sameIds)
   const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
   const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
   const agentHandleOf = useRowAgentHandles()
@@ -1720,8 +1722,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const threadView = isBoard ? boardViewSettings : listThreadView
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
   const localProjectsForRemoteThreads = useMemo(
-    () => SidebarOrganization.projectWorkspaces(workspaceState.items).map(workspace => ({ workspaceId: workspace.workspaceId, path: workspace.path })),
-    [workspaceState.items],
+    () => SidebarOrganization.projectWorkspaces(workspaceItems).map(workspace => ({ workspaceId: workspace.workspaceId, path: workspace.path })),
+    [workspaceItems],
   )
   const remoteThreads = useRemoteSidebarThreads(props.wide !== false, localProjectsForRemoteThreads)
   const remoteRunningSessionIds = useMemo(
@@ -1812,36 +1814,35 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   } | null>(null)
 
   const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
+  // Project attribution reads only ids and folders; a streaming turn republishes the list without changing either.
+  const folderRowsById = useStableValue(sessionState.byId, sameFolderRows)
   const workspaceBySession = useMemo(
-    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceState.items, sessions }),
-    [sessions, workspaceState.items],
+    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceItems, sessions: sessionsForAutoArchive(sessionState.ids, folderRowsById) }),
+    [folderRowsById, sessionState.ids, workspaceItems],
   )
   /** The workspace a Session really lives in, for the deep link; grouping keeps using the project attribution. */
   const realWorkspaceBySession = useMemo(() => {
-    const result = SidebarOrganization.sessionWorkspaceIds(workspaceState.items)
+    const result = SidebarOrganization.sessionWorkspaceIds(workspaceItems)
     // Local blank identities are not attached on the Host until typing begins.
     for (const draft of Object.values(unsentDrafts)) {
       if (!result.has(draft.sessionId) && draft.workspaceId !== undefined) result.set(draft.sessionId, draft.workspaceId)
     }
     return result
-  }, [workspaceState.items, unsentDrafts])
-  const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
-  const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
+  }, [workspaceItems, unsentDrafts])
+  const archivedSessionIds = useMemo(() => setIncludes(archivedIdList), [archivedIdList])
+  const pinnedSessionIds = useMemo(() => setIncludes(pinnedIdList), [pinnedIdList])
   const settledSessionIds = useMemo(() => setIncludes(preferences.settledSessionIds), [preferences.settledSessionIds])
   const defaultProjectTitle = props.tSidebar('threadSidebarDefaultProject')
   const displayWorkspaces = useMemo(
     () =>
-      SidebarOrganization.projectWorkspaces(workspaceState.items).map(workspace => ({
+      SidebarOrganization.projectWorkspaces(workspaceItems).map(workspace => ({
         id: workspace.workspaceId,
         title: workspace.title.length > 0 ? workspace.title : defaultProjectTitle,
       })),
-    [defaultProjectTitle, workspaceState.items],
+    [defaultProjectTitle, workspaceItems],
   )
   /** Project folder per workspace id: the project row's icon is resolved from it on the Host. */
-  const workspacePathById = useMemo(
-    () => new Map<string, string>(workspaceState.items.map(workspace => [workspace.workspaceId, workspace.path])),
-    [workspaceState.items],
-  )
+  const workspacePathById = useMemo(() => new Map<string, string>(workspaceItems.map(workspace => [workspace.workspaceId, workspace.path])), [workspaceItems])
   const identityPaths = useMemo(() => [...new Set([...workspacePathById.values()])].sort(), [workspacePathById])
   const lifecycleApi = useApi(projectLifecycleApi)
   const projectIdentities = useQuery({
@@ -1858,61 +1859,76 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const projectKeys = useMemo(() => {
     const keys = new Map<string, string>()
     for (const identity of projectIdentities.data?.identities ?? []) {
-      const workspace = workspaceState.items.find(item => item.path === identity.path)
+      const workspace = workspaceItems.find(item => item.path === identity.path)
       if (workspace !== undefined) keys.set(workspace.workspaceId, identity.key)
     }
     return keys
-  }, [projectIdentities.data, workspaceState.items])
+  }, [projectIdentities.data, workspaceItems])
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
   const workspaceNameById = useMemo(
-    () => new Map<string, string | undefined>(workspaceState.items.map(workspace => [workspace.workspaceId, workspaceName(workspace.path)])),
-    [workspaceState.items],
+    () => new Map<string, string | undefined>(workspaceItems.map(workspace => [workspace.workspaceId, workspaceName(workspace.path)])),
+    [workspaceItems],
   )
   const integrationQueuedAtBySessionId = useMemo(
     () => indexQueuedIntegrationSessions((jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads)),
     [jjRepositories.data],
   )
-  const rebasedIndex = useMemo(
-    () =>
-      indexRebasedThreadSessions({
-        threads: (jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads),
-        sessions: new Map(
-          sessions.map(session => [
-            session.id,
-            {
-              id: session.id,
-              running: session.running,
-              pendingInteraction: sessionStatus.get(session.id) === undefined ? undefined : sessionStatus.get(session.id)?.pendingInteraction !== undefined,
-              updatedAt: session.updatedAt,
-            },
-          ]),
-        ),
-        archivedSessionIds,
-        pinnedSessionIds,
-        settledSessionIds,
-        now,
-        delayMs: threadDelayMs(preferences.rebasedThreadSettleDelay),
-      }),
-    [archivedSessionIds, jjRepositories.data, now, pinnedSessionIds, preferences.rebasedThreadSettleDelay, sessionStatus, sessions, settledSessionIds],
-  )
-  const settledSessionStates = useMemo(
-    () =>
-      new Map<string, SettledSessionState>(
-        sessions.map(session => {
-          const status = sessionStatus.get(session.id)
-          return [
-            session.id,
-            {
-              running: session.running,
-              pendingInteraction: status === undefined ? undefined : status.pendingInteraction !== undefined,
-              updatedAt: session.updatedAt,
-            },
-          ]
-        }),
-      ),
-    [sessionStatus, sessions],
-  )
+  // Both indexes look up a few ids (rebased jj threads, settled threads); folding every listed row into them on each
+  // list publish was most of the sidebar's allocation while a turn streams.
+  const listedSessionIds = useMemo(() => new Set<string>(sessionState.ids), [sessionState.ids])
+  const rowsById: Readonly<Record<string, SessionSummary | undefined>> = sessionState.byId
+  const rebasedIndex = useMemo(() => {
+    const threads = (jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads)
+    const states = new Map<string, RebasedSessionState>()
+    for (const thread of threads) {
+      if (thread.rebasedAt === undefined) continue
+      for (const sessionId of thread.sessionIds) {
+        const session = listedSessionIds.has(sessionId) ? rowsById[sessionId] : undefined
+        if (session === undefined) continue
+        const status = sessionStatus.get(session.id)
+        states.set(session.id, {
+          id: session.id,
+          running: session.running,
+          pendingInteraction: status === undefined ? undefined : status.pendingInteraction !== undefined,
+          updatedAt: session.updatedAt,
+        })
+      }
+    }
+    return indexRebasedThreadSessions({
+      threads,
+      sessions: states,
+      archivedSessionIds,
+      pinnedSessionIds,
+      settledSessionIds,
+      now,
+      delayMs: threadDelayMs(preferences.rebasedThreadSettleDelay),
+    })
+  }, [
+    archivedSessionIds,
+    jjRepositories.data,
+    listedSessionIds,
+    now,
+    pinnedSessionIds,
+    preferences.rebasedThreadSettleDelay,
+    rowsById,
+    sessionStatus,
+    settledSessionIds,
+  ])
+  const settledSessionStates = useMemo(() => {
+    const states = new Map<string, SettledSessionState>()
+    for (const sessionId of preferences.settledSessionIds) {
+      const session = listedSessionIds.has(sessionId) ? rowsById[sessionId] : undefined
+      if (session === undefined) continue
+      const status = sessionStatus.get(session.id)
+      states.set(session.id, {
+        running: session.running,
+        pendingInteraction: status === undefined ? undefined : status.pendingInteraction !== undefined,
+        updatedAt: session.updatedAt,
+      })
+    }
+    return states
+  }, [listedSessionIds, preferences.settledSessionIds, rowsById, sessionStatus])
   const settledStatus = useMemo(
     () => ({ settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }),
     [preferences.settledAt, preferences.settledSessionIds],
@@ -2642,7 +2658,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (draftsCleaning) return
     setDraftsCleaning(true)
     try {
-      const plan = DraftThreadsModel.planCleanup({ drafts: draftSessions, workspaces: workspaceState.items })
+      const plan = DraftThreadsModel.planCleanup({ drafts: draftSessions, workspaces: workspaceItems })
       let archived = 0
       for (const sessionId of plan.sessionIds) {
         try {
@@ -3471,6 +3487,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [threadViewAttentionEntries, threadViewSettings.views],
   )
   const [viewTabRow, setViewTabRow] = useState<HTMLDivElement | null>(null)
+  const [viewMenuOpenId, setViewMenuOpenId] = useState<string | null>(null)
   const [fullViewTabs, setFullViewTabs] = useState<HTMLDivElement | null>(null)
   const compactViewTabs = useCompactViewTabs(viewTabRow, fullViewTabs)
   const viewTabs = threadViewSettings.views
@@ -3816,10 +3833,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     for (const entries of rows.values())
       entries.sort((left, right) => (activityAtBySessionId.get(right.id) ?? right.updatedAt) - (activityAtBySessionId.get(left.id) ?? left.updatedAt))
-    rows.set(
-      'pinned',
-      rows.get('pinned')?.sort((left, right) => workspaceState.pinnedSessionIds.indexOf(left.id) - workspaceState.pinnedSessionIds.indexOf(right.id)) ?? [],
-    )
+    rows.set('pinned', rows.get('pinned')?.sort((left, right) => pinnedIdList.indexOf(left.id) - pinnedIdList.indexOf(right.id)) ?? [])
     return rows
   }, [
     archivedSessionIds,
@@ -3832,7 +3846,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     preferences.idleSectionOverrides,
     activityAtBySessionId,
     visibleThreadEntries,
-    workspaceState.pinnedSessionIds,
+    pinnedIdList,
   ])
   // Built per list change, not per render: a section's merged and sorted rows are also the windowed list's input.
   const sectionThreadsBySection = useMemo(() => {
@@ -3993,7 +4007,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       })),
     ]
     if (threadView.groupBy === 'state') {
-      const pinnedOrder = new Map(workspaceState.pinnedSessionIds.map((sessionId, index) => [sessionId, index]))
+      const pinnedOrder = new Map(pinnedIdList.map((sessionId, index) => [sessionId, index]))
       const statusEntries = entries.map(entry => {
         const thread = entry.thread
         const sessionId = thread.kind === 'local' ? thread.session.id : `${thread.remote.runtimeId}:${thread.remote.sessionId}`
@@ -4055,7 +4069,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     threadView.groupBy,
     visibleRemoteThreads,
     visibleThreadEntries,
-    workspaceState.pinnedSessionIds,
+    pinnedIdList,
   ])
   /** Rows of a status group whose inline verb is Resume, so the group header can offer one bulk verb. */
   const statusGroupResumableSessions = useMemo(() => {
@@ -4716,13 +4730,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   useEffect(() => {
     if (!isPrimarySurface || sessionState.phase !== 'ready') return
-    const currentStatusEntries = sessions.map(session => {
-      const status = sessionStatus.get(session.id)
-      return {
-        sessionId: session.id,
-        status: { pendingInteractionKey: status?.pendingInteraction?.key, pendingInteractionKind: status?.pendingInteraction?.kind },
-      }
-    })
+    // Only a pending interaction can start a transition; rows without one read as absent from the previous record.
+    const currentStatusEntries: { sessionId: SessionId; status: ThreadInteractionStatus }[] = []
+    for (const session of sessions) {
+      const pending = sessionStatus.get(session.id)?.pendingInteraction
+      if (pending !== undefined)
+        currentStatusEntries.push({ sessionId: session.id, status: { pendingInteractionKey: pending.key, pendingInteractionKind: pending.kind } })
+    }
     const currentStatus: Readonly<Record<string, ThreadInteractionStatus>> = Object.fromEntries(
       currentStatusEntries.map((entry): [string, ThreadInteractionStatus] => [entry.sessionId, entry.status]),
     )
@@ -4850,9 +4864,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           >
             {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => {
               const compactLabel = threadViewPresetCompactLabel(view)
-              const matchingThreadIds = threadViewAttentionEntries
-                .filter(entry => ThreadViewModel.matchesAttentionView(entry, { filters: view.statusFilters, sourceFilter: view.sourceFilter }))
-                .map(entry => entry.thread.id)
+              // Read only by this tab's context menu: matching every listed row per tab on each render was the
+              // sidebar's hottest loop while a turn streams.
+              const matchingThreadIds =
+                viewMenuOpenId === view.id
+                  ? threadViewAttentionEntries
+                      .filter(entry => ThreadViewModel.matchesAttentionView(entry, { filters: view.statusFilters, sourceFilter: view.sourceFilter }))
+                      .map(entry => entry.thread.id)
+                  : NO_VIEW_MENU_THREAD_IDS
               const clearViewUnread = (): void => {
                 const entries = matchingThreadIds.flatMap(sessionId => {
                   const record = attention.records.get(sessionId)
@@ -4870,7 +4889,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   ? undefined
                   : `${label}${countSuffix}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
               return (
-                <ContextMenu key={view.id}>
+                <ContextMenu key={view.id} onOpenChange={open => setViewMenuOpenId(open ? view.id : null)}>
                   <ContextMenuTrigger asChild>
                     <Button
                       type="button"
