@@ -2,8 +2,6 @@
 
 ![Open the manager for skills, MCP servers or plugins from one page](docs/screenshots/capabilities-hub.png)
 
-![The plugin catalog as its own Settings page](docs/screenshots/plugin-market.png)
-
 One launch point for the three kinds of capability an agent or DSH can gain. Open **Settings › Capabilities hub**:
 each card names the kind, what adding one grants, a count read from its owner, and a button that opens the owner's
 own page. The hub stores nothing, installs nothing and makes no network call.
@@ -16,13 +14,6 @@ own page. The hub stores nothing, installs nothing and makes no network call.
 
 A manager page that is not loaded keeps its card, with a disabled button and the package to add to the profile. An
 owner API that is absent shows which plugin the count needs.
-
-## Plugin Market
-
-**Settings › Plugin Market** frames the catalog section the installed `dshmarket` bundle registers, so the community
-catalog is a page of its own beside the managers it fills instead of a row buried inside All settings. The page owns
-none of the catalog: it renders that plugin's section, and with no market installed it names the command to add
-(`dsh plugin --profile web add dshmarket`) and fills in on its own once the section registers.
 
 ## skills.sh
 
