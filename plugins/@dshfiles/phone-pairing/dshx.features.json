@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "phone-pairing",
+      "title": "Pair a phone over a self-provisioned HTTPS tunnel",
+      "summary": "Opt-in public phone access: a persisted setting decides whether DSH exposes the pairing gateway, the chosen provider provisions the tunnel, and startup prints a one-time QR plus 6-digit code. Redemption issues a persistent per-device cookie; the gateway proxies to the loopback native listener with its own exchanged cookie and rewrites Host/Origin.",
+      "surfaces": [
+        "host"
+      ],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: terminal QR plus loopback gateway",
+      "configuration": [],
+      "states": [
+        "disabled",
+        "tunnel-ready",
+        "offer-printed",
+        "paired",
+        "unpaired",
+        "revoked",
+        "no-provider"
+      ],
+      "failureModes": [
+        "Nothing is published until settings.json enables phone access; the disabled startup only prints the enable path and detected providers.",
+        "A missing tunnel provider or unusable native cookie reports on the terminal and never exposes the native listener.",
+        "An expired, reused or rate-limited pairing attempt is refused without issuing a device.",
+        "Revocation stops new requests for that cookie but does not yet drop sockets already open."
+      ],
+      "externalDependencies": [
+        {
+          "id": "tunnel-provider",
+          "boundary": "Tailscale CLI or cloudflared binary",
+          "deterministicFake": "Tunnel startup is injectable through the loopback gateway tests; no provider is invoked there."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.store-redemption",
+          "file": "plugins/@dshfiles/phone-pairing/tests/store.test.ts",
+          "testName": "redeems an offer once and authenticates the stored device afterwards"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.store-revocation",
+          "file": "plugins/@dshfiles/phone-pairing/tests/store.test.ts",
+          "testName": "revokes a device and survives a restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.store-code",
+          "file": "plugins/@dshfiles/phone-pairing/tests/store.test.ts",
+          "testName": "accepts the typed code without scanning"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.gateway-auth",
+          "file": "plugins/@dshfiles/phone-pairing/tests/gateway.test.ts",
+          "testName": "refuses unpaired requests, pairs once, and proxies with the native cookie"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.native-e2e",
+          "file": "plugins/@dshfiles/phone-pairing/tests/gateway-native.e2e.test.ts",
+          "testName": "pairs by code and proxies the authenticated app"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "phone-pairing.no-browser-surface",
+          "reason": "The Host prints to the terminal and serves a standalone pairing page; no DSH client slot is registered."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "phone pairing tunnel",
+          "file": "plugins/@dshfiles/phone-pairing/tests/gateway-native.e2e.test.ts",
+          "testName": "pairs by code and proxies the authenticated app"
+        }
+      ]
+    }
+  ]
+}
