@@ -411,7 +411,8 @@ function OlderRowsSentinel({ listRef, hidden, onVisible, fillSteps }: {
     let near = false
     let fired = false
     let upward = false
-    let lastTop = list.scrollTop
+    // First read in an observer callback, where layout is current; reading at mount would force the new rows' layout.
+    let lastTop: number | null = null
     // A thread opens at its newest row, and collapsed Turns are a few pixels tall, so the top is often within reach
     // there; widening only once the reader leaves the tail, or a few steps while the rows do not fill the view, keeps
     // an open from paging in the whole history.
@@ -426,12 +427,14 @@ function OlderRowsSentinel({ listRef, hidden, onVisible, fillSteps }: {
     }
     const observer = new IntersectionObserver((records) => {
       near = records.some(record => record.isIntersecting)
+      lastTop ??= list.scrollTop
       take()
     }, { root: list, rootMargin: '1200px 0px 0px 0px' })
     // Reading upward also counts when the rows cannot scroll yet: a wheel or key toward older rows.
     const onScroll = (): void => {
-      if (list.scrollTop < lastTop) upward = true
-      lastTop = list.scrollTop
+      const top = list.scrollTop
+      if (lastTop !== null && top < lastTop) upward = true
+      lastTop = top
       take()
     }
     const onWheel = (event: WheelEvent): void => {

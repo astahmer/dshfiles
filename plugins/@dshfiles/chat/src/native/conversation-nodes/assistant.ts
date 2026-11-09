@@ -66,10 +66,24 @@ function compactReasoningTimings(
   return blocks.flatMap((block, index) => block === undefined ? [] : [timings[index]])
 }
 
+/** Streamed text blocks are cons strings; testing the whole text would flatten (copy) it once per chunk. */
+const textVisibility = new WeakMap<AssistantBlock, boolean>()
+
 function blockIsVisible(block: AssistantBlock | undefined): boolean {
   if (block === undefined || block.kind === 'tool-call') return false
-  if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
-  return true
+  if (block.kind !== 'text' && block.kind !== 'reasoning') return true
+  const known = textVisibility.get(block)
+  if (known !== undefined) return known
+  const visible = /\S/u.test(block.text)
+  textVisibility.set(block, visible)
+  return visible
+}
+
+function appendText(previous: AssistantBlock | undefined, kind: 'text' | 'reasoning', delta: string): AssistantBlock {
+  const continued = previous?.kind === kind
+  const block: AssistantBlock = { kind, text: (continued ? previous.text : '') + delta }
+  textVisibility.set(block, (continued && blockIsVisible(previous)) || /\S/u.test(delta))
+  return block
 }
 
 function countVisibleBlocks(blocks: readonly AssistantBlock[]): number {
@@ -84,7 +98,7 @@ function hasVisibleContent(blocks: readonly AssistantBlock[]): boolean {
 
 function hasInterruptionEvidence(blocks: readonly AssistantBlock[]): boolean {
   return blocks.some((block) => {
-    if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
+    if (block.kind === 'text' || block.kind === 'reasoning') return /\S/u.test(block.text)
     return true
   })
 }
@@ -123,14 +137,14 @@ function updateChunk(
       const previous = blocks[chunk.index]
       changedIndex = chunk.index
       previousVisible = blockIsVisible(previous)
-      blocks[chunk.index] = { kind: 'text', text: (previous?.kind === 'text' ? previous.text : '') + chunk.text }
+      blocks[chunk.index] = appendText(previous, 'text', chunk.text)
       break
     }
     case 'reasoning-delta': {
       const previous = blocks[chunk.index]
       changedIndex = chunk.index
       previousVisible = blockIsVisible(previous)
-      blocks[chunk.index] = { kind: 'reasoning', text: (previous?.kind === 'reasoning' ? previous.text : '') + chunk.text }
+      blocks[chunk.index] = appendText(previous, 'reasoning', chunk.text)
       reasoningTimings[chunk.index] ??= { startedAt: time }
       break
     }

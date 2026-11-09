@@ -53,8 +53,8 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     firstSeq, loadingOlder, hasMore, loadOlder, loadThrough,
   }), [firstSeq, loadingOlder, hasMore, loadOlder, loadThrough])
   const { navigation, busyTurn } = useChatNavigation(viewport, reading, navigationInput)
-  const content = useRef<{ input: ChatScrollInput; applied: ChatScrollInput | null; opened: boolean }>({
-    input, applied: null, opened: false,
+  const content = useRef<{ input: ChatScrollInput; applied: ChatScrollInput | null; opened: boolean; layoutChanged: boolean }>({
+    input, applied: null, opened: false, layoutChanged: false,
   })
   // A fold batch owns layout and scrolling until it lands: at the tail for own input or a following
   // reader, otherwise with the reader's content still. Growth consumes any room the landing installed.
@@ -146,9 +146,15 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     viewport.updateTurns(loadedTurns)
     const layoutChanged = previous.order !== order || previous.ready !== ready
     if (layoutChanged) viewport.invalidate()
-    viewport.reclaimBelow()
-    processContent()
-    if (layoutChanged && content.current.opened) reading.refreshActiveTurn()
+    content.current.layoutChanged ||= layoutChanged
+    // Measuring here would force the layout the commit just invalidated, once per streamed publication.
+    viewport.afterLayout(() => {
+      const changed = content.current.layoutChanged
+      content.current.layoutChanged = false
+      viewport.reclaimBelow()
+      processContent()
+      if (changed && content.current.opened) reading.refreshActiveTurn()
+    })
   }, [
     viewport, reading, processContent, navigationInput, ready, order, lastKey, lastIsUser,
     steeringId, submissionId, running, loadedTurns, chatScroll, deferCompletedTurns, transcriptView, cancelPendingFollow,
