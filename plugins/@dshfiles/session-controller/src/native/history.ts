@@ -140,14 +140,14 @@ export class SessionHistoryController {
     validateHistoryWindow(request)
     const { address } = request
     const target = addressId(address)
-    const buffered = new Deque<
+    type FollowItem =
       | { readonly type: 'event'; readonly event: SessionEvent }
       | {
         readonly type: 'assistant-stream'
         readonly frame: SessionAssistantStreamFrame
         readonly ordinal: number
       }
-    >()
+    const buffered = new Deque<FollowItem & { readonly bytes: number }>()
     let snapshotCursor: SessionSeqCursor | undefined
     let assistantStreamOrdinal = 0
     let wake: (() => void) | undefined
@@ -171,30 +171,28 @@ export class SessionHistoryController {
     // over a gigabyte. The follower also carries a byte budget, and a lagging client resyncs from a fresh snapshot.
     const MAX_BUFFERED_BYTES = 8 * 1024 * 1024
     let bufferedBytes = 0
-    const bytesOf = (item: { readonly type: 'event' | 'assistant-stream' }): number =>
-      item.type === 'assistant-stream' ? 1_024 : Buffer.byteLength(JSON.stringify(item))
-    const full = (item: { readonly type: 'event' | 'assistant-stream' }): boolean =>
-      buffered.size >= MAX_BUFFERED_FRAMES || bufferedBytes + bytesOf(item) > MAX_BUFFERED_BYTES
-    const pushBack = (item: Parameters<typeof buffered.pushBack>[0]): void => {
-      if (follower.closed) return
-      if (full(item)) {
+    // Measured once on arrival: the event is serialized for its size here, not again when the queue checks or drains it.
+    const measured = (item: FollowItem): (FollowItem & { readonly bytes: number }) | undefined => {
+      if (follower.closed) return undefined
+      const bytes = item.type === 'assistant-stream' ? 1_024 : Buffer.byteLength(JSON.stringify(item))
+      if (buffered.size >= MAX_BUFFERED_FRAMES || bufferedBytes + bytes > MAX_BUFFERED_BYTES) {
         follower.closed = true
         notify()
-        return
+        return undefined
       }
-      bufferedBytes += bytesOf(item)
-      buffered.pushBack(item)
+      bufferedBytes += bytes
+      return { ...item, bytes }
+    }
+    const pushBack = (item: FollowItem): void => {
+      const entry = measured(item)
+      if (entry === undefined) return
+      buffered.pushBack(entry)
       notify()
     }
-    const pushFront = (item: Parameters<typeof buffered.pushFront>[0]): void => {
-      if (follower.closed) return
-      if (full(item)) {
-        follower.closed = true
-        notify()
-        return
-      }
-      bufferedBytes += bytesOf(item)
-      buffered.pushFront(item)
+    const pushFront = (item: FollowItem): void => {
+      const entry = measured(item)
+      if (entry === undefined) return
+      buffered.pushFront(entry)
       notify()
     }
     this.closeFollowers.add(close)
@@ -281,7 +279,7 @@ export class SessionHistoryController {
       // The budget is a queue depth, not a lifetime cap: what the consumer takes leaves the queue.
       const take = (): (typeof buffered extends Deque<infer Item> ? Item : never) | undefined => {
         const item = buffered.popFront()
-        if (item !== undefined) bufferedBytes -= bytesOf(item)
+        if (item !== undefined) bufferedBytes -= item.bytes
         return item
       }
       while (!follower.closed && !signal.aborted) {
