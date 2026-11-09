@@ -10,7 +10,7 @@
     "antislop(require-safety-comment-for-type-assertion)": 308,
     "react(purity)": 0,
     "react-hooks(exhaustive-deps)": 0,
-    "ui-guidance(no-native-title)": 66
+    "ui-guidance(no-native-title)": 64
   },
   "ast-grep": {
     "no-deeply-nested-ternary": 0,

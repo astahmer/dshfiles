@@ -230,6 +230,27 @@ Feature: Backlog
     When the remaining selection is made again
     Then the batch status action updates only the remaining selected items
 
+  @scenario:backlog.selection-bar-narrow
+  Scenario: The batch action bar stays on one line in a narrow panel
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And 12 numbered items are captured
+    And all 12 items are selected in the Items view
+    And the window is 620px wide
+    Then the batch action bar keeps every action on one line as icons
+    When the window is 460px wide
+    Then the batch action bar moves Set kind, Pin and Unpin into More actions
+    And the last row scrolls clear of the batch action bar
+    When More actions applies "Pin" to the selection
+    Then 12 rows show Pinned
+    When all 12 items are selected in the Items view
+    And More actions applies "Unpin" to the selection
+    Then 0 rows show Pinned
+    When all 12 items are selected in the Items view
+    And More actions sets the selection's kind to "Bug"
+    And the window is 1280px wide
+    Then item b:12 shows the kind "Bug"
+
   @scenario:backlog.board-multi-select
   Scenario: Select multiple board cards with modifier clicks and batch update them
     Given the isolated plugin profile "@dshfiles/backlog" is booted

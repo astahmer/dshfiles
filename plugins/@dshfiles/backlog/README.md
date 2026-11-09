@@ -133,7 +133,9 @@ Feed, Inbox, Items, Board, search results and project item groups share Cmd/Ctrl
 Shift-click ranges. Plain clicks keep the existing open behavior and clear the batch. Right-click a selected
 item to apply the menu's counted actions to the entire selection, including the existing explicit permanent-delete
 confirmation. Filter changes and collapsed Items groups remove hidden targets; project overview groups keep separate
-selection scopes. Items also has select-all-visible and the batch action bar.
+selection scopes. Items also has select-all-visible and the batch action bar. The bar stays on one line and never
+hides the last row: below 42rem its buttons keep only their icon, and below 28rem Set kind, Pin and Unpin move into
+More actions.
 
 Status, kind and drops update the view before the Host answers. While you type, chips under the capture
 box show the kind, tags and links triage will derive.

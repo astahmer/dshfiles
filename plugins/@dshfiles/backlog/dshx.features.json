@@ -404,7 +404,7 @@
     {
       "id": "multi-select-items",
       "title": "Select items in ranges and batch-edit them",
-      "summary": "Feed, Inbox, Items, Board, search results and project item groups support click-to-open, Shift-click ranges and Cmd/Ctrl-click toggles. Context-menu actions batch the visible selection; filters and collapsed groups remove hidden targets. Items also offers select-all-visible and an action bar. Dragging a selected board card moves its whole selection, including cards from other columns; dragging an unselected card moves only that card.",
+      "summary": "Feed, Inbox, Items, Board, search results and project item groups support click-to-open, Shift-click ranges and Cmd/Ctrl-click toggles. Context-menu actions batch the visible selection; filters and collapsed groups remove hidden targets. Items also offers select-all-visible and an action bar that stays on one line above the last row: below 42rem its buttons keep only their icon, and below 28rem Set kind, Pin and Unpin move into More actions. Dragging a selected board card moves its whole selection, including cards from other columns; dragging an unselected card moves only that card.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -440,6 +440,11 @@
         {
           "kind": "gherkin",
           "id": "backlog.multi-select",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.selection-bar-narrow",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {

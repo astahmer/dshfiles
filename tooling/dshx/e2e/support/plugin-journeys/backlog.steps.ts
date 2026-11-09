@@ -1145,6 +1145,108 @@ Then('the batch status action updates only the remaining selected items', async 
   await finishJourneyAssertions(page)
 })
 
+const selectionActions = (page: Page) => page.getByRole('group', { name: 'Selection actions', exact: true })
+const itemsTable = (page: Page) => page.getByRole('table', { name: 'Backlog items' })
+
+/** The bar's tiers follow its panel (28rem narrow, 42rem compact), so a layout change fails here instead of testing the wrong tier. */
+const expectSelectionActionsOnOneLine = async (page: Page, tier: 'compact' | 'narrow'): Promise<void> => {
+  const bar = selectionActions(page)
+  const barBox = await bar.boundingBox()
+  const panelBox = await bar.locator('xpath=..').boundingBox()
+  if (barBox === null || panelBox === null) throw new Error('The selection actions are not laid out.')
+  expect(panelBox.width, `panel width for the ${tier} tier`).toBeLessThan(tier === 'narrow' ? 448 : 672)
+  if (tier === 'compact') expect(panelBox.width, 'panel width for the compact tier').toBeGreaterThanOrEqual(448)
+  expect(barBox.height).toBeLessThanOrEqual(40)
+  expect(barBox.x).toBeGreaterThanOrEqual(panelBox.x)
+  expect(barBox.x + barBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width)
+  expect(await bar.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+}
+
+When('{int} numbered items are captured', async ({ page }: { page: Page }, count: number) => {
+  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  for (let index = 1; index <= count; index += 1) {
+    await capture.fill(`Numbered item ${String(index)}`)
+    await capture.press('Enter')
+    await expect(capture).toHaveText('')
+    await StartupDialogs.dismissProviderSetupIfShown(page)
+  }
+  await expect(feed(page)).toContainText(`Numbered item ${String(count)}`)
+})
+
+When('all {int} items are selected in the Items view', async ({ page }: { page: Page }, count: number) => {
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  await expect(itemsTable(page)).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Select all visible items', exact: true }).click()
+  await expect(selectionActions(page)).toContainText(`${String(count)} selected`)
+})
+
+When('the window is {int}px wide', async ({ page }: { page: Page }, width: number) => {
+  await page.setViewportSize({ width, height: 800 })
+})
+
+Then('the batch action bar keeps every action on one line as icons', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-selection-bar-compact', async () => {
+    await expectSelectionActionsOnOneLine(page, 'compact')
+    const bar = selectionActions(page)
+    const startThread = await bar.getByRole('button', { name: 'Start thread', exact: true }).boundingBox()
+    expect(startThread?.width).toBeLessThan(40)
+    await expect(bar.getByRole('button', { name: 'Unpin', exact: true })).toBeVisible()
+    await expect(bar.getByRole('button', { name: 'More actions', exact: true })).toBeHidden()
+  })
+})
+
+Then('the batch action bar moves Set kind, Pin and Unpin into More actions', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-selection-bar-narrow', async () => {
+    await expectSelectionActionsOnOneLine(page, 'narrow')
+    const bar = selectionActions(page)
+    await expect(bar.getByRole('button', { name: 'Move to' })).toBeVisible()
+    await expect(bar.getByRole('button', { name: 'Set kind' })).toBeHidden()
+    await expect(bar.getByRole('button', { name: 'Pin', exact: true })).toBeHidden()
+    await expect(bar.getByRole('button', { name: 'Unpin', exact: true })).toBeHidden()
+    await bar.getByRole('button', { name: 'More actions', exact: true }).click()
+    await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Set kind', 'Pin', 'Unpin'])
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+  })
+})
+
+Then('the last row scrolls clear of the batch action bar', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-selection-bar-last-row', async () => {
+    await itemsTable(page).evaluate(element => element.scrollTo({ top: element.scrollHeight }))
+    await expect.poll(async () => itemsTable(page).evaluate(element => Math.ceil(element.scrollTop + element.clientHeight) >= element.scrollHeight)).toBe(true)
+    const lastRowBottom = await itemsTable(page).evaluate(element =>
+      Math.max(...Array.from(element.querySelectorAll('[data-index]'), row => row.getBoundingClientRect().bottom)),
+    )
+    const barBox = await selectionActions(page).boundingBox()
+    expect(lastRowBottom).toBeLessThanOrEqual(barBox?.y ?? 0)
+  })
+})
+
+When('More actions applies {string} to the selection', async ({ page }: { page: Page }, action: string) => {
+  await selectionActions(page).getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menu').getByRole('menuitem', { name: action, exact: true }).click()
+})
+
+When("More actions sets the selection's kind to {string}", async ({ page }: { page: Page }, kind: string) => {
+  await selectionActions(page).getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Set kind', exact: true }).hover()
+  await page.getByRole('menu').last().getByRole('menuitem', { name: kind, exact: true }).click()
+})
+
+Then('{int} rows show Pinned', async ({ page }: { page: Page }, count: number) => {
+  await recordAssertion(page, `backlog-selection-bar-pinned-${String(count)}`, async () => {
+    await expect(selectionActions(page)).toHaveCount(0)
+    await expect(itemsTable(page).getByLabel('Pinned', { exact: true })).toHaveCount(count)
+  })
+})
+
+Then('item b:{int} shows the kind {string}', async ({ page }: { page: Page }, id: number, kind: string) => {
+  await recordAssertion(page, 'backlog-selection-bar-more-kind', async () => {
+    await expect(page.getByRole('row', { name: await withBacklogRefs(page, `Item b:${String(id)}`), exact: true })).toContainText(kind)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('Start thread is clicked for the selection', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Start thread', exact: true }).click()
 })
