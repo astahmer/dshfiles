@@ -66,9 +66,15 @@ const hasDraftAttachmentApi = (value: unknown): value is DraftAttachmentApi => O
 
 const hasSessionInput = (value: unknown): value is ConversationWithInput => Option.isSome(Schema.decodeUnknownOption(sessionInputShape)(value))
 
-const restoreComposerReferences = (composer: SessionInput): void => {
-  const parsed = Schema.decodeUnknownOption(restoreReferencesShape)(composer)
-  if (Option.isSome(parsed)) parsed.value.restoreReferences()
+interface ReferenceRestoringComposer {
+  restoreReferences(): boolean
+}
+
+const canRestoreReferences = (value: unknown): value is ReferenceRestoringComposer => Option.isSome(Schema.decodeUnknownOption(restoreReferencesShape)(value))
+
+/** Called on the composer itself: the decoded copy would run the verb with a `this` that has none of its state. */
+const restoreComposerReferences = (composer: SessionInput | ReferenceRestoringComposer): void => {
+  if (canRestoreReferences(composer)) composer.restoreReferences()
 }
 
 const isAttachmentId = (value: string): value is AttachmentIdType => value.length > 0
@@ -394,6 +400,7 @@ export type { QueuedRow }
 
 export class SessionQueueEditorModel {
   static readonly editor = sessionQueueEditor
+  static readonly restoreComposerReferences = restoreComposerReferences
   static readonly imageReader = sessionImageReader
   static readonly transfer = sessionQueueTransfer
 }
