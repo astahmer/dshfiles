@@ -210,6 +210,7 @@ export default DshxPlugin.make({
     }),
     Api.bind(threadActionsApi, {
       list: (input, call) => ThreadActions.use(actions => actions.list({ input, caller: call.caller })),
+      status: (input, call) => ThreadActions.use(actions => actions.status({ input, caller: call.caller })),
       references: (input, call) => ThreadActions.use(actions => actions.references({ input, caller: call.caller })),
       archive: (input, call) =>
         ThreadActions.use(actions => actions.archive({ input, caller: call.caller })).pipe(
