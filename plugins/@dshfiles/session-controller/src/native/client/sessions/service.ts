@@ -262,6 +262,8 @@ export class ClientSessions implements ISessions {
   private readonly retainObservers = new Map<SessionId, RetentionObserver>()
   /** Released generations kept open, oldest first. */
   private readonly parked = new Set<SessionId>()
+  /** Rows whose retention changed since the list last published; one switch retains and releases several sources. */
+  private readonly retentionDirty = new Set<SessionId>()
   private readonly scopeDrops = new Set<Promise<void>>()
   private closed = false
   private readonly lifetime = new AbortController()
@@ -697,17 +699,30 @@ export class ClientSessions implements ISessions {
   }
 
   private publishRetention(id: SessionId): void {
-    const state = this.list.getSnapshot()
-    const row = state.byId[id]
-    const retainedBy = this.retentionSnapshot(id).retainedBy
-    if (row !== undefined && row.retainedBy !== retainedBy) {
-      this.list.set({ ...state, byId: { ...state.byId, [id]: { ...row, retainedBy } } })
-    }
+    // A thread switch retains and releases four sources (main view and sidebar view, old and new thread); each list
+    // publication re-runs every list subscriber. The rows publish once, in the next task: the thread on screen comes
+    // from uiSession's current binding, so the switch paints before the retain counts reach list readers.
+    if (this.retentionDirty.size === 0) setTimeout(this.publishRetainedRows, 0)
+    this.retentionDirty.add(id)
     const observer = this.retainObservers.get(id)
     const snapshot = this.retentionSnapshot(id)
     if (observer === undefined || observer.published === snapshot) return
     observer.published = snapshot
     notifySubscribers(observer.listeners, '[session-controller] reference sources')
+  }
+
+  private readonly publishRetainedRows = (): void => {
+    const state = this.list.getSnapshot()
+    let byId: SessionListState['byId'] | undefined
+    for (const id of this.retentionDirty) {
+      const row = (byId ?? state.byId)[id]
+      const retainedBy = this.retentionSnapshot(id).retainedBy
+      if (row === undefined || row.retainedBy === retainedBy) continue
+      byId ??= { ...state.byId }
+      byId[id] = { ...row, retainedBy }
+    }
+    this.retentionDirty.clear()
+    if (byId !== undefined) this.list.set({ ...state, byId })
   }
 
   private retireScope(id: SessionId, record: ScopeRecord, disposeFiber = true): void {

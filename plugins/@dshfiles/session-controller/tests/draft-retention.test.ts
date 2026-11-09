@@ -212,4 +212,28 @@ describe('released session generations', () => {
     expect(ids.slice(2).every(id => sessions.binding(id) !== undefined)).toBe(true)
     expect(sessions.retain(ids[0]!, { source: 'mainView' }).binding.session).not.toBe(firstSession)
   })
+
+  it('publishes one list change for a switch that retains and releases several sources', async () => {
+    vi.spyOn(Session.prototype, 'open').mockImplementation(() => Promise.resolve())
+    const { sessions } = fixture()
+    const [from, to] = [SessionId('session-switch-from'), SessionId('session-switch-to')]
+    for (const sessionId of [from, to]) sessions.handleSessionAdded({ sessionId, agentAvailable: false, updatedAt: 0, running: false, blank: false })
+    const main = sessions.retain(from, { source: 'mainView' })
+    const side = sessions.retain(from, { source: 'sidebarView' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    let publications = 0
+    const stop = sessions.list.subscribe(() => {
+      publications += 1
+    })
+    sessions.retain(to, { source: 'mainView' })
+    main.release()
+    sessions.retain(to, { source: 'sidebarView' })
+    side.release()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    stop()
+
+    expect(publications).toBe(1)
+    expect(sessions.list.getSnapshot().byId[to]?.retainedBy).toEqual({ mainView: 1, sidebarView: 1 })
+    expect(sessions.list.getSnapshot().byId[from]?.retainedBy).toEqual({})
+  })
 })

@@ -13,6 +13,7 @@ export default defineConfig({
   host: { entry: 'build/host/host.js', bundleDependencies: ['@dshfiles/session-log-window'] },
   client: {
     entry: 'src/client-entry.tsx',
+    shared: '@dshfiles/shared-runtime',
     // The native build inlines these into its client chunk; they are not browser-roster modules.
     bundleDependencies: [
       '@deepseek-ai/dsh-brand',
