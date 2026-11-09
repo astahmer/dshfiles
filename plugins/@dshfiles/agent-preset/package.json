@@ -26,6 +26,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
+  "dependencies": {
+    "@dshfiles/shared-runtime": "workspace:*"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
@@ -87,7 +90,8 @@
         "@deepseek-ai/dsh-api-remotes"
       ],
       "external": [
-        "@deepseek-ai/dsh-client-store"
+        "@deepseek-ai/dsh-client-store",
+        "@dshfiles/shared-runtime"
       ],
       "immediately": false
     }

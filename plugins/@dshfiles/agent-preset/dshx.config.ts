@@ -5,6 +5,7 @@ export default defineConfig({
   host: { entry: 'src/host.ts' },
   client: {
     entry: 'src/client-entry.tsx',
+    shared: '@dshfiles/shared-runtime',
     // Plain helpers have no browser module-table entry in stock DSH.
     bundleDependencies: ['@deepseek-ai/dsh-util-values', '@deepseek-ai/dsh-agent-preset-registry'],
   },

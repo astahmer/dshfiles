@@ -5,6 +5,7 @@ export default defineConfig({
   host: { entry: 'src/host.ts' },
   client: {
     entry: 'src/client-entry.tsx',
+    shared: '@dshfiles/shared-runtime',
     // Native non-roster utilities: inline them, never add a missing browser module.
     bundleDependencies: ['@deepseek-ai/dsh-util-values', '@deepseek-ai/schemastery'],
   },

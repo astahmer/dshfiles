@@ -75,6 +75,7 @@
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "cmdk": "catalog:",
+    "effect": "catalog:",
     "motion": "catalog:",
     "react-remove-scroll": "2.7.2",
     "tailwind-merge": "catalog:",
