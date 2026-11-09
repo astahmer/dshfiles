@@ -32,6 +32,11 @@ import { LAND_ATTEMPTS, runVerifiedLand, type LandSettlement, type LandStepResul
  * New thread screen and the sidebar are open: 45 thread workspaces measured 2.1s at 4 and 1.0s at 8, with no gain above.
  */
 const STATUS_READ_CONCURRENCY = 8
+/**
+ * Workspaces answered by one `jj log` in a repository scan. Each adds about 300 bytes to the revset and template
+ * arguments, so this stays well under Linux's 128 KiB limit for a single argument.
+ */
+const MAX_WORKSPACES_PER_READ = 128
 
 const REVISION_TEMPLATE = 'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
 const LAND_REVISION_TEMPLATE =
@@ -143,6 +148,29 @@ const classifyMarkedRevisions = (marked: readonly string[]): { readonly unlanded
     else return undefined
   }
   return { unlanded, behind }
+}
+
+/**
+ * Split the output of the read shared by several workspaces into each workspace's two halves, or undefined when a line
+ * names no workspace or an unknown one. A line is `<index><U|B>[,…]\t<revision>`.
+ */
+const classifyWorkspaceRevisions = (
+  marked: readonly string[],
+  workspaceCount: number,
+): readonly { readonly unlanded: string[]; readonly behind: string[] }[] | undefined => {
+  const halves = Array.from({ length: workspaceCount }, () => ({ unlanded: new Array<string>(), behind: new Array<string>() }))
+  for (const line of marked) {
+    const separator = line.indexOf('\t')
+    if (separator <= 0) return undefined
+    for (const owner of line.slice(0, separator).split(',')) {
+      const entry = halves[Number(owner.slice(0, -1))]
+      const half = owner.at(-1)
+      if (entry === undefined || (half !== 'U' && half !== 'B')) return undefined
+      const revisionLines = half === 'U' ? entry.unlanded : entry.behind
+      revisionLines.push(line.slice(separator + 1))
+    }
+  }
+  return halves
 }
 
 const parseRevisionLines = (revisionLines: readonly string[]): Effect.Effect<readonly ThreadRevision[], JjFailed> => {
@@ -374,6 +402,39 @@ const make = Effect.gen(function* () {
     const classified = classifyMarkedRevisions(lines(output))
     if (classified === undefined) return yield* jjFailed('JJ returned incomplete revision metadata; refusing to continue.')
     return { unlanded: yield* parseRevisionLines(classified.unlanded), behind: yield* parseRevisionLines(classified.behind) }
+  })
+
+  /**
+   * Every workspace's halves from one `jj log` per chunk: each jj spawn loads the repository view, which is most of its
+   * cost on a store with dozens of workspaces. A revision can belong to several workspaces, so each line lists the
+   * `<index><half>` marks of every workspace that has it. `--no-graph` prints the union in index order, the order each
+   * workspace's own read printed its subset in.
+   */
+  const workspacesRevisions = Effect.fnUntraced(function* (input: { readonly names: readonly string[]; readonly target: string; readonly cwd: string }) {
+    const asTemplateString = (revset: string) => revset.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
+    const halves = input.names.map(name => ({
+      unlanded: unlandedRevset(name, input.target),
+      behind: `latest(${behindRevset(`${name}@`, input.target)}, ${MAX_BEHIND_REVISIONS + 1})`,
+    }))
+    const marks = halves.map(
+      (half, index) =>
+        `if(self.contained_in("${asTemplateString(half.unlanded)}"), "${index}U", if(self.contained_in("${asTemplateString(half.behind)}"), "${index}B"))`,
+    )
+    const output = yield* jj(
+      [
+        '--ignore-working-copy',
+        'log',
+        '--no-graph',
+        '-r',
+        halves.map(half => `(${half.unlanded}) | ${half.behind}`).join(' | '),
+        '-T',
+        `separate(",", ${marks.join(', ')}) ++ "\\t" ++ ${REVISION_TEMPLATE}`,
+      ],
+      input.cwd,
+    )
+    const marked = classifyWorkspaceRevisions(lines(output), input.names.length)
+    if (marked === undefined) return yield* jjFailed('JJ returned incomplete revision metadata; refusing to continue.')
+    return yield* Effect.forEach(marked, entry => Effect.all({ unlanded: parseRevisionLines(entry.unlanded), behind: parseRevisionLines(entry.behind) }))
   })
 
   const readAtOperation = (args: readonly string[], cwd: string, operationId: string) => jj(['--at-operation', operationId, ...args], cwd)
@@ -693,30 +754,33 @@ const make = Effect.gen(function* () {
     const names = listedNames.filter(name => name.length > 0 && !spares.has(name) && !inFlightSpares.has(name))
     const rebaseMetadata = yield* readRebaseMetadata(repoRoot)
     const target = yield* targetRevset(repoRoot)
-    const statuses = yield* Effect.forEach(
+    const workspaces = (yield* Effect.forEach(
       names,
-      name =>
-        Effect.gen(function* () {
-          const workspacePath = path.join(directory, name)
-          const present = yield* exists(path.join(workspacePath, '.jj'))
-          if (!present && !name.startsWith('thread-')) return undefined
-          const state = yield* threadRevisions({ unlanded: unlandedRevset(name, target), behind: behindRevset(`${name}@`, target), cwd: repoRoot })
-          return withRebaseMetadata(
-            {
-              name,
-              path: workspacePath,
-              repoRoot,
-              missing: !present,
-              unlanded: state.unlanded,
-              behind: state.behind.length > 0,
-              behindCount: Math.min(state.behind.length, MAX_BEHIND_REVISIONS),
-            },
-            rebaseMetadata[name],
-          )
-        }),
+      name => Effect.map(exists(path.join(directory, name, '.jj')), present => (present || name.startsWith('thread-') ? [{ name, present }] : [])),
       { concurrency: STATUS_READ_CONCURRENCY },
+    )).flat()
+    const chunks = Array.from({ length: Math.ceil(workspaces.length / MAX_WORKSPACES_PER_READ) }, (_, index) =>
+      workspaces.slice(index * MAX_WORKSPACES_PER_READ, (index + 1) * MAX_WORKSPACES_PER_READ),
     )
-    return statuses.filter((status): status is ThreadStatus => status !== undefined)
+    const states = (yield* Effect.forEach(chunks, chunk => workspacesRevisions({ names: chunk.map(workspace => workspace.name), target, cwd: repoRoot }), {
+      concurrency: STATUS_READ_CONCURRENCY,
+    })).flat()
+    const statuses = workspaces.map((workspace, index) => {
+      const state = states[index] ?? { unlanded: [], behind: [] }
+      return withRebaseMetadata(
+        {
+          name: workspace.name,
+          path: path.join(directory, workspace.name),
+          repoRoot,
+          missing: !workspace.present,
+          unlanded: state.unlanded,
+          behind: state.behind.length > 0,
+          behindCount: Math.min(state.behind.length, MAX_BEHIND_REVISIONS),
+        },
+        rebaseMetadata[workspace.name],
+      )
+    })
+    return statuses
   })
 
   const reviewHistory = Effect.fn('thread workspaces review history')(function* (input: { readonly repoRoot: string; readonly name: string }) {

@@ -13,7 +13,7 @@ import { ThreadWorkspaces, type ThreadStatus } from './thread-workspaces.js'
 import type { ThreadLocation } from './thread-workspace-model.js'
 
 /**
- * A repository scan costs one `jj` process per workspace and two more per thread, while the New thread screen and the
+ * A repository scan costs a few `jj` processes per repository, while the New thread screen and the
  * sidebar ask for it. Every layer is cached and every scan is single-flight: a poll storm shares one scan instead of
  * pinning one browser connection per caller, and a mutation is the only thing that reads them all again. A registered
  * folder's repository and workspace identity never change, so it outlives the statuses that do.
@@ -21,7 +21,7 @@ import type { ThreadLocation } from './thread-workspace-model.js'
 const LOCATION_TTL = Duration.minutes(30)
 const THREAD_STATUS_TTL = Duration.seconds(30)
 const REPOSITORY_VIEW_TTL_MS = 60_000
-/** One `jj workspace list` plus two revsets per thread, so repositories are scanned a bounded few at a time. */
+/** A few `jj` reads per repository, so repositories are scanned a bounded few at a time. */
 const REPOSITORY_SCAN_CONCURRENCY = 4
 /** One `jj` process each, and the scan runs while the user is working. */
 const LOCATE_CONCURRENCY = 8
@@ -125,11 +125,22 @@ export class RepositoryViews extends Context.Service<
           ),
         { capacity: MAX_LOCATIONS, timeToLive: exit => (Exit.isSuccess(exit) ? LOCATION_TTL : Duration.zero) },
       )
+      /**
+       * Keyed on the store's operation heads as well: an operation that lands is read at once instead of up to the TTL
+       * later. Re-listing an unchanged repository after the TTL spawns nothing, since its jj reads are view reads cached
+       * per operation head; the TTL only bounds how stale its files (rebase records, spares, deleted folders) can be.
+       */
       const statuses = yield* Cache.make({
-        lookup: (repoRoot: string) => threads.list(repoRoot),
+        lookup: (key: string) => threads.list(key.slice(key.indexOf('\n') + 1)),
         capacity: MAX_STATUS_REPOSITORIES,
         timeToLive: THREAD_STATUS_TTL,
       })
+      const operationHeads = (repoRoot: string) =>
+        fileSystem.readDirectory(path.join(repoRoot, '.jj', 'repo', 'op_heads', 'heads')).pipe(
+          Effect.map(heads => [...heads].sort().join(',')),
+          Effect.orElseSucceed(() => ''),
+        )
+      const threadStatusesOf = (repoRoot: string) => Effect.flatMap(operationHeads(repoRoot), heads => Cache.get(statuses, `${heads}\n${repoRoot}`))
 
       const location = (target: string) => Cache.get(locations, target)
       const bestEffortLocation = (target: string) => location(target).pipe(Effect.orElseSucceed(() => Option.none<ThreadLocation>()))
@@ -203,7 +214,7 @@ export class RepositoryViews extends Context.Service<
           repoRoots,
           repoRoot =>
             Effect.gen(function* () {
-              const threadStatuses = yield* Cache.get(statuses, repoRoot)
+              const threadStatuses = yield* threadStatusesOf(repoRoot)
               const bookmarks = yield* threads.bookmarks(repoRoot)
               const owner = byPath.get(repoRoot)
               return {
