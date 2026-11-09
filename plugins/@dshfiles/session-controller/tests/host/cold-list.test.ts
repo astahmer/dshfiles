@@ -55,7 +55,12 @@ const storedEvent = (event: { readonly seq: number; readonly time: number; reado
 /** A cold Session whose projection checkpoint has no row at all, so its list metadata has to come from its stored log. */
 const recoveryFixture = async (
   readLog: () => Promise<readonly SessionEvent[]>,
-  { sizeBytes = 2_048, revision = 'r1', stored }: { readonly sizeBytes?: number; readonly revision?: string; readonly stored?: Map<string, unknown> } = {},
+  { sizeBytes = 2_048, revision = 'r1', stored, rows = 1 }: {
+    readonly sizeBytes?: number
+    readonly revision?: string
+    readonly stored?: Map<string, unknown>
+    readonly rows?: number
+  } = {},
 ) => {
   const ctx = new Context()
   contexts.add(ctx)
@@ -63,15 +68,42 @@ const recoveryFixture = async (
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
   const list = new ApiSessionList(ctx, 8)
-  const session = ctx.sessions.prepare(SessionId('cold-recover'), { meta: { createdAt: 100, cwd: resolve('cold-list-recover-fixture') } })
-  const records: SessionRecord[] = [{ header: session.header, live: false, persisted: true }]
+  const sessions = Array.from({ length: rows }, (_, index) => ctx.sessions.prepare(
+    SessionId(index === 0 ? 'cold-recover' : `cold-recover-${index}`),
+    { meta: { createdAt: 100 - index, cwd: resolve('cold-list-recover-fixture') } },
+  ))
+  const session = sessions[0]
+  if (session === undefined) throw new Error('the fixture prepares at least one Session')
+  const records: SessionRecord[] = sessions.map(prepared => ({ header: prepared.header, live: false, persisted: true }))
+  const headerOf = (sessionId: string) => sessions.find(prepared => prepared.id === sessionId)?.header ?? session.header
   const logReads: string[] = []
-  // SAFETY: list() reads listSessions and, on a checkpoint miss, readSession from the query service.
+  const persistenceLists: string[] = []
+  const persistence = {
+    list: async () => {
+      persistenceLists.push('list')
+      return records.map(record => ({ header: record.header, sizeBytes, revision }))
+    },
+    stat: async (sessionId: string) => {
+      stats.push(sessionId)
+      return { header: headerOf(sessionId), sizeBytes, revision }
+    },
+    open: async (sessionId: string) => ({
+      header: headerOf(sessionId),
+      inheritedEventCount: 0,
+      read: async () => {
+        logReads.push(sessionId)
+        return { events: [...(await readLog())], eventState: 'owned' }
+      },
+      close: async () => undefined,
+    }),
+  }
+  // SAFETY: list() reads listSessions; readSession lists the persisted corpus before its read, as the core engine does.
   ctx.provide('sessionQuery', {
     listSessions: async () => records,
     readSession: async (sessionId: string) => {
-      logReads.push(sessionId)
-      return { session: session.header, inheritedEventCount: 0, events: [...(await readLog())] }
+      await persistence.list()
+      const handle = await persistence.open(sessionId)
+      return { session: handle.header, inheritedEventCount: 0, events: (await handle.read()).events }
     },
   } as never)
   // SAFETY: the cold path calls only cachedSnapshot and cachedPredecessorTitle, and neither has this Session's row.
@@ -80,13 +112,8 @@ const recoveryFixture = async (
     cachedPredecessorTitle: () => undefined,
   } as never)
   const stats: string[] = []
-  // SAFETY: recovery reads only the stored log's size and revision before folding it.
-  ctx.provide('sessionPersistence', {
-    stat: async (sessionId: string) => {
-      stats.push(sessionId)
-      return { header: session.header, sizeBytes, revision }
-    },
-  } as never)
+  // SAFETY: recovery stats a stored log for its size and revision, then opens and reads that one log.
+  ctx.provide('sessionPersistence', persistence as never)
   if (stored !== undefined) {
     // SAFETY: the list metadata store opens one domain and reads and writes one snapshot key of one table.
     ctx.provide('storageDomain', {
@@ -103,7 +130,7 @@ const recoveryFixture = async (
   ctx.on('api-session/added', summary => {
     pushed.push(summary)
   })
-  return { ctx, list, logReads, stats, session, pushed }
+  return { ctx, list, logReads, stats, session, pushed, persistenceLists }
 }
 
 it('pushes a checkpoint-less cold Session with no turn as blank instead of an untitled draft', async () => {
@@ -212,4 +239,12 @@ it('recovers from the logs when the stored answers are malformed', async () => {
   await list.list()
   await expect.poll(() => pushed.map(summary => summary.blank)).toEqual([true])
   expect(logReads).toEqual(['cold-recover'])
+})
+
+it('folds many checkpoint-less logs without listing the persisted corpus once', async () => {
+  const { list, logReads, pushed, persistenceLists } = await recoveryFixture(abandonedDraft, { rows: 12 })
+  await list.list()
+  await expect.poll(() => pushed.length).toBe(12)
+  expect(logReads).toHaveLength(12)
+  expect(persistenceLists).toEqual([])
 })

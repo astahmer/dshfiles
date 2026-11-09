@@ -7,7 +7,7 @@ import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type { ProjectionSnapshot, SessionProjectionMap } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
-import { SessionQueryError, type SessionRecord, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
+import { readColdSessionLog, SessionQueryError, type SessionRecord, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
@@ -413,8 +413,9 @@ export class ApiSessionList {
         const served = known?.metadata ?? UNKNOWN_METADATA
         let metadata: SessionListMetadata | undefined
         try {
-          const stored = await this.ctx.get('sessionPersistence')?.stat(record.header.id, { signal: this.lifetime.signal })
-          if (stored?.sizeBytes === undefined || stored.sizeBytes > DRAFT_LOG_MAX_BYTES) {
+          const persistence = this.ctx.get('sessionPersistence')
+          const stored = await persistence?.stat(record.header.id, { signal: this.lifetime.signal })
+          if (persistence === undefined || stored?.sizeBytes === undefined || stored.sizeBytes > DRAFT_LOG_MAX_BYTES) {
             this.coldMetadata.set(id, undefined)
             if (stored?.sizeBytes !== undefined) remember(id, { createdAt: record.header.createdAt, revision: null, metadata: null })
             skipped += 1
@@ -424,7 +425,8 @@ export class ApiSessionList {
             metadata = known.metadata ?? undefined
             reused += 1
           } else {
-            const { events } = await coldReads.use(() => this.ctx.sessionQuery.readSession(record.header.id))
+            // `sessionQuery.readSession` lists the whole persisted corpus before each read; this opens only the one log.
+            const { events } = await coldReads.use(() => readColdSessionLog(persistence, record.header.id, this.lifetime.signal))
             metadata = events.reduce(applySessionListMetadata, { blank: true, lastPromptAt: null })
             remember(id, { createdAt: record.header.createdAt, revision: stored.revision, metadata })
             folded += 1
