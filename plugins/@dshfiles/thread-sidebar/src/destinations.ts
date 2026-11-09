@@ -94,7 +94,7 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     formerLabels: ['JJ Integration: Thread integration', 'Land'],
   },
   {
-    panelId: 'pulls-review',
+    panelId: 'diffs-review',
     destination: 'land',
     label: 'Review',
     description: 'Review a workspace before landing it.',

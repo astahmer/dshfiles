@@ -27,7 +27,7 @@ only useful as long as the review it belongs to.
 This plugin owns the only viewed-marks store. Besides the per-turn marks above, it keeps
 **revision-range marks**: one file of one workspace's diff between a base (`main`, `@-`, a fork
 point) and a head commit, keyed `["range", workspacePath, base, head, path]`. The thread
-**Changes** facet and the Review page ([pulls-review](../pulls-review/README.md)) read and write
+**Changes** facet and the Review page ([diffs-review](../diffs-review/README.md)) read and write
 them through the `@dshfiles/diff-viewed/marks-api` module:
 
 - `rangeState({ workspacePath, base, head })` — the viewed paths of that range (agent tool
@@ -38,8 +38,8 @@ them through the `@dshfiles/diff-viewed/marks-api` module:
 A new head commit is a new review, so its files start not viewed, the same rule as a new turn.
 Range marks have their own bound (5,000, least recently written dropped first), so they never
 evict turn marks; `state` still returns turn marks only, so the review tab's poll stays small.
-The Review page's earlier marks (pulls-review's `reviewed` record) move here once on its first
-load; see the pulls-review README.
+The Review page's earlier marks (the `reviewed` record diffs-review kept as pulls-review) move here once on its first
+load; see the diffs-review README.
 
 ## Port notes
 

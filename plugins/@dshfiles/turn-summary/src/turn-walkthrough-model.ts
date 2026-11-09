@@ -54,7 +54,7 @@ const groups = (files: readonly EditedFile[]): readonly WalkthroughGroup[] => {
   })
 }
 
-/** The native address of one turn's changed-files review; pulls-review's Changes facet claims it when loaded. */
+/** The native address of one turn's changed-files review; diffs-review's Changes facet claims it when loaded. */
 const changesAddress = (input: { readonly sessionId: string; readonly seq: number; readonly turn: number }): string =>
   `dsh-resource://changes-review/session/${encodeURIComponent(input.sessionId)}/${String(input.seq)}/${String(input.turn)}`
 

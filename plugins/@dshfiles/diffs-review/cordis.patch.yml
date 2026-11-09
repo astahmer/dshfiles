@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-diffs-review
+      name: '@dshfiles/diffs-review'

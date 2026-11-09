@@ -1085,6 +1085,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/diffs-review/review-page-context",
+      "kind": "module",
+      "title": "@dshfiles/diffs-review/review-page-context",
+      "summary": "What the tab hands the main-area page when the user asks for the full page.",
+      "publicSymbol": "PageReviewContext, WorkspaceReviewRequest, requestWorkspaceReview, PageReviewContextModel",
+      "importFrom": "@dshfiles/diffs-review/review-page-context",
+      "owner": "@dshfiles/diffs-review",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/diffs-review/src/review-page-context.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "editorArtifactsApi",
       "importFrom": "@dshfiles/editor/artifacts-api",
       "owner": "@dshfiles/editor",
@@ -1399,6 +1419,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "details": [
         "Registry id: @dshfiles/jj-integration.revision-section"
       ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/jj-integration/revision-graph",
+      "kind": "module",
+      "title": "@dshfiles/jj-integration/revision-graph",
+      "summary": "The `revision-graph` dshx module: the revision graph layout and the SVG row cell that draws it, shared so a plugin can draw a revision graph without depending on `@dshfiles/jujutsu`.",
+      "publicSymbol": "(side-effect module)",
+      "importFrom": "@dshfiles/jj-integration/revision-graph",
+      "owner": "@dshfiles/jj-integration",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/jj-integration/src/revision-graph.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1745,26 +1785,6 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "Agent tools: pull_request_search (read-only), pull_request_link, pull_request_unlink, pull_request_list (read-only), pull_request_watch, pull_request_create_preview (read-only), pull_request_create, pull_request_unwatch"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
-      "command": null
-    },
-    {
-      "key": "module:@dshfiles/pulls-review/review-page-context",
-      "kind": "module",
-      "title": "@dshfiles/pulls-review/review-page-context",
-      "summary": "What the tab hands the main-area page when the user asks for the full page.",
-      "publicSymbol": "PageReviewContext, WorkspaceReviewRequest, requestWorkspaceReview, PageReviewContextModel",
-      "importFrom": "@dshfiles/pulls-review/review-page-context",
-      "owner": "@dshfiles/pulls-review",
-      "scope": "client or host",
-      "mode": "shared types and helpers",
-      "registration": "import",
-      "risk": "additive",
-      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
-      "occupancy": "unavailable",
-      "occupants": [],
-      "details": [],
-      "source": "plugins/@dshfiles/pulls-review/src/review-page-context.ts",
-      "docs": "docs/plugin-boundaries.md",
       "command": null
     },
     {

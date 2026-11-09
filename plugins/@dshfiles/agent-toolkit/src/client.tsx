@@ -109,7 +109,7 @@ export default defineClient({
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, Panel))
 
     // The Context facet follows the thread the right pane shows, remembered from setup so a tab that mounts after a
-    // switch still knows it (the same pattern pulls-review's Changes facet uses).
+    // switch still knows it (the same pattern diffs-review's Changes facet uses).
     const panelThread = createSnapshotStore<string | undefined>(ctx.sidebarRight.mounted.getSnapshot())
     ctx.effect(
       () =>

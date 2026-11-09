@@ -32,7 +32,7 @@ const DECISIONS = [
     'agent-toolkit/agent-toolkit-page',
     'Thread panel › Context facet, not the Agents destination: the page shows what the agent can use in one thread (§4.4 Context lists agent-toolkit).',
   ],
-  ['pulls-review/*', 'Thread panel › Changes facet scopes (§4.4), not a Land detail page; Land keeps the cross-thread queue and History.'],
+  ['diffs-review/*', 'Thread panel › Changes facet scopes (§4.4), not a Land detail page; Land keeps the cross-thread queue and History.'],
   ['jujutsu/composer-context', 'Thread panel › Changes facet "vs main" scope, not a composer chip.'],
   [
     'jj-integration/thread-workspace-menu, jj-integration/rebase',

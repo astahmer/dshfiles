@@ -96,7 +96,7 @@ no-op.
 - Every dshx API dispatch (browser, plugin or agent tool) is a server span
   `<api id>/<method>`: package, API id, method, caller kind, outcome code and
   duration.
-- Under it: `jj <subcommand>` (jujutsu, jj-integration, backlog, pulls-review),
+- Under it: `jj <subcommand>` (jujutsu, jj-integration, backlog, diffs-review),
   `git worktree` (jj-integration), `secret resolve` and `secret <verb>`
   (secret-catalog), `jev classify` (backlog, memory: model, provider, HTTP
   status, token counts), multi-host gateway `<namespace>/<method>` requests

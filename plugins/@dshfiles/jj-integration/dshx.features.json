@@ -1154,7 +1154,7 @@
     {
       "id": "thread-integration-row-details",
       "title": "Thread integration row details",
-      "summary": "One row expands in place: every blocker in priority order, the pending revisions with their change ids, the thread's sessions, the workspace path with a copy action, and an on-demand preview of the latest messages. The workspace and thread ids stay secondary and copyable rather than driving the row. Open in thread opens that thread with its Changes facet (through the dshx Changes contract) when pulls-review is loaded; this page stays the cross-thread view.",
+      "summary": "One row expands in place: every blocker in priority order, the pending revisions with their change ids, the thread's sessions, the workspace path with a copy action, and an on-demand preview of the latest messages. The workspace and thread ids stay secondary and copyable rather than driving the row. Open in thread opens that thread with its Changes facet (through the dshx Changes contract) when diffs-review is loaded; this page stays the cross-thread view.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"Current thread workspace: thread-*\"",

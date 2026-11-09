@@ -48,7 +48,7 @@ are jj-integration's (they can integrate); git-worktrees answers when jj-integra
 `VcsDetector` from `@dshfiles/vcs-provider-port/detect` answers which VCS owns a path (`jj`, `git` or none) from the
 nearest `.jj` or `.git`, jj first when both exist, without starting a process. It resolves symlinks before walking,
 and a linked `git worktree` (a `.git` file) whose common git directory sits beside a `.jj` reads as jj: a plain
-worktree of a colocated repository is never handed to a git adapter. jj-integration and pulls-review use it to pick
+worktree of a colocated repository is never handed to a git adapter. jj-integration and diffs-review use it to pick
 their jj or git adapter.
 
 Callers: `@dshfiles/backlog` (an item's thread starts isolated) and `@dshfiles/session-undo` (turn snapshots).

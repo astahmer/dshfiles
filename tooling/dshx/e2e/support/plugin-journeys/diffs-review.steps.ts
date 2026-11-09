@@ -1,0 +1,102 @@
+import { mkdir, writeFile } from 'node:fs/promises'
+import { openGlobalPanel } from '../plugin-view-names.js'
+import { dirname, join } from 'node:path'
+import { expect, type Page } from '@playwright/test'
+import { Then, When } from '../bdd.js'
+import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { threadWorkspacePathFor } from './jj-integration.steps.js'
+
+const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const THREAD_CHANGES = [
+  { path: 'README.md', content: `# Review fixture\n\n${Array.from({ length: 80 }, (_, index) => `Documentation line ${String(index + 1)}.`).join('\n')}\n` },
+  { path: 'src/app.ts', content: 'export const reviewFixture = true\n' },
+]
+
+When('the Review page is opened from the sidebar', async ({ page }: { page: Page }) => {
+  await openGlobalPanel(page, 'Review')
+  await expect(page.getByRole('heading', { name: 'Review', exact: true })).toBeVisible()
+})
+
+const expectPanelReadsThreadWorkspace = async ({ page, base, range }: { page: Page; base: string; range: string }): Promise<void> => {
+  const projectPicker = page.getByRole('button', { name: 'Choose project or workspace', exact: true })
+  await expect(projectPicker).toBeVisible()
+  // The picker names the project or workspace; the absolute path stays out of the label.
+  await expect(projectPicker).toContainText(threadWorkspacePathFor(page).split('/').filter(Boolean).at(-1) ?? '')
+  await expect(projectPicker).not.toContainText(threadWorkspacePathFor(page))
+  const baseSelector = page.getByRole('textbox', { name: 'Base branch or bookmark', exact: true })
+  await expect(baseSelector).toBeVisible()
+  await baseSelector.fill(base)
+  await expect(page.getByText(range, { exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/^\d+ files?$/).first()).toBeVisible({ timeout: 30_000 })
+}
+
+Then('the Review page reads the thread workspace against {string}', async ({ page }: { page: Page }, base: string) => {
+  await recordAssertion(page, 'diffs-review-reads-thread-workspace', () => expectPanelReadsThreadWorkspace({ page, base, range: `${base}..@` }))
+})
+
+/** A git worktree has no working-copy revision: the review runs from the merge base to `HEAD` plus the worktree. */
+Then('the Review page reads the git thread worktree against {string}', async ({ page }: { page: Page }, base: string) => {
+  await recordAssertion(page, 'diffs-review-reads-git-thread-worktree', () => expectPanelReadsThreadWorkspace({ page, base, range: `${base}..HEAD` }))
+})
+
+/** Cucumber reads a bare `/` as an alternation, so the command name escapes it. */
+When('the \\/diffs command runs in the current thread', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true })
+  await composer.fill('/diffs')
+  await composer.press('Enter')
+})
+
+Then('the thread shows the diffs review scope report', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'diffs-review-command-report', async () => {
+    await expect(page.getByText(/Diffs review · main\.\.@/)).toBeVisible({ timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+/**
+ * The e2e profile has no model provider, so the new thread starts with an empty diff. Add files in two rule-based scopes
+ * to prove the panel renders the whole review instead of making the user switch scopes.
+ */
+When('the thread workspace holds changed files in different scopes', async ({ page }: { page: Page }) => {
+  const workspace = threadWorkspacePathFor(page)
+  await Promise.all(
+    THREAD_CHANGES.map(async file => {
+      const path = join(workspace, file.path)
+      await mkdir(dirname(path), { recursive: true })
+      await writeFile(path, file.content)
+    }),
+  )
+})
+
+Then("every scope's file diffs appear in the same scrollable review", async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'diffs-review-renders-files-across-scopes', async () => {
+    const review = page.getByTestId('diffs-review-diffs')
+    await expect(review).toBeVisible({ timeout: 30_000 })
+    await expect(review.locator('[data-diff-path="README.md"]')).toBeVisible()
+    await expect(review.locator('[data-diff-path="src/app.ts"]')).toBeVisible()
+    await expect(review.getByText('Docs', { exact: true })).toBeVisible()
+    await expect(review.getByText('Code', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Next scope', exact: true })).toHaveCount(0)
+    const scroller = review.locator('[class*="overflow-auto"]').first()
+    await expect(scroller).toBeVisible()
+    await expect.poll(() => scroller.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(0)
+    await scroller.hover()
+    await page.mouse.wheel(0, 500)
+    await expect.poll(() => scroller.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('all changed files are selected for batch review', async ({ page }: { page: Page }) => {
+  await page.getByRole('checkbox', { name: 'Select all files in this review', exact: true }).check()
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+})
+
+Then('marking selected files reviewed updates progress across scopes', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Mark selected reviewed', exact: true }).click()
+  await recordAssertion(page, 'diffs-review-batch-marks-cross-scope-selection', async () => {
+    await expect(page.getByText('2/2 reviewed', { exact: true })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('2 selected', { exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})

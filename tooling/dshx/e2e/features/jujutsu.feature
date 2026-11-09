@@ -88,7 +88,7 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.composer-context
   Scenario: One composer chip summarizes the thread's repository context
-    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/pulls-review, @dshfiles/multi-host, @dshfiles/rich-composer" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/diffs-review, @dshfiles/multi-host, @dshfiles/rich-composer" is booted
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And the repository is registered and a thread is started in it
     Then the composer run summary names the project, thread workspace and bookmark in one chip

@@ -23,7 +23,7 @@ whole plugin.
 | Goal stall guard                                           | `dshfiles-goal-stall-guard` row                                                                     | on             | row switch                                        | [goal-stall-guard](../plugins/@dshfiles/goal-stall-guard/README.md)                 |
 | Usage index over session logs                              | `dshfiles-usage` row; OTLP export: `OTEL_SDK_DISABLED` / `OTEL_METRICS_EXPORTER=none`               | on             | row switch; environment variables at start        | [usage](../plugins/@dshfiles/usage/README.md)                                       |
 | Tool search hides `bash` and `ask_user_question`           | opt-in bundle `@dshfiles/tool-search`, not in the `web` seed                                        | off            | profile install                                   | [tool-search](../plugins/@dshfiles/tool-search/README.md)                           |
-| AI review-scope summaries (one model call)                 | none needed: runs only on **Summarize**                                                             | —              | —                                                 | [pulls-review](../plugins/@dshfiles/pulls-review/README.md)                         |
+| AI review-scope summaries (one model call)                 | none needed: runs only on **Summarize**                                                             | —              | —                                                 | [diffs-review](../plugins/@dshfiles/diffs-review/README.md)                         |
 
 ### The DeepSeek account
 

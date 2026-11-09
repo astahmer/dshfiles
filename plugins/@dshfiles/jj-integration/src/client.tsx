@@ -124,7 +124,7 @@ export default defineClient({
   ],
   setup(ctx, decorate, metadata) {
     const translate = ctx.locale.bind(JJ_INTEGRATION_LOCALE_NAMESPACE)
-    /** The thread panel's Changes facet, when the plugin that owns it (pulls-review) is loaded; this panel stays the cross-thread view. */
+    /** The thread panel's Changes facet, when the plugin that owns it (diffs-review) is loaded; this panel stays the cross-thread view. */
     const openChanges = (input: { readonly workspacePath: string; readonly sessionId: string }): boolean => {
       const changes = metadata?.plugin?.use(Changes).get()
       return changes?.status === 'active' ? changes.value.review(input) : false

@@ -47,7 +47,7 @@
     "@dshfiles/project-checks",
     "@dshfiles/prompt-stash",
     "@dshfiles/pull-requests",
-    "@dshfiles/pulls-review",
+    "@dshfiles/diffs-review",
     "@dshfiles/queue-reorder",
     "@dshfiles/references",
     "@dshfiles/resource-packs",
@@ -8609,8 +8609,8 @@
       }
     },
     {
-      "name": "pulls_review",
-      "description": "Read a workspace's changes against a base bookmark, or an exact saved range of persistent JJ change IDs, and return pulls.review scopes with per-scope file and line counts.",
+      "name": "diffs_review",
+      "description": "Read a workspace's changes against a base bookmark, or an exact saved range of persistent JJ change IDs, and return review scopes (pulls.review rules) with per-scope file and line counts.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8638,7 +8638,7 @@
       }
     },
     {
-      "name": "pulls_review_revisions",
+      "name": "diffs_review_revisions",
       "description": "Review several Jujutsu revisions together: each revision with its own changed files and line counts, ancestors first. The revisions need not be adjacent, and a selection with gaps is reported as such; use jj_details for a patch.",
       "parameters": {
         "type": "object",

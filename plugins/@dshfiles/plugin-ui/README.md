@@ -145,7 +145,7 @@ the screen named; when a screen needs a prop the component lacks, add it here ra
 | -------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `TraceWaterfall`, `AgentTimeline`, `CallStackTree` | traces: span tree, session traces, span exception frames                        |
 | `StackTrace`, `CodeBlock`                          | test-runs: failing test frames and code frames, Stack trace card under bash     |
-| `MergeChecks`                                      | pulls-review Land card                                                          |
+| `MergeChecks`                                      | diffs-review Land card                                                          |
 | `MergeConflictGraph`                               | jj-integration workspace menu conflict notice                                   |
 | `FallbackChain`                                    | model-effort-picker fallbacks, with a "Serving now" rung                        |
 | `CreditsUsage`                                     | ai-accounts quota windows                                                       |
