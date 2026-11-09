@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The recorded commands/index deltas include guarded thread-local model selection; see README. Update with every upstream bump or delta change.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The recorded commands/index deltas include guarded thread-local model selection; see README. Update with every upstream bump or delta change; the list delta recovers cold list metadata from the stored log when a projection checkpoint is missing.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-api-session-controller",
