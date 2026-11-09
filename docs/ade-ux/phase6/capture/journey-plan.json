@@ -41,7 +41,8 @@
   {
     "name": "j4-changes-sheet",
     "steps": [
-      "tap css \"[data-phone-panels]\"",
+      "tap css \"[data-phone-thread-menu-toggle]\"",
+      "tap css \"[data-phone-thread-menu] button[aria-label='Open right sidebar']\"",
       "assert-css \"[data-phone-sheet]\"",
       "tap css \"[data-phone-sheet] button[aria-label='New tab']\"",
       "tap css \"[data-phone-sheet] button:has-text('Changes')\"",

@@ -226,13 +226,7 @@ button.crumbEditable {
   display: none;
 }
 
-/* Phone shell (thread-sidebar marks the document with data-shell-phone-nav):
-   the top bar names the thread and owns the menu button, so the session header
-   renders no title row. While the menu is open (data-phone-thread-tools on the
-   document) a layer covers the conversation (.root is its containing block):
-   a scrim, and a panel listing the views, the header controls and the composer
-   tools other plugins mark data-phone-thread-tool="<label>". Those stay hidden
-   on a phone until the menu reveals one (phone-thread-tools.ts). */
+/* The menu contract hides only tools with a mounted reader in their own composer occurrence. */
 .phoneMenuLayer {
   position: absolute;
   inset: 0;
@@ -336,7 +330,7 @@ button.crumbEditable {
 }
 
 @media (max-width: 639.98px) {
-  :global(html[data-shell-phone-nav]) :global([data-phone-thread-tool]:not([data-phone-thread-tool-revealed])) {
+  :global(html[data-shell-phone-nav]) :global([data-phone-thread-tool-hidden]) {
     display: none !important;
   }
 

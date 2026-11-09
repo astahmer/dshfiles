@@ -1,3 +1,4 @@
+import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
 import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -54,6 +55,7 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
   const owner = useId()
   const ui = useAnnotationsUi()
   const [open, setOpen] = useState(false)
+  const phoneTool = usePhoneThreadTool({ id: '@dshfiles/annotations/picker', label: 'Annotations', open: () => setOpen(true), active: open })
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pairing, sendPairing] = useMachine(pairingMachine)
   const [rowAction, dispatchRowAction] = useReducer(rowActionReducer, noRowAction)
@@ -227,7 +229,7 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
             variant="ghost"
             size="sm"
             aria-label="Annotate an element"
-            data-phone-thread-tool="Annotations"
+            {...phoneTool.triggerProps}
             onMouseDown={event => event.preventDefault()}
             className="dshx-root dshx:relative dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent"
           >
@@ -239,7 +241,12 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" side="top" className="dshx-root dshx:flex dshx:max-h-[460px] dshx:w-96 dshx:flex-col dshx:gap-0 dshx:p-0">
+        <PopoverContent
+          onCloseAutoFocus={phoneTool.onCloseAutoFocus}
+          align="start"
+          side="top"
+          className="dshx-root dshx:flex dshx:max-h-[460px] dshx:w-96 dshx:flex-col dshx:gap-0 dshx:p-0"
+        >
           <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-2">
             <div>
               <h2 className="dshx:text-sm dshx:font-semibold">Annotations</h2>

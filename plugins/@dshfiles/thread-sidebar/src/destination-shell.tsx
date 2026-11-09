@@ -38,7 +38,8 @@ import {
   type ResolvedDestination,
 } from './destinations.js'
 import type { NavigationRecord } from './navigation-api.js'
-import { PhoneThreadMenu, PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard } from './phone-shell.js'
+import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard } from './phone-shell.js'
+import { usePhoneThreadMenu } from '@dshfiles/rich-composer/phone-thread-menu'
 
 const ICONS = {
   'messages-square': MessagesSquareIcon,
@@ -655,11 +656,15 @@ const PhoneNavigation = (
     props.record({ destination: bar.back.to, surface: 'back' })
     if (!listOpen) props.toggleSidebar()
   }
-  const threadMenuOpen = PhoneThreadMenu.useOpen()
+  const { service: threadMenu, snapshot: threadMenuState } = usePhoneThreadMenu()
+  const stageSessionId = props.stageThreadId === undefined ? props.selectedThreadId : props.stageThreadId
+  const menuReader = bar.thread ? threadMenuState.readers.find(reader => reader.sessionId === stageSessionId) : undefined
+  const threadMenuOpen = menuReader !== undefined && threadMenuState.openReader === menuReader.id
+  const menuReaderId = menuReader?.id
   useEffect(() => {
-    if (!bar.thread) PhoneThreadMenu.close()
-  }, [bar.thread])
-  useEffect(() => PhoneThreadMenu.close, [])
+    threadMenu?.close()
+    return menuReaderId === undefined ? undefined : threadMenu?.attachLauncher(menuReaderId)
+  }, [threadMenu, menuReaderId])
   // Tapping the row of the thread (or the page) already on the stage changes no selection, so the effect above would
   // leave the list open: close it after the click, unless the selection change already did.
   const listOpenRef = useRef(listOpen)
@@ -697,13 +702,20 @@ const PhoneNavigation = (
           >
             {bar.title}
           </h1>
-          {bar.thread ? (
+          {menuReader !== undefined ? (
             <button
               type="button"
               data-phone-thread-menu-toggle=""
               aria-label="Thread menu"
               aria-expanded={threadMenuOpen}
-              onClick={PhoneThreadMenu.toggle}
+              onClick={event => {
+                const opener = event.currentTarget
+                threadMenu?.toggle(menuReader.id, () => {
+                  if (!opener.isConnected) return false
+                  opener.focus()
+                  return true
+                })
+              }}
               className={cn(
                 'dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent',
                 threadMenuOpen && 'dshx:bg-accent dshx:text-foreground',

@@ -1,9 +1,10 @@
 import type { ISessions, SessionReference, SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ConversationContentInputProps, ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type {} from './conversation-header.js'
+import { useContract } from '@dshfiles/dshx/client'
+import { ConversationScope } from './conversation-header.js'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { PropsRenderFactories, PropsRuntime, SessionProviderComponent } from '@deepseek-ai/dsh-client-ui-slots'
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Fragment, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 
 export const WORKBENCH_CONVERSATION_SLOT = 'dshfiles.workbench.conversation'
 export const WORKBENCH_THREAD_CHILDREN = { [WORKBENCH_CONVERSATION_SLOT]: { kind: 'single', scope: 'session' } } as const
@@ -43,16 +44,18 @@ type ConversationSources = Pick<PropsRuntime<typeof WORKBENCH_CONVERSATION_SLOT>
 
 /** Register this child once; each occurrence binds the SessionProvider surrounding its own panel. */
 export const WorkbenchThreadConversation = (props: ConversationSources & PropsRenderFactories): ReactNode => {
+  const presentation = useContract(ConversationScope)
+  const Scope = presentation.status === 'active' ? presentation.value.Scope : Fragment
   const session = props.useSession(snapshot => snapshot)
   const conversation = props.useConversation(snapshot => snapshot)
   const summaryBlank = props.useSessions(snapshot => snapshot.byId[session.sessionId]?.blank)
   // Both producer-owned Factories inherit this panel's fixed Session. Native
   // Content keeps its resident editor and per-Session child-view selection.
   return (
-    <>
+    <Scope>
       {props.renderFactorySlot('dshfiles.workbench.conversation-header', { reserveHostCorner: true })}
       {props.renderFactorySlot('conversation.content', HeroPolicy.content(session, conversation, summaryBlank))}
-    </>
+    </Scope>
   )
 }
 

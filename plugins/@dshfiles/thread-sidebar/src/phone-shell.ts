@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect } from 'react'
 import { Destinations, type DestinationId, type ResolvedDestination } from './destinations.js'
 
 /** Where the phone top bar's Back goes: a destination's list, the More list, or the page a thread was opened from. */
@@ -14,7 +14,7 @@ export interface PhoneStageOrigin {
 export interface PhoneTopBar {
   readonly title: string
   readonly back: PhoneBackTarget | null
-  /** The stage shows a thread (or a new-thread draft): the bar offers its panels. */
+  /** The stage shows a thread or a new-thread draft. */
   readonly thread: boolean
 }
 
@@ -55,10 +55,9 @@ export const PhoneTopBarModel = {
     if (owner === undefined) {
       const title = input.selectedThreadId === null ? 'New thread' : input.stageTitle?.trim() || 'Thread'
       const from = input.origin === undefined ? undefined : PhoneTopBarModel.pageLabel(input.destinations, input.origin.panelId)
-      if (from !== undefined && input.origin !== undefined)
-        return { title, back: { to: 'page', panelId: input.origin.panelId, label: from }, thread: input.selectedThreadId !== null }
+      if (from !== undefined && input.origin !== undefined) return { title, back: { to: 'page', panelId: input.origin.panelId, label: from }, thread: true }
       const threads = input.destinations.find(candidate => candidate.id === 'threads')
-      return { title, back: { to: 'threads', label: threads?.label ?? 'Threads' }, thread: input.selectedThreadId !== null }
+      return { title, back: { to: 'threads', label: threads?.label ?? 'Threads' }, thread: true }
     }
     const section = owner.sections.find(candidate => candidate.panelId === input.activePanelId)
     // The Inbox page is the Inbox tab's root: it is named after the tab, not its first section ("Needs you").
@@ -124,25 +123,3 @@ export const useSoftwareKeyboard = (): void => {
     }
   }, [])
 }
-
-/**
- * The thread menu the top bar's menu button opens: `data-phone-thread-tools` on the document. Rich Composer reads it to
- * show its thread menu (views, header actions and utilities, the thread-panel opener, and the composer tools marked
- * `data-phone-thread-tool`). The top bar opens it and closes it whenever the stage stops showing a thread; the menu
- * closes itself after a pick.
- */
-const THREAD_MENU_ATTRIBUTE = 'data-phone-thread-tools'
-
-const subscribeThreadMenu = (listener: () => void): (() => void) => {
-  const observer = new MutationObserver(listener)
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: [THREAD_MENU_ATTRIBUTE] })
-  return () => observer.disconnect()
-}
-
-const readThreadMenu = (): boolean => document.documentElement.hasAttribute(THREAD_MENU_ATTRIBUTE)
-
-export const PhoneThreadMenu = {
-  useOpen: (): boolean => useSyncExternalStore(subscribeThreadMenu, readThreadMenu, () => false),
-  toggle: (): void => void document.documentElement.toggleAttribute(THREAD_MENU_ATTRIBUTE),
-  close: (): void => document.documentElement.removeAttribute(THREAD_MENU_ATTRIBUTE),
-} as const

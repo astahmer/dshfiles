@@ -4,6 +4,7 @@ export default defineConfig({
   name: '@dshfiles/rich-composer',
   modules: {
     'conversation-contract': 'src/conversation-contract.ts',
+    'phone-thread-menu': 'src/phone-thread-menu.tsx',
   },
   client: {
     shared: '@dshfiles/shared-runtime',

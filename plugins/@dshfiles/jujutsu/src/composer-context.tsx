@@ -1,3 +1,4 @@
+import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
@@ -227,6 +228,13 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
     retry: false,
   })
   const countsByPath = useMemo(() => new Map(diffQuery.data?.files.map(file => [file.path, file]) ?? []), [diffQuery.data])
+  const phoneTool = usePhoneThreadTool({
+    id: '@dshfiles/jujutsu/changes',
+    label: 'Workspace changes',
+    open: () => setExpanded(true),
+    active: expanded,
+    available: repository !== null,
+  })
   if (repository === null) return null
 
   const fileCount = repository.totals?.files ?? repository.files.length
@@ -244,7 +252,7 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
     <TooltipProvider delayDuration={500}>
       <div
         className="dshx-root dshx:mb-1.5 dshx:rounded-lg dshx:border dshx:bg-background/90 dshx:text-xs"
-        data-phone-thread-tool={heading}
+        {...phoneTool.triggerProps}
         ref={context.ref}
         style={ABOVE_STYLE}
       >

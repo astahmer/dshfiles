@@ -1,7 +1,7 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
 import clsx from 'clsx'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
@@ -9,10 +9,8 @@ import type {
 } from '../contract/slots.ts'
 import { resolveActiveView } from '../view-selection.ts'
 import { DefaultConversationViews } from './DefaultConversationViews.tsx'
-import {
-  closePhoneThreadTools, concealPhoneThreadTools, findPhoneThreadTools, openPhoneThreadTool, usePhoneShell, usePhoneThreadToolsOpen,
-  type PhoneThreadTool,
-} from './phone-thread-tools.ts'
+import { usePhoneShell } from './phone-thread-tools.ts'
+import { phoneMenuScope, usePhoneMenuReader, usePhoneThreadMenu } from '../../phone-thread-menu.tsx'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -128,14 +126,40 @@ export function ConversationSessionHeader({
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const phone = usePhoneShell()
-  const phoneToolsOpen = usePhoneThreadToolsOpen()
+  const { service: phoneMenu, snapshot: phoneMenuState } = usePhoneThreadMenu()
+  const readerId = useContext(phoneMenu?.scope ?? phoneMenuScope())
+  usePhoneMenuReader(readerId === null ? null : { id: readerId, sessionId })
+  const phoneToolsOpen = readerId !== null && phoneMenuState.openReader === readerId
+  const phoneTools = phoneMenuState.tools.filter(tool => tool.readerId === readerId)
+  const closePhoneThreadTools = () => phoneMenu?.close()
   const phoneMenuRef = useRef<HTMLDivElement>(null)
-  const [phoneTools, setPhoneTools] = useState<readonly PhoneThreadTool[]>([])
   useLayoutEffect(() => {
     if (!phone || !phoneToolsOpen) return
-    concealPhoneThreadTools()
-    setPhoneTools(phoneMenuRef.current === null ? [] : findPhoneThreadTools(phoneMenuRef.current))
-  }, [phone, phoneToolsOpen])
+    const previousFocus = document.activeElement
+    phoneMenuRef.current?.focus()
+    const keydown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        phoneMenu?.close()
+      }
+      if (event.key !== 'Tab') return
+      const controls = Array.from(phoneMenuRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input, [tabindex="0"]') ?? [])
+      const first = controls[0]
+      const last = controls.at(-1)
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === phoneMenuRef.current)) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === phoneMenuRef.current)) {
+        event.preventDefault()
+        first?.focus()
+      }
+    }
+    document.addEventListener('keydown', keydown)
+    return () => {
+      document.removeEventListener('keydown', keydown)
+      if (phoneMenu?.state.get().closeReason !== 'pick' && previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus()
+    }
+  }, [phone, phoneToolsOpen, phoneMenu])
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string>()
   useEffect(() => {
@@ -156,22 +180,18 @@ export function ConversationSessionHeader({
   const showTabs = !hideChrome && tabs.length > 1
   // A selected view other than the first keeps its strip on a phone, so the way back to it is never hidden.
   const secondaryViewActive = active !== undefined && active.id !== tabs[0]?.id
+  const renderViewTabs = (className: string | undefined, activeClassName: string | undefined, onPicked?: () => void) => tabs.map(viewTab => (
+    <button key={viewTab.id} type="button" role="tab" aria-selected={viewTab.id === active?.id}
+      className={clsx(className, viewTab.id === active?.id && activeClassName)}
+      onClick={() => { selectView(viewTab.id); onPicked?.() }}>
+      {viewTab.label}
+    </button>
+  ))
   const tabStrip = (
     // data-conversation-tabs: marks the tab strip, which the window-chrome
     // geometry and the browser coverage lane anchor on.
     <div className={css.tabs} role="tablist" data-conversation-tabs="">
-      {tabs.map(viewTab => (
-        <button
-          key={viewTab.id}
-          type="button"
-          role="tab"
-          aria-selected={viewTab.id === active?.id}
-          className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-          onClick={() => { selectView(viewTab.id) }}
-        >
-          {viewTab.label}
-        </button>
-      ))}
+      {renderViewTabs(css.tab, css.tabActive)}
     </div>
   )
   const headerActions = (
@@ -190,43 +210,28 @@ export function ConversationSessionHeader({
     </div>
   )
   // The phone top bar names the thread and owns the menu button: no second title row here.
-  if (phone && hideChrome) return null
   if (phone && !phoneToolsOpen) return showTabs && secondaryViewActive && tabStrip
   if (phone)
     return (
-      <div className={css.phoneMenuLayer} ref={phoneMenuRef} data-phone-thread-menu="">
+      <div className={css.phoneMenuLayer} data-phone-thread-menu="">
         <button type="button" className={css.phoneMenuScrim} aria-label={t('session.phoneMenuClose')} tabIndex={-1} onClick={closePhoneThreadTools} />
         <div
           className={css.phoneMenu}
           role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          ref={phoneMenuRef}
           aria-label={t('session.phoneTools')}
-          onKeyDown={event => {
-            if (event.key === 'Escape') closePhoneThreadTools()
-          }}
         >
           {showTabs && (
             <section className={css.phoneMenuSection}>
               <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuViews')}</h3>
               <div role="tablist" className={css.phoneMenuList}>
-                {tabs.map(viewTab => (
-                  <button
-                    key={viewTab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={viewTab.id === active?.id}
-                    className={clsx(css.phoneMenuItem, viewTab.id === active?.id && css.phoneMenuItemActive)}
-                    onClick={() => {
-                      selectView(viewTab.id)
-                      closePhoneThreadTools()
-                    }}
-                  >
-                    {viewTab.label}
-                  </button>
-                ))}
+                {renderViewTabs(css.phoneMenuItem, css.phoneMenuItemActive, closePhoneThreadTools)}
               </div>
             </section>
           )}
-          <section className={css.phoneMenuSection}>
+          {!hideChrome && <section className={css.phoneMenuSection}>
             <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuThread')}</h3>
             <div className={css.phoneMenuRow}>
               {headerActions}
@@ -235,18 +240,18 @@ export function ConversationSessionHeader({
                 {headerCorner}
               </div>
             </div>
-          </section>
+          </section>}
           {phoneTools.length > 0 && (
             <section className={css.phoneMenuSection}>
               <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuComposer')}</h3>
               <div className={css.phoneMenuList}>
                 {phoneTools.map(tool => (
                   <button
-                    key={tool.label}
+                    key={tool.id}
                     type="button"
                     className={css.phoneMenuItem}
                     data-phone-thread-tool-proxy=""
-                    onClick={() => { openPhoneThreadTool(tool.element) }}
+                    onClick={() => { phoneMenu?.pick(tool) }}
                   >
                     {tool.label}
                   </button>

@@ -1,4 +1,8 @@
+import { defineContract } from '@dshfiles/dshx/client'
+import type { ComponentType, ReactNode } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+
+export const ConversationScope = defineContract<{ readonly Scope: ComponentType<{ readonly children: ReactNode }> }>('@dshfiles/workbench.conversation-scope')
 
 /** Presentation contract implemented by the owned Conversation producer, not a second Session owner. */
 declare module '@deepseek-ai/dsh-client-ui-slots' {

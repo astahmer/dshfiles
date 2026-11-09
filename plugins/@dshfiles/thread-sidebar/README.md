@@ -6,7 +6,7 @@
 
 ![On a phone the rail becomes a bottom tab bar; More lists the other destinations](docs/screenshots/phone-tab-bar.png)
 
-![On a phone the stage is a stack: a top bar names the thread or page, Back returns to the list it came from, and Thread panels opens the thread panel](docs/screenshots/phone-stack-navigation.png)
+![On a phone the stage is a stack: a top bar names the thread or page, Back returns to the list it came from, and Thread menu offers the thread-panel opener when its reader is mounted](docs/screenshots/phone-stack-navigation.png)
 
 ![On a touch screen each thread row has a ⋯ button that opens its actions menu](docs/screenshots/touch-row-menu.png)
 

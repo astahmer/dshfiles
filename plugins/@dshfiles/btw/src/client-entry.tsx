@@ -1,3 +1,4 @@
+import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -296,8 +297,9 @@ export default defineClient({
 
     const ComposerChip = (props: PropsRuntime<'conversation.input.right'>): ReactNode => {
       const available = props.useSessions(state => state.byId[props.sessionId]?.blank === false)
-      if (!available) return null
       const label = t('composerChip')
+      const phoneTool = usePhoneThreadTool({ id: '@dshfiles/btw/ask', label, open: () => askAbout(props.sessionId), available })
+      if (!available) return null
       return (
         <TooltipProvider delayDuration={500}>
           <Tooltip>
@@ -307,7 +309,7 @@ export default defineClient({
                 variant="ghost"
                 size="icon-sm"
                 aria-label={label}
-                data-phone-thread-tool={label}
+                {...phoneTool.triggerProps}
                 className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground"
                 onMouseDown={event => event.preventDefault()}
                 onClick={() => askAbout(props.sessionId)}

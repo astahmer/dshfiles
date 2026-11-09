@@ -1320,7 +1320,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             toggleSidebar={toggleSidebar}
             record={recordNavigation}
             stageTitle={stageTitle}
-            // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
           />
         )}
         <MovedToDialog

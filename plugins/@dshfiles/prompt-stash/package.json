@@ -28,6 +28,7 @@
   "dependencies": {
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/rich-composer": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "effect": "catalog:"
   },

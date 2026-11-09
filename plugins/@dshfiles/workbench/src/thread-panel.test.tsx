@@ -15,7 +15,10 @@ import {
 import type { PropsRenderFactories, PropsRuntime, SessionProviderComponent } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { createContext, useContext } from 'react'
+import { defineClientPlugin } from '@dshfiles/dshx/client'
+import { createTestClient } from '@dshfiles/dshx/testing'
+import { ConversationScope } from './conversation-header.js'
+import { createContext, useContext, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWorkbenchThreadPanel, WorkbenchThreadConversation, WORKBENCH_CONVERSATION_SLOT } from './thread-panel.js'
 
@@ -147,6 +150,29 @@ const factory = () => {
 }
 
 describe('fixed Conversation native hero policy', () => {
+  it('shares an optional producer scope across the resident header and composer, and withdraws it on unload', async () => {
+    const client = await createTestClient()
+    const native = factory()
+    const Scope = (props: { readonly children: ReactNode }) => <section data-conversation-scope="">{props.children}</section>
+    const view = render(<WorkbenchThreadConversation {...conversationSources(emptySession())} renderFactorySlot={native.renderFactorySlot} />)
+    expect(screen.getByLabelText('Native header').closest('[data-conversation-scope]')).toBeNull()
+    try {
+      await act(async () => {
+        await client.mount(defineClientPlugin({ id: 'scope', uses: ['ui'], setup: api => void api.provide(ConversationScope, { Scope }) }), {
+          packageId: '@test/conversation-producer',
+        })
+      })
+      const scope = screen.getByLabelText('Native header').closest('[data-conversation-scope]')
+      expect(scope).not.toBeNull()
+      expect(screen.getByLabelText('Native content').closest('[data-conversation-scope]')).toBe(scope)
+      await act(async () => client.dispose())
+      expect(screen.getByLabelText('Native header').closest('[data-conversation-scope]')).toBeNull()
+    } finally {
+      view.unmount()
+      await client.dispose()
+    }
+  })
+
   const cases: Array<{
     label: string
     session?: Partial<SessionSnapshot>
