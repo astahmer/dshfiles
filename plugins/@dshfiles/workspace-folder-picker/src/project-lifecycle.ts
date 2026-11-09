@@ -139,7 +139,7 @@ export class ProjectRegistry extends Context.Service<
 
 const excerpt = (text: string, limit = 1_000): string => text.trim().split('\n').slice(-6).join('\n').slice(-limit)
 
-const expandHome = (path: string, home: string): string => (path.startsWith('~/') ? join(home, path.slice(2)) : path)
+const expandHome = (path: string, home: string): string => (path.startsWith('~/') || path.startsWith('~\\') ? join(home, path.slice(2)) : path)
 
 /** The last git progress line (`Receiving objects:  45% (450/1000)`), split on carriage returns as a terminal would draw it. */
 const STAGE_ORDER: readonly CloneStage[] = ['connecting', 'counting', 'receiving', 'resolving', 'checkout']

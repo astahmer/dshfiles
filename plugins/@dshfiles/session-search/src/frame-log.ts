@@ -6,6 +6,7 @@
  */
 import { readdirSync, statSync, type Dirent } from 'node:fs'
 import { open, readdir } from 'node:fs/promises'
+import { basename } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
 import { decodeJson } from '@dshfiles/dshx/json'
 import { sessionHeaderSchema, type SessionHeaderRow } from './protocol.js'
@@ -167,7 +168,7 @@ export class FrameLog {
         if (path === undefined) continue
         const info = statSync(path, { bigint: true, throwIfNoEntry: false })
         if (info === undefined) continue
-        const name = sessionDirectory.slice(sessionDirectory.lastIndexOf('/') + 1)
+        const name = basename(sessionDirectory)
         logs.push({
           sessionId: name,
           path,

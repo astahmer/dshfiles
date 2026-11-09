@@ -9,7 +9,8 @@ export interface RegisteredProjectSource {
 const THREADS_DIRECTORY_SUFFIX = '-threads'
 const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 
-const segments = (path: string): readonly string[] => path.replace(/\/+$/u, '').split('/')
+// A Windows Host reports `C:\…\repo-threads\thread-…`, so both separators split a path.
+const segments = (path: string): readonly string[] => path.replace(/[\\/]+$/u, '').split(/[\\/]/u)
 
 const belongsToThreadsDirectory = (name: string | undefined): boolean =>
   name !== undefined && name.length > THREADS_DIRECTORY_SUFFIX.length && name.endsWith(THREADS_DIRECTORY_SUFFIX)

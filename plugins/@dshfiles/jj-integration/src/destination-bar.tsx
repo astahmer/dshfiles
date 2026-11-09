@@ -68,7 +68,7 @@ const randomThreadName = (): string => {
 }
 
 const threadNameOf = (path: string | undefined): string | null => {
-  const name = path?.split('/').at(-1)
+  const name = path?.split(/[\\/]/u).at(-1)
   return name !== undefined && Schema.is(threadWorkspaceNameEffect)(name) ? name : null
 }
 

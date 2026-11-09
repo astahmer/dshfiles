@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises'
+import { basename } from 'node:path'
 import { constants, zstdCompressSync } from 'node:zlib'
 import { appendFile } from 'node:fs/promises'
 import { withoutUndefined } from '../src/optional-fields.js'
@@ -21,7 +22,7 @@ export const writeSessionLog = async (input: {
 }): Promise<string> => {
   const { directory, exchanges } = input
   await mkdir(directory, { recursive: true })
-  const id = input.sessionId ?? directory.slice(directory.lastIndexOf('/') + 1)
+  const id = input.sessionId ?? basename(directory)
   const compress = (text: string): Buffer => zstdCompressSync(Buffer.from(text, 'utf8'), { params: { [constants.ZSTD_c_checksumFlag]: 1 } })
   let seq = -1
   let time = 1_700_000_000_000
