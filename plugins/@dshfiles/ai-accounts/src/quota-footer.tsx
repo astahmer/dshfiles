@@ -258,7 +258,7 @@ const QuotaStripBody = (props: QuotaSurfaceProps): JSX.Element => {
   const { meterLabel, usageWindowLayout, usageShortNames } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
-  const { usage } = useAccountsUsage()
+  const { usage } = useAccountsUsage({ ambient: true })
   const withShortName = useShortNames()
   const stripRef = useRef<HTMLDivElement>(null)
   const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
@@ -387,7 +387,7 @@ const QuotaStripBody = (props: QuotaSurfaceProps): JSX.Element => {
 const QuotaRailButton = (props: QuotaSurfaceProps): JSX.Element => {
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
-  const { usage } = useAccountsUsage()
+  const { usage } = useAccountsUsage({ ambient: true })
   const withShortName = useShortNames()
   const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
   const now = useQuotaClock({ resetsAt: items.map(item => ('unavailable' in item ? null : item.resetsAt)) })
