@@ -56,7 +56,7 @@ import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settin
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
-import { createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, settingsWorkbenchPanelId } from './workbench-panels.js'
+import { createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, type SettingsOpenRequest, settingsWorkbenchPanelId } from './workbench-panels.js'
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
@@ -156,6 +156,8 @@ export default defineClient({
     const settingsOpen: ObservableSnapshot<boolean> = { getSnapshot: () => !actor.getSnapshot().matches('closed'), subscribe: subscribeActor }
     const activeSection: ObservableSnapshot<string | undefined> = { getSnapshot: () => actor.getSnapshot().context.sectionId, subscribe: subscribeActor }
     const inStage: ObservableSnapshot<boolean> = { getSnapshot: () => actor.getSnapshot().matches('tab'), subscribe: subscribeActor }
+    /** The latest section or field asked for; the Settings pane keeps its own navigation, so it follows these too. */
+    const openRequests = createSnapshotStore<SettingsOpenRequest | undefined>(undefined)
 
     // Settings follows the main view: a Settings tab picked in the strip, or a reload landing on it, opens it there.
     ctx.effect(() => {
@@ -189,6 +191,7 @@ export default defineClient({
      */
     const openSettings = (sectionId?: string): void => {
       actor.send(sectionId === undefined ? { type: 'open' } : { type: 'open', sectionId })
+      openRequests.set(sectionId === undefined ? undefined : { sectionId })
     }
     /** Opens another plugin's page in the stage: Settings links AI accounts, MCP servers, Secrets and Hosts. */
     const openPanel = (panelId: string): void => {
@@ -276,6 +279,7 @@ export default defineClient({
       const field = fieldTargetFor(target)
       if (field === undefined) return false
       actor.send({ type: 'open', field })
+      openRequests.set({ sectionId: field.sectionId, field })
       return true
     }
 
@@ -540,6 +544,7 @@ export default defineClient({
             title: t('title'),
             component: createSettingsWorkbenchHub({
               groups,
+              openRequests,
               closeSettings: deps.closeSettings,
               view: input =>
                 settingsViewProps({
@@ -660,6 +665,7 @@ export default defineClient({
       if (request.section !== undefined) openEvent.sectionId = request.section
       if (request.target !== undefined) openEvent.target = request.target
       actor.send(openEvent)
+      openRequests.set(request.section === undefined ? undefined : { sectionId: request.section })
       if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
     }
 
