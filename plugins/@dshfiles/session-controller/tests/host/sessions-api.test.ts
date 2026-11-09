@@ -9,6 +9,7 @@ import { LlmAdapter, LlmRuntime, createUserMessage, type GenerateOptions, type S
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import * as JsonlPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import { SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
@@ -118,7 +119,17 @@ const fixture = async (replies: readonly string[] = []) => {
     { packageId: '@dshfiles/session-controller' },
   )
   const sessions = createHostApiClient(ctx, sessionsApi, '@acme/driver')
-  return { ctx, agent: handle.agent, model, sessions }
+  return { ctx, agent: handle.agent, handle, model, sessions }
+}
+
+/** Core's read engine without a search backend: these tests read Sessions, they never search them. */
+class ReadOnlySessionQuery extends SessionQueryEngine {
+  override searchSessions(): never {
+    throw new Error('search is not part of these tests')
+  }
+  override searchEvents(): never {
+    throw new Error('search is not part of these tests')
+  }
 }
 
 const textOf = (options: GenerateOptions | undefined): string =>
@@ -194,6 +205,27 @@ it('reads the recent user and assistant messages of a thread, oldest first', asy
     ['assistant', 'Second answer.'],
   ])
   await expect(sessions.messages({ sessionId: 'not-a-thread' })).rejects.toMatchObject({ remoteCode: 'thread-not-found' })
+})
+
+it("reads a cold thread's messages from its own log without listing every stored thread", async () => {
+  const { ctx, agent, handle, sessions } = await fixture(['Cold answer.'])
+  await sessions.prompt({ sessionId: agent.id, text: 'Cold question' })
+  await sessions.wait({ sessionId: agent.id, timeoutMs: 10_000 })
+  await handle.dispose()
+  await ctx.plugin(ReadOnlySessionQuery, {})
+  const persistence = ctx.sessionPersistence
+  const list = persistence.list.bind(persistence)
+  let listings = 0
+  persistence.list = options => {
+    listings += 1
+    return list(options)
+  }
+  const read = await sessions.messages({ sessionId: agent.id, limit: 5 })
+  expect(read.entries.map(entry => [entry.role, entry.text])).toEqual([
+    ['user', 'Cold question'],
+    ['assistant', 'Cold answer.'],
+  ])
+  expect(listings).toBe(0)
 })
 
 it('generates outside any thread, decoding a JSON Schema reply', async () => {

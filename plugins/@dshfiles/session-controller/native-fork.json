@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The recorded commands/index deltas include guarded thread-local model selection; see README. Update with every upstream bump or delta change; the list delta recovers cold list metadata from the stored log in the background when a projection checkpoint is missing, persists those answers by createdAt and log revision (added list-metadata-store.ts), cuts projection selections from one memoized full cold block, and patches the cached corpus on Session create/dispose, and folds a checkpoint-less small log through one persistence read handle instead of sessionQuery.readSession (which lists the whole corpus per read); the history delta sizes each follower item once and counts followers per Session; the agent delta keeps the handle of every Agent it creates or resumes and disposes one idle for 5 minutes (not running, nothing queued, no open question, no history follower, no held command, no live child), and index suppresses api-session/removed for that eviction so the row stays listed.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The recorded commands/index deltas include guarded thread-local model selection; see README. Update with every upstream bump or delta change; the list delta recovers cold list metadata from the stored log in the background when a projection checkpoint is missing, persists those answers by createdAt and log revision (added list-metadata-store.ts), cuts projection selections from one memoized full cold block, and patches the cached corpus on Session create/dispose, and folds a checkpoint-less small log through one persistence read handle instead of sessionQuery.readSession (which lists the whole corpus per read); the history delta sizes each follower item once and counts followers per Session, and answers a cold page/follow of a Session with no stored log from the tail's one lookup; the agent delta keeps the handle of every Agent it creates or resumes and disposes one idle for 5 minutes (not running, nothing queued, no open question, no history follower, no held command, no live child), and index suppresses api-session/removed for that eviction so the row stays listed.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-api-session-controller",
@@ -17,7 +17,7 @@
       "local": "locale"
     }
   ],
-  "added": ["src/native/client/sessions/share-record.ts", "src/native/cold-reads.ts", "src/native/control.test.ts", "src/native/list-metadata-store.ts"],
+  "added": ["src/native/client/sessions/record-reuse.ts", "src/native/client/sessions/share-record.ts", "src/native/cold-reads.ts", "src/native/control.test.ts", "src/native/list-metadata-store.ts"],
   "delta": [
     "src/native/agent.ts",
     "src/native/assistant-stream.ts",

@@ -37,6 +37,7 @@ import { SessionAssistantStreamAccumulator } from './assistant-stream.ts'
 import { coldReads } from './cold-reads.ts'
 import { BrowserEvent } from '../browser-event.ts'
 import { TailLog } from '../tail-log.ts'
+import type { LogWindowMetrics } from '@dshfiles/session-log-window'
 
 const DEFAULT_MAX_MESSAGES = 50
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
@@ -105,6 +106,7 @@ export class SessionHistoryController {
     // dshfiles delta: an older page of a cold Session comes from the same log tail its opening decoded.
     if (request.address.kind === 'session' && this.ctx.sessions.get(request.address.sessionId) === undefined) {
       const tailPage = await tailPageOf(this.ctx, request.address.sessionId, { ...request, beforeSeq, throughSeq }, signal)
+      if (tailPage === 'missing') rejectNotFound(request.address)
       if (tailPage !== undefined) return tailPage
     }
     using source = await this.sourceFor(request.address, signal, false)
@@ -236,7 +238,9 @@ export class SessionHistoryController {
       // dshfiles delta: a cold Session opens from the end of its log (see ../tail-log.ts); the full read stays the path
       // for a live Session and for every log the tail cannot serve exactly.
       const cold = address.kind === 'session' && this.ctx.sessions.get(target) === undefined
-      const tail = cold ? await coldReads.use(() => tailOpening(this.ctx, target, request, signal)) : undefined
+      const opened = cold ? await coldReads.use(() => tailOpening(this.ctx, target, request, signal)) : undefined
+      if (opened === 'missing') rejectNotFound(address)
+      const tail = opened
       using source = tail !== undefined
         ? undefined
         : await (cold ? coldReads.use(() => this.sourceFor(address, signal, true)) : this.sourceFor(address, signal, true))
@@ -384,10 +388,11 @@ async function tailOpening(
   readonly cursor: SessionSeqCursor
   readonly page: { readonly events: SessionEvent[]; readonly hasMore: boolean }
   readonly projections: NonNullable<SessionObservation['projections']>
-} | undefined> {
+} | 'missing' | undefined> {
   try {
-    const log = await TailLog.open({ ctx, sessionId, signal })
-    if (log === undefined) return undefined
+    const metrics: LogWindowMetrics = {}
+    const log = await TailLog.open({ ctx, sessionId, signal, metrics })
+    if (log === undefined) return storedLogMissing(ctx, sessionId, metrics) ? 'missing' : undefined
     for (let frames = 16; ; frames *= 2) {
       signal.throwIfAborted()
       const decoded = log.decodedFrames
@@ -414,6 +419,15 @@ async function tailOpening(
 }
 
 /**
+ * The tail's own lookup found no stored log and the Session is still not attached, so the full read could only repeat
+ * that lookup (a walk of every project directory) and answer not-found. A local draft the browser never created here
+ * is this case.
+ */
+function storedLogMissing(ctx: Context, sessionId: SessionId, metrics: LogWindowMetrics): boolean {
+  return metrics.fallback_reason === 'stat-missing' && ctx.sessions.get(sessionId) === undefined
+}
+
+/**
  * One older page of a cold Session from the end of its log, decoding further back until the page is settled.
  * `undefined` sends the caller to the full read, which also owns every request error.
  */
@@ -427,10 +441,11 @@ async function tailPageOf(
     readonly turnWindow?: SessionPageRequest['turnWindow']
   },
   signal: AbortSignal,
-): Promise<SessionPage | undefined> {
+): Promise<SessionPage | 'missing' | undefined> {
   try {
-    const log = await TailLog.open({ ctx, sessionId, signal })
-    if (log === undefined) return undefined
+    const metrics: LogWindowMetrics = {}
+    const log = await TailLog.open({ ctx, sessionId, signal, metrics })
+    if (log === undefined) return storedLogMissing(ctx, sessionId, metrics) ? 'missing' : undefined
     // A page through seq -1 holds nothing: the sidebar asks for it on hover so the click finds the tail already open.
     if (request.throughSeq < 0) return { records: [], hasMore: true }
     for (let frames = 16; ; frames *= 2) {

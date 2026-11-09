@@ -842,3 +842,22 @@ the first read (`SqliteStore.deferred`, `usage/src/store.ts`): activation droppe
 first read pays 0.6 MB. `traces` stays eager on purpose: `RetentionWorker` prunes at boot, a write that needs the
 store. `backlog` hydrates every item, alias and lease into its in-memory view at activation (`BacklogStore.layer`), and
 `session-search`'s Host half never opens its index at all.
+
+## Cold Session reads proportional to the Session (2026-11-09, U6)
+
+Scratch Host on a clone of the live home (2,929 logs in 793 project directories, two SSH runtimes in multi-host),
+`session/page` over HTTP and `session/follow` over `/api/remote.mux`, cold = first request after a Host start, warm =
+repeated. Spans from the clone's trace store (`session tail read` `stat_ms`), Host CPU profile on the scratch inspector.
+
+| Request                                  | Before                                             | After                                                                                                                | Owner                                                                                                          |
+| ---------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| page/follow, empty New chat draft        | 8.2–9.5 s cold and warm                            | unchanged (8.7–9.6 s)                                                                                                | `@dshfiles/multi-host` `owns()` lists every runtime over SSH for an unknown id (Host idle: 172 ms CPU in 14 s) |
+| same, runtimes removed (Host-owned part) | page 0.4–0.7 s / follow 2.9 s cold; 0.1–0.2 s warm | page 0.2 s / follow 0.2 s cold (boot lag, lookup 0 ms); 6–19 ms warm; 35–46 ms once the listing is over a minute old | session-controller history + persistence fork lookup                                                           |
+| follow, 90 MB thread, first after start  | 9,114 ms                                           | 147 ms                                                                                                               | session-controller `MirroredSessions.resolve` asked the sources before this Host's own store                   |
+| page/follow, 90 MB / small thread, warm  | 10/6 ms, 5/6 ms                                    | 24–55 / 19–52 ms, 9–27 / 12–33 ms (machine load 5)                                                                   | already tail- or size-bounded                                                                                  |
+
+Causes: an unknown id cost two persistence lookups per request (tail stat, then `observeSession`'s stat), each a
+sequential walk of all 793 project directories (75 ms idle, 1.7–2.9 s behind the boot listing, which also held every
+first read behind the root-wide encoding walk); and a stored thread opened before this Host's first list merge was sent
+to `multi-host`'s ownership check. The sessions API transcript fallback read through `readSession`, which lists the
+whole corpus first; it now observes the one Session.

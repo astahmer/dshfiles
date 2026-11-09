@@ -69,6 +69,33 @@ describe('mirrored sessions', () => {
     expect(merged[0]?.updatedAt).toBe(100)
   })
 
+  it('pages a thread stored on this Host locally before any list, without asking the sources who owns it', async () => {
+    const { ctx, mirrored, source } = await fixture()
+    const asked: string[] = []
+    mirrored.registry.register(
+      source({
+        rows: [],
+        owns: sessionId => {
+          asked.push(sessionId)
+          return false
+        },
+      }),
+    )
+    // SAFETY: the ownership check reads only `stat`; a stored thread answers its header snapshot.
+    ctx.provide('sessionPersistence', {
+      stat: async (sessionId: string) => (sessionId === 'session-stored' ? { header: { id: sessionId } } : undefined),
+    } as never)
+    const page = { records: [], hasMore: false }
+    const pageOf = (sessionId: string) =>
+      mirrored.page({ address: { kind: 'session', sessionId: SessionId(sessionId) } } as never, new AbortController().signal, async () => page)
+
+    await expect(pageOf('session-stored')).resolves.toBe(page)
+    await expect(pageOf('session-stored')).resolves.toBe(page)
+    expect(asked).toEqual([])
+    await expect(pageOf('session-elsewhere')).resolves.toBe(page)
+    expect(asked).toEqual(['session-elsewhere'])
+  })
+
   it('survives a source whose list rejects', async () => {
     const { mirrored, source } = await fixture()
     mirrored.registry.register(

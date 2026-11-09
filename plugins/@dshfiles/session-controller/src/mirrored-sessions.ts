@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import { createSessionSourceRegistry, type MirroredSessionSource, type SessionSourceRegistry } from '@dshfiles/session-source-port'
 import type {
   SessionAddress,
@@ -39,8 +40,11 @@ const addressedSessionId = (address: SessionAddress): SessionId | undefined => (
 export class MirroredSessions {
   readonly registry: SessionSourceRegistry = createSessionSourceRegistry()
   private readonly published = new Map<string, { readonly running: boolean }>()
-  /** Session ids this Host's own list last returned: cold, but local, so no runtime is asked whether it owns them. */
-  private listedLocally: ReadonlySet<string> = new Set()
+  /**
+   * Session ids this Host's own list last returned, plus those found in its own store since: cold, but local, so no
+   * runtime is asked whether it owns them.
+   */
+  private listedLocally = new Set<string>()
 
   /** @param ctx - Host context used to publish list and status changes to the browser. */
   constructor(private readonly ctx: Context) {}
@@ -65,8 +69,24 @@ export class MirroredSessions {
     if (this.isLocal(sessionId)) return undefined
     const claimed = this.registry.ownerOf(sessionId)
     if (claimed !== undefined) return claimed
+    // Before this Host's first list, a stored local thread was sent to every runtime's ownership check: 9 s of SSH
+    // listings for unreachable runtimes on the first open after a restart. This Host's own store answers first.
+    if (this.registry.sources().length > 0 && (await this.storedHere(sessionId))) {
+      this.listedLocally.add(sessionId)
+      return undefined
+    }
     // A runtime that cannot answer does not own the Session; the local implementation then reports it missing.
     return this.registry.resolveOwner(sessionId).catch(() => undefined)
+  }
+
+  /** Whether this Host's own persistence holds the Session; a failing lookup leaves the answer to the sources. */
+  private async storedHere(sessionId: SessionId): Promise<boolean> {
+    const persistence = this.ctx.get('sessionPersistence')
+    if (persistence === undefined) return false
+    return persistence.stat(sessionId).then(
+      snapshot => snapshot !== undefined,
+      () => false,
+    )
   }
 
   private async require(sessionId: SessionId, endpoint: string): Promise<MirroredSessionSource> {
