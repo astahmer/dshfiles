@@ -265,4 +265,15 @@ describe('hostStorage', () => {
     await expect(store.ready).rejects.toMatchObject({ kind: 'unavailable' })
     await client.dispose()
   })
+
+  it('reads what a renamed plugin stored under its former id, and keeps its own entries apart', async () => {
+    const { PluginRuntimeModel } = await import('../src/client/plugin-runtime.js')
+    const { host, browser } = await leadingHost()
+    await PluginStorageModel.open(host as never, '@acme/old-name').set('store/marks', { a: 1 })
+    const api = PluginRuntimeModel.create({ ctx: browser as never, packageId: '@acme/new-name', decorate: component => component }).plugin
+    const former = HostStorageModel.forPlugin(api, { formerId: '@acme/old-name' })
+    expect((await former.get('store/marks'))?.value).toEqual({ a: 1 })
+    expect(await HostStorageModel.forPlugin(api).get('store/marks')).toBeUndefined()
+    expect(await former.delete('store/marks')).toBe(true)
+  })
 })
