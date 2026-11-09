@@ -43,12 +43,15 @@ const createRemoteStore = (initial: ModelDirectoryState): SnapshotStore<ModelDir
   }
 }
 
+const CATALOG_FRESH_MS = 30_000
+
 export class RemoteModelDirectory {
   readonly store: SnapshotStore<ModelDirectoryState>
   private catalog: RemoteModelCatalog | undefined
   /** Remote catalog load, kept apart from the base selection so neither overwrites the other's status. */
   private catalogState: CatalogState = { kind: 'idle' }
   private generation = 0
+  private loadedAt = Number.NEGATIVE_INFINITY
   private readonly unsubscribe: () => void
 
   constructor(
@@ -60,12 +63,15 @@ export class RemoteModelDirectory {
   }
 
   readonly load = async (): Promise<ModelDirectoryState> => {
+    // The picker loads on every composer mount, i.e. every thread switch; a recent catalog answers it without a request.
+    if (this.catalogState.kind === 'ready' && performance.now() - this.loadedAt < CATALOG_FRESH_MS) return this.store.getSnapshot()
     const generation = ++this.generation
     this.setCatalogState({ kind: 'loading' })
     try {
       const catalog = await this.fetchCatalog()
       if (generation !== this.generation) return this.store.getSnapshot()
       this.catalog = catalog
+      this.loadedAt = performance.now()
       this.setCatalogState({ kind: 'ready', catalog })
     } catch (error) {
       if (generation !== this.generation) return this.store.getSnapshot()

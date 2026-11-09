@@ -86,8 +86,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
         Number(left.group.id === state.current?.provider && left.model.id === state.current.model),
     )
   }, [filteredGroups, state.current])
-  const usage = useApiQuery(aiAccountsApi, 'usage')
-  const profiles = useApiQuery(aiAccountsApi, 'read')
+  // Only the open menu shows account labels and quotas; reading them on mount cost two requests per thread switch.
+  const usage = useApiQuery(aiAccountsApi, 'usage', { enabled: open })
+  const profiles = useApiQuery(aiAccountsApi, 'read', { enabled: open })
   const providerLabels = useMemo(
     () => new Map((profiles.data?.accounts ?? []).map(profile => [profile.instanceId, PROVIDER_LABEL[profile.kind]])),
     [profiles.data],

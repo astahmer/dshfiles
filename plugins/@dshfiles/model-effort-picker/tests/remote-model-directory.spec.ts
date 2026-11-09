@@ -67,4 +67,21 @@ describe('RemoteModelDirectory status', () => {
     await remote.load()
     expect(remote.store.getSnapshot()).toMatchObject({ status: 'error', error: 'remote catalog unavailable' })
   })
+
+  it('answers a reload right after a successful load from the catalog it has, and retries after a failure', async () => {
+    let fetches = 0
+    let fails = true
+    const { remote } = fixture(async () => {
+      fetches += 1
+      if (fails) throw new Error('unreachable')
+      return catalog
+    })
+    await remote.load()
+    expect(remote.store.getSnapshot().status).toBe('error')
+    fails = false
+    await remote.load()
+    await remote.load()
+    expect(fetches).toBe(2)
+    expect(remote.store.getSnapshot()).toMatchObject({ status: 'ready', routable: true })
+  })
 })
