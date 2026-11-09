@@ -1,5 +1,5 @@
 import { DshxPlugin } from '@dshfiles/dshx/effect'
-import { Cause, Clock, Context, Effect, Layer, Schedule } from 'effect'
+import { Cause, Clock, Context, Effect, Layer } from 'effect'
 import { StartIntentClaims, StartIntents, type StartIntent } from './start-intents.js'
 import { BacklogStore } from './store.js'
 import { ThreadStart } from './thread-start.js'
@@ -98,16 +98,22 @@ export class StartRecovery extends Context.Service<StartRecovery, { readonly swe
     }),
   )
 
-  /** The loop the plugin runs: the first pass shortly after boot, then one pass every interval. */
+  /**
+   * The loop the plugin runs: the first pass shortly after boot, then one pass every interval while any start is logged.
+   * An empty log parks the loop until the next start is recorded, so an idle backlog never queries it.
+   */
   static readonly loop = Layer.effectDiscard(
     Effect.gen(function* () {
       const recovery = yield* StartRecovery
+      const intents = yield* StartIntents
       const tick = recovery.sweep.pipe(
         Effect.catchCause(cause =>
           Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.logWarning('backlog: the thread start recovery loop failed', cause),
         ),
       )
-      yield* DshxPlugin.worker(Effect.sleep(FIRST_SWEEP).pipe(Effect.andThen(Effect.repeat(tick, Schedule.spaced(SWEEP_INTERVAL)))))
+      const untilLogged = intents.untilLogged.pipe(Effect.catch(error => Effect.logWarning('backlog: the thread start recovery log could not be checked', error)))
+      const pass = tick.pipe(Effect.andThen(untilLogged), Effect.andThen(Effect.sleep(SWEEP_INTERVAL)))
+      yield* DshxPlugin.worker(Effect.sleep(FIRST_SWEEP).pipe(Effect.andThen(Effect.forever(pass))))
     }),
   )
 }

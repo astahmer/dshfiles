@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Clock, Context, Effect, Layer } from 'effect'
+import { TestClock } from 'effect/testing'
 import { SessionsUnavailable } from './errors.js'
 import { StartRecovery } from './start-recovery.js'
 import { StartIntentClaims, StartIntents, type StartIntent, type StartIntentDraft } from './start-intents.js'
@@ -35,6 +36,27 @@ const openRecovery = (input: { readonly resume: Resume; readonly rows?: BacklogT
       store: Context.get(context, BacklogStore),
     })),
   )
+}
+
+/** The plugin loop over a log whose `stale` reads are counted: one read per recovery pass. */
+const openLoop = (input: { readonly resume: Resume }) => {
+  const rows = backlogRows()
+  const passes = { count: 0 }
+  const countedIntents = Layer.effect(
+    StartIntents,
+    Effect.gen(function* () {
+      const intents = yield* StartIntents
+      return StartIntents.of({ ...intents, stale: query => Effect.andThen(Effect.sync(() => (passes.count += 1)), intents.stale(query)) })
+    }),
+  ).pipe(Layer.provide(StartIntents.layer), Layer.provideMerge(backlogDbLayer(rows)))
+  return Layer.build(
+    StartRecovery.loop.pipe(
+      Layer.provideMerge(StartRecovery.layer),
+      Layer.provideMerge(fakeThreads(input.resume)),
+      Layer.provideMerge(Layer.mergeAll(StartIntentClaims.layer, countedIntents)),
+      Layer.provideMerge(backlogStoreLayer({ rows })),
+    ),
+  ).pipe(Effect.map(context => ({ passes, intents: Context.get(context, StartIntents), store: Context.get(context, BacklogStore) })))
 }
 
 const draft = (itemIds: readonly number[]): StartIntentDraft => ({
@@ -118,6 +140,50 @@ describe('thread start recovery', () => {
       expect(detail.ok && detail.value.item.attention).toBe('blocked')
       const reported = detail.ok ? detail.value.item.events.filter(event => event.kind === 'commented') : []
       expect(reported.some(event => event.detail.includes('never did'))).toBe(true)
+    }),
+  )
+
+  it.effect('stops querying an empty log after the boot pass and wakes when a start is recorded', () =>
+    Effect.gen(function* () {
+      const resumed: string[] = []
+      const { passes, intents, store } = yield* openLoop({ resume: succeeding(resumed) })
+
+      yield* TestClock.adjust('10 seconds')
+      expect(passes.count).toBe(1)
+      yield* TestClock.adjust('10 minutes')
+      expect(passes.count).toBe(1)
+
+      const captured = yield* store.capture({ text: 'bug: composer drops chips', actor: { kind: 'user' } })
+      yield* staleStart(intents, [captured.item.id])
+      yield* TestClock.adjust('20 seconds')
+      expect(passes.count).toBe(2)
+      expect(resumed).toEqual(['start-1'])
+      yield* TestClock.adjust('10 minutes')
+      expect(passes.count).toBe(2)
+    }),
+  )
+
+  it.effect('retries a start a Host restart interrupted until it finishes, then parks', () =>
+    Effect.gen(function* () {
+      const attempts: string[] = []
+      const { passes, intents, store } = yield* openLoop({
+        resume: intent =>
+          attempts.push(intent.id) === 1 ? Effect.fail(new SessionsUnavailable({})) : Effect.succeed({ sessionId: 'session-9', linked: [...intent.itemIds], missing: [] }),
+      })
+      const captured = yield* store.capture({ text: 'bug: composer drops chips', actor: { kind: 'user' } })
+      yield* staleStart(intents, [captured.item.id])
+
+      yield* TestClock.adjust('10 seconds')
+      expect(attempts).toEqual(['start-1'])
+      expect((yield* intents.find('start-1'))?.attempts).toBe(1)
+
+      yield* TestClock.adjust('60 seconds')
+      expect(attempts).toEqual(['start-1', 'start-1'])
+      expect(yield* intents.find('start-1')).toBeNull()
+
+      const settled = passes.count
+      yield* TestClock.adjust('10 minutes')
+      expect(passes.count).toBe(settled)
     }),
   )
 })

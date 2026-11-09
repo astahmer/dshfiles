@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Option, Ref, Schema } from 'effect'
+import { Context, Effect, Latch, Layer, Option, Ref, Schema } from 'effect'
 import { SqlClient, SqlSchema } from 'effect/sql'
 import { BacklogDb } from './backlog-db.js'
 import type { BacklogActor } from './store.js'
@@ -138,12 +138,15 @@ export class StartIntents extends Context.Service<
     readonly remove: (id: string) => Effect.Effect<void, StartIntentFailed>
     readonly find: (id: string) => Effect.Effect<StartIntent | null, StartIntentFailed>
     readonly stale: (input: { readonly before: number; readonly limit: number }) => Effect.Effect<readonly StartIntent[], StartIntentFailed>
+    /** Completes at once while any start is logged, otherwise when the next one is recorded. */
+    readonly untilLogged: Effect.Effect<void, StartIntentFailed>
   }
 >()('@dshfiles/backlog/StartIntents') {
   static readonly layer = Layer.effect(
     StartIntents,
     Effect.gen(function* () {
       const sql = yield* BacklogDb
+      const recorded = yield* Latch.make(false)
       const failed = (operation: StartIntentFailed['operation'], intentId?: string) => (cause: unknown) =>
         intentId === undefined ? new StartIntentFailed({ operation, cause }) : new StartIntentFailed({ operation, intentId, cause })
 
@@ -169,7 +172,7 @@ export class StartIntents extends Context.Service<
       })
 
       return StartIntents.of({
-        record: (draft, now) => record(draft, now).pipe(Effect.mapError(failed('record', draft.id))),
+        record: (draft, now) => record(draft, now).pipe(Effect.mapError(failed('record', draft.id)), Effect.andThen(recorded.open), Effect.asVoid),
         touch: (id, now) => sql`UPDATE start_intents SET updated_at = ${now} WHERE intent_id = ${id}`.pipe(Effect.mapError(failed('touch', id))),
         setSession: (id, sessionId, now) =>
           sql`UPDATE start_intents SET session_id = ${sessionId}, updated_at = ${now} WHERE intent_id = ${id}`.pipe(Effect.mapError(failed('session', id))),
@@ -180,6 +183,11 @@ export class StartIntents extends Context.Service<
         remove: id => sql`DELETE FROM start_intents WHERE intent_id = ${id}`.pipe(Effect.mapError(failed('remove', id))),
         find: id => find(id).pipe(Effect.mapError(failed('read', id))),
         stale: input => startIntentsStale({ sql, before: input.before, limit: input.limit }),
+        untilLogged: Effect.gen(function* () {
+          yield* recorded.close
+          const logged = yield* sql`SELECT 1 FROM start_intents LIMIT 1`
+          if (logged.length === 0) yield* recorded.await
+        }).pipe(Effect.mapError(failed('read'))),
       })
     }),
   )
