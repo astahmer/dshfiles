@@ -244,6 +244,46 @@ class ClientSessionReference implements SessionReference {
 /** Released Session generations kept open for a quick switch back. */
 const PARKED_SCOPE_LIMIT = 3
 
+/**
+ * Floor between list publishes that only move a row's activity (`projectionValues`, `updatedAt`, projection values):
+ * a streaming turn changes them about once a second and every list reader pays O(rows) per publish. Structural
+ * changes (rows added or removed, running, blank, title, retention, projection load state) publish immediately.
+ */
+const LIST_ACTIVITY_PUBLISH_INTERVAL_MS = 2_000
+
+const ACTIVITY_ROW_FIELDS = new Set(['projectionValues', 'updatedAt'])
+
+const onlyActivityChanged = (
+  previousById: Readonly<Record<SessionId, SessionSummary>>,
+  byId: Readonly<Record<SessionId, SessionSummary>>,
+  previousProjections: Readonly<Record<SessionId, SessionProjectionSnapshot>>,
+  projections: Readonly<Record<SessionId, SessionProjectionSnapshot>>,
+): boolean => {
+  if (byId !== previousById) {
+    if (Object.keys(byId).length !== Object.keys(previousById).length) return false
+    for (const [id, row] of Object.entries(byId) as [SessionId, SessionSummary][]) {
+      const before = previousById[id]
+      if (before === row) continue
+      if (before === undefined) return false
+      const keys = new Set([...Object.keys(before), ...Object.keys(row)])
+      for (const key of keys) {
+        if (ACTIVITY_ROW_FIELDS.has(key)) continue
+        // SAFETY: both are plain summary rows; `key` comes from their own keys.
+        if (!Object.is((before as unknown as Record<string, unknown>)[key], (row as unknown as Record<string, unknown>)[key])) return false
+      }
+    }
+  }
+  if (projections !== previousProjections) {
+    if (Object.keys(projections).length !== Object.keys(previousProjections).length) return false
+    for (const [id, projection] of Object.entries(projections) as [SessionId, SessionProjectionSnapshot][]) {
+      const before = previousProjections[id]
+      if (before === projection) continue
+      if (before === undefined || before.state !== projection.state || before.error !== projection.error) return false
+    }
+  }
+  return true
+}
+
 /** Host catalog and local reference allocator; view selection remains outside the Controller. */
 export class ClientSessions implements ISessions {
   /**
@@ -267,6 +307,9 @@ export class ClientSessions implements ISessions {
   /** Last published summary per manager list entry; entries keep their identity while unchanged. */
   private readonly summaryByEntry = new WeakMap<SessionListEntry, SessionSummary>()
   private readonly scopeDrops = new Set<Promise<void>>()
+  /** When the list last published, and the pending publish of activity-only changes coalesced behind it. */
+  private listPublishedAt = 0
+  private deferredListPublish: ReturnType<typeof setTimeout> | undefined
   private closed = false
   private readonly lifetime = new AbortController()
   readonly drafts: ClientSessionDrafts
@@ -322,6 +365,7 @@ export class ClientSessions implements ISessions {
     const disposeManagerProjection = this.manager.subscribe(() => { this.projectList() })
     rootCtx.effect(() => async () => {
       this.closed = true
+      clearTimeout(this.deferredListPublish)
       this.lifetime.abort(new Error('Session Controller is disposed'))
       this.drafts.dispose()
       disposeManagerProjection()
@@ -807,10 +851,21 @@ export class ClientSessions implements ISessions {
         const title = typeof projectedTitle === 'string' && projectedTitle !== '' ? projectedTitle : undefined
         const displayTitle = title ?? child.label ?? childId
         if (summary === undefined) {
+          const running = this.scopes.get(childId)?.session.getSnapshot().running ?? false
+          const retainedBy = this.retentionSnapshot(childId).retainedBy
+          const before = previousById[childId]
+          // A streaming parent republishes its catalog about once a second: reuse the unchanged child row instead of
+          // minting one per child per publish.
+          if (before !== undefined && before.displayTitle === displayTitle && before.parentId === parentId
+            && before.origin === 'subagent' && before.running === running && before.blank === false && before.updatedAt === 0
+            && before.retainedBy === retainedBy && before.projectionValues === projectionValues && before.title === title
+            && Object.keys(before).length === 8 + (projectionValues === undefined ? 0 : 1) + (title === undefined ? 0 : 1)) {
+            byId[childId] = before
+            continue
+          }
           byId[childId] = {
             id: childId, displayTitle, parentId: parentId as SessionId,
-            origin: 'subagent', running: this.scopes.get(childId)?.session.getSnapshot().running ?? false, blank: false, updatedAt: 0,
-            retainedBy: this.retentionSnapshot(childId).retainedBy,
+            origin: 'subagent', running, blank: false, updatedAt: 0, retainedBy,
             ...(projectionValues === undefined ? {} : { projectionValues }),
             ...(title === undefined ? {} : { title }),
           }
@@ -851,7 +906,21 @@ export class ClientSessions implements ISessions {
       const summary = next.byId[entry.sessionId]
       if (summary !== undefined) this.summaryByEntry.set(entry, summary)
     }
-    if (next !== previous) this.list.set(next)
+    if (next !== previous) {
+      const wait = this.listPublishedAt + LIST_ACTIVITY_PUBLISH_INTERVAL_MS - Date.now()
+      if (wait > 0 && next.ids === previous.ids && previous.phase === phase
+        && onlyActivityChanged(previous.byId, next.byId, previous.projectionsBySession, next.projectionsBySession)) {
+        this.deferredListPublish ??= setTimeout(() => {
+          this.deferredListPublish = undefined
+          if (!this.closed) this.projectList()
+        }, wait)
+      } else {
+        clearTimeout(this.deferredListPublish)
+        this.deferredListPublish = undefined
+        this.listPublishedAt = Date.now()
+        this.list.set(next)
+      }
+    }
     const { nonblank, hostIds } = this.manager.draftEvidence()
     this.drafts.reconcile(nonblank, hostIds)
   }
