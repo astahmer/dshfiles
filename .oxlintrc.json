@@ -134,6 +134,12 @@
     "plugins/@dshfiles/settings-web-search/src/native/**",
     "plugins/@dshfiles/settings-web-search/src/host.ts",
     "plugins/@dshfiles/settings-web-search/src/css-modules.d.ts",
+    "plugins/@dshfiles/schedule/src/native/**",
+    "plugins/@dshfiles/schedule/src/host.ts",
+    "plugins/@dshfiles/schedule/src/css-modules.d.ts",
+    "plugins/@dshfiles/settings-subagent/src/native/**",
+    "plugins/@dshfiles/settings-subagent/src/host.ts",
+    "plugins/@dshfiles/settings-subagent/src/css-modules.d.ts",
     "plugins/@dshfiles/session-persistence-jsonl/src/native/**"
   ],
   "overrides": [
