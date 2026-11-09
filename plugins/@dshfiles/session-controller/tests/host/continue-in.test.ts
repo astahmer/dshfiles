@@ -79,8 +79,12 @@ const harness = () => {
       },
     } as never,
   )
-  // SAFETY: fork reads only the composition of the source's preset.
-  const agents = { composeAgent: async () => ({ setup: () => undefined }), presetForObservation: () => undefined } as never
+  // SAFETY: fork reads only the composition of the source's preset and records the child it creates.
+  const agents = {
+    composeAgent: async () => ({ setup: () => undefined }),
+    presetForObservation: () => undefined,
+    own: (handle: { readonly agent: unknown }) => handle.agent,
+  } as never
   const commands = new SessionCommandController(ctx, agents, '/default')
   return { commands, created, attached, directories, notices, sourceId }
 }

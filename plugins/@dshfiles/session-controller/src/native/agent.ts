@@ -5,7 +5,7 @@ import { mkdir } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type {
-  Agent, AgentOptions, AgentSetup, ModelSelection as AgentModelSelection, ModelSelectionRef,
+  Agent, AgentHandle, AgentOptions, AgentSetup, ModelSelection as AgentModelSelection, ModelSelectionRef,
 } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
@@ -16,7 +16,16 @@ import type { SessionInspection } from '@deepseek-ai/dsh-session-persistence'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type {} from '@deepseek-ai/dsh-typert-registry'
+import * as Schema from 'effect/Schema'
 import type { ModelSelection } from './types.ts'
+
+/**
+ * dshfiles: how long an owned Agent stays attached with nothing to do. A resumed cold thread keeps its whole decoded log
+ * in the heap (measured: a 90 MB zstd log retained 410 MB after 8 idle minutes), and nothing else ever releases it.
+ */
+const IDLE_AGENT_EVICTION_MS = 5 * 60_000
+
+const hasOpenQuestions = Schema.is(Schema.Struct({ active: Schema.NonEmptyArray(Schema.Unknown) }))
 
 /** Cold Session identity absent from persistence. */
 export class ApiSessionNotFound extends Error {}
@@ -172,6 +181,11 @@ export class ApiSessionAgentController {
   private readonly claims = new Map<SessionId, Promise<void>>()
   private readonly selections = new WeakMap<Agent, InstalledSelection>()
   private readonly imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
+  private readonly handles = new Map<SessionId, AgentHandle>()
+  private readonly lastActivity = new Map<SessionId, number>()
+  private readonly holds = new Map<SessionId, number>()
+  private readonly evictions = new Map<SessionId, Promise<void>>()
+  private sweep: Promise<number> | undefined
 
   /** @param ctx - Host context carrying Agent, model, persistence, and Typert services. */
   constructor(private readonly ctx: Context) {
@@ -190,6 +204,107 @@ export class ApiSessionAgentController {
       if ('error' in found) throw found.error
       return found.agent.ctx
     })
+    const touch = (sessionId: SessionId): void => {
+      if (this.handles.has(sessionId)) this.lastActivity.set(sessionId, Date.now())
+    }
+    ctx.on('session/event', (session) => { touch(session.id) }, { global: true })
+    ctx.on('agent/status', ({ agent }) => { touch(agent.id) }, { global: true })
+    ctx.on('agent/disposed', ({ agent }) => {
+      if (this.handles.get(agent.id)?.agent !== agent) return
+      this.handles.delete(agent.id)
+      this.lastActivity.delete(agent.id)
+    }, { global: true })
+  }
+
+  /**
+   * dshfiles: dispose owned Agents left idle, on one timer. A disposed thread stays listed and reopens cold.
+   * @param isFollowed - whether a history follower still reads a Session.
+   */
+  startIdleEviction(isFollowed: (sessionId: SessionId) => boolean): void {
+    this.ctx.effect(() => {
+      const timer = setInterval(() => { void this.evictIdleAgents({ isFollowed }) }, IDLE_AGENT_EVICTION_MS / 5)
+      timer.unref()
+      return () => { clearInterval(timer) }
+    }, 'session-controller: idle Agent eviction')
+  }
+
+  /**
+   * Dispose every owned Agent idle past the threshold through its handle; the Session log stays the source of truth.
+   * @param options - follower predicate, and the clock reading the sweep compares against.
+   * @returns how many Agents were disposed.
+   */
+  evictIdleAgents(options: { readonly isFollowed: (sessionId: SessionId) => boolean; readonly now?: number }): Promise<number> {
+    this.sweep ??= this.evictIdle(options.isFollowed, options.now ?? Date.now()).finally(() => { this.sweep = undefined })
+    return this.sweep
+  }
+
+  /** Whether a Session is being disposed by idle eviction rather than removed. */
+  isEvicting(sessionId: SessionId): boolean {
+    return this.evictions.has(sessionId)
+  }
+
+  /**
+   * Keep a Session's Agent attached while one command runs on it.
+   * @param sessionId - Session the command addresses.
+   * @param operation - the command.
+   * @returns the command's result.
+   */
+  async hold<Value>(sessionId: SessionId, operation: () => Promise<Value>): Promise<Value> {
+    this.holds.set(sessionId, (this.holds.get(sessionId) ?? 0) + 1)
+    try {
+      return await operation()
+    } finally {
+      const remaining = (this.holds.get(sessionId) ?? 1) - 1
+      if (remaining === 0) this.holds.delete(sessionId)
+      else this.holds.set(sessionId, remaining)
+      if (this.handles.has(sessionId)) this.lastActivity.set(sessionId, Date.now())
+    }
+  }
+
+  /**
+   * Record an Agent this controller's context created, so idle eviction may dispose it.
+   * @param handle - the handle `ctx.agents.create` or `resume` returned.
+   * @returns the live Agent.
+   */
+  own(handle: AgentHandle): Agent {
+    this.handles.set(handle.agent.id, handle)
+    this.lastActivity.set(handle.agent.id, Date.now())
+    return handle.agent
+  }
+
+  private async evictIdle(isFollowed: (sessionId: SessionId) => boolean, now: number): Promise<number> {
+    let evicted = 0
+    for (const [sessionId, at] of this.lastActivity) {
+      if (now - at < IDLE_AGENT_EVICTION_MS) continue
+      const handle = this.handles.get(sessionId)
+      if (handle === undefined || !this.evictable(handle.agent, isFollowed)) continue
+      const disposal = Promise.withResolvers<void>()
+      this.evictions.set(sessionId, disposal.promise)
+      try {
+        await handle.dispose()
+        evicted += 1
+      } catch (error: unknown) {
+        this.ctx.logger.warn(`session-controller: idle Agent "${sessionId}" disposal failed: ${String(error)}`)
+      } finally {
+        if (this.handles.get(sessionId) === handle) {
+          this.handles.delete(sessionId)
+          this.lastActivity.delete(sessionId)
+        }
+        this.evictions.delete(sessionId)
+        disposal.resolve()
+      }
+    }
+    return evicted
+  }
+
+  private evictable(agent: Agent, isFollowed: (sessionId: SessionId) => boolean): boolean {
+    const id = agent.id
+    if (this.ctx.agents.get(id) !== agent || agent.status !== 'idle'
+      || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0) return false
+    if ((this.holds.get(id) ?? 0) > 0 || this.resumes.has(id) || this.claims.has(id) || isFollowed(id)) return false
+    if (this.ctx.agents.list().some(other => this.ctx.agents.isOwnedBy(other.id, agent))) return false
+    const values: Readonly<Record<string, unknown>> = this.ctx.sessionProjections.snapshot(agent.session).values
+    return !hasOpenQuestions(values['userQuestions'])
   }
 
   /**
@@ -214,6 +329,8 @@ export class ApiSessionAgentController {
     sessionId: SessionId,
     observation?: SessionObservation,
   ): Promise<ApiSessionAgentResult> {
+    await this.evictions.get(sessionId)
+    if (this.handles.has(sessionId)) this.lastActivity.set(sessionId, Date.now())
     const live = this.liveAgent(sessionId)
     if (live !== undefined) return live
     const attached = this.ctx.sessions.get(sessionId)
@@ -278,6 +395,7 @@ export class ApiSessionAgentController {
   async createSession(request: ApiSessionCreateRequest): Promise<ApiSessionCreated> {
     const named = request.sessionId
     if (named === undefined) return this.created(await this.createMinted(request.cwd, await this.composeAgent(request.agentPreset)))
+    await this.evictions.get(named)
     return this.inOrder(named, async () => this.created(await this.claim(named, request)))
   }
 
@@ -437,11 +555,11 @@ export class ApiSessionAgentController {
     if (published !== undefined && hasApiSessionSubagentOwner(this.ctx, published, live)) {
       throw new ApiSessionSubagentOwnership(sessionId)
     }
-    return (await this.ctx.agents.resume({
+    return this.own(await this.ctx.agents.resume({
       resumeSessionId: sessionId,
       agentOptions: this.agentOptions(),
       setup: composition.setup,
-    })).agent
+    }))
   }
 
   private async inOrder<Value>(sessionId: SessionId, operation: () => Promise<Value>): Promise<Value> {
@@ -491,11 +609,11 @@ export class ApiSessionAgentController {
     if (!reusable) return this.createMinted(request.cwd, composition)
     this.assertPresetApplicable(sessionId, request.agentPreset)
     try {
-      return (await this.ctx.agents.resume({
+      return this.own(await this.ctx.agents.resume({
         resumeSessionId: sessionId,
         agentOptions: this.agentOptions(),
         setup: this.reuseSetup(composition),
-      })).agent
+      }))
     } catch (error: unknown) {
       if (error instanceof ApiSessionStartedSinceObserved) return this.createMinted(request.cwd, composition)
       if (!(error instanceof Error) || error.name !== 'SessionAlreadyOwnedError') throw error
@@ -566,7 +684,7 @@ export class ApiSessionAgentController {
     } catch (error: unknown) {
       throw new Error(`failed to ensure project directory "${cwd}": ${String(error)}`, { cause: error })
     }
-    return (await this.ctx.agents.create({
+    return this.own(await this.ctx.agents.create({
       sessionId,
       agentOptions: this.agentOptions(),
       meta: {
@@ -574,7 +692,7 @@ export class ApiSessionAgentController {
         ...(composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset }),
       },
       setup: composition.setup,
-    })).agent
+    }))
   }
 
   private agentOptions(): AgentOptions {

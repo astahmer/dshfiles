@@ -45,6 +45,7 @@ const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 export class SessionHistoryController {
   private readonly closeFollowers = new Set<() => void>()
   private readonly assistantStreams = new Map<SessionId, SessionAssistantStreamAccumulator>()
+  private readonly followers = new Map<SessionId, number>()
 
   /**
    * @param ctx - Host context carrying Session query and projection services.
@@ -69,6 +70,11 @@ export class SessionHistoryController {
       for (const close of this.closeFollowers) close()
       this.closeFollowers.clear()
     }, 'session-controller.history')
+  }
+
+  /** dshfiles: whether an open history follow still reads this Session, which keeps its Agent from idle eviction. */
+  isFollowed(sessionId: SessionId): boolean {
+    return this.followers.has(sessionId)
   }
 
   /**
@@ -196,6 +202,7 @@ export class SessionHistoryController {
       notify()
     }
     this.closeFollowers.add(close)
+    this.followers.set(target, (this.followers.get(target) ?? 0) + 1)
     const disposeEvent = this.ctx.on('session/event', (session, event) => {
       if (session.id !== target) return
       pushBack({ type: 'event', event })
@@ -304,6 +311,9 @@ export class SessionHistoryController {
       }
     } finally {
       this.closeFollowers.delete(close)
+      const remaining = (this.followers.get(target) ?? 1) - 1
+      if (remaining === 0) this.followers.delete(target)
+      else this.followers.set(target, remaining)
       signal.removeEventListener('abort', onAbort)
       disposeCreated()
       disposeEvent()

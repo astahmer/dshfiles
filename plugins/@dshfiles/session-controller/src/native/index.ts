@@ -184,6 +184,7 @@ export class SessionController extends TypertRemoteService {
       await Promise.allSettled([...this.promotions])
     }, 'session-controller.promotions')
     this.history = new SessionHistoryController(ctx, (observation) => { this.promote(observation) })
+    this.agents.startIdleEviction(sessionId => this.history.isFollowed(sessionId))
     this.listState = new ApiSessionList(ctx, resolved.listWorkSliceMs)
     this.mirrored = new MirroredSessions(ctx)
     this.mirrored.provide()
@@ -205,6 +206,8 @@ export class SessionController extends TypertRemoteService {
       ctx.emit('api-session/added', this.listState.summaryFor(session))
     })
     ctx.on('session/disposed', (session) => {
+      // An idle-evicted Session stays stored and listed; its `agent/disposed` row already says it is cold.
+      if (this.agents.isEvicting(session.id)) return
       ctx.emit('api-session/removed', session.id)
     })
     const publishAgentAvailability = ({ agent }: { agent: Agent }): undefined => {
@@ -300,7 +303,7 @@ export class SessionController extends TypertRemoteService {
 
   /** dshfiles: Host-only; the chat-resume API checks access first. */
   retryStoppedTurn(request: { readonly sessionId: SessionId; readonly seq: number }): Promise<boolean> {
-    return this.commands.retryStoppedTurn(request)
+    return this.agents.hold(request.sessionId, () => this.commands.retryStoppedTurn(request))
   }
 
   /**
@@ -348,7 +351,7 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('selectModel')
   selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue> {
-    return this.mirrored.selectModel(request, value => this.commands.selectModel(value))
+    return this.mirrored.selectModel(request, value => this.agents.hold(value.sessionId, () => this.commands.selectModel(value)))
   }
 
   /** Read local selection intent without creating an Agent or changing deployment defaults. */
@@ -369,7 +372,7 @@ export class SessionController extends TypertRemoteService {
 
   /** Owned Host API only: never mutate the global default, enqueue input, or wake this thread. */
   selectThreadModel(request: ThreadModelSelect & { sessionId: SessionId }): Promise<ThreadModelSnapshot> {
-    return this.commands.selectThreadModel(request)
+    return this.agents.hold(request.sessionId, () => this.commands.selectThreadModel(request))
   }
 
   /**
@@ -493,7 +496,7 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('rename')
   rename(request: SessionRenameRequest): Promise<SessionRenameValue> {
-    return this.commands.rename(request)
+    return this.agents.hold(request.sessionId, () => this.commands.rename(request))
   }
 
   /**
@@ -546,7 +549,7 @@ export class SessionController extends TypertRemoteService {
       ...(clientTimeZone === undefined ? {} : { clientTimeZone }),
       ...(principal === undefined ? {} : { principal }),
     }
-    return this.mirrored.prompt(request, signal, () => this.commands.prompt(request, source))
+    return this.mirrored.prompt(request, signal, () => this.agents.hold(request.sessionId, () => this.commands.prompt(request, source)))
   }
 
   /**
@@ -566,7 +569,7 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('updateQueue')
   updateQueue(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue> {
-    return this.mirrored.updateQueue(request, () => this.commands.updateQueue(request))
+    return this.mirrored.updateQueue(request, () => this.agents.hold(request.sessionId, () => this.commands.updateQueue(request)))
   }
 
   /**
