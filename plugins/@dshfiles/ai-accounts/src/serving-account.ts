@@ -13,6 +13,8 @@ import {
 
 export const SERVING_ACCOUNT_RETENTION_MS = 90 * 86_400_000
 export const MAX_SERVING_ACCOUNT_SESSIONS = 2000
+/** Pruning reads every per-record file synchronously (hundreds of ms on a full store), so it runs at most hourly. */
+export const SERVING_ACCOUNT_PRUNE_INTERVAL_MS = 3_600_000
 const servingAccountDomain = defineDomain({
   name: 'ai_accounts_serving',
   version: 1,
@@ -81,7 +83,11 @@ export const createServingAccountService = (ctx: Context, now: () => number = Da
   const enqueue = (work: () => Promise<void>) => {
     queue = queue.then(work).catch(() => ctx.logger.warn('ai-accounts: serving account metadata storage failed'))
   }
+  let prunedAt: number | undefined
   const prune = async () => {
+    const at = now()
+    if (prunedAt !== undefined && at - prunedAt < SERVING_ACCOUNT_PRUNE_INTERVAL_MS) return
+    prunedAt = at
     const store = await domain()
     if (store === undefined) return
     for (const key of ServingAccountModel.pruneKeys(store.table('successful').entries(), now())) await store.table('successful').delete(key)
