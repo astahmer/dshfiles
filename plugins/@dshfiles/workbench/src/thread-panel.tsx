@@ -67,10 +67,10 @@ export interface WorkbenchThreadPanelProps {
 /** Call once at the client composition root. Every mounted panel owns and releases its own reference. */
 export const createWorkbenchThreadPanel = (sessions: Pick<ISessions, 'list' | 'retain'>) => {
   const subscribe = (listener: () => void) => sessions.list.subscribe(listener)
-  const getSnapshot = () => sessions.list.getSnapshot()
   return function WorkbenchThreadPanel(props: WorkbenchThreadPanelProps): ReactNode {
-    const list = useSyncExternalStore(subscribe, getSnapshot)
-    const listedId = list.ids.find(id => id === props.sessionId)
+    // Only listing membership matters here; a whole-list subscription re-rendered every mounted conversation on each
+    // retention or title change.
+    const listedId = useSyncExternalStore(subscribe, () => sessions.list.getSnapshot().ids.find(id => id === props.sessionId))
     const [reference, setReference] = useState<SessionReference>()
     useEffect(() => {
       if (listedId === undefined) {

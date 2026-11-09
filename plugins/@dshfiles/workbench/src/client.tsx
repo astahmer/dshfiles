@@ -37,6 +37,7 @@ import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { createMainPanelSources } from './panel-sources.js'
 import { panelMainTarget } from './panel-main-target.js'
 import { createTabPanelAdapter } from './tab-panels.js'
+import { KeptThreadViews } from './kept-thread-views.js'
 import { createSemanticPanelOpener } from './semantic-panel-opener.js'
 import { createResettableAsidePlacement, WorkbenchReset } from './reset-layout.js'
 import { ConversationPanels } from './conversation-panels.js'
@@ -293,14 +294,20 @@ export default defineClient({
             return () => releases.forEach(release => release())
           }, [])
           const syncTabs = useRef<() => void>(() => undefined)
+          const keptThreads = useMemo(() => new KeptThreadViews(), [])
           useEffect(() => {
             const adapter = createTabPanelAdapter({
               registry,
               thread: sessionId => () => (
-                <ThreadPanel
+                <keptThreads.Outlet
                   sessionId={sessionId}
-                  SessionProvider={SessionProvider}
-                  renderConversation={() => renderConversationSlot(WORKBENCH_CONVERSATION_SLOT, {})}
+                  render={() => (
+                    <ThreadPanel
+                      sessionId={sessionId}
+                      SessionProvider={SessionProvider}
+                      renderConversation={() => renderConversationSlot(WORKBENCH_CONVERSATION_SLOT, {})}
+                    />
+                  )}
                 />
               ),
               panel: (panelId, scope) => {
@@ -349,8 +356,9 @@ export default defineClient({
               unsubscribe()
               if (syncMainTabs === sync) syncMainTabs = undefined
               adapter.dispose()
+              keptThreads.dropReleased()
             }
-          }, [renderMain, renderConversationSlot, SessionProvider])
+          }, [renderMain, renderConversationSlot, SessionProvider, keptThreads])
           useEffect(() => {
             const follow = (requested?: string | null): void => {
               const id = requested === undefined ? ctx.layout.panelInfo.getSnapshot().activePanelId : requested
@@ -382,30 +390,33 @@ export default defineClient({
           }, [])
           if (!ready) return null
           return (
-            <WorkbenchView
-              registry={registry}
-              onResetLayout={resetLayout}
-              store={store}
-              region="main"
-              defaultLayout="conversation"
-              t={props.t}
-              onOpenPanel={openIn('main')}
-              onDropPanel={handleDrop('main')}
-              acceptDroppedPanel={acceptsForeignPanel}
-              onApi={api => {
-                drainPendingOpen('main', api)
-                syncTabs.current()
-              }}
-              onAddSurface={() => addNestedSurface('main')}
-              headerActions={context => (
-                <>
-                  <ToggleRightPanel />
-                  <ToggleBottomPanel />
-                  <LayoutsMenu />
-                  <MoveMenu from="main" {...context} />
-                </>
-              )}
-            />
+            <>
+              <keptThreads.Host />
+              <WorkbenchView
+                registry={registry}
+                onResetLayout={resetLayout}
+                store={store}
+                region="main"
+                defaultLayout="conversation"
+                t={props.t}
+                onOpenPanel={openIn('main')}
+                onDropPanel={handleDrop('main')}
+                acceptDroppedPanel={acceptsForeignPanel}
+                onApi={api => {
+                  drainPendingOpen('main', api)
+                  syncTabs.current()
+                }}
+                onAddSurface={() => addNestedSurface('main')}
+                headerActions={context => (
+                  <>
+                    <ToggleRightPanel />
+                    <ToggleBottomPanel />
+                    <LayoutsMenu />
+                    <MoveMenu from="main" {...context} />
+                  </>
+                )}
+              />
+            </>
           )
         }),
       ),
