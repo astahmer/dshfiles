@@ -5,7 +5,7 @@ import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { defineClient, FileViewer, Files, type FilesService, SessionScreen, SettingsSection, type SettingsSectionItem } from '@dshfiles/dshx/client'
+import { Command, defineClient, FileViewer, Files, type FilesService, SessionScreen, SettingsSection, type SettingsSectionItem } from '@dshfiles/dshx/client'
 import { Markdown } from '@dshfiles/plugin-ui/components/markdown'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -15,6 +15,7 @@ import { threadOnScreen } from '@dshfiles/workbench/thread-on-screen'
 import { useEffect, useSyncExternalStore } from 'react'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import { ArtifactsPanel } from './artifacts-panel.js'
 import { createEditorStore, type EditorStore } from './editor-store.js'
 import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
 import { editorSettingsLocale, EDITOR_SETTINGS_LOCALE_NAMESPACE } from './editor-settings-locales.js'
@@ -133,6 +134,28 @@ export default defineClient({
 
     // The workbench keeps moved panels mounted, so the Monaco instance and its view state survive docking changes.
     const workbench = workbenchPanels()
+    const Artifacts = decorate(() => {
+      const sessionId = useSyncExternalStore(subscribeSession, currentSession, noSession)
+      return (
+        <PluginQueryProvider>
+          <ArtifactsPanel sessionId={sessionId} loadEngine={loadEngine} />
+        </PluginQueryProvider>
+      )
+    })
+    const artifactsPanelId = 'dshfiles-editor.artifacts'
+    ctx.effect(
+      () => workbench.register({ id: artifactsPanelId, title: 'Editor: Artifacts', component: Artifacts, allowMultiple: false }),
+      'dshfiles-editor: artifacts workbench panel',
+    )
+    plugin?.add(Command, {
+      id: 'dshfiles-editor.artifacts',
+      title: 'Editor: Artifacts',
+      keywords: ['artifact', 'document'],
+      run: () => {
+        if (!ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === WORKBENCH_MAIN_PANEL_ID)) return false
+        workbench.open(artifactsPanelId)
+      },
+    })
     ctx.effect(() => workbench.register({ id: WORKBENCH_PANEL_ID, title: 'Editor: Files', component: Panel }), 'dshfiles-editor: workbench panel')
     // Its panel registry is page-global and may exist without it; the workbench is loaded when its own main panel is.
     const workbenchInstalled = (): boolean => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === WORKBENCH_MAIN_PANEL_ID)
