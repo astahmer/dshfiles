@@ -1,7 +1,7 @@
 import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { useSettings } from '@dshfiles/dshx/client'
 import { useProjectBookmark } from '@dshfiles/jj-integration/project-bookmark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
