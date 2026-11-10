@@ -614,12 +614,13 @@ button.crumbEditable {
   );
 }
 
-/* An open @/slash menu (data-trigger-menu, ui-input-trigger) renders inside
-   the input card, so the seat's stacking context caps its z-index; lift the
-   seat above the back-to-bottom control (z-index 8, ui-chat ChatView) while
-   the menu is open. The steady state stays 7 so the control keeps painting
+/* An open @/slash menu (data-trigger-menu, ui-input-trigger) or annotation
+   list (AnnotationsPill) renders inside the input card, so the seat's stacking
+   context caps its z-index; lift the seat above the back-to-bottom control
+   (z-index 8, ui-chat ChatView) while either is open. The steady state stays 7 so the control keeps painting
    over the card. */
-.body[data-content-phase='active'] .composerSeat:has([data-trigger-menu]) {
+.body[data-content-phase='active'] .composerSeat:has([data-trigger-menu]),
+.body[data-content-phase='active'] .composerSeat:has([data-annotations-pill]:is(:hover, :focus-within, [data-pinned])) {
   z-index: 9;
 }
 
