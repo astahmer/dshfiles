@@ -47,6 +47,10 @@ const eventRowSchema = Schema.Struct({
     Schema.Array(Schema.Union([nonNegativeInt, Schema.Tuple([Schema.Number.check(Schema.isInt()), Schema.Number.check(Schema.isInt())])])),
   ),
 })
+// Built once: a decoder built per line was a quarter of a tail's decode time.
+const decodeRowLine = Schema.decodeUnknownSync(Schema.fromJsonString(rowSchema))
+const decodeEventRow = Schema.decodeUnknownSync(eventRowSchema)
+const decodeEventRowLine = Schema.decodeUnknownResult(Schema.fromJsonString(eventRowSchema))
 
 /**
  * Phases one open measured, in milliseconds, plus how it was served. A caller owns the span; this bag is its attributes.
@@ -384,8 +388,8 @@ export class TailLog {
 const eventOf = (line: string): SessionEvent => {
   // The row itself is returned, not the schema's output, which would move the declared keys first: the browser copy
   // must match the full read byte for byte.
-  const record = Schema.decodeUnknownSync(Schema.fromJsonString(rowSchema))(line)
-  const sources = Schema.decodeUnknownSync(eventRowSchema)(record).sourceEventSeqs?.flatMap(entry =>
+  const record = decodeRowLine(line)
+  const sources = decodeEventRow(record).sourceEventSeqs?.flatMap(entry =>
     typeof entry === 'number' ? [entry] : Array.from({ length: entry[1] - entry[0] + 1 }, (_, index) => entry[0] + index),
   )
   // SAFETY: the JSONL backend wrote this row from a validated SessionEvent; only the seq ranges differ on disk.
@@ -436,7 +440,7 @@ export const openLogHead = async (publicInput: LogWindowInput, windowBytes: numb
 }
 
 /** Whether one stored row is an event rather than the log's leading header row, which carries no seq. */
-const isEventRow = (line: string): boolean => Schema.decodeUnknownResult(Schema.fromJsonString(eventRowSchema))(line)._tag === 'Success'
+const isEventRow = (line: string): boolean => decodeEventRowLine(line)._tag === 'Success'
 
 /** Decode the events of complete frames, oldest first, plus whether every frame yielded its records whole. */
 const decodeFrames = (bytes: Buffer, frames: readonly FrameRange[]): { readonly events: readonly SessionEvent[]; readonly complete: boolean } => {

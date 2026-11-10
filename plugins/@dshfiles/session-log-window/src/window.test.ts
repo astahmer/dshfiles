@@ -28,6 +28,8 @@ const turn = (index: number, firstSeq: number): SessionEvent[] => {
       time,
       data: { content: [{ type: 'text', text: randomBytes(4_000).toString('hex') }], source: { kind: 'user' }, role: 'user', id: `message-${String(index)}` },
       surfaceOp: 'append',
+      // The writer stores contiguous sources as a [start, end] range the tail must expand back.
+      ...(firstSeq === 0 ? {} : { sourceEventSeqs: [firstSeq - 2, firstSeq - 1, firstSeq] }),
     },
     { type: 'turn/end', seq: firstSeq + 2, time, data: { turn: index, reason: { kind: 'interrupted' } } },
   ] as never
