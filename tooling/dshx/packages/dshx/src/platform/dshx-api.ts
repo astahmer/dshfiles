@@ -57,10 +57,9 @@ const redactRecord = (record: Readonly<Record<string, JsonValue>>): Record<strin
   Object.fromEntries(Object.entries(record).map(([key, item]) => [key, SECRET_KEY.test(key) ? '[redacted]' : redactJson(item)]))
 
 /** The details a remote failure carried, when they are a JSON object small enough to keep; secrets are redacted. */
-const safeDetails = (details: unknown): Readonly<Record<string, JsonValue>> | undefined => {
-  const decoded = Schema.decodeUnknownOption(detailsSchema)(details)
-  if (Option.isNone(decoded) || Object.keys(decoded.value).length === 0) return undefined
-  const redacted = redactRecord(decoded.value)
+const safeDetails = (details: Option.Option<Readonly<Record<string, JsonValue>>>): Readonly<Record<string, JsonValue>> | undefined => {
+  if (Option.isNone(details) || Object.keys(details.value).length === 0) return undefined
+  const redacted = redactRecord(details.value)
   return JSON.stringify(redacted).length > MAX_REMOTE_DETAILS ? undefined : redacted
 }
 
@@ -108,7 +107,11 @@ export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version,
     }
     if (!parsed.value.result.ok) {
       const failure = parsed.value.result.error
-      throw new DshPlatformError(failure.code ?? 'remote-error', safeMessage(failure.message), safeDetails(failure.details))
+      throw new DshPlatformError(
+        failure.code ?? 'remote-error',
+        safeMessage(failure.message),
+        safeDetails(Schema.decodeUnknownOption(detailsSchema)(failure.details)),
+      )
     }
     const output = Schema.decodeUnknownOption(outputSchema)(parsed.value.result.value)
     if (Option.isNone(output) || output.value.version !== version) {

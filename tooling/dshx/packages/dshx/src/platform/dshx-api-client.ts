@@ -16,7 +16,11 @@ const apiErrorOf = (error: unknown, contract: Pick<ApiClientContract, 'id' | 'ow
     return ApiProtocolModel.error('transport', error.message, contract.id, method, true, error)
   if (['authentication-expired', 'api-http-error', 'invalid-response', 'invalid-method'].includes(error.code))
     return ApiProtocolModel.error('transport', error.message, contract.id, method, false, error)
-  return ApiRuntimeModel.errorFromRemote({ ok: false, error: { code: error.code, message: error.message, ...(error.details !== undefined && { details: error.details }) } }, contract.id, method)
+  return ApiRuntimeModel.errorFromRemote(
+    { ok: false, error: { code: error.code, message: error.message, ...(error.details !== undefined && { details: error.details }) } },
+    contract.id,
+    method,
+  )
 }
 
 /**
