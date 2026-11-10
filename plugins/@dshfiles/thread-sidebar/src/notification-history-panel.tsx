@@ -21,10 +21,13 @@ import type { NotificationHistoryTranslate } from './notification-history-locale
 const historyKey = ['thread-sidebar', 'notification-history'] as const
 const noEntries: readonly NotificationHistoryEntry[] = []
 
+type HistoryView = 'all' | 'unread' | 'dismissed'
+
+const isHistoryView = (value: string): value is HistoryView => value === 'all' || value === 'unread' || value === 'dismissed'
+
 type HistoryAction =
   | { readonly kind: 'read'; readonly ids: readonly string[]; readonly read: boolean }
   | { readonly kind: 'dismiss'; readonly id: string; readonly dismissed: boolean }
-  | { readonly kind: 'clear'; readonly ids: readonly string[] }
 
 export const NotificationHistoryPanel = (props: {
   readonly sessions: ISessions
@@ -35,7 +38,7 @@ export const NotificationHistoryPanel = (props: {
   const api = useApi(notificationHistoryApi)
   const queryClient = useQueryClient()
   const t = props.t
-  const [view, setView] = useState('all')
+  const [view, setView] = useState<HistoryView>('all')
   const [clearIds, setClearIds] = useState<readonly string[] | null>(null)
   const [navigationNotice, setNavigationNotice] = useState(false)
   const sessions = useSyncExternalStore(
@@ -55,9 +58,12 @@ export const NotificationHistoryPanel = (props: {
   const transition = useMutation({
     mutationFn: async (action: HistoryAction) => {
       if (action.kind === 'read') return api.setRead({ ids: [...action.ids], read: action.read })
-      if (action.kind === 'dismiss') return api.setDismissed({ id: action.id, dismissed: action.dismissed })
-      return api.clear({ ids: [...action.ids], confirm: true })
+      return api.setDismissed({ id: action.id, dismissed: action.dismissed })
     },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: historyKey }),
+  })
+  const clear = useMutation({
+    mutationFn: (ids: readonly string[]) => api.clear({ ids: [...ids], confirm: true }),
     onSuccess: async () => {
       setClearIds(null)
       await queryClient.invalidateQueries({ queryKey: historyKey })
@@ -76,7 +82,7 @@ export const NotificationHistoryPanel = (props: {
   const unread = active.filter(entry => !entry.read)
   const dismissed = entries.filter(entry => entry.dismissed)
   const visible = view === 'unread' ? unread : view === 'dismissed' ? dismissed : active
-  const busy = transition.isPending || open.isPending
+  const busy = transition.isPending || open.isPending || clear.isPending
   const failure = transition.error ?? open.error
   return (
     <Page
@@ -87,7 +93,9 @@ export const NotificationHistoryPanel = (props: {
       tabs={{
         label: t('title'),
         value: view,
-        onValueChange: setView,
+        onValueChange: value => {
+          if (isHistoryView(value)) setView(value)
+        },
         items: [
           { value: 'all', label: t('all'), count: active.length },
           { value: 'unread', label: t('unread'), count: unread.length },
@@ -102,12 +110,20 @@ export const NotificationHistoryPanel = (props: {
         <Button
           size="sm"
           variant="outline"
-          disabled={busy || unread.length === 0}
-          onClick={() => transition.mutate({ kind: 'read', ids: unread.map(entry => entry.id), read: true })}
+          disabled={busy || entries.every(entry => entry.read)}
+          onClick={() => transition.mutate({ kind: 'read', ids: entries.filter(entry => !entry.read).map(entry => entry.id), read: true })}
         >
           {t('markAllRead')}
         </Button>
-        <Button size="sm" variant="destructive" disabled={busy || entries.length === 0} onClick={() => setClearIds(entries.map(entry => entry.id))}>
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={busy || entries.length === 0}
+          onClick={() => {
+            clear.reset()
+            setClearIds(entries.map(entry => entry.id))
+          }}
+        >
           {t('clear')}
         </Button>
       </div>
@@ -124,9 +140,7 @@ export const NotificationHistoryPanel = (props: {
       )}
       {failure === null ? null : (
         <Alert variant="destructive">
-          <AlertDescription>
-            {errorMessage(failure, t('actionFailed'))} {t('actionFailed')}
-          </AlertDescription>
+          <AlertDescription>{errorMessage(failure, t('actionFailed'))}</AlertDescription>
         </Alert>
       )}
       {navigationNotice ? (
@@ -182,7 +196,7 @@ export const NotificationHistoryPanel = (props: {
       <AlertDialog
         open={clearIds !== null}
         onOpenChange={isOpen => {
-          if (!isOpen && !transition.isPending) setClearIds(null)
+          if (!isOpen && !clear.isPending) setClearIds(null)
         }}
       >
         <AlertDialogContent>
@@ -190,20 +204,20 @@ export const NotificationHistoryPanel = (props: {
             <AlertDialogTitle>{t('clearTitle')}</AlertDialogTitle>
             <AlertDialogDescription>{t('clearDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
-          {transition.error === null ? null : (
+          {clear.error === null ? null : (
             <Alert variant="destructive">
-              <AlertDescription>{t('actionFailed')}</AlertDescription>
+              <AlertDescription>{errorMessage(clear.error, t('actionFailed'))}</AlertDescription>
             </Alert>
           )}
           <AlertDialogFooter>
-            <Button variant="outline" disabled={transition.isPending} onClick={() => setClearIds(null)}>
+            <Button variant="outline" disabled={clear.isPending} onClick={() => setClearIds(null)}>
               {t('cancel')}
             </Button>
             <Button
               variant="destructive"
-              disabled={transition.isPending}
+              disabled={clear.isPending}
               onClick={() => {
-                if (clearIds !== null) transition.mutate({ kind: 'clear', ids: clearIds })
+                if (clearIds !== null) clear.mutate(clearIds)
               }}
             >
               {t('clear')}

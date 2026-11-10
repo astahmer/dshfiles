@@ -5,7 +5,7 @@ import { HostContext, cordisLogger } from './host-context.js'
 import { causeReport } from './cause-report.js'
 import { detached, detachedContext } from './detached.js'
 
-type EventName = Extract<keyof Events, string>
+type EventName = keyof Events & string
 type EventArguments<K extends EventName> = Parameters<Events[K]>
 type EventResult<K extends EventName> = ReturnType<Events[K]>
 type LeadingArguments<Arguments> = Arguments extends readonly [...infer Leading, unknown] ? Leading : never

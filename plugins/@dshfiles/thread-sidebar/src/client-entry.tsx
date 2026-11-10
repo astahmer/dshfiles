@@ -693,15 +693,16 @@ export default defineClient({
      * Navigation history can point at a thread archived since the visit. Restore it before opening:
      * native navigation clears an archived main Session right after it opens, releasing the reference.
      */
-    const openSessionRestoringArchived = (sessionId: SessionSummary['id']): void => {
-      if (!ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) {
-        openThread(sessionId)
-        return
+    const openSessionRestoringArchived = async (sessionId: SessionSummary['id']): Promise<boolean> => {
+      if (ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) {
+        try {
+          await ctx.workspaces.unarchiveSession(sessionId)
+        } catch {
+          return false
+        }
       }
-      void ctx.workspaces.unarchiveSession(sessionId).then(
-        () => openThread(sessionId),
-        () => undefined,
-      )
+      openThread(sessionId)
+      return true
     }
 
     const notificationHistoryTranslate = ctx.locale.bind('dshfiles.notificationHistory')
@@ -724,9 +725,7 @@ export default defineClient({
                 const snapshot = ctx.sessions.list.getSnapshot()
                 const existingId = snapshot.ids.find(id => id === sessionId)
                 if (existingId === undefined || snapshot.byId[existingId] === undefined) return false
-                if (ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(existingId)) await ctx.workspaces.unarchiveSession(existingId)
-                openThread(existingId)
-                return true
+                return openSessionRestoringArchived(existingId)
               }}
             />
           </PluginQueryProvider>
@@ -1131,7 +1130,7 @@ export default defineClient({
         const openIfListed = (): void => {
           const session = ctx.sessions.list.getSnapshot().byId[id]
           if (session === undefined || session.blank) return
-          openSessionRestoringArchived(id)
+          void openSessionRestoringArchived(id)
         }
         if (ctx.sessions.list.getSnapshot().byId[id] !== undefined) {
           openIfListed()

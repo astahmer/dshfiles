@@ -1,28 +1,21 @@
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
-import { Context, Effect, Layer, Option, Schema } from 'effect'
-import { notificationHistoryEntrySchema, notificationHistorySnapshotSchema, type NotificationHistoryEntry } from './notification-history-api.js'
+import { Context, Effect, Layer, Option, Schema, Struct } from 'effect'
+import { NOTIFICATION_HISTORY_LIMIT, notificationHistoryEntrySchema, notificationHistorySnapshotSchema } from './notification-history-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 
 type Snapshot = typeof notificationHistorySnapshotSchema.Type
-type RecordInput = Pick<NotificationHistoryEntry, 'id' | 'sessionId' | 'at' | 'category'>
 
 const storedSchema = SchemaHelpers.strictStruct(
   Schema.Struct({
     version: Schema.Literal(1),
-    entries: Schema.Array(SchemaHelpers.strictStruct(notificationHistoryEntrySchema)).check(Schema.isMaxLength(500)),
+    entries: Schema.Array(SchemaHelpers.strictStruct(notificationHistoryEntrySchema)).check(Schema.isMaxLength(NOTIFICATION_HISTORY_LIMIT)),
   }),
 )
 
-const recordSchema = SchemaHelpers.strictStruct(
-  Schema.Struct({
-    id: notificationHistoryEntrySchema.fields.id,
-    sessionId: notificationHistoryEntrySchema.fields.sessionId,
-    at: notificationHistoryEntrySchema.fields.at,
-    category: notificationHistoryEntrySchema.fields.category,
-  }),
-)
+const recordSchema = SchemaHelpers.strictStruct(notificationHistoryEntrySchema.mapFields(Struct.pick(['id', 'sessionId', 'at', 'category'])))
+type RecordInput = typeof recordSchema.Type
 const decodeRecord = Schema.decodeUnknownEffect(recordSchema)
 
 const historyDomain = defineDomain({
@@ -31,13 +24,23 @@ const historyDomain = defineDomain({
   tables: { snapshot: { valueSchema: zodSchemaFromEffect(storedSchema), __key: 'snapshot' } },
 })
 
+const operations = ['open', 'read', 'record', 'read-state', 'dismiss', 'clear'] as const
+const operationPhrases = {
+  open: 'open its saved storage',
+  read: 'read the saved history',
+  record: 'save a new notification',
+  'read-state': 'save the read status',
+  dismiss: 'dismiss or restore the entry',
+  clear: 'clear the selected entries',
+} satisfies Record<(typeof operations)[number], string>
+
 export class NotificationHistoryFailed extends Schema.TaggedError<NotificationHistoryFailed>()(
   'NotificationHistoryFailed',
-  { operation: Schema.Literals(['open', 'read', 'record', 'read-state', 'dismiss', 'clear']), cause: Schema.optional(Schema.Defect()) },
+  { operation: Schema.Literals(operations), cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'notification-history-failed' },
 ) {
   override get message(): string {
-    return `Notification history could not ${this.operation}. Retry after checking the Host storage diagnostics; the previous history is unchanged.`
+    return `Notification history could not ${operationPhrases[this.operation]}. The previous history is unchanged; retry, and reload the page if it keeps failing.`
   }
 }
 
@@ -62,10 +65,7 @@ export class NotificationHistory extends Context.Service<
         Effect.map(value => ({ entries: Option.isSome(value) ? value.value.entries : [] })),
         Effect.mapError(cause => new NotificationHistoryFailed({ operation: 'read', cause })),
       )
-      const change = (input: {
-        readonly operation: NotificationHistoryFailed['operation']
-        readonly update: (entries: Snapshot['entries']) => Snapshot['entries']
-      }) =>
+      const change = (input: { readonly operation: (typeof operations)[number]; readonly update: (entries: Snapshot['entries']) => Snapshot['entries'] }) =>
         domain
           .withWriteLock(
             Effect.gen(function* () {
@@ -88,7 +88,7 @@ export class NotificationHistory extends Context.Service<
               if (entries.some(entry => entry.id === record.id)) return entries
               return [...entries, { ...record, read: false, dismissed: false }]
                 .sort((left, right) => right.at - left.at || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
-                .slice(0, 500)
+                .slice(0, NOTIFICATION_HISTORY_LIMIT)
             },
           })
         }),

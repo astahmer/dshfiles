@@ -1,3 +1,4 @@
+import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, PubSub, type Scope, Stream } from 'effect'
 import { ThreadAttention, ThreadAttentionStoreModel } from './attention-store.js'
@@ -7,6 +8,8 @@ import { InflightMarkerWriteFailed } from './sidebar-errors.js'
 
 export interface SessionEvent {
   readonly sessionId: string
+  readonly origin: SessionSummary['origin']
+  readonly parentSessionId: SessionSummary['parentId']
   readonly event: { readonly type: string; readonly seq: number; readonly time: number }
 }
 
@@ -25,7 +28,12 @@ export class SessionEvents extends Context.Service<SessionEvents, { readonly sub
       yield* Effect.acquireRelease(
         Effect.sync(() =>
           host.ctx.on('session/event', (session, event) => {
-            PubSub.publishUnsafe(pubsub, { sessionId: String(session.id), event })
+            PubSub.publishUnsafe(pubsub, {
+              sessionId: String(session.id),
+              origin: session.header.origin,
+              parentSessionId: session.header.parentSession,
+              event,
+            })
           }),
         ),
         dispose => Effect.sync(dispose),

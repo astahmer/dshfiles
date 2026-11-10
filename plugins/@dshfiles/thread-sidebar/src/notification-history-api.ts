@@ -1,10 +1,13 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { Schema } from 'effect'
+import { THREAD_NOTIFICATION_CATEGORIES } from './thread-notifications.js'
+
+export const NOTIFICATION_HISTORY_LIMIT = 500
 
 const identifier = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512))
 const timestamp = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(8_640_000_000_000_000))
-const category = Schema.Literals(['approval-needed', 'input-needed', 'turn-finished', 'stopped', 'failed'])
-const ids = Schema.Array(identifier).check(Schema.isMaxLength(500))
+const category = Schema.Literals(THREAD_NOTIFICATION_CATEGORIES)
+const ids = Schema.Array(identifier).check(Schema.isMaxLength(NOTIFICATION_HISTORY_LIMIT))
 
 export const notificationHistoryEntrySchema = Schema.Struct({
   id: identifier,
@@ -18,7 +21,7 @@ export const notificationHistoryEntrySchema = Schema.Struct({
 export type NotificationHistoryEntry = typeof notificationHistoryEntrySchema.Type
 
 export const notificationHistorySnapshotSchema = Schema.Struct({
-  entries: Schema.Array(notificationHistoryEntrySchema).check(Schema.isMaxLength(500)),
+  entries: Schema.Array(notificationHistoryEntrySchema).check(Schema.isMaxLength(NOTIFICATION_HISTORY_LIMIT)),
 })
 
 export const notificationHistoryApi = defineApi({
@@ -29,8 +32,7 @@ export const notificationHistoryApi = defineApi({
     list: method({
       input: Schema.Struct({}),
       output: notificationHistorySnapshotSchema,
-      description:
-        'Read the last 500 retained thread notifications, newest first, including read and dismissed entries. Summaries are fixed categories, never conversation contents. Read-only.',
+      description: `Read the last ${NOTIFICATION_HISTORY_LIMIT} retained thread notifications, newest first, including read and dismissed entries. Summaries are fixed categories, never conversation contents. Read-only.`,
       tool: { name: 'notification_history_list', readOnly: true, render: result => JSON.stringify(result) },
     }),
     setRead: method({

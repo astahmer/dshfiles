@@ -9,6 +9,7 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import ApprovalService, { setApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import { HostContext, tracerLayer } from '@dshfiles/dshx/effect'
+import { Settings } from '@dshfiles/dshx/effect/settings'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
@@ -20,6 +21,8 @@ import { randomUUID } from 'node:crypto'
 import { NotificationHistory } from './notification-history.js'
 import { notificationHistoryRecorder } from './notification-history-host.js'
 import { SessionEvents } from './session-events.js'
+import { type SidebarSettingsValue } from './sidebar-settings.js'
+import { threadSidebarSettings } from './settings.js'
 import { jsonStorageDomain } from './storage.test-support.js'
 
 const fixture = (root: string) =>
@@ -60,6 +63,7 @@ const withRecorder = <A, E>(
       Layer.provideMerge(NotificationHistory.layer),
       Layer.provideMerge(SessionEvents.layer),
       Layer.provideMerge(StorageDomain.layer),
+      Layer.provideMerge(Settings.layerTest<SidebarSettingsValue>('thread-sidebar', threadSidebarSettings.schema({}))),
       Layer.provide(Layer.succeed(HostContext, HostContext.of({ ctx: created.host.ctx, packageId: '@dshfiles/thread-sidebar' }))),
     )
     return yield* NotificationHistory.use(history => body({ fixture: created, history })).pipe(Effect.provide(layer))
@@ -214,7 +218,21 @@ describe('notification history Host collection', () => {
     ),
   )
 
-  it.effect('records a tracing span without adding request content', () =>
+  it.effect('keeps subagent finishes out of history, as their toasts are', () =>
+    withRecorder(({ fixture: created, history }) =>
+      Effect.gen(function* () {
+        const child = yield* Effect.promise(() => created.host.ctx.agents.create({ sessionId: SessionId(randomUUID()), meta: { origin: 'subagent' } }))
+        const committed = yield* historyWrites({ fixture: created, count: 1 })
+        yield* Effect.yieldNow
+        child.agent.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+        created.handle.agent.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+        yield* Fiber.join(committed)
+        expect((yield* history.snapshot).entries.map(entry => entry.sessionId)).toEqual([String(created.handle.agent.id)])
+      }),
+    ),
+  )
+
+  it.effect('records a tracing span for each history write', () =>
     withRecorder(({ history }) =>
       Effect.gen(function* () {
         using recorder = recordSpans()

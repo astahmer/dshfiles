@@ -83,9 +83,9 @@ so the row's unread dot clears too. Done on an older turn's item leaves a newer 
 
 ## Notification history
 
-**Observe › Notifications** keeps the last 500 thread events, newest first, on the Host. The history includes finished, failed, and stopped turns, approval requests, and input requests. Recording does not depend on a browser being open, notification permissions, sound settings, or toast delivery.
+**Observe › Notifications** keeps the last 500 thread events, newest first, on the Host. The history includes finished, failed, and stopped turns, approval requests, and input requests. Recording does not depend on a browser being open, notification permissions, sound settings, or toast delivery. It follows the attention rule for subagents: child Sessions are recorded only when the `includeSubagentAttention` preference is on, exactly as their toasts are.
 
-**History** shows retained entries except dismissed ones. **Unread** filters unread entries. **Dismissed** lets you restore an entry without changing its read status. **Mark read**, **Mark unread**, and **Mark all read** affect notification history only. They do not answer questions, resolve Inbox items, or change thread attention.
+**History** shows retained entries except dismissed ones. **Unread** filters unread entries. **Dismissed** lets you restore an entry without changing its read status. **Mark read**, **Mark unread**, and **Mark all read** affect notification history only. **Mark all read** also marks unread entries that are dismissed. They do not answer questions, resolve Inbox items, or change thread attention.
 
 **Open thread** opens an existing thread and marks its notification read. Archived threads offer **Restore and open thread**. An unavailable thread leaves its notification readable and dismissible. **Clear history** asks for confirmation and permanently deletes the captured retained entries, including dismissed entries. Notifications that arrive after the dialog opens remain. Threads are never deleted.
 
@@ -100,6 +100,8 @@ The same Host methods serve the UI and `notification_history_list`, `notificatio
 The history belongs to Thread Sidebar, which already owns thread notifications. Its single-snapshot store keeps read, dismiss, clear, and retention changes in one durable write. The existing attention store cannot serve history because it keeps only the latest finish and deletes acknowledged rows. Extending Activity Timeline would couple notification retention to unrelated event payloads and require a storage migration. Browser-only persistence would miss events while no browser is open.
 
 Actual approval and question requests are observed through prepended, transparent Host interceptors. Observers always delegate the original continuation, including when storage fails. An invoked tool or `approval/asked` event alone is not proof of a request reaching an answerer, so neither creates a notification.
+
+Limitation: prepending places the observer ahead of automatic answerers too. A `permission` hook that answers an approval without a human still records an **Approval requested** entry. No plugin in this repository installs such a hook today. Recording after the continuation returns would drop requests that are still waiting for a person, so the observer stays first.
 
 ## Sidebar controls
 

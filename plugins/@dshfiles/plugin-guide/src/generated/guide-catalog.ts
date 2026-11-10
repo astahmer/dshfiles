@@ -1191,7 +1191,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:199",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:216",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -1204,8 +1204,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/jj-integration owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: ownWorkspaceFor, provision, destination, classifyWorkspaces, projects, noFolder, repositories, refreshRepositories, threadAt, revisionGraph, isolate, land, queueLand, cancelQueuedLand, integrationProgress, reviewHistory, threadStatus, landThread, workspaceSetup, cancelWorkspaceSetup, workspaceSync, discard, discardMany, cleanupWorkspaces, startCleanup, cleanupJobs",
-        "Agent tools: jj_thread_destination (read-only), jj_thread_projects (read-only), jj_thread_repositories (read-only), jj_thread_refresh_repositories (read-only), jj_thread_isolate, jj_thread_review_history (read-only), jj_thread_status (read-only), jj_thread_rebase, jj_workspace_setup, jj_cancel_workspace_setup, jj_thread_workspace_sync (read-only), jj_thread_discard, jj_thread_discard_many, jj_thread_cleanup, jj_thread_cleanup_jobs (read-only)"
+        "Methods: ownWorkspaceFor, provision, destination, classifyWorkspaces, projects, noFolder, projectBookmark, setProjectBookmark, repositories, refreshRepositories, threadAt, revisionGraph, isolate, land, queueLand, cancelQueuedLand, integrationProgress, reviewHistory, threadStatus, landThread, workspaceSetup, cancelWorkspaceSetup, workspaceSync, discard, discardMany, cleanupWorkspaces, startCleanup, cleanupJobs",
+        "Agent tools: jj_thread_destination (read-only), jj_thread_projects (read-only), jj_project_bookmark (read-only), jj_set_project_bookmark, jj_thread_repositories (read-only), jj_thread_refresh_repositories (read-only), jj_thread_isolate, jj_thread_review_history (read-only), jj_thread_status (read-only), jj_thread_rebase, jj_workspace_setup, jj_cancel_workspace_setup, jj_thread_workspace_sync (read-only), jj_thread_discard, jj_thread_discard_many, jj_thread_cleanup, jj_thread_cleanup_jobs (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1226,7 +1226,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: RepositoryAutoIntegration, mayAutoIntegrateWorkspace"
+        "Also exports: RepositoryBookmarkEntry, ProjectBookmarkSource, ProjectBookmarkChoice, RepositoryBookmarks, RepositoryAutoIntegration, mayAutoIntegrateWorkspace"
       ],
       "source": "plugins/@dshfiles/jj-integration/src/settings.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -1269,6 +1269,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/jj-integration/src/no-folder.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/jj-integration/project-bookmark",
+      "kind": "module",
+      "title": "@dshfiles/jj-integration/project-bookmark",
+      "summary": "Every project-bookmark read shares this prefix, so a changed choice refreshes them all at once.",
+      "publicSymbol": "ProjectBookmarkQuery, useProjectBookmarkQuery, useProjectBookmarkResolution, useProjectBookmark",
+      "importFrom": "@dshfiles/jj-integration/project-bookmark",
+      "owner": "@dshfiles/jj-integration",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/jj-integration/src/project-bookmark-query.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1936,8 +1956,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/thread-sidebar owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: list, archive, unarchive, settle, unsettle, pin, unpin, rename, fork, continueIn, fanOut, create, prompt, stop, selectModel, references, projectList, projectRegister, projectRename, projectDelete, projectReorder, move",
-        "Agent tools: thread_list (read-only), thread_archive, thread_unarchive, thread_settle, thread_unsettle, thread_pin, thread_unpin, thread_rename, thread_fork, thread_continue_in, thread_fan_out, thread_create, thread_prompt, thread_stop, thread_select_model, thread_references (read-only), project_list (read-only), project_register, project_rename, project_delete, project_reorder, thread_move"
+        "Methods: list, archive, unarchive, settle, unsettle, pin, unpin, rename, fork, continueIn, fanOut, create, prompt, stop, selectModel, status, references, projectList, projectRegister, projectRename, projectDelete, projectReorder, move",
+        "Agent tools: thread_list (read-only), thread_archive, thread_unarchive, thread_settle, thread_unsettle, thread_pin, thread_unpin, thread_rename, thread_fork, thread_continue_in, thread_fan_out, thread_create, thread_prompt, thread_stop, thread_select_model, thread_status (read-only), thread_references (read-only), project_list (read-only), project_register, project_rename, project_delete, project_reorder, thread_move"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2031,7 +2051,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "DestinationSections",
       "importFrom": "@dshfiles/thread-sidebar/destinations",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:254",
+      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:261",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/thread-sidebar.destination-section",
@@ -2518,6 +2538,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "ProjectSettingsPanels",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-settings-panels",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-settings-panels.ts:28",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/workspace-folder-picker.project-settings-panel",
+      "kind": "registry",
+      "title": "ProjectSettingsPanels",
+      "summary": "Contribution registry owned by @dshfiles/workspace-folder-picker.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(ProjectSettingsPanels, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/workspace-folder-picker renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/workspace-folder-picker.project-settings-panel"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "RepositorySetup",
       "importFrom": "@dshfiles/workspace-folder-picker/repository-setup-contract",
       "owner": "@dshfiles/workspace-folder-picker",
@@ -2588,7 +2630,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-communication › agent-directory"
       ],
       "details": [
-        "Used by 77 catalog feature(s)",
+        "Used by 78 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2616,7 +2658,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/background-jobs › thread-jobs-facet"
       ],
       "details": [
-        "Used by 29 catalog feature(s)",
+        "Used by 30 catalog feature(s)",
         "Destinations in use: thread-panel"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2810,7 +2852,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 53 catalog feature(s)",
+        "Used by 54 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2922,7 +2964,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › subagent-traces"
       ],
       "details": [
-        "Used by 104 catalog feature(s)",
+        "Used by 107 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

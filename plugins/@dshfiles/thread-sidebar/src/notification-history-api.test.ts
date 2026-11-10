@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, test } from 'vitest'
-import { notificationHistoryApi, notificationHistoryEntrySchema } from './notification-history-api.js'
+import { NOTIFICATION_HISTORY_LIMIT, notificationHistoryApi, notificationHistoryEntrySchema } from './notification-history-api.js'
 import { THREAD_NOTIFICATION_CATEGORIES } from './thread-notifications.js'
 
 describe('notification history API', () => {
@@ -18,7 +18,7 @@ describe('notification history API', () => {
     expect(Schema.is(clearInput)({ ids: ['event'] })).toBe(false)
     expect(Schema.is(clearInput)({ ids: ['event'], confirm: false })).toBe(false)
     expect(Schema.is(clearInput)({ ids: ['event'], confirm: true })).toBe(true)
-    expect(Schema.is(clearInput)({ ids: Array.from({ length: 501 }, () => 'event'), confirm: true })).toBe(false)
+    expect(Schema.is(clearInput)({ ids: Array.from({ length: NOTIFICATION_HISTORY_LIMIT + 1 }, () => 'event'), confirm: true })).toBe(false)
   })
 
   test('covers each notification category without storing conversation contents', () => {
