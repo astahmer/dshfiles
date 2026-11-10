@@ -86,7 +86,13 @@ describe('tool-search ranking recall', () => {
     const documented = recall(catalog, documentedQueries)
     const added = recall(catalog, newQueries)
     if (process.env.DSH_TOOL_SEARCH_MEASURE === '1') {
-      console.info(JSON.stringify({ tools: catalog.length, documented: { hits: documented.hits, of: documented.rows.length }, added: { hits: added.hits, of: added.rows.length } }))
+      console.info(
+        JSON.stringify({
+          tools: catalog.length,
+          documented: { hits: documented.hits, of: documented.rows.length },
+          added: { hits: added.hits, of: added.rows.length },
+        }),
+      )
       for (const row of [...documented.rows, ...added.rows]) console.info(`${row.rank ?? '-'}\t${row.target}\t"${row.query}"\t${row.top.join(', ')}`)
     }
     const total = documented.rows.length + added.rows.length

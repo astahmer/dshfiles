@@ -29,7 +29,9 @@ const tokenize = (text: string): string[] => (normalize(text).match(/[\p{L}\p{N}
 
 /** Words that carry no capability; dropped from a query unless nothing else is left. */
 const stopwords = new Set(
-  'a an the i me my mine we us our you your it its this that these those is are was were be been being am do does did have has had to of in on at by for with from into onto about and or so as if than then what which who whom how much many any anything some can could should would will shall may might must there here still right now please just let up each'.split(' '),
+  'a an the i me my mine we us our you your it its this that these those is are was were be been being am do does did have has had to of in on at by for with from into onto about and or so as if than then what which who whom how much many any anything some can could should would will shall may might must there here still right now please just let up each'.split(
+    ' ',
+  ),
 )
 
 /**
@@ -218,8 +220,7 @@ const queryTerms = (query: string): ReadonlyMap<string, number> => {
   const meaningful = tokens.filter(token => !stopwords.has(token))
   const literal = meaningful.length > 0 ? meaningful : tokens
   const weights = new Map(literal.map(token => [token, 1]))
-  for (const token of literal)
-    for (const expansion of tokenize(synonyms[token] ?? '')) if (!weights.has(expansion)) weights.set(expansion, synonymWeight)
+  for (const token of literal) for (const expansion of tokenize(synonyms[token] ?? '')) if (!weights.has(expansion)) weights.set(expansion, synonymWeight)
   return weights
 }
 
