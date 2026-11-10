@@ -82,6 +82,7 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/activity-timeline": "workspace:*",
+    "@dshfiles/context-compaction": "workspace:*",
     "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/frame-layout": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
@@ -111,6 +112,7 @@
     "@deepseek-ai/dsh-client-ui-settings": "catalog:",
     "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
+    "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
     "@deepseek-ai/dsh-cordis-host-runner": "catalog:",
     "@deepseek-ai/dsh-credentials": "catalog:",
     "@deepseek-ai/dsh-credentials-local": "0.2.1-rc.2",
@@ -160,6 +162,7 @@
     "@deepseek-ai/dsh-client-ui-settings": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-cordis-host-runner": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-credentials": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-llm": ">=0.2.1-rc.2 <0.3.0-0",
@@ -173,6 +176,7 @@
     "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "~3.18.4",
     "@dshfiles/activity-timeline": ">=0.1.0 <0.2.0-0",
+    "@dshfiles/context-compaction": ">=0.1.0",
     "@dshfiles/session-controller": "workspace:*"
   },
   "peerDependenciesMeta": {
@@ -186,6 +190,9 @@
       "optional": true
     },
     "@deepseek-ai/dsh-workspace": {
+      "optional": true
+    },
+    "@dshfiles/context-compaction": {
       "optional": true
     }
   },
@@ -205,7 +212,8 @@
         "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-primitives"
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-workspace"
       ],
       "external": [
         "@dshfiles/shared-runtime"

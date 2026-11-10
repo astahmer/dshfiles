@@ -202,6 +202,14 @@ Feature: AI Accounts
     When a briefly exhausted Command Code account fails a turn with auto-resume on
     Then the turn resumes on its own one minute after the reset
 
+  @scenario:ai-accounts.idle-cache-warning
+  Scenario: Warn before re-sending a long idle thread past its prompt-cache lifetime
+    Given the isolated plugin composition of "@dshfiles/ai-accounts, @dshfiles/context-compaction, @dshfiles/settings-shell, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model answers in a fresh workspace whose prompt cache lasts one minute
+    Then once the thread sat idle past that minute the meter line warns that the next send re-sends the prompt uncached
+    And Send anyway hides the warning until the next request
+
   @scenario:model-effort-picker.fast-mode-supported
   Scenario: Fast mode appears only on supported legacy Codex model catalog entries
     Given the isolated model picker profile with a legacy inert Codex account is booted

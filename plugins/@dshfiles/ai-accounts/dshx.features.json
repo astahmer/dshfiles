@@ -1298,6 +1298,79 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "idle-cache-warning",
+      "title": "Warn before re-sending an idle thread past its prompt-cache lifetime",
+      "summary": "In the composer meter line, before the context ring, a chip appears once a long thread sat idle past its provider prompt-cache lifetime (Anthropic 5 min, OpenAI and Codex 10 min, or a per-route setting): \"cache expired · next send ≈$0.45\". Its popover gives the idle time, the prompt tokens the next request re-sends uncached and their models.dev price against the cached price, and offers Compact first (session-controller compact), New thread with a reference (a thread in the same folder whose first message names this one and carries the draft) or Send anyway. The prompt size is the native contextPressure projection; the route comes from context-compaction threshold API, else the route of the latest turn.",
+      "reach": ["seed jev-setup-chat-thread", "click button \"cache expired*\"", "expect button \"Compact first\""],
+      "surfaces": ["client", "settings"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: meter line",
+      "configuration": [
+        {
+          "key": "idleCacheWarning",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the warning.",
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.idle-cache-model"]
+        },
+        {
+          "key": "idleCacheMinTokens",
+          "defaultValue": "50000",
+          "constraints": "Integer prompt tokens below which the warning stays quiet.",
+          "coveredBy": ["ai-accounts.idle-cache-model"]
+        },
+        {
+          "key": "promptCacheMinutes",
+          "defaultValue": "{}",
+          "constraints": "provider/model or provider/* to a lifetime in minutes (1 to 10080); routes of other vendors stay quiet without one.",
+          "coveredBy": ["ai-accounts.idle-cache-lifetime", "ai-accounts.idle-cache-warning"]
+        }
+      ],
+      "states": [
+        "quiet-warm-cache",
+        "quiet-short-thread",
+        "quiet-unknown-lifetime",
+        "quiet-running",
+        "warning",
+        "compacting",
+        "continuing-elsewhere",
+        "dismissed",
+        "action-failed"
+      ],
+      "failureModes": [
+        "A route without a price still warns with the uncached token count and no amount.",
+        "A failed compaction or thread creation shows the error in the popover; the message can still be sent as is.",
+        "The idle time comes from the thread list updatedAt, so any later log write (a background job settling) restarts it and the warning stays quiet rather than early."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.idle-cache-warning",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.idle-cache-model",
+          "file": "plugins/@dshfiles/ai-accounts/src/idle-cache-model.test.ts",
+          "testName": "warns once a long thread sat idle past its cache lifetime, pricing the uncached prompt as a cache write"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.idle-cache-lifetime",
+          "file": "plugins/@dshfiles/ai-accounts/src/idle-cache-model.test.ts",
+          "testName": "prefers a route override, then a provider-wide one"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the chip reads projections, the price quote and the context-compaction threshold, and its actions call session-controller compact and create, whose Host work is traced there."
+        }
+      ]
     }
   ],
   "kind": "bundle",

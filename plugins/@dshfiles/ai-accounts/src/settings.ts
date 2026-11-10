@@ -79,6 +79,12 @@ export const aiAccountsSettings = defineSettings({
     pricingRefreshHours: Schema.natural().min(1).max(720).default(24),
     /** `provider/model` or `provider/*` → a models.dev id, `free`, or `input=… output=… cacheRead=… cacheWrite=…` (USD per 1M tokens). */
     pricingOverrides: Schema.dict(Schema.string()).default({}),
+    /** Warn in the composer before a message re-sends a long idle thread's whole prompt past its provider's cache lifetime. */
+    idleCacheWarning: Schema.boolean().default(true),
+    /** Prompt tokens below which the idle-cache warning stays quiet. */
+    idleCacheMinTokens: Schema.natural().max(10_000_000).default(50_000),
+    /** `provider/model` or `provider/*` → prompt-cache lifetime in minutes, e.g. 60 for a provider whose profile sets `cacheRetention: long`. */
+    promptCacheMinutes: Schema.dict(Schema.natural().min(1).max(10_080)).default({}),
     /** When nobody being able to run an agent matters: Quota forecast counts the gaps that fall in these hours. */
     workHours: Schema.object({
       /** `Date.getDay()` values, 0 = Sunday. */

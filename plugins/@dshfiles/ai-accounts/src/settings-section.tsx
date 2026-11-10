@@ -25,6 +25,7 @@ const REFRESH_SECONDS = [15, 30, 60, 120, 300, 900] as const
 const INTERVAL_MINUTES = [1, 2, 5, 10, 15, 30, 60] as const
 const RETENTION_DAYS = [30, 90, 180, 365] as const
 const PRICING_REFRESH_HOURS = [6, 12, 24, 48, 168] as const
+const IDLE_CACHE_MIN_TOKENS = [10_000, 25_000, 50_000, 100_000, 200_000] as const
 const METER_LABELS = [
   { value: 'both', label: '% left and reset' },
   { value: 'percent', label: '% left' },
@@ -459,6 +460,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
       </Group>
 
       <CostEstimatesGroup readOnly={readOnly} write={write} />
+      <IdleCacheGroup readOnly={readOnly} write={write} />
 
       <WorkHoursGroup readOnly={readOnly} write={write} />
 
@@ -738,6 +740,88 @@ const CostEstimatesGroup = (props: { readonly readOnly: boolean; readonly write:
         {parsed.skipped === 0 ? null : (
           <p className="dshx:text-xs dshx:text-destructive">
             {String(parsed.skipped)} line{parsed.skipped === 1 ? '' : 's'} not in <code>route/model = value</code> form will be dropped.
+          </p>
+        )}
+      </div>
+    </Group>
+  )
+}
+
+const minutesToText = (overrides: Readonly<Record<string, number>>): string =>
+  Object.entries(overrides)
+    .map(([route, minutes]) => `${route} = ${String(minutes)}`)
+    .join('\n')
+
+const textToMinutes = (text: string) => {
+  const parsed = textToOverrides(text)
+  const overrides: Record<string, number> = {}
+  let skipped = parsed.skipped
+  for (const [route, value] of Object.entries(parsed.overrides)) {
+    const minutes = Number(value)
+    if (Number.isInteger(minutes) && minutes >= 1 && minutes <= 10_080) overrides[route] = minutes
+    else skipped += 1
+  }
+  return { overrides, skipped }
+}
+
+const IdleCacheGroup = (props: { readonly readOnly: boolean; readonly write: (task: Promise<unknown>) => void }): JSX.Element => {
+  const preferences = usePreferences()
+  const settings = preferences.settings
+  const savedText = minutesToText(preferences.promptCacheMinutes)
+  const [draft, setDraft] = useState<string | null>(null)
+  const parsed = textToMinutes(draft ?? savedText)
+  const saveLifetimes = (): void => {
+    if (draft === null || draft === savedText) return
+    props.write(settings.set('promptCacheMinutes', parsed.overrides).then(() => setDraft(null)))
+  }
+  return (
+    <Group
+      description="Before you message a long thread idle past its provider's prompt-cache lifetime, the composer shows what the uncached prompt costs and offers to compact first or continue in a new thread."
+      heading="Idle prompt cache"
+    >
+      <Row label="Warn before an uncached send">
+        {id => (
+          <Switch
+            checked={preferences.idleCacheWarning}
+            disabled={props.readOnly}
+            id={id}
+            onCheckedChange={value => props.write(settings.set('idleCacheWarning', value))}
+          />
+        )}
+      </Row>
+      <Row hint="Shorter threads stay quiet." label="From prompt size">
+        {id => (
+          <NumberSelect
+            disabled={props.readOnly || !preferences.idleCacheWarning}
+            format={value => `${String(value / 1_000)}K tokens`}
+            id={id}
+            onChange={value => props.write(settings.set('idleCacheMinTokens', value))}
+            options={IDLE_CACHE_MIN_TOKENS}
+            value={preferences.idleCacheMinTokens}
+          />
+        )}
+      </Row>
+      <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+        <Label className="dshx:text-sm dshx:font-normal" htmlFor="ai-accounts-prompt-cache-minutes">
+          Cache lifetimes
+        </Label>
+        <p className="dshx:text-xs dshx:text-muted-foreground">
+          One rule per line in minutes: <code>route/model = 60</code>, or <code>route/*</code>. Without a rule, Anthropic models use 5 and OpenAI or Codex
+          models 10; other providers stay quiet.
+        </p>
+        <Textarea
+          className="dshx:min-h-16 dshx:font-mono! dshx:text-xs"
+          disabled={props.readOnly || !preferences.idleCacheWarning}
+          id="ai-accounts-prompt-cache-minutes"
+          onBlur={saveLifetimes}
+          onChange={event => setDraft(event.target.value)}
+          placeholder="claude_work/* = 60"
+          spellCheck={false}
+          value={draft ?? savedText}
+        />
+        {parsed.skipped === 0 ? null : (
+          <p className="dshx:text-xs dshx:text-destructive">
+            {String(parsed.skipped)} line{parsed.skipped === 1 ? '' : 's'} not in <code>route/model = minutes</code> form will be dropped.
           </p>
         )}
       </div>

@@ -283,6 +283,39 @@ The panel asks the Host for 36 days of history thinned to one reading per half
 hour, keeping every reading where a reset time or a spent window changes. An
 older Host ignores the bucket and returns its bounded series.
 
+## Idle prompt cache
+
+![Cache-expired warning in the composer meter line](docs/screenshots/idle-cache-warning.png)
+
+A provider keeps a prompt prefix cached for a while after the last request that
+used it. Message a long thread after that, and the request pays the full input
+(or cache-write) rate for every prompt token. Once a thread sat idle past its
+route's lifetime, a chip opens the composer meter line: "cache expired · next
+send ≈$0.45". Its popover gives the idle time, the prompt tokens the next
+request re-sends and their models.dev price against the cached price, and three
+choices:
+
+- **Compact first** runs the thread's `/compact` (session-controller
+  `sessions.compact`), so the next message carries the summary instead.
+- **New thread with a reference** starts a thread in the same folder whose first
+  message names this one, with your draft; with no draft it opens with the
+  reference in its composer.
+- **Send anyway** hides the chip until the thread's next request.
+
+The prompt size is the context ring's (`contextPressure`). The route comes from
+`@dshfiles/context-compaction`'s `compaction_threshold`, else from the latest
+turn's cost entry. The idle time is the thread list's `updatedAt`, so any later
+log write restarts it: the chip errs quiet, never early.
+
+Lifetimes: Anthropic models 5 min, OpenAI and Codex models 10 min (the upper
+end of OpenAI's 5–10 min), detected from the models.dev id or the model name.
+Other routes stay quiet until Settings › AI Accounts › Idle prompt cache ›
+Cache lifetimes names one (`route/model = minutes`, or `route/*`). DSH's
+native provider profile chooses what a request asks for with `cacheRetention`
+(`short`, the default; `long` asks Anthropic for 1 h and OpenAI for 24 h): give
+such a route its lifetime here. Threads under **From prompt size** (50K tokens by
+default) stay quiet; **Warn before an uncached send** turns it off.
+
 ## Editing
 
 Edits save automatically after a short pause by default. A subtle indicator

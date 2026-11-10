@@ -28,6 +28,9 @@ import { useContract } from '@dshfiles/dshx/client'
 import { EdgeUsageWidget } from './edge-usage.js'
 import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry, SessionUsageCost } from './session-cost.js'
+import { IdleCacheWarningDockEntry } from './idle-cache-warning.js'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { TurnCostEstimate } from './turn-cost-estimate.js'
 import { CredentialRecoveryMessage } from './credential-recovery-message.js'
 // Type-only: the owned Chat fork's seat beside Resume on a failed turn.
@@ -53,7 +56,7 @@ export default defineClientPlugin({
   id: 'llm-ai-accounts',
   name: '@dshfiles/ai-accounts',
   uses: ['ui'],
-  inject: ['layout', 'locale', 'remote', 'remote.credentials', 'sessions'],
+  inject: ['layout', 'locale', 'remote', 'remote.credentials', 'sessions', 'uiWorkspace'],
   locales: [aiAccountsLocale],
   // Declare the services used through the scoped context. The UI capability
   // supplies the native slot adapter and decorates each registered component.
@@ -196,6 +199,12 @@ export default defineClientPlugin({
         <SessionCostDockEntry useProjection={props.useProjection} />
       </PluginQueryProvider>
     )
+    const openSession = (sessionId: string): void => ctx.uiWorkspace.openSession(SessionId(sessionId))
+    const IdleCacheWarningView = (props: { readonly sessionId: string; readonly useProjection?: unknown; readonly useSessions?: unknown }): JSX.Element => (
+      <PluginQueryProvider>
+        <IdleCacheWarningDockEntry openSession={openSession} sessionId={props.sessionId} useProjection={props.useProjection} useSessions={props.useSessions} />
+      </PluginQueryProvider>
+    )
     const SessionUsageCostView = (props: SessionUsageCostOwnerProps): JSX.Element => (
       <PluginQueryProvider>
         <SessionUsageCost {...props} />
@@ -261,6 +270,8 @@ export default defineClientPlugin({
       EdgeUsageHostView,
     )
 
+    // First in the meter line: what the next send costs once an idle thread's prompt cache expired.
+    api.ui.register({ name: 'conversation.composer.dock', id: 'ai-accounts-idle-cache', order: 0, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, IdleCacheWarningView)
     // `separate` placement: its own dock entry beside Chat's usage pill. `inside`: Chat's usage pill renders it.
     api.ui.register({ name: 'conversation.composer.dock', id: 'ai-accounts-session-cost', order: 10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, SessionCostView)
     api.ui.register({ name: 'conversation.composer.usageCost', id: 'ai-accounts-session-cost', order: 0 }, SessionUsageCostView)
