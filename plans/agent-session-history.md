@@ -2,8 +2,9 @@
 
 > Not started on stock DSH. The first attempt extended upstream `@deepseek-ai/dsh-tool-session-query` and added a
 > latest-page read to `sessionController.page` in a DSH core fork; this repository carries no core patches, so that
-> route is closed until upstream exposes the read. Discovery already ships in `@dshfiles/memory` (see Context). No
-> Agent tool reads another Session's messages: `dshx_comm_history` (live descendants only) was removed with
+> route is closed until upstream exposes the read. Discovery already ships in `@dshfiles/memory` (see Context), and
+> `memory_read` with a `range` returns a bounded raw excerpt of another thread's log (at most 60 events, 8 KB) with no
+> workspace preset. No other Agent tool reads another Session's messages: `dshx_comm_history` (live descendants only) was removed with
 > `dshx_comm_workspace` on 2026-11-04 (see the
 > [agent-communication README](../plugins/@dshfiles/agent-communication/README.md#removed-session-reads)).
 
@@ -223,7 +224,10 @@ inspected Session.
       and the opaque `workspace_topic` hash is neither. Find a verifiable source before associating a Session with a
       change.
 - [ ] **Orchestration writes** (prompt, queue, cancel, resume, acknowledge) on another Session need the write presets
-      above; none exist as Agent tools beyond the native subagent and thread tools.
+      above. Prompt, queue, steer and stop ship as `thread_prompt`, `thread_queue_*` and `thread_stop`
+      ([`thread-sidebar`](../plugins/@dshfiles/thread-sidebar/README.md)) and resume as `chat_resume_interrupted`
+      ([`session-controller`](../plugins/@dshfiles/session-controller/README.md)), gated only by "call when the user
+      asked", not by a Host-enforced preset.
 - [ ] **Descendant-workspace lookup.** Re-adding a `dshx_comm_workspace`-style lookup (descendant → DSH Workspace id
       and title) is a new decision for this plan; `SessionCorpus.workspaceAt` still exists in agent-communication.
 
