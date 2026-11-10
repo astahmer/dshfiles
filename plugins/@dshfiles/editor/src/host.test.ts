@@ -32,7 +32,7 @@ const mountedEditor = Effect.gen(function* () {
   return { fs, workspace, client: createHostApiClient(host.ctx, editorApi, '@dshfiles/editor') }
 }).pipe(Effect.provide(NodeServices.layer))
 
-const remoteFailure = (call: () => Promise<unknown>) =>
+const remoteFailure = <A>(call: () => Promise<A>) =>
   Effect.flip(Effect.tryPromise({ try: call, catch: error => (isApiError(error) ? error : new Error('not an ApiError')) }))
 
 describe('editor Host', () => {

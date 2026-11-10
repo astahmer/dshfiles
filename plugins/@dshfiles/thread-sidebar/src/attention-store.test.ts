@@ -23,7 +23,7 @@ const durableRows = (root: string) =>
     snapshot => snapshot.sessions,
   ).pipe(Effect.provide(attentionAt(root)))
 
-const turnEnd = (kind: string): unknown => ({ type: 'turn/end', seq: 12, time: 1_000, data: { turn: 3, reason: { kind } } })
+const turnEnd = (kind: string) => ({ type: 'turn/end', seq: 12, time: 1_000, data: { turn: 3, reason: { kind } } })
 
 describe('thread attention', () => {
   it('only turn ends that ask the user for something count as attention', () => {
