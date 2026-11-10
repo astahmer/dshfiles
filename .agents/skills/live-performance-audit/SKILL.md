@@ -23,7 +23,9 @@ node $S/host-cpu-profile.mjs "${DSH_HOST_PID:?set the verified Host PID}" 60   #
 
 For a page load, record the HAR yourself instead of asking the user for one. `har-capture.mjs` loads the live GUI
 read-only in a headless Chromium (the same `~/.dsh/runtime/web-url` entry the probes read) and writes a redacted HAR:
-no headers, cookies, query strings or response bodies, request bodies replaced by digests, mode 600:
+no headers, cookies, query strings or response bodies, request bodies replaced by digests, mode 600. A
+`/api/dshx-batch` POST keeps each call's endpoint (`dshx-<channel hash>/<method>`), an envelope digest and the size of
+its answer line, never the payload or the answer:
 
 ```sh
 node $S/har-capture.mjs --seconds 60 --summary                 # one fresh load, summarized
@@ -40,7 +42,9 @@ when the two disagree. Status `-1` marks reads still open when the capture ended
 It prints requests, how long until the first request left the browser queue, `blocked` (queue) and `wait` (server)
 p50/p95, requests aborted before being sent, duplicate method + body calls, bytes, and the top methods with the plugin
 that owns each dshx channel (every `@dshfiles/*` package × API id in the repository, hashed with dshx's
-`ApiChannelModel.apiChannel`). It never prints headers, cookies, bodies, query strings or the page URL. Request time far
+`ApiChannelModel.apiChannel`). A batch counts as one request in the totals and expands into its calls in the method
+table (`batched`, `maxKB`, and `every·s`, the median interval between calls, which names a repeating poll or event
+re-read). It never prints headers, cookies, bodies, query strings or the page URL. Request time far
 above `wait` means the browser queue: what holds the six HTTP/1.1 sockets (other tabs, the `shared-streams` worker's
 EventSources, slow reads) is only visible in the user's browser, through `chrome://net-export` with the tab count noted.
 The HAR's `_initiator.stack` names the calling function when a core method has several possible owners.

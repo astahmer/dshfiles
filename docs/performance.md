@@ -1003,6 +1003,47 @@ headless page with none), so the queue numbers compare the page's own demand, no
 reads left in this load are Host-side, not queueing: `session/list` 3.5 s server time for 3.5 MB (core),
 `worktree-memory/scratchHosts` 3.7 s ×2, `ai-accounts/read` 2.5 s, `permissionPresets/catalog` 2.1 s (core).
 
-Two things `har-summary.mjs` cannot see yet: the entries inside a `dshx-batch` POST (bodies are digested, so the 27
-batches map to "unmapped dshx-batch"), and which read is the 174 KB batch answer that repeats every ~15 s (at 17.7,
-31.3 and three times at 55.3–55.7 s). Attributing them needs the capture to keep each entry's endpoint hash.
+That `har-summary.mjs` could not see inside a `dshx-batch` POST, so the 27 batches mapped to "unmapped dshx-batch" and
+the 174 KB answer repeating every ~15 s (at 17.7, 31.3 and three times at 55.3–55.7 s) had no owner. The next section
+attributes them.
+
+## Batch-aware page load and the owned reads it named (2026-11-10, evening)
+
+`har-capture.mjs` now records request bodies (Playwright's `content: 'omit'` HAR dropped them, so every POST had the
+same digest and duplicate counts were wrong) and keeps, for each `/api/dshx-batch` POST, every call's endpoint
+(`dshx-<channel hash>/<method>`), an envelope digest without its `traceparent`, and the byte size of its NDJSON answer
+line. `har-summary.mjs` expands a batch into its calls, so each row names its owner, its largest answer (`maxKB`) and
+its median repeat interval (`every·s`). Headless one-tab load of the live Host, 60 s, machine load 23–31:
+
+| Measure                         | Before (summary without batch expansion) | After                                                             |
+| ------------------------------- | ---------------------------------------- | ----------------------------------------------------------------- |
+| rows attributed to an owner     | 26 of 51 (25 `unmapped dshx-batch`)      | every row; 50 calls in 27 batches expanded                        |
+| repeating ~174 KB batch answer  | unattributed                             | `thread-sidebar-attention/state`, 176.6 KB per read               |
+| duplicates (same method + body) | 27 extra (every POST body empty)         | 2 extra                                                           |
+| heaviest batch call at load     | hidden in a 944 KB batch                 | `jj-threads/repositories` 741.5 KB                                |
+| slowest batch call at load      | hidden                                   | `multi-host/projectOrigins` 8.96 s (`multi-host project origins`) |
+
+### Fixes and their numbers
+
+| Read                             | Owner and cause (trace)                                                                                                                                                     | Before                                                                                  | After                                                                                                                        |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `worktree-memory/scratchHosts`   | The whole time is the `worktree-memory probe` span (`ps` spawn) queued behind the page-load Host work; `ps` alone takes 0.10 s. "Twice" is the load read plus the 30 s poll | 1381 ms at load, 63 ms at the 30 s poll; 4.1 s worst trace; one `ps` per reader per tab | first read 20 s after mount; one probe per 15 s for every reader, concurrent readers joined (unit test); live after: pending |
+| `ai-accounts/read`               | `ai accounts read` 341 ms: keychain spawn 139 ms (p50 47 ms), the rest untraced Host time before it; every read rebuilt routes, pool and profiles                           | route rebuilds per unchanged read: 1; fixture 2.4–12.9 ms per read                      | rebuilds per unchanged read: 0; fixture 1.6–28 ms per read (load 21–35: no measurable difference)                            |
+| `thread-sidebar-attention/state` | ~1000 unacknowledged records re-read whole on every `changed` event and 30 s poll                                                                                           | 176.6 KB per change (synthetic 1200 records: 214.5 KB)                                  | `changesSince`: 272 B per finished turn, 136 B per opened thread; first read of a page unchanged                             |
+| 13 `retry: 1` queries (P0-3b)    | usage, activity-timeline, agent-communication, thread-sidebar inbox overrode `retryOnceUnlessTimedOut` with no stated reason                                                | a client timeout retried once                                                           | not retried; other failures still retried once                                                                               |
+
+```sh
+node --test .agents/skills/live-performance-audit/scripts/har-*.test.mjs
+pnpm --dir plugins/@dshfiles/worktree-memory exec vitest run src/process-probe.test.ts
+pnpm --dir plugins/@dshfiles/ai-accounts exec vitest run src/read-route-snapshot.test.ts
+pnpm --dir plugins/@dshfiles/thread-sidebar exec vitest run src/attention-store.test.ts src/attention-client-store.test.ts
+```
+
+The worktree-memory first-read delay and the retry changes are client-only; the scratch cache, the route snapshot
+and `changesSince` are Host changes and take effect only after the user restarts DSH. A page against an older Host
+reads the whole attention state as before. Live after-numbers for all four need a build in the canonical checkout
+(and, for the Host halves, a restart) and the same capture.
+
+Still slow in this load and not owned by these fixes: `session/list` 1.36–3.1 s for 3.55 MB (core),
+`settings/describe` 200.8 KB ×2 (core, Host gap rows 97 and 99), `multi-host/projectOrigins` 8.96 s, and the
+attention writes (`acknowledge`, `clearUnread`, `markUnread`), which still answer the whole 177 KB snapshot.
