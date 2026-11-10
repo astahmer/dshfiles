@@ -168,8 +168,9 @@ and child status pills, [ADE UX](../../../docs/ade-ux/README.md) Phase 7), `Dele
 `AgentQueue` (host-pool work queue), `ClarifyPrompt` (an owned ask_user_question card), `ToolbarWalkthrough`
 (plugin-guide onboarding), `ShapeshiftCard` (palette actions that morph into a form), `RevisionScrubber` (rewind any
 turn), `RevisionAvatarGraph`, `AgentCursors` and `AgentPresenceBar` (thread-share v2 presence), `AccessMap` (a
-policies scope view). Not done: `ContextGraph` as an optional graph view of agent-toolkit's Context facet. `ActivityDock`
-was adopted for turn-summary's walkthrough card and lost its caller when the walkthrough became a row toggle.
+policies scope view). Not done: `ContextGraph` as an optional graph view of agent-toolkit's Context facet. `ActivityDock` was
+deleted once turn-summary's walkthrough became a row toggle; its `DockChanges` list stays in `motion/activity-dock`
+for that walkthrough.
 
 Recount a component's callers outside the kit and the gallery:
 
