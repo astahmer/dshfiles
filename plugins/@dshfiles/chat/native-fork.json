@@ -48,6 +48,7 @@
     "src/native/chat/ReasoningContent.tsx",
     "src/native/chat/ReasoningRow.module.css",
     "src/native/chat/ReasoningRow.tsx",
+    "src/native/chat/StatsPills.tsx",
     "src/native/chat/TurnTailNodeView.tsx",
     "src/native/chat/TurnUsagePanel.tsx",
     "src/native/chat/UserContent.tsx",

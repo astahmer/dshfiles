@@ -817,6 +817,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "ai-accounts.session-cost-usage-seat",
+          "file": "plugins/@dshfiles/ai-accounts/src/session-cost.test.tsx",
+          "testName": "adds the estimate after the usage pill label and beside a bucket"
+        },
+        {
+          "kind": "unit-test",
           "id": "ai-accounts.pricing-cost-unit-cache-fallback",
           "file": "plugins/@dshfiles/ai-accounts/src/pricing-catalog.test.ts",
           "testName": "fetches, trims and caches the catalog, then serves the cache offline"

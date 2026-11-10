@@ -54,6 +54,27 @@ describe('connection test recovery', () => {
   })
 })
 
+describe('failed hop', () => {
+  test('names the first failed hop with its message and recovery', () => {
+    const hop = ConnectionDiagnostics.failedHop([
+      { step: 'ssh', ok: true, ms: 80 },
+      { step: 'runtime', ok: false, ms: 300, code: 'runtime-not-running', message: 'No launch file was found' },
+      { step: 'identity', ok: false, ms: 0 },
+    ])
+    expect(hop).toEqual({ step: 'runtime', label: 'DSH runtime failed · No launch file was found', recovery: ConnectionDiagnostics.recovery('runtime') })
+  })
+
+  test('labels a hop without a message by its name alone', () => {
+    expect(ConnectionDiagnostics.failedHop([{ step: 'ssh', ok: false, ms: 5 }])?.label).toBe('SSH login failed')
+  })
+
+  test('reports nothing when every hop passed or none ran', () => {
+    expect(ConnectionDiagnostics.failedHop([{ step: 'ssh', ok: true, ms: 5 }])).toBeUndefined()
+    expect(ConnectionDiagnostics.failedHop([])).toBeUndefined()
+    expect(ConnectionDiagnostics.failedHop(undefined)).toBeUndefined()
+  })
+})
+
 describe('version mismatch', () => {
   test('reports the remote version only when both are known and differ', () => {
     expect(ConnectionDiagnostics.versionMismatch({ localVersion: '0.2.1', remoteVersion: '0.2.0' })).toBe('0.2.0')

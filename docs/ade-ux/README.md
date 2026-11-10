@@ -27,9 +27,8 @@ owner.
 
 **Rollout (needs the user)**
 
-- [ ] Restart the live DSH Host when convenient. Host halves changed in activity-timeline, agent-questions,
-      thread-sidebar, jj-integration, ai-accounts, backlog, traces, hmr-gate, diff-viewed, agent-toolkit, references,
-      settings-shell and memory; rebuild the canonical checkout first (`dshx checkout sync`).
+- [x] ~~Restart the live DSH Host~~: the `web` Host restarted on 2026-11-10 with every changed Host half; the Workbench
+      centre, typed drafts and the Browser tab were then checked on it.
 
 **Inbox and attention (Phase 2)**
 
@@ -55,7 +54,9 @@ owner.
 
 **Thread loop (Phase 4)**
 
-- [ ] Done / Restore releases and recreates the workspace (C3 in [t3code parity](../../plans/t3code-parity.md)).
+- [x] ~~Done / Restore releases and recreates the workspace~~: `autoCleanup.onSettle` removes it on settle and the
+      next turn checks it out again ([settle cleanup](../../plugins/@dshfiles/jj-integration/README.md#settle-cleanup));
+      a live restore check stays open in the plan.
 - [x] ~~Walkthrough~~: turn-summary renders a Walkthrough row under a turn that changed files: the files by folder
       and Review in Changes (setting `walkthrough`).
 - [x] ~~Step timestamps and durations~~: already shipped by `@dshfiles/tool-meta` on every tool card.

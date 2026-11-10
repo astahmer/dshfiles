@@ -7,7 +7,7 @@ import {
   verificationReceiptActivity,
   workspaceActivity,
 } from './adapters.js'
-import { activityLevelSchema, backlogActivitySchema, verificationReceiptEventSchema, type ActivityIngest } from './types.js'
+import { activityLevelSchema, backlogActivitySchema, verificationReceiptEventSchema, verificationReceiptSummaryOf, type ActivityIngest } from './types.js'
 
 const timestamp = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 const boundedText = (max: number) => Schema.String.check(Schema.isMaxLength(max))
@@ -92,5 +92,5 @@ export const ingestOfPayload = (payload: ActivityEventPayload): ActivityIngest =
   if (payload.kind === 'integration') return integrationActivity(payload.value)
   if (payload.kind === 'workspace') return workspaceActivity(payload.value)
   if (payload.kind === 'backlog') return backlogActivity(payload.value)
-  return verificationReceiptActivity(payload.value)
+  return verificationReceiptActivity(verificationReceiptSummaryOf(payload))
 }

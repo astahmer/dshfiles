@@ -2,11 +2,12 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandGroup, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { CheckIcon, ChevronDownIcon, LaptopIcon, PlusIcon, ServerIcon, SettingsIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, LaptopIcon, PlusIcon, SearchIcon, ServerIcon, SettingsIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { queryOptions, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { HostSummary, RuntimeSummary } from '../api.js'
 import { HostDialog, hostState, StatusDot } from './hosts-dialog.js'
+import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { runtimePingRefetchInterval } from '../runtime-status-refresh-policy.js'
@@ -78,11 +79,37 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
       }),
     ),
   })
+  // A failed ping only carries the runtime's last error; the stepwise test that Diagnose runs names the hop that broke.
+  const hops = useQueries({
+    queries: pickable.map((runtime, index) => {
+      const host = hosts.find(item => item.id === runtime.hostId)
+      const sshTarget = host?.connector.kind === 'ssh' ? host.connector.sshTarget : undefined
+      return queryOptions({
+        queryKey: ['multi-host', 'hop', runtime.id, sshTarget, runtime.remoteHome],
+        queryFn: () => api.testConnection({ name: host?.name ?? runtime.name, sshTarget: sshTarget ?? '', remoteHome: runtime.remoteHome ?? '' }),
+        enabled: pings[index]?.data?.ok === false && sshTarget !== undefined && runtime.remoteHome !== undefined,
+        staleTime: 60_000,
+        retry: false,
+      })
+    }),
+  })
+  const failedHop = (runtime: RuntimeSummary | undefined) => {
+    const index = pickable.findIndex(item => item.id === runtime?.id)
+    if (pings[index]?.data?.ok !== false) return undefined
+    return ConnectionDiagnostics.failedHop(hops[index]?.data?.steps)
+  }
   const liveState = (runtime: RuntimeSummary | undefined) => {
     const ping = pings[pickable.findIndex(item => item.id === runtime?.id)]?.data
     if (ping === undefined) return hostState(runtime)
-    return ping.ok ? { tone: 'online' as const, label: `Connected · ${ping.ms} ms` } : { tone: 'error' as const, label: ping.message }
+    if (ping.ok) return { tone: 'online' as const, label: `Connected · ${ping.ms} ms` }
+    return { tone: 'error' as const, label: failedHop(runtime)?.label ?? ping.message }
   }
+  const failing = pickable.flatMap((runtime, index) => {
+    const hop = failedHop(runtime)
+    if (hop === undefined) return []
+    return [{ runtime, failure: hop, name: hosts.find(host => host.id === runtime.hostId)?.name ?? runtime.name, hop: hops[index], ping: pings[index] }]
+  })
+  const selectedHop = failedHop(selected)
   const selectedHost = hosts.find(host => host.id === selected?.hostId)
   const label = destination.kind === 'local' ? 'Local' : (selectedHost?.name ?? selected?.name ?? 'Unknown host')
   const rawState = destination.kind === 'runtime' ? liveState(selected) : undefined
@@ -108,6 +135,7 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
             <TooltipContent className="dshx:max-w-72">
               Host: the machine this thread runs on. Local is this computer; a remote host runs it over SSH.
               {state === undefined ? null : ` ${state.label}.`}
+              {selectedHop === undefined ? null : ` ${selectedHop.recovery}`}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -205,6 +233,31 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
               </CommandGroup>
             </CommandList>
           </Command>
+          {open && failing.length > 0 ? (
+            <ul className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:px-3 dshx:py-2 dshx:text-xs" aria-label="Host recovery">
+              {failing.map(item => (
+                <li key={item.runtime.id} className="dshx:flex dshx:items-center dshx:gap-2">
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:text-muted-foreground">
+                    <span className="dshx:font-medium dshx:text-foreground">{item.name}</span>: {item.failure.recovery}
+                  </span>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    aria-label={`Diagnose ${item.name}`}
+                    disabled={item.hop?.isFetching === true}
+                    onClick={() => {
+                      void item.hop?.refetch()
+                      void item.ping?.refetch()
+                    }}
+                  >
+                    <SearchIcon className="dshx:size-3.5" />
+                    Diagnose
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {directory.isError ? (
             <p className="dshx:px-3 dshx:pb-2 dshx:text-xs dshx:text-destructive">Hosts are unavailable: the multi-host plugin did not answer.</p>
           ) : null}

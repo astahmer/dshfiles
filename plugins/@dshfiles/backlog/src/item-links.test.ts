@@ -25,3 +25,24 @@ describe('thread link extraction', () => {
     expect(BacklogItems.isSessionId('session-controller')).toBe(false)
   })
 })
+
+describe('revision backlinks', () => {
+  const revision = (target: string) => ({ type: 'revision' as const, target })
+
+  it('reaches a revision through a prefix of its change or commit id, either way round', () => {
+    expect(BacklogItems.linkReaches(revision('mounnnvz'), revision('mounnnvzuzupkxql'))).toBe(true)
+    expect(BacklogItems.linkReaches(revision('3f32cd261a80ffee'), revision('3f32cd26'))).toBe(true)
+  })
+
+  it('does not match a bookmark, a mixed alphabet, a too-short prefix or another revision', () => {
+    expect(BacklogItems.linkReaches(revision('main'), revision('mainline'))).toBe(false)
+    expect(BacklogItems.linkReaches(revision('mou'), revision('mounnnvz'))).toBe(false)
+    expect(BacklogItems.linkReaches(revision('3f32'), revision('3f3zz'))).toBe(false)
+    expect(BacklogItems.linkReaches(revision('mounnnvz'), revision('mmotoyuv'))).toBe(false)
+  })
+
+  it('keeps exact matching for every other link type', () => {
+    expect(BacklogItems.linkReaches({ type: 'thread', target: 'session-abcdef12' }, { type: 'thread', target: 'session-abcdef' })).toBe(false)
+    expect(BacklogItems.linkReaches({ type: 'branch', target: 'main' }, { type: 'branch', target: 'main' })).toBe(true)
+  })
+})

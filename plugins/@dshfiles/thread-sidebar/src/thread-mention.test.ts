@@ -87,6 +87,16 @@ test('thread mention insert requests carry the composer they address', () => {
   assert.equal(ThreadMentionModel.decodeThreadMentionInsertRequest('@thread:target'), null)
 })
 
+test('an unaddressed mention goes to the stage composer, never an aside composer', () => {
+  const takes = (composerSessionId: string, request: { sessionId: string; hostSessionId?: string }, stageSessionId: string | undefined) =>
+    ThreadMentionModel.composerTakesInsert({ request, composerSessionId, stageSessionId })
+  assert.equal(takes('main-thread', { sessionId: 'target' }, 'main-thread'), true)
+  assert.equal(takes('aside-thread', { sessionId: 'target' }, 'main-thread'), false)
+  assert.equal(takes('main-thread', { sessionId: 'target' }, undefined), false)
+  assert.equal(takes('aside-thread', { sessionId: 'target', hostSessionId: 'aside-thread' }, 'main-thread'), true)
+  assert.equal(takes('main-thread', { sessionId: 'target', hostSessionId: 'aside-thread' }, 'main-thread'), false)
+})
+
 const dragDataTransfer = () => {
   const values = new Map<string, string>()
   return {

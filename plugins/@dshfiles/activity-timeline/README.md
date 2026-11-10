@@ -60,8 +60,11 @@ Sources are decoupled: the timeline listens on Cordis events and never reads
 another plugin's state file or service. `@dshfiles/jj-integration` and
 `@dshfiles/agent-communication` emit structured events; core
 `agent/created|disposed|status|error|inbox/inserted` are mapped directly.
-Project Checks emits only a strict v1 receipt summary after persistence and
-answers a bounded backfill from its own receipt store. Timeline requests replay
+Project Checks emits only a strict v2 receipt summary after persistence and
+answers a bounded backfill from its own receipt store. v2 carries the remote ID
+and failure code but no peer `sshTarget`, `workspace` or failure message, plus
+the recorded verification stage. v1 summaries still decode; their peer keys and
+message are dropped before storage and their stage reads `not-recorded`. Timeline requests replay
 on startup and after `dshfiles/activity/source-ready`, so either plugin boot
 order works; receipt-derived event IDs dedupe overlapping replay.
 
@@ -73,7 +76,9 @@ causationId, summary, detail, metadata, references[{kind,id,label}],
 provenance: observed|reported }`. IDs come from the source (message ID, call ID,
 integration event ID, or receipt-derived ID) so duplicate delivery dedupes.
 Verification metadata carries only recorded before/after revision facts; current
-freshness is not inferred from a historical event. Missing optional metadata is
+freshness is not inferred from a historical event. Its `verificationStage` is
+`manual`, `completion`, `rebase` or `not-recorded`, and the summary line names it
+(for example `stage rebase candidate`). Missing optional metadata is
 normalized to `null`.
 
 ## Persistence and replay

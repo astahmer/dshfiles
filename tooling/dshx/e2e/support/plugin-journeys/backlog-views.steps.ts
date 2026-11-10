@@ -4,7 +4,7 @@ import { backlogLabel, withBacklogRefs } from './backlog-refs.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 /**
- * Journeys for the approved Backlog views (plans/backlog "Remaining"). Shared Backlog steps such as capture, opening
+ * Journeys for the approved Backlog views (plugins/@dshfiles/backlog/docs/redesign.md). Shared Backlog steps such as capture, opening
  * an item and the context-menu moves live in backlog.steps.ts; these steps only add what those views need.
  */
 

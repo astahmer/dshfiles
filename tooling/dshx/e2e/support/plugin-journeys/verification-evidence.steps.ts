@@ -45,6 +45,8 @@ Then('the Activity Timeline shows safe receipt facts and current Project Checks 
     await expect(page.getByText(/This bounded Project Checks receipt may have expired/)).toBeVisible()
     await expect(page.locator('pre').filter({ hasText: 'sourceRevisionBefore' })).toContainText('sourceRevisionAfter')
     await expect(page.locator('pre').filter({ hasText: 'sourceRevisionBefore' })).toContainText('configurationFreshness')
+    await expect(page.locator('pre').filter({ hasText: 'sourceRevisionBefore' })).toContainText('"verificationStage": "manual"')
+    await expect(failure).toHaveAccessibleName(/stage manual run/)
   })
 })
 
@@ -68,6 +70,7 @@ Then('each failed attempt is projected exactly once with safe metadata', async (
       await expect(metadata).toContainText('"automatic": true')
       await expect(metadata).toContainText('"status": "failed"')
       await expect(metadata).toContainText('"configurationFreshness": "unknown"')
+      await expect(metadata).toContainText('"verificationStage": "completion"')
       await expect(page.getByText(/PRIVATE_EVIDENCE_SENTINEL/u)).toHaveCount(0)
     }
   })

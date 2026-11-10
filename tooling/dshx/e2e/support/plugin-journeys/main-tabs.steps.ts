@@ -47,7 +47,9 @@ const stripPlacement = (page: Page) =>
   page.evaluate(() => {
     const hosts = document.querySelectorAll('[data-dshfiles-main-tabs]')
     const host = hosts[0]
-    const outlet = host?.nextElementSibling
+    // The strip renders in the frame's shell.beforeMain seat, the main surface's previous sibling.
+    const mainSurface = document.querySelector('[data-main-column] > [data-slot="main"]')
+    const outlet = host !== undefined && mainSurface?.previousElementSibling?.contains(host) === true ? mainSurface : null
     const strip = host?.querySelector('[role="tablist"]')?.closest('[data-dshfiles-main-tabs] > *')
     let panel = outlet?.matches('[data-slot="main"]') === true ? outlet.firstElementChild : null
     while (panel !== null && panel !== undefined && getComputedStyle(panel).display === 'contents') panel = panel.firstElementChild

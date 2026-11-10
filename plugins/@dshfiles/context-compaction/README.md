@@ -8,6 +8,10 @@ The request budget comes from the resolved model context window, reserves output
 
 The subclass uses only the published `BasicCompactionEngine` hook and calls `super.summarize()` for each bounded slice. It depends on `@deepseek-ai/dsh-compaction-basic@0.2.1-rc.2`; this is an extension, not copied upstream code. On each DSH upgrade, re-check the hook signature, the native transaction behavior, and the chunking tests before widening the peer range. No DSH core package or private source file is patched.
 
+## Next compaction
+
+The `threshold` API (agent tool `compaction_threshold`, module `@dshfiles/context-compaction/compaction-api`) answers, for one live thread, the token count at which automatic compaction next runs. It takes the running engine's resolved policy (captured from the engine instance, so profile overrides and `modelPolicies` count), the thread's routed provider/model from its latest request header, the route's context window, and the output reservation (`maxTokens` from that header, else the adapter default), and applies `floor(min(W × thresholdRatio, W − O − headroomTokens))` as `compaction-basic`'s `resolveCompactSpec` does (that function is not exported, so `compactionThresholdTokens` restates it and its tests pin the documented defaults). It also returns the engine's own pressure reading (`tokenMeter.measure().totalTokens`). It returns null before the thread routed a request, for a route that declares no window, and where the engine itself would skip proactive compaction. `@dshfiles/agent-plan` shows it beside the composer's context meter.
+
 ## Verify
 
 ```bash

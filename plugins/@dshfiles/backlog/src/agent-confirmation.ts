@@ -45,7 +45,7 @@ const check = (input: { readonly callerKind: string; readonly confirm?: boolean 
 }
 
 /** The sentence a guarded tool's description and its `confirm` argument share. */
-const confirmDescription = 'Explicit opt-in an agent must pass when the user asked for this; without it an agent call is refused. The panel never needs it.'
+const confirmDescription = 'Agent opt-in, only when the user asked; agent calls without it are refused.'
 
 export class AgentConfirmation {
   static readonly bulkLimit = AGENT_BULK_LIMIT

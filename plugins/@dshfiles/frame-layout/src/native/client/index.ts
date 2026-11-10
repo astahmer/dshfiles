@@ -237,6 +237,7 @@ export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStrip
         'rightbar': { kind: 'single', scope: 'root' },
         'shell.dock': { kind: 'single', scope: 'root' },
         'shell.main': { kind: 'single', scope: 'root' },
+        'shell.beforeMain': { kind: 'list', scope: 'root' },
         'shell.bottom': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.leading': { kind: 'single', scope: 'root' },

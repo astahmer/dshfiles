@@ -31,23 +31,27 @@ import type { RightbarOwnerProps } from './index.ts'
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.main' | 'shell.dock' | 'shell.bottom' | 'shell.overlay' | 'shell.leading'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.main' | 'shell.beforeMain' | 'shell.dock' | 'shell.bottom' | 'shell.overlay' | 'shell.leading'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
 
 /**
- * The stable centre/strip seat survives mode changes. The outer main anchor
- * precedes all nested keyed outlets, so main-tabs can portal beside it rather
- * than accidentally attaching inside a workbench panel.
+ * The stable centre column survives mode changes: the `shell.beforeMain` rows
+ * (the main-tabs strip) sit above the main surface, which an entry may hide
+ * while keeping it mounted.
  */
 export function CenterColumn({ mode, renderSlot, children }: {
   mode: MainSurfaceMode
   children?: ReactNode
-} & PropsRenderSlots<'main' | 'shell.main'>) {
+} & PropsRenderSlots<'main' | 'shell.main' | 'shell.beforeMain'>) {
   const renderMain = useMemo(() => MainSurfaceRendering.createRenderer(renderSlot), [renderSlot])
+  const [hiddenHolds, setHiddenHolds] = useState(0)
+  const holdMainHidden = useCallback(() => MainSurfaceRendering.hold(delta => setHiddenHolds(count => count + delta)), [])
+  const beforeMain = useMemo(() => renderSlot('shell.beforeMain', { mode, holdMainHidden }), [renderSlot, mode, holdMainHidden])
   return (
     <div className={css.centerCol} data-main-column>
-      <div className={css.mainSurface} data-slot="main" data-main-surface={mode}>
+      {beforeMain}
+      <div className={css.mainSurface} data-slot="main" data-main-surface={mode} style={hiddenHolds > 0 ? { display: 'none' } : undefined}>
         {MainSurfaceRendering.render(mode, renderSlot, renderMain, children)}
       </div>
     </div>

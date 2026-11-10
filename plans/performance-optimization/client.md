@@ -18,7 +18,7 @@ The [earlier ADE baseline](../../docs/ade-performance/README.md#measurement-rule
 ### C01 — Incremental transcript reference decoration · P1
 
 - [x] **Implemented and verified** in the working copy of this thread workspace, 2026-10-18. Streaming frame cost itself is still unmeasured.
-- **Superseded 2026-11-04:** the observers are gone; Chat renders references from its inline-reference registry ([DOM hook refactor](../dom-hook-refactor.md), steps 2–3).
+- **Superseded 2026-11-04:** the observers are gone; Chat renders references from its inline-reference registry ([plugin boundaries](../../docs/plugin-boundaries.md#extend-another-owners-ui-through-its-seats-not-its-dom)).
 - **Sources / behavior (before):** memory decoration, JJ decoration and session mentions (their former `MutationObserver` installers). Body-wide observers discarded mutation records and scheduled complete eligible-block/code/link scans once per animation frame. Memory reconstructed text through TreeWalker; unrelated DOM updates and the decorators' own writes could schedule work over unchanged history. rAF coalescing limits frequency, not work per frame.
 - **Implement:** 1. Track dirty blocks and added subtrees from MutationRecords. 2. Process only affected conversation roots; handle root replacement and detached nodes. 3. Make self-generated decoration mutations idempotent or explicitly recognizable; preserve an initial bounded scan.
 - **Ownership / safety:** Each decorator owns its observer, queued nodes and cleanup. Preserve React-owned node identity, inline-markup spans, excluded composer/link/code regions, keyboard activation and JJ prefix restoration. Share only proven common semantics, not a generic DOM-scanning service.

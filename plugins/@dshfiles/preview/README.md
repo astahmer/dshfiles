@@ -10,7 +10,8 @@ Three things a thread needs while it builds a web app:
   thread.
 - **Thread dev servers.** The thread header lists the TCP ports the thread's processes listen on, with **Open** and
   **Stop**. Open loads the URL in the right-Sidebar Browser tab beside the thread on screen (the native
-  `ui-sidebar-browser` row, which the `web` seed enables), or in a new browser tab when no pane takes it.
+  `ui-sidebar-browser` row, which the `web` seed enables), or in a new browser tab when no pane takes it. A page link
+  in the chat and `preview_reveal` open the same tab; a link to an image opens the image viewer instead.
 - **Agent browser.** **Watch** on a preview page opens the thread panel's **Agent browser** tab: the agent's own
   headless page, mirrored about twice a second while the tab and window are visible (an unchanged frame sends only its
   hash). Clicks, scrolls, typed text and named keys replay on that page, so you can see and take over what the agent

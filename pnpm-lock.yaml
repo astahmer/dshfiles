@@ -807,6 +807,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.4
+      '@dshfiles/context-compaction':
+        specifier: workspace:*
+        version: link:../context-compaction
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
@@ -816,6 +819,9 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.2
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4

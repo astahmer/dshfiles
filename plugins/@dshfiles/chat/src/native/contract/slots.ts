@@ -2,8 +2,10 @@
 // The turn-error action seat lives in its own published contract module.
 import type {} from '../../turn-error-action.ts'
 import type {} from '../../turn-usage-cost.ts'
+import type {} from '../../session-usage-cost.ts'
 export type { TurnErrorActionOwnerProps } from '../../turn-error-action.ts'
 export type { TurnUsageCostOwnerProps } from '../../turn-usage-cost.ts'
+export type { SessionUsageCostOwnerProps } from '../../session-usage-cost.ts'
 import type { ChatTurnActionExtras, ChatTurnTailExtras } from '../../chat-focus.ts'
 import type { MessageImageGallery } from '../../message-images.ts'
 import type { RefObject } from 'react'

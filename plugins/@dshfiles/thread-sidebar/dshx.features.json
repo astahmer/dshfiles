@@ -2506,8 +2506,8 @@
         {
           "kind": "unit-test",
           "id": "thread-sidebar.thread-reference-mention-unit-main-composer",
-          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention-dom.test.ts",
-          "testName": "the main composer session ignores an aside conversation on screen beside it"
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "an unaddressed mention goes to the stage composer, never an aside composer"
         }
       ],
       "telemetry": [

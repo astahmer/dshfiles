@@ -8,7 +8,7 @@ call.
 Why: on DeepSeek V4.1 Flash through DSH, with three Agents searching at once,
 stock `grep` took 3-4 s median per call (9.4 s p90) on the welii corpus; this
 bundle measured 0.36 s median (1.1 s p90), and search time per session fell
-from 5.5 s to 0.7 s. See [plans/fff-search](../../../plans/fff-search/README.md).
+from 5.5 s to 0.7 s. See [the benchmark](docs/benchmark.md).
 
 ## How it replaces the stock tools
 

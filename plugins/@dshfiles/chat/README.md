@@ -75,6 +75,7 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/chat/ReasoningContent.tsx`, `CompactionItem.tsx` | reasoning and the compaction summary render through `FencedMarkdown`, so a claimed fence renders there too |
 | `src/native/chat/AssistantMarkdown.tsx` (also), `UserContent.tsx`, `ChatView.tsx` (also) | text blocks render through `InlineReferenceMarkdown`, the Referenced-session line through `InlineReferenceText`, and the transcript sits in an `InlineReferenceScope` naming its Session |
 | `src/native/chat/use-chat-viewport.ts`, `use-chat-scroll.ts`, `ChatView.tsx` (also) | a commit's scroll work (follow the tail, restore, keep a paging anchor) runs from a ResizeObserver delivery after the next layout instead of inside the layout effect, so a streamed publication or a first open no longer forces a synchronous layout; the older-rows sentinel reads its first scroll offset in its observer callback |
+| `src/session-usage-cost.ts`, `src/native/chat/StatsPills.tsx`, `src/native/apply.ts` (also) | new: the published `@dshfiles/chat/session-usage-cost` seat; the composer usage pill declares it as a child of its dock entry and renders it after its label and beside each bucket of its dialog (below) |
 | `src/native/conversation-nodes/assistant.ts`, `turn-tail.ts`, `AssistantMarkdown.tsx` (also) | text visibility is carried per streamed block and tested with `/\S/` instead of `trim()`, so a chunk no longer copies the whole message text |
 
 ### Focus a Turn, Step or tool call from another plugin
@@ -128,6 +129,20 @@ keep their rendered references. A throwing matcher or renderer shows the written
 messages are rich-composer's: they use the native `conversation.user.text` rules and `conversation.user.text.node` slot
 instead. Another plugin's own Markdown can apply the same providers with `InlineReferenceMarkdown` from
 `@dshfiles/chat/inline-reference-markdown` (backlog item text does).
+
+### Add a cost to the usage readouts
+
+Chat owns two usage readouts and a list seat in each, so a pricing plugin (`@dshfiles/ai-accounts`) adds its estimate
+without touching their markup:
+
+- `conversation.chat.turnUsageCost` (`@dshfiles/chat/turn-usage-cost`): one completed Turn's usage dialog renders the
+  entries as its cost row, with `{ turn, useProjection }`.
+- `conversation.composer.usageCost` (`@dshfiles/chat/session-usage-cost`): the composer's Detailed usage pill renders
+  the entries after its label (`placement: 'pill'`) and inside each bucket value of its dialog (`'input'`,
+  `'cacheRead'`, `'cacheWrite'` when the thread wrote cache, `'output'`), with the thread's `useProjection`. An entry
+  brings its own separator and spacing and returns `null` when it has nothing to add; Compact mode renders no seat.
+
+Without entries the readouts are the native ones.
 
 ### Render fenced code from another plugin
 

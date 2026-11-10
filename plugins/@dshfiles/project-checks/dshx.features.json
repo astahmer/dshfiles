@@ -450,7 +450,7 @@
     {
       "id": "activity-projection",
       "title": "Project check receipts appear safely in the Activity Timeline",
-      "summary": "Persist authoritative verification receipts before emitting a strict v1 safe summary, replay a bounded recent window when Activity Timeline starts, and keep Project Checks useful when Timeline is absent.",
+      "summary": "Persist authoritative verification receipts before emitting a strict v2 safe summary with the verification stage, replay a bounded recent window when Activity Timeline starts, and keep Project Checks useful when Timeline is absent.",
       "surfaces": ["host", "storage", "integration", "client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -462,7 +462,8 @@
         "A legacy receipt without revision fields remains readable and backfillable.",
         "Backfill is bounded to retained receipts and repeated delivery converges by receipt id.",
         "Current source freshness is recalculated by the Project Checks API; configuration equivalence remains unknown.",
-        "A peer sshTarget, workspace path or stderr-derived failure message never enters the Activity event; a value that would fails the producer schema and is not published."
+        "A peer sshTarget, workspace path or stderr-derived failure message never enters the Activity event; the v2 producer schema has no such key and rejects one.",
+        "A legacy receipt without a stage publishes without one; it is never inferred."
       ],
       "externalDependencies": [
         {
@@ -494,7 +495,7 @@
         },
         {
           "kind": "unit-test",
-          "id": "project-checks.activity-projection-safe-v1",
+          "id": "project-checks.activity-projection-safe-v2",
           "file": "plugins/@dshfiles/project-checks/src/receipt-activity.test.ts",
           "testName": "publishes only the bounded, versioned receipt facts"
         },
@@ -509,6 +510,12 @@
           "id": "project-checks.activity-projection-peer-sentinels",
           "file": "plugins/@dshfiles/project-checks/src/receipt-activity.test.ts",
           "testName": "keeps peer targets, workspace paths and peer stderr out of the Activity payload"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.activity-projection-stage",
+          "file": "plugins/@dshfiles/project-checks/src/receipt-activity.test.ts",
+          "testName": "carries every recorded stage in the v2 Activity payload and omits it for legacy receipts"
         },
         {
           "kind": "unit-test",

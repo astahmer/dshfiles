@@ -256,6 +256,20 @@ const priorityRank = (priority: BacklogPriority | undefined): number => {
 const sameLink = (left: Pick<BacklogLink, 'type' | 'target'>, right: Pick<BacklogLink, 'type' | 'target'>): boolean =>
   left.type === right.type && left.target === right.target
 
+/** A jj change id (reverse hex, `k`–`z`) or a commit id (hex), long enough that a prefix names one revision. */
+const revisionIdPatterns = [/^[k-z]{4,}$/u, /^[0-9a-f]{4,}$/u] as const
+
+/**
+ * A link reaches a target when it names the same thing: for a revision, a `jj:` prefix of the same change or commit
+ * id counts, so `jj:mounnnvz` written in a note backlinks the revision whose full id the jj panel shows.
+ */
+const linkReaches = (link: Pick<BacklogLink, 'type' | 'target'>, target: Pick<BacklogLink, 'type' | 'target'>): boolean => {
+  if (sameLink(link, target)) return true
+  if (link.type !== 'revision' || target.type !== 'revision') return false
+  const [shorter, longer] = link.target.length <= target.target.length ? [link.target, target.target] : [target.target, link.target]
+  return revisionIdPatterns.some(pattern => pattern.test(shorter) && pattern.test(longer)) && longer.startsWith(shorter)
+}
+
 const uniqueLinks = (links: readonly BacklogLink[]): BacklogLink[] =>
   links.filter((link, index) => links.findIndex(other => sameLink(other, link)) === index).slice(0, MAX_LINKS)
 
@@ -461,6 +475,7 @@ export class BacklogItems {
   static readonly uniqueLinks = uniqueLinks
   static readonly isSessionId = isSessionId
   static readonly sameLink = sameLink
+  static readonly linkReaches = linkReaches
   static readonly projectPath = projectPath
   static readonly projectOf = projectOf
   static readonly freshness = freshness

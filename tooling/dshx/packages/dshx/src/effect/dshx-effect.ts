@@ -1,7 +1,6 @@
 /* oxlint-disable antislop/no-export-bag -- the deprecated DshxEffect namespace is a Cordis edge kept for existing callers; delete it when they reach 0. */
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { Cause, Context, Effect, Exit, Layer, type ManagedRuntime, Option, Queue, Scope, Stream } from 'effect'
-import { ApiProtocolModel } from '../api/common.js'
 import { ApiClientEventsModel } from '../api/client-events.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import type {
