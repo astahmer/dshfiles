@@ -211,6 +211,21 @@ export class ProjectionValueStore {
     }
   }
 
+  /**
+   * Release every value outside one accepted key set while preserving subscribed faces.
+   * A Session whose history state is no longer resident keeps only what its list row
+   * reads; opening it again refetches the rest from the Host.
+   * @param keys - projection keys that stay.
+   */
+  retainOnly(keys: readonly string[]): void {
+    const kept = new Set(keys)
+    for (const key of [...this.rows.keys()]) {
+      if (kept.has(key)) continue
+      this.rows.delete(key)
+      this.changed(key)
+    }
+  }
+
   /** Discard one Host generation's values and watermarks while preserving subscribed faces. */
   clear(): void {
     for (const key of this.rows.keys()) {

@@ -15,6 +15,7 @@ export interface CliArgs {
   readonly explain: boolean
   readonly boot: boolean
   readonly verbose: boolean
+  readonly typecheck: boolean
   readonly json: boolean
   readonly runtime: boolean
   readonly open: boolean
@@ -91,6 +92,10 @@ const sharedArgs = {
   verbose: {
     type: 'boolean',
     description: 'Print underlying command failures.',
+  },
+  typecheck: {
+    type: 'boolean',
+    description: 'Typecheck the project before building; pass --no-typecheck to skip it.',
   },
   json: { type: 'boolean', description: 'Emit stable machine-readable JSON.' },
   runtime: {
@@ -397,6 +402,7 @@ const optionScopes: ReadonlyMap<string, OptionScope> = new Map([
     },
   ],
   ['fix', { allows: ({ command }) => command === 'check', usage: 'DSHX4147: --fix is only valid with check.' }],
+  ['typecheck', { allows: ({ command }) => command === 'build', usage: '--no-typecheck is only valid with build.' }],
   ['runtime', { allows: ({ command }) => command === 'check', usage: '--runtime is only valid with check.' }],
   ['boot', { allows: ({ command }) => command === 'check', usage: '--boot is only valid with check.' }],
   [
@@ -524,11 +530,18 @@ const cliArgsCommonToContexts = (contexts: readonly CliOptionContext[]): ArgsDef
   return args
 }
 
+/** Citty reads `--no-<flag>` as the boolean `<flag>` set to false; the validator has to accept it. */
+const negatedOptionDefinition = (token: string): SharedArgDefinition | undefined => {
+  if (!token.startsWith('--no-')) return undefined
+  const definition = optionDefinitions.get(`--${token.slice('--no-'.length)}`)
+  return definition?.type === 'boolean' ? definition : undefined
+}
+
 function validateOptionTokens(argv: readonly string[]): void {
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index]
     if (token === undefined || !token.startsWith('-')) continue
-    const definition = optionDefinitions.get(token)
+    const definition = optionDefinitions.get(token) ?? negatedOptionDefinition(token)
     if (definition === undefined) throw new CliUsageError(`Unknown argument ${JSON.stringify(token)}.`)
     if (definition.type === 'boolean') continue
     const value = argv[index + 1]
@@ -592,6 +605,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   const explain = parsed.explain
   const boot = parsed.boot
   const verbose = parsed.verbose ?? false
+  const typecheck = parsed.typecheck ?? true
   const json = parsed.json ?? false
   const runtime = parsed.runtime ?? false
   const open = parsed.open ?? false
@@ -684,6 +698,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 
   const platformCommand = isPlatformCommand(command)
   if ((json || open || port !== undefined) && command === undefined) throw new CliUsageError('An option requires a command.')
+  // `--no-typecheck` is a negation, so the shared scope check (which treats false as unset) cannot
+  // reject it: name the one command that reads it here instead.
+  if (parsed.typecheck === false && command !== 'build') throw new CliUsageError('--no-typecheck is only valid with build.')
   validateOptionScopes(
     {
       json,
@@ -895,6 +912,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ...(order !== undefined && { order }),
       ...(port !== undefined && { port }),
       verbose,
+      typecheck,
       json,
       runtime,
       open,
@@ -941,6 +959,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(order !== undefined && { order }),
     ...(port !== undefined && { port }),
     verbose,
+    typecheck,
     json,
     runtime,
     open,

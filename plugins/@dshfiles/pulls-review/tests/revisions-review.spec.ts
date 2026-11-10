@@ -86,6 +86,28 @@ describe.skipIf(!jjAvailable)('combined revision review', () => {
     ),
   )
 
+  it.effect("reads each revision's own patch and jj order out of the batched read", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { host, workspace, ids } = yield* fixture
+        const requested = [ids.third, ids.first, ids.second]
+        const result = yield* Effect.promise(() => client(host).reviewRevisions({ path: workspace, revisions: requested }))
+        if (result.status !== 'ok') throw new Error(result.message)
+        const ownPatches = yield* Effect.forEach(result.revisions, revision => Effect.promise(() => jj(workspace, 'diff', '--git', '-r', revision.commitId)))
+        expect(result.revisions.map(revision => revision.patch)).toEqual(ownPatches)
+        const order = yield* Effect.promise(() =>
+          jj(workspace, 'log', '--reversed', '--no-graph', '-r', requested.join(' | '), '-T', 'commit_id.short(64) ++ "\\n"'),
+        )
+        expect(result.revisions.map(revision => revision.commitId)).toEqual(
+          order
+            .split('\n')
+            .filter(line => line.length > 0)
+            .map(line => line.trim()),
+        )
+      }),
+    ),
+  )
+
   it.effect('reviews the rest and names a revision that is gone or divergent', () =>
     Effect.scoped(
       Effect.gen(function* () {

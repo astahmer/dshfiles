@@ -8,10 +8,17 @@ type ServingAccountClient = typeof servingAccountApi extends ApiContract<infer M
 export const servingAccountPollInterval = (running: boolean, snapshot: ServingAccountSnapshot | null | undefined): number | false =>
   running && snapshot !== null ? 1500 : false
 
-export const servingAccountQuery = (client: Pick<ServingAccountClient, 'snapshot'>, sessionId: string | null, running: boolean) =>
+/** Idle snapshots of chats visited earlier stay cached this long; a later turn changes the key anyway. */
+const IDLE_SNAPSHOT_GC_MS = 10 * 60_000
+
+/**
+ * @param updatedAt - the Session's durable activity time. An idle snapshot only changes when a turn runs, and every
+ * turn moves it, so an idle read is reused per Session version instead of refetched on each thread switch.
+ */
+export const servingAccountQuery = (client: Pick<ServingAccountClient, 'snapshot'>, sessionId: string | null, running: boolean, updatedAt: number | null) =>
   queryOptions({
     // Running/idle transitions force a new read; inactive queries retain no previous-turn attempts.
-    queryKey: ['ai-accounts', 'serving-account', sessionId, running] as const,
+    queryKey: ['ai-accounts', 'serving-account', sessionId, running, running ? null : updatedAt] as const,
     queryFn: async ({ signal }): Promise<ServingAccountSnapshot | null> => {
       if (sessionId === null) return null
       try {
@@ -31,6 +38,6 @@ export const servingAccountQuery = (client: Pick<ServingAccountClient, 'snapshot
     refetchInterval: query => servingAccountPollInterval(running, query.state.data),
     refetchIntervalInBackground: false,
     retry: false,
-    gcTime: 0,
-    staleTime: 0,
+    gcTime: running ? 0 : IDLE_SNAPSHOT_GC_MS,
+    staleTime: running ? 0 : Number.POSITIVE_INFINITY,
   })

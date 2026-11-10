@@ -39,6 +39,18 @@
     "./project-config": {
       "types": "./src/project-config.ts",
       "default": "./dist/project-config.js"
+    },
+    "./project-settings-panels": {
+      "types": "./src/project-settings-panels.ts",
+      "default": "./dist/project-settings-panels.js"
+    },
+    "./project-icon-view": {
+      "types": "./src/project-icon-view.tsx",
+      "default": "./dist/project-icon-view.js"
+    },
+    "./project-folder-setup": {
+      "types": "./src/project-folder-setup.tsx",
+      "default": "./dist/project-folder-setup.js"
     }
   },
   "scripts": {
@@ -55,6 +67,7 @@
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
@@ -116,7 +129,9 @@
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-api-workspace-controller"
       ],
-      "external": [],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ],
       "immediately": false
     }
   },

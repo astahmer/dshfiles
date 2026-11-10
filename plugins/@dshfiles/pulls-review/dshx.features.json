@@ -336,6 +336,58 @@
       ]
     },
     {
+      "id": "package-json-table",
+      "title": "Read package.json dependency changes as a table",
+      "summary": "In the Changes facet, the combined revisions review and the Review page, a changed package.json shows its added, removed and updated dependencies as a table (package and section, previous, new, change) that replaces the file text diff; Show text diff puts the lines back. A row whose section the diff never names keeps the text on screen, and other changed lines are counted so the table hides nothing.",
+      "surfaces": ["client"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes",
+      "configuration": [],
+      "states": ["table-replaces-text", "text-shown", "ambiguous-rows-keep-text", "other-lines-noted"],
+      "failureModes": [
+        "A dependency row the parser cannot place in a named section keeps the file text diff on screen with a note, instead of hiding real edits behind a wrong table."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Review workspace changes: *\"",
+        "click radio \"Whole thread\"",
+        "expect text \"Every change since this thread left*\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.package-json-table-unit-read",
+          "file": "plugins/@dshfiles/pulls-review/tests/package-json-changes.spec.ts",
+          "testName": "reads added, removed and updated dependencies of named sections, and counts the other changed lines"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.package-json-table-unit-ambiguous",
+          "file": "plugins/@dshfiles/pulls-review/tests/package-json-changes.spec.ts",
+          "testName": "lists a version bump in a hunk that starts mid-section, but not as confident"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.package-json-table-unit-nested",
+          "file": "plugins/@dshfiles/pulls-review/tests/package-json-changes.spec.ts",
+          "testName": "does not take a sibling of a closed nested object for a dependency"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "pulls-review.package-json-table-browser",
+          "reason": "Walked in a scratch DSH (Changes facet, Uncommitted and Whole thread scopes, Show and Hide text diff); screenshots in docs/screenshots. No Gherkin scenario yet."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: parses the patch the review API already returned, whose Host work carries the automatic api-dispatch span."
+        }
+      ]
+    },
+    {
       "id": "combined-revisions",
       "title": "Review several selected revisions together",
       "summary": "Revisions selected in the graph open as one combined review: every revision listed oldest first with its own files, one revision's diff on screen with Previous and Next, a viewed mark per file of each revision, and line comments that name their revision. Each revision stays its own change because jj cannot diff across a gap, so a selection with gaps says so. In a thread that owns the repository it is the Revisions scope of the Changes facet; otherwise it opens on the Review page. The pulls_review_revisions agent tool reads the same review.",

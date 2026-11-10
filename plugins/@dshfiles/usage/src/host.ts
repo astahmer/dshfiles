@@ -7,7 +7,6 @@ import { dshxRegistryApi } from '@dshfiles/dshx/api'
 import { Api, DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { localOtlpEndpoint } from '@dshfiles/dshx/tracing'
-import { SqliteStore } from '@dshfiles/sqlite-store'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Clock, Effect, Layer, Option, Schedule, Schema } from 'effect'
 import { FetchHttpClient } from 'effect/http'
@@ -16,12 +15,14 @@ import { SessionLogFiles, SessionLogIndex } from './indexer.js'
 import { Indexer, ToolRegistry } from './indexing.js'
 import { recordJevUsage } from './jev-usage-recorder.js'
 import { observeLiveCall } from './live-calls.js'
-import { LEGACY_USER_VERSION, usageMigrations } from './migrations.js'
 import { OtlpExporter, OtlpMetricsExporter } from './otel-exporter.js'
 import { AccountKinds, Pricing } from './pricing.js'
 import { UsageRepo } from './store.js'
 
 const INDEX_INTERVAL = '30 seconds'
+
+/** A read marks demand: the periodic catch-up pass runs only while a panel or an Agent is actually looking. */
+const demanded = <A, E, R>(read: Effect.Effect<A, E, R>) => Indexer.use(indexer => Effect.andThen(indexer.touch, read))
 const otlpServiceName = OtlpMetricsExporter.serviceName(process.env)
 
 const decodePersistence = Schema.decodeUnknownOption(Schema.Struct({ config: Schema.Struct({ root: Schema.String.check(Schema.isMinLength(1)) }) }))
@@ -77,7 +78,16 @@ const LiveCalls = Layer.effectDiscard(
   }),
 )
 
-const IndexingLoop = Layer.effectDiscard(DshxPlugin.worker(Indexer.use(indexer => indexer.pass).pipe(Effect.repeat(Schedule.spaced(INDEX_INTERVAL)))))
+const IndexingLoop = Layer.effectDiscard(
+  DshxPlugin.worker(
+    Indexer.use(indexer =>
+      Effect.gen(function* () {
+        if (!(yield* indexer.demanded)) return
+        yield* indexer.pass
+      }),
+    ).pipe(Effect.repeat(Schedule.spaced(INDEX_INTERVAL))),
+  ),
+)
 
 /** The OTLP exporter, when the environment or the Host's own receiver names a destination; off otherwise. */
 const Exporter = Layer.unwrap(
@@ -103,12 +113,7 @@ const UsageLive = Layer.unwrap(
       Layer.provideMerge(Indexer.layer({ sessionsRoot: root })),
       Layer.provideMerge(Layer.mergeAll(SessionLogIndex.layer, Pricing.layer({ catalogPath: DEFAULT_PRICING_PATH }))),
       Layer.provideMerge(UsageRepo.layer),
-      Layer.provide([
-        SessionLogFiles.layer,
-        ToolRegistryLive,
-        AccountKindsLive,
-        SqliteStore.layer({ filename: dshHomePath('plugins', 'usage', 'usage.db'), migrations: usageMigrations, legacyUserVersion: LEGACY_USER_VERSION }),
-      ]),
+      Layer.provide([SessionLogFiles.layer, ToolRegistryLive, AccountKindsLive]),
       Layer.provide([HostApis.layer, NodeFileSystem.layer, NodePath.layer]),
     ),
   ),
@@ -119,22 +124,26 @@ export default DshxPlugin.make({
   layer: UsageLive,
   apis: [
     Api.bind(usageApi, {
-      requests: input => UsageRepo.use(repo => repo.requests(input)),
-      charts: input => UsageRepo.use(repo => repo.charts(input)),
-      status: () => Indexer.use(indexer => indexer.status),
+      requests: input => demanded(UsageRepo.use(repo => repo.requests(input))),
+      charts: input => demanded(UsageRepo.use(repo => repo.charts(input))),
+      status: () => demanded(Indexer.use(indexer => indexer.status)),
       refresh: () => Indexer.use(indexer => Effect.andThen(indexer.pass, indexer.status)),
-      jevUsage: input => UsageRepo.use(repo => repo.jevUsage(input)),
+      jevUsage: input => demanded(UsageRepo.use(repo => repo.jevUsage(input))),
       recordJevUsage: (input, call) => recordJevUsage({ record: input, caller: call.caller }),
       activity: input =>
-        Effect.gen(function* () {
-          const query = yield* Effect.fromResult(resolveActivityQuery(input, yield* Clock.currentTimeMillis))
-          return yield* UsageRepo.use(repo => repo.activity({ ...query, eventLimit: query.eventLimit ?? 50 }))
-        }),
+        demanded(
+          Effect.gen(function* () {
+            const query = yield* Effect.fromResult(resolveActivityQuery(input, yield* Clock.currentTimeMillis))
+            return yield* UsageRepo.use(repo => repo.activity({ ...query, eventLimit: query.eventLimit ?? 50 }))
+          }),
+        ),
       otelMetrics: input =>
-        Effect.gen(function* () {
-          const range = yield* Effect.fromResult(resolveOtelMetricsRange(input, yield* Clock.currentTimeMillis))
-          return yield* UsageRepo.use(repo => repo.otelMetrics({ ...range, temporality: 'delta', serviceName: otlpServiceName }))
-        }),
+        demanded(
+          Effect.gen(function* () {
+            const range = yield* Effect.fromResult(resolveOtelMetricsRange(input, yield* Clock.currentTimeMillis))
+            return yield* UsageRepo.use(repo => repo.otelMetrics({ ...range, temporality: 'delta', serviceName: otlpServiceName }))
+          }),
+        ),
     }),
   ],
 })

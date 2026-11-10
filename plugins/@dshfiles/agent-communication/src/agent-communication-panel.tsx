@@ -367,7 +367,14 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
       const cwd = member === undefined ? null : sessionCwd(member.id)
       if (cwd === null) return `${props.t('workspace')} · ${topic.slice('workspace/'.length, 'workspace/'.length + 8)}`
       const project = projectLabel({ path: cwd })
-      return EntityLabels.isThreadWorkspace(cwd) ? `${project} · ${cwd.replace(/\/+$/u, '').split('/').at(-1) ?? ''}` : project
+      return EntityLabels.isThreadWorkspace(cwd)
+        ? `${project} · ${
+            cwd
+              .replace(/[\\/]+$/u, '')
+              .split(/[\\/]/u)
+              .at(-1) ?? ''
+          }`
+        : project
     },
   }
   const navigationQuery = useQuery({

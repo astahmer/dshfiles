@@ -133,13 +133,51 @@
     "plugins/@dshfiles/settings-models/src/css-modules.d.ts",
     "plugins/@dshfiles/settings-web-search/src/native/**",
     "plugins/@dshfiles/settings-web-search/src/host.ts",
-    "plugins/@dshfiles/settings-web-search/src/css-modules.d.ts"
+    "plugins/@dshfiles/settings-web-search/src/css-modules.d.ts",
+    "plugins/@dshfiles/schedule/src/native/**",
+    "plugins/@dshfiles/schedule/src/host.ts",
+    "plugins/@dshfiles/schedule/src/css-modules.d.ts",
+    "plugins/@dshfiles/settings-subagent/src/native/**",
+    "plugins/@dshfiles/settings-subagent/src/host.ts",
+    "plugins/@dshfiles/settings-subagent/src/css-modules.d.ts",
+    "plugins/@dshfiles/cordis-client-runner/src/native/**",
+    "plugins/@dshfiles/cordis-client-runner/src/host.ts",
+    "plugins/@dshfiles/cordis-cards/src/native/**",
+    "plugins/@dshfiles/cordis-cards/src/host.ts",
+    "plugins/@dshfiles/cordis-cards/src/css-modules.d.ts",
+    "plugins/@dshfiles/session-persistence-jsonl/src/native/**"
   ],
   "overrides": [
     {
       "files": ["tooling/dshx/packages/dshx/src/client/env.ts", "tooling/dshx/packages/dshx/client/env.d.ts", "tooling/dshx/packages/dshx/client/index.d.ts"],
       "rules": {
         "typescript/triple-slash-reference": "off"
+      }
+    },
+    {
+      "files": [
+        "plugins/@dshfiles/storage-domain/src/native/**/*.ts",
+        "plugins/@dshfiles/storage-domain/tests/**/*.ts",
+        "plugins/@dshfiles/storage-json/src/native/**/*.ts",
+        "plugins/@dshfiles/storage-json/tests/**/*.ts",
+        "plugins/@dshfiles/session-log-window/src/**/*.ts"
+      ],
+      "rules": {
+        "antislop/no-unknown-parameters": "off",
+        "antislop/no-unknown-returns": "off",
+        "antislop/no-unsafe-dictionary-type": "off",
+        "antislop/require-safety-comment-for-type-assertion": "off",
+        "antislop/no-export-bag": "off",
+        "antislop/no-known-value-widening": "off",
+        "antislop/no-conditional-empty-object-spread": "off",
+        "antislop/no-passthrough-variable": "off",
+        "antislop/no-chained-type-assertions": "off"
+      }
+    },
+    {
+      "files": ["plugins/@dshfiles/session-log-window/src/**/*.ts"],
+      "rules": {
+        "antislop/no-export-bag": "off"
       }
     }
   ]

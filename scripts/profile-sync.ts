@@ -45,7 +45,7 @@ import { ScriptJson } from './json.ts'
 const repositoryRoot = join(import.meta.dirname, '..')
 const packagesRoot = join(repositoryRoot, 'plugins/@dshfiles')
 const lockWaitMs = 120_000
-const installTimeoutMs = 180_000
+const installTimeoutMs = process.platform === 'win32' ? 600_000 : 180_000
 const stateFilename = '.dshfiles-profile-sync.json'
 const legacyStateFilename = '.nixfiles-managed-plugins.json'
 const patchStart = '# BEGIN NIX-MANAGED DSH PLUGINS'
@@ -209,6 +209,13 @@ const atomicWrite = (path: string, content: string): void => {
 }
 
 const signalGroup = (processGroupId: number, signal: NodeJS.Signals): void => {
+  if (process.platform === 'win32') {
+    // taskkill /T reaches the whole tree. Without /F it only asks (console processes usually ignore that), so the
+    // SIGTERM stage stays graceful and the SIGKILL that follows forces it; the caller waits for the exit either way.
+    const force = signal === 'SIGKILL' ? ['/F'] : []
+    spawn('taskkill', ['/PID', String(processGroupId), '/T', ...force], { stdio: 'ignore', windowsHide: true }).once('error', () => undefined)
+    return
+  }
   try {
     process.kill(-processGroupId, signal)
   } catch (error) {
@@ -221,7 +228,13 @@ const installProfile = async (): Promise<void> => {
   const startedAt = Date.now()
   log(`pnpm install in ${profileDirectory}`)
   // The reconciler edits the manifest on purpose; CI=true would otherwise make pnpm refuse to update the lockfile.
-  const child = spawn('pnpm', ['install', '--prefer-offline', '--no-frozen-lockfile'], { cwd: profileDirectory, stdio: 'inherit', detached: true })
+  // On Windows pnpm is a .cmd shim, which Node only spawns through a shell.
+  const child = spawn('pnpm', ['install', '--prefer-offline', '--no-frozen-lockfile'], {
+    cwd: profileDirectory,
+    stdio: 'inherit',
+    detached: process.platform !== 'win32',
+    shell: process.platform === 'win32',
+  })
   const exited = new Promise<number | null>((resolveExit, rejectExit) => {
     child.once('error', rejectExit)
     child.once('exit', (code, signal) => resolveExit(signal === null ? code : null))
@@ -381,6 +394,12 @@ const syncOwnedBundles = async (): Promise<void> => {
 
   await withProfileLock(async () => {
     const manifest = normalizedManifest(readJson(profileManifestSchema, manifestPath))
+    // dsh-superagent runs in a stock profile it owns (docs/superagent.md); every owned bundle would change its Sessions.
+    if (selectedNames === null && manifest.dependencies['dsh-superagent'] !== undefined) {
+      throw new Error(
+        `Profile ${values.profile} runs dsh-superagent, which keeps a stock DSH profile. Leave it unsynchronized, or add one bundle deliberately with --bundle @dshfiles/<name>.`,
+      )
+    }
     const dependencies = Object.fromEntries([
       ...Object.entries(manifest.dependencies).filter(([name]) => !replaced(name)),
       ...selectedBundles.map(bundle => [bundle.name, `link:${bundle.directory}`]),

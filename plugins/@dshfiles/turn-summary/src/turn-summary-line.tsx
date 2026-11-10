@@ -150,6 +150,7 @@ export const TurnSummaryLine = (props: {
       {walkthrough && walkthroughOpen && (
         <TurnWalkthroughList
           openChanges={changesSeq === undefined ? undefined : () => props.openChanges({ seq: changesSeq, turn: props.turn.turn })}
+          openFile={props.openFile}
           summary={summary}
         />
       )}

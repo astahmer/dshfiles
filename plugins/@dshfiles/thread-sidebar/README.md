@@ -831,11 +831,11 @@ Saved views use the `thread-sidebar-views` API over the same `thread-sidebar.thr
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in
 `src/thread-actions-api.ts`) exposes the sidebar's thread and project actions to
-the Agent as twenty-one native tools: `thread_list`, `thread_archive`,
+the Agent as twenty-three native tools: `thread_list`, `thread_archive`,
 `thread_unarchive`, `thread_settle`, `thread_unsettle`, `thread_pin`,
 `thread_unpin`, `thread_rename`,
-`thread_fork`, `thread_continue_in`, `thread_create`, `thread_prompt`, `thread_stop`,
-`thread_select_model`, `thread_references`, `project_list`,
+`thread_fork`, `thread_continue_in`, `thread_fan_out`, `thread_create`, `thread_prompt`, `thread_stop`,
+`thread_select_model`, `thread_status`, `thread_references`, `project_list`,
 `project_register`, `project_rename`, `project_delete`, `project_reorder`, and
 `thread_move` (a reorder within the project that already holds the thread;
 `thread_continue_in` is the cross-project move). `src/thread-actions.ts`
@@ -879,6 +879,33 @@ references this thread" when it could not look. The same rows drive the
 **Referenced by** submenu of a thread row's context menu and of the conversation
 header's `...` menu, which is why the client tolerates a Host that predates the
 method (it shows one muted line instead of the rows).
+
+`thread_subscribe`, `thread_unsubscribe` and `thread_subscriptions` (API
+`thread-subscriptions`, `src/subscriptions-api.ts`) are the opt-in completion
+notices b:eqtb asked for. A thread that intends to end its turn while it waits on
+another thread — typically one it started with `thread_create` / `thread_fork`,
+which is a root thread and never resumes its creator — calls
+`thread_subscribe { sessionId }` first: the edge is stored durably in the
+`thread_subscriptions` storage domain (`src/subscriptions-store.ts`), and from
+then on that target's `turn/end` queues ONE compact notice into the subscriber
+and wakes it when it is idle. The notice carries the status (`finished`,
+`failed`, `blocked`, `stopped`, `truncated`, or `waiting-on-question` when the
+target stopped on a question, which outranks its finish reason) plus a
+320-character preview of its newest answer — never the transcript, never tool
+output — and says that quoted text is data, not instructions. Delivery is
+session-controller's `sessions.message` with `wake: true`, the same inbox path a
+native subagent settlement uses (`src/subscription-notices-host.ts`); the
+watcher only listens to the public `session/event` stream. Nothing is delivered
+without an edge, so the default stays silent: a created thread does not wake its
+creator. A thread cannot watch itself and a pair cannot watch itself in both
+directions (two threads that wake each other would keep each other running); an
+archived subscriber or target ends the edge — at once through this plugin's own
+archive path, and on the next notice pass for an archive made elsewhere — and a
+subscriber the Host no longer resolves loses its edge instead of retrying. The
+same state is the **Notify “…” when this thread finishes** checkbox in a thread
+row's context menu (checked while the open thread watches that row) and the
+`N notified` badge on a row that has subscribers; both read the one Host
+snapshot, refreshed by the API's `changed` event.
 
 `thread_queue_remove`, `thread_queue_steer` and `thread_queue_edit` act on one
 queued message through the Session controller's `updateQueue`, the verb the queue

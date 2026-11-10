@@ -52,6 +52,24 @@ const LIST_PROJECTIONS = [
 ] as const
 
 /**
+ * Full projection state stays resident for the last few viewed Sessions. A Session's
+ * history baseline carries every registered key (turn outlines, goals, todos, usage);
+ * keeping that for every thread ever opened grows the tab with the browsing session.
+ * The rest keeps only what its list row reads (see LIST_ROW_STATE_KEYS).
+ */
+const RESIDENT_SESSION_STATE_LIMIT = 3
+
+/** Values a list row still reads after its Session's history state is released. */
+const LIST_ROW_STATE_KEYS = ['title', 'sessionListMetadata'] as const
+
+/**
+ * Session instances nobody renders that stay instantiated. The sidebar restores and revisits threads freely, and a
+ * resident instance carries its whole event window; past this many, the least recently viewed unsubscribed instance
+ * is released and rebuilt (with a fresh window) the next time a view opens it.
+ */
+const RESIDENT_UNMOUNTED_SESSION_LIMIT = 4
+
+/**
  * The generated Remote client type still describes the native list request.
  * The fork's Host accepts the selector, so this boundary adapter widens only
  * that one call.
@@ -174,6 +192,10 @@ export class SessionManager {
   private readonly provisional = new Map<SessionId, ProvisionalRecord>()
   private readonly hostNonblank = new Set<SessionId>()
   private readonly hostKnown = new Set<SessionId>()
+  /** Viewed Session ids, oldest first: bounds how much history projection state stays resident. */
+  private readonly viewedSessions: SessionId[] = []
+  /** Guards the release pass: `drop` re-enters state release, and the pass already mutates `sessions`. */
+  private releasingSessions = false
 
 
   private listSnapshotCache: SessionListSnapshot
@@ -182,6 +204,10 @@ export class SessionManager {
    *  must be recovered by value or every SessionListItem memo misses on every refresh. */
   private entryCache = new Map<SessionId, SessionListEntry>()
   private itemsCache: readonly SessionListEntry[] = []
+  /** Summaries `itemsCache` was flattened from: while unchanged, row order and lineage depth are unchanged too. */
+  private itemsSource: readonly SessionSummary[] | undefined
+  /** Per-row inputs besides the summary that each cached entry was built from. */
+  private readonly entryInputs = new WeakMap<SessionListEntry, { readonly values: unknown; readonly blank: boolean }>()
   private readonly notifier = new Notifier(() => {
     this.listSnapshotCache = this.buildListSnapshot()
   })
@@ -258,6 +284,7 @@ export class SessionManager {
     this.sessions.delete(sessionId)
     this.addresses.delete(sessionId)
     this.pruneEngagement(sessionId, this.retainedIds(this.summaries))
+    this.releaseStaleSessionState()
     return this.startSessionDisposal(session)
   }
 
@@ -309,6 +336,7 @@ export class SessionManager {
     if (session === undefined) {
       session = this.createSession(sessionId)
       this.sessions.set(sessionId, session)
+      this.markViewed(sessionId)
       // Sync the running and blank bits from the list snapshot into the new
       // instance (consistency when the list precedes open).
       const summary = this.summaries.find(s => s.sessionId === sessionId)
@@ -389,6 +417,58 @@ export class SessionManager {
    */
   private pruneEngagement(sessionId: SessionId, retained: ReadonlySet<SessionId>): void {
     if (!retained.has(sessionId)) this.engagedSessions.delete(sessionId)
+  }
+
+  /** Record one Session as viewed (most recent last), bounding resident history state. */
+  private markViewed(sessionId: SessionId): void {
+    const previous = this.viewedSessions.indexOf(sessionId)
+    if (previous !== -1) this.viewedSessions.splice(previous, 1)
+    this.viewedSessions.push(sessionId)
+    this.releaseStaleSessionState()
+  }
+
+  /**
+   * Release history projection values for viewed Sessions past the resident limit.
+   * A Session still mounted here (or a provisional blank) keeps everything; an evicted
+   * one keeps only the keys its list row reads, so reopening it refetches the rest.
+   */
+  private releaseStaleSessionState(): void {
+    let resident = this.viewedSessions.length
+    for (const sessionId of [...this.viewedSessions]) {
+      if (resident <= RESIDENT_SESSION_STATE_LIMIT) break
+      if (this.sessions.has(sessionId) || this.provisional.has(sessionId)) continue
+      this.viewedSessions.splice(this.viewedSessions.indexOf(sessionId), 1)
+      this.projectionStores.get(sessionId)?.retainOnly(LIST_ROW_STATE_KEYS)
+      this.projectionLoads.delete(sessionId)
+      resident -= 1
+    }
+    this.releaseUnrenderedSessions()
+  }
+
+  /**
+   * Release the least recently viewed Session instances that no view subscribes to.
+   * A released instance is rebuilt by the next `get`, which refetches its window from the Host.
+   */
+  private releaseUnrenderedSessions(): void {
+    if (this.releasingSessions) return
+    const unrendered = this.viewedSessions.filter(sessionId => {
+      const session = this.sessions.get(sessionId)
+      // A scoped instance is held by a view that may not have subscribed yet; releasing it leaves that view on a
+      // disposed Session whose history never opens (a blank transcript after a restore burst).
+      if (session === undefined || session.retainedOrSubscribed) return false
+      return !this.provisional.has(sessionId) && !this.engagedSessions.has(sessionId)
+    })
+    const surplus = unrendered.length - RESIDENT_UNMOUNTED_SESSION_LIMIT
+    if (surplus <= 0) return
+    this.releasingSessions = true
+    try {
+      for (const sessionId of unrendered.slice(0, surplus)) {
+        const session = this.sessions.get(sessionId)
+        if (session !== undefined) void this.drop(sessionId, session)
+      }
+    } finally {
+      this.releasingSessions = false
+    }
   }
 
   /** Resident per-session projection store (create-on-demand; outlives instantiation). */
@@ -963,24 +1043,61 @@ export class SessionManager {
     for (const parentSessionId of parents) void this.refreshProjections(parentSessionId)
   }
 
-  private buildListSnapshot(): SessionListSnapshot {
-    const merged: TitledSessionSummary[] = this.summaries.map((summary) => {
-      // List rows read the generic 'title' projection key (host-computed unit
-      // value; there is no dedicated title frame).
-      const projectionStore = this.projectionStores.get(summary.sessionId)
-      const title = projectionStore?.get('title')
-      const projectionValues = projectionStore?.values()
-      const metadata = projectionValues?.sessionListMetadata
-      return {
-        ...summary,
-        // Cached list hints can precede a history opening or control update.
-        blank: this.effectiveBlank(summary) && metadata?.blank !== false,
-        updatedAt: Math.max(summary.updatedAt, metadata?.lastPromptAt ?? 0),
-        ...(typeof title === 'string' && title !== '' ? { title } : {}),
-        ...(projectionValues === undefined ? {} : { projectionValues }),
-      }
+  private titledSummary(summary: SessionSummary): TitledSessionSummary {
+    // List rows read the generic 'title' projection key (host-computed unit
+    // value; there is no dedicated title frame).
+    const projectionStore = this.projectionStores.get(summary.sessionId)
+    const title = projectionStore?.get('title')
+    const projectionValues = projectionStore?.values()
+    const metadata = projectionValues?.sessionListMetadata
+    return {
+      ...summary,
+      // Cached list hints can precede a history opening or control update.
+      blank: this.effectiveBlank(summary) && metadata?.blank !== false,
+      updatedAt: Math.max(summary.updatedAt, metadata?.lastPromptAt ?? 0),
+      ...(typeof title === 'string' && title !== '' ? { title } : {}),
+      ...(projectionValues === undefined ? {} : { projectionValues }),
+    }
+  }
+
+  /**
+   * A projection frame for one Session leaves every other row's inputs untouched. While the summaries are the ones
+   * the cached rows were flattened from, rebuild only rows whose projection values or blank evidence moved, instead
+   * of re-merging and re-flattening the whole catalog (thousands of rows, several times per running turn).
+   * @returns the updated rows in the cached order, or undefined when the order or lineage may have changed.
+   */
+  private patchListItems(summaryById: ReadonlyMap<SessionId, SessionSummary>): SessionListEntry[] | undefined {
+    if (this.itemsSource !== this.summaries || this.itemsCache.length !== this.summaries.length) return undefined
+    return this.itemsCache.map((previous) => {
+      const summary = summaryById.get(previous.sessionId)
+      const inputs = this.entryInputs.get(previous)
+      if (summary === undefined || inputs === undefined) return this.rowEntry(previous, summary)
+      const values = this.projectionStores.get(summary.sessionId)?.values()
+      const blank = this.effectiveBlank(summary)
+      if (inputs.values === values && inputs.blank === blank) return previous
+      return this.rowEntry(previous, summary)
     })
-    const fresh = flattenLineage(merged)
+  }
+
+  private rowEntry(previous: SessionListEntry, summary: SessionSummary | undefined): SessionListEntry {
+    if (summary === undefined) return previous
+    const { agentAvailable: _agentAvailable, ...row } = this.titledSummary(summary)
+    return { ...row, depth: previous.depth }
+  }
+
+  private recordEntryInputs(entry: SessionListEntry, summary: SessionSummary | undefined): void {
+    if (summary === undefined) return
+    this.entryInputs.set(entry, {
+      values: this.projectionStores.get(entry.sessionId)?.values(),
+      blank: this.effectiveBlank(summary),
+    })
+  }
+
+  private buildListSnapshot(): SessionListSnapshot {
+    const summaryById = new Map<SessionId, SessionSummary>()
+    for (const summary of this.summaries) summaryById.set(summary.sessionId, summary)
+    const fresh = this.patchListItems(summaryById) ?? flattenLineage(this.summaries.map(summary => this.titledSummary(summary)))
+    this.itemsSource = this.summaries
     const items = fresh.map((entry) => {
       const prev = this.entryCache.get(entry.sessionId)
       if (
@@ -990,8 +1107,12 @@ export class SessionManager {
         && prev.origin === entry.origin && prev.title === entry.title && prev.depth === entry.depth
         && prev.formatStatus === entry.formatStatus
         && prev.projectionValues === entry.projectionValues
-      ) return prev
+      ) {
+        this.recordEntryInputs(prev, summaryById.get(prev.sessionId))
+        return prev
+      }
       this.entryCache.set(entry.sessionId, entry)
+      this.recordEntryInputs(entry, summaryById.get(entry.sessionId))
       return entry
     })
     const itemIds = new Set(items.map(entry => entry.sessionId))

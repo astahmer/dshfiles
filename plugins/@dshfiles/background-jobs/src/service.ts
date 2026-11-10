@@ -120,10 +120,17 @@ const rowFromLive = (view: JobView): JobRow => {
   }
 }
 
+interface CachedRow {
+  /** The immutable record the row was derived from; a different object means the row is stale. */
+  readonly source: HistoryJob | JobView
+  readonly row: JobRow
+}
+
 interface MergedRows {
   readonly historyJobs: ReadonlyMap<string, HistoryJob>
   readonly liveViews: ReadonlyMap<string, JobView>
   readonly rows: readonly JobRow[]
+  readonly byJobId: ReadonlyMap<string, CachedRow>
 }
 
 const rowOf = (input: { readonly history: HistorySnapshot; readonly live: LiveJobsState; readonly jobId: string }): JobRow | undefined => {
@@ -174,11 +181,21 @@ export class JobsBoard extends Context.Service<
       const rowsOf = Effect.fnUntraced(function* (input: { readonly history: HistorySnapshot; readonly live: LiveJobsState }) {
         const cached = yield* Ref.get(merged)
         if (Option.isSome(cached) && cached.value.historyJobs === input.history.jobs && cached.value.liveViews === input.live.views) return cached.value.rows
-        const byId = new Map<string, JobRow>()
-        for (const job of input.history.jobs.values()) byId.set(job.id, rowFromHistory(job))
-        for (const view of input.live.views.values()) byId.set(view.id, rowFromLive(view))
-        const rows = [...byId.values()]
-        yield* Ref.set(merged, Option.some({ historyJobs: input.history.jobs, liveViews: input.live.views, rows }))
+        // A live event or an indexing pass replaces only the records it changed, so a row whose record
+        // is still that same object is still current. Rebuilding every row here costs ~40ms at the
+        // 20_000-row cap, which is what a board read following any job event used to pay.
+        const previous = Option.getOrElse(cached, () => null)
+        const byJobId = new Map<string, CachedRow>()
+        const reuse = (source: HistoryJob | JobView, build: () => JobRow): JobRow => {
+          const known = previous?.byJobId.get(source.id)
+          const row = known !== undefined && known.source === source ? known.row : build()
+          byJobId.set(source.id, { source, row })
+          return row
+        }
+        for (const job of input.history.jobs.values()) reuse(job, () => rowFromHistory(job))
+        for (const view of input.live.views.values()) reuse(view, () => rowFromLive(view))
+        const rows = [...byJobId.values()].map(entry => entry.row)
+        yield* Ref.set(merged, Option.some({ historyJobs: input.history.jobs, liveViews: input.live.views, rows, byJobId }))
         return rows
       })
 

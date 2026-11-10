@@ -8,7 +8,7 @@ import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry, settingsPage } from '../steps.js'
-import { selectModelForNewThread } from '../threads.js'
+import { confirmFolderSetupStep, createScratchDirectory, selectModelForNewThread } from '../threads.js'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
@@ -28,6 +28,7 @@ interface HeldDestinationLookup {
 }
 
 const repositories = new WeakMap<Page, ThreadRepository>()
+const plainFolders = new WeakMap<Page, string>()
 const divergentCheckouts = new WeakMap<Page, { readonly checkoutCommitId: string; readonly featureCommitId: string }>()
 const existingSharedThreads = new WeakMap<Page, string>()
 const configuredBaseThreads = new WeakMap<Page, { readonly name: string; readonly commitId: string }>()
@@ -299,6 +300,7 @@ const chooseProjectPath = async (page: Page, path: string): Promise<void> => {
   await search.press('Enter')
   await expect(picker.locator('p').filter({ hasText: path }).first()).toBeVisible()
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await confirmFolderSetupStep(page, path)
   await expect(picker).toBeHidden()
 }
 
@@ -321,6 +323,67 @@ When(
     await expect(projectButton(page)).toHaveText('repo')
   },
 )
+
+When('a disposable jj repository with a {string} bookmark is chosen as the New thread project', async ({ page }: { page: Page }, bookmark: string) => {
+  const repository = await createRepository(page)
+  const inRepository = (args: readonly string[]) => jjAt(repository.repositoryPath, repository.temporaryRoot, args)
+  // Its own commit above main, so a workspace started from it is told apart from one started from main.
+  inRepository(['new', 'main'])
+  await writeFile(join(repository.repositoryPath, `${bookmark}.txt`), `${bookmark}\n`)
+  inRepository(['describe', '--message', `${bookmark} fixture`])
+  inRepository(['bookmark', 'create', bookmark, '--revision', '@'])
+  inRepository(['new', 'main'])
+  await chooseProjectPath(page, repository.repositoryPath)
+  await expect(projectButton(page)).toHaveText('repo')
+})
+
+/** Settings › Projects (workspace-folder-picker) with this scenario's project picked; jj-integration draws its Main branch region. */
+const projectMainBranchRegion = async (page: Page) => {
+  const settings = settingsPage(page)
+  if (!(await settings.isVisible())) await openSettingsDialog(page)
+  await settingsNavEntry(page, 'Projects').click()
+  const repository = repositoryFor(page)
+  await settings.getByRole('radiogroup', { name: 'Projects', exact: true }).getByRole('radio', { name: new RegExp(`^repo\\s*${repository.repositoryPath.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}$`, 'u') })
+    .check()
+  return settings.getByRole('region', { name: 'Main branch', exact: true })
+}
+
+When('{string} is chosen as the project\'s main branch in Settings › Projects', async ({ page }: { page: Page }, bookmark: string) => {
+  const region = await projectMainBranchRegion(page)
+  const choice = region.getByRole('combobox', { name: 'Main branch of repo', exact: true })
+  // The Host resolves the project's own default before the field is offered.
+  await expect(choice).toHaveText(/^Automatic \(main\)/u)
+  await expect(choice).toBeEnabled()
+  await choice.click()
+  await page.getByRole('option', { name: bookmark, exact: true }).click()
+})
+
+Then('Settings › Projects shows the project using {string}, chosen here', async ({ page }: { page: Page }, bookmark: string) => {
+  const region = await projectMainBranchRegion(page)
+  await recordAssertion(page, 'jj-integration-project-main-branch-chosen-in-settings', async () => {
+    await expect(region.getByRole('combobox', { name: 'Main branch of repo', exact: true })).toHaveText(bookmark)
+    await expect(region.getByText(`Using ${bookmark}`, { exact: true })).toBeVisible()
+    await expect(region.getByText('Chosen here', { exact: true })).toBeVisible()
+    await expect(region.getByRole('alert')).toHaveCount(0)
+  })
+})
+
+When('Settings › Projects is closed', async ({ page }: { page: Page }) => {
+  await closeSettings(page)
+})
+
+Then('the New thread workspace starts from the project\'s main branch {string}', async ({ page }: { page: Page }, bookmark: string) => {
+  const repository = repositoryFor(page)
+  const threadName = provisionedThreadName(page)
+  const expectedParent = commitIdOf(repository, bookmark)
+  await recordAssertion(page, 'jj-integration-project-main-branch-starts-new-thread-workspaces', async () => {
+    expect(expectedParent).not.toBe(repository.baseCommitId)
+    await expectOwnWorkspace(page, true, bookmark)
+    await expect.poll(() => workspaceNames(repository, [threadName])).toEqual(['default', threadName].sort())
+    expect(commitIdOf(repository, `${threadName}@-`)).toBe(expectedParent)
+  })
+  await finishJourneyAssertions(page)
+})
 
 When('the {string} bookmark is picked in the destination bar and refused', async ({ page }: { page: Page }, bookmark: string) => {
   const refusal = page.getByText(`"${bookmark}" points at more than one revision, so no workspace was created.`, { exact: false })
@@ -566,6 +629,7 @@ When('a disposable jj repository is chosen by its home-relative path', async ({ 
   await search.press('Enter')
   await expect(picker.locator('p').filter({ hasText: homeRelativeRepositoryPath }).first()).toBeVisible()
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await confirmFolderSetupStep(page, homeRelativeRepositoryPath)
   await expect(picker).toBeHidden()
   await expect(projectButton(page)).toHaveText('repo')
 })
@@ -1050,6 +1114,65 @@ Then('the blank new thread returns to the owning project checkout', async ({ pag
     await expect(workspaceToggle(page)).toBeVisible()
     await expectOwnWorkspace(page, false)
     expect(workspaceNames(repository, [provisionedThreadName(page)])).toEqual(['default', provisionedThreadName(page)])
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a disposable jj repository with an asset icon is chosen as the New thread project', async ({ page }: { page: Page }) => {
+  const repository = await createRepository(page)
+  await mkdir(join(repository.repositoryPath, 'assets'), { recursive: true })
+  await writeFile(
+    join(repository.repositoryPath, 'assets', 'icon.svg'),
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="#3b82f6"/></svg>',
+  )
+  await chooseProjectPath(page, repository.repositoryPath)
+  await expect(projectButton(page)).toHaveText('repo')
+})
+
+Then('the project row shows the icon the repository ships', async ({ page }: { page: Page }) => {
+  // Project rows only exist while the thread list groups by project.
+  await page.getByRole('button', { name: /^Group: /u }).click()
+  await page
+    .getByRole('menuitemradio', { name: /^Project$/u })
+    .or(page.getByRole('option', { name: /^Project$/u }))
+    .first()
+    .click()
+  await recordAssertion(page, 'jj-integration-project-icon-comes-from-the-repository', async () => {
+    await expect(page.locator('[data-project-icon-source="assets/icon.svg"]')).toBeVisible({ timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a plain folder is chosen as the New thread project', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-jj-not-a-repository-')
+  const folder = join(root, 'plain-project')
+  await mkdir(folder, { recursive: true })
+  await writeFile(join(folder, 'README.md'), 'plain folder\n')
+  plainFolders.set(page, folder)
+  await chooseProjectPath(page, folder)
+  await expect(projectButton(page)).toHaveText('plain-project')
+})
+
+Then('the destination bar offers Initialize repository instead of a workspace toggle', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-not-a-repository-offers-initialize', async () => {
+    const destination = page.getByLabel('New thread destination', { exact: true })
+    await expect(destination.getByText('Not a Jujutsu repository', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(destination.getByRole('button', { name: 'Initialize repository', exact: true })).toBeVisible()
+  })
+})
+
+When('Initialize repository is clicked in the destination bar', async ({ page }: { page: Page }) => {
+  await page.getByLabel('New thread destination', { exact: true }).getByRole('button', { name: 'Initialize repository', exact: true }).click()
+})
+
+Then('the opened project becomes a Jujutsu repository', async ({ page }: { page: Page }) => {
+  const folder = plainFolders.get(page)
+  if (folder === undefined) throw new Error('The plain-folder fixture was not created for this scenario.')
+  await recordAssertion(page, 'jj-integration-enable-jujutsu-initializes-in-place', async () => {
+    await expect.poll(() => existsSync(join(folder, '.jj')), { timeout: 60_000 }).toBe(true)
+    const destination = page.getByLabel('New thread destination', { exact: true })
+    await expect(destination.getByText('Not a Jujutsu repository', { exact: true })).toHaveCount(0, { timeout: 30_000 })
+    await expect(workspaceToggle(page)).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

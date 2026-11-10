@@ -5,7 +5,7 @@
     {
       "id": "thread-destination",
       "title": "New thread destination and workspace isolation",
-      "summary": "The Workspace segment of a new thread\u2019s run row: its own jj workspace (from a chosen bookmark) or in place in the project checkout, defaulting to the isolate-by-default setting; unsent drafts, attachments, and structured references follow workspace changes.",
+      "summary": "The Workspace segment of a new thread\u2019s run row: its own jj workspace (from a chosen bookmark) or in place in the project checkout, defaulting to the isolate-by-default setting; unsent drafts, attachments, and structured references follow workspace changes. A project that is not a Jujutsu repository yet says so in the same segment and offers Enable, which runs the guarded colocated init the folder picker uses; the segment becomes the real one when the Host reports a repository.",
       "reach": [
         "click button \"New session\"",
         "expect button \"Workspace: *\"",
@@ -58,12 +58,13 @@
           "coveredBy": ["jj-integration.discard"]
         }
       ],
-      "states": ["shared-checkout", "isolated", "finished", "missing"],
+      "states": ["shared-checkout", "isolated", "finished", "missing", "not-a-repository", "enabling-jujutsu"],
       "failureModes": [
         "A folder outside a jj or git repository offers no bookmark or isolation.",
         "A thread workspace with revisions to rebase is never removed by the sweep.",
         "A destination that names no revision or several (unknown name, ambiguous prefix, conflicted bookmark) is refused before jj creates anything, with the bar's recovery text, and retrying creates nothing.",
-        "A failed `jj workspace add` removes what it registered, and a spare that cannot be claimed is replaced, so neither leaves a second workspace."
+        "A failed `jj workspace add` removes what it registered, and a spare that cannot be claimed is replaced, so neither leaves a second workspace.",
+        "Enable is offered only while the Jujutsu bundle is loaded and jj is installed; nothing is initialized without the click, and a broken .jj is refused rather than repaired."
       ],
       "externalDependencies": [
         {
@@ -73,6 +74,16 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.project-icon-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.not-a-repository-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
         {
           "kind": "gherkin",
           "id": "jj-integration.destination-browser-journey",
@@ -1189,7 +1200,7 @@
     {
       "id": "new-thread-project-picker",
       "title": "Pick a New-thread project",
-      "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces lists only thread workspaces whose folders still exist. A pasted absolute path registers that folder (also a drive or UNC path on a Windows Host), and Browse\u2026 registers the folder chosen in the Host's native dialog when it has one.",
+      "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces lists only thread workspaces whose folders still exist. A pasted absolute path, Register project and Browse\u2026 (also a drive or UNC path on a Windows Host) open the folder setup step before registering, so the folder is inspected and a Git checkout can Enable Jujutsu first.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"New session\"",
@@ -1355,6 +1366,11 @@
       ],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "jj-integration.workspace-setup-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "jj-integration.workspace-setup-unit-selection",
           "file": "plugins/@dshfiles/project-checks/src/workspace-setup-selection.test.ts",
@@ -1383,12 +1399,70 @@
           "id": "jj-integration.workspace-setup-unit-wait-bound",
           "file": "plugins/@dshfiles/jj-integration/src/workspace-setup-wait.test.ts",
           "testName": "gives up after the bound instead of holding the turn forever"
+        }
+      ]
+    },
+    {
+      "id": "project-main-branch",
+      "title": "Choose a project's main branch",
+      "summary": "Settings › Projects › Main branch picks the bookmark a project's thread workspaces start from, Land advances, and the Jujutsu panel, Changes and pull requests compare against. Automatic follows dsh.project.json, then origin's default branch (git origin/HEAD or the trunk() alias jj git clone records), then the global bookmark setting; a choice is kept per repository in the profile (repositoryBookmarks), never in the repository. The jj_project_bookmark tool reports the branch and the layer that chose it; jj_set_project_bookmark (null for Automatic) makes the same choice, written against the settings revision it read so concurrent saves keep each other.",
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings\"",
+        "click button \"Projects\"",
+        "expect region \"Main branch\"",
+        "click combobox \"Main branch of sample\"",
+        "click option \"develop\"",
+        "expect text \"Chosen here\""
+      ],
+      "surfaces": ["host", "client", "tool"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Projects › Main branch",
+      "configuration": [
+        {
+          "key": "repositoryBookmarks",
+          "defaultValue": "[]",
+          "constraints": "One { repository, bookmark } per absolute repository root; wins over dsh.project.json and origin's default branch.",
+          "coveredBy": ["jj-integration.project-main-branch-precedence"]
         },
         {
-          "kind": "not-applicable",
-          "reason": "The composer card needs a profile-trusted project-checks action flagged for workspace setup. The scratch composition activates project-checks as a bundle, so a patch row appended after boot double-activates it, and one written before boot needs the actions known at compose time. 2026-11-07 - every project-checks journey fails on that same post-boot row, so this journey is blocked by the harness, not by the feature. The dispatch, phase and cancel seam is covered by the workspace-setup unit tests here.",
-          "id": "jj-integration.workspace-setup-browser-journey"
+          "key": "bookmark",
+          "defaultValue": "main",
+          "constraints": "Fallback main branch for a project without its own, a dsh.project.json bookmark or a detected origin default branch.",
+          "coveredBy": ["jj-integration.project-main-branch-detection"]
         }
+      ],
+      "states": ["loading", "automatic", "chosen", "missing-bookmark", "read-error", "save-error"],
+      "failureModes": [
+        "A chosen bookmark that does not exist locally is reported; new threads cannot start from it until it exists.",
+        "A Host from before the setting shows the read failure, and every surface keeps the global bookmark.",
+        "A repository without an origin, or whose origin names no default branch, uses dsh.project.json or the global bookmark."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.project-main-branch-precedence",
+          "file": "plugins/@dshfiles/jj-integration/src/settings.test.ts",
+          "testName": "prefers the per-project choice, then dsh.project.json, then the detected default branch, then the global setting"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.project-main-branch-detection",
+          "file": "plugins/@dshfiles/jj-integration/src/project-bookmarks.integration.test.ts",
+          "testName": "uses origin's default branch when the project chose none"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.project-main-branch-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        { "kind": "automatic", "source": "jj" }
       ]
     }
   ]

@@ -5,7 +5,7 @@
     {
       "id": "sqlite-store-open",
       "title": "One SqlClient layer for a plugin-owned SQLite file",
-      "summary": "Open a SQLite file in a private directory with WAL, busy timeout and synchronous pragmas, run Migrator migrations once per file, adopt a legacy PRAGMA user_version without re-running its steps, and keep the main file and its sidecars owner-only.",
+      "summary": "Open a SQLite file in a private directory with WAL, busy timeout and synchronous pragmas, run Migrator migrations once per file, adopt a legacy PRAGMA user_version without re-running its steps, and keep the main file and its sidecars owner-only. `deferred` moves that open to the first call on a plugin's own service, for stores whose first read comes later than activation.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -48,6 +48,18 @@
           "id": "sqlite-store.two-databases",
           "file": "plugins/@dshfiles/sqlite-store/src/sqlite-store.test.ts",
           "testName": "serves two databases from one layer under their own keys"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.deferred-first-call",
+          "file": "plugins/@dshfiles/sqlite-store/src/sqlite-store.test.ts",
+          "testName": "deferred builds the service on the first call, not when the layer builds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.deferred-retry",
+          "file": "plugins/@dshfiles/sqlite-store/src/sqlite-store.test.ts",
+          "testName": "deferred retries a failed build on the next call instead of caching the failure"
         }
       ],
       "telemetry": [

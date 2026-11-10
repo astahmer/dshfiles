@@ -146,7 +146,17 @@ const ingest = (input: { readonly index: WorkingIndex; readonly record: LogRecor
   })
 }
 
-const trim = (input: { readonly jobs: Map<string, HistoryJob>; readonly maxJobs: number }): void => {
+/**
+ * A settled job stays in the index for a day, then the count cap bounds what is left. The index had grown to 20,000
+ * rows — every job ever run in this home — which is 13 MB of state and as many rows as a board read could page.
+ */
+const HISTORY_RETENTION_MS = 24 * 60 * 60 * 1000
+
+const trim = (input: { readonly jobs: Map<string, HistoryJob>; readonly maxJobs: number; readonly now: number }): void => {
+  const cutoff = input.now - HISTORY_RETENTION_MS
+  for (const job of input.jobs.values()) {
+    if (job.settled && job.startedAt < cutoff) input.jobs.delete(job.id)
+  }
   if (input.jobs.size <= input.maxJobs) return
   const oldest = [...input.jobs.values()].sort((left, right) => left.startedAt - right.startedAt).slice(0, input.jobs.size - input.maxJobs)
   for (const job of oldest) input.jobs.delete(job.id)
@@ -304,7 +314,7 @@ export class HistoryIndex extends Context.Service<
             index.offsets.set(file.path, chunk.value.endOffset)
             const sessionId = sessionIdOf(path.basename(path.dirname(file.path)))
             for (const record of chunk.value.records) ingest({ index, record, file, sessionId })
-            trim({ jobs: index.jobs, maxJobs: config.maxJobs })
+            trim({ jobs: index.jobs, maxJobs: config.maxJobs, now: Date.now() })
           }),
           { discard: true },
         )

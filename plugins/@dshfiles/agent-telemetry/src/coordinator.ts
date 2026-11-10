@@ -714,6 +714,16 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     'dsh.llm.purpose': request.purpose,
   })
 
+  /** Session events are frozen, so a captured message maps to the same GenAI message; every model call re-reads the whole context. */
+  const mappedInputs = new WeakMap<CapturedMessage, GenAiMessage>()
+  const mappedInput = (message: CapturedMessage): GenAiMessage => {
+    const cached = mappedInputs.get(message)
+    if (cached !== undefined) return cached
+    const mapped = GenAi.inputMessage(message)
+    mappedInputs.set(message, mapped)
+    return mapped
+  }
+
   const startLlm = (request: ObservedLlmRequest): LlmState => {
     const state = request.sessionId === undefined ? undefined : sessions.get(request.sessionId)
     const turn = state?.turn
@@ -739,7 +749,7 @@ export const createCoordinator = (options: CoordinatorOptions) => {
     const attempt = step.nextAttempt
     step.nextAttempt += 1
     const capture = options.captureContent()
-    const inputMessages = capture ? turn.contextMessages.map(message => GenAi.inputMessage(message)) : []
+    const inputMessages = capture ? turn.contextMessages.map(mappedInput) : []
     const span = startSpan(GenAiNames.chatSpan(request.model), {
       kind: 'client',
       parent: contextOf(step.span),

@@ -56,7 +56,7 @@ describe('phoneAwareDockActions', () => {
     })
     visibility.set(true)
     let phone = true
-    const actions = phoneAwareDockActions(createDockPaneActions(visibility), () => phone)
+    const actions = phoneAwareDockActions(createDockPaneActions(visibility, { panels: () => [], close: () => {} }), () => phone)
     PhoneSheetState.set(false)
     expect(actions.isOpen()).toBe(false)
     actions.toggle()

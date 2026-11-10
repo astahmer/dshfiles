@@ -45,6 +45,12 @@ test('an equal field set makes two summaries the same', () => {
   assert.equal(HostSnapshotsModel.sameSessionSummary(summary('a', { cwd: '/tmp' }), summary('a', { cwd: '/other' })), false)
 })
 
+test('a thread switch that only moves view retention keeps the previous state object', () => {
+  const first = HostSnapshotsModel.stabilizeSessionListState(null, state([summary('a', { retainedBy: { mainView: 1 } }), summary('b')]))
+  const second = HostSnapshotsModel.stabilizeSessionListState(first, state([summary('a'), summary('b', { retainedBy: { mainView: 1 } })]))
+  assert.equal(second, first)
+})
+
 test('nested JSON values compare by content, not by key order or identity', () => {
   assert.equal(HostSnapshotsModel.sameJsonValue({ mainView: 1, nested: { list: [1, 2, 3] } }, { nested: { list: [1, 2, 3] }, mainView: 1 }), true)
   assert.equal(HostSnapshotsModel.sameJsonValue({ nested: { list: [1, 2] } }, { nested: { list: [1, 3] } }), false)
@@ -124,4 +130,38 @@ test('the status selector keeps the caller value type and its snapshot identity'
   const second = HostSnapshotsModel.selectStableSessionStatus(new Map([[SessionId('a'), { ...status }]]))
   assert.equal(first.get(SessionId('a'))?.running, true)
   assert.equal(second, first)
+})
+
+test('a publish whose unchanged rows already kept their identity reuses the incoming record without a copy', () => {
+  const a = summary('a')
+  const first = HostSnapshotsModel.stabilizeSessionListState(null, state([a, summary('b')]))
+  const next = state([a, summary('b', { updatedAt: 2_000 })])
+  const second = HostSnapshotsModel.stabilizeSessionListState(first, next)
+  assert.equal(second.byId, next.byId)
+  assert.equal(second.projectionsBySession, first.projectionsBySession)
+})
+
+test('an equal projection value arriving as a new object keeps the previous projection', () => {
+  const projection = {
+    state: 'ready' as const,
+    error: null,
+    values: { subagentCatalog: [{ id: SessionId('c'), mode: 'continuable' as const, label: 'c', createdAt: 1 }] },
+  }
+  const first = HostSnapshotsModel.stabilizeSessionListState(null, { ...state([summary('a')]), projectionsBySession: { [SessionId('a')]: projection } })
+  const second = HostSnapshotsModel.stabilizeSessionListState(first, {
+    ...state([summary('a', { updatedAt: 2_000 })]),
+    projectionsBySession: { [SessionId('a')]: structuredClone(projection) },
+  })
+  assert.equal(second.projectionsBySession, first.projectionsBySession)
+})
+
+test('rows compared on the fields a consumer reads ignore a streaming turn touching other fields', () => {
+  const sameFolder = (left: SessionSummary, right: SessionSummary): boolean => left.cwd === right.cwd
+  const before = state([summary('a', { cwd: '/p' }), summary('b')]).byId
+  assert.equal(
+    HostSnapshotsModel.sameRowsBy(before, state([summary('a', { cwd: '/p', updatedAt: 9_000, running: true }), summary('b')]).byId, sameFolder),
+    true,
+  )
+  assert.equal(HostSnapshotsModel.sameRowsBy(before, state([summary('a', { cwd: '/q' }), summary('b')]).byId, sameFolder), false)
+  assert.equal(HostSnapshotsModel.sameRowsBy(before, state([summary('a', { cwd: '/p' })]).byId, sameFolder), false)
 })

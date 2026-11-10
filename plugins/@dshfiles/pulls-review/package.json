@@ -40,6 +40,7 @@
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-checks": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/vcs-provider-port": "workspace:*",
     "@dshfiles/workspace-folder-picker": "workspace:*",
     "@effect/platform-node": "catalog:",
@@ -114,7 +115,9 @@
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-workspace"
       ],
-      "external": [],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ],
       "immediately": false
     }
   },

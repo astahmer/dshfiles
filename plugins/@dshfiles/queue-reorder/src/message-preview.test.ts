@@ -23,6 +23,11 @@ test('clips by Unicode code point and appends one ellipsis', () => {
   assert.equal(MessagePreviewModel.messagePreview([{ type: 'text', text: 'A🦊B🦊C' }], 5), 'A🦊B🦊C')
 })
 
+test('previews a long body from its head, and still finds text behind a long whitespace run', () => {
+  assert.equal(MessagePreviewModel.messagePreview([{ type: 'text', text: `${'a'.repeat(20_000)}🦊` }], 40), `${'a'.repeat(40)}…`)
+  assert.equal(MessagePreviewModel.messagePreview([{ type: 'text', text: `${'\n'.repeat(20_000)}behind the spaces` }], 40), 'behind the spaces')
+})
+
 test('previews each image and file in message order and skips text', () => {
   const blocks: readonly QueuedBlock[] = [
     { type: 'text', text: 'look' },

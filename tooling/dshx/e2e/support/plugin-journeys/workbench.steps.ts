@@ -10,7 +10,7 @@ import { After, Given, Then, When } from '../bdd.js'
 import { openGlobalPanel, reusableViewName, viewNamePattern } from '../plugin-view-names.js'
 import { bootComposedPluginProfile } from '../boot.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, visitIsolatedPluginProfile, settingsNavEntry } from '../steps.js'
-import { createScratchDirectory, registerWorkspaceFolder, selectModelForNewThread, sendMessage } from '../threads.js'
+import { confirmFolderSetupStep, createScratchDirectory, registerWorkspaceFolder, selectModelForNewThread, sendMessage } from '../threads.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
 
 const MAIN_LAYOUT_KEY = 'dshfiles.workbench.layout.v1'
@@ -526,6 +526,8 @@ const createWorkbenchWorkspace = async (page: Page): Promise<string> => {
       const path = picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true })
       await path.fill(workspace)
       await picker.getByRole('button', { name: 'Register project', exact: true }).first().click()
+      await expect(picker).toBeHidden()
+      await confirmFolderSetupStep(page, workspace)
     }
     await expect(picker).toBeHidden()
   }

@@ -115,8 +115,26 @@ export class FffSearch {
     return /^\*{1,2}(?:\/\*{1,2})?$/u.test(trimmed) ? undefined : trimmed
   }
 
+  /**
+   * fff reads path- and glob-shaped query tokens as constraints on which files it searches. A single-file scope is sent
+   * as `<file>*`, or `**\/<file>*` when the file sits at the root: searching its directory instead collected every other
+   * file's matches before dropping them, which measured 1.5 s for one file on a 20k-file tree. A bare path token is not
+   * a constraint at all (fff reads it as the pattern), and a file name fff would read as a glob, a negation or several
+   * tokens keeps the directory constraint.
+   */
+  static scopeConstraint(scope: SearchScope): string | undefined {
+    const file = scope.file === undefined ? undefined : FffSearch.#fileConstraint(scope.file)
+    if (file !== undefined) return file
+    return scope.directory === undefined ? undefined : `${scope.directory}/`
+  }
+
+  static #fileConstraint(file: string): string | undefined {
+    if (/[*?[\]{}!\s]/u.test(file)) return undefined
+    return file.includes('/') ? `${file}*` : `**/${file}*`
+  }
+
   static grep(options: { finder: FileFinder; scope: SearchScope; pattern: string; include: string | undefined; workingDirectory: string }): GrepOutcome {
-    const constraints = [options.scope.directory === undefined ? undefined : `${options.scope.directory}/`, FffSearch.includeConstraint(options.include)]
+    const constraints = [FffSearch.scopeConstraint(options.scope), FffSearch.includeConstraint(options.include)]
     // A pattern with no regex syntax is a literal; fff's plain mode matches it fastest, as fff-mcp does for identifiers.
     const constraintShaped = options.pattern.split(/\s+/).some(token => /[/*?{}!]|\.\w+$/.test(token))
     const mode = constraintShaped || /[\\^$.|?*+()[\]{}]/.test(options.pattern) ? 'regex' : 'plain'

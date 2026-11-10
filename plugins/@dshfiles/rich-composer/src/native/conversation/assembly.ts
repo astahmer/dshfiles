@@ -58,6 +58,7 @@ class BoundConversation implements ConversationBinding {
   private readonly targetSources = new Map<string, ObservableSnapshot<unknown>>()
   private revision = -1
   private frame: number | undefined
+  private activeTargets: ReadonlySet<string> = new Set()
   private disposeFeed: () => void = () => {}
 
   constructor(
@@ -170,9 +171,15 @@ class BoundConversation implements ConversationBinding {
   }
 
   private currentSnapshot(): ConversationSnapshot {
+    // Keep the set's identity while its members are unchanged: shell chrome selects only
+    // `activeTargets`, and must not re-render on every streamed view publication.
+    const active = this.assembler.activityTargets()
+    if (active.size !== this.activeTargets.size || [...active].some(target => !this.activeTargets.has(target))) {
+      this.activeTargets = active
+    }
     return {
       views: this.viewStore,
-      activeTargets: this.assembler.activityTargets(),
+      activeTargets: this.activeTargets,
     }
   }
 }

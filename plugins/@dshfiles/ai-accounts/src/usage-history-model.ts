@@ -24,7 +24,9 @@ export const usageMetaSchema = Schema.Struct({
   lastReadAt: Schema.NullOr(timestamp).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null))),
   lastAttemptAt: Schema.NullOr(timestamp).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null))),
   intervalMinutes: AiAccountsSchema.intBetween(1, 60).pipe(Schema.withDecodingDefaultKey(Effect.succeed(5))),
-  retentionDays: AiAccountsSchema.intBetween(1, 365).pipe(Schema.withDecodingDefaultKey(Effect.succeed(90))),
+  // The panel's longest window is a month, so a quarter of quota points nobody can chart was 13 MB of a whole-domain JSON
+  // store that is rewritten on every sweep.
+  retentionDays: AiAccountsSchema.intBetween(1, 365).pipe(Schema.withDecodingDefaultKey(Effect.succeed(30))),
 })
 
 export const usageHistoryPointSchema = Schema.Struct({

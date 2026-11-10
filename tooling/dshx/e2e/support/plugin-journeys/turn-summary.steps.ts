@@ -30,13 +30,19 @@ When('the fake model writes a file in a fresh workspace', async ({ page }: { pag
 })
 
 Then('the finished turn opens a walkthrough naming the written file', async ({ page }: { page: Page }) => {
-  const toggle = page.getByRole('button', { name: 'Walkthrough' })
+  const toggle = page.getByRole('button', { name: 'Walkthrough', exact: true })
   await recordAssertion(page, 'turn-summary-walkthrough-names-written-file', async () => {
     await expect(toggle).toBeVisible({ timeout: 60_000 })
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await page.mouse.move(4, 4)
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-expanded', 'true')
     await expect(page.locator('[data-dshfiles-turn-walkthrough]')).toContainText('walkthrough.md')
+  })
+  await recordAssertion(page, 'turn-summary-walkthrough-file-opens', async () => {
+    const file = page.locator('[data-dshfiles-turn-walkthrough]').getByRole('button', { name: 'walkthrough.md' })
+    await expect(file).toBeVisible()
+    await file.click()
   })
   await finishJourneyAssertions(page)
 })

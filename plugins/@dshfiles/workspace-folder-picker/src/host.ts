@@ -2,17 +2,29 @@ import type {} from '@deepseek-ai/dsh-host-directory-picker'
 import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
+import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
 import { Effect, FileSystem, Layer, Option } from 'effect'
 import { workspaceFolderBrowserApi } from './directory-browser-api.js'
 import { FolderInspector } from './folder-inspection.js'
 import { DirectoryBrowser, executableLookupLayer, ProjectRemover, projectRegistryLayer } from './host-edge-promise.js'
 import { CloneJobs, ExecutableLookup, ProjectCommands, ProjectCreator, ProjectHome } from './project-lifecycle.js'
+import { ProjectIcons } from './project-icons.js'
+import { ProjectIdentities } from './project-identities.js'
 import { loadProjectConfig } from './project-config.js'
 import { projectLifecycleApi } from './project-lifecycle-api.js'
+import { registeredProjects } from './registered-projects.js'
 
-const projectLayer = Layer.mergeAll(CloneJobs.layer, ProjectCreator.layer, FolderInspector.layer).pipe(
+const inspectionLayer = FolderInspector.layer
+
+const projectLayer = Layer.mergeAll(
+  CloneJobs.layer,
+  ProjectCreator.layer,
+  inspectionLayer,
+  ProjectIcons.layer,
+  ProjectIdentities.layer.pipe(Layer.provide(inspectionLayer)),
+).pipe(
   Layer.provide(ProjectCommands.layer),
-  Layer.provideMerge(Layer.mergeAll(executableLookupLayer, projectRegistryLayer, DshChildProcessSpawner.layer, nodeFileSystemLayer)),
+  Layer.provideMerge(Layer.mergeAll(executableLookupLayer, projectRegistryLayer, DshChildProcessSpawner.layer, nodeFileSystemLayer, nodePathLayer)),
 )
 
 const toolsStatus = Effect.fn('project tools status')(function* () {
@@ -32,7 +44,7 @@ const pickerCapabilities = Effect.fn('directory picker read capability')(functio
 
 export default DshxPlugin.make({
   name: 'dshfiles-workspace-folder-picker',
-  inject: ['subprocess', 'workspaceController'],
+  inject: ['subprocess', 'workspaceController', 'workspaceRegistry'],
   layer: Layer.mergeAll(projectLayer, DirectoryBrowser.layer, ProjectRemover.layer),
   apis: [
     Api.bind(workspaceFolderBrowserApi, {
@@ -50,6 +62,12 @@ export default DshxPlugin.make({
       inspect: input => FolderInspector.use(inspector => inspector.inspect(input.path)),
       initProject: input => ProjectCreator.use(creator => creator.initialize(input)),
       publishProject: input => ProjectCreator.use(creator => creator.publish(input)),
+      projects: () =>
+        Effect.map(hostService('workspaceRegistry'), registry => ({
+          projects: registeredProjects(registry.list().map(workspace => ({ workspaceId: String(workspace.id), title: workspace.title, path: workspace.path }))),
+        })),
+      projectIdentities: input => ProjectIdentities.use(identities => Effect.map(identities.read(input.paths), identities => ({ identities }))),
+      icon: input => ProjectIcons.use(icons => icons.read(input)),
       readProjectConfig: input =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem

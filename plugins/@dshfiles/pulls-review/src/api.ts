@@ -145,7 +145,8 @@ const reviewInputSchema = Schema.Struct({
   path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)).annotate({ description: 'Absolute path of the workspace to review.' }),
   base: Schema.optional(
     Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).annotate({
-      description: 'Base bookmark or revision; defaults to the first of main, master or trunk.',
+      description:
+        'Base bookmark or revision; defaults to the project’s main branch (Settings › Projects, dsh.project.json or origin’s default branch), else the first of main, master or trunk.',
     }),
   ),
   fromChangeId: Schema.optional(

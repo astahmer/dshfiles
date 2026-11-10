@@ -133,3 +133,11 @@ Feature: Jujutsu revision interactions
     Then the cleanup dialog shows age presets without removing anything
     When one stale untracked folder and the older-page workspace are selected for cleanup
     Then cleanup removes only the selected folder and clears the old graph workspace label without reloading
+
+  @scenario:jujutsu.workspace-cleanup-failure
+  Scenario: A thread workspace cleanup that fails stays on its project's panel with a safe recovery
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration, @dshfiles/multi-host, @dshfiles/workspace-folder-picker" is booted
+    When a disposable Jujutsu repository with an empty thread workspace that cannot be deleted is selected
+    And the repository actions menu opens the workspace cleanup
+    And the undeletable thread workspace is selected for cleanup
+    Then the project panel keeps the cleanup failure with its reason and a safe recovery

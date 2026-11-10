@@ -1,16 +1,8 @@
 import { Option, Schema } from 'effect'
-import { ProcessTable } from './process-table.js'
+import { ProcessTable, type PsRow } from './process-table.js'
 import { scratchKindValues, type ScratchHost, type ScratchHosts } from './types.js'
 
-export interface ScratchProcessRow {
-  readonly pid: number
-  readonly ppid: number
-  readonly pgid: number
-  readonly rssKb: number
-  readonly cpuPercent: number
-  readonly startedAt: number
-  readonly command: string
-}
+export type ScratchProcessRow = PsRow
 
 /**
  * `${os.tmpdir()}/dshx-scratch/<hostPid>.json`, written by dshx for every scratch Host it starts (docs/orphan-cleanup.md). Read here directly: the contract is a file shape, not a dshx module this plugin could import.
@@ -29,7 +21,6 @@ export type ScratchRecord = typeof scratchRecordSchema.Type
 const decodeRecordJson = Schema.decodeUnknownOption(Schema.fromJsonString(scratchRecordSchema))
 
 // `Mon Oct 19 14:02:03 2026`, as `ps -o lstart` prints it under LC_ALL=C.
-const SCRATCH_PS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+(\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.*)$/
 const SCRATCH_PROFILE = /(?:^|\s)--profile[\s=]dshx-boot(?=\s|$)/
 const PORT = /(?:^|\s)--port[\s=](\d+)(?=\s|$)/
 // `ps -o lstart` has one-second resolution, so a start time recorded in milliseconds lands within a second of it.
@@ -41,25 +32,6 @@ const MAX_ANCESTORS = 64
 const isScratchCommand = (command: string): boolean => SCRATCH_PROFILE.test(command)
 
 const sameStart = (left: number, right: number): boolean => Math.abs(left - right) < START_SLACK_MS
-
-const parsePs = (text: string): ScratchProcessRow[] =>
-  text.split('\n').flatMap(line => {
-    const match = SCRATCH_PS_LINE.exec(line)
-    if (match === null) return []
-    const startedAt = Date.parse(match[6] ?? '')
-    if (Number.isNaN(startedAt)) return []
-    return [
-      {
-        pid: Number(match[1]),
-        ppid: Number(match[2]),
-        pgid: Number(match[3]),
-        rssKb: Number(match[4]),
-        cpuPercent: Number(match[5]),
-        startedAt,
-        command: (match[7] ?? '').trim(),
-      },
-    ]
-  })
 
 /** The Host serving this page and every process above it (a supervisor): never listed, never signalled. */
 const protectedPids = (rows: readonly ScratchProcessRow[], hostPid: number): ReadonlySet<number> => {
@@ -154,9 +126,6 @@ const guardStop = (input: {
   return row.pgid === row.pid ? 'signal-group' : 'signal-tree'
 }
 
-export class ScratchHostDetector {
-  static readonly parsePs = parsePs
-  static readonly decodeRecord = (text: string): Option.Option<ScratchRecord> => decodeRecordJson(text)
-  static readonly detect = detect
-  static readonly guardStop = guardStop
-}
+export const parsePs = ProcessTable.parsePs
+export const decodeRecord = (text: string): Option.Option<ScratchRecord> => decodeRecordJson(text)
+export { detect, guardStop }

@@ -37,27 +37,34 @@ const pinned = Effect.fnUntraced(function* (run: JjRun) {
   return { operationId, revisions, ids, count }
 })
 
-const landmarkDefinitions = [
-  { kind: 'current', label: 'Current', revset: '@' },
-  { kind: 'main-origin', label: 'main@origin', revset: 'remote_bookmarks(exact:main, exact:origin)' },
-  { kind: 'main', label: 'main', revset: 'bookmarks(exact:main)' },
-  { kind: 'default', label: 'Default', revset: 'present(default@)' },
-] satisfies { kind: GraphNavigation['landmarks'][number]['kind']; label: string; revset: string }[]
+/** The `main` landmarks name the project's main branch (`main` unless jj-integration says otherwise). */
+const landmarkDefinitions = (bookmark: string) =>
+  [
+    { kind: 'current', label: 'Current', revset: '@' },
+    { kind: 'main-origin', label: `${bookmark}@origin`, revset: `remote_bookmarks(exact:${JSON.stringify(bookmark)}, exact:"origin")` },
+    { kind: 'main', label: bookmark, revset: `bookmarks(exact:${JSON.stringify(bookmark)})` },
+    { kind: 'default', label: 'Default', revset: 'present(default@)' },
+  ] satisfies { kind: GraphNavigation['landmarks'][number]['kind']; label: string; revset: string }[]
 
-const readGraphNavigation = Effect.fnUntraced(function* (run: JjRun) {
+const readGraphNavigation = Effect.fnUntraced(function* (run: JjRun, bookmark = 'main') {
   const snapshot = yield* pinned(run)
-  const landmarks = yield* Effect.forEach(landmarkDefinitions, definition =>
-    Effect.gen(function* () {
-      const result = yield* snapshot.revisions(definition.revset)
-      if (result.truncated) return yield* new OutputLimitExceeded({ subject: 'bookmarks' })
-      const landmark: GraphNavigation['landmarks'][number] = {
-        kind: definition.kind,
-        label: definition.label,
-        status: result.revisions.length === 0 ? 'missing' : result.revisions.length === 1 ? 'resolved' : 'ambiguous',
-        revisions: result.revisions,
-      }
-      return landmark
-    }),
+  const definitions = landmarkDefinitions(bookmark)
+  const landmarks = yield* Effect.forEach(
+    definitions,
+    definition =>
+      Effect.gen(function* () {
+        const result = yield* snapshot.revisions(definition.revset)
+        if (result.truncated) return yield* new OutputLimitExceeded({ subject: 'bookmarks' })
+        const landmark: GraphNavigation['landmarks'][number] = {
+          kind: definition.kind,
+          label: definition.label,
+          status: result.revisions.length === 0 ? 'missing' : result.revisions.length === 1 ? 'resolved' : 'ambiguous',
+          revisions: result.revisions,
+        }
+        return landmark
+      }),
+    // Each landmark is one jj process over its own revset and none depends on another's output.
+    { concurrency: definitions.length },
   )
   const navigation: GraphNavigation = { operationId: snapshot.operationId, landmarks }
   return navigation
@@ -85,16 +92,23 @@ const readRevisionRelationship = Effect.fnUntraced(function* (input: { readonly 
   if (!endpoints.ids.includes(selected) || !endpoints.ids.includes(target)) {
     return yield* new RevisionNotFound({ reason: 'not-at-operation', reference: selected, candidates: [] })
   }
-  const selectedOnlyCount = yield* snapshot.count(`::${selected} ~ ::${target}`)
-  const targetOnlyCount = yield* snapshot.count(`::${target} ~ ::${selected}`)
   const common = `heads(::${selected} & ::${target})`
   const connection = `(${common}):: & (::${selected} | ::${target})`
   const difference = `::${selected} ~ ::${target}`
-  const ancestors = yield* snapshot.ids(common)
-  const connectionIds = yield* snapshot.ids(connection)
-  const differenceIds = yield* snapshot.ids(difference)
-  const rows = yield* snapshot.revisions(`${selected} | ${target} | (${connection}) | (${difference})`)
-  const endpointRows = yield* snapshot.revisions(`${selected} | ${target}`)
+  // Every read below names its own revset and none consumes another's output; four at a time keeps the spawn peak
+  // bounded while the caller waits for the slowest read instead of their sum.
+  const [selectedOnlyCount, targetOnlyCount, ancestors, connectionIds, differenceIds, rows, endpointRows] = yield* Effect.all(
+    [
+      snapshot.count(`::${selected} ~ ::${target}`),
+      snapshot.count(`::${target} ~ ::${selected}`),
+      snapshot.ids(common),
+      snapshot.ids(connection),
+      snapshot.ids(difference),
+      snapshot.revisions(`${selected} | ${target} | (${connection}) | (${difference})`),
+      snapshot.revisions(`${selected} | ${target}`),
+    ],
+    { concurrency: 4 },
+  )
   const endpointIds = new Set(endpointRows.revisions.map(revision => revision.commitId))
   const combined = [...endpointRows.revisions, ...rows.revisions.filter(revision => !endpointIds.has(revision.commitId))]
   const relationship: RevisionRelationship = {

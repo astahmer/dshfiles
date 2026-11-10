@@ -19,7 +19,7 @@ const decide = (
   options: {
     readonly archived?: readonly string[]
     readonly running?: boolean | undefined
-    readonly kinds?: readonly ('empty' | 'integrated' | 'secondary' | 'untracked')[]
+    readonly kinds?: readonly ('empty' | 'integrated' | 'merged' | 'secondary' | 'untracked')[]
   } = {},
 ) =>
   WorkspaceCleanupModel.decide({
@@ -81,6 +81,27 @@ describe('WorkspaceCleanupModel.decide', () => {
     expect(WorkspaceCleanupModel.skipReasonMessage('busy')).toContain('running or waiting')
     expect(WorkspaceCleanupModel.skipReasonMessage('queued')).toContain('integration is queued')
     expect(WorkspaceCleanupModel.skipReasonMessage('too-recent')).toContain('more recently')
+  })
+
+  it('names a merged pull request as the merged kind once the work is on the bookmark', () => {
+    expect(decide(idleThread({ rebasedAt: now - 7 * HOUR, mergedPullRequests: ['owner/repo#42'] }), { kinds: ['merged', 'integrated'] })).toEqual({
+      action: 'remove',
+      kind: 'merged',
+      lastUsedAt: now - 10 * HOUR,
+    })
+  })
+
+  it('never calls it merged while its revisions are still unlanded', () => {
+    expect(decide(idleThread({ rebasedAt: now - 7 * HOUR, unlandedCount: 2, mergedPullRequests: ['owner/repo#42'] }), { kinds: ['merged'] })).toEqual({
+      action: 'skip',
+      reason: 'has-work',
+      lastUsedAt: now - 10 * HOUR,
+    })
+  })
+
+  it('reads merged workspaces only for a manual run that offers them', () => {
+    expect(WorkspaceCleanupModel.readsBookmarkedWork({ trigger: 'manual', kinds: ['merged'] })).toBe(true)
+    expect(WorkspaceCleanupModel.readsBookmarkedWork({ trigger: 'automatic', kinds: ['merged'] })).toBe(false)
   })
 
   it('includes recently integrated workspaces at zero age without bypassing safety checks', () => {

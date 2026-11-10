@@ -188,13 +188,28 @@ export class BoardStore extends Context.Service<
 
       const pendingOfRow = (json: string | null) => (json === null ? Effect.succeed(null) : decodePending(json))
 
-      const loadBoard = Effect.fnUntraced(function* (id: string) {
+      const loadRow = Effect.fnUntraced(function* (id: string) {
         const found = yield* findRow(id)
         if (Option.isNone(found)) return yield* new BoardNotFound()
         const row = found.value
-        const pending = yield* pendingOfRow(row.pending_json)
-        const scene = yield* decodeScene(row.scene_json)
-        return { row, scene, pending }
+        return { row, pending: yield* pendingOfRow(row.pending_json) }
+      })
+
+      const loadBoard = Effect.fnUntraced(function* (id: string) {
+        const loaded = yield* loadRow(id)
+        return { ...loaded, scene: yield* decodeScene(loaded.row.scene_json) }
+      })
+
+      /** Only a write that leaves part of the scene out has to parse the stored one: the autosave sends all three. */
+      const sceneFor = Effect.fnUntraced(function* (sceneJson: string, input: Input<'write'>) {
+        if (input.elements !== undefined && input.appState !== undefined && input.files !== undefined)
+          return { elements: input.elements, appState: input.appState, files: input.files }
+        const current = yield* decodeScene(sceneJson)
+        return {
+          elements: input.elements ?? current.elements,
+          appState: input.appState ?? current.appState,
+          files: input.files ?? current.files,
+        }
       })
 
       /** One revision-checked replacement of a board row inside the caller's transaction. */
@@ -218,14 +233,14 @@ export class BoardStore extends Context.Service<
           now,
         })
         if (updated.length !== 1) {
-          const current = yield* loadBoard(change.id)
+          const current = yield* loadRow(change.id)
           return yield* new StaleBoardRevision({ currentRevision: current.row.revision })
         }
-        const reread = yield* loadBoard(change.id)
+        const reread = yield* loadRow(change.id)
         return summaryOf(reread.row, reread.pending)
       })
 
-      const checked = (loaded: Effect.Success<ReturnType<typeof loadBoard>>, expectedRevision: number) =>
+      const checked = (loaded: { readonly row: { readonly revision: number } }, expectedRevision: number) =>
         loaded.row.revision === expectedRevision ? Effect.void : Effect.fail(new StaleBoardRevision({ currentRevision: loaded.row.revision }))
 
       const list = Effect.fn('whiteboard list')(function* (input: Input<'list'>) {
@@ -253,7 +268,7 @@ export class BoardStore extends Context.Service<
           elementCount: liveElementCount(scene.elements),
           now: yield* Clock.currentTimeMillis,
         })
-        const created = yield* loadBoard(id)
+        const created = yield* loadRow(id)
         return summaryOf(created.row, created.pending)
       })
 
@@ -263,14 +278,10 @@ export class BoardStore extends Context.Service<
           Effect.gen(function* () {
             if (input.boardId === undefined) return yield* create(input, pending)
             if (input.expectedRevision === undefined) return yield* new InvalidBoardWrite({ reason: 'missing-revision' })
-            const current = yield* loadBoard(input.boardId)
+            const current = yield* loadRow(input.boardId)
             if (current.row.deleted_at !== null) return yield* new BoardDeleted()
             yield* checked(current, input.expectedRevision)
-            const scene: Scene = {
-              elements: input.elements ?? current.scene.elements,
-              appState: input.appState ?? current.scene.appState,
-              files: input.files ?? current.scene.files,
-            }
+            const scene = yield* sceneFor(current.row.scene_json, input)
             return yield* replace({
               id: input.boardId,
               expectedRevision: input.expectedRevision,

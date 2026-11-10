@@ -32,6 +32,12 @@ const sourceMapOf = (raw: string): Option.Option<RawSourceMap> =>
     ...(map.sourceRoot !== undefined && { sourceRoot: map.sourceRoot }),
   }))
 
+interface SourceMapEntry {
+  readonly map: RawSourceMap
+  /** The serialized size the shared map-byte budget accounts for, computed once per decoded map. */
+  readonly bytes: number
+}
+
 interface Fingerprint {
   readonly path: string
   /** Path, modification time and size: a changed file gets a new cache entry. */
@@ -99,11 +105,37 @@ export const listBundles = Effect.fn('annotations list bundles')(function* (inpu
 /**
  * CSS-module class names from a stored selector, unescaped. A bare utility class
  * ("cta", "row") appears in too many bundles to be evidence; a module name carries
- * its hash and an underscore.
+ * its hash and an underscore. One compound can carry several: `._a_1x2._b_3y4`
+ * is two names, and reading the dot as part of one name matches no bundle at all.
  */
 export const classCandidates = (selector: string): string[] => {
-  const matches = selector.match(/\.[^\s>]+/g) ?? []
-  const names = matches.map(match => match.slice(1).replaceAll('\\', '')).filter(name => name.length >= 4 && name.includes('_'))
+  const names: string[] = []
+  let current = ''
+  let collecting = false
+  let escaped = false
+  const flush = (): void => {
+    if (collecting && current.length >= 4 && current.includes('_')) names.push(current)
+    current = ''
+    collecting = false
+  }
+  for (const character of selector) {
+    if (escaped) {
+      current += character
+      escaped = false
+      continue
+    }
+    if (character === '\\') {
+      escaped = true
+      continue
+    }
+    if (character === '.' || character === '>' || /\s/u.test(character)) {
+      flush()
+      collecting = character === '.'
+      continue
+    }
+    if (collecting) current += character
+  }
+  flush()
   return Array.from(new Set(names)).slice(0, 6)
 }
 
@@ -136,7 +168,11 @@ export class SourceResolver extends Context.Service<SourceResolver, SourceResolv
     const withFileSystem = Effect.provideService(FileSystem.FileSystem, fileSystem)
     const readText = (key: string) => fileSystem.readFileString(pathOfKey(key)).pipe(Effect.option)
     const texts = yield* Cache.make({ capacity: 256, lookup: readText })
-    const maps = yield* Cache.make({ capacity: 256, lookup: (key: string) => Effect.map(readText(key), text => Option.flatMap(text, sourceMapOf)) })
+    const maps = yield* Cache.make({
+      capacity: 256,
+      lookup: (key: string) =>
+        Effect.map(readText(key), text => Option.map(Option.flatMap(text, sourceMapOf), map => ({ map, bytes: JSON.stringify(map).length }))),
+    })
     const bundles = yield* Effect.cached(
       Effect.map(
         Effect.forEach(input.roots, root => listBundles({ root, limit: input.maxBundles ?? MAX_BUNDLES })),
@@ -155,31 +191,34 @@ export class SourceResolver extends Context.Service<SourceResolver, SourceResolv
     const positionFor = Effect.fnUntraced(function* (match: {
       readonly name: string
       readonly bundle: Bundle
-      readonly map: RawSourceMap
+      readonly entry: SourceMapEntry
       readonly confidence: 'map' | 'text'
     }) {
-      if (match.confidence === 'text') return Option.fromUndefinedOr(SourceMaps.sourceContentPosition({ map: match.map, needle: match.name }))
+      if (match.confidence === 'text') return Option.fromUndefinedOr(SourceMaps.sourceContentPosition({ map: match.entry.map, needle: match.name }))
       return Option.flatMap(yield* codeOf(match.bundle), code => {
         const generated = SourceMaps.findGeneratedPosition({ text: code, needle: match.name })
-        return Option.fromUndefinedOr(generated === undefined ? undefined : SourceMaps.originalPositionFor({ map: match.map, position: generated }))
+        return Option.fromUndefinedOr(generated === undefined ? undefined : SourceMaps.originalPositionFor({ map: match.entry.map, position: generated }))
       })
     })
 
     const matchFor = Effect.fnUntraced(function* (match: {
       readonly name: string
       readonly bundle: Bundle
-      readonly map: RawSourceMap
+      readonly entry: SourceMapEntry
       readonly confidence: 'map' | 'text'
     }) {
       const position = yield* positionFor(match)
       if (Option.isNone(position)) return Option.none<SourceMatch>()
-      const absolute = absoluteOf({ bundle: match.bundle, source: position.value.source })
+      const mapped = position.value
+      // A decoded line or column outside the schema's range means the map segment is unreadable; no match beats a source an annotation cannot hold.
+      if (mapped.line < 1 || mapped.column < 0) return Option.none<SourceMatch>()
+      const absolute = absoluteOf({ bundle: match.bundle, source: mapped.source })
       if (!ownedSource(absolute)) return Option.none<SourceMatch>()
       return Option.some<SourceMatch>({
         name: match.name,
         file: relative(process.cwd(), absolute),
-        line: position.value.line,
-        column: position.value.column,
+        line: mapped.line,
+        column: mapped.column,
         confidence: match.confidence,
       })
     })
@@ -197,8 +236,8 @@ export class SourceResolver extends Context.Service<SourceResolver, SourceResolv
             if (scannedBytes > maxTotalMapBytes) return found
             const map = yield* mapOf(bundle)
             if (Option.isNone(map)) continue
-            scannedBytes += JSON.stringify(map.value).length
-            const match = yield* matchFor({ name, bundle, map: map.value, confidence })
+            scannedBytes += map.value.bytes
+            const match = yield* matchFor({ name, bundle, entry: map.value, confidence })
             if (Option.isSome(match)) {
               found.push(match.value)
               break

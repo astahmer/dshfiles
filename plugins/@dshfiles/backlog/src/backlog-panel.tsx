@@ -1035,6 +1035,7 @@ export const BacklogPanel = (props: {
                 openId={openId}
                 select={select}
                 openThread={props.openThread}
+                threadTitle={sessionId => threads.find(thread => thread.id === sessionId)?.title}
                 openInbox={props.openInbox}
                 acknowledgeThread={thread =>
                   void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())

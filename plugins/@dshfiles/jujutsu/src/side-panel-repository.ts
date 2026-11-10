@@ -11,10 +11,20 @@ export interface SidePanelRequest {
 
 type Listener = (request: SidePanelRequest) => void
 
+/** A Windows Host path: drive-absolute (`C:\…`, `C:/…`) or UNC (`\\server\share`). */
+const isWindowsPath = (path: string): boolean => /^[A-Za-z]:(?:[\\/]|$)/u.test(path) || path.startsWith('\\\\')
+
+/**
+ * One spelling for a Host path with no trailing separator. A Windows path also takes either separator and compares
+ * case-insensitively; a POSIX path keeps its exact `/`-separated spelling.
+ */
+const comparablePath = (path: string): string =>
+  isWindowsPath(path) ? path.replaceAll('\\', '/').replace(/\/+$/u, '').toLowerCase() : path.replace(/\/+$/u, '')
+
 /** Whether `path` is the repository root or lies inside it. */
 export const containsPath = (root: string, path: string): boolean => {
-  const trimmedRoot = root.replace(/\/+$/, '')
-  const trimmedPath = path.replace(/\/+$/, '')
+  const trimmedRoot = comparablePath(root)
+  const trimmedPath = comparablePath(path)
   return trimmedRoot.length > 0 && (trimmedPath === trimmedRoot || trimmedPath.startsWith(trimmedRoot + '/'))
 }
 

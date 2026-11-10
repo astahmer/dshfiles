@@ -6,6 +6,7 @@ import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Duration, Effect, Layer, Option, Schedule, Schema, Stream } from 'effect'
 import { backgroundJobsApi } from './api.js'
 import { HistoryConfig, HistoryIndex } from './history.js'
+import { HistoryDemand } from './history-demand.js'
 import { JobRegistry, LiveJobs } from './live.js'
 import { OutlivedJobs, TurnActivity } from './outlived.js'
 import { JobsBoard } from './service.js'
@@ -40,9 +41,15 @@ const HistoryConfigLive = Layer.unwrap(
 const IndexingLoop = Layer.effectDiscard(
   Effect.gen(function* () {
     const history = yield* HistoryIndex
-    yield* history.pass.pipe(
-      Effect.map(indexing => indexing.caughtUp),
-      Effect.catchCause(cause => Effect.as(Effect.logError('background-jobs: history indexing failed', cause), false)),
+    const demand = yield* HistoryDemand
+    const pass = Effect.gen(function* () {
+      if (!(yield* demand.demanded)) return false
+      return yield* history.pass.pipe(
+        Effect.map(indexing => indexing.caughtUp),
+        Effect.catchCause(cause => Effect.as(Effect.logError('background-jobs: history indexing failed', cause), false)),
+      )
+    })
+    yield* pass.pipe(
       Effect.repeat(
         Schedule.spaced(CATCH_UP_DELAY).pipe(
           Schedule.setInputType<boolean>(),
@@ -62,8 +69,11 @@ const ChangeEvents = Layer.effectDiscard(
     yield* board.changes.pipe(
       Stream.groupedWithin(Number.MAX_SAFE_INTEGER, CHANGE_EVENT_INTERVAL),
       Stream.runForEach(() =>
-        Api.publish({ contract: backgroundJobsApi, event: 'changed', payload: {} }).pipe(
-          Effect.catchTag('PublishEventError', error => Effect.logWarning('background-jobs: board change event refused', error.message)),
+        Effect.andThen(
+          HistoryDemand.use(demand => demand.touch),
+          Api.publish({ contract: backgroundJobsApi, event: 'changed', payload: {} }).pipe(
+            Effect.catchTag('PublishEventError', error => Effect.logWarning('background-jobs: board change event refused', error.message)),
+          ),
         ),
       ),
       DshxPlugin.detached,
@@ -88,6 +98,7 @@ const ReapLoop = Layer.effectDiscard(
 )
 
 const BackgroundJobsLive = Layer.mergeAll(IndexingLoop, ChangeEvents, ReapLoop).pipe(
+  Layer.provideMerge(HistoryDemand.layer),
   Layer.provideMerge(JobsBoard.layer),
   Layer.provideMerge(OutlivedJobs.layer),
   Layer.provideMerge(TurnActivity.layer),
@@ -103,11 +114,23 @@ export default DshxPlugin.make({
   layer: BackgroundJobsLive,
   apis: [
     Api.bind(backgroundJobsApi, {
-      board: input => JobsBoard.use(board => board.board(input)),
-      output: input => JobsBoard.use(board => board.output({ jobId: input.jobId, from: input.from ?? 0 })),
+      board: input =>
+        Effect.andThen(
+          HistoryDemand.use(demand => demand.touch),
+          JobsBoard.use(board => board.board(input)),
+        ),
+      output: input =>
+        Effect.andThen(
+          HistoryDemand.use(demand => demand.touch),
+          JobsBoard.use(board => board.output({ jobId: input.jobId, from: input.from ?? 0 })),
+        ),
       kill: input => JobsBoard.use(board => board.kill({ jobId: input.jobId })),
       wait: input => JobsBoard.use(board => board.wait(input)),
-      refresh: () => JobsBoard.use(board => board.refresh),
+      refresh: () =>
+        Effect.andThen(
+          HistoryDemand.use(demand => demand.touch),
+          JobsBoard.use(board => board.refresh),
+        ),
     }),
   ],
 })

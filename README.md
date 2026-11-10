@@ -146,6 +146,13 @@ only vendored toolchain in the repository. It provides plugin scaffolding, build
 the CLI used by owned plugins. See [`tooling/dshx/FORK.md`](tooling/dshx/FORK.md)
 for provenance and the [authoring guide](tooling/dshx/docs/sdk/getting-started.md).
 
+### Adopted bundles
+
+[dsh-superagent](docs/superagent.md) is DeepSeek's proactive agent for one GitHub
+repository. It turns requests from allowed people into Tickets, works on each in its own
+Session and answers with a pull request. It is adopted unchanged at a pinned upstream commit
+and runs in its own `superagent` profile: `node scripts/superagent.mjs setup`.
+
 ## Documentation
 
 - [`AGENTS.md`](AGENTS.md): project boundaries, safe profile workflow, and development rules.

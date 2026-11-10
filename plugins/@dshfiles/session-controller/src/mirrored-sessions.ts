@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import {
   createSessionSourceRegistry,
   isSessionPromptRefused,
@@ -49,8 +50,11 @@ const addressedSessionId = (address: SessionAddress): SessionId | undefined => (
 export class MirroredSessions {
   readonly registry: SessionSourceRegistry = createSessionSourceRegistry()
   private readonly published = new Map<string, { readonly running: boolean }>()
-  /** Session ids this Host's own list last returned: cold, but local, so no runtime is asked whether it owns them. */
-  private listedLocally: ReadonlySet<string> = new Set()
+  /**
+   * Session ids this Host's own list last returned, plus those found in its own store since: cold, but local, so no
+   * runtime is asked whether it owns them.
+   */
+  private listedLocally = new Set<string>()
 
   /** @param ctx - Host context used to publish list and status changes to the browser. */
   constructor(private readonly ctx: Context) {}
@@ -75,8 +79,24 @@ export class MirroredSessions {
     if (this.isLocal(sessionId)) return undefined
     const claimed = this.registry.ownerOf(sessionId)
     if (claimed !== undefined) return claimed
+    // Before this Host's first list, a stored local thread was sent to every runtime's ownership check: 9 s of SSH
+    // listings for unreachable runtimes on the first open after a restart. This Host's own store answers first.
+    if (this.registry.sources().length > 0 && (await this.storedHere(sessionId))) {
+      this.listedLocally.add(sessionId)
+      return undefined
+    }
     // A runtime that cannot answer does not own the Session; the local implementation then reports it missing.
     return this.registry.resolveOwner(sessionId).catch(() => undefined)
+  }
+
+  /** Whether this Host's own persistence holds the Session; a failing lookup leaves the answer to the sources. */
+  private async storedHere(sessionId: SessionId): Promise<boolean> {
+    const persistence = this.ctx.get('sessionPersistence')
+    if (persistence === undefined) return false
+    return persistence.stat(sessionId).then(
+      snapshot => snapshot !== undefined,
+      () => false,
+    )
   }
 
   private async require(sessionId: SessionId, endpoint: string): Promise<MirroredSessionSource> {
@@ -155,15 +175,29 @@ export class MirroredSessions {
   ): AsyncIterable<SessionFollowFrame> {
     const sessionId = addressedSessionId(request.address)
     const source = sessionId === undefined ? undefined : await this.resolve(sessionId)
-    if (source === undefined) {
-      yield* local(request, signal)
-      return
+    if (source !== undefined && source.follow === undefined) {
+      throw new RemoteError('gateway/bad-request', 'This runtime cannot stream that Session.', {})
     }
-    if (source.follow === undefined) throw new RemoteError('gateway/bad-request', 'This runtime cannot stream that Session.', {})
+    const frames = (source?.follow === undefined ? local(request, signal) : source.follow(request, signal))[Symbol.asyncIterator]()
+    // Not `yield*`: a delegating generator keeps the last inner result in its frame while it waits for the next one, and
+    // a follow idles for as long as its view is open, so every open follow pinned its opening snapshot (up to ~6 MB of
+    // records each, 699 MB across the live Host's follows on 2026-11-09). The slots are cleared before each wait.
+    let step: IteratorResult<SessionFollowFrame> | undefined
+    let frame: SessionFollowFrame | undefined
     try {
-      yield* source.follow(request, signal)
+      for (;;) {
+        step = await frames.next()
+        if (step.done === true) return
+        frame = step.value
+        step = undefined
+        yield frame
+        frame = undefined
+      }
     } catch (error) {
+      if (source === undefined) throw error
       throw MirroredSessions.failure('session/follow', error)
+    } finally {
+      await frames.return?.()
     }
   }
 

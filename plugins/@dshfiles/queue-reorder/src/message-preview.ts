@@ -12,14 +12,21 @@ export class MessagePreviewModel {
       .join('')
 
   static readonly messagePreview = (content: readonly { readonly type: string; readonly text?: string | undefined }[], limit: number): string => {
-    const flat = content
+    const text = content
       .filter(block => block.type !== 'image' && block.type !== 'file')
       .map(block => (block.type === 'text' ? (block.text ?? '') : `[${block.type}]`))
       .join(' ')
-      .replace(/\s+/gu, ' ')
-      .trim()
-    const chars = Array.from(flat)
-    return chars.length > limit ? `${chars.slice(0, limit).join('')}…` : flat
+    // A preview never shows more than `limit` code points, and a code point costs at most two UTF-16 units: the head
+    // below already holds every code point the preview can show, so a long queued body is not scanned in full.
+    const coversText = text.length <= limit * 2 + 2
+    const head = coversText ? text : text.slice(0, limit * 2 + 2)
+    const chars = Array.from(head.replace(/\s+/gu, ' ').trimStart())
+    if (chars.length > limit) return `${chars.slice(0, limit).join('')}…`
+    if (coversText) return chars.join('').trimEnd()
+    // The head held only whitespace, which collapses to fewer characters than the message actually shows.
+    const flat = text.replace(/\s+/gu, ' ').trim()
+    const all = Array.from(flat)
+    return all.length > limit ? `${all.slice(0, limit).join('')}…` : flat
   }
 
   /** One preview per attachment, in message order; the same attachment twice gets distinct keys. */

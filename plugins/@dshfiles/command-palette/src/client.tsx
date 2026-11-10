@@ -302,8 +302,13 @@ export default defineClient({
   setup(ctx, decorate, metadata) {
     const plugin = metadata?.plugin
     if (plugin !== undefined) {
-      plugin.keyed(plugin.commands.keys, keys => ContributedCommandsModel.list(plugin.list(Command).get(), keys))
-      plugin.keyed(plugin.list(PaletteActions), ContributedCommandsModel.listActions)
+      const commandRows = PaletteApi.openRows()
+      const commandRowsOf = ContributedCommandsModel.createCommandRows()
+      plugin.onDispose(commandRows.dispose)
+      plugin.keyed(plugin.commands.keys, keys => commandRows.set(commandRowsOf(plugin.list(Command).get(), keys)))
+      const contributedRows = PaletteApi.openRows()
+      plugin.onDispose(contributedRows.dispose)
+      plugin.keyed(plugin.list(PaletteActions), actions => contributedRows.set(actions))
       let lastState: CommandPaletteState = { mode: null, recentLimit: 10 }
       plugin.provide(CommandPalette, {
         open: PaletteApi.open,

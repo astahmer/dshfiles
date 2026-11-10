@@ -1,0 +1,157 @@
+import type { MathResolver, mountAsync } from 'pele/lazy'
+import { KATEX_ENTRY_FILE, RENDERER_ENTRY_FILE, RENDERER_ROUTE } from './renderer-route.js'
+
+/** The part of pele's `lazy` entry this plugin calls. */
+export interface PeleRenderer {
+  readonly mountAsync: typeof mountAsync
+}
+
+/** Why the renderer is unavailable: the download failed, or the Host serves a build without the expected entry. */
+export class RendererLoadFailed extends Error {
+  readonly _tag = 'RendererLoadFailed'
+  override readonly name = 'RendererLoadFailed'
+  constructor(
+    readonly reason: 'download' | 'outdated',
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+export type RendererLoad = { readonly _tag: 'loaded'; readonly renderer: PeleRenderer } | { readonly _tag: 'failed'; readonly error: RendererLoadFailed }
+
+/** Loads pele, and KaTeX for `$$…$$` labels, from the Host route; one instance per page. */
+export interface RendererLoader {
+  /** Resolves to the renderer or why it is unavailable; never rejects. A success is kept; a failure is retried next call. */
+  readonly renderer: () => Promise<RendererLoad>
+  /** A typesetter for math labels, or undefined when KaTeX cannot be loaded (labels then stay readable TeX). */
+  readonly math: () => Promise<MathResolver | undefined>
+}
+
+/** The KaTeX options the math resolver passes; a subset of KaTeX's own `KatexOptions`. */
+interface KatexRenderOptions {
+  readonly displayMode: boolean
+  readonly output: 'mathml'
+  readonly throwOnError: boolean
+  readonly trust: boolean
+  readonly strict: 'ignore'
+  readonly maxSize: number
+  readonly maxExpand: number
+}
+
+interface KatexModule {
+  readonly renderToString: (tex: string, options: KatexRenderOptions) => string
+}
+
+/** What the Host route's `lazy.js` exports, before `mountAsync` is checked. */
+type RendererNamespace = Partial<PeleRenderer>
+/** What the Host route's `katex.mjs` exports, before `renderToString` is checked. */
+interface KatexNamespace {
+  readonly default?: Partial<KatexModule>
+}
+
+const describe = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
+
+/**
+ * Math labels: pele has no typesetter, so `$$…$$` goes through KaTeX's MathML output (no fonts or stylesheet needed),
+ * measured in a hidden probe. Ported from t3code's `MermaidDiagram.tsx` (MIT).
+ */
+const createMathResolver = (katex: KatexModule, document: Document): MathResolver => {
+  const typeset = new Map<string, ReturnType<MathResolver>>()
+  let probe: HTMLDivElement | null = null
+  // pele calls this on every layout, including resizes.
+  return (tex, size) => {
+    const key = `${String(size)}:${tex}`
+    if (typeset.has(key)) return typeset.get(key)
+    let markup: ReturnType<MathResolver> = null
+    try {
+      if (probe === null) {
+        probe = document.createElement('div')
+        probe.style.cssText = 'position:absolute;left:-9999px;visibility:hidden;display:inline-block;white-space:nowrap'
+        document.body.append(probe)
+      }
+      probe.style.fontSize = `${String(size)}px`
+      probe.innerHTML = katex.renderToString(tex, {
+        displayMode: true,
+        output: 'mathml',
+        throwOnError: true,
+        // No \href, \url, \htmlClass or other command that emits active HTML.
+        trust: false,
+        strict: 'ignore',
+        maxSize: 20,
+        maxExpand: 1000,
+      })
+      const expression = probe.querySelector('math')
+      // The annotation repeats the TeX source; the sanitizer would keep its text.
+      expression?.querySelector('annotation')?.remove()
+      if (expression !== null) {
+        const { width, height } = expression.getBoundingClientRect()
+        markup = { html: expression.outerHTML, width, height }
+      }
+    } catch {
+      // Unsupported TeX stays readable as its source.
+    }
+    typeset.set(key, markup)
+    return markup
+  }
+}
+
+/**
+ * Where one renderer module is served. After a failed load the URL gains `?attempt=N`, so a browser that cached the
+ * failed module fetch requests it again.
+ */
+export const moduleUrl = (origin: string, file: string, attempt: number): string =>
+  `${origin}${RENDERER_ROUTE}/${file}${attempt === 0 ? '' : `?attempt=${String(attempt)}`}`
+
+/**
+ * @param origin - the page origin the Host route lives on.
+ * @param document - the page document KaTeX output is measured in.
+ */
+export const createRendererLoader = (origin: string, document: Document): RendererLoader => {
+  let loaded: Promise<RendererLoad> | null = null
+  let failures = 0
+  let math: Promise<MathResolver | undefined> | null = null
+  // Computed specifiers: the Client build leaves these native browser imports of the Host route. Each names the
+  // namespace it expects with every member optional, and the caller checks the members it uses.
+  const importRenderer = (attempt: number): Promise<RendererNamespace> => import(/* @vite-ignore */ moduleUrl(origin, RENDERER_ENTRY_FILE, attempt))
+  const importKatex = (): Promise<KatexNamespace> => import(/* @vite-ignore */ moduleUrl(origin, KATEX_ENTRY_FILE, 0))
+
+  const renderer = (): Promise<RendererLoad> => {
+    if (loaded !== null) return loaded
+    const pending = importRenderer(failures).then(
+      (namespace): RendererLoad => {
+        const candidate = namespace.mountAsync
+        return typeof candidate === 'function'
+          ? { _tag: 'loaded', renderer: { mountAsync: candidate } }
+          : {
+              _tag: 'failed',
+              error: new RendererLoadFailed('outdated', 'The diagram renderer is out of date. Rebuild @dshfiles/mermaid-diagrams, then reload the page.'),
+            }
+      },
+      (cause: unknown): RendererLoad => ({
+        _tag: 'failed',
+        error: new RendererLoadFailed('download', `The diagram renderer could not be downloaded (${describe(cause)}). Check the connection to DSH and retry.`),
+      }),
+    )
+    loaded = pending
+    void pending.then(result => {
+      if (result._tag === 'loaded') return
+      failures += 1
+      loaded = null
+    })
+    return pending
+  }
+
+  const mathResolver = (): Promise<MathResolver | undefined> => {
+    math ??= importKatex().then(
+      namespace => {
+        const katex = namespace.default
+        return typeof katex?.renderToString === 'function' ? createMathResolver({ renderToString: katex.renderToString }, document) : undefined
+      },
+      () => undefined,
+    )
+    return math
+  }
+
+  return { renderer, math: mathResolver }
+}

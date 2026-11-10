@@ -24,11 +24,12 @@ const AGE_CHOICES = [
 const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: string }[] = [
   { kind: 'empty', label: 'Empty' },
   { kind: 'integrated', label: 'Already landed' },
+  { kind: 'merged', label: 'Merged pull request' },
   { kind: 'untracked', label: 'Untracked folders' },
   { kind: 'secondary', label: 'Other JJ workspaces' },
 ]
 
-const KIND_TAG = { empty: 'WS', integrated: 'WS', secondary: 'JJ', untracked: 'DIR' } as const satisfies Record<CleanupKindView, string>
+const KIND_TAG = { empty: 'WS', integrated: 'WS', merged: 'PR', secondary: 'JJ', untracked: 'DIR' } as const satisfies Record<CleanupKindView, string>
 
 const AGE_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 

@@ -14,6 +14,8 @@
 
 ![Preview cleanup with a custom inactivity threshold](docs/screenshots/workspace-cleanup.png)
 
+![Keep a failed thread-workspace cleanup on its project's panel](docs/screenshots/workspace-cleanup-failure.png)
+
 ![Open Jujutsu revision links from chat](docs/screenshots/chat-references.png)
 
 A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
@@ -121,7 +123,8 @@ Two panels in navigation, the main view and the Workbench chooser: **Revision gr
   Hovering
   one lazily previews a bounded revision graph around it: the reference, its
   neighbours, and the working copy, main, main@origin and default workspace
-  landmarks, with the referenced row marked `>`. The preview labels the selected
+  landmarks (main being the project's main branch, which jj-integration resolves
+  per project), with the referenced row marked `>`. The preview labels the selected
   revision's commit-ID prefix and change ID separately; hover the prefix for the
   full commit ID. A click
   opens the Jujutsu side panel on that repository and either
@@ -151,7 +154,10 @@ Two panels in navigation, the main view and the Workbench chooser: **Revision gr
 
 - **Current**, **main@origin**, **main**, and **Default** locate exact revisions.
   Current is the selected JJ workspace's `@`; Default is `default@`, not the
-  trunk bookmark. Missing or conflicting landmarks are disabled rather than
+  trunk bookmark. The main landmarks, the trunk lane and **Rebase onto** follow
+  the project's main branch (jj-integration's Settings › Projects, `dsh.project.json`
+  or origin's default branch), so a `develop` project shows **develop** and
+  **develop@origin**; without jj-integration, or on an older Host, they stay on `main`. Missing or conflicting landmarks are disabled rather than
   guessed. Coincident landmarks remain separate shortcuts to the same row.
 - Locate scrolls, focuses, and briefly highlights its row. A filtered or
   outside-page target offers **Show temporarily** or **Clear filters and

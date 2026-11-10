@@ -38,6 +38,7 @@ const hostVerb =
 const effectDeps = (deps: FixtureDeps): ThreadActionDeps => ({
   ...deps,
   listSessions: hostVerb(deps.listSessions),
+  sessionExists: hostVerb(deps.sessionExists),
   readTitles: hostVerb(deps.readTitles),
   listThreadRelations: hostVerb(deps.listThreadRelations),
   searchThreadContent: hostVerb(deps.searchThreadContent),
@@ -54,6 +55,7 @@ const effectDeps = (deps: FixtureDeps): ThreadActionDeps => ({
   ownWorkspaceFor: hostVerb(deps.ownWorkspaceFor),
   stop: hostVerb(deps.stop),
   selectModel: hostVerb(deps.selectModel),
+  inspectProject: hostVerb(deps.inspectProject),
   registerProject: hostVerb(deps.registerProject),
   renameProject: hostVerb(deps.renameProject),
   deleteProject: hostVerb(deps.deleteProject),
@@ -70,6 +72,7 @@ const createThreadActions = (deps: FixtureDeps) => {
       Effect.runPromise(action({ input: context.input, caller: context.caller }), { signal: context.signal })
   return {
     list: call(actions.list),
+    status: call(actions.status),
     references: call(actions.references),
     archive: call(actions.archive),
     unarchive: call(actions.unarchive),
@@ -96,6 +99,7 @@ const createThreadActions = (deps: FixtureDeps) => {
 
 const createDeps = (overrides: Partial<FixtureDeps> = {}): FixtureDeps => ({
   listSessions: async () => [summary('session-a'), summary('session-b')],
+  sessionExists: async () => true,
   readTitles: async ids => new Map(ids.map(id => [id, `title ${id}`])),
   listThreadRelations: async () => [],
   searchThreadContent: async () => [],
@@ -116,6 +120,17 @@ const createDeps = (overrides: Partial<FixtureDeps> = {}): FixtureDeps => ({
   ownWorkspaceFor: async projectId => projectId,
   stop: async () => undefined,
   selectModel: async input => ({ provider: input.provider, model: input.model }),
+  inspectProject: async path => ({
+    path,
+    kind: 'git',
+    repositoryRoot: path,
+    remoteUrl: 'https://example.test/repo.git',
+    defaultBranch: 'main',
+    gitAbove: false,
+    brokenJjMetadata: false,
+    canEnableJujutsu: true,
+    reason: null,
+  }),
   registerProject: async (path, title) => ({ projectId: 'project-1', title: title ?? path, path, created: true }),
   renameProject: async (projectId, title) => ({ projectId, title }),
   deleteProject: async () => undefined,
@@ -166,6 +181,38 @@ describe('thread actions: fan out', () => {
     expect(calls.indexOf('select:session-1:alpha')).toBeLessThan(calls.indexOf('prompt:session-1'))
     expect(calls.indexOf('select:session-2:beta')).toBeLessThan(calls.indexOf('prompt:session-2'))
     expect(calls).toContain('rename:session-1:Compare these answers · alpha')
+  })
+})
+
+describe('thread actions: status', () => {
+  test('reports each named thread as stored, archived and settled without listing or reading titles', async () => {
+    const stored = new Set(['session-live', 'session-archived', 'session-settled'])
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => {
+          throw new Error('status must not list threads')
+        },
+        readTitles: async () => {
+          throw new Error('status must not read titles')
+        },
+        sessionExists: async sessionId => stored.has(sessionId),
+        archivedSessionIds: () => ['session-archived'],
+        settledSessionIds: () => ['session-settled'],
+      }),
+    )
+
+    const result = await actions.status({
+      input: { sessionIds: ['session-live', 'session-archived', 'session-settled', 'session-missing'] },
+      caller: agent('caller'),
+      signal,
+    })
+
+    expect(result.threads).toEqual([
+      { sessionId: 'session-live', exists: true, archived: false, settled: false },
+      { sessionId: 'session-archived', exists: true, archived: true, settled: false },
+      { sessionId: 'session-settled', exists: true, archived: false, settled: true },
+      { sessionId: 'session-missing', exists: false, archived: false, settled: false },
+    ])
   })
 })
 
@@ -228,6 +275,46 @@ describe('thread actions: list', () => {
 
     expect(result.threads.map(thread => thread.sessionId)).toEqual(['session-c'])
     expect(result.total).toBe(1)
+  })
+
+  test('folds titles only for the rows a plain page returns', async () => {
+    const folded: string[][] = []
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [0, 1, 2, 3, 4].map(index => summary(`session-${String(index)}`, { updatedAt: 100 - index })),
+        readTitles: async ids => {
+          folded.push([...ids])
+          return new Map(ids.map(id => [id, `title ${id}`]))
+        },
+      }),
+    )
+
+    const result = await actions.list({ input: { limit: 2 }, caller: agent('session-a'), signal })
+
+    expect(folded).toEqual([['session-0', 'session-1']])
+    expect(result.threads.map(thread => thread.title)).toEqual(['title session-0', 'title session-1'])
+    expect(result.total).toBe(5)
+    expect(result.truncated).toBe(true)
+  })
+
+  test('still folds every candidate title when a query can match past the page', async () => {
+    const folded: string[][] = []
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [0, 1, 2].map(index => summary(`session-${String(index)}`, { updatedAt: 100 - index })),
+        readTitles: async ids => {
+          folded.push([...ids])
+          return new Map(ids.map(id => [id, id === 'session-2' ? 'needle' : `title ${id}`]))
+        },
+      }),
+    )
+
+    const result = await actions.list({ input: { query: 'needle', limit: 1 }, caller: agent('session-a'), signal })
+
+    expect(folded).toEqual([['session-0', 'session-1', 'session-2']])
+    expect(result.threads.map(thread => thread.sessionId)).toEqual(['session-2'])
+    expect(result.total).toBe(1)
+    expect(result.truncated).toBe(false)
   })
 })
 
@@ -603,6 +690,17 @@ describe('thread actions: projects', () => {
       title: 'New',
       path: '/work/new',
       created: true,
+      inspection: {
+        path: '/work/new',
+        kind: 'git',
+        repositoryRoot: '/work/new',
+        remoteUrl: 'https://example.test/repo.git',
+        defaultBranch: 'main',
+        gitAbove: false,
+        brokenJjMetadata: false,
+        canEnableJujutsu: true,
+        reason: null,
+      },
     })
     expect(await actions.projectRename({ input: { projectId: 'project-1', title: 'Renamed' }, caller: agent('session-a'), signal })).toEqual({
       projectId: 'project-1',
@@ -878,6 +976,7 @@ describe('thread actions: tool exposure', () => {
       'thread_prompt',
       'thread_stop',
       'thread_select_model',
+      'thread_status',
       'thread_references',
       'project_list',
       'project_register',
@@ -897,6 +996,6 @@ describe('thread actions: tool exposure', () => {
     const readOnly = Object.values(threadActionsApi.methods)
       .filter(method => method.tool?.readOnly === true)
       .map(method => method.tool?.name)
-    expect(readOnly).toEqual(['thread_list', 'thread_references', 'project_list'])
+    expect(readOnly).toEqual(['thread_list', 'thread_status', 'thread_references', 'project_list'])
   })
 })

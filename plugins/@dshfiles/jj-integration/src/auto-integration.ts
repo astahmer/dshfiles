@@ -5,6 +5,7 @@ import type { ProjectChecksVerifiedTurn } from '@dshfiles/project-checks/complet
 import { Cause, Context, Effect, Layer, Option, Path, Ref } from 'effect'
 import { ActivityLog, WorkspaceRegistry } from './host-edges-promise.js'
 import { JjSettings } from './jj-settings.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { mayAutoIntegrateWorkspace } from './settings.js'
 import { ThreadWorkspaces, type LandCandidateVerification, type ThreadRevision } from './thread-workspaces.js'
 import type { ThreadLocation } from './thread-workspace-model.js'
@@ -49,6 +50,7 @@ export class AutoIntegration extends Context.Service<AutoIntegration, { readonly
       const threads = yield* ThreadWorkspaces
       const registry = yield* WorkspaceRegistry
       const settings = yield* JjSettings
+      const projectBookmarks = yield* ProjectBookmarks
       const sync = yield* WorkspaceSync
       const log = yield* ActivityLog
       const projectChecks = (yield* HostApis).client(projectChecksApi)
@@ -82,7 +84,7 @@ export class AutoIntegration extends Context.Service<AutoIntegration, { readonly
             log.emit({ type: `workspace.auto_integration_${state}`, summary, detail, path: workspace.path, sessionId, correlationId, level })
 
           yield* report('queued', `Queued automatic integration for ${path.basename(workspace.path)}`)
-          const bookmark = (yield* settings.get).bookmark
+          const bookmark = yield* projectBookmarks.bookmarkFor(initialLocation.value.repoRoot)
           const authorizedRepoRoot = yield* Ref.make<string | undefined>(undefined)
           const outcome = yield* threads
             .landVerified({

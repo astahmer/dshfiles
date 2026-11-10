@@ -1,5 +1,14 @@
 @import '@dshfiles/plugin-ui/styles.css';
 
+/* The kit sheet scans every owned plugin (`@source '../..'`), which also reads test files and markdown that never
+   ship to a browser: they cost roughly a third of the scan and produce no class the app can render. */
+@source not '../../*/tests';
+@source not '../../*/src/**/*.test.ts';
+@source not '../../*/src/**/*.test.tsx';
+@source not '../../*/src/**/*.spec.ts';
+@source not '../../*/src/**/*.spec.tsx';
+@source not '../../*/**/*.md';
+
 /* Shiki highlights with its `css-variables` theme: each token colour is `var(--shiki-token-*)`
    with no fallback, and the Web shell defines none of those variables, so every token inherited
    the plain text colour. Map every scope the theme emits onto the palette for both schemes;

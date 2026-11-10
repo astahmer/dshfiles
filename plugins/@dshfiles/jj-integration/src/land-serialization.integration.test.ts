@@ -141,6 +141,23 @@ describe.skipIf(!jjAvailable)('thread landing serialization against real jj', ()
     expect((await next).status).toBe('landed')
   })
 
+  it('provision claims a spare still being added instead of adding a second workspace beside it', async () => {
+    const repo = join(root, 'repo-a')
+    initRepository(repo)
+    const addedPaths = () => calls.filter(call => call.args[0] === 'workspace' && call.args[1] === 'add').map(call => call.args[2])
+    // Hold the spare the first provision warms (the second `workspace add`), so the next provision overlaps it.
+    beforeCall = async input => {
+      if (input.args[0] === 'workspace' && input.args[1] === 'add' && addedPaths().length === 2)
+        await new Promise(resolvePromise => setTimeout(resolvePromise, 400))
+    }
+    const first = await threads.provision(repo)
+    const second = await threads.provision(repo)
+    const [firstAdded, spareAdded] = addedPaths()
+    expect(firstAdded).toBe(first.path)
+    // A concurrent `jj workspace add` here can fail with “Could not commit packed-ref transaction” in a colocated repo.
+    expect(second.path).toBe(spareAdded)
+  })
+
   it('reports queued, validating then rebasing progress in that order', async () => {
     const repo = join(root, 'repo-a')
     initRepository(repo)

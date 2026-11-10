@@ -203,13 +203,35 @@ export const profileFor = (page: Page): BootedProfile => {
   return profile
 }
 
-const assertClientBootReady = (outcome: Awaited<ReturnType<typeof readBootOutcome>>, profile: BootedProfile, label: string): void => {
-  const failures = ClientBootCheckModel.clientEntryFailures(ClientBootCheckModel.parseBootText(outcome.text), profile.expectedClientEntries)
+type BootOutcome = Awaited<ReturnType<typeof readBootOutcome>>
+
+/** Every way a scratch boot can fail, as one list so a retry can tell whether it helped. */
+const bootProblems = (outcome: BootOutcome, profile: BootedProfile): readonly string[] => [
+  ...(outcome.ready ? [] : [`readiness: ${outcome.readinessError ?? 'not reported'}`]),
+  ...outcome.missingClientEntries.map(id => `missing Client entry: ${id}`),
+  ...(outcome.failureCardVisible ? ['the boot failure card stayed mounted'] : []),
+  ...ClientBootCheckModel.clientEntryFailures(ClientBootCheckModel.parseBootText(outcome.text), profile.expectedClientEntries).map(
+    entry => `Client entry ${entry.id}: ${entry.state}${entry.detail === undefined ? '' : ` (${entry.detail})`}`,
+  ),
+]
+
+const assertClientBootReady = (outcome: BootOutcome, profile: BootedProfile, label: string): void => {
   const details = `${label}\n${outcome.text}\n\nHost output:\n${profile.output()}`
-  expect(outcome.ready, `${details}\n\nReadiness: ${outcome.readinessError ?? 'not reported'}`).toBe(true)
-  expect(outcome.missingClientEntries, details).toEqual([])
-  expect(outcome.failureCardVisible, details).toBe(false)
-  expect(failures, details).toEqual([])
+  expect(bootProblems(outcome, profile), `${details}\n\nReadiness: ${outcome.readinessError ?? 'not reported'}`).toEqual([])
+}
+
+/**
+ * A fresh page asks for the Client bundles while the Host is still serving them, and one navigation can lose that race:
+ * the boot card then names core entries that never loaded. One more navigation separates that cold start from a bundle
+ * that is really broken — and the first attempt's problems stay in the failure, so the evidence still shows what broke.
+ */
+const readBootAfterRetry = async (page: Page, profile: BootedProfile): Promise<{ readonly outcome: BootOutcome; readonly firstAttempt: readonly string[] }> => {
+  const first = await readProfileOutcome(page, profile)
+  const firstAttempt = bootProblems(first, profile)
+  if (firstAttempt.length === 0) return { outcome: first, firstAttempt }
+  process.stderr.write(`[boot-retry] ${profile.profile}: the first navigation failed (${firstAttempt.join('; ')}), navigating once more\n`)
+  await visitScratchProfile(page, profile)
+  return { outcome: await readProfileOutcome(page, profile), firstAttempt }
 }
 
 const readProfileOutcome = (page: Page, profile: BootedProfile) =>
@@ -254,9 +276,15 @@ export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProf
   try {
     await visitScratchProfile(page, profile)
     // Preview consent is optional; a boot failure must report its real audit instead of timing out on that dialog.
-    const boot = await readProfileOutcome(page, profile)
-    assertClientBootReady(boot, profile, 'The isolated scratch profile did not boot cleanly.')
-    expect(boot.slotFailures, 'The isolated scratch profile lost a Slot during boot.').toEqual([])
+    const boot = await readBootAfterRetry(page, profile)
+    assertClientBootReady(
+      boot.outcome,
+      profile,
+      boot.firstAttempt.length === 0
+        ? 'The isolated scratch profile did not boot cleanly.'
+        : `The isolated scratch profile did not boot cleanly on either navigation.\nFirst navigation:\n${boot.firstAttempt.join('\n')}`,
+    )
+    expect(boot.outcome.slotFailures, 'The isolated scratch profile lost a Slot during boot.').toEqual([])
     // The boot seeds the Preview Notice acknowledgement (withStartupAcknowledgements), so only provider setup can open;
     // a notice here means that seed broke, and the overlay assertion below names it instead of a timed dismissal hiding it.
     await StartupDialogs.dismissProviderSetupDuringStartup(page)

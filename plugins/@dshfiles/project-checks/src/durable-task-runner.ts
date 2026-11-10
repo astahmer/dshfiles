@@ -200,11 +200,8 @@ export class DurableTasks extends Context.Service<
       })
 
       const list = Effect.fn('project-checks tasks list')(function* (sessionId: string) {
-        const tasks = yield* store.all
-        return tasks
-          .filter(task => task.sessionId === sessionId)
-          .toSorted((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id))
-          .slice(0, MAX_LISTED_TASKS)
+        const tasks = yield* store.listForSession({ sessionId, limit: MAX_LISTED_TASKS })
+        return tasks.toSorted((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id))
       })
 
       const cancel = Effect.fn('project-checks task cancel')(function* (taskId: string) {

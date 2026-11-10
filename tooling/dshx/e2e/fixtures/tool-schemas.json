@@ -1,8 +1,9 @@
 {
-  "hostBundles": 68,
+  "hostBundles": 79,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
+    "@dshfiles/agent-loop",
     "@dshfiles/agent-plan",
     "@dshfiles/agent-questions",
     "@dshfiles/agent-telemetry",
@@ -20,6 +21,8 @@
     "@dshfiles/capabilities-hub",
     "@dshfiles/command-palette",
     "@dshfiles/context-compaction",
+    "@dshfiles/cordis-cards",
+    "@dshfiles/cordis-client-runner",
     "@dshfiles/diff-viewed",
     "@dshfiles/editor",
     "@dshfiles/fff-search",
@@ -32,8 +35,11 @@
     "@dshfiles/mcp-endpoint",
     "@dshfiles/mcp-servers",
     "@dshfiles/memory",
+    "@dshfiles/mermaid-diagrams",
     "@dshfiles/model-effort-picker",
     "@dshfiles/multi-host",
+    "@dshfiles/phone-access",
+    "@dshfiles/phone-pairing",
     "@dshfiles/plugin-guide",
     "@dshfiles/policies",
     "@dshfiles/preview",
@@ -45,13 +51,18 @@
     "@dshfiles/queue-reorder",
     "@dshfiles/references",
     "@dshfiles/resource-packs",
+    "@dshfiles/schedule",
     "@dshfiles/secret-catalog",
+    "@dshfiles/session-persistence-jsonl",
     "@dshfiles/session-search",
     "@dshfiles/session-undo",
     "@dshfiles/settings-models",
     "@dshfiles/settings-shell",
+    "@dshfiles/settings-subagent",
     "@dshfiles/settings-web-search",
     "@dshfiles/shared-streams",
+    "@dshfiles/storage-domain",
+    "@dshfiles/storage-json",
     "@dshfiles/test-runs",
     "@dshfiles/thread-share",
     "@dshfiles/thread-sidebar",
@@ -70,12 +81,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 589,
-  "apiToolBindings": 405,
-  "apiToolNameCount": 405,
-  "apiToolSchemas": 404,
+  "apiMethods": 599,
+  "apiToolBindings": 414,
+  "apiToolNameCount": 414,
+  "apiToolSchemas": 413,
   "definedTools": 24,
-  "tools": 428,
+  "tools": 437,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -4796,11 +4807,14 @@
     },
     {
       "name": "jj_graph_navigation",
-      "description": "Resolve the current, main@origin, main and default-workspace landmarks in one call. Read-only.",
+      "description": "Resolve the current, main@origin, main and default-workspace landmarks in one call; `bookmark` names the project main branch the main landmarks use (main by default). Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
           "repoId": {
+            "type": "string"
+          },
+          "bookmark": {
             "type": "string"
           }
         },
@@ -5357,8 +5371,24 @@
       }
     },
     {
+      "name": "jj_project_bookmark",
+      "description": "The main branch of the project holding a path: the bookmark its thread workspaces start from, Land advances, and source control and Changes compare against, with the layer that chose it (Settings › Projects choice, dsh.project.json, origin’s default branch, or the global setting). Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "jj_reference_graph",
-      "description": "A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks. Read-only.",
+      "description": "A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks; `bookmark` names the project main branch those main landmarks use (main by default). Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -5366,6 +5396,9 @@
             "type": "string"
           },
           "reference": {
+            "type": "string"
+          },
+          "bookmark": {
             "type": "string"
           }
         },
@@ -5483,6 +5516,26 @@
       }
     },
     {
+      "name": "jj_set_project_bookmark",
+      "description": "Choose the main branch of the project holding a path, as Settings › Projects does: new thread workspaces start from it, Land advances it, and source control and Changes compare against it. `bookmark: null` removes the choice so dsh.project.json, origin’s default branch or the global setting decide again (reverse it the same way). Returns the new resolution. Call only when the user asked to change that project’s main branch.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "bookmark": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "bookmark"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "jj_thread_cleanup",
       "description": "Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision unless one other local bookmark holds all of it (preview rows name it in integratedInto, and the bookmark stays), no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left, or held by another bookmark). Other JJ workspaces are manual-only and opt-in: present checkouts must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. Missing secondary checkouts can only be forgotten when their root stays absent and no unlanded work or live Session remains; cleanup never deletes their path. JJ snapshots present working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. When targets is present, only matching preview rows are removed. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.",
       "parameters": {
@@ -5501,6 +5554,7 @@
               "enum": [
                 "empty",
                 "integrated",
+                "merged",
                 "secondary",
                 "untracked"
               ]
@@ -5522,6 +5576,7 @@
                   "enum": [
                     "empty",
                     "integrated",
+                    "merged",
                     "secondary",
                     "untracked"
                   ]
@@ -5549,10 +5604,15 @@
     },
     {
       "name": "jj_thread_cleanup_jobs",
-      "description": "Progress and recent trail of background workspace cleanup jobs, newest first: state, phase, counts, the item in flight, the failure, and the newest job’s full result. Read-only.",
+      "description": "Progress and recent trail of background workspace cleanup jobs, newest first: state, phase, owning repository, counts, the item in flight, the failure with its safe recovery, and the full result of the newest job of each repository. Pass path to see one project’s jobs, including those asked from its thread workspaces. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "path": {
+            "description": "A project or one of its thread workspaces: only the cleanup jobs of the repository that owns it, plus runs over every repository.",
+            "type": "string"
+          }
+        },
         "additionalProperties": false
       }
     },
@@ -5645,7 +5705,7 @@
     },
     {
       "name": "jj_thread_rebase",
-      "description": "Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.",
+      "description": "Integrate this thread’s described work into the project’s main branch (Settings › Projects) unless another bookmark is named: rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -5696,7 +5756,7 @@
     },
     {
       "name": "jj_thread_status",
-      "description": "Show this thread’s jj workspace: its revisions not yet on the target bookmark (main by default), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.",
+      "description": "Show this thread’s jj workspace: its revisions not yet on the project’s main branch (Settings › Projects), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8238,6 +8298,44 @@
       }
     },
     {
+      "name": "project_icon",
+      "description": "The icon of the project at a folder: the iconPath declared in dsh.project.json, then a short list of conventional paths, then a monogram from the folder name. Cached on the Host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_identities",
+      "description": "The repository identity behind each project folder: the Git/Jujutsu origin when there is one, else the repository root, else the folder itself, so two checkouts of one repository can group as one project. Cached on the Host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_init",
       "description": "Turn an existing folder into a project in place: jj git init (colocated), a README.md when it has none, a first described commit and a main bookmark, then register it as a project. Existing files are kept and become the first revision. Refuses a folder that is already a repository or sits inside one. Call only when the user asked to initialize that folder.",
       "parameters": {
@@ -8279,6 +8377,15 @@
       }
     },
     {
+      "name": "project_projects",
+      "description": "List registered projects (DSH Workspaces) on this machine with their workspace id, title and path, leaving out jj thread workspaces. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_publish",
       "description": "Publish a local repository that has no origin: create the GitHub repository with the GitHub CLI, add it as origin and push the bookmark. visibility is required so nothing is created by default; a repository that already has an origin, or no commits, is refused with the next command. Call only when the user asked to publish that repository.",
       "parameters": {
@@ -8307,7 +8414,7 @@
     },
     {
       "name": "project_register",
-      "description": "Register an existing directory as a project so threads can live in it. Call only when the user asked for this.",
+      "description": "Register an existing directory as a project so threads can live in it, and report what the folder is. It registers only: it never clones and never enables Jujutsu — read project_inspect, then project_init or jj_open_repository for that. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8512,7 +8619,7 @@
             "type": "string"
           },
           "base": {
-            "description": "Base bookmark or revision; defaults to the first of main, master or trunk.",
+            "description": "Base bookmark or revision; defaults to the project’s main branch (Settings › Projects, dsh.project.json or origin’s default branch), else the first of main, master or trunk.",
             "type": "string"
           },
           "fromChangeId": {
@@ -10318,6 +10425,25 @@
       }
     },
     {
+      "name": "thread_status",
+      "description": "Point lookup of named threads (DSH Sessions): whether each is still stored, archived or settled, without listing or reading any log. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "sessionIds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "thread_stop",
       "description": "Stop one thread's running work through the same cancel path as the sidebar's stop: its current turn ends and the thread stays available. Call only when the user asked for this.",
       "parameters": {
@@ -10330,6 +10456,41 @@
         "required": [
           "sessionId"
         ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "thread_subscribe",
+      "description": "Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) is queued into the subscriber and wakes it when it is idle. Defaults the subscriber to the calling thread. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "subscriberSessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "thread_subscriptions",
+      "description": "List thread subscriptions: which thread is notified when which other thread finishes a turn. Filter by subscriber or target; omit both for every edge. Nothing is delivered without a subscription. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "subscriberSessionId": {
+            "type": "string"
+          },
+          "targetSessionId": {
+            "type": "string"
+          }
+        },
         "additionalProperties": false
       }
     },
@@ -10372,6 +10533,25 @@
         "type": "object",
         "properties": {
           "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "thread_unsubscribe",
+      "description": "Stop the notices for one pair: no further completion of the target reaches the subscriber. Defaults the subscriber to the calling thread. Call only when the user asked for this.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "subscriberSessionId": {
             "type": "string"
           }
         },

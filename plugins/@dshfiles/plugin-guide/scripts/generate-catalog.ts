@@ -12,7 +12,7 @@
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(here, '..')
@@ -104,7 +104,7 @@ interface SlotReference {
 }
 
 // SAFETY: slot-capabilities.ts exports CLIENT_SLOT_REFERENCES typed as ClientSlotReference[], which SlotReference restates field for field.
-const slotModule = (await import(slotReferenceFile)) as { readonly CLIENT_SLOT_REFERENCES: readonly SlotReference[] }
+const slotModule = (await import(pathToFileURL(slotReferenceFile).href)) as { readonly CLIENT_SLOT_REFERENCES: readonly SlotReference[] }
 const slotText = read(slotReferenceFile)
 /** The DSH release the slot facts were last checked against, from the reference's own header. */
 const slotFactsCheckedAgainst = /against the installed ([0-9][^\s]*)\s+(?:\*\s+)?declarations/u.exec(slotText)?.[1] ?? 'unknown'
@@ -303,7 +303,7 @@ for (const name of readdirSync(pluginsDir).sort()) {
 // ---- Presentation surfaces from the feature catalogs ----------------------------------------------------------------
 
 // SAFETY: features.ts exports DSHX_PRESENTATION_SURFACES as a readonly tuple of string literals.
-const featureSchema = (await import(featureSchemaFile)) as { readonly DSHX_PRESENTATION_SURFACES: readonly string[] }
+const featureSchema = (await import(pathToFileURL(featureSchemaFile).href)) as { readonly DSHX_PRESENTATION_SURFACES: readonly string[] }
 const usage = new Map<string, { count: number; destinations: Set<string>; examples: string[] }>()
 for (const name of readdirSync(pluginsDir).sort()) {
   const catalogFile = join(pluginsDir, name, 'dshx.features.json')

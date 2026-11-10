@@ -10,6 +10,7 @@ import {
 } from './api.js'
 import { ReviewGit } from './git.js'
 import { type JjReadFailed, ReviewJj } from './jj.js'
+import { ProjectBase } from './project-base.js'
 import type { ReviewBackend } from './review-backend.js'
 import { RevisionReviewModel, type ResolvedRevision } from './revision-review.js'
 import { groupPatch } from './scopes.js'
@@ -54,6 +55,7 @@ const diffArgs = (base: string, head = HEAD_REVISION): readonly string[] => ['di
 const jjBackend = (jj: ReviewJj['Service']): ReviewBackend => ({
   vcs: 'jj',
   baseCandidates: BASE_CANDIDATES,
+  projectCandidates: branch => [branch, `${branch}@origin`],
   liveHead: HEAD_REVISION,
   savedRevision: changeIdRevset,
   // An unknown revision just means this candidate is absent; a workspace that is not a jj repository is not a missing base.
@@ -91,6 +93,8 @@ export class ReviewWorkspace extends Context.Service<
       const jjReads = yield* ReviewJj
       const jj = jjBackend(jjReads)
       const git = yield* Effect.serviceOption(ReviewGit)
+      // Without jj-integration (or in tests) a review without a base keeps trying main, master and trunk.
+      const projectBase = yield* Effect.serviceOption(ProjectBase)
       const detector = yield* VcsDetector
       const fileSystem = yield* FileSystem.FileSystem
 
@@ -110,10 +114,16 @@ export class ReviewWorkspace extends Context.Service<
         if (input.requested !== undefined && input.requested.length > 0) {
           return (yield* input.backend.resolves({ path: input.path, revision: input.requested })) ? input.requested : undefined
         }
-        for (const candidate of input.backend.baseCandidates) {
+        for (const candidate of yield* baseCandidatesFor(input.backend, input.path)) {
           if (yield* input.backend.resolves({ path: input.path, revision: candidate })) return candidate
         }
         return undefined
+      })
+
+      /** The project's main branch first (chosen, declared or detected), then the conventional names. */
+      const baseCandidatesFor = Effect.fnUntraced(function* (backend: ReviewBackend, path: string) {
+        const project = Option.isSome(projectBase) ? yield* projectBase.value.defaultFor(path) : undefined
+        return [...new Set([...(project === undefined ? [] : backend.projectCandidates(project)), ...backend.baseCandidates])]
       })
 
       const readRange = Effect.fn('review range read')(function* (input: ReviewInput & { readonly exactRange: boolean; readonly backend: ReviewBackend }) {
@@ -121,7 +131,12 @@ export class ReviewWorkspace extends Context.Service<
         const base = input.exactRange
           ? backend.savedRevision(input.fromChangeId ?? '')
           : yield* resolveBase({ backend, path: input.path, requested: input.base })
-        if (base === undefined) return failure(input.path, 'no-base', `No base bookmark found; expected one of ${backend.baseCandidates.join(', ')}.`)
+        if (base === undefined)
+          return failure(
+            input.path,
+            'no-base',
+            `No base bookmark found; expected one of ${(yield* baseCandidatesFor(backend, input.path)).join(', ')}. Choose the project's main branch in Settings › Projects, or type a base.`,
+          )
         if (input.exactRange && !(yield* backend.resolves({ path: input.path, revision: base })))
           return failure(input.path, 'no-base', 'The saved base change ID no longer resolves in this repository.')
         const headRevision = input.exactRange ? backend.savedRevision(input.toChangeId ?? '') : backend.liveHead
@@ -197,17 +212,20 @@ export class ReviewWorkspace extends Context.Service<
           ),
         )
 
-      /** One revision's change, within what is left of the review's one patch budget. */
+      /** One revision's change, within what is left of the review's one patch budget; `patch` is the batched read's own text. */
       const readRevision = Effect.fn('review revision read')(function* (input: {
         readonly path: string
         readonly revision: ResolvedRevision
         readonly budget: number
+        readonly patch?: string | undefined
       }) {
         // An exhausted budget still lists the revision, flagged, instead of dropping it from the review.
         const diff =
           input.budget <= 0
             ? { stdout: '', truncated: true }
-            : yield* jjReads.read({ path: input.path, args: RevisionReviewModel.diffArgs(input.revision.commitId), outputLimit: input.budget })
+            : input.patch === undefined
+              ? yield* jjReads.read({ path: input.path, args: RevisionReviewModel.diffArgs(input.revision.commitId), outputLimit: input.budget })
+              : { stdout: input.patch, truncated: false }
         const patch = diff.stdout
         const grouped = yield* groupPatch({ patch, title: input.revision.shortChangeId })
         return {
@@ -224,8 +242,34 @@ export class ReviewWorkspace extends Context.Service<
         } satisfies RevisionReview
       })
 
-      const readRevisions = Effect.fn('review revisions read')(function* (input: RevisionsReviewInput) {
+      /** Every revision's own patch in one jj read; undefined when that read fails, is cut, or its framing is unusable, so the one-by-one reads still decide. */
+      const readPatches = Effect.fn('review revisions patch batch')(function* (input: {
+        readonly path: string
+        readonly revisions: readonly ResolvedRevision[]
+      }) {
+        if (input.revisions.length < 2) return undefined
+        const output = yield* jjReads
+          .read({ path: input.path, args: RevisionReviewModel.patchesArgs(input.revisions.map(revision => revision.commitId)), outputLimit: MAX_PATCH_CHARS })
+          .pipe(Effect.option)
+        return Option.isNone(output) || output.value.truncated ? undefined : RevisionReviewModel.decodePatches(output.value.stdout)
+      })
+
+      /** Every requested id's revision in one read, ancestors first; undefined unless each id names one of the returned revisions. */
+      const describeSelection = Effect.fn('review revisions describe')(function* (input: { readonly path: string; readonly revisions: readonly string[] }) {
+        if (input.revisions.length < 2) return undefined
+        const output = yield* jjReads
+          .read({ path: input.path, args: RevisionReviewModel.describeManyArgs(input.revisions), outputLimit: 128_000 })
+          .pipe(Effect.option)
+        if (Option.isNone(output) || output.value.truncated) return undefined
+        return RevisionReviewModel.decodeSelection(input.revisions, output.value.stdout)
+      })
+
+      /** The selected revisions, ancestors first, plus the requested ids jj could not name: one read when every id resolves, one per id otherwise. */
+      const selection = Effect.fn('review revisions selection')(function* (input: RevisionsReviewInput) {
         const requested = [...new Set(input.revisions)]
+        const described = yield* describeSelection({ path: input.path, revisions: requested })
+        const noneSkipped: readonly UnresolvedRevision[] = []
+        if (described !== undefined) return { ordered: described, unresolved: noneSkipped }
         const outcomes = yield* Effect.forEach(requested, revision => resolveRevision({ path: input.path, revision }), { concurrency: 4 })
         const found = new Map<string, ResolvedRevision>()
         for (const outcome of outcomes) if ('commitId' in outcome && !found.has(outcome.commitId)) found.set(outcome.commitId, outcome)
@@ -235,12 +279,22 @@ export class ReviewWorkspace extends Context.Service<
             ? ''
             : (yield* jjReads.read({ path: input.path, args: RevisionReviewModel.orderArgs(resolved.map(revision => revision.commitId)), outputLimit: 16_384 }))
                 .stdout
-        const ordered = RevisionReviewModel.inOrder(resolved, ordering)
+        return {
+          ordered: RevisionReviewModel.inOrder(resolved, ordering),
+          unresolved: outcomes.filter((outcome): outcome is UnresolvedRevision => !('commitId' in outcome)),
+        }
+      })
+
+      const readRevisions = Effect.fn('review revisions read')(function* (input: RevisionsReviewInput) {
+        const { ordered, unresolved } = yield* selection(input)
+        const batched = yield* readPatches({ path: input.path, revisions: ordered })
         const revisions: RevisionReview[] = []
         let budget = MAX_PATCH_CHARS
         // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- oldest first, each read takes what the earlier ones left of one patch budget.
         for (const revision of ordered) {
-          const read = yield* readRevision({ path: input.path, revision, budget })
+          const batchedPatch = budget > 0 ? batched?.get(revision.commitId) : undefined
+          const patch = batchedPatch !== undefined && batchedPatch.length <= budget ? batchedPatch : undefined
+          const read = yield* readRevision({ path: input.path, revision, budget, ...(patch === undefined ? undefined : { patch }) })
           revisions.push(read)
           budget -= read.patch.length
         }
@@ -248,7 +302,7 @@ export class ReviewWorkspace extends Context.Service<
           status: 'ok',
           path: input.path,
           revisions,
-          unresolved: outcomes.filter((outcome): outcome is UnresolvedRevision => !('commitId' in outcome)),
+          unresolved,
           segments: RevisionReviewModel.segments(ordered),
           truncated: revisions.some(revision => revision.truncated),
           fileCount: revisions.reduce((total, revision) => total + revision.fileCount, 0),

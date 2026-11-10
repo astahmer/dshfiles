@@ -19,7 +19,7 @@ export const publishApiEvent = HostApiEventsModel.publish
 export const pluginStorage = PluginStorageModel.open
 /** Bridge an Effect schema into a `@deepseek-ai/dsh-storage-domain` table `valueSchema`. */
 export const toStorageSchema = PluginStorageModel.toStorageSchema
-export type { PluginStorage } from './plugin-storage.js'
+export type { PluginStorage, StorageListAllInput } from './plugin-storage.js'
 /** One model call outside any thread, with optional schema-checked JSON output. */
 export { generate } from './generate.js'
 export type { GenerateInput, GenerateModel, GenerateResult } from './generate.js'

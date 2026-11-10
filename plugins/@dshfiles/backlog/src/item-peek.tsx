@@ -80,7 +80,7 @@ import { DueDates, useToday } from './due-date-hooks.js'
 import { PeekSections } from './peek-sections.js'
 import { BacklogNotices } from './notices.js'
 import { PeekWork } from './peek-work.js'
-import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
+import { startThreadItemOf, StartThreadForm, type StartThreadItem } from './start-thread.js'
 import { BacklogComposerScope } from './composer-tools.js'
 import { BacklogTextBox } from './text-box.js'
 import { actorThreadFor } from './actor-thread.js'
@@ -1198,7 +1198,7 @@ const PeekBody = (props: {
   }, [item.id])
   const captured = item.events.find(event => event.kind === 'created')?.detail.trim() ?? ''
   const showCapture = captured !== '' && captured !== `${item.title}\n${item.body}`.trim() && captured !== item.title.trim()
-  const relationshipLinks = BacklogItems.uniqueLinks(item.links)
+  const relationshipLinks = BacklogItems.uniqueLinks(item.links).filter(link => link.type !== 'thread' || BacklogItems.isSessionId(link.target))
   const threadsById = new Map(props.threads.map(thread => [thread.id, thread]))
   const threadTitleCounts = new Map<string, number>()
   for (const link of relationshipLinks) {
@@ -1469,7 +1469,7 @@ const PeekBody = (props: {
               agentReplying={agentReplying}
             />
             <CommentBox
-              item={{ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: item.body.slice(0, 500) }}
+              item={{ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: StartThreadForm.preview(item.body, 500) }}
               threads={props.threads}
               projects={props.projectPaths}
               openCreatedByDefault={props.openCreatedByDefault}

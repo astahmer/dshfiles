@@ -6,7 +6,8 @@ import { WorkspaceFolderPickerSchema } from './schema.js'
 const MAX_PATH_LENGTH = 4_096
 
 const cloneUrlPattern = /^(?:https:\/\/[^\s]+|ssh:\/\/[^\s]+|git@[A-Za-z0-9.-]+:[^\s]+|file:\/\/\/[^\s]+)$/u
-const absolutePathPattern = /^(?:\/|~\/)/u
+// `/…`, `~/…`, or on a Windows Host a drive-absolute `C:\…` (either separator).
+const absolutePathPattern = /^(?:\/|~[\\/]|[A-Za-z]:[\\/])/u
 const folderNamePattern = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/u
 
 /** https, ssh (`ssh://` or `git@host:path`) or a local `file:///` URL; never a leading `-` git would read as an option. */
@@ -19,8 +20,8 @@ export const localCloneUrlSchema = WorkspaceFolderPickerSchema.trimmedText.check
 const parentPathSchema = WorkspaceFolderPickerSchema.trimmedText.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(MAX_PATH_LENGTH),
-  Schema.makeFilter(value => (absolutePathPattern.test(value) ? true : 'Use an absolute or ~/ folder path.')),
-  Schema.makeFilter(value => (value.split('/').includes('..') ? 'The folder path cannot contain "..".' : true)),
+  Schema.makeFilter(value => (absolutePathPattern.test(value) ? true : 'Use an absolute (/… or C:\\…) or ~/ folder path.')),
+  Schema.makeFilter(value => (value.split(/[\\/]/u).includes('..') ? 'The folder path cannot contain "..".' : true)),
 )
 
 /** One new folder name: no separators, no leading dot or dash, so it cannot escape the parent or read as an option. */
@@ -91,6 +92,8 @@ const projectConfigOutput = Schema.Struct({
   invalid: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
 })
 
+export type LoadedProjectConfigOutput = typeof projectConfigOutput.Type
+
 const publishedProjectSchema = Schema.Struct({
   path: Schema.String,
   repository: Schema.String,
@@ -114,6 +117,14 @@ export const projectToolsSchema = Schema.Struct({
 })
 
 const jobsOutput = Schema.Struct({ jobs: Schema.Array(cloneJobSchema) })
+
+const registeredProjectSchema = Schema.Struct({
+  workspaceId: Schema.String.check(Schema.isMinLength(1)),
+  title: Schema.String,
+  path: Schema.String.check(Schema.isMinLength(1)),
+})
+
+const projectsOutput = Schema.Struct({ projects: Schema.Array(registeredProjectSchema).check(Schema.isMaxLength(1_000)) })
 
 const compact = (job: CloneJob): string => `${job.state} · ${job.phase} · ${job.path}`
 
@@ -195,6 +206,54 @@ export const projectLifecycleApi = defineApi({
           output.config === null
             ? `${output.path} · ${output.invalid ?? 'no dsh.project.json'}`
             : `${output.path} · workspace ${output.config.defaultThreadWorkspace ?? 'inherit'} · ${String(output.config.checks?.length ?? 0)} check(s)`,
+      },
+    }),
+    projects: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({}),
+      output: projectsOutput,
+      description:
+        'List registered projects (DSH Workspaces) on this machine with their workspace id, title and path, leaving out jj thread workspaces. Read-only.',
+      tool: {
+        name: 'project_projects',
+        readOnly: true,
+        render: output => output.projects.map(project => `${project.title} · ${project.path}`).join('\n') || 'No registered projects.',
+      },
+    }),
+    projectIdentities: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({ paths: Schema.Array(parentPathSchema).check(Schema.isMinLength(1), Schema.isMaxLength(100)) }),
+      output: Schema.Struct({
+        identities: Schema.Array(
+          Schema.Struct({
+            path: Schema.String.check(Schema.isMinLength(1)),
+            /** Stable across checkouts of one repository: its origin, else the repository root, else the folder. */
+            key: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)),
+            remoteUrl: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048))),
+            repositoryRoot: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048))),
+          }),
+        ).check(Schema.isMaxLength(100)),
+      }),
+      description:
+        'The repository identity behind each project folder: the Git/Jujutsu origin when there is one, else the repository root, else the folder itself, so two checkouts of one repository can group as one project. Cached on the Host. Read-only.',
+      tool: {
+        name: 'project_identities',
+        readOnly: true,
+        render: output => output.identities.map(identity => `${identity.path} → ${identity.key}`).join('\n'),
+      },
+    }),
+    icon: WorkspaceFolderPickerSchema.method({
+      input: Schema.Struct({ path: parentPathSchema, title: Schema.optional(Schema.String.check(Schema.isMaxLength(200))) }),
+      output: Schema.Struct({
+        kind: Schema.Literals(['image', 'monogram']),
+        value: Schema.String.check(Schema.isMaxLength(120_000)),
+        mediaType: Schema.NullOr(Schema.Literals(['image/svg+xml', 'image/png', 'image/jpeg', 'image/webp', 'image/x-icon'])),
+        source: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+      }),
+      description:
+        'The icon of the project at a folder: the iconPath declared in dsh.project.json, then a short list of conventional paths, then a monogram from the folder name. Cached on the Host. Read-only.',
+      tool: {
+        name: 'project_icon',
+        readOnly: true,
+        render: output => (output.kind === 'monogram' ? `Monogram ${output.value}` : `${output.source} (${output.mediaType ?? 'image'})`),
       },
     }),
     publishProject: WorkspaceFolderPickerSchema.method({

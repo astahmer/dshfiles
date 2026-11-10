@@ -83,7 +83,13 @@ class ToolSearch extends Context.Service<
           Ref.update(ownRegistryChanges, count => count + 1).pipe(Effect.andThen(effect), Effect.ensuring(Ref.update(ownRegistryChanges, count => count - 1)))
         const ownedSync = <A>(operation: () => A) => owned(Effect.sync(operation))
 
-        const globals = (): Map<string, ToolSchema> => new Map(ctx.tools.schemas().map(schema => [schema.name, schema]))
+        /** Every registry mutation emits `tools/change`, and the watcher below drops this projection then. */
+        let globalCatalog: Map<string, ToolSchema> | undefined
+
+        const globals = (): Map<string, ToolSchema> => {
+          globalCatalog ??= new Map(ctx.tools.schemas().map(schema => [schema.name, schema]))
+          return globalCatalog
+        }
         const isAlwaysVisible = (name: string) => alwaysVisible.some(pattern => pattern.test(name))
 
         const reportGlobalSchemas = Effect.gen(function* () {
@@ -221,6 +227,7 @@ class ToolSearch extends Context.Service<
         })
 
         const globalsChanged = Effect.gen(function* () {
+          globalCatalog = undefined
           if ((yield* Ref.get(ownRegistryChanges)) > 0) return
           yield* reportGlobalSchemas
           for (const state of states.values()) {

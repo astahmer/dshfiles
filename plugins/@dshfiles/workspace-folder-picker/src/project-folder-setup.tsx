@@ -37,7 +37,13 @@ export const ProjectFolderSetup = (props: {
     onSuccess: project => props.onAdded(project.path),
     onError: cause => setError(errorMessage(cause, 'Could not initialize this folder.')),
   })
+  const publish = useMutation({
+    mutationFn: (visibility: 'private' | 'public') => props.api.publishProject({ path: props.path, visibility }),
+    onSuccess: project => setPublished(project.repository),
+    onError: cause => setError(errorMessage(cause, 'Could not publish this repository.')),
+  })
   const [enabling, setEnabling] = useState(false)
+  const [published, setPublished] = useState<string | null>(null)
   const found = inspection.data
 
   const enableJujutsu = async (): Promise<void> => {
@@ -55,7 +61,9 @@ export const ProjectFolderSetup = (props: {
   }
 
   const canEnable = found !== undefined && found.canEnableJujutsu && setup.status === 'active'
-  const busy = enabling || initialize.isPending
+  const busy = enabling || initialize.isPending || publish.isPending
+  // A local checkout without a remote cannot be pushed anywhere: this is the onboarding moment to give it one.
+  const publishable = found !== undefined && found.kind !== 'none' && found.remoteUrl === null
 
   return (
     <Dialog open onOpenChange={(open: boolean) => (open ? undefined : props.onClose())}>
@@ -91,6 +99,20 @@ export const ProjectFolderSetup = (props: {
               <span className="dshx:text-xs dshx:text-muted-foreground">This folder sits inside that checkout; its threads work in the folder you chose.</span>
             )}
             {found?.reason !== null && found?.reason !== undefined && <span className="dshx:text-xs dshx:text-muted-foreground">{found.reason}</span>}
+            {published !== null && (
+              <span className="dshx:text-xs dshx:text-muted-foreground">Published {published}: origin is set, so this project can push and land.</span>
+            )}
+            {publishable && published === null && (
+              <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+                <span className="dshx:text-xs dshx:text-muted-foreground">No origin yet.</span>
+                <Button disabled={busy} onClick={() => publish.mutate('private')} size="sm" type="button" variant="ghost">
+                  Publish privately
+                </Button>
+                <Button disabled={busy} onClick={() => publish.mutate('public')} size="sm" type="button" variant="ghost">
+                  Publish publicly
+                </Button>
+              </span>
+            )}
           </div>
           {found?.kind === 'none' && (
             <p className="dshx:text-sm dshx:text-muted-foreground">

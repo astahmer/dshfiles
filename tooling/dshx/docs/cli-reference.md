@@ -51,10 +51,12 @@ Each finding names `file:line`, the rule and a `fix`. `--json` prints `{ schemaV
 ## `dshx build`
 
 ```bash
-dshx build [--cwd <project>] [--verbose]
+dshx build [--cwd <project>] [--no-typecheck] [--verbose]
 ```
 
 Build runs the offline manifest, migration, compatibility, and TypeScript checks before compiling. It builds enabled Host and Client faces through the bounded Vite kernel, emits declarations by default, and verifies the artifact shape. Its only writes are build outputs.
+
+The TypeScript check runs in its own compiler process beside the bundler and reuses incremental state under the project's `node_modules/.cache/dshx/typecheck/`, so a rebuild re-reads only what changed; deleting that directory forces a full run. `--no-typecheck` skips the check (the bundler already rejects syntax errors, and `dshx check` still typechecks), which suits a pipeline whose own `typecheck` task runs the compiler once for the whole change.
 
 Every face writes into a hidden sibling staging directory (`.dist.dshx-<pid>-<id>/`). Only when all faces succeed does the build replace `dist/` with it, by renaming the old directory away and the staged one in. A running Host that polls bundles therefore sees one complete change per plugin, and a file the build no longer produces (a renamed module, a disabled face, a sourcemap or declaration turned off) leaves with the old directory. A failed build keeps the last good `dist/`. Anything else written into `dist/` is replaced too, so keep other generators' output elsewhere. `dshx dev` watchers still write in place.
 

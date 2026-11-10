@@ -17,7 +17,8 @@ export const useServingAccount = (useSessions: UseServingAccountSessions) => {
       }) ?? null,
   )
   const running = useSessions(state => (sessionId === null ? false : state.byId[sessionId]?.running === true))
-  const query = useQuery(servingAccountQuery(client, sessionId, running))
+  const updatedAt = useSessions(state => (sessionId === null ? null : (state.byId[sessionId]?.updatedAt ?? null)))
+  const query = useQuery(servingAccountQuery(client, sessionId, running, updatedAt))
   const snapshot = query.data?.sessionId === sessionId && !query.isError ? query.data : null
   const current = snapshot?.currentAttempt
   // While a chat runs, an old successful account is not evidence of the current attempt.

@@ -1,7 +1,7 @@
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { WorkbenchPanelDefinition, WorkbenchPanelProps, WorkbenchPanelRegistry } from '@dshfiles/workbench/registry'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
@@ -18,16 +18,27 @@ interface SettingsWorkbenchHubInput {
   readonly query: string
 }
 
-/** The Settings page as a free-docking pane, with navigation and search owned by this pane rather than the shell actor. */
+/** A section or field another surface asked Settings to show (`dshfiles:open-settings`, the palette, a section link). */
+export interface SettingsOpenRequest {
+  readonly sectionId: string
+  readonly field?: FieldTarget
+}
+
+/**
+ * The Settings page as a free-docking pane, with navigation and search owned by this pane rather than the shell actor.
+ * Open requests still steer it: without them every caller naming a section landed on General.
+ */
 export const createSettingsWorkbenchHub = (sources: {
   readonly groups: ObservableSnapshot<readonly GroupedEntries[]>
+  readonly openRequests: ObservableSnapshot<SettingsOpenRequest | undefined>
   readonly view: (input: SettingsWorkbenchHubInput) => Omit<SettingsViewProps, 'onClose'>
   readonly closeSettings: () => void
 }): WorkbenchPanelDefinition['component'] =>
   function SettingsWorkbenchHub(props) {
     const groups = useObservable(sources.groups)
-    const [activeId, setActiveId] = useState<string>()
-    const [field, setField] = useState<FieldTarget>()
+    const request = useObservable(sources.openRequests)
+    const [activeId, setActiveId] = useState(request?.sectionId)
+    const [field, setField] = useState(request?.field)
     const [query, setQuery] = useState('')
     const [host, setHost] = useState<HTMLDivElement | null>(null)
     const select = (id: string): void => {
@@ -35,6 +46,12 @@ export const createSettingsWorkbenchHub = (sources: {
       setField(undefined)
       setQuery('')
     }
+    useEffect(() => {
+      if (request === undefined) return
+      setActiveId(request.sectionId)
+      setField(request.field)
+      setQuery('')
+    }, [request])
     const close = props.onClose ?? sources.closeSettings
     const view = sources.view({ groups, activeId, field, query })
     const owner: SettingsSectionOwnerProps & {

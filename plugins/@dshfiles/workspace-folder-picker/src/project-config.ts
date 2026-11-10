@@ -52,7 +52,9 @@ const invalidConfig = (file: string): LoadedProjectConfig => ({
  */
 export const loadProjectConfig = (fs: FileSystem.FileSystem, workspaceRoot: string) =>
   Effect.gen(function* () {
-    const file = `${workspaceRoot.replace(/[\\/]+$/u, '')}/${PROJECT_CONFIG_FILE}`
+    // The module is shared with a client bundle, so no node:path: join with the separator the root itself uses.
+    const separator = /^[A-Za-z]:\\|^\\\\/u.test(workspaceRoot) ? '\\' : '/'
+    const file = `${workspaceRoot.replace(/[\\/]+$/u, '')}${separator}${PROJECT_CONFIG_FILE}`
     const text = yield* fs.readFileString(file).pipe(
       Effect.map(Option.some),
       Effect.orElseSucceed(() => Option.none<string>()),

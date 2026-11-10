@@ -11,6 +11,8 @@ export interface ReviewBackend {
   readonly vcs: VcsKind
   /** Base bookmarks (git: branches) tried in order when the caller names none. */
   readonly baseCandidates: readonly string[]
+  /** The project's main branch as this backend names it locally, then on origin; tried before `baseCandidates`. */
+  readonly projectCandidates: (branch: string) => readonly string[]
   /** The live head a review without a saved range reads: jj's `@`, git's `HEAD` plus its uncommitted files. */
   readonly liveHead: string
   /** A saved land record's id as a revision this backend accepts (jj: a change id, git: a commit id). */

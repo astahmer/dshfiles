@@ -137,10 +137,14 @@ export function ConversationWidthControls({ container, phase }: ConversationWidt
   const publishWidths = useCallback((container: HTMLDivElement): void => {
     const target = container.parentElement ?? container
     const column = container.offsetWidth
-    target.style.setProperty('--dsh-conversation-column-width', `${column}px`)
+    // An unchanged value is not written again: each write dirties the conversation's layout for the next reader.
+    const setWidth = (name: string, value: string): void => {
+      if (target.style.getPropertyValue(name) !== value) target.style.setProperty(name, value)
+    }
+    setWidth('--dsh-conversation-column-width', `${column}px`)
     const preference = readWidthPreference()
     if (preference === null) target.style.removeProperty('--dsh-chat-user-width')
-    else target.style.setProperty('--dsh-chat-user-width', `${resolveContentWidth(column, preference)}px`)
+    else setWidth('--dsh-chat-user-width', `${resolveContentWidth(column, preference)}px`)
   }, [])
 
   useLayoutEffect(() => {

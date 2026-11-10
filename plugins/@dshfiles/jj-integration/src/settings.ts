@@ -33,7 +33,21 @@ export const jjIntegrationSettings = defineSettings({
     ])
       .default('settle')
       .description('Buttons the “Landed on …” notice offers. The thread list’s automatic done and archive settings do it without a click.'),
-    bookmark: Schema.string().default('main').description('Exact local bookmark new threads start from and Land advances.'),
+    bookmark: Schema.string()
+      .default('main')
+      .description(
+        'Fallback main branch: the exact local bookmark new threads start from and Land advances, for a project that sets none of its own, declares none in dsh.project.json, and whose origin names no default branch.',
+      ),
+    repositoryBookmarks: Schema.array(
+      Schema.object({
+        repository: Schema.string().description('Absolute repository root.'),
+        bookmark: Schema.string().description('Main branch of that repository.'),
+      }),
+    )
+      .default([])
+      .description(
+        'Main branch per project: the bookmark new thread workspaces start from, Land advances, and source control and Changes compare against. Set it in Settings › Projects; it wins over dsh.project.json and the detected default branch.',
+      ),
     threadsDirectory: Schema.string()
       .default('')
       .description('Parent directory for thread workspaces. Empty uses `<repository>-threads` beside the repository.'),
@@ -126,6 +140,75 @@ export class IntegratedNoticeActions {
 }
 
 export const isolatesNewThreadsByDefault = (settings: JjIntegrationSettings): boolean => settings.isolateByDefault || settings.autoIntegrationScope === 'all'
+
+export type RepositoryBookmarkEntry = JjIntegrationSettings['repositoryBookmarks'][number]
+
+/** Which layer decided a project's main branch, strongest first. */
+export type ProjectBookmarkSource = 'project' | 'file' | 'detected' | 'global'
+
+/** A project's main branch and the layer that chose it. */
+export interface ProjectBookmarkChoice {
+  readonly bookmark: string
+  readonly source: ProjectBookmarkSource
+}
+
+/** Repository paths differ only by a trailing separator when a person typed them. */
+const comparablePath = (path: string): string => path.trim().replace(/[\\/]+$/u, '')
+
+/** A bookmark name a person or a repository wrote: one non-empty token jj and git both accept as a name. */
+const usableBookmarkName = (name: string | null | undefined): string | null => {
+  const trimmed = name?.trim() ?? ''
+  return trimmed.length === 0 ||
+    trimmed.length > 200 ||
+    trimmed.startsWith('-') ||
+    trimmed.startsWith('/') ||
+    trimmed.includes('..') ||
+    /[\s"'`\\]/u.test(trimmed)
+    ? null
+    : trimmed
+}
+
+/**
+ * The per-project main branch: the profile override, else the repository's `dsh.project.json`, else the branch origin
+ * marks as default, else the global setting. Paths compare without a trailing separator, like the auto-integration
+ * opt-out.
+ */
+export class RepositoryBookmarks {
+  static readonly usableName = usableBookmarkName
+
+  static readonly overrideFor = (input: { readonly repositoryRoot: string; readonly entries: readonly RepositoryBookmarkEntry[] }): string | null => {
+    const repository = comparablePath(input.repositoryRoot)
+    const entry = input.entries.findLast(candidate => comparablePath(candidate.repository) === repository)
+    return usableBookmarkName(entry?.bookmark)
+  }
+
+  /** The entries with this repository's override replaced, or removed when `bookmark` is null or unusable. */
+  static readonly withOverride = (input: {
+    readonly entries: readonly RepositoryBookmarkEntry[]
+    readonly repositoryRoot: string
+    readonly bookmark: string | null
+  }): RepositoryBookmarkEntry[] => {
+    const repository = comparablePath(input.repositoryRoot)
+    const others = input.entries.filter(entry => comparablePath(entry.repository) !== repository)
+    const bookmark = usableBookmarkName(input.bookmark)
+    return bookmark === null ? others : [...others, { repository, bookmark }]
+  }
+
+  static readonly resolve = (input: {
+    readonly override: string | null
+    readonly declared: string | null | undefined
+    readonly detected: string | null
+    readonly fallback: string
+  }): ProjectBookmarkChoice => {
+    const override = usableBookmarkName(input.override)
+    if (override !== null) return { bookmark: override, source: 'project' }
+    const declared = usableBookmarkName(input.declared)
+    if (declared !== null) return { bookmark: declared, source: 'file' }
+    const detected = usableBookmarkName(input.detected)
+    if (detected !== null) return { bookmark: detected, source: 'detected' }
+    return { bookmark: input.fallback, source: 'global' }
+  }
+}
 
 /** Repository-level opt-out from automatic integration, matched on the repository root the Host reports. */
 export class RepositoryAutoIntegration {

@@ -61,6 +61,91 @@ describe('pluginStorage', () => {
     expect((await storage.list()).entries).toHaveLength(5)
   })
 
+  it('reads a whole prefix in one snapshot, in the order paging it to exhaustion yields', async () => {
+    const { context } = await storageHost()
+    const storage = PluginStorageModel.open(context, '@acme/plugin')
+    const keys = ['run/b/3', 'run/a/9', 'run/a/1', 'other/1', 'run/a/10', 'run/b/1', 'run/c/2']
+    for (const key of keys) await storage.set(key, key)
+
+    for (const prefix of ['run/', 'run/a/', 'run', 'other/', '', 'nope/']) {
+      const expected = keys.filter(key => key.startsWith(prefix)).sort()
+      const all = await storage.listAll({ prefix })
+      expect(
+        all.map(entry => entry.key),
+        `prefix ${JSON.stringify(prefix)}`,
+      ).toEqual(expected)
+      expect(all.map(entry => entry.value)).toEqual(expected)
+      for (const limit of [1, 2, 3, 500]) {
+        const paged: string[] = []
+        let cursor: string | undefined
+        do {
+          const page = await storage.list(cursor === undefined ? { prefix, limit } : { prefix, limit, cursor })
+          paged.push(...page.entries.map(entry => entry.key))
+          cursor = page.cursor ?? undefined
+        } while (cursor !== undefined)
+        expect(paged, `prefix ${JSON.stringify(prefix)} limit ${String(limit)}`).toEqual(expected)
+      }
+    }
+    expect(await storage.listAll()).toHaveLength(keys.length)
+  })
+
+  it('orders unicode keys by code unit, exactly as paging does', async () => {
+    const { context } = await storageHost()
+    const storage = PluginStorageModel.open(context, '@acme/plugin')
+    const keys = ['u/é', 'u/e\u0301', 'u/E', 'u/日本', 'u/🙂', 'u/\uFFFF', 'u/Z', 'u/z', 'u/a', 'u/A']
+    for (const key of keys) await storage.set(key, key)
+    const all = await storage.listAll({ prefix: 'u/' })
+    expect(all.map(entry => entry.key)).toEqual([...keys].sort())
+    expect(all[0]?.key).toBe('u/A')
+
+    const first = await storage.list({ prefix: 'u/', limit: 4 })
+    const rest = await storage.list({ prefix: 'u/', limit: 500, cursor: first.cursor ?? undefined })
+    expect([...first.entries, ...rest.entries].map(entry => entry.key)).toEqual(all.map(entry => entry.key))
+  })
+
+  it('follows the prefix edges: a key equal to the prefix, and a sibling that only shares letters', async () => {
+    const { context } = await storageHost()
+    const storage = PluginStorageModel.open(context, '@acme/plugin')
+    for (const key of ['a', 'a/1', 'a/2', 'ab/1', 'a0']) await storage.set(key, key)
+    expect((await storage.listAll({ prefix: 'a' })).map(entry => entry.key)).toEqual(['a', 'a/1', 'a/2', 'a0', 'ab/1'])
+    expect((await storage.listAll({ prefix: 'a/' })).map(entry => entry.key)).toEqual(['a/1', 'a/2'])
+    expect((await storage.listAll({ prefix: 'ab/' })).map(entry => entry.key)).toEqual(['ab/1'])
+    expect(await storage.listAll({ prefix: 'abc' })).toEqual([])
+    const first = await storage.list({ prefix: 'a', limit: 3 })
+    expect(first.cursor).toBe('a/2')
+    expect((await storage.list({ prefix: 'a', limit: 3, cursor: first.cursor ?? undefined })).entries.map(entry => entry.key)).toEqual(['a0', 'ab/1'])
+  })
+
+  it('sees writes and deletes made before a read, and paging resumes after a cursor that was deleted', async () => {
+    const { context } = await storageHost()
+    const storage = PluginStorageModel.open(context, '@acme/plugin')
+    for (const key of ['p/1', 'p/2', 'p/3', 'p/4']) await storage.set(key, key)
+
+    const first = await storage.list({ prefix: 'p/', limit: 2 })
+    expect(first.entries.map(entry => entry.key)).toEqual(['p/1', 'p/2'])
+    await storage.delete('p/2')
+    await storage.set('p/15', 'late')
+    await storage.set('p/0', 'early')
+    const second = await storage.list({ prefix: 'p/', limit: 2, cursor: first.cursor ?? undefined })
+    expect(second.entries.map(entry => entry.key)).toEqual(['p/3', 'p/4'])
+    expect(second.cursor).toBeNull()
+
+    expect((await storage.listAll({ prefix: 'p/' })).map(entry => entry.key)).toEqual(['p/0', 'p/1', 'p/15', 'p/3', 'p/4'])
+    await storage.set('p/25', 'later')
+    expect((await storage.listAll({ prefix: 'p/' })).map(entry => entry.key)).toEqual(['p/0', 'p/1', 'p/15', 'p/25', 'p/3', 'p/4'])
+  })
+
+  it('never mixes another namespace into a whole-prefix read', async () => {
+    const { context } = await storageHost()
+    const acme = PluginStorageModel.open(context, '@acme/plugin')
+    const other = PluginStorageModel.open(context, '@other/plugin')
+    await acme.set('k/1', 'acme')
+    await other.set('k/2', 'other')
+    await other.set('k/0', 'other')
+    expect((await acme.listAll({ prefix: 'k/' })).map(entry => entry.key)).toEqual(['k/1'])
+    expect((await other.listAll({ prefix: 'k/' })).map(entry => entry.key)).toEqual(['k/0', 'k/2'])
+  })
+
   it('deletes a key once and refuses values and namespaces it cannot store', async () => {
     const { context } = await storageHost()
     const storage = PluginStorageModel.open(context, '@acme/plugin')

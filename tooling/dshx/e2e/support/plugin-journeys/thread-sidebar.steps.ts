@@ -1,13 +1,15 @@
-import { expect, type Locator, type Page, type Response, type TestInfo } from '@playwright/test'
+import { expect, type Locator, type Page, type Request, type Response, type TestInfo } from '@playwright/test'
 import { openGlobalPanel, viewNamePattern } from '../plugin-view-names.js'
 import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
+import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion, reloadPastProviderSetup, settingsPage, settingsNavEntry } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
+import { ApiChannelModel } from '../../../packages/dshx/src/api/channel.js'
 import { createScratchDirectory, openNewThreadAddWorkspace, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 import { materializeNonblankThread } from '../thread-composer.js'
 import { ThreadSidebarJourney } from '../thread-list-grouping.js'
@@ -569,6 +571,106 @@ Then('the continuation opens in that project with the conversation and the origi
     await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible({ timeout: 15_000 })
     await threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true }).click()
     await expect(sectionOfSidebar(page, 'settled').locator(`article[data-thread-id="${journey.sourceThreadId}"]`)).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
+interface PromotedThreadJourney {
+  readonly threadId: string
+  readonly projectTitle: string
+  readonly projectPath: string
+}
+
+const promotedThreadJourneys = new WeakMap<Page, PromotedThreadJourney>()
+
+/** The thread-actions API as the browser's own Host serves it, for the project a promoted thread now belongs to. */
+const promotedProjectOf = async (page: Page, threadId: string): Promise<PromotedThreadJourney> => {
+  const call = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/thread-sidebar', apiId: 'thread-actions', version: 1 })
+  const listed = Schema.decodeUnknownSync(
+    Schema.Struct({ threads: Schema.Array(Schema.Struct({ sessionId: Schema.String, projectId: Schema.optional(Schema.String) })) }),
+  )(await call('list', {}))
+  const projectId = listed.threads.find(thread => thread.sessionId === threadId)?.projectId
+  if (projectId === undefined) throw new Error('The promoted thread has no project.')
+  const projects = Schema.decodeUnknownSync(
+    Schema.Struct({ projects: Schema.Array(Schema.Struct({ projectId: Schema.String, title: Schema.String, path: Schema.String })) }),
+  )(await call('projectList', {}))
+  const project = projects.projects.find(candidate => candidate.projectId === projectId)
+  if (project === undefined) throw new Error('The promoted thread names a project the project list does not hold.')
+  return { threadId, projectTitle: project.title, projectPath: project.path }
+}
+
+When('a No folder thread is started and turned into a project from its row menu', async ({ page }: { page: Page }) => {
+  await page
+    .getByRole('button', { name: /^New (session|thread)$/ })
+    .first()
+    .click()
+  const composer = page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands/ })
+  await expect(composer).toBeVisible()
+  const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
+  // The composer's picker and the jj-integration replacement mount a moment apart; a click during the hand-off can open
+  // a picker without No folder. Close and reopen until the replacement is the one answering.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+    const noFolder = picker.getByRole('option', { name: /^No folder/ }).first()
+    if (!(await noFolder.isVisible({ timeout: 2_000 }).catch(() => false))) {
+      await page.keyboard.press('Escape')
+      throw new Error('The New-thread picker has no No folder entry yet.')
+    }
+    await noFolder.click()
+  }).toPass({ timeout: 45_000 })
+  await expect(picker).toBeHidden()
+  // Choosing a project swaps the composer a moment after the chip changes; a draft filled too early is dropped, and the
+  // send stays disabled. A draft that survives the swap is in the composer the send will use.
+  await expect(async () => {
+    await composer.fill('thread sidebar promotion e2e target')
+    await page.waitForTimeout(750)
+    await expect(composer).toContainText('thread sidebar promotion e2e target', { timeout: 1_000 })
+  }).toPass({ timeout: 20_000 })
+  await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+  await expect.poll(() => currentThreadId(page)).not.toBeNull()
+  const threadId = currentThreadId(page)
+  if (threadId === null) throw new Error('The No folder thread did not materialize.')
+  const row = threadRow(page, threadId)
+  await expect(row).toBeVisible()
+  // The turn that materialized the thread can still be settling, which remounts the row and closes its menu; reopen
+  // until the promotion verb the row now carries is on screen.
+  const turnIntoProject = page.getByRole('menuitem', { name: 'Turn into project', exact: true })
+  await expect(async () => {
+    if (!(await turnIntoProject.isVisible())) await openThreadRowMenu(row)
+    await expect(turnIntoProject).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
+  await recordAssertion(page, 'no-folder-row-offers-turn-into-project', () => expect(turnIntoProject).toBeVisible())
+  await turnIntoProject.click()
+  await recordAssertion(page, 'promotion-confirms-in-a-notice', () =>
+    expect(
+      threadSidebar(page)
+        .getByText(/Turned into project/u)
+        .first(),
+    ).toBeVisible(),
+  )
+  promotedThreadJourneys.set(page, await promotedProjectOf(page, threadId))
+})
+
+Then('the thread sits under its own project and its scratch folder exists', async ({ page }: { page: Page }) => {
+  const journey = promotedThreadJourneys.get(page)
+  if (journey === undefined) throw new Error('No promoted thread journey was recorded.')
+  await recordAssertion(page, 'promoted-thread-keeps-its-scratch-folder', async () => {
+    expect(journey.projectPath).toContain(`${sep}no-folder${sep}`)
+    expect(existsSync(journey.projectPath)).toBe(true)
+  })
+  await recordAssertion(page, 'promoted-thread-groups-under-its-own-project', async () => {
+    const groupButton = threadSidebar(page)
+      .getByRole('button', { name: /^Group: /u })
+      .first()
+    await expect(groupButton).toBeVisible()
+    await groupButton.click()
+    await page.getByRole('menuitemradio', { name: 'Project', exact: true }).click()
+    const group = threadSidebar(page).getByRole('region', { name: journey.projectTitle, exact: true })
+    await expect(group.locator(`article[data-thread-id="${journey.threadId}"]`)).toHaveCount(1)
+    await expect(
+      threadSidebar(page).getByRole('region', { name: 'No folder', exact: true }).locator(`article[data-thread-id="${journey.threadId}"]`),
+    ).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -2331,13 +2433,31 @@ const sidebarExpandControl = (page: Page) => page.getByRole('button', { name: /^
 
 const jjInventoryRequests = new WeakMap<Page, { count: number }>()
 
+/** The inventory read as the transport names it: batched entries carry its per-channel route, a retry its own path. */
+const JJ_INVENTORY_ENDPOINT = `${ApiChannelModel.apiChannel('@dshfiles/jj-integration', 'jj-threads').slice(1)}/repositories`
+const JJ_INVENTORY_PATH = `/api/${JJ_INVENTORY_ENDPOINT}`
+const batchReadsSchema = Schema.Struct({
+  entries: Schema.Array(Schema.Struct({ endpoint: Schema.String })),
+})
+
+/** Reads share the one `/api/dshx-batch` route, one NDJSON line per entry, so the endpoint is in the body, not the URL. */
+const batchedInventoryReads = (request: Request): number => {
+  if (!request.url().endsWith('/api/dshx-batch')) return 0
+  const body = request.postData()
+  if (body === null) return 0
+  const batch = Schema.decodeUnknownOption(Schema.fromJsonString(batchReadsSchema))(body)
+  if (Option.isNone(batch)) return 0
+  return batch.value.entries.filter(entry => entry.endpoint === JJ_INVENTORY_ENDPOINT).length
+}
+
 /** Counts the JJ inventory reads the page makes, so a journey can prove a hidden surface bought none. */
 const countJjInventoryRequests = (page: Page): { count: number } => {
   const existing = jjInventoryRequests.get(page)
   if (existing !== undefined) return existing
   const entry = { count: 0 }
   page.on('request', request => {
-    if (/\/api\/dshx-[0-9a-f]+\/repositories$/.test(new URL(request.url()).pathname)) entry.count += 1
+    entry.count += batchedInventoryReads(request)
+    if (new URL(request.url()).pathname === JJ_INVENTORY_PATH) entry.count += 1
   })
   jjInventoryRequests.set(page, entry)
   return entry

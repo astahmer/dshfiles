@@ -6,8 +6,8 @@ import {
   IconApiOutlineRegular,
   IconChevronDownOutlineRegular,
   IconChevronRightOutlineRegular,
-  MarkdownText,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FencedMarkdown } from '../../fenced-markdown.tsx'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { markdownLabels } from '../markdown-labels.ts'
 import type { CompactionSummaryNode } from '../contract/snapshot.ts'
@@ -70,7 +70,7 @@ export const CompactionItem = memo(function CompactionItem({
         <span className={css.compactionSummary}>{summary}</span>
       </button>
       {open && node.summary !== null
-        && <div className={css.compactionBody}><MarkdownText text={node.summary} labels={labels} /></div>}
+        && <div className={css.compactionBody}><FencedMarkdown text={node.summary} labels={labels} /></div>}
     </div>
   )
 })

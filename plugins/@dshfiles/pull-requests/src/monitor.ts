@@ -31,6 +31,8 @@ const capturePullRequestResult = (effect: Effect.Effect<GitHubPullRequestView, G
 
 const POLL_INTERVAL_MS = 2 * 60_000
 const MAX_BACKOFF_MS = 60 * 60_000
+/** Watched pull requests polled at once: one `gh` call each, kept modest for GitHub's API budget. */
+const POLL_CONCURRENCY = 6
 const SETTLE_SOURCE = '@dshfiles/pull-requests'
 
 export class PullRequestSessionRequired extends Schema.TaggedError<PullRequestSessionRequired>()('PullRequestSessionRequired', {
@@ -303,18 +305,23 @@ export class PullRequestMonitor extends Context.Service<
           if (group === undefined) groups.set(key, [watcher])
           else group.push(watcher)
         }
-        for (const group of groups.values()) {
+        const targets = [...groups.values()].flatMap(group => {
           const first = group[0]
-          if (first === undefined) continue
-          yield* pollPullRequest({ repo: first.repo, number: first.number, force: false }).pipe(
-            Effect.catchCause(() =>
-              Effect.logWarning('pull-requests: pull request poll failed; the next poll will continue', {
-                repo: first.repo,
-                number: first.number,
-              }),
+          return first === undefined ? [] : [{ repo: first.repo, number: first.number }]
+        })
+        yield* Effect.forEach(
+          targets,
+          target =>
+            pollPullRequest({ ...target, force: false }).pipe(
+              Effect.catchCause(() =>
+                Effect.logWarning('pull-requests: pull request poll failed; the next poll will continue', {
+                  repo: target.repo,
+                  number: target.number,
+                }),
+              ),
             ),
-          )
-        }
+          { concurrency: POLL_CONCURRENCY, discard: true },
+        )
       })
 
       const link = Effect.fn('pull-requests link')(function* (input: PullRequestLinkInput, caller: ApiCaller) {

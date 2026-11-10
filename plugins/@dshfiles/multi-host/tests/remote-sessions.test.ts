@@ -7,7 +7,7 @@ import { Cause, Effect, Exit, Fiber, Layer, Stream } from 'effect'
 import { TestClock } from 'effect/testing'
 import { Connectors } from '../src/connectors/connectors.js'
 import type { Gateway } from '../src/connectors/gateway.js'
-import { RemoteRequestFailed } from '../src/errors.js'
+import { RemoteRequestFailed, SshUnreachable } from '../src/errors.js'
 import { HostDirectory } from '../src/host-directory.js'
 import { RemoteInteractions } from '../src/remote-interactions.js'
 import { RemoteSessions } from '../src/remote-sessions.js'
@@ -40,9 +40,11 @@ interface Fixture {
   readonly setEvents: (events: Stream.Stream<unknown>) => void
   readonly setStream: (stream: Stream.Stream<unknown>) => void
   readonly released: () => number
+  readonly connects: () => number
 }
 
-const fixture = (): Fixture => {
+/** `unreachable` fails every connect like an SSH host that is down; `hanging` never answers. */
+const fixture = (transport: 'up' | 'unreachable' | 'hanging' = 'up'): Fixture => {
   const calls: { method: string; args: unknown }[] = []
   const routed: { method: string; mutation: boolean }[] = []
   let streamed: readonly unknown[] = [{ type: 'snapshot', cursor: 0, records: [], hasMore: false, projections: { asOfSeq: 0, values: {} } }]
@@ -50,6 +52,7 @@ const fixture = (): Fixture => {
   let promptFailure: RemoteRequestFailed | undefined
   let events: Stream.Stream<unknown> = Stream.never
   let followed: Stream.Stream<unknown> | undefined
+  let connects = 0
   const gateway = (): Gateway => ({
     origin: 'http://127.0.0.1:1',
     launchUrl: 'http://127.0.0.1:1/?token=test-token-12345678',
@@ -106,11 +109,15 @@ const fixture = (): Fixture => {
       followed = stream
     },
     released: () => releases,
+    connects: () => connects,
     layer: Layer.succeed(
       Connectors,
       Connectors.of({
         connect: () =>
           Effect.gen(function* () {
+            connects += 1
+            if (transport === 'hanging') return yield* Effect.never
+            if (transport === 'unreachable') return yield* new SshUnreachable()
             const connection = gateway()
             yield* Effect.addFinalizer(() => Effect.sync(() => (releases += 1)))
             return connection
@@ -119,6 +126,9 @@ const fixture = (): Fixture => {
     ),
   }
 }
+
+/** The background refresh runs on its own fiber over real file I/O, so tests wait on it in real time. */
+const settle = Effect.promise(() => new Promise(resolve => setTimeout(resolve, 100)))
 
 const home = () => mkdtempSync(join(tmpdir(), 'multi-host-sessions-'))
 
@@ -186,14 +196,45 @@ describe('RemoteSessions', () => {
     }).pipe(Effect.provide(services(test)))
   })
 
-  it.effect('answers concurrent ownership lookups of one Session from a single discovery', () => {
+  it.effect('answers an unknown id as not owned without waiting on a runtime', () => {
+    const test = fixture('hanging')
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      expect(yield* sessions.source.owns(SessionId('draft-never-created'))).toBe(false)
+      expect(test.calls).toEqual([])
+    }).pipe(Effect.provide(services(test)))
+  })
+
+  it.effect('learns a listed remote Session from the background refresh an unknown id starts', () => {
     const test = fixture()
     return Effect.gen(function* () {
       const sessions = yield* RemoteSessions
       const remote = SessionId('session-remote')
       const answers = yield* Effect.all([sessions.source.owns(remote), sessions.source.owns(remote)], { concurrency: 'unbounded' })
-      expect(answers).toEqual([true, true])
+      expect(answers).toEqual([false, false])
+      yield* settle
       expect(test.calls.filter(call => call.method === 'list')).toHaveLength(1)
+      expect(yield* sessions.source.owns(remote)).toBe(true)
+    }).pipe(Effect.provide(services(test)))
+  })
+
+  it.effect('does not ask an unreachable runtime again until its backoff ends', () => {
+    const test = fixture('unreachable')
+    return Effect.gen(function* () {
+      const sessions = yield* RemoteSessions
+      expect(yield* sessions.source.owns(SessionId('draft-1'))).toBe(false)
+      yield* settle
+      const attempts = test.connects()
+      expect(attempts).toBeGreaterThan(0)
+      yield* TestClock.adjust('20 seconds')
+      expect(yield* sessions.source.owns(SessionId('draft-2'))).toBe(false)
+      yield* sessions.source.list({})
+      yield* settle
+      expect(test.connects()).toBe(attempts)
+      yield* TestClock.adjust('15 seconds')
+      expect(yield* sessions.source.owns(SessionId('draft-3'))).toBe(false)
+      yield* settle
+      expect(test.connects()).toBeGreaterThan(attempts)
     }).pipe(Effect.provide(services(test)))
   })
 

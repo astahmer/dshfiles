@@ -3,12 +3,8 @@ import type { ImageBlock, Message } from '@deepseek-ai/dsh-llm'
 import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { Llm } from '@dshfiles/dshx/effect/llm'
 import { Effect, Layer, Schema } from 'effect'
+import { compactionRequestBudget, MIN_REQUEST_BUDGET_BYTES } from './budget.js'
 import { serializedMessageBytes, summarizeInChunks, SummaryRequestFailed } from './chunked-summary.js'
-
-const FALLBACK_CONTEXT_WINDOW = 32_768
-const MAX_INPUT_BYTES = 64_000
-const SUMMARY_PROMPT_RESERVE = 4_096
-const MIN_CONTEXT_RESERVE = 4_096
 
 const CompactionConfig = Schema.Struct({
   maxTokens: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(8_192))),
@@ -55,10 +51,8 @@ const summarizeBounded = Effect.fn('context compaction run')(function* (request:
   const route = provider === undefined || model === undefined ? undefined : { provider, model }
   const modelInfo =
     route === undefined ? undefined : yield* llm.modelInfo(route).pipe(Effect.mapError(cause => new ContextCompactionFailure({ reason: 'model-info', cause })))
-  const contextWindow = modelInfo?.context?.contextWindow ?? FALLBACK_CONTEXT_WINDOW
-  const reserve = Math.max(MIN_CONTEXT_RESERVE, Math.ceil(contextWindow * 0.05))
-  const maxInputBytes = Math.min(MAX_INPUT_BYTES, Math.floor((contextWindow - request.config.maxTokens - reserve) / 2) - SUMMARY_PROMPT_RESERVE)
-  if (maxInputBytes < 1_024) return yield* new ContextCompactionFailure({ reason: 'input-capacity' })
+  const maxInputBytes = compactionRequestBudget({ contextWindow: modelInfo?.context?.contextWindow, maxTokens: request.config.maxTokens })
+  if (maxInputBytes < MIN_REQUEST_BUDGET_BYTES) return yield* new ContextCompactionFailure({ reason: 'input-capacity' })
 
   const imagePricing = route === undefined ? undefined : yield* llm.imagePricing(route)
   const textOnlyRoute = modelInfo?.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')
