@@ -1,5 +1,11 @@
 Feature: Chat browser journeys
 
+  @scenario:chat.quote-message
+  Scenario: Quoting conversation text keeps source and line breaks in an editable draft
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/rich-composer, @dshfiles/session-controller" is booted
+    When a thread with a multiline answer is opened for quoting
+    Then user messages and selected assistant text become editable unsent quotes
+
   @scenario:chat.windowed-transcript
   Scenario: A long persisted transcript mounts older rows as the reader scrolls
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted

@@ -3,6 +3,37 @@
   "kind": "bundle",
   "features": [
     {
+      "id": "quote-message",
+      "title": "Quote a message into an editable draft",
+      "summary": "Quote selected conversation text or a whole message with its author, Session and message sequence, preserving line breaks without sending.",
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: Quote message action",
+      "configuration": [],
+      "states": ["message-visible", "quote-in-draft", "draft-edited"],
+      "failureModes": [
+        "The action hides when no composer provider is active.",
+        "An uneditable composer refuses insertion and offers retry guidance without changing the draft."
+      ],
+      "externalDependencies": [],
+      "reach": ["seed tool-call-thread", "expect button \"Quote message\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.quote-draft",
+          "file": "plugins/@dshfiles/chat/tests/quote-message.test.tsx",
+          "testName": "inserts editable multiline text with source context without replacing the draft or submitting"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.quote-message",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only insertion into the existing composer draft; no Host request or submission." }]
+    },
+    {
       "id": "resume-interrupted",
       "title": "Resume the latest stopped task",
       "summary": "Resume beside the latest task a restart or a failed model request stopped, while the Host confirms it remains idle; superseded history stays read-only.",

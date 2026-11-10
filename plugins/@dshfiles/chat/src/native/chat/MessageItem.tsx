@@ -303,8 +303,9 @@ export function PendingSubmissionBubble({ submission, loadImage, renderFactorySl
 
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderFactorySlot, loadImage, t,
+  node, renderFactorySlot, loadImage, t, useSession,
 }: ChatNodeViewProps<'user' | 'steering'>) {
+  const sessionId = useSession(snapshot => snapshot.sessionId)
   const data = node.data
   return (
     <UserStyleBubble
@@ -317,6 +318,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
       actions={text => (
         <MessageIconActions
           text={text}
+          quoteSource={{ sessionId, seq: node.anchorSeq, role: 'user' }}
           time={data.time}
           clock="start"
           className={css.actions}
