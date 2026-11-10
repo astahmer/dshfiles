@@ -12,9 +12,13 @@ are row 16 of [DSH Host gaps](dsh-host-gaps.md).
 
 ## Remaining
 
-- [ ] **Child flow on a real provider.** Cold-resume across a Host restart is
-      proven only with the synthetic LLM adapter (`pnpm --dir plugins/@dshfiles/agent-questions verify:scratch`). Needs a
-      paid provider.
+- [ ] **Real-provider cold resume.** The live real-provider question and answer
+      exchange is documented in the [README](../plugins/@dshfiles/agent-questions/README.md#verify)
+      with both the Codex and the DeepSeek Flash routes. Cold resume is proven
+      only with the synthetic adapter. With a user-approved live Host restart,
+      have a real child ask its parent, restart while the question is pending,
+      reattach by question id, answer it, and verify the child continues with the
+      answer. Do not share a live login with a scratch Host.
 - [ ] **Element anchors** for feedback: element-linked annotations now ship in
       [`@dshfiles/annotations`](../plugins/@dshfiles/annotations/README.md);
       Markdown feedback cannot anchor to one of them yet.

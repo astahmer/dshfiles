@@ -143,4 +143,6 @@ button needs DOM the card does not expose. The Client has its own
 
 ## Verify
 
-Run `pnpm typecheck`, `pnpm test`, and `pnpm build` from this package. `pnpm verify:scratch` composes the package with its cold-resume fixture in an isolated scratch DSH profile; it does not change the active profile.
+Run `pnpm typecheck`, `pnpm test`, and `pnpm build` from this package. `pnpm verify:scratch` composes the package with its synthetic-provider cold-resume fixture in an isolated scratch DSH profile; it does not change the active profile.
+
+On 2026-11-11, live real-provider children called `ask_parent_question` and were answered with `answer_parent_question` through the active Host: a `codex-alex2/gpt-6.1-terra` child received `cobalt`, and an `opencode-go-alex/deepseek-v4.1-flash` child received `cobalt` and continued. Both questions resolved by answer, not by expiry. This verifies the live exchange, not cold resume across a Host restart.
