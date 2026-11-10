@@ -328,8 +328,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
       t,
       revealed,
       canActOnRow,
-      isRowBusy: row =>
-        (busyRowId !== null && copyMutation.variables?.cwd === cwd && busyRowId === row.id) || loadingRowId === row.id,
+      isRowBusy: row => (busyRowId !== null && copyMutation.variables?.cwd === cwd && busyRowId === row.id) || loadingRowId === row.id,
       copyPending,
       isRevealing: row => loadingRowId === row.id,
       onReveal: row => void rowActionHandlers.current.onReveal(row),

@@ -125,7 +125,9 @@ export default definePlugin({
       gateway = createPairingGateway({ upstream, port: gatewayPort, store: pairing, publicOrigin: origin, nativeCookie })
       await gateway.listen()
       await settingStore?.save(
-        settings?.origin === undefined ? { enabled: true, provider: provider as never } : { enabled: true, provider: provider as never, origin: settings.origin },
+        settings?.origin === undefined
+          ? { enabled: true, provider: provider as never }
+          : { enabled: true, provider: provider as never, origin: settings.origin },
       )
       printOffer()
       return { provider, origin }

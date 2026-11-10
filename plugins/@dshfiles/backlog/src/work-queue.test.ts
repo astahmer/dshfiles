@@ -329,7 +329,12 @@ describe('settled threads', () => {
         expect(yield* LeaseEndings.sweepOnce({ store, lookup: Option.some(lookup), settledThreads: true })).toBe(0)
         expect(recorder.named('backlog lease sweep').map(span => span.attributes['dshx.backlog.settled_returned'])).toEqual([undefined, 1, 0])
 
-        const reopened = yield* store.applySignal({ id: abandoned, status: 'doing', link: { type: 'thread', target: 'session-bbbbbb' }, reason: 'mentioned in a thread' })
+        const reopened = yield* store.applySignal({
+          id: abandoned,
+          status: 'doing',
+          link: { type: 'thread', target: 'session-bbbbbb' },
+          reason: 'mentioned in a thread',
+        })
         expect(reopened.ok && reopened.value.item.status).toBe('doing')
       }),
     ).pipe(Effect.provide(DshxEffect.tracerLayer)),

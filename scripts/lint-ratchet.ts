@@ -157,7 +157,13 @@ const readFindings = (): ReadonlyArray<Finding> => {
       }
     })
   }
-  const output = run(['ast-grep', 'scan', ...lintRoots, '--json=stream', ...[...astGrepBoundaries, ...astGrepVendored, ...astGrepNativeEntryImporters].map(path => `--globs=!${path}`)])
+  const output = run([
+    'ast-grep',
+    'scan',
+    ...lintRoots,
+    '--json=stream',
+    ...[...astGrepBoundaries, ...astGrepVendored, ...astGrepNativeEntryImporters].map(path => `--globs=!${path}`),
+  ])
   return output
     .split('\n')
     .filter(Boolean)

@@ -5,7 +5,14 @@ import { describe, expect, it } from 'vitest'
 import { AssistantStreamAttempt } from '../src/native/assistant-stream.ts'
 
 const attempt = () =>
-  new AssistantStreamAttempt(SessionId('session-1'), 1, () => 1, 1, 1, () => undefined)
+  new AssistantStreamAttempt(
+    SessionId('session-1'),
+    1,
+    () => 1,
+    1,
+    1,
+    () => undefined,
+  )
 
 const blocks = [{ signature: 'sig-1' }]
 

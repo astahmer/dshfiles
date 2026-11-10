@@ -46,7 +46,14 @@ const openLoop = (input: { readonly resume: Resume }) => {
     StartIntents,
     Effect.gen(function* () {
       const intents = yield* StartIntents
-      return StartIntents.of({ ...intents, stale: query => Effect.andThen(Effect.sync(() => (passes.count += 1)), intents.stale(query)) })
+      return StartIntents.of({
+        ...intents,
+        stale: query =>
+          Effect.andThen(
+            Effect.sync(() => (passes.count += 1)),
+            intents.stale(query),
+          ),
+      })
     }),
   ).pipe(Layer.provide(StartIntents.layer), Layer.provideMerge(BacklogTestStore.dbLayer(rows)))
   return Layer.build(
@@ -168,7 +175,9 @@ describe('thread start recovery', () => {
       const attempts: string[] = []
       const { passes, intents, store } = yield* openLoop({
         resume: intent =>
-          attempts.push(intent.id) === 1 ? Effect.fail(new SessionsUnavailable({})) : Effect.succeed({ sessionId: 'session-9', linked: [...intent.itemIds], missing: [] }),
+          attempts.push(intent.id) === 1
+            ? Effect.fail(new SessionsUnavailable({}))
+            : Effect.succeed({ sessionId: 'session-9', linked: [...intent.itemIds], missing: [] }),
       })
       const captured = yield* store.capture({ text: 'bug: composer drops chips', actor: { kind: 'user' } })
       yield* staleStart(intents, [captured.item.id])

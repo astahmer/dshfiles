@@ -144,14 +144,18 @@ plainDescribe('search index heap', () => {
     )
     const prose = (length: number) => {
       const parts: string[] = []
-      for (let size = 0; size < length; ) {
+      for (let size = 0; size < length;) {
         const word = vocabulary[Math.floor(vocabulary.length * random() ** 2.5)] ?? ''
         parts.push(word)
         size += word.length + 1
       }
       return parts.join(' ')
     }
-    const items = corpus(200, random).map(item => ({ ...item, body: prose(2_400), events: [{ at: 0, actor: 'user', kind: 'created' as const, detail: prose(700) }] }))
+    const items = corpus(200, random).map(item => ({
+      ...item,
+      body: prose(2_400),
+      events: [{ at: 0, actor: 'user', kind: 'created' as const, detail: prose(700) }],
+    }))
     const textLength = items.reduce((total, item) => total + item.body.length + (item.events[0]?.detail.length ?? 0), 0)
     const records = new Map(items.map(item => [item.id, item]))
     collect()

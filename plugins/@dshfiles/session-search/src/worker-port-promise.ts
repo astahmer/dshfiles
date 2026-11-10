@@ -2,7 +2,14 @@ import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer, ManagedRuntime } from 'effect'
 
 import type { IndexHealth } from './api-schemas.js'
-import type { FindInSessionRequest, FindInSessionResult, SearchEventsResult, SearchSessionsResult, SessionEventSearchRequest, SessionSearchRequest } from './protocol.js'
+import type {
+  FindInSessionRequest,
+  FindInSessionResult,
+  SearchEventsResult,
+  SearchSessionsResult,
+  SessionEventSearchRequest,
+  SessionSearchRequest,
+} from './protocol.js'
 import { SearchWorker, type SearchWorkerOptions } from './worker-client.js'
 
 type PortCalls = {

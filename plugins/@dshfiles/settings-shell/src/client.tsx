@@ -57,7 +57,13 @@ import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settin
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
-import { createSettingsHubRouter, createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, settingsWorkbenchPanelId, type SettingsOpenRequest } from './workbench-panels.js'
+import {
+  createSettingsHubRouter,
+  createSettingsWorkbenchHub,
+  registerSettingsWorkbenchPanels,
+  settingsWorkbenchPanelId,
+  type SettingsOpenRequest,
+} from './workbench-panels.js'
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'

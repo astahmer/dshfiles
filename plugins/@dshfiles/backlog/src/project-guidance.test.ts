@@ -20,7 +20,9 @@ describe('project guidance', () => {
     Effect.gen(function* () {
       yield* TestClock.setTime(1_000)
       const store = yield* Effect.map(
-        Layer.build(BacklogTestStore.layer({ rows: BacklogTestStore.rows(), settings: { projectGuidance: [{ project: '/work/dshfiles', guidance: 'Never push.' }] } })),
+        Layer.build(
+          BacklogTestStore.layer({ rows: BacklogTestStore.rows(), settings: { projectGuidance: [{ project: '/work/dshfiles', guidance: 'Never push.' }] } }),
+        ),
         context => Context.get(context, BacklogStore),
       )
       const guided = (yield* store.capture({ text: 'guided', project: '/work/dshfiles', actor: user })).item.id
