@@ -14,7 +14,7 @@ export default defineConfig({
     'repository-setup-contract': 'src/repository-setup-contract.ts',
   },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
-  client: { shared: '@dshfiles/shared-runtime', entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },
+  client: { dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },
   build: {
     sourcemap: true,
     declarations: true,

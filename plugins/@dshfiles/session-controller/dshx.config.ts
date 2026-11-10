@@ -13,6 +13,7 @@ export default defineConfig({
   host: { dshxRuntime: 'snapshot', entry: 'build/host/host.js', bundleDependencies: ['@dshfiles/session-log-window'] },
   client: {
     entry: 'src/client-entry.tsx',
+    dshxRuntime: 'shared',
     shared: '@dshfiles/shared-runtime',
     // The native build inlines these into its client chunk; they are not browser-roster modules.
     bundleDependencies: [

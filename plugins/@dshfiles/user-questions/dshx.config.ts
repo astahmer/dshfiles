@@ -6,6 +6,7 @@ export default defineConfig({
   modules: { 'html-preview': 'src/html-preview.ts' },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: {
+    dshxRuntime: 'shared',
     shared: '@dshfiles/shared-runtime',
     entry: 'src/client-entry.tsx',
     // Not browser-roster packages, so the native plugin's build inlines them too.
