@@ -728,21 +728,21 @@ Node 22.23.3, 4 cores. Every number is taken after 110 s of settle, over a 120 s
 `/io` and `/status` (worker threads included). Probe: boot, seed `<home>/sessions`, settle, sample; the per-pass numbers
 come from `session-search/tests/idle-pass.bench.spec.ts` (`IDLE_BENCH=1`).
 
-| Measure (idle Host, 2,800 Sessions) | Before                | After            |
-| ----------------------------------- | --------------------- | ---------------- |
-| Host CPU                            | 6.53 % of a core      | 0.23 %           |
-| syscalls (read + write)             | 2,086 /s              | 19 /s            |
-| bytes read / written                | 489 / 489 KB per min  | 4 / 4 KB per min |
-| settled RSS                         | 541 MB                | 526 MB           |
+| Measure (idle Host, 2,800 Sessions) | Before               | After            |
+| ----------------------------------- | -------------------- | ---------------- |
+| Host CPU                            | 6.53 % of a core     | 0.23 %           |
+| syscalls (read + write)             | 2,086 /s             | 19 /s            |
+| bytes read / written                | 489 / 489 KB per min | 4 / 4 KB per min |
+| settled RSS                         | 541 MB               | 526 MB           |
 
 The owner was the session-search worker's ingest loop, which re-walked the whole corpus every 5 s even when nothing
 changed:
 
-| Cost                        | Before                                  | After                                            | Why                                                                                                     |
-| --------------------------- | --------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| one idle pass               | 354 ms CPU / 462 ms wall                | 33 ms / 30 ms                                    | the log walk used promise fs calls (294 ms of thread-pool round trips); the worker owns its thread, so sync calls; one cursor query per pass instead of two per Session |
-| idle poll                   | every 5 s                               | 5 s doubling to 60 s, back to 5 s on any wake    | every committed Session event already nudges the worker, so the poll only catches outside writers       |
-| first build                 | 10.6 s, 285 MB written for an 8.6 MB index | 4.2 s, 42 MB written for 8.3 MB              | Sessions commit in groups (64 or 250 ms, a savepoint each) instead of one FTS5 segment per transaction; read buffers sized to the file instead of a zero-filled 2 MiB window (13 % of build CPU); constant SQL prepared once |
+| Cost          | Before                                     | After                                         | Why                                                                                                                                                                                                                          |
+| ------------- | ------------------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| one idle pass | 354 ms CPU / 462 ms wall                   | 33 ms / 30 ms                                 | the log walk used promise fs calls (294 ms of thread-pool round trips); the worker owns its thread, so sync calls; one cursor query per pass instead of two per Session                                                      |
+| idle poll     | every 5 s                                  | 5 s doubling to 60 s, back to 5 s on any wake | every committed Session event already nudges the worker, so the poll only catches outside writers                                                                                                                            |
+| first build   | 10.6 s, 285 MB written for an 8.6 MB index | 4.2 s, 42 MB written for 8.3 MB               | Sessions commit in groups (64 or 250 ms, a savepoint each) instead of one FTS5 segment per transaction; read buffers sized to the file instead of a zero-filled 2 MiB window (13 % of build CPU); constant SQL prepared once |
 
 Boot, same scratch Host (`--cpu-prof` through `NODE_OPTIONS`, 2,800 Sessions): about 8.3 s of main-thread CPU before
 the Host settles, and no owned plugin reaches the top 30 self-time owners. Node internals and module compilation
@@ -984,19 +984,19 @@ Host restarted on 2026-11-10 at 16:15. One headless load of that Host, 100 minut
 node .agents/skills/live-performance-audit/scripts/har-capture.mjs --seconds 60 --summary --out <scratch>/fresh.har
 ```
 
-| Measure                                   | 2026-11-06 (user's browser, 143 s)       | 2026-11-10 (headless, 60 s)                       |
-| ----------------------------------------- | ---------------------------------------- | ------------------------------------------------- |
-| `/api` requests                           | 158                                      | 53 (27 of them `dshx-batch` POSTs)                |
-| first request left the browser queue      | 115.6 s after the first was issued       | 0 ms                                              |
-| share of request time queued (`blocked`)  | 99 %, p95 113 s                          | 0 %, p95 0 ms                                     |
-| request time p50 / p95                    | 4.3 s / 113 s                            | 43 ms / 2.77 s                                    |
-| server time (`wait`) p50 / p95            | 5 ms / 1.4 s                             | 35 ms / 2.52 s                                    |
-| aborted in the queue                      | 26                                       | 0                                                 |
-| `session/modelCatalog`                    | 16                                       | 1                                                 |
-| `credentials/describe`                    | 13                                       | 2 (one body)                                      |
-| `llm/listProviders` + `listConfigurable…` | 8 + 8                                    | 1 + 1                                             |
-| `changes.summary` 404s                    | 8                                        | 0                                                 |
-| bytes received                            | 7.8 MB                                   | 6.1 MB (`session/list` 3.5 MB, batches 2.0 MB)    |
+| Measure                                   | 2026-11-06 (user's browser, 143 s) | 2026-11-10 (headless, 60 s)                    |
+| ----------------------------------------- | ---------------------------------- | ---------------------------------------------- |
+| `/api` requests                           | 158                                | 53 (27 of them `dshx-batch` POSTs)             |
+| first request left the browser queue      | 115.6 s after the first was issued | 0 ms                                           |
+| share of request time queued (`blocked`)  | 99 %, p95 113 s                    | 0 %, p95 0 ms                                  |
+| request time p50 / p95                    | 4.3 s / 113 s                      | 43 ms / 2.77 s                                 |
+| server time (`wait`) p50 / p95            | 5 ms / 1.4 s                       | 35 ms / 2.52 s                                 |
+| aborted in the queue                      | 26                                 | 0                                              |
+| `session/modelCatalog`                    | 16                                 | 1                                              |
+| `credentials/describe`                    | 13                                 | 2 (one body)                                   |
+| `llm/listProviders` + `listConfigurable…` | 8 + 8                              | 1 + 1                                          |
+| `changes.summary` 404s                    | 8                                  | 0                                              |
+| bytes received                            | 7.8 MB                             | 6.1 MB (`session/list` 3.5 MB, batches 2.0 MB) |
 
 The two captures differ in browser (the user's, with every other tab and the `shared-streams` worker, against a
 headless page with none), so the queue numbers compare the page's own demand, not the user's socket pool. The slow

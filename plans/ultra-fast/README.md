@@ -40,18 +40,18 @@ folded into [RAM usage](../../docs/ram-usage.md)); this file orders them and hol
 Measured on a clone of the live home on a scratch Host unless a row says live; live numbers only through the read-only
 probes, never by restarting or snapshotting the live Host.
 
-| Metric                                    | Target                          | Probe                                         |
-| ----------------------------------------- | ------------------------------- | --------------------------------------------- |
-| Thread switch, warm, content and composer | p95 ≤ 100 ms, no task > 50 ms   | `switch-probe.mjs`                            |
-| Thread switch, cold thread                | p95 ≤ 250 ms                    | `switch-probe.mjs` after a Host start         |
-| New thread to focused composer            | ≤ 100 ms                        | scripted click, `dshx dev`                    |
-| Page reload to interactive                | ≤ 1.5 s; boot JS parsed −50 %   | `har-capture.mjs`, `__DSH_BOOT__`             |
-| Streaming a turn                          | no long task > 50 ms, ≥ 55 fps  | performance observer during a scripted turn   |
-| Requests per interaction                  | ≤ 3, none queued behind streams | `REQUESTS=1 switch-probe.mjs`, HAR            |
-| Host event loop                           | lag p99 ≤ 50 ms                 | `host-lag.mjs`                                |
-| Host heap after GC, idle after boot       | ≤ 400 MB                        | CDP `process.memoryUsage` on the scratch Host |
+| Metric                                    | Target                          | Probe                                                                          |
+| ----------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------ |
+| Thread switch, warm, content and composer | p95 ≤ 100 ms, no task > 50 ms   | `switch-probe.mjs`                                                             |
+| Thread switch, cold thread                | p95 ≤ 250 ms                    | `switch-probe.mjs` after a Host start                                          |
+| New thread to focused composer            | ≤ 100 ms                        | scripted click, `dshx dev`                                                     |
+| Page reload to interactive                | ≤ 1.5 s; boot JS parsed −50 %   | `har-capture.mjs`, `__DSH_BOOT__`                                              |
+| Streaming a turn                          | no long task > 50 ms, ≥ 55 fps  | performance observer during a scripted turn                                    |
+| Requests per interaction                  | ≤ 3, none queued behind streams | `REQUESTS=1 switch-probe.mjs`, HAR                                             |
+| Host event loop                           | lag p99 ≤ 50 ms                 | `host-lag.mjs`                                                                 |
+| Host heap after GC, idle after boot       | ≤ 400 MB                        | CDP `process.memoryUsage` on the scratch Host                                  |
 | Host heap after GC, after a day of use    | ≤ 800 MB, flat                  | live `ps` RSS trend; scratch replay (2026-11-10 live: RSS 409–579 MB at 1.6 h) |
-| Browser tab heap, 10 threads visited      | ≤ 500 MB                        | `performance.memory` / CDP on the page        |
+| Browser tab heap, 10 threads visited      | ≤ 500 MB                        | `performance.memory` / CDP on the page                                         |
 
 ## Workstreams (structural first)
 
