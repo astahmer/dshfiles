@@ -113,7 +113,9 @@ surfaces, configuration keys, states, failure modes, external dependencies, and
 line. `not-applicable` needs a reason of at least 20 characters saying why no
 journey can exist (for example multi-host needs an SSH server and a second
 runtime). Optional `reach` steps tell `dshx dev open` how to get to the feature
-from the app root (see the `verify-dsh` skill).
+from the app root (see the `verify-dsh` skill). `dshx create` scaffolds a
+catalog with a new plugin (`create-dshx/src/templates.ts`), so a plugin starts
+linked from its manifest's `dshx.features`.
 
 `features:check` fails on a bundle feature with neither a scenario nor a
 `not-applicable` reason, a library feature without a unit test, a missing,
@@ -500,7 +502,19 @@ instead of replaying the unchanged ones, and 210 forced browser runs across the
 In CI, `check.yml` splits `pnpm check` across parallel jobs: the `boot` job runs
 `check:plugin-boot` in three shards (`scripts/ci/plugin-shard.mjs boot`, every
 bundle once and the composed web profile in shard 0), and `e2e-smoke` runs the
-`@smoke` journeys on its own runner. `features:check` rides in the `dshx` job.
+`@smoke` journeys in two shards (`plugin-shard.mjs smoke`). `features:check`
+rides in the `dshx` job. Every pull request gets only that smoke subset: the
+whole suite takes 30-50 minutes serial, too long to gate each change.
+
 `plugin-e2e-coverage.yml` runs the inventory and catalog tests, the report and
-`bddgen` listing; it does not execute the full journeys yet (see
-[plans/plugin-e2e-coverage.md](../plans/plugin-e2e-coverage.md)).
+the `bddgen` listing on every push, and its `journeys` job runs every journey
+nightly and on `workflow_dispatch`: six shards of whole owners
+(`plugin-shard.mjs <i> 6 journeys`, round-robin over the packages with a
+`test:e2e` script, about 13 each), 60 minutes per shard. That job sets
+`TURBO_FORCE=1` and `DSHX_E2E_SCENARIO_CACHE=0`, so a restored Turbo task or a
+scenario receipt never replays a pass into the baseline. A red shard uploads
+`tooling/dshx/test-results`, `tooling/dshx/playwright-report` and
+`.dsh-e2e-evidence` as `plugin-journeys-<run>-<shard>` for seven days. One
+shard reproduces locally as `node scripts/ci/plugin-shard.mjs <i> 6 journeys`
+(that is a broad run: under memory pressure, name one owner with
+`pnpm check:e2e <plugin>` instead).
