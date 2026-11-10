@@ -664,7 +664,8 @@ const make = Effect.gen(function* () {
   const snapshotRevision = Effect.fn('thread workspaces snapshot revision')(function* (target: string, operationId: string) {
     if (!OPERATION_ID.test(operationId)) return null
     const revset = `at_operation(${operationId}, coalesce(@ ~ (empty() & description(exact:"")), @-))`
-    const line = (yield* jj(['--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'commit_id ++ " " ++ change_id ++ "\\n"'], target)).split('\n')[0] ?? ''
+    const line =
+      (yield* jj(['--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'commit_id ++ " " ++ change_id ++ "\\n"'], target)).split('\n')[0] ?? ''
     const [commitId = '', changeId = ''] = line.trim().split(' ')
     return isCommitId(commitId) && changeId.length > 0 ? { commitId, changeId } : null
   })
