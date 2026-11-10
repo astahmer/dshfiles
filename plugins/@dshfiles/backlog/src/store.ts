@@ -312,7 +312,7 @@ const withProject = (item: BacklogItem): BacklogItem => {
 
 const referencingIn = (view: StoreView, link: BacklogLink): BacklogSummary[] =>
   [...view.records.values()]
-    .filter(item => item.links.some(candidate => BacklogItems.sameLink(candidate, link)))
+    .filter(item => item.links.some(candidate => BacklogItems.linkReaches(candidate, link)))
     .sort(byActivity)
     .map(item => summarize(item, view.at, view.relations, null, view.dormantDays))
 

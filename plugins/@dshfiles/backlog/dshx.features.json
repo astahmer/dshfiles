@@ -991,6 +991,44 @@
       ]
     },
     {
+      "id": "backlinks",
+      "title": "See the backlog items that link to a thread or revision",
+      "summary": "A thread's header shows how many backlog items link to it; clicking the count lists each item's chip, with the shared preview card on hover. A revision's details in the jj panel list the items that link to it under Backlog, where a `jj:` change or commit id prefix of four or more characters counts as a link. Nothing renders when no item links there or when the backlog plugin is absent.",
+      "surfaces": ["client", "integration"],
+      "surface": "detail",
+      "destination": "work",
+      "currentSurface": "thread header utilities count chip; jj panel revision details (jj-integration RevisionSections)",
+      "configuration": [],
+      "states": ["hidden", "listed", "previewed"],
+      "failureModes": ["A Host without the backlog API, or a failing read, renders nothing; a missing owner also stops the minute poll."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.thread-backlinks",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.backlinks-revision-prefix",
+          "file": "plugins/@dshfiles/backlog/src/item-links.test.ts",
+          "testName": "reaches a revision through a prefix of its change or commit id, either way round"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.backlinks-revision-exact",
+          "file": "plugins/@dshfiles/backlog/src/item-links.test.ts",
+          "testName": "does not match a bookmark, a mixed alphabet, a too-short prefix or another revision"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
       "id": "reference-preview",
       "title": "Preview a referenced item from a conversation",
       "summary": "An Agent writing `b:<id>` in its markdown gets a link: clicking it opens an inline card with the item's title, kind, status, project and body. A mention the user sent renders as the composer's chip, hiding the serialized title and tool hint. Image attachments appear as thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. Open in Backlog selects that item in the Backlog panel. Prose and inline code are linked; fenced code examples, existing links and text that only contains the token stay as written.",

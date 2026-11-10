@@ -1817,3 +1817,20 @@ Then('Backlog stores only the secret reference for Jev', async ({ page }: { page
 Then('the Jev setup journey is complete', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })
+
+When('the thread the item links is opened', async ({ page }: { page: Page }) => {
+  const related = peek(page).getByRole('list', { name: 'Related' })
+  await related.getByRole('button', { name: 'Fake thread title', exact: true }).click()
+})
+
+Then('the thread header lists backlog item b:{int} titled {string}', async ({ page }: { page: Page }, id: number, title: string) => {
+  await recordAssertion(page, 'backlog-thread-backlinks', async () => {
+    const count = page.getByRole('button', { name: '1 backlog item links here', exact: true })
+    await expect(count).toBeVisible({ timeout: 20_000 })
+    await count.click()
+    const chip = page.getByRole('dialog').getByRole('button', { name: `Preview backlog item ${await withBacklogRefs(page, `b:${String(id)}`)}`, exact: true })
+    await expect(chip).toBeVisible()
+    await expect(chip).toContainText(title)
+  })
+  await finishJourneyAssertions(page)
+})
