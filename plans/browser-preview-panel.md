@@ -2,18 +2,18 @@
 
 Goal: a thread's dev server and the page its agent drives show beside the thread, like t3code, Codex and Claude Code.
 
-Shipped (2026-11-06), documented in the [preview README](../plugins/@dshfiles/preview/README.md): the `web` seed enables
-the native right-Sidebar Browser tab (P1, needs a Host restart to apply), Open falls back to a new browser tab instead of
-a dead button (P2), and **Watch** opens the **Agent browser** tab that mirrors the agent's headless page with click,
-scroll and key input (P4, polled viewport frames with hash dedup rather than CDP screencast).
+Shipped and documented in the [preview README](../plugins/@dshfiles/preview/README.md): the native right-Sidebar Browser
+tab (checked live on the `web` Host after its 2026-11-10 restart: the dev-server chip's **Open**, a chat link and
+`preview_reveal` each load the URL there), Open falling back to a new browser tab, and **Watch** opening the **Agent
+browser** mirror.
 
-Resume here: after the Host restart, check P1 live (Open, `preview_reveal`, chat links with **In-App Sidebar**), then P3.
+Resume here: P3.
 
 ## Open
 
 | Phase | What                                                                                                                                                                                                                        | Owner                | Status |
 | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ------ |
-| P1    | Live check after the restart: the chip's Open, `preview_reveal` and chat links each open a right-Sidebar Browser tab.                                                                                                       | user + preview       | todo   |
+| P1b   | One of two live `preview_reveal` calls made while the thread was on screen in a fresh browser did not open the pane (the other opened it within 1.4 s). Reproduce before changing the chip's reveal handling.              | preview              | todo   |
 | P3    | Auto-reveal: when a thread's dev server first appears, offer one **Preview** action that opens it in the pane; a setting turns auto-open on. No pane steals focus without a click by default.                               | preview              | todo   |
 | P4b   | Remote GUI: when the GUI origin is not loopback, Open on a loopback URL loads the viewer's own machine. Prefer Watch there (or open the mirror for a dev-server row through a short-lived preview page).                    | preview              | todo   |
 | P4c   | Measure the mirror with `live-performance-audit` (bytes/s and Host CPU while watching an animated page); switch to CDP `Page.startScreencast` only if polling is the measured cost.                                         | preview              | todo   |
