@@ -40,10 +40,9 @@ export const createSettingsHubRouter = () => {
   const hubs = new Set<SettingsHubRegistration>()
   let pending: SettingsOpenRequest | undefined
   const deliver = (hub: SettingsHubRegistration): void => {
-    const request = pending
-    if (request === undefined) return
+    if (pending === undefined) return
+    hub.open(pending)
     pending = undefined
-    hub.open(request)
   }
   return {
     register: (hub: SettingsHubRegistration) => {
