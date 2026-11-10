@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
+import type * as Types from 'effect/Types'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 
 type ToolSearchStatus = 'loaded' | 'already_loaded' | 'unavailable'
@@ -99,10 +100,9 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
         ],
         restrict: (filter: { readonly allow?: readonly string[]; readonly deny?: readonly string[] }) => {
           const filters = restrictions.get(agent) ?? []
-          const allowed: Filter = {
-            ...(filter.allow === undefined ? {} : { allow: new Set(filter.allow) }),
-            ...(filter.deny === undefined ? {} : { deny: new Set(filter.deny) }),
-          }
+          const allowed: Types.Mutable<Filter> = {}
+          if (filter.allow !== undefined) allowed.allow = new Set(filter.allow)
+          if (filter.deny !== undefined) allowed.deny = new Set(filter.deny)
           filters.push(allowed)
           restrictions.set(agent, filters)
           emit('tools/change')
