@@ -17,6 +17,54 @@ const sectionEntrySchema = Schema.Struct(sectionEntryFields)
 
 const MAX_LISTED_ENTRIES = 50
 
+const pluginEntrySchema = Schema.Struct({
+  entryId: Schema.String,
+  moduleName: Schema.String,
+  enabled: Schema.Boolean,
+  phase: Schema.NullOr(Schema.String),
+  /** Why the profile patch cannot change this entry; absent when it can. */
+  readOnlyReason: Schema.optionalKey(Schema.String),
+})
+export type PluginEntry = typeof pluginEntrySchema.Type
+
+const pluginChangeSchema = Schema.Struct({
+  entryId: Schema.String,
+  changed: Schema.Boolean,
+  enabled: Schema.NullOr(Schema.Boolean),
+  application: Schema.String,
+  restartReason: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.String),
+  warnings: Schema.Array(Schema.String).check(Schema.isMaxLength(50)),
+})
+export type PluginChange = typeof pluginChangeSchema.Type
+
+const SOURCE_LABELS = {
+  user: 'override',
+  composition: 'profile composition',
+  default: 'schema default',
+  unknown: 'source unknown',
+} as const
+
+const APPLICATION_LABELS: Readonly<Record<string, string>> = {
+  applied: 'applied to the running DSH',
+  'restart-required': 'saved; takes effect after the user restarts DSH',
+  overridden: 'saved, but a higher-priority profile layer keeps the previous value; edit that layer in cordis.patch.yml',
+  failed: 'not applied',
+  cancelled: 'cancelled',
+}
+
+const fieldRowSchema = Schema.Struct({
+  path: Schema.Array(Schema.String).check(Schema.isMaxLength(16)),
+  title: Schema.String,
+  source: Schema.Literals(['user', 'composition', 'default', 'unknown']),
+  explicit: Schema.Boolean,
+  equalsInherited: Schema.Boolean,
+  override: Schema.optionalKey(Schema.String),
+  inherited: Schema.optionalKey(Schema.String),
+  schemaDefault: Schema.optionalKey(Schema.String),
+  effective: Schema.optionalKey(Schema.String),
+})
+
 export const settingsShellApi = defineApi({
   id: 'settings-shell',
   version: 1,
@@ -128,6 +176,93 @@ export const settingsShellApi = defineApi({
       tool: {
         name: 'settings_set',
         render: output => `Updated ${output.namespace}: ${output.applied.length === 0 ? 'no fields' : output.applied.join(', ')}.`,
+      },
+    }),
+    /** Each visible field of one namespace with its default, override, inherited and effective value and where it comes from. */
+    inspect: method({
+      input: Schema.Struct({
+        namespace: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+        query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(128))),
+      }),
+      output: Schema.Struct({
+        namespace: Schema.String,
+        revision: Schema.Number,
+        writable: Schema.Boolean,
+        applies: Schema.String,
+        fields: Schema.Array(fieldRowSchema).check(Schema.isMaxLength(200)),
+        truncated: Schema.Boolean,
+      }),
+      description:
+        'Inspect one settings namespace field by field: the schema default, the user override (present even when it equals the default), the inherited value a reset restores, the effective value, and its source (override, profile composition, schema default, or unknown when the Host cannot tell). A query filters fields by path, title or description. Secret fields are never listed. Read-only.',
+      tool: {
+        name: 'settings_inspect',
+        readOnly: true,
+        render: output => {
+          if (output.fields.length === 0) return `${output.namespace} · revision ${String(output.revision)}: no matching fields.`
+          const lines = output.fields.map(field =>
+            [
+              `${field.path.join('.')} = ${field.effective ?? 'unset'}`,
+              field.explicit ? `override${field.equalsInherited ? ' (equals inherited)' : ''}` : SOURCE_LABELS[field.source],
+              field.inherited === undefined ? undefined : `inherits ${field.inherited}`,
+              field.schemaDefault === undefined || field.schemaDefault === field.inherited ? undefined : `schema default ${field.schemaDefault}`,
+            ]
+              .filter(part => part !== undefined)
+              .join(' · '),
+          )
+          return [
+            `${output.namespace} · revision ${String(output.revision)} · applies ${output.applies}${output.writable ? '' : ' · read-only'}`,
+            ...lines,
+            output.truncated ? 'More fields match; narrow the query.' : undefined,
+          ]
+            .filter(line => line !== undefined)
+            .join('\n')
+        },
+      },
+    }),
+    /** The profile's Loader entries with their enablement, read from the plugin manager. */
+    plugins: method({
+      input: Schema.Struct({ query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(128))) }),
+      output: Schema.Struct({ entries: Schema.Array(pluginEntrySchema).check(Schema.isMaxLength(2000)) }),
+      description:
+        'List the plugin entries of the active profile with their module, whether each is enabled, its runtime phase, and why it cannot be changed when the profile patch cannot address it. A query filters by entry id or module. Read-only.',
+      tool: {
+        name: 'plugin_inventory',
+        readOnly: true,
+        render: output =>
+          output.entries.length === 0
+            ? 'No matching plugin entries.'
+            : output.entries
+                .map(entry =>
+                  [
+                    `${entry.entryId} · ${entry.moduleName}`,
+                    entry.enabled ? 'enabled' : 'disabled',
+                    entry.phase ?? 'not running',
+                    entry.readOnlyReason === undefined ? undefined : `read-only (${entry.readOnlyReason})`,
+                  ]
+                    .filter(part => part !== undefined)
+                    .join(' · '),
+                )
+                .join('\n'),
+      },
+    }),
+    /** Enable or disable one Loader entry through the plugin manager, reporting whether it applied live or waits for a restart. */
+    setPluginEnabled: method({
+      input: Schema.Struct({ entryId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)), enabled: Schema.Boolean }),
+      output: pluginChangeSchema,
+      description:
+        'Enable or disable one plugin entry of the active profile (an entryId from plugin_inventory). The plugin manager saves it in the profile patch and reports whether the running DSH applied it or needs a restart; this never restarts DSH. Reverse it with the opposite value. Call only when the user asked to enable or disable that plugin.',
+      tool: {
+        name: 'plugin_set_enabled',
+        render: output =>
+          [
+            `${output.entryId}: ${output.changed ? (output.enabled === false ? 'disabled' : 'enabled') : 'already in that state'}`,
+            APPLICATION_LABELS[output.application] ?? output.application,
+            output.restartReason === undefined ? undefined : `restart reason: ${output.restartReason}`,
+            output.error,
+            ...output.warnings,
+          ]
+            .filter(part => part !== undefined)
+            .join(' · '),
       },
     }),
     /** Reset one field of a namespace to its schema default without restating the rest of the section. */

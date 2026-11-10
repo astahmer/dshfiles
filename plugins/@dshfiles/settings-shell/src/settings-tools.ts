@@ -7,6 +7,9 @@ import {
   type SettingsRow,
   type SettingsServiceMissing,
 } from './native-settings-promise.js'
+import { SettingsPluginPages } from './plugin-settings.js'
+import { jsonValueSchema, SettingsSchemaModel, type JsonValue } from './schema-form/schema-model.js'
+import { SettingProvenanceModel, type SettingSource } from './schema-form/setting-provenance.js'
 import { SettingsSearch, type SectionEntryRow } from './settings-search.js'
 
 /** One namespace section is far larger than any settings form; keep the model-facing JSON bounded. */
@@ -14,6 +17,8 @@ const MAX_VALUE_BYTES = 64 * 1024
 const MAX_NAMES_IN_ERROR = 8
 const MAX_MESSAGE = 300
 const MAX_LISTED_ENTRIES = 50
+const MAX_INSPECTED_FIELDS = 200
+const MAX_FIELD_VALUE_BYTES = 2 * 1024
 
 export class SettingsNamespaceUnknown extends Schema.TaggedError<SettingsNamespaceUnknown>()(
   'SettingsNamespaceUnknown',
@@ -75,6 +80,72 @@ export interface SettingsNamespaceRow {
   readonly valueTooLarge?: boolean
 }
 
+/** One field as `settings_inspect` reports it; values are JSON text, absent when the layer has none. */
+export interface SettingFieldRow {
+  readonly path: string[]
+  readonly title: string
+  readonly source: SettingSource
+  readonly explicit: boolean
+  readonly equalsInherited: boolean
+  readonly override?: string
+  readonly inherited?: string
+  readonly schemaDefault?: string
+  readonly effective?: string
+}
+
+export interface SettingsInspection {
+  readonly namespace: string
+  readonly revision: number
+  readonly writable: boolean
+  readonly applies: string
+  readonly fields: SettingFieldRow[]
+  readonly truncated: boolean
+}
+
+const secretPathsSchema = Schema.Array(Schema.Struct({ path: Schema.Array(Schema.String) }))
+const asJson = (value: unknown): JsonValue | undefined => Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(value))
+
+/** JSON text of one layer's value, cut to a bound a model reads comfortably. */
+const jsonText = (value: JsonValue | undefined): string | undefined => {
+  if (value === undefined) return undefined
+  const text = JSON.stringify(value)
+  return jsonBytes(text) > MAX_FIELD_VALUE_BYTES ? `${text.slice(0, MAX_FIELD_VALUE_BYTES)}…` : text
+}
+
+const fieldRows = (descriptor: SettingsRow, query: string | undefined): { readonly fields: SettingFieldRow[]; readonly truncated: boolean } => {
+  const secrets = Option.getOrElse(Schema.decodeUnknownOption(secretPathsSchema)(descriptor.secrets ?? []), () => [])
+  const fields = SettingsSchemaModel.settingFields({
+    schema: asJson(descriptor.schema) ?? null,
+    secrets,
+    text: SettingsPluginPages.localizedTextReader('en'),
+  })
+  const needle = query?.trim().toLowerCase() ?? ''
+  const value = asJson(descriptor.value)
+  const base = asJson(descriptor.base)
+  const user = asJson(descriptor.user)
+  const matching = fields.filter(field => needle === '' || `${field.path.join('.')} ${field.title} ${field.description}`.toLowerCase().includes(needle))
+  const rows = matching.slice(0, MAX_INSPECTED_FIELDS).map(field => {
+    const provenance = SettingProvenanceModel.of({ field, value, base, user })
+    const override = provenance.explicit ? jsonText(SettingsSchemaModel.valueAt(user, field.path)) : undefined
+    const inherited = jsonText(provenance.inherited)
+    const schemaDefault = jsonText(provenance.schemaDefault)
+    const effective = jsonText(provenance.effective)
+    const row: SettingFieldRow = {
+      path: [...field.path],
+      title: field.title,
+      source: provenance.source,
+      explicit: provenance.explicit,
+      equalsInherited: provenance.equalsInherited,
+      ...(override === undefined ? {} : { override }),
+      ...(inherited === undefined ? {} : { inherited }),
+      ...(schemaDefault === undefined ? {} : { schemaDefault }),
+      ...(effective === undefined ? {} : { effective }),
+    }
+    return row
+  })
+  return { fields: rows, truncated: matching.length > rows.length }
+}
+
 const failureSchema = Schema.Struct({ code: Schema.optionalKey(Schema.String), message: Schema.optionalKey(Schema.String) })
 
 const classifyWriteFailure = (error: NativeSettingsWriteFailed) => {
@@ -128,6 +199,7 @@ export class SettingsTools extends Context.Service<
       readonly path: readonly string[]
     }) => Effect.Effect<{ readonly namespace: string; readonly path: string[] }, SettingsWriteFailure>
     readonly publishSearchEntries: (entries: readonly SectionEntryRow[]) => Effect.Effect<{ readonly count: number }>
+    readonly inspect: (input: { readonly namespace: string; readonly query?: string | undefined }) => Effect.Effect<SettingsInspection, SettingsReadFailure>
   }
 >()('@dshfiles/settings-shell/SettingsTools') {
   static readonly layer = Layer.effect(
@@ -172,7 +244,21 @@ export class SettingsTools extends Context.Service<
 
       const publishSearchEntries = (entries: readonly SectionEntryRow[]) => Effect.as(Ref.set(searchEntries, entries), { count: entries.length })
 
-      return SettingsTools.of({ list, set, unset, publishSearchEntries })
+      const inspect = Effect.fn('settings-shell settings inspect')(function* (input: { readonly namespace: string; readonly query?: string | undefined }) {
+        const forms = yield* native.forms
+        const descriptor = yield* requireNamespace(forms, input.namespace)
+        const rows = fieldRows(descriptor, input.query)
+        return {
+          namespace: descriptor.ns,
+          revision: descriptor.revision,
+          writable: forms.writable,
+          applies: descriptor.applies ?? 'unknown',
+          fields: rows.fields,
+          truncated: rows.truncated,
+        }
+      })
+
+      return SettingsTools.of({ list, set, unset, publishSearchEntries, inspect })
     }),
   )
 }

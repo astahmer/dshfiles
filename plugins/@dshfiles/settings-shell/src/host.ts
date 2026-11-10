@@ -5,6 +5,7 @@ import { FetchHttpClient } from 'effect/http'
 import { BundleLabels } from './bundle-labels-promise.js'
 import { InstalledVersions } from './installed-versions.js'
 import { NativeSettings } from './native-settings-promise.js'
+import { PluginControls } from './plugin-controls.js'
 import { ReleaseCheck } from './release-check.js'
 import { settingsShellSettings } from './settings.js'
 import { SettingsTools } from './settings-tools.js'
@@ -33,7 +34,7 @@ const PortDriftWarning = Layer.effectDiscard(
 )
 
 const settingsShellLayer = Layer.mergeAll(SettingsTools.layer, ReleaseCheck.layer, BundleLabels.layer, PortDriftWarning).pipe(
-  Layer.provideMerge(Layer.mergeAll(InstalledVersions.layer, NativeSettings.layer)),
+  Layer.provideMerge(Layer.mergeAll(InstalledVersions.layer, NativeSettings.layer, PluginControls.layer)),
   Layer.provideMerge(Layer.merge(nodeFileSystemLayer, FetchHttpClient.layer)),
 )
 
@@ -68,6 +69,15 @@ export default DshxPlugin.make({
       set: input => SettingsTools.use(tools => tools.set(input)),
       unset: input => SettingsTools.use(tools => tools.unset(input)),
       publishSearchEntries: input => SettingsTools.use(tools => tools.publishSearchEntries(input.entries)),
+      inspect: input => SettingsTools.use(tools => tools.inspect(input)),
+      plugins: input =>
+        PluginControls.use(controls =>
+          Effect.map(controls.list, entries => {
+            const needle = input.query?.trim().toLowerCase() ?? ''
+            return { entries: entries.filter(entry => needle === '' || `${entry.entryId} ${entry.moduleName}`.toLowerCase().includes(needle)) }
+          }),
+        ),
+      setPluginEnabled: input => PluginControls.use(controls => controls.setEnabled(input)),
     }),
   ],
 })

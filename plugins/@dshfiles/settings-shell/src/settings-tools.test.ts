@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@effect/vitest'
+import Schemastery from '@deepseek-ai/schemastery'
 import { Context, Effect, Layer } from 'effect'
 import { NativeSettings, type SettingsRow, type SettingsSurface, type SettingsUnsetOp } from './native-settings-promise.js'
 import { SettingsTools } from './settings-tools.js'
@@ -166,14 +167,70 @@ describe('settings tools: write', () => {
 })
 
 describe('settings-shell tool exposure', () => {
-  it('exposes the release check and settings read, merge and reset tools', async () => {
+  it('exposes the release check, settings read, inspect, merge and reset, and plugin enablement tools', async () => {
     const { settingsShellApi } = await import('./shell-api.js')
     const tools = Object.values(settingsShellApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
-    expect(tools.map(tool => tool.name)).toEqual(['dsh_release_status', 'settings_list', 'settings_set', 'settings_unset'])
-    expect(tools.filter(tool => tool.readOnly === true).map(tool => tool.name)).toEqual(['dsh_release_status', 'settings_list'])
+    expect(tools.map(tool => tool.name)).toEqual([
+      'dsh_release_status',
+      'settings_list',
+      'settings_set',
+      'settings_inspect',
+      'plugin_inventory',
+      'plugin_set_enabled',
+      'settings_unset',
+    ])
+    expect(tools.filter(tool => tool.readOnly === true).map(tool => tool.name)).toEqual([
+      'dsh_release_status',
+      'settings_list',
+      'settings_inspect',
+      'plugin_inventory',
+    ])
     for (const method of Object.values(settingsShellApi.methods)) {
       if (method.tool === undefined) continue
       expect(method.description).toBeTruthy()
     }
   })
+})
+
+describe('settings tools: inspect', () => {
+  const schema = Schemastery.object({
+    maxTabs: Schemastery.natural().default(12).description('Most tabs.'),
+    dense: Schemastery.boolean().default(false),
+    label: Schemastery.string(),
+    token: Schemastery.string().role('secret'),
+  }).toJSON()
+  const describeRows = () => [
+    row(
+      'workbench',
+      { maxTabs: 20, dense: false, label: 'seeded' },
+      { schema, base: { maxTabs: 20, dense: false, label: 'seeded' }, user: { dense: false }, applies: 'live', secrets: [{ path: ['token'], set: true }] },
+    ),
+  ]
+
+  it.effect('reports each visible field with its source, override, inherited value and schema default', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const tools = yield* toolsFor(createSurface({ describe: describeRows }))
+        const inspection = yield* tools.inspect({ namespace: 'workbench' })
+        expect(inspection).toMatchObject({ namespace: 'workbench', revision: 4, writable: true, applies: 'live', truncated: false })
+        expect(inspection.fields).toEqual([
+          { path: ['maxTabs'], title: 'Max tabs', source: 'composition', explicit: false, equalsInherited: false, inherited: '20', schemaDefault: '12', effective: '20' },
+          {
+            path: ['dense'],
+            title: 'Dense',
+            source: 'user',
+            explicit: true,
+            equalsInherited: true,
+            override: 'false',
+            inherited: 'false',
+            schemaDefault: 'false',
+            effective: 'false',
+          },
+          { path: ['label'], title: 'Label', source: 'unknown', explicit: false, equalsInherited: false, inherited: '"seeded"', effective: '"seeded"' },
+        ])
+        expect((yield* tools.inspect({ namespace: 'workbench', query: 'most' })).fields.map(field => field.path)).toEqual([['maxTabs']])
+        expect((yield* Effect.flip(tools.inspect({ namespace: 'nope' })))._tag).toBe('SettingsNamespaceUnknown')
+      }),
+    ),
+  )
 })

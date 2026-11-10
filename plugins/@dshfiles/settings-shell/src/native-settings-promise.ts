@@ -12,6 +12,11 @@ export interface SettingsRow {
   readonly autoGenerate: boolean
   readonly secrets?: readonly unknown[]
   readonly value: unknown
+  /** Serialized schema (`toJSON()`), composition base with defaults resolved, and the raw user layer. */
+  readonly schema?: unknown
+  readonly base?: unknown
+  readonly user?: unknown
+  readonly applies?: string
 }
 
 /** A field reset. Path mutation exists so a caller holding a redacted view never restates the section. */
