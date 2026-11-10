@@ -108,8 +108,11 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const [dialog, setDialog] = useState<ActiveDialog | null>(null)
   const [draftIds, setDraftIds] = useState<readonly number[]>([])
   const nextDraftId = useRef(0)
-  const revealed: RevealedSecret | null =
-    revealSnapshot.context.revealed === null ? null : { id: revealSnapshot.context.revealed.rowId, value: revealSnapshot.context.revealed.value }
+  const revealedEntry = revealSnapshot.context.revealed
+  const revealed = useMemo<RevealedSecret | null>(
+    () => (revealedEntry === null ? null : { id: revealedEntry.rowId, value: revealedEntry.value }),
+    [revealedEntry],
+  )
   const queryClient = useQueryClient()
   const workspaceIds = useMemo(() => workspaceSnapshot.items.map(workspace => workspace.workspaceId).sort(), [workspaceSnapshot])
   // The Host splits projects from thread workspaces and drops registrations whose folder is gone, as the New thread picker does.
