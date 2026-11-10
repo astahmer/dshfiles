@@ -44,14 +44,14 @@ const offerThinkingOff = <Model extends ThinkingCatalogModel>(model: Model): Mod
  */
 const SILENT_REASONING_STREAM_IDLE_TIMEOUT_MS = 300_000
 /**
- * OpenCode Go answers or dies within seconds: first-token p90 on this route is
- * ~11s, and every 300s stall in the 2026-10-15..18 window was this route (four
- * `TIMEOUT` failures plus 309s and 404s first-token stalls that only completed
- * after the full pi-ai bound). A 2-minute silence here is a dead route, and
- * failing at 2 minutes lets the retry policy fail over instead of burning five
- * minutes of the turn per attempt.
+ * OpenCode Go answers quickly when the upstream is healthy: first-token p90 on
+ * this route is ~11s. A 2-minute silence was treated as a dead route, but the
+ * 2026-11-05..07 stalls showed the shared upstream going quiet for longer while
+ * the turn was still alive, so the bound now matches pi-ai's own: a route that
+ * stays silent this long has failed either way, and the retry policy still fails
+ * the turn over instead of hanging forever.
  */
-const OPENCODE_GO_STREAM_IDLE_TIMEOUT_MS = 120_000
+const OPENCODE_GO_STREAM_IDLE_TIMEOUT_MS = 300_000
 
 const streamIdleTimeoutMsFor = (upstreamId: string): number =>
   upstreamId === 'opencode-go' ? OPENCODE_GO_STREAM_IDLE_TIMEOUT_MS : SILENT_REASONING_STREAM_IDLE_TIMEOUT_MS

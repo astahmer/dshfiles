@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { homedir, userInfo } from 'node:os'
+import { isAbsolute, join, relative, sep } from 'node:path'
 import { Effect } from 'effect'
 import { chromium, type Browser, type BrowserContext, type Locator, type Page, type Route } from 'playwright-core'
 import { withSpan } from '@dshfiles/dshx/tracing'
@@ -99,8 +100,11 @@ const accountHomeExecutable = async (error: unknown, exists: (path: string) => P
   if (process.env.PLAYWRIGHT_BROWSERS_PATH !== undefined || !(error instanceof Error)) return undefined
   const missing = MISSING_EXECUTABLE.exec(error.message)?.[1]
   const accountHome = userInfo().homedir
-  if (missing === undefined || accountHome === homedir() || !missing.startsWith(`${homedir()}/`)) return undefined
-  const relocated = `${accountHome}${missing.slice(homedir().length)}`
+  if (missing === undefined || accountHome === homedir()) return undefined
+  // `relative` is separator- and case-aware on Windows, where a `${homedir()}/` prefix never matches `C:\Users\…`.
+  const inHome = relative(homedir(), missing)
+  if (inHome === '' || inHome === '..' || inHome.startsWith(`..${sep}`) || isAbsolute(inHome)) return undefined
+  const relocated = join(accountHome, inHome)
   return (await exists(relocated)) ? relocated : undefined
 }
 

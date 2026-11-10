@@ -91,8 +91,36 @@ describe('FffSearch.grep', () => {
     expect(grep('LifecycleRules', { path: 'src/rules.ts' }).matches.map(match => match.path)).toEqual(['src/rules.ts'])
   })
 
+  it('sends a single file as a glob constraint instead of searching its directory', () => {
+    expect(FffSearch.scopeConstraint({ root: '/workspace' })).toBeUndefined()
+    expect(FffSearch.scopeConstraint({ root: '/workspace', directory: 'src' })).toBe('src/')
+    expect(FffSearch.scopeConstraint({ root: '/workspace', directory: 'src', file: 'src/rules.ts' })).toBe('src/rules.ts*')
+    expect(FffSearch.scopeConstraint({ root: '/workspace', file: 'many.txt' })).toBe('**/many.txt*')
+    expect(FffSearch.scopeConstraint({ root: '/workspace', directory: 'src', file: 'src/a b.ts' })).toBe('src/')
+    expect(FffSearch.scopeConstraint({ root: '/workspace', file: 'rules[1].ts' })).toBeUndefined()
+  })
+
+  it('keeps every match of a single file beyond one page', () => {
+    const outcome = grep('needle \\d+', { path: 'many.txt' })
+    expect(outcome.matches).toHaveLength(FffSearch.maxGrepMatches)
+    expect(outcome.total).toBe(300)
+  })
+
   it('reads a pattern that looks like an fff constraint as a regular expression', () => {
     expect(grep('\\*\\.yml').matches.map(match => match.path)).toEqual(['src/rules.ts'])
+  })
+
+  it('drops only a wildcard-only include', () => {
+    expect(FffSearch.includeConstraint('*')).toBeUndefined()
+    expect(FffSearch.includeConstraint('**')).toBeUndefined()
+    expect(FffSearch.includeConstraint('**/*')).toBeUndefined()
+    expect(FffSearch.includeConstraint(' *.tsx ')).toBe('*.tsx')
+    expect(FffSearch.includeConstraint(undefined)).toBeUndefined()
+  })
+
+  it('keeps a wildcard include from breaking a valid regex pattern', () => {
+    const outcome = grep('LifecycleRules.apply|LifecycleRules.check', { include: '*' })
+    expect(outcome.matches.map(match => match.path).sort()).toEqual(['src/nested/use.tsx', 'src/rules.test.ts'])
   })
 
   it('matches case-sensitively, like ripgrep', () => {

@@ -119,7 +119,8 @@ export const createCodexLoginFiles = (isManagedSetupHome: ManagedSetupHomePolicy
     if (snapshot(target, isManagedSetupHome).fingerprint !== expected) return false
     if (!snapshot(stage, isManagedSetupHome).signedIn) throw new Error('Codex did not save ChatGPT credentials')
     const source = join(stage.effectiveHomePath, 'auth.json')
-    if ((lstatSync(source).mode & 0o077) !== 0) throw new Error('Codex auth file must be private')
+    // Windows reports synthetic POSIX mode bits, so only a POSIX Host can check them; its ACLs govern otherwise.
+    if (process.platform !== 'win32' && (lstatSync(source).mode & 0o077) !== 0) throw new Error('Codex auth file must be private')
     renameSync(source, join(target.effectiveHomePath, 'auth.json'))
     return true
   },

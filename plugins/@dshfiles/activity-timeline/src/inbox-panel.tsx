@@ -16,7 +16,7 @@ import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
-import { ClockIcon, EllipsisIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { ClockIcon, EllipsisIcon, MessagesSquareIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useState } from 'react'
@@ -283,9 +283,27 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         | { readonly kind: 'reopen'; readonly id: string }
         | { readonly kind: 'snooze'; readonly id: string; readonly choice: SnoozeChoice }
         | { readonly kind: 'mute'; readonly source: string; readonly muted: boolean }
+        | { readonly kind: 'resume-all'; readonly itemIds: readonly string[] }
         | { readonly kind: 'act'; readonly id: string; readonly verb: AttentionProviderVerb; readonly choiceId?: string },
-    ) =>
-      runHostRequest({
+    ) => {
+      if (request.kind === 'resume-all') {
+        // One request per item, so a slow resume never spends the next item's timeout; a refusal is counted, not fatal.
+        let resumed = 0
+        let refusedCount = 0
+        for (const itemId of request.itemIds) {
+          try {
+            const outcome = await runHostRequest({ request: signal => api.act({ id: itemId, verb: 'Resume' }, { signal }) })
+            if (outcome.ok) resumed += 1
+            else refusedCount += 1
+          } catch {
+            refusedCount += 1
+          }
+        }
+        return refusedCount === 0
+          ? { ok: true, message: t('resumedAll', { count: resumed }) }
+          : { ok: false, message: t('resumedSome', { sent: resumed, failed: refusedCount }) }
+      }
+      return runHostRequest({
         request: async signal => {
           if (request.kind === 'done') return void (await api.done({ id: request.id }, { signal }))
           if (request.kind === 'reopen') return void (await api.reopen({ id: request.id }, { signal }))
@@ -293,7 +311,8 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
           if (request.kind === 'mute') return void (await api.muteSource({ source: request.source, muted: request.muted }, { signal }))
           return api.act({ id: request.id, verb: request.verb, ...(request.choiceId !== undefined && { choiceId: request.choiceId }) }, { signal })
         },
-      }),
+      })
+    },
     onSuccess: outcome => settle(outcome ?? null),
     onError: failed,
   })
@@ -309,6 +328,18 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   const counts = data?.counts
   // Ages are read against the moment the list arrived, so a render never reads the clock.
   const now = listQuery.dataUpdatedAt
+  // Every open item that can be resumed moves at once: the inbox already lists only what needs the user.
+  const resumableIds = data === undefined ? [] : InboxView.resumableIds(data.items)
+  const resumeAllAction =
+    view === 'needs-you' && resumableIds.length > 0
+      ? {
+          id: 'resume-all',
+          label: t('resumeAll'),
+          icon: <RefreshCwIcon aria-hidden />,
+          pending: transition.isPending,
+          onSelect: () => transition.mutate({ kind: 'resume-all', itemIds: resumableIds }),
+        }
+      : null
   const tabs: readonly { readonly view: AttentionView; readonly label: string; readonly count: number }[] = [
     { view: 'needs-you', label: t('needsYou'), count: counts?.needsYou ?? 0 },
     { view: 'other', label: t('other'), count: counts?.other ?? 0 },
@@ -323,6 +354,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
       heading={t('title')}
       description={t('subtitle')}
       className="dshx:mx-auto dshx:w-full dshx:max-w-3xl"
+      {...(resumeAllAction === null ? {} : { primaryAction: resumeAllAction })}
       tabs={{
         label: t('title'),
         value: view,

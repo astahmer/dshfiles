@@ -111,12 +111,17 @@ export const PlanProgress = {
    * latest write); `history` supplies when each step started and finished.
    */
   progress(items: readonly PlanItem[], history: readonly PlanWrite[]): PlanProgress {
+    const statusByWrite = history.map(write => {
+      const statuses = new Map<string, PlanStatus>()
+      for (const todo of write.todos) if (!statuses.has(todo.content)) statuses.set(todo.content, todo.status)
+      return { time: write.time, statuses }
+    })
     const steps = items.map((item): PlanStep => {
       let startedAt: number | undefined
       let completedAt: number | undefined
       let previousTime: number | undefined
-      for (const write of history) {
-        const status = write.todos.find(candidate => candidate.content === item.content)?.status
+      for (const write of statusByWrite) {
+        const status = write.statuses.get(item.content)
         if (status === 'in_progress' && startedAt === undefined) startedAt = write.time
         if (status === 'completed' && completedAt === undefined) {
           completedAt = write.time

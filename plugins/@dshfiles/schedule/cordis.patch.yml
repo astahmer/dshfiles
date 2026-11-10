@@ -1,0 +1,5 @@
+- id: ui-schedule
+  disabled: true
+- insert:
+    - id: dshfiles-schedule
+      name: '@dshfiles/schedule'

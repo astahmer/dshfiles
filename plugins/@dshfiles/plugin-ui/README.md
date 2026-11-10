@@ -63,7 +63,7 @@ pnpm dlx shadcn@4.21.4 add <name-or-registry-url>
 ## Page kit
 
 Every plugin page (main panel, stage detail) is built from one template, so the product reads as one app
-([ADE plan §5](../../../plans/ade-ux/README.md#5-the-plugin-presentation-contract); tokens and anatomy in
+([ADE plan §5](../../../docs/ade-ux/README.md#5-the-plugin-presentation-contract); tokens and anatomy in
 [DESIGN.md](../../../DESIGN.md)). Pilots: activity-timeline, background-jobs, mcp-servers.
 
 ```tsx

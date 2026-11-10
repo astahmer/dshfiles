@@ -9,6 +9,7 @@ import { HOST_GENERATION_DIRECTORY, HOST_GENERATION_MANIFEST } from '../../host/
 import { CompilerKernel } from '../kernel.js'
 import type { BuildArtifact, BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
 import { HostCompilerGuards } from './guards.js'
+import { HostRuntimeStore, type RuntimeSnapshotOutcome } from './runtime-store.js'
 
 const VIRTUAL_HOST_ENTRY = '\0virtual:dshx-host-entry'
 const VIRTUAL_HOST_PUBLIC = '\0virtual:dshx-host-public'
@@ -59,6 +60,7 @@ const EFFECT_PATH = fileURLToPath(new URL('../../effect/index.js', import.meta.u
 const EFFECT_SERVICES_PATH = fileURLToPath(new URL('../../effect/services.js', import.meta.url))
 const HOST_GENERATION_PATH = fileURLToPath(new URL('../../host/generation.js', import.meta.url))
 const VIRTUAL_HOST_REEXPORT_PREFIX = '\0virtual:dshx-host-reexport:'
+const RUNTIME_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 
 /** Public dshx subpaths a Host bundle inlines whole: the ids schemas and each standard Effect service. */
 const DSHX_REEXPORTED_MODULES: ReadonlyMap<string, string> = new Map([
@@ -78,6 +80,36 @@ const DSHX_REEXPORTED_MODULES: ReadonlyMap<string, string> = new Map([
     'storage-domain',
   ].map((name): readonly [string, string] => [`@dshfiles/dshx/effect/${name}`, fileURLToPath(new URL(`../../effect/${name}.js`, import.meta.url))]),
 ])
+
+/** Every DSHX runtime module a Host virtual entry imports: the roots of a shared runtime snapshot. */
+const RUNTIME_ENTRIES: readonly string[] = [
+  HOST_RUNTIME_PATH,
+  HOST_DEFINE_PATH,
+  HOST_PROCESS_PATH,
+  HOST_WEB_STARTUP_PATH,
+  HOST_OUTSIDE_RELOAD_PATH,
+  HOST_SDK_PATH,
+  API_DEFINE_PATH,
+  API_ZOD_VIEW_PATH,
+  API_HOST_CLIENT_PATH,
+  API_HOST_EVENTS_PATH,
+  API_COMMON_PATH,
+  HOST_PLUGIN_STORAGE_PATH,
+  HOST_GENERATE_PATH,
+  SETTINGS_DEFINE_PATH,
+  SETTINGS_SECTION_ENTRIES_SCHEMA_PATH,
+  COMMUNICATION_RUNTIME_PATH,
+  COMMUNICATION_TYPES_PATH,
+  PLATFORM_HOST_API_PATH,
+  NATIVE_RPC_SCHEMA_PATH,
+  SESSION_DIGEST_PATH,
+  TRACING_PATH,
+  JSON_PATH,
+  EFFECT_PATH,
+  EFFECT_SERVICES_PATH,
+  HOST_GENERATION_PATH,
+  ...DSHX_REEXPORTED_MODULES.values(),
+]
 
 /** Opt-in in-process Host replacement: publish immutable generations behind a stable wrapper. */
 export interface HostGenerationBuild {
@@ -99,9 +131,11 @@ export interface BuildHostOptions {
   readonly generation?: HostGenerationBuild
   readonly schemaSnapshot?: boolean
   readonly schemaSnapshotAliases?: readonly { readonly find: string; readonly replacement: string }[]
+  /** `snapshot` imports the DSHX runtime from an immutable content-addressed store shared by every Host built with the same DSHX; it falls back to `inline` when this project cannot use one. */
+  readonly dshxRuntime?: 'inline' | 'snapshot'
 }
 
-export type HostBuildResult = BuildReport
+export type HostBuildResult = BuildReport & { readonly dshxRuntime?: RuntimeSnapshotOutcome }
 
 /** Public dshx entry points a Host bundle may import, each inlined through its own virtual module. */
 const VIRTUAL_DSHX_PUBLIC_MODULES: ReadonlyMap<string, string> = new Map([
@@ -358,7 +392,12 @@ function hostGenerationReport(report: BuildReport, declarations: boolean): Build
   return { ...report, output }
 }
 
-async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildHostOptions, watch: boolean): Promise<InlineConfig> {
+async function hostConfig(
+  paths: Awaited<ReturnType<typeof resolveOptions>>,
+  options: BuildHostOptions,
+  watch: boolean,
+  onRuntimeOutcome: (outcome: RuntimeSnapshotOutcome) => void = () => {},
+): Promise<InlineConfig> {
   const bundleDependencies = options.bundleDependencies ?? []
   if (bundleDependencies.includes('@deepseek-ai/cordis')) {
     throw new DshxError('DSHX4004', 'Host bundleDependencies cannot include @deepseek-ai/cordis.', {
@@ -380,6 +419,10 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
     exports: 'named',
   } as const
   const userPlugins = await CompilerKernel.resolveUserPlugins(options.vite?.plugins, watch)
+  const runtimeSnapshot =
+    options.dshxRuntime === 'snapshot'
+      ? HostRuntimeStore.plugin({ runtimeRoot: RUNTIME_ROOT, entries: RUNTIME_ENTRIES, consumerRoot: paths.root, onOutcome: onRuntimeOutcome })
+      : undefined
   const config: InlineConfig = {
     root: paths.root,
     configFile: false,
@@ -389,12 +432,21 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
     logLevel: 'error',
     plugins: [
       hostEntryPlugin(paths, options),
+      ...(runtimeSnapshot === undefined ? [] : [runtimeSnapshot]),
       ...userPlugins,
       CompilerKernel.artifactDeclarationPlugin('host', paths.outDir, options.declarations ?? true),
       // A generation build publishes a hashed chunk behind a wrapper, so only the primary Host
       // bundle names its own entry and can carry a dependency manifest a planner can read.
       ...(generation === undefined
-        ? [CompilerKernel.dependencyManifestPlugin({ face: 'host', root: paths.root, outDir: paths.outDir, entryFile: 'index.js' })]
+        ? [
+            CompilerKernel.dependencyManifestPlugin({
+              face: 'host',
+              root: paths.root,
+              outDir: paths.outDir,
+              entryFile: 'index.js',
+              extraModules: () => runtimeSnapshot?.sourceFiles() ?? [],
+            }),
+          ]
         : []),
       HostCompilerGuards.hostPeerDependencyPlugin(paths.root),
       CompilerKernel.boundaryPlugin({
@@ -457,9 +509,12 @@ export async function watchHost(options: BuildHostOptions): Promise<BuildWatcher
 /** Build a DSH-compatible Host entry as one Node ESM file. */
 export async function buildHost(options: BuildHostOptions): Promise<HostBuildResult> {
   const paths = await resolveOptions(options)
-  const config = await hostConfig(paths, options, false)
+  let dshxRuntime: RuntimeSnapshotOutcome | undefined
+  const config = await hostConfig(paths, options, false, outcome => {
+    dshxRuntime = outcome
+  })
   const declarations = options.declarations ?? true
-  const report = CompilerKernel.buildReport(
+  const built = CompilerKernel.buildReport(
     await build(config).catch(CompilerKernel.surfaceGuardError),
     'host',
     'index.js',
@@ -467,5 +522,6 @@ export async function buildHost(options: BuildHostOptions): Promise<HostBuildRes
     declarations,
     'DSHX1304',
   )
-  return options.generation === undefined ? report : hostGenerationReport(report, declarations)
+  const report = options.generation === undefined ? built : hostGenerationReport(built, declarations)
+  return dshxRuntime === undefined ? report : { ...report, dshxRuntime }
 }

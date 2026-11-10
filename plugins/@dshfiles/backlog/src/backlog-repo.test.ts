@@ -254,6 +254,23 @@ describe('the legacy import', () => {
   )
 })
 
+describe('the sync mappings table', () => {
+  it.effect('writes several mappings in one batch and treats an empty batch as a no-op', () =>
+    Effect.gen(function* () {
+      const { repo } = yield* open(backlogRows())
+      yield* repo.mappings.putMany([
+        ['1', mapping(1)],
+        ['2', { ...mapping(2), remoteKey: 'ENG-2' }],
+      ])
+      yield* repo.mappings.putMany([])
+
+      expect(yield* repo.mappings.size).toBe(2)
+      expect((yield* repo.mappings.entries).map(([key]) => key)).toEqual(['1', '2'])
+      expect(Option.getOrThrow(yield* repo.mappings.get('2')).remoteKey).toBe('ENG-2')
+    }).pipe(Effect.scoped),
+  )
+})
+
 describe('short aliases', () => {
   it.effect('gives a new item a fixed short alias while legacy numbers keep resolving, across a restart', () =>
     Effect.gen(function* () {

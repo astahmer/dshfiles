@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { SqliteStore } from '@dshfiles/sqlite-store'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { afterEach, describe, expect, it } from '@effect/vitest'
 import { Effect, Layer, Ref, type Scope } from 'effect'
@@ -10,8 +11,8 @@ import { TestClock } from 'effect/testing'
 import type { NormalizedSpan } from '../otlp/normalize.js'
 import { AlertRepoTest, TraceRepoTest } from '../test-layers.test-support.js'
 import { TraceRepo } from '../trace-repo.js'
-import { ALERT_EVALUATION_SPAN, AlertEngine, isRoutineAlertEvaluation, RunningSessions, ThreadAttention } from './alert-engine.js'
-import { AlertDb, AlertRepo, MAX_ALERT_EVENTS } from './alert-repo.js'
+import { ALERT_EVALUATION_SPAN, AlertEngine, isRoutineAlertEvaluation, ThreadAttention } from './alert-engine.js'
+import { ALERT_MIGRATIONS, AlertDb, AlertRepo, MAX_ALERT_EVENTS } from './alert-repo.js'
 import type { AlertRuleDraft } from './alert-types.js'
 
 const START = 1_700_000_000_000
@@ -68,34 +69,32 @@ type Harness = {
   readonly engine: AlertEngine['Service']
   readonly traces: TraceRepo['Service']
   readonly marked: Ref.Ref<readonly string[]>
-  readonly running: Set<string>
 }
 
-/** The engine over fresh in-memory stores without the built-in rules; thread attention and running agents stand in for thread-sidebar and the Host. */
-const withEngine = <A, E>(body: (harness: Harness) => Effect.Effect<A, E, Scope.Scope>, options: { readonly attentionOwner?: boolean } = {}) =>
+/** The engine over fresh in-memory stores without the built-in rules; thread attention stands in for thread-sidebar. */
+const withEngine = <A, E>(
+  body: (harness: Harness) => Effect.Effect<A, E, Scope.Scope>,
+  options: { readonly attentionOwner?: boolean; readonly keepBuiltins?: boolean } = {},
+) =>
   Effect.gen(function* () {
     const marked = yield* Ref.make<readonly string[]>([])
-    const running = new Set<string>()
-    const edges = Layer.mergeAll(
-      Layer.succeed(
-        ThreadAttention,
-        ThreadAttention.of({
-          mark: sessionId =>
-            options.attentionOwner === false
-              ? Effect.succeed(false)
-              : Effect.as(
-                  Ref.update(marked, ids => [...ids, sessionId]),
-                  true,
-                ),
-        }),
-      ),
-      Layer.succeed(RunningSessions, RunningSessions.of({ ids: Effect.sync(() => running) })),
+    const edges = Layer.succeed(
+      ThreadAttention,
+      ThreadAttention.of({
+        mark: sessionId =>
+          options.attentionOwner === false
+            ? Effect.succeed(false)
+            : Effect.as(
+                Ref.update(marked, ids => [...ids, sessionId]),
+                true,
+              ),
+      }),
     )
     yield* TestClock.setTime(START)
     return yield* Effect.gen(function* () {
       const alerts = yield* AlertRepo
-      for (const builtin of yield* alerts.rules()) yield* alerts.remove(builtin.id)
-      return yield* body({ engine: yield* AlertEngine, traces: yield* TraceRepo, marked, running })
+      if (options.keepBuiltins !== true) for (const builtin of yield* alerts.rules()) yield* alerts.remove(builtin.id)
+      return yield* body({ engine: yield* AlertEngine, traces: yield* TraceRepo, marked })
     }).pipe(Effect.scoped, Effect.provide(AlertEngine.layer.pipe(Layer.provideMerge(Layer.mergeAll(AlertRepoTest, TraceRepoTest, edges)))))
   })
 
@@ -126,11 +125,12 @@ describe('alert engine', () => {
 
   it.effect('a long span counts in the window it ended in even when it started before it', () =>
     withEngine(
-      Effect.fn(function* ({ engine, traces, running }) {
+      Effect.fn(function* ({ engine, traces }) {
         yield* engine.save({
           ...errorRule,
           name: 'Long turns',
           kind: 'duration',
+          windowMinutes: 10,
           filter: { service: null, operation: 'invoke_agent*', attribute: null },
           threshold: 15 * 60_000,
         })
@@ -138,11 +138,25 @@ describe('alert engine', () => {
           [span({ endMs: START - 60_000, durationMs: 20 * 60_000, name: 'invoke_agent deepseek', sessionId: 'session-slow' })],
           retention,
         )
-        expect((yield* engine.evaluate()).firing).toBe(0)
-        expect(yield* firstRuleState(engine)).toMatchObject({ status: 'ok', sampleCount: 0 })
-        running.add('session-slow')
         expect((yield* engine.evaluate()).firing).toBe(1)
+        expect(yield* firstRuleState(engine)).toMatchObject({ status: 'firing', value: 20 * 60_000, sampleCount: 1 })
       }),
+    ),
+  )
+  it.effect('ships the long-turn rule off, so a long finished turn announces nothing', () =>
+    withEngine(
+      Effect.fn(function* ({ engine, traces, marked }) {
+        yield* traces.ingestSpans(
+          [span({ endMs: START - 60_000, durationMs: 20 * 60_000, name: 'invoke_agent deepseek', sessionId: 'session-long' })],
+          retention,
+        )
+        const longTurn = (yield* engine.snapshot({ historyLimit: 10 })).rules.find(rule => rule.id === 'builtin-long-turn')
+        expect(longTurn).toMatchObject({ enabled: false, state: { status: 'ok' } })
+        expect(yield* engine.evaluate()).toMatchObject({ firing: 0, transitions: 0 })
+        expect((yield* engine.snapshot({ historyLimit: 10 })).history).toEqual([])
+        expect(yield* Ref.get(marked)).toEqual([])
+      }),
+      { keepBuiltins: true },
     ),
   )
 
@@ -284,6 +298,60 @@ describe('alert repo', () => {
   const onFile = (path: string) =>
     AlertRepo.layer.pipe(Layer.provide(AlertDb.layerAt(path)), Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)))
 
+  /** A file as migration 1 left it, before the long-turn correction, so the seeded rule still ships enabled. */
+  const legacyLongTurn = {
+    id: 'builtin-long-turn',
+    name: 'Agent turn over 15 minutes',
+    kind: 'duration',
+    filter: { service: null, operation: 'invoke_agent*', attribute: null },
+    windowMinutes: 30,
+    threshold: 15 * 60_000,
+    comparator: 'above',
+    percentile: 95,
+    minSamples: 1,
+    severity: 'info',
+    enabled: true,
+    notify: true,
+    markThreads: true,
+    mutedUntil: null,
+    builtin: true,
+    createdAt: 1,
+  }
+
+  const seedLegacyLongTurn = (input: { readonly path: string; readonly updatedAt: number }) =>
+    Effect.gen(function* () {
+      const sql = yield* AlertDb
+      yield* sql`INSERT OR REPLACE INTO rules (id, position, rule) VALUES ('builtin-long-turn', 2, ${JSON.stringify({ ...legacyLongTurn, updatedAt: input.updatedAt })})`
+    }).pipe(
+      Effect.provide(
+        SqliteStore.layerAs(AlertDb, {
+          filename: input.path,
+          migrations: { '1_rules': ALERT_MIGRATIONS['1_rules'] },
+          legacyUserVersion: 1,
+          pragmas: { synchronous: 'full' },
+        }).pipe(Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))),
+      ),
+    )
+
+  const longTurnEnabledOn = (path: string) =>
+    Effect.gen(function* () {
+      const alerts = yield* AlertRepo
+      return (yield* alerts.rule('builtin-long-turn')).enabled
+    }).pipe(Effect.provide(onFile(path)))
+
+  it.effect('turns off the seeded long-turn rule, unless the user edited that copy', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'traces-alerts-'))
+    directories.push(directory)
+    const unedited = join(directory, 'unedited.db')
+    const edited = join(directory, 'edited.db')
+    return Effect.gen(function* () {
+      yield* seedLegacyLongTurn({ path: unedited, updatedAt: 1 })
+      yield* seedLegacyLongTurn({ path: edited, updatedAt: 2 })
+      expect(yield* longTurnEnabledOn(unedited)).toBe(false)
+      expect(yield* longTurnEnabledOn(edited)).toBe(true)
+    })
+  })
+
   it.effect('seeds the built-in rules once, so an edit or removal survives a reopen', () => {
     const directory = mkdtempSync(join(tmpdir(), 'traces-alerts-'))
     directories.push(directory)
@@ -294,7 +362,7 @@ describe('alert repo', () => {
         expect((yield* first.rules()).map(rule => [rule.id, rule.enabled, rule.builtin])).toEqual([
           ['builtin-model-errors', true, true],
           ['builtin-jj-latency', true, true],
-          ['builtin-long-turn', true, true],
+          ['builtin-long-turn', false, true],
           ['builtin-plugin-api-errors', false, true],
         ])
         yield* first.remove('builtin-jj-latency')

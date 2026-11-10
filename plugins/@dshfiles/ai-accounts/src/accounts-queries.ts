@@ -15,6 +15,7 @@ import {
   type AccountsUsage,
   type NativeProviders,
   type SecretCatalogKeys,
+  type UsageCard,
 } from './api.js'
 import { AiAccountsSchema } from './effect-schema.js'
 
@@ -125,25 +126,46 @@ const normalizeUsage = (raw: unknown): AccountsUsage | null => {
   return { ...parsed.success, cards: parsed.success.cards.map(card => ({ ...card, displayName: card.displayName ?? card.instanceId })) }
 }
 
+/** Shown when the Host answers in a shape this Client cannot decode. */
+export const UNREADABLE_USAGE_MESSAGE = 'The account host sent an answer this page cannot read. Reload the page; if that does not help, restart DSH.'
+
+type UsageReadFailure = NonNullable<UsageCard['readFailure']>
+
 /** A provider read that failed or was throttled says nothing new about the quota; the last good windows still stand. */
-const TRANSIENT_USAGE_STATUS = new Set<AccountsUsage['cards'][number]['usage']['status']>(['error', 'rate-limited'])
+const isTransientUsageStatus = (status: UsageCard['status']): status is UsageReadFailure['status'] => status === 'error' || status === 'rate-limited'
+
+/** The last good windows, dated when they were read and carrying why the latest read did not replace them. */
+const keptReading = (last: UsageCard, lastSweepReadAt: number, failure: UsageReadFailure, nextReadAt: number | undefined): UsageCard => {
+  const { nextReadAt: _expiredHold, ...reading } = last
+  const kept: UsageCard = { ...reading, readAt: last.readAt ?? lastSweepReadAt, readFailure: failure }
+  return nextReadAt === undefined ? kept : { ...kept, nextReadAt }
+}
 
 /**
  * Keeps each account's last good quota through a failed read, so a meter does
  * not vanish between polls: an unreadable answer keeps the whole snapshot, and
- * a card whose provider read failed keeps its previous windows. Removed
- * accounts and real state changes (signed out, unsupported) still apply.
+ * a card whose provider read failed keeps its previous windows. Either way the
+ * kept card keeps its own read time and says why it was kept. Removed accounts
+ * and real state changes (signed out, unsupported) still apply.
  */
 const keepLastGoodUsage = (previous: AccountsUsage | null | undefined, next: AccountsUsage | null): AccountsUsage | null => {
-  if (next === null) return previous ?? null
   if (previous === null || previous === undefined) return next
+  if (next === null) {
+    const failure: UsageReadFailure = { status: 'error', message: UNREADABLE_USAGE_MESSAGE }
+    return {
+      ...previous,
+      cards: previous.cards.map(card => (card.usage.status === 'ok' ? { ...card, usage: keptReading(card.usage, previous.readAt, failure, undefined) } : card)),
+    }
+  }
   const previousById = new Map(previous.cards.map(card => [card.instanceId, card]))
   return {
     ...next,
     cards: next.cards.map(card => {
       const last = previousById.get(card.instanceId)
-      if (!TRANSIENT_USAGE_STATUS.has(card.usage.status) || last?.usage.status !== 'ok') return card
-      return { ...card, usage: last.usage }
+      const { status, message, nextReadAt, windows } = card.usage
+      // Windows on a throttled card are a new reading (Mistral at 100%), not a failed one.
+      if (!isTransientUsageStatus(status) || windows.length > 0 || last?.usage.status !== 'ok') return card
+      return { ...card, usage: keptReading(last.usage, previous.readAt, { status, message }, nextReadAt) }
     }),
   }
 }

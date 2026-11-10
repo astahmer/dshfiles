@@ -162,14 +162,14 @@ export function orderByRecency(
  * @param memberIds - authoritative account membership.
  * @param savedOrder - previously saved browser-local order.
  * @param summaries - current Session metadata; unknown new members wait for their summaries.
- * @param rowState - global pin and archive membership; only account members can supplement the order.
+ * @param rowState - global pin and archive membership indexed once for every account; only account members can supplement the order.
  * @returns saved relative positions plus missing members ordered by pin, fork source, recency, and archive status.
  */
 export function reconcileManualOrder(
   memberIds: readonly SessionId[],
   savedOrder: readonly string[] | undefined,
   summaries: SessionListState['byId'],
-  rowState?: Pick<SessionRowState, 'pinnedSessionIds' | 'archivedSessionIds'>,
+  rowState?: IndexedRowState,
 ): SessionId[] {
   const members = new Map(memberIds.map(id => [id as string, id]))
   const included = new Set<string>()
@@ -180,7 +180,7 @@ export function reconcileManualOrder(
     ordered.push(id)
     included.add(key)
   }
-  const archived = new Set(rowState?.archivedSessionIds)
+  const archived = rowState?.archivedSessionIds ?? new Set<SessionId>()
   const pins: SessionId[] = []
   for (const sessionId of rowState?.pinnedSessionIds ?? []) {
     const id = members.get(sessionId)
@@ -264,6 +264,28 @@ export interface SessionRowState {
   archivedSessionIds: readonly SessionId[]
   /** Archived-row visibility choice applied to lists and search alike. */
   archivedFilter: ArchivedFilter
+}
+
+/** Row state whose archive membership is indexed for derivations repeated across accounts. */
+export interface IndexedRowState {
+  /** Registry-global pin ids; pinned rows lead their section in the local order. */
+  pinnedSessionIds: readonly SessionId[]
+  /** The registry-global archive set, indexed by the caller instead of once per account. */
+  archivedSessionIds: ReadonlySet<SessionId>
+}
+
+/**
+ * Index registry-global archive membership once, for a derivation that runs over every account.
+ * @param rowState - registry-global pin and archive membership.
+ * @returns the same membership with its archive ids indexed.
+ */
+export function indexRowState(
+  rowState: Pick<SessionRowState, 'pinnedSessionIds' | 'archivedSessionIds'>,
+): IndexedRowState {
+  return {
+    pinnedSessionIds: rowState.pinnedSessionIds,
+    archivedSessionIds: new Set(rowState.archivedSessionIds),
+  }
 }
 
 /**

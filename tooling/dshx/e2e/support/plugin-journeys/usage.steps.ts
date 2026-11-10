@@ -247,7 +247,7 @@ Then('the tool execution report and Jev call report are visible', async ({ page 
   await finishJourneyAssertions(page)
 })
 
-/** Opens one thread panel tab type from the right sidebar's guide (plans/ade-ux §4.4 facets). */
+/** Opens one thread panel tab type from the right sidebar's guide (docs/ade-ux §4.4 facets). */
 const openThreadFacet = async (page: Page, title: string): Promise<void> => {
   const entry = page
     .locator('[data-sidebar-right-guide-entry]')

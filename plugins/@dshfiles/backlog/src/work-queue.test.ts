@@ -220,4 +220,63 @@ describe('claims', () => {
       }),
     ).pipe(Effect.provide(DshxEffect.tracerLayer)),
   )
+  it.effect('looks each claim holder up with one status call and never lists threads', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(1_000)
+        const store = yield* openStore()
+        const holders = ['session-aaaaaa', 'session-bbbbbb', 'session-cccccc']
+        for (const sessionId of holders) {
+          const captured = yield* store.capture({ text: `claim by ${sessionId}`, status: 'todo', actor: user })
+          yield* store.claim({ id: captured.item.id, actor: { kind: 'agent', sessionId, cwd: '/work/repo' } })
+        }
+        const statusCalls: string[][] = []
+        let listCalls = 0
+        const threadActions = {
+          status: (input: { readonly sessionIds: readonly string[] }) => {
+            statusCalls.push([...input.sessionIds])
+            return Effect.succeed({
+              threads: input.sessionIds.map(sessionId => ({
+                sessionId,
+                exists: sessionId !== 'session-cccccc',
+                archived: sessionId === 'session-bbbbbb',
+                settled: false,
+              })),
+            })
+          },
+          list: () => {
+            listCalls += 1
+            return Effect.succeed({ threads: [], total: 0, truncated: false })
+          },
+        }
+        const lookup = LeaseEndings.holderLookup({ threadActions, hasStatus: true })
+        const ended = yield* LeaseEndings.sweepOnce({ store, lookup: Option.some(lookup) })
+        expect(ended).toBe(2)
+        expect(statusCalls.map(ids => ids.join()).sort()).toEqual(holders)
+        expect(listCalls).toBe(0)
+        expect((yield* store.leases).map(entry => entry.lease.holder)).toEqual(['agent:session-aaaaaa'])
+      }),
+    ),
+  )
+
+  it.effect('falls back to the thread listing on a Host whose thread-sidebar has no status call', () =>
+    Effect.gen(function* () {
+      let statusCalls = 0
+      const threadActions = {
+        status: () => {
+          statusCalls += 1
+          return Effect.succeed({ threads: [] })
+        },
+        list: (input: { readonly query?: string | undefined }) =>
+          Effect.succeed({
+            threads: [{ sessionId: input.query ?? '', running: false, liveAgent: false, archived: false, pinned: false, settled: true }],
+            total: 1,
+            truncated: false,
+          }),
+      }
+      const lookup = LeaseEndings.holderLookup({ threadActions, hasStatus: false })
+      expect(yield* lookup('session-aaaaaa')).toEqual(['session-aaaaaa', 'settled'])
+      expect(statusCalls).toBe(0)
+    }),
+  )
 })

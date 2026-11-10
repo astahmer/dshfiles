@@ -80,7 +80,8 @@ import { DueDates, useToday } from './due-date-hooks.js'
 import { PeekSections } from './peek-sections.js'
 import { BacklogNotices } from './notices.js'
 import { PeekWork } from './peek-work.js'
-import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
+import { startThreadItemOf, StartThreadForm, type StartThreadItem } from './start-thread.js'
+import { BacklogComposerScope } from './composer-tools.js'
 import { BacklogTextBox } from './text-box.js'
 import { actorThreadFor } from './actor-thread.js'
 import { BacklogTriage } from './triage.js'
@@ -329,6 +330,7 @@ const BodyField = (props: {
         projects={props.projects}
         attachments={attachments}
         variant="body"
+        tools={BacklogComposerScope.item({ id: props.id, surface: 'backlog.description' })}
         autoFocus
         onBlur={save}
         onCancel={cancel}
@@ -488,11 +490,20 @@ const ReplyEditor = (props: {
       </p>
     )
   return (
-    <ReplyComposer event={props.event} files={initialFiles} threads={props.threads} projects={props.projects} onSave={props.onSave} onCancel={props.onCancel} />
+    <ReplyComposer
+      itemId={props.itemId}
+      event={props.event}
+      files={initialFiles}
+      threads={props.threads}
+      projects={props.projects}
+      onSave={props.onSave}
+      onCancel={props.onCancel}
+    />
   )
 }
 
 const ReplyComposer = (props: {
+  readonly itemId: number
   readonly event: BacklogEvent
   readonly files: readonly ComposerFile[]
   readonly threads: readonly ComposerThread[]
@@ -527,6 +538,7 @@ const ReplyComposer = (props: {
         projects={props.projects}
         attachments={attachments}
         variant="reply"
+        tools={BacklogComposerScope.item({ id: props.itemId, surface: 'backlog.reply' })}
         submitLabel="Save reply"
         submitDisabled={text.trim() === '' && attachments.files.length === 0}
         pending={pending}
@@ -926,6 +938,7 @@ const CommentBox = (props: {
         projects={props.projects}
         attachments={attachments}
         variant="reply"
+        tools={BacklogComposerScope.item({ id: props.item.id, surface: 'backlog.reply' })}
         submitLabel="Reply"
         submitDisabled={text.trim() === '' && attachments.files.length === 0}
         pending={sending}
@@ -1185,7 +1198,7 @@ const PeekBody = (props: {
   }, [item.id])
   const captured = item.events.find(event => event.kind === 'created')?.detail.trim() ?? ''
   const showCapture = captured !== '' && captured !== `${item.title}\n${item.body}`.trim() && captured !== item.title.trim()
-  const relationshipLinks = BacklogItems.uniqueLinks(item.links)
+  const relationshipLinks = BacklogItems.uniqueLinks(item.links).filter(link => link.type !== 'thread' || BacklogItems.isSessionId(link.target))
   const threadsById = new Map(props.threads.map(thread => [thread.id, thread]))
   const threadTitleCounts = new Map<string, number>()
   for (const link of relationshipLinks) {
@@ -1456,7 +1469,7 @@ const PeekBody = (props: {
               agentReplying={agentReplying}
             />
             <CommentBox
-              item={{ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: item.body.slice(0, 500) }}
+              item={{ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: StartThreadForm.preview(item.body, 500) }}
               threads={props.threads}
               projects={props.projectPaths}
               openCreatedByDefault={props.openCreatedByDefault}

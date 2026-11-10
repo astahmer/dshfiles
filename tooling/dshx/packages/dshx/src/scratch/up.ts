@@ -287,6 +287,7 @@ export const scratchUp = async (
       origin: new URL(launchUrl).origin,
       launchUrl,
       bundles: bundles.map(bundle => bundle.packageId),
+      expectedEntries: bundles.filter(bundle => bundle.composesLoaderRows).map(bundle => bundle.packageId),
       expectedClientEntries: bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId),
       project: { path: project, workspaceId, ownedByScratch: options.project === undefined },
       host: { pid: hostPid, signature: [`--profile ${prepared.profile}`, `--port ${port}`] },

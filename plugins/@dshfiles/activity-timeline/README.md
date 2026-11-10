@@ -14,12 +14,14 @@ Open the reusable **Activity Timeline: Activity** view from navigation or the Wo
 
 <img alt="Inbox at 390×844 in WebKit" src="docs/screenshots/inbox-panel-phone.png" width="195">
 
-The plugin also owns the attention inbox of [the ADE plan](../../../plans/ade-ux/README.md#48-the-attention-model)
+The plugin also owns the attention inbox of [the ADE plan](../../../docs/ade-ux/README.md#48-the-attention-model)
 (Phase 2a). The **Inbox** entry in the left navigation (a temporary home until the Phase 3 rail) carries the only
 badge, the Needs you count. The page has **Needs you** (blocking and failed items) and **Other** (ready items) tabs,
 plus **Snoozed**, **Done** and **Muted** when they hold items. Each row shows a severity glyph, the reason, the source,
 a link to the thread and its verbs inline: answer choices, Open, Done, Snooze (1 h, 4 h, tomorrow, until it changes)
-and Mute source. The history tabs offer Reopen, Unsnooze and Unmute, so every user transition can be undone. Browser
+and Mute source. Every open item a provider marks resumable also gets one page-level **Resume all**, so a batch of
+usage-limit stops leaves the list in one click. The history tabs offer Reopen, Unsnooze and Unmute, so every user
+transition can be undone. Browser
 alerts for new blocking items are opt-in, per browser, below the list.
 
 ### The attention contract

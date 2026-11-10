@@ -25,6 +25,12 @@ export interface FilesService {
 export interface ChangesService {
   /** Show the review of `workspacePath`, scoped to one session's work when `sessionId` is given; false when it cannot. */
   review(input: { readonly workspacePath: string; readonly sessionId?: string }): boolean
+  /**
+   * Show several revisions of `workspacePath` together, in `sessionId`'s review when given; false when it cannot. Each
+   * id is a commit id or a change id. Optional: a provider built before this method answers nothing, so callers treat
+   * its absence as false.
+   */
+  reviewRevisions?(input: { readonly workspacePath: string; readonly revisions: readonly string[]; readonly sessionId?: string }): boolean
 }
 
 /** The embedded browser pane beside the session on screen. */

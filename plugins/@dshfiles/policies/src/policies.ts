@@ -11,6 +11,7 @@ const ruleSchema = Schema.Struct({
 export type PolicyRule = Schema.Schema.Type<typeof ruleSchema>
 
 const patterns = new Map<string, RegExp>()
+const toolMatchers = new Map<string, RegExp>()
 
 const compiled = (source: string): RegExp => {
   const known = patterns.get(source)
@@ -26,16 +27,26 @@ const toolPattern = (glob: string): string =>
     .map(part => part.replace(/[.+?^${}()|[\]\\]/gu, '\\$&'))
     .join('.*')}$`
 
+const toolMatcher = (glob: string): RegExp => {
+  const known = toolMatchers.get(glob)
+  if (known !== undefined) return known
+  const matcher = compiled(toolPattern(glob))
+  toolMatchers.set(glob, matcher)
+  return matcher
+}
+
 /** Deny rules matched against one tool call. A rule whose pattern does not compile denies every call of its tool: a policy fails closed. */
 export class Policies {
   static readonly ruleSchema = ruleSchema
 
   static denying(rules: readonly PolicyRule[], call: { readonly name: string; readonly arguments: unknown }): PolicyRule | undefined {
-    const serialized = JSON.stringify(call.arguments ?? null)
+    let serialized: string | undefined
     return rules.find(rule => {
-      if (!rule.enabled || !compiled(toolPattern(rule.tool)).test(call.name)) return false
+      if (!rule.enabled || !toolMatcher(rule.tool).test(call.name)) return false
+      if (rule.match === '') return true
+      serialized ??= JSON.stringify(call.arguments ?? null)
       try {
-        return rule.match === '' || compiled(rule.match).test(serialized)
+        return compiled(rule.match).test(serialized)
       } catch {
         return true
       }

@@ -90,7 +90,7 @@ export default defineClientPlugin({
     const label = (): string => translate('aiAccountsPanel')
     // SAFETY: This id is registered as a main-panel slot below.
     const openAccounts = (): void => ctx.layout.selectPanel(PANEL_ID as MainPanelId)
-    // Usage and quota live on one page now, Observe › Usage › Quota (plans/ade-ux §6), owned by @dshfiles/usage. Without
+    // Usage and quota live on one page now, Observe › Usage › Quota (docs/ade-ux §6), owned by @dshfiles/usage. Without
     // usage, the former Usage history and Quota forecast pages below still open, so nothing is lost.
     const usageNavigation = api.use(UsageNavigation)
     const openQuota = (target: UsageQuotaTarget, fallback: string): void => {
@@ -228,7 +228,7 @@ export default defineClientPlugin({
     // The Models page only draws rows for settings namespaces, which accounts
     // are not, so they join it through its footer seat.
     api.ui.register({ name: 'settings.models.footer', id: 'ai-accounts-models', order: 0, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, ModelsPageAccountsView)
-    // Quota lives in the frame's status strip now (plans/ade-ux §4.1 R5), as one item instead of the sidebar footer's
+    // Quota lives in the frame's status strip now (docs/ade-ux §4.1 R5), as one item instead of the sidebar footer's
     // menu and preview strip; frame-layout renders nothing for it when another frame owns the layout.
     ctx.effect(() =>
       QuotaStatusItem.register({

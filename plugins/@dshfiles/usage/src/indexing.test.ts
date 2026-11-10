@@ -26,6 +26,24 @@ const indexerTest = (input: { readonly sessionsRoot: string; readonly registry: 
 
 const scratchRoot = Effect.flatMap(FileSystem.FileSystem, fileSystem => fileSystem.makeTempDirectoryScoped({ prefix: 'usage-indexing-' }))
 
+describe('Indexer demand', () => {
+  it.layer(PlatformTest)(it => {
+    it.effect('runs the periodic catch-up pass only while something reads the ledger', () =>
+      Effect.gen(function* () {
+        const reads = yield* Ref.make(0)
+        const sessionsRoot = yield* scratchRoot
+        yield* Effect.gen(function* () {
+          const indexer = yield* Indexer
+          // A Host nobody is looking at does not fold session logs.
+          expect(yield* indexer.demanded).toBe(false)
+          yield* indexer.touch
+          expect(yield* indexer.demanded).toBe(true)
+        }).pipe(Effect.provide(indexerTest({ sessionsRoot, registry: registryTest({ reads }) })))
+      }),
+    )
+  })
+})
+
 describe('Indexer', () => {
   it.layer(PlatformTest)(it => {
     it.effect('joins a running pass instead of starting another', () =>

@@ -163,12 +163,15 @@ export const createQueueEditMachine = <DraftId extends string, Attachment>() =>
       adoptComposerForEdit: assign(({ context }): Partial<EditContext<DraftId, Attachment>> => {
         const composer = context.ports.composer
         for (const id of context.backupIds) composer.removeAttachment(id)
-        composer.setDraft(QueueEditModel.textOf(context.row?.blocks ?? []))
+        const text = QueueEditModel.textOf(context.row?.blocks ?? [])
+        composer.setDraft(text)
         const hydrated = context.ports.drafts.create(context.files)
         let notice: string | null = null
         if (hydrated.length > 0 && !composer.addAttachments(hydrated)) {
           context.ports.drafts.release(hydrated)
           notice = 'The composer refused the attachments; Cancel still puts the original back.'
+        } else {
+          composer.restoreReferences()
         }
         composer.focus()
         return { notice }
@@ -268,7 +271,11 @@ export const createQueueEditMachine = <DraftId extends string, Attachment>() =>
         { readonly ports: QueueEditPorts<DraftId, Attachment>; readonly blocks: readonly QueuedBlock[]; readonly cache: Map<string, File> }
       >(async ({ input }) => {
         const hydrated = input.ports.drafts.create(await readBlocks(input))
-        if (hydrated.length > 0 && !input.ports.composer.addAttachments(hydrated)) input.ports.drafts.release(hydrated)
+        if (hydrated.length > 0 && !input.ports.composer.addAttachments(hydrated)) {
+          input.ports.drafts.release(hydrated)
+          return
+        }
+        input.ports.composer.restoreReferences()
       }),
       place: fromPromise<void, { readonly ports: QueueEditPorts<DraftId, Attachment>; readonly itemId: string; readonly before: readonly string[] }>(
         ({ input }) => moveIntoPlace({ ports: input.ports, itemId: input.itemId, before: input.before }),
@@ -358,7 +365,10 @@ export const createQueueEditMachine = <DraftId extends string, Attachment>() =>
           onDone: { target: '#queueEdit.editing' },
           onError: {
             target: '#queueEdit.editing',
-            actions: assign({ notice: "Could not reload this message's attachments into the composer; Cancel still puts the original back." }),
+            actions: assign({
+              notice: ({ event }) =>
+                `Could not reload this message's attachments into the composer (${QueueEditModel.messageOf(event.error)}); Cancel still puts the original back.`,
+            }),
           },
         },
       },

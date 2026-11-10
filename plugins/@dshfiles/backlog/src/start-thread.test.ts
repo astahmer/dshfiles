@@ -187,4 +187,13 @@ describe('start thread form', () => {
     expect(StartThreadForm.starting([item()])).toBe('Starting a thread for b:103…')
     expect(StartThreadForm.refs([item(), item({ id: 104 })])).toBe('b:103, b:104')
   })
+
+  it('clips a long preview on a word boundary and marks the cut', () => {
+    expect(StartThreadForm.preview('quickplay should go from move to next move and never idle between moves', 30)).toBe('quickplay should go from…')
+    expect(StartThreadForm.preview('short enough', 30)).toBe('short enough')
+  })
+
+  it('never splits a character or an emoji when it clips a preview', () => {
+    expect(StartThreadForm.preview(`${'x'.repeat(10)}🟩🟩🟩`, 11)).toBe(`${'x'.repeat(10)}🟩…`)
+  })
 })

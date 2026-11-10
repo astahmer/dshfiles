@@ -7,12 +7,15 @@ import { SessionId } from '@dshfiles/dshx/ids'
 import { Git } from '@dshfiles/git-cli'
 import { Jj } from '@dshfiles/jj-cli'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Effect, Layer, Option, Schema } from 'effect'
 import { pullsReviewApi } from './api.js'
 import { ReviewGit } from './git.js'
 import { ReviewJj } from './jj.js'
+import { ProjectBase } from './project-base.js'
 import { reviewReportText } from './report.js'
 import { ReviewWorkspace } from './review.js'
+import { RevisionReviewModel } from './revision-review.js'
 import { PullsReviewSummary } from './summarize.js'
 import { SummaryRoutes } from './summary-routes-promise.js'
 
@@ -39,7 +42,10 @@ const jjLayer = ReviewJj.layer.pipe(Layer.provide(Jj.layer), Layer.provide(platf
 /** The git adapter: a thread workspace in a git-only repository reviews through git instead of jj. */
 const gitLayer = ReviewGit.layer.pipe(Layer.provide(Git.layer), Layer.provide(platformLayer))
 
-const reviewLayer = Layer.provideMerge(ReviewWorkspace.layer, Layer.mergeAll(jjLayer, gitLayer, NodeFileSystem.layer))
+const reviewLayer = Layer.provideMerge(
+  ReviewWorkspace.layer,
+  Layer.mergeAll(jjLayer, gitLayer, NodeFileSystem.layer, ProjectBase.layer.pipe(Layer.provide(HostApis.layer))),
+)
 
 const pullsReviewLayer = Layer.provideMerge(pullsCommand, Layer.provideMerge(PullsReviewSummary.layer, Layer.merge(reviewLayer, SummaryRoutes.layer)))
 
@@ -51,6 +57,9 @@ export default DshxPlugin.make({
     Api.bind(pullsReviewApi, {
       review: input => ReviewWorkspace.use(workspace => workspace.review(input)),
       report: input => ReviewWorkspace.use(workspace => workspace.review(input)).pipe(Effect.map(result => ({ text: reviewReportText(result) }))),
+      reviewRevisions: input => ReviewWorkspace.use(workspace => workspace.reviewRevisions(input)),
+      reportRevisions: input =>
+        ReviewWorkspace.use(workspace => workspace.reviewRevisions(input)).pipe(Effect.map(result => ({ text: RevisionReviewModel.reportText(result) }))),
       summarize: input =>
         PullsReviewSummary.use(summary =>
           summary.summarize({

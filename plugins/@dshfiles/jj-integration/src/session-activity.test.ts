@@ -66,6 +66,30 @@ describe('SessionActivity', () => {
     }).pipe(Effect.scoped),
   )
 
+  it.effect('reports the end of a turn at once for one workspace, while the display read keeps its TTL', () =>
+    Effect.gen(function* () {
+      const sessions = yield* Ref.make<ReadonlyMap<string, StoredSession>>(new Map([['a', { running: true, questions: 0 }]]))
+      const lists = yield* Ref.make(0)
+      yield* Effect.gen(function* () {
+        const activity = yield* SessionActivity
+        expect((yield* activity.display)?.get('a')?.running).toBe(true)
+        yield* Ref.set(sessions, new Map([['a', { running: false, questions: 0 }]]))
+        expect((yield* activity.display)?.get('a')?.running).toBe(true)
+        expect((yield* activity.workspaceDisplay(['a']))?.get('a')?.running).toBe(false)
+      }).pipe(Effect.provide(SessionActivity.layer.pipe(Layer.provide(sessionsLayer(sessions, lists)))))
+    }),
+  )
+
+  it.effect('reports the end of a turn at once for one workspace, while the display read keeps its TTL', () =>
+    Effect.gen(function* () {
+      const { sessions, activity } = yield* setup
+      expect((yield* activity.display)?.get('busy')?.running).toBe(true)
+      yield* Ref.set(sessions, new Map([['busy', { running: false, questions: 0 }]]))
+      expect((yield* activity.display)?.get('busy')?.running).toBe(true)
+      expect((yield* activity.workspaceDisplay(['busy']))?.get('busy')?.running).toBe(false)
+    }).pipe(Effect.scoped),
+  )
+
   it.effect('guards on the workspace Sessions, falling back to the list for an unreadable one', () =>
     Effect.gen(function* () {
       const { sessions, activity } = yield* setup

@@ -72,6 +72,13 @@ export class ChatViewport {
   private fold: FoldRequest = noFoldRequest
   /** When the reader last started a scrolling gesture, and whether a pointer (a scrollbar drag) is still held. */
   private gesture = { at: Number.NEGATIVE_INFINITY, pointerHeld: false }
+  /**
+   * A fresh ResizeObserver observation is delivered after the next layout and before paint, where geometry reads are
+   * free. Created before the size observer so a commit's work runs before that frame's resize handling.
+   */
+  private readonly layoutClean = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => { this.runAfterLayout() })
+  private afterLayoutTask: (() => void) | null = null
+  private afterLayoutFrame: number | null = null
   /** Transition state and row callbacks owned by this viewport's attachment. */
   readonly motion = createFlowMotion(
     () => this.foldDriver(),
@@ -124,6 +131,10 @@ export class ChatViewport {
     this.gesture = { at: Number.NEGATIVE_INFINITY, pointerHeld: false }
     this.observer?.disconnect()
     this.observer = null
+    this.layoutClean?.disconnect()
+    if (this.afterLayoutFrame !== null) cancelAnimationFrame(this.afterLayoutFrame)
+    this.afterLayoutFrame = null
+    this.afterLayoutTask = null
     this.elements = null
     this.events = null
     this.fold = noFoldRequest
@@ -139,6 +150,37 @@ export class ChatViewport {
   connect(events: ViewportEvents): () => void {
     this.events = events
     return () => { if (this.events === events) this.events = null }
+  }
+
+  /**
+   * Run geometry work after the browser's next layout instead of forcing one from a commit; the latest task wins,
+   * and it still runs before that frame paints. Detached or without ResizeObserver, it runs now.
+   * @param task - reads and writes scroll geometry against the committed content.
+   */
+  afterLayout(task: () => void): void {
+    const column = this.elements?.column
+    if (column === undefined || this.layoutClean === null) { task(); return }
+    this.afterLayoutTask = task
+    this.layoutClean.unobserve(column)
+    this.layoutClean.observe(column)
+    // A 0×0 column (a hidden view) gets no observation; the frame after next runs the task anyway.
+    if (this.afterLayoutFrame === null) {
+      this.afterLayoutFrame = requestAnimationFrame(() => {
+        this.afterLayoutFrame = requestAnimationFrame(() => {
+          this.afterLayoutFrame = null
+          this.runAfterLayout()
+        })
+      })
+    }
+  }
+
+  private runAfterLayout(): void {
+    const task = this.afterLayoutTask
+    this.afterLayoutTask = null
+    if (this.afterLayoutFrame !== null) cancelAnimationFrame(this.afterLayoutFrame)
+    this.afterLayoutFrame = null
+    if (this.elements !== null) this.layoutClean?.unobserve(this.elements.column)
+    task?.()
   }
 
   /**

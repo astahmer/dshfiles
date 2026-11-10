@@ -22,13 +22,20 @@ describe('project-checks tool exposure', () => {
       'project_checks_receipts',
       'project_checks_retry',
       'project_checks_run',
+      'project_checks_setup_actions',
       'project_checks_tasks',
     ])
     const readOnly = tools
       .filter(tool => tool.readOnly === true)
       .map(tool => tool.name)
       .sort()
-    expect(readOnly).toEqual(['project_checks_actions', 'project_checks_hook_events', 'project_checks_receipts', 'project_checks_tasks'])
+    expect(readOnly).toEqual([
+      'project_checks_actions',
+      'project_checks_hook_events',
+      'project_checks_receipts',
+      'project_checks_setup_actions',
+      'project_checks_tasks',
+    ])
     for (const method of Object.values(projectChecksApi.methods)) {
       expect(method.description ?? method.tool?.description).toBeTruthy()
     }

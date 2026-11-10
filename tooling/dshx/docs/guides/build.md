@@ -79,6 +79,23 @@ The choice follows the boundaries in other plugin reload systems: OpenCode V2 sc
 
 The feature is development-only and opt-in. `dshx build` still emits one self-contained `dist/index.js`, because `dev` is not read outside `dshx dev`. Disposal cancels nothing by itself: a plugin that owns timers, sockets, or subscriptions must register them through `ctx.effect` so the replaced generation releases them.
 
+## Build phases
+
+`dshx build` runs three independent passes over the project: the offline manifest/migration/compatibility
+checks, the TypeScript check, and the face builds. Only the manifest checks gate the others, because they
+decide whether the project is buildable at all. The typecheck starts its own compiler process as the face
+builds start and is waited on before publishing, so its wall time hides behind bundling while its
+diagnostics still block the release of the staged directory.
+
+The compiler reuses incremental state from `node_modules/.cache/dshx/typecheck/<name>-<config>.tsbuildinfo`.
+TypeScript fingerprints the options and file versions it recorded, so an edited file, an edited `tsconfig.json`
+or a new compiler version invalidates what it needs; delete the directory to force a full run. A project whose
+`node_modules` is read-only falls back to a full run instead of failing.
+
+`--no-typecheck` skips that pass for pipelines that compile once elsewhere (`pnpm typecheck`, turbo's
+typecheck task). It changes no other behaviour: the bundler still rejects syntax errors, and `dshx check`
+still typechecks.
+
 ## Vite plugin contract
 
 `plugins` accepts native Vite `PluginOption[]`, including nested arrays and promises. Vite `enforce` and `apply` ordering is retained. DSHX entry/browser guards run before user transformations; protocol, capability, and artifact guards run after them.

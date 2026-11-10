@@ -18,7 +18,7 @@ const startMachine = () => {
   return { actor, moves, commits }
 }
 
-const rowOf = () => ({ sessionId: 'thread-a', section: 'active' as const })
+const rowOf = () => ({ kind: 'local' as const, sessionId: 'thread-a', section: 'active' as const })
 
 describe('thread drag machine', () => {
   it('keeps a row drag and a section gesture from running at once', () => {
@@ -44,7 +44,7 @@ describe('thread drag machine', () => {
     actor.send({ type: 'row.over', section: 'inactive' })
     actor.send({ type: 'row.drop', section: 'inactive' })
 
-    expect(moves).toEqual([{ sessionId: 'thread-a', section: 'inactive' }])
+    expect(moves).toEqual([{ kind: 'local', sessionId: 'thread-a', section: 'inactive' }])
     expect(actor.getSnapshot().matches('suppressing')).toBe(true)
     expect(actor.getSnapshot().context.suppressed).toBe('row')
 
@@ -59,6 +59,14 @@ describe('thread drag machine', () => {
 
     expect(moves).toEqual([])
     expect(actor.getSnapshot().context.suppressed).toBe('row')
+  })
+
+  it('carries the row kind so a remote drop writes the preference half only', () => {
+    const { actor, moves } = startMachine()
+    actor.send({ type: 'row.start', row: { kind: 'remote', sessionId: 'thread-remote', section: 'active' } })
+    actor.send({ type: 'row.drop', section: 'settled' })
+
+    expect(moves).toEqual([{ kind: 'remote', sessionId: 'thread-remote', section: 'settled' }])
   })
 
   it('leaves no suppression behind when a row drag is cancelled', () => {

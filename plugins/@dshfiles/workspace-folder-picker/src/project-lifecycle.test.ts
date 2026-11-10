@@ -40,13 +40,17 @@ describe('project lifecycle inputs', () => {
     }),
   )
 
-  it.effect('reads the last git progress line', () =>
+  it.effect('reads the last git progress line, its stage and its percent', () =>
     Effect.sync(() => {
-      expect(ProjectLifecycleModel.readProgress('Receiving objects:  33% (1/3)\rReceiving objects:  66% (2/3)\r')).toEqual({
+      expect(ProjectLifecycleModel.readProgress('Cloning into x...\rReceiving objects:  33% (1/3)\rReceiving objects:  66% (2/3)\r')).toEqual({
         percent: 66,
+        stage: 'receiving',
         message: 'Receiving objects:  66% (2/3)',
       })
-      expect(ProjectLifecycleModel.readProgress('Cloning into x...\n')).toEqual({ percent: null, message: 'Cloning into x...' })
+      expect(ProjectLifecycleModel.readProgress('Cloning into x...\n')?.stage).toBe('connecting')
+      expect(ProjectLifecycleModel.readProgress('Resolving deltas: 100% (3/3), done.\n')?.stage).toBe('resolving')
+      expect(ProjectLifecycleModel.readProgress('Checking out files: 100% (3/3)\n')?.stage).toBe('checkout')
+      expect(ProjectLifecycleModel.readProgress('Cloning into x...\n')).toEqual({ percent: null, stage: 'connecting', message: 'Cloning into x...' })
       expect(ProjectLifecycleModel.readProgress('\r\n')).toBeUndefined()
     }),
   )
@@ -102,7 +106,7 @@ const lifecycle = (input: {
           register: path =>
             Effect.sync(() => {
               registered.push(path)
-              return { workspaceId: `ws-${String(registered.length)}`, title: path.split('/').at(-1) ?? path, path }
+              return { workspaceId: `ws-${String(registered.length)}`, title: path.split(/[\\/]/).at(-1) ?? path, path }
             }),
         }),
       ),
@@ -204,6 +208,40 @@ describe.skipIf(!toolsAvailable)('project lifecycle against real git and jj', ()
     ),
   )
 
+  it.live('keeps a checkout that failed after it started, then retries clean into the same folder', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        let attempts = 0
+        const failAfterCheckout = (command: CommandInput) => {
+          if (command.argv[1] !== 'clone') return Option.none()
+          attempts += 1
+          if (attempts > 1) return Option.none()
+          return Option.some(
+            Effect.gen(function* () {
+              const fs = yield* FileSystem.FileSystem
+              const destination = command.argv.at(-1) ?? ''
+              yield* fs.makeDirectory(destination).pipe(Effect.orDie)
+              yield* fs.writeFileString(join(destination, 'half.txt'), 'partial').pipe(Effect.orDie)
+              yield* command.onStderr?.('Checking out files:  50% (1/2)\r') ?? Effect.void
+              return { exitCode: 1, stdout: '', stderr: 'fatal: the remote end hung up unexpectedly' }
+            }).pipe(Effect.provide(NodeServices.layer)),
+          )
+        }
+        const { root, origin, registered, jobs, fs } = yield* lifecycle({ installed: ['git', 'jj'], fakeCommand: failAfterCheckout })
+        const failed = yield* settled(jobs, (yield* jobs.start({ repositoryUrl: `file://${origin}`, parentPath: root, name: 'kept' })).id)
+        expect(failed.state).toBe('failed')
+        expect(failed.error).toMatch(/partial checkout is kept/u)
+        expect(yield* fs.exists(join(root, 'kept', 'half.txt'))).toBe(true)
+        expect(registered).toEqual([])
+        const retried = yield* jobs.retry(failed.id)
+        const succeeded = yield* settled(jobs, retried.id)
+        expect(succeeded.state).toBe('succeeded')
+        expect(yield* fs.exists(join(root, 'kept', 'half.txt'))).toBe(false)
+        expect(registered).toEqual([join(root, 'kept')])
+      }),
+    ),
+  )
+
   it.live('cancels a running clone, deletes its partial folder and never registers it', () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -297,6 +335,115 @@ describe.skipIf(!toolsAvailable)('project lifecycle against real git and jj', ()
         expect(created.gitHubRepository).toBeNull()
         expect(created.warning).toContain('gh auth status')
         expect(registered).toEqual([join(root, 'fresh')])
+      }),
+    ),
+  )
+
+  it.live('turns an existing folder into a project in place and keeps its files', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { root, registered, creator, fs } = yield* lifecycle({ installed: ['git', 'jj'] })
+        const folder = join(root, 'existing')
+        yield* fs.makeDirectory(folder)
+        yield* fs.writeFileString(join(folder, 'notes.md'), 'kept\n')
+        const project = yield* creator.initialize({ path: folder })
+        expect(project).toMatchObject({ path: folder, workspaceId: 'ws-1' })
+        expect(registered).toEqual([folder])
+        expect(yield* fs.exists(join(folder, '.jj'))).toBe(true)
+        expect(yield* fs.readFileString(join(folder, 'notes.md'))).toBe('kept\n')
+        expect(yield* fs.readFileString(join(folder, 'README.md'))).toBe('# existing\n')
+        const log = execFileSync('jj', ['log', '--no-graph', '-T', 'description.first_line() ++ "\\n"', '-r', '@-'], { cwd: folder, encoding: 'utf8' })
+        expect(log.trim()).toBe('chore: initialize existing')
+        const bookmarks = execFileSync('jj', ['bookmark', 'list', '--template', 'self.name()'], { cwd: folder, encoding: 'utf8' })
+        expect(bookmarks.trim()).toBe('main')
+      }),
+    ),
+  )
+
+  it.live('retries a failed clone into the same destination as a new job and refuses other states', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { root, origin, jobs } = yield* lifecycle({ installed: ['git', 'jj'] })
+        const failed = yield* settled(jobs, (yield* jobs.start({ repositoryUrl: `file://${join(root, 'missing')}`, parentPath: root, name: 'retried' })).id)
+        expect(failed.state).toBe('failed')
+        expect((yield* Effect.flip(jobs.retry('clone-unknown')))._tag).toBe('JobMissing')
+        const retried = yield* jobs.retry(failed.id)
+        expect(retried).toMatchObject({ path: failed.path, state: 'running' })
+        expect(retried.id).not.toBe(failed.id)
+        expect((yield* settled(jobs, retried.id)).state).toBe('failed')
+        const succeeded = yield* settled(jobs, (yield* jobs.start({ repositoryUrl: `file://${origin}`, parentPath: root, name: 'succeeded' })).id)
+        expect(succeeded.state).toBe('succeeded')
+        expect((yield* Effect.flip(jobs.retry(succeeded.id)))._tag).toBe('CloneNotRetryable')
+      }),
+    ),
+  )
+
+  it.live('publishes a local jj checkout that has no origin and pushes its bookmark', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const bareRepository = { path: '' }
+        const fakeGh = (command: CommandInput) =>
+          command.argv[0] === 'gh'
+            ? Option.some(
+                Effect.sync(() => {
+                  execFileSync('git', ['remote', 'add', 'origin', bareRepository.path], { cwd: command.cwd })
+                  return { exitCode: 0, stdout: 'https://github.com/test/published\n', stderr: '' }
+                }),
+              )
+            : Option.none()
+        const { root, creator, fs } = yield* lifecycle({ installed: ['git', 'jj', 'gh'], fakeCommand: fakeGh })
+        const path = join(root, 'to-publish')
+        bareRepository.path = join(root, 'remote.git')
+        execFileSync('git', ['init', '--bare', bareRepository.path], { stdio: 'ignore' })
+        yield* fs.makeDirectory(path)
+        yield* creator.initialize({ path })
+        const published = yield* creator.publish({ path, visibility: 'private' })
+        expect(published).toMatchObject({ repository: 'https://github.com/test/published', pushed: true, warning: null })
+        expect(execFileSync('git', ['--git-dir', bareRepository.path, 'log', '--format=%s', 'main'], { encoding: 'utf8' }).trim()).toBe(
+          'chore: initialize to-publish',
+        )
+      }),
+    ),
+  )
+
+  it.live('refuses to publish a folder without a repository, a repository with an origin, and one without commits', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { root, creator, fs } = yield* lifecycle({ installed: ['git', 'jj', 'gh'] })
+        const plain = join(root, 'plain-publish')
+        yield* fs.makeDirectory(plain)
+        expect((yield* Effect.flip(creator.publish({ path: plain, visibility: 'private' })))._tag).toBe('NotARepository')
+
+        const initialized = join(root, 'with-origin')
+        yield* fs.makeDirectory(initialized)
+        yield* creator.initialize({ path: initialized })
+        execFileSync('git', ['remote', 'add', 'origin', 'https://example.invalid/owner/repo.git'], { cwd: initialized })
+        const withOrigin = yield* Effect.flip(creator.publish({ path: initialized, visibility: 'private' }))
+        expect(withOrigin._tag).toBe('RemoteExists')
+        expect(withOrigin.message).toContain('https://example.invalid/owner/repo.git')
+
+        const empty = join(root, 'no-commits')
+        yield* fs.makeDirectory(empty)
+        execFileSync('git', ['init', '--initial-branch=main'], { cwd: empty, stdio: 'ignore' })
+        const noCommits = yield* Effect.flip(creator.publish({ path: empty, visibility: 'private' }))
+        expect(noCommits._tag).toBe('ProjectCreateFailed')
+        expect(noCommits.message).toContain('No commits yet')
+      }),
+    ),
+  )
+
+  it.live('refuses to initialize a folder that is already a repository or sits inside one', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { root, creator, fs } = yield* lifecycle({ installed: ['git', 'jj'] })
+        const inside = join(root, 'existing', 'nested')
+        const existing = join(root, 'existing')
+        yield* fs.makeDirectory(existing)
+        yield* creator.initialize({ path: existing })
+        yield* fs.makeDirectory(inside)
+        const failure = yield* Effect.flip(creator.initialize({ path: inside }))
+        expect(failure._tag).toBe('AlreadyARepository')
+        expect(failure.message).toMatch(/inside the repository/u)
       }),
     ),
   )

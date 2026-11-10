@@ -28,6 +28,20 @@ const taskIdSchema = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
 
 export const verifiedCompletionInputSchema = Schema.Struct({ sessionId: sessionIdSchema, turn: safeInt, sourceRevision: revisionSchema })
 
+const workspacePathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048))
+
+export const setupActionsInputSchema = Schema.Struct({ workspacePath: workspacePathSchema, repoRoot: workspacePathSchema })
+
+export const setupActionViewSchema = Schema.Struct({
+  id: actionIdSchema,
+  label: Schema.String.check(Schema.isMaxLength(80)),
+  runOnWorkspaceCreate: Schema.Boolean,
+  awaitBeforeFirstTurn: Schema.Boolean,
+  onSettle: Schema.Boolean,
+})
+
+export type SetupActionView = typeof setupActionViewSchema.Type
+
 export const candidateVerificationInputSchema = Schema.Struct({
   sessionId: sessionIdSchema,
   turn: safeInt,
@@ -60,6 +74,9 @@ export const actionViewSchema = Schema.Struct({
   timeoutMs: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1_000), Schema.isLessThanOrEqualTo(300_000)),
   verifyBeforeComplete: Schema.Boolean,
   replayPolicy: Schema.Literals(['manual', 'read-only']).pipe(Schema.withDecodingDefaultKey(Effect.succeed<'manual' | 'read-only'>('manual'))),
+  runOnWorkspaceCreate: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  awaitBeforeFirstTurn: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  onSettle: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   execution: Schema.Struct({
     target: Schema.Literals(['local', 'remote', 'auto']),
     remoteId: Schema.NullOr(Schema.String.check(Schema.isMaxLength(32))),
@@ -141,7 +158,7 @@ export const projectChecksApi = defineApi({
       input: openSchema(actionsInputSchema),
       output: openSchema(Schema.Array(actionViewSchema).check(Schema.isMaxLength(32))),
       description:
-        'The trusted project actions configured for a thread directory, with each action command line and where it applies. Defaults to the calling thread. Read-only.',
+        'The trusted project actions configured for a thread directory, with each action command line and where it applies, including the runOnWorkspaceCreate / awaitBeforeFirstTurn / onSettle setup flags. Defaults to the calling thread. Read-only.',
       tool: { name: 'project_checks_actions', readOnly: true, render: compactJson },
     }),
     receipts: method({
@@ -164,6 +181,13 @@ export const projectChecksApi = defineApi({
       description:
         'Run one configured project action and return the receipt. The action may execute on a configured peer host; the receipt records the executor and any local fallback. It must be configured and visible for the thread directory. Defaults to the calling thread. Call only when the user asked to run that check.',
       tool: { name: 'project_checks_run', render: compactJson },
+    }),
+    setupActions: method({
+      input: exactSchema(setupActionsInputSchema),
+      output: openSchema(Schema.Array(setupActionViewSchema).check(Schema.isMaxLength(32))),
+      description:
+        'The trusted actions flagged to prepare a thread workspace or run on settle, for one workspace and the checkout it belongs to. An action qualifies only when its trusted root contains both. Read-only.',
+      tool: { name: 'project_checks_setup_actions', readOnly: true, render: compactJson },
     }),
     dispatch: method({
       input: exactSchema(Schema.Struct({ sessionId: Schema.optionalKey(sessionIdSchema), actionId: actionIdSchema, idempotencyKey: uuidSchema })),

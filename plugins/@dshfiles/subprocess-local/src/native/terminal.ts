@@ -15,6 +15,11 @@ import type { BoundProcessOwner } from './managed-owner.ts'
 import type { ProcessIdentity, ProcessInspector, ProcessSnapshot } from './process-inspector.ts'
 import type { ShellActivity } from './shell-activity.ts'
 
+// dshfiles delta: readiness polls ask only for the foreground group, so the descendant scan they also kept
+// current is evidence for a host-exit fallback (teardown scans again), not a decision input. On macOS that
+// scan is a whole-table /bin/ps fork (~40 ms on a loaded host) blocking the event loop every 50 ms poll.
+const DESCENDANT_SCAN_INTERVAL_MS = 1_000
+
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const finish = (): void => {
@@ -69,6 +74,7 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
   private exited = false
   private outputPaused = false
   private trackedDescendants: ProcessIdentity[] = []
+  private trackedScanAt = 0
   private activityRevision = 0
   private activityKey = ''
   private quiescent = false
@@ -96,6 +102,7 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
     this.pid = terminal.pid
     try { this.rootIdentity = inspector.snapshot().tree(this.pid).find(member => member.pid === this.pid) }
     catch (_rootIdentityUnavailable) { this.rootIdentity = undefined }
+    this.trackedScanAt = Date.now()
     this.done = this.outcome.promise
     const resume = (): void => {
       if (!this.outputPaused) return
@@ -153,7 +160,11 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
   // Local inspection is synchronous; the seam returns a promise for remote transports.
   // oxlint-disable-next-line typescript/require-await -- Preserve promise rejection semantics at the async provider contract.
   async inspectForeground(): Promise<SubprocessTerminalForeground | undefined> {
-    this.descendants(this.inspector.snapshot())
+    const now = Date.now()
+    if (now - this.trackedScanAt >= DESCENDANT_SCAN_INTERVAL_MS) {
+      this.trackedScanAt = now
+      this.descendants(this.inspector.snapshot())
+    }
     const processGroupId = this.inspector.foregroundPgid(this.pid)
     if (processGroupId === undefined) return undefined
     return {

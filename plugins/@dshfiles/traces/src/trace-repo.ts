@@ -132,6 +132,12 @@ const traceMigrations = {
   '6_spans_end': scriptOf(`
   CREATE INDEX spans_end ON spans (end_us);
   `),
+  // The panel's un-gated stats read scans the window for service, name, duration and status every 10 s; through the
+  // (trace_id, span_id) primary key those columns cost one scattered lookup per span (39–44 ms of a 30k-span window),
+  // where this index answers the same scan from the index alone (10–12 ms).
+  '7_spans_window': scriptOf(`
+  CREATE INDEX spans_window ON spans (start_us, service, name, end_us, status_code);
+  `),
 }
 
 /** The span store's SQLite file; its statements never open spans, so storing traces never traces itself. */

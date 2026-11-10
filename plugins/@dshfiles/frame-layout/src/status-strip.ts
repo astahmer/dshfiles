@@ -1,5 +1,5 @@
 /**
- * The status strip (plan `plans/ade-ux` §4.1 region R5): one thin row at the bottom of the frame. Plugins add at most
+ * The status strip (plan `docs/ade-ux` §4.1 region R5): one thin row at the bottom of the frame. Plugins add at most
  * one item each through `StatusItems`; global items sit on the left, items about the open thread on the right. The
  * frame owns the row, its order and its phone form (one chip that opens the list); a plugin owns only its item's text.
  *

@@ -1,5 +1,4 @@
 import type { CommandItem } from '@dshfiles/dshx/client'
-import { PaletteApi } from './palette-api.js'
 import type { PaletteAction } from './palette-contract.js'
 
 const PALETTE_ACTION_ID = /^@[^/]+\/.+/u
@@ -21,55 +20,39 @@ const toPaletteAction = (command: CommandItem, keys: readonly string[] | undefin
   }
 }
 
-/**
- * List every contributed command in the palette with the keys it answers to now.
- *
- * Commands whose id lacks the package scope stay out with a warning: the
- * palette keys its frecency and dedupe by that scoped id.
- * @returns a disposer removing the rows it added.
- */
-const listContributedCommands = (commands: readonly CommandItem[], keys: ReadonlyMap<string, readonly string[]>): (() => void) => {
-  const disposers = commands.flatMap(command => {
-    const action = toPaletteAction(command, keys.get(command.id))
-    if (action === undefined) {
-      if (command.hidden !== true)
-        console.warn(`command-palette: ${command.id} is not listed; command ids start with the package scope, e.g. @acme/plugin.open.`)
-      return []
-    }
-    try {
-      return [PaletteApi.registerAction(action)]
-    } catch (error) {
-      console.warn(`command-palette: ${command.id} is not listed`, error)
-      return []
-    }
-  })
-  return () => {
-    for (const dispose of disposers) dispose()
-  }
-}
+const sameKeys = (left: readonly string[] | undefined, right: readonly string[] | undefined): boolean =>
+  left === right || (left !== undefined && right !== undefined && left.length === right.length && left.every((key, index) => key === right[index]))
 
 /**
- * List every row other plugins added to the `PaletteActions` registry.
- *
- * A row with an invalid definition or an id another row holds is left out with a warning instead of breaking the rest.
- * @returns a disposer removing the rows it added.
+ * The palette rows of every contributed command with the keys it answers to now. A command whose object and keys are
+ * unchanged keeps its row object, so a shortcut-catalog change re-lists nothing that did not move.
  */
-const listContributedActions = (actions: readonly PaletteAction[]): (() => void) => {
-  const disposers = actions.flatMap(action => {
-    try {
-      return [PaletteApi.registerAction(action)]
-    } catch (error) {
-      console.warn(`command-palette: ${action.id} is not listed`, error)
-      return []
-    }
-  })
-  return () => {
-    for (const dispose of disposers) dispose()
+const createCommandRows = (): ((commands: readonly CommandItem[], keys: ReadonlyMap<string, readonly string[]>) => readonly PaletteAction[]) => {
+  let previous = new Map<CommandItem, { readonly keys: readonly string[] | undefined; readonly action: PaletteAction }>()
+  return (commands, keys) => {
+    const next = new Map<CommandItem, { readonly keys: readonly string[] | undefined; readonly action: PaletteAction }>()
+    const rows = commands.flatMap(command => {
+      const commandKeys = keys.get(command.id)
+      const known = previous.get(command)
+      if (known !== undefined && sameKeys(known.keys, commandKeys)) {
+        next.set(command, known)
+        return [known.action]
+      }
+      const action = toPaletteAction(command, commandKeys)
+      if (action === undefined) {
+        if (command.hidden !== true)
+          console.warn(`command-palette: ${command.id} is not listed; command ids start with the package scope, e.g. @acme/plugin.open.`)
+        return []
+      }
+      next.set(command, { keys: commandKeys, action })
+      return [action]
+    })
+    previous = next
+    return rows
   }
 }
 
 export class ContributedCommandsModel {
   static readonly toPaletteAction = toPaletteAction
-  static readonly list = listContributedCommands
-  static readonly listActions = listContributedActions
+  static readonly createCommandRows = createCommandRows
 }

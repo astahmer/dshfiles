@@ -24,6 +24,15 @@ describe('Utf8', () => {
     expect(Utf8.tail('é'.repeat(3), 5)).toBe('éé')
   })
 
+  it('cuts only text past the byte budget', () => {
+    expect(Utf8.clip('a'.repeat(13), 13)).toBe('a'.repeat(13))
+    expect(Utf8.clip('a'.repeat(14), 13)).toBe(`${'a'.repeat(10)}…`)
+    expect(Utf8.clip('', 13)).toBe('')
+    expect(Utf8.clip('é😀', 6)).toBe('é😀')
+    expect(Utf8.clip('é😀', 5)).toBe('é…')
+    expect(Utf8.clip('a'.repeat(1_000_000), 13)).toBe(`${'a'.repeat(10)}…`)
+  })
+
   it('bounds text with an explicit truncation marker', () => {
     const bounded = Utf8.boundHeadTail(`HEAD${'x'.repeat(10_000)}TAIL`, 200)
     expect(Utf8.byteLength(bounded.text)).toBeLessThanOrEqual(200)

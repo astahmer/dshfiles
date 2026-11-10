@@ -10,6 +10,7 @@ import {
   type RequestMessage,
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
+import type { Session, SessionEventMap } from '@deepseek-ai/dsh-session'
 import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Effect, Schema } from 'effect'
 import type { RequestMessagesStatus } from './contract.ts'
@@ -52,7 +53,9 @@ class RequestMessagesListenerFailure extends Schema.TaggedError<RequestMessagesL
   }
 }
 
-const requestOptions = Effect.fn('request messages dispatch')(function* (ctx: Context, options: GenerateOptions) {
+type LatestSteps = WeakMap<Session, SessionEventMap['step/start']>
+
+const requestOptions = Effect.fn('request messages dispatch')(function* (ctx: Context, latestSteps: LatestSteps, options: GenerateOptions) {
   if (!isAgentLoopRequest(options) || options.sessionId === undefined || options.toolHistory === undefined) return options
   const sessionId = options.sessionId
   const toolHistory = options.toolHistory
@@ -60,17 +63,17 @@ const requestOptions = Effect.fn('request messages dispatch')(function* (ctx: Co
   if (agent === undefined) return options
   const messages = options.messages
   if (!messages.every(isMessage)) return options
-  const stepStart = agent.session.snapshotEvents().findLast(event => event.type === 'step/start')
-  if (stepStart?.type !== 'step/start') return options
+  const step = latestSteps.get(agent.session)
+  if (step === undefined) return options
   const signal = options.signal ?? new AbortController().signal
   const sent = yield* Effect.tryPromise({
     try: () =>
       agentEvents(ctx, agent).waterfall(
         'agent/request-messages',
         {
-          turn: stepStart.data.turn,
-          step: stepStart.data.step,
-          isFirstStepOfTurn: stepStart.data.step === 1,
+          turn: step.turn,
+          step: step.step,
+          isFirstStepOfTurn: step.step === 1,
           messages,
           toolHistory,
           signal,
@@ -111,7 +114,17 @@ const release = (runtime: LlmRuntime, installation: Installation, token: symbol)
 export const installRequestMessages = Effect.fn('request messages install')(function* (input: { readonly ctx: Context; readonly runtime: LlmRuntime }) {
   const runtime = input.runtime
   const token = Symbol('request-messages host')
-  const dispatch = yield* DshxPlugin.callback((options: GenerateOptions) => requestOptions(input.ctx, options))
+  /**
+   * The agent loop appends `step/start` before every model request, so a live fold sees each step without the
+   * deprecated session event reads. A registered session projection would also persist a row whose absence from
+   * older checkpoints forces every cold Session open into a full log read.
+   */
+  const latestSteps: LatestSteps = new WeakMap()
+  const stopFolding = input.ctx.on('session/event', (session, event) => {
+    if (event.type === 'step/start') latestSteps.set(session, event.data)
+  })
+  yield* Effect.addFinalizer(() => Effect.sync(stopFolding))
+  const dispatch = yield* DshxPlugin.callback((options: GenerateOptions) => requestOptions(input.ctx, latestSteps, options))
   const existing = installationKey in runtime ? runtime[installationKey] : undefined
   if (isInstallation(existing)) {
     existing.hosts.set(token, dispatch)

@@ -110,6 +110,19 @@ export class AgentDirectory extends Context.Service<
 }
 
 /**
+ * The live Sessions as scan targets, without a persisted-corpus listing: a live Session cannot be stopped, so a caller
+ * that excludes stopped Sessions needs nothing from storage. A live Session is persisted as it runs.
+ */
+const liveSessionTargets = (input: {
+  readonly liveRoots: ReadonlySet<string>
+  readonly sessions: ReadonlyArray<{ readonly id: string }>
+}): ReadonlyArray<SessionQuestionTarget> =>
+  input.sessions.map(session => {
+    const sessionId = String(session.id)
+    return { sessionId, sessionLive: true, sessionPersisted: true, targetIsLiveRoot: input.liveRoots.has(sessionId) }
+  })
+
+/**
  * Native `ask_user_question` forms across Sessions: which Sessions are live roots, the Session list to scan, one
  * Session's projected question facts, and the native answer API for continued forms.
  */
@@ -143,6 +156,7 @@ export class NativeQuestions extends Context.Service<
         liveRootIds,
         isLiveRoot: agent => Option.exists(sessionIdOf(agent.id), id => context.agents.get(id) === agent) && liveRootIds().has(agent.id),
         listTargets: Effect.fn('agent questions sessions list')(function* (input) {
+          if (!input.includeStopped) return liveSessionTargets({ liveRoots: input.liveRoots, sessions: context.sessions.list() })
           const sessions = yield* Effect.tryPromise({
             try: signal => context.sessionQuery.listSessions(signal),
             catch: cause => new SessionListFailed({ cause }),

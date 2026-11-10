@@ -22,7 +22,14 @@ export interface ApiHostRegistrationParts {
   readonly handlers: ApiHandlers<Record<string, AnyApiMethodDefinition>>
 }
 
-const apiHostRegistrations = new WeakMap<object, ApiHostRegistrationParts>()
+/**
+ * Keyed on the global symbol registry, not a module-level WeakMap: a Host bundle inlines dshx once, and a contract
+ * imported from another plugin's dshx module is built by that module's own copy. Both copies must still agree that a
+ * registration is a registration, or a cross-package contract fails validation at boot.
+ */
+const HOST_REGISTRATION_PARTS = Symbol.for('dshfiles.dshx.apiHostRegistrationParts')
+
+type MarkedHostRegistration = { readonly [HOST_REGISTRATION_PARTS]?: ApiHostRegistrationParts }
 
 type MethodFromSchemas<InputSchema, OutputSchema> = ApiMethodDefinition<
   InputSchema extends ApiSchema ? ApiSchemaInput<InputSchema> : void,
@@ -71,12 +78,12 @@ function assertId(id: string): void {
 
 /** Internal authenticity check shared by the source and generated Host adapters. */
 function isApiHostRegistration(value: unknown): value is ApiHostRegistration {
-  return typeof value === 'object' && value !== null && apiHostRegistrations.has(value)
+  return typeof value === 'object' && value !== null && HOST_REGISTRATION_PARTS in value
 }
 
 /** Internal registration data shared by the author helper and Host runtime. */
 function apiHostRegistrationParts(value: ApiHostRegistration): ApiHostRegistrationParts {
-  const parts = apiHostRegistrations.get(value)
+  const parts = (value as MarkedHostRegistration)[HOST_REGISTRATION_PARTS]
   if (parts === undefined) throw new TypeError('Invalid API Host contribution; create it with contract.host({ ...handlers }).')
   return parts
 }
@@ -128,9 +135,11 @@ function defineApi<
         throw new Error(`API ${JSON.stringify(definition.id)} handlers do not exactly match its methods: ${details}.`)
       }
       const registration = {} as ApiHostRegistration<Methods, Handlers>
-      apiHostRegistrations.set(registration, {
-        contract,
-        handlers: handlers as ApiHandlers<Record<string, AnyApiMethodDefinition>>,
+      Object.defineProperty(registration, HOST_REGISTRATION_PARTS, {
+        value: { contract, handlers: handlers as ApiHandlers<Record<string, AnyApiMethodDefinition>> },
+        enumerable: false,
+        configurable: false,
+        writable: false,
       })
       return registration
     },

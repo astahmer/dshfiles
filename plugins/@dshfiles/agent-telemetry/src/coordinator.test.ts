@@ -462,6 +462,30 @@ describe('content capture', () => {
     expect(String(recorder.span('execute_tool bash').attributes['gen_ai.tool.call.result'])).toContain('TOOL-OUTPUT-SECRET')
     expect(String(recorder.span('invoke_agent deepseek-harness').attributes['gen_ai.output.messages'])).toContain('REPLY-SECRET')
   })
+
+  it('reuses a frozen context message mapping while still seeing messages added between calls', async () => {
+    capture = true
+    using recorder = recordSpans()
+    const observer = coordinator()
+    const observed = session('s-13')
+    emit(observer, observed, 'turn/start', { turn: 1 })
+    emit(observer, observed, 'user/message', { role: 'user', content: [{ type: 'text', text: 'FIRST-SECRET' }], source: { kind: 'user' } })
+    emit(observer, observed, 'step/start', { turn: 1, step: 1 })
+    await drain(observer.interceptLlm(request(observed.id), () => stream(chunks())))
+    emit(observer, observed, 'step/end', { turn: 1, step: 1 })
+    emit(observer, observed, 'user/message', { role: 'user', content: [{ type: 'text', text: 'SECOND-SECRET' }], source: { kind: 'user' } })
+    emit(observer, observed, 'step/start', { turn: 1, step: 2 })
+    await drain(observer.interceptLlm(request(observed.id), () => stream(chunks())))
+    emit(observer, observed, 'step/end', { turn: 1, step: 2 })
+    emit(observer, observed, 'turn/end', { turn: 1, reason: { kind: 'completed' } })
+
+    const messages = recorder.named('chat kilo-auto/free').map(span => decodeJson(jsonValueSchema, String(span.attributes['gen_ai.input.messages'])))
+    expect(messages[0]).toEqual([{ role: 'user', parts: [{ type: 'text', content: 'FIRST-SECRET' }] }])
+    expect(messages[1]).toEqual([
+      { role: 'user', parts: [{ type: 'text', content: 'FIRST-SECRET' }] },
+      { role: 'user', parts: [{ type: 'text', content: 'SECOND-SECRET' }] },
+    ])
+  })
 })
 
 describe('failure containment', () => {

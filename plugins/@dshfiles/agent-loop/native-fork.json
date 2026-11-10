@@ -1,0 +1,17 @@
+{
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The only delta drops the duplicate per-block replay metadata a settled attempt stored inside its durable stream; the message source keeps the envelope the provider needs.",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-agent-loop",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
+    "path": "packages/core/agent-loop"
+  },
+  "files": [
+    {
+      "upstream": "src",
+      "local": "src/native"
+    }
+  ],
+  "delta": ["src/native/agent.ts", "src/native/assistant-stream.ts", "src/native/index.ts"]
+}

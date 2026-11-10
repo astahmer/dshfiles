@@ -2,7 +2,8 @@ import { isIgnored, parseGitignore, type IgnoreRule } from './gitignore.js'
 
 const MAX_FILES = 20_000
 const MAX_DIRECTORIES = 4_000
-const PARALLEL_LISTS = 8
+/** Every list call shares one gateway socket, so the walk is round-trip bound: more in flight means fewer rounds. */
+const PARALLEL_LISTS = 24
 const PROGRESS_INTERVAL_MS = 200
 /** Host `changes` watches one directory's direct entries, so only the shallowest directories get a stream each. */
 export const MAX_WATCHED_DIRECTORIES = 64

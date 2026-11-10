@@ -58,9 +58,15 @@ describe('Claude usage reads', () => {
 
     answers.push(usage)
     const first = await service.readUsage(configDir)
-    await service.readUsage(configDir)
+    now += 30_000
+    const reused = await service.readUsage(configDir)
     expect(first.status).toBe('ok')
     expect(requests).toBe(1)
+    // A refresh answered from the shared reading stays dated when it was really read.
+    expect(first).toMatchObject({ readAt: 1_000_000, nextReadAt: 1_120_000 })
+    expect(reused).toMatchObject({ readAt: 1_000_000, nextReadAt: 1_120_000 })
+    expect(reused.readFailure).toBeUndefined()
+    now -= 30_000
 
     now += 3 * 60_000
     answers.push(new Response('{}', { status: 429, headers: { 'retry-after': '60' } }))
@@ -68,7 +74,14 @@ describe('Claude usage reads', () => {
     now += 30_000
     await service.readUsage(configDir)
     expect(requests).toBe(2)
-    expect(limited).toMatchObject({ status: 'ok', windows: first.windows, message: expect.stringContaining('min ago') })
+    expect(limited).toMatchObject({
+      status: 'ok',
+      windows: first.windows,
+      message: expect.stringContaining('min ago'),
+      readAt: 1_000_000,
+      nextReadAt: 1_000_000 + 3 * 60_000 + 60_000,
+      readFailure: { status: 'rate-limited' },
+    })
 
     now += 31_000
     answers.push(new Response('{}', { status: 500 }))

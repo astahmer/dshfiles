@@ -61,7 +61,7 @@ const selectRequested = assign<ShellContext, ShellEvent, undefined, ShellEvent, 
 
 /**
  * Settings visibility and section selection: the native shell's owner store (open, close, select, openSection) for the
- * one Settings page in the stage (plan `plans/ade-ux` §4.6). The Host's main view is the truth: showing the panel from
+ * one Settings page in the stage (plan `docs/ade-ux` §4.6). The Host's main view is the truth: showing the panel from
  * anywhere (a tab, a reload) opens Settings there, and leaving it closes Settings.
  */
 // SAFETY: xstate's `types` entries are empty type carriers; nothing reads their values.

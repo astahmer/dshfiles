@@ -15,10 +15,10 @@ interface RecordedSplice {
 
 /** An in-memory inbox with standard splice semantics that records every splice it applies. */
 const memoryInbox = (nextTurnIds: readonly string[], nextStepIds: readonly string[] = []) => {
-  const lists: Record<InboxTarget, QueuedMessage[]> = {
+  const lists = {
     'next-turn': nextTurnIds.map(id => ({ id })),
     'next-step': nextStepIds.map(id => ({ id })),
-  }
+  } satisfies Record<InboxTarget, QueuedMessage[]>
   const splices: RecordedSplice[] = []
   const inbox: QueueInbox<QueuedMessage> = {
     get nextTurn() {

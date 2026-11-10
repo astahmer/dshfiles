@@ -48,11 +48,11 @@ describe('agent inline references', () => {
     document.getSelection()?.removeAllRanges()
   })
 
-  it('links a known mention, braced or legacy, and keeps the text as written', () => {
+  it('shows a known mention, braced or legacy, as the same chip', () => {
     renderRun('Ask @luna and @{dsh} to fix b:1.')
-    expect(links()).toEqual(['@luna', '@{dsh}'])
-    const first = document.querySelector('[data-dshfiles-agent-reference="luna"]')
-    expect(first?.getAttribute('role')).toBe('link')
+    expect(links()).toEqual(['@luna', '@dsh'])
+    expect(document.querySelectorAll('[data-ref-chip="agent"]')).toHaveLength(2)
+    const first = document.querySelector('[data-dshfiles-agent-reference="luna"] button')
     expect(first?.getAttribute('aria-label')).toBe('Preview agent @luna')
   })
 
@@ -69,23 +69,38 @@ describe('agent inline references', () => {
     AgentInlineReference.setHandles(new Set(['luna', 'dsh', 'nova']))
     expect(listener).toHaveBeenCalledOnce()
     renderRun('Ping @{nova}')
-    expect(links()).toEqual(['@{nova}'])
+    expect(links()).toEqual(['@nova'])
     stop?.()
   })
 
-  it('opens the card from a click or the keyboard, anchored on the link, and ignores a right click or a selection', () => {
+  it('opens the card from a click or the keyboard, anchored on the chip, and ignores a selection', () => {
     const { handles: seen, anchorIds, stop } = previews()
     renderRun('Working with @luna.')
-    const link = document.querySelector('[data-dshfiles-agent-reference]')
-    act(() => void link?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })))
-    act(() => void link?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
-    act(() => void link?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 2 })))
+    const chip = document.querySelector('[data-dshfiles-agent-reference] button')
+    act(() => void chip?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })))
+    act(() => void chip?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
     document.getSelection()?.selectAllChildren(document.body)
-    act(() => void link?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })))
+    act(() => void chip?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })))
     expect(seen).toEqual(['luna', 'luna'])
     // The request carries the anchor the card re-measures when the page scrolls.
-    expect(document.querySelector(`[data-dshfiles-entity-anchor="${String(anchorIds[0])}"]`)).toBe(link)
+    expect(document.querySelector(`[data-dshfiles-entity-anchor="${String(anchorIds[0])}"]`)).toBe(chip)
     stop()
+  })
+
+  it('offers the card on hover after a short dwell', () => {
+    vi.useFakeTimers()
+    try {
+      const { handles: seen, stop } = previews()
+      renderRun('Working with @luna.')
+      const chip = document.querySelector('[data-dshfiles-agent-reference] button')
+      act(() => void chip?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })))
+      expect(seen).toEqual([])
+      act(() => vi.advanceTimersByTime(160))
+      expect(seen).toEqual(['luna'])
+      stop()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('opens the card from the native mention chip a sent message renders', () => {

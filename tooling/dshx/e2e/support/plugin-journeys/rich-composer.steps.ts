@@ -244,9 +244,15 @@ Then('the run row holds project, host, workspace and model, and sending with the
     await expect(row.locator('[data-run-segment="project"]')).toBeVisible()
     await expect(row.getByRole('button', { name: 'Run on Local', exact: true })).toBeVisible()
     await expect(row.locator('[data-run-segment="workspace"]')).toBeVisible()
-    await expect(row.locator('[data-run-segment="model"]')).toBeVisible()
-    // The input keeps no second model seat while the row holds it.
-    await expect(page.locator('[data-composer-card] [data-slot="conversation.input.model"]')).toHaveCount(0)
+    // The model seat rides the run row while the row can hold it and the tool row
+    // otherwise (a wrapped seat strands itself at the right edge); either way the
+    // composer shows exactly one of it.
+    const modelSeats = page.locator('[data-slot="conversation.input.model"]')
+    await expect(modelSeats).toHaveCount(1)
+    await expect(modelSeats).toBeVisible()
+    const modelInRow = await row.locator('[data-slot="conversation.input.model"]').count()
+    const modelInCard = await page.locator('[data-composer-card] [data-slot="conversation.input.model"]').count()
+    expect(modelInRow + modelInCard).toBe(1)
   })
   await recordAssertion(page, 'rich-composer-run-row-sends-with-defaults', async () => {
     // Zero chip changes: type and send with the row's defaults.

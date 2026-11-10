@@ -499,6 +499,33 @@ export class SessionInputShell implements SessionInput {
   }
 
   /**
+   * Rebuild the reference chips a plain-text draft's serialized references still name: a queued message's text comes
+   * back as text, so every source's own restore grammar turns it back into the chips the composer sent.
+   * @returns whether any chip was restored.
+   */
+  restoreReferences(): boolean {
+    const controller = this.deps.inputTriggers?.()
+    if (controller === undefined) return false
+    const current = this.state.getSnapshot()
+    if (current.draft === '' || current.occurrences.length > 0) return false
+    const spans = controller.restoreReferences(current.draft)
+    if (spans.length === 0) return false
+    this.draftEditor.restoreDraft(
+      current.draft,
+      spans.map(span => ({
+        source: span.source,
+        ref: span.ref,
+        label: span.label,
+        ...(span.appearance === undefined ? {} : { appearance: span.appearance }),
+        clipboardText: span.clipboardText,
+        offset: span.start,
+        length: span.end - span.start,
+      })),
+    )
+    return true
+  }
+
+  /**
    * Consume one command token after business success (scoped consume-token
    * event listener body). Span guard: revision CAS then splice; bare-token
    * guard: trimmed-draft equality then clear.

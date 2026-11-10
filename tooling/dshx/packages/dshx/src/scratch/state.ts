@@ -51,6 +51,12 @@ export const ScratchStateSchema = Schema.Struct({
   launchUrl: Schema.String,
   bundles: Schema.Array(Schema.String),
   expectedClientEntries: Schema.Array(Schema.String),
+  /**
+   * The bundles under test that own a top-level Loader row; absent on a state written before this field, when every
+   * bundle was assumed to own one. A bundle installed only as an agent-preset child (`@dshfiles/tool-ask-user`) has no
+   * row and never appears in the Host's plugin list, so the doctor demands an active entry only for these.
+   */
+  expectedEntries: Schema.optional(Schema.Array(Schema.String)),
   project: Schema.Struct({ path: Schema.String, workspaceId: Schema.String, ownedByScratch: Schema.Boolean }),
   host: ownedProcessSchema,
   browser: Schema.Struct({ ...ownedProcessFields, cdpPort: Schema.Number.check(Schema.isFinite(), Schema.isInt()) }),

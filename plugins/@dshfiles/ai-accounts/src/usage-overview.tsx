@@ -16,6 +16,7 @@ import { ExtraUsageMeter } from './extra-usage-view.js'
 import { useQuotaClock } from './quota-clock.js'
 import { usePreferences } from './use-preferences.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
+import { UsageReadStatus, UsageRefreshNotice } from './usage-read-status.js'
 import { ArrangeableAccount, useUsageLayout, type UsageArrangement } from './usage-arrangement.js'
 import { UsageOverviewModel, type OverviewCard, type ProviderTab } from './usage-overview-model.js'
 
@@ -52,6 +53,8 @@ const AccountUsageCard = (props: {
   readonly hostName: string
   readonly readAt: number
   readonly now: number
+  readonly refreshing: boolean
+  readonly onRefresh: () => void
   readonly onConnectAccount: (accountId: string) => void
 }): JSX.Element => {
   const usage = props.card.usage
@@ -61,14 +64,14 @@ const AccountUsageCard = (props: {
   return (
     <article
       className={cn(
-        'dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-3',
+        'dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-2',
         limited && 'dshx:border-destructive/50 dshx:bg-destructive/5',
       )}
     >
-      <div className={cn('dshx:flex dshx:flex-col dshx:gap-2', !props.card.enabled && 'dshx:opacity-50')}>
-        <header className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+      <div className={cn('dshx:flex dshx:flex-col dshx:gap-1.5', !props.card.enabled && 'dshx:opacity-50')}>
+        <header className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
           <ProviderGlyph className="dshx:size-3.5" kind={props.card.kind} />
-          <strong className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-semibold">{props.card.displayName}</strong>
+          <strong className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-xs dshx:font-semibold">{props.card.displayName}</strong>
           {!props.card.enabled ? <span className="dshx:text-[9px] dshx:font-medium dshx:tracking-wide dshx:text-muted-foreground">OFF</span> : null}
           <UsagePlanBadge plan={usage.plan} />
           {limited ? (
@@ -111,23 +114,25 @@ const AccountUsageCard = (props: {
           const resetLabel = window.reserve === true ? 'Reserve refills' : null
           return (
             <div className="dshx:flex dshx:flex-col dshx:gap-1" key={window.label}>
-              <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:text-xs">
+              <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:text-[11px]">
                 <span className={cn('dshx:truncate', props.card.enabled && spent ? 'dshx:font-medium dshx:text-destructive' : 'dshx:text-muted-foreground')}>
                   {window.label}
                 </span>
-                <strong className={cn('dshx:font-semibold dshx:tabular-nums', props.card.enabled ? QUOTA_TONE_TEXT[tone] : 'dshx:text-muted-foreground')}>
+                <strong
+                  className={cn('dshx:text-xs dshx:font-semibold dshx:tabular-nums', props.card.enabled ? QUOTA_TONE_TEXT[tone] : 'dshx:text-muted-foreground')}
+                >
                   {spent ? '0% left · limit reached' : `${String(Math.round(window.percentRemaining))}% left`}
                 </strong>
               </div>
               <Progress
                 aria-label={`${props.card.displayName} ${window.label} remaining`}
                 className={cn(
-                  'dshx:h-1.5 dshx:bg-muted',
+                  'dshx:h-1 dshx:bg-muted',
                   props.card.enabled ? QUOTA_TONE_PROGRESS[tone] : 'dshx:*:data-[slot=progress-indicator]:bg-muted-foreground',
                 )}
                 value={Math.max(0, Math.min(100, window.percentRemaining))}
               />
-              <div className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
+              <div className="dshx:text-[11px] dshx:text-muted-foreground dshx:tabular-nums">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className={props.card.enabled && spent ? 'dshx:font-semibold dshx:text-destructive' : undefined}>
@@ -138,17 +143,12 @@ const AccountUsageCard = (props: {
                   </TooltipTrigger>
                   {window.resetsAt === null ? null : <TooltipContent>{new Date(window.resetsAt).toLocaleString()}</TooltipContent>}
                 </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>Age {UsageOverviewModel.formatAge(props.readAt, props.now)}</span>
-                  </TooltipTrigger>
-                  <TooltipContent>Age of this usage snapshot</TooltipContent>
-                </Tooltip>
               </div>
             </div>
           )
         })}
         {extraUsage === undefined ? null : <ExtraUsageMeter extra={extraUsage} muted={!props.card.enabled} now={props.now} />}
+        <UsageReadStatus onRetry={props.onRefresh} refreshing={props.refreshing} sweepReadAt={props.readAt} usage={usage} />
         {usage.bankedResets > 0 ? <BankedResets count={usage.bankedResets} expiries={usage.bankedResetExpiries} /> : null}
         {limited && usage.bankedResets > 0 && props.card.kind === 'codex' ? (
           <p className="dshx:text-[11px] dshx:text-muted-foreground">Spend a banked reset with “Reset usage” in the Codex app; it is not used automatically.</p>
@@ -192,7 +192,7 @@ const HiddenAccounts = (props: { readonly hidden: readonly OverviewCard[]; reado
   )
 }
 
-const DEFAULT_WIDTH = 400
+const DEFAULT_WIDTH = 340
 const MIN_WIDTH = 280
 const MIN_HEIGHT = 160
 
@@ -294,7 +294,7 @@ const ResizeGrip = (props: {
  */
 export const UsageOverview = (props: {
   readonly usage: AccountsUsage | null
-  readonly failed: boolean
+  readonly failure: string | null
   readonly refreshing: boolean
   readonly onRefresh: () => void
   readonly onOpenHistory: () => void
@@ -336,7 +336,7 @@ export const UsageOverview = (props: {
           onResize={setDraggedSize}
           target={sectionRef}
         />
-        <header className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b dshx:px-2 dshx:py-1.5">
+        <header className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b dshx:px-2 dshx:py-1">
           <ToggleGroup
             aria-label="Provider"
             className="dshx:min-w-0 dshx:overflow-x-auto"
@@ -384,11 +384,16 @@ export const UsageOverview = (props: {
             <TooltipContent>Refresh usage</TooltipContent>
           </Tooltip>
         </header>
-        <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))] dshx:content-start dshx:gap-2 dshx:overflow-y-auto dshx:overscroll-contain dshx:p-2">
+        {props.failure === null ? null : (
+          <div className="dshx:shrink-0 dshx:px-2 dshx:pt-2">
+            <UsageRefreshNotice failure={props.failure} onRetry={props.onRefresh} refreshing={props.refreshing} />
+          </div>
+        )}
+        <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:grid-cols-[repeat(auto-fill,minmax(min(260px,100%),1fr))] dshx:content-start dshx:gap-1.5 dshx:overflow-y-auto dshx:overscroll-contain dshx:p-1.5">
           {props.usage === null ? (
-            <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
-              {props.failed ? 'The account host did not answer.' : 'Reading usage…'}
-            </p>
+            props.failure === null ? (
+              <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">Reading usage…</p>
+            ) : null
           ) : visibleCards.length === 0 ? (
             <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
               {sections.unavailable.length + sections.hidden.length === 0 ? 'No saved account for this provider.' : 'No account with quota to show.'}
@@ -410,6 +415,8 @@ export const UsageOverview = (props: {
                   hostName={props.usage?.hostName ?? ''}
                   now={now}
                   readAt={props.usage?.readAt ?? now}
+                  refreshing={props.refreshing}
+                  onRefresh={props.onRefresh}
                   onConnectAccount={props.onConnectAccount}
                 />
               </ArrangeableAccount>

@@ -41,7 +41,9 @@ import { ThreadAsideOpenProvider, ThreadSidebar, type ThreadSidebarStandardProps
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { HeaderThreadActions } from './header-actions.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
-import { SubagentProvenanceToolRow } from './subagent-provenance/subagent-tool-row.js'
+import type { SubagentPreviewBindings } from './subagent-provenance/subagent-live-preview.js'
+import { SubagentPreviewDock } from './subagent-provenance/subagent-preview-dock.js'
+import { SubagentProvenanceToolRow, type SubagentToolViewProps } from './subagent-provenance/subagent-tool-row.js'
 import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
 import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
@@ -85,6 +87,8 @@ const WAITING_THREADS_PANEL_ID = 'thread-sidebar-waiting'
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
     threadSidebarFollowUp: unknown
+    /** One subagent followed from its transcript row while that row is open. */
+    threadSidebarSubagentPreview: unknown
     threadSidebarPromptLink: unknown
     threadSidebarArchivedView: unknown
     threadSidebarSkillAutocomplete: unknown
@@ -287,7 +291,7 @@ export default defineClient({
           }),
         'thread-sidebar: working status item',
       )
-      // The one restart notice (plans/ade-ux §4.1 R5): Host files changed on disk plus other plugins' pending updates,
+      // The one restart notice (docs/ade-ux §4.1 R5): Host files changed on disk plus other plugins' pending updates,
       // with the restart verbs the sidebar shell guards.
       const RestartItem = (props: StatusItemProps): JSX.Element | null => (
         <RestartStatusItem
@@ -585,11 +589,15 @@ export default defineClient({
       ),
     )
 
-    // Notification sounds fire in a background tab, where no gesture can resume an audio context:
-    // unlock it on the first interaction so a later alert still rings.
+    // Notification sounds fire in a background tab. A browser with sticky user activation (`navigator.userActivation`)
+    // resumes a context created at the first sound, so only the others open the device on the first gesture: opening
+    // it blocks the main thread for 100–300 ms, which would land on the click that starts a turn.
     ctx.effect(() => {
+      if ('userActivation' in navigator) return () => undefined
       const unlockNotificationAudio = (): void => {
-        void ThreadNotificationAudioModel.unlock()
+        const unlock = (): void => void ThreadNotificationAudioModel.unlock()
+        if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(unlock, { timeout: 500 })
+        else unlock()
       }
       window.addEventListener('pointerdown', unlockNotificationAudio, { capture: true, once: true })
       window.addEventListener('keydown', unlockNotificationAudio, { capture: true, once: true })
@@ -860,18 +868,47 @@ export default defineClient({
         decorate(SubagentCatalogAction),
       ),
     )
-    ctx.slots.inject('tool.call.toolview', () =>
+    const subagentTarget = (childId: string): SubagentAddress | SessionId => ctx.sessions.subagentAddress(SessionId(childId)) ?? SessionId(childId)
+    const subagentPreview: SubagentPreviewBindings = {
+      t: translate,
+      retainChild: (childId, signal) => {
+        const reference = ctx.sessions.retain(subagentTarget(childId), { source: 'threadSidebarSubagentPreview', signal })
+        return { ready: reference.ready, release: () => reference.release() }
+      },
+      openChild: childId => ctx.uiWorkspace.openSession(subagentTarget(childId)),
+      openChildAside: childId => {
+        const address = ctx.sessions.subagentAddress(SessionId(childId))
+        if (address !== undefined) subagentCatalogActions(address.parentSessionId).openChildAside(address)
+      },
+      canOpenAside: childId => ctx.sessions.subagentAddress(SessionId(childId)) !== undefined,
+    }
+    ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
-        {
-          name: 'tool.call.toolview',
-          key: 'subagent',
-          registrant: '@dshfiles/thread-sidebar',
-          priority: -1000,
-          locale: 'conversation',
-        },
-        decorate(SubagentProvenanceToolRow),
+        { name: 'conversation.input.dock', id: 'thread-sidebar-subagents-live', order: 4, inject: sessionId => ({ sessionId }) },
+        decorate((props: PropsRuntime<'conversation.input.dock'> & { readonly sessionId: SessionSummary['id'] }) => (
+          <SubagentPreviewDock
+            useSessions={props.useSessions}
+            useSessionStatus={props.useSessionStatus}
+            sessionId={props.sessionId}
+            preview={subagentPreview}
+          />
+        )),
       ),
     )
+    const SubagentRow = decorate((props: SubagentToolViewProps) => <SubagentProvenanceToolRow {...props} preview={subagentPreview} />)
+    for (const key of ['subagent', 'subagent_fork'])
+      ctx.slots.inject('tool.call.toolview', () =>
+        ctx.slots.register(
+          {
+            name: 'tool.call.toolview',
+            key,
+            registrant: '@dshfiles/thread-sidebar',
+            priority: -1000,
+            locale: 'conversation',
+          },
+          SubagentRow,
+        ),
+      )
 
     const continueInProject = async (sessionId: SessionSummary['id'], projectId: string) => {
       const continued = await createApiClient(ctx, threadActionsApi).continueIn({ sessionId, projectId })
@@ -1045,6 +1082,8 @@ export default defineClient({
         if (project !== undefined) ctx.uiWorkspace.startSession(project.workspaceId)
       },
       continueInProject,
+      projectRegister: (input: { readonly path: string; readonly title: string }) =>
+        createApiClient(ctx, threadActionsApi).projectRegister({ path: input.path, title: input.title }),
       open: openThread,
       openLinkedSession: (sessionId: SessionSummary['id']) => {
         const activePanelId = ctx.layout.panelInfo.getSnapshot().activePanelId

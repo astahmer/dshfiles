@@ -14,7 +14,8 @@ import type { ContextPressureProjection } from '@deepseek-ai/dsh-token-meter/cli
 import type { RemoteResult, TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
 import type { ObservableSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { z } from 'zod'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import type { ModelCatalogDirectory } from './catalog.ts'
 import type { SessionDrafts } from '@dshfiles/session-controller/draft-client'
 
@@ -77,10 +78,10 @@ export class ModelDirectory {
   private disposed = false
   /** Selection lifecycle, kept apart from the catalog load so neither overwrites the other. */
   private selection: SelectionState = { kind: 'idle' }
-  private readonly contextPressureSchema = z.object({
-    pressureTokens: z.number().optional(),
-    projectedTokens: z.number().optional(),
-    contextWindow: z.number().optional(),
+  private readonly contextPressureSchema = Schema.Struct({
+    pressureTokens: Schema.optional(Schema.Finite),
+    projectedTokens: Schema.optional(Schema.Finite),
+    contextWindow: Schema.optional(Schema.Finite),
   })
   private readonly unsubscribeCatalog: () => void
   private readonly unsubscribeSelection: () => void
@@ -216,12 +217,12 @@ export class ModelDirectory {
   private readContextPressure(): ContextPressureProjection | undefined {
     const value = this.pressure.getSnapshot()
     if (value === undefined) return undefined
-    const decoded = this.contextPressureSchema.safeParse(value)
-    if (!decoded.success) return undefined
+    const decoded = Schema.decodeUnknownOption(this.contextPressureSchema)(value)
+    if (Option.isNone(decoded)) return undefined
     return {
-      ...(decoded.data.pressureTokens === undefined ? {} : { pressureTokens: decoded.data.pressureTokens }),
-      ...(decoded.data.projectedTokens === undefined ? {} : { projectedTokens: decoded.data.projectedTokens }),
-      ...(decoded.data.contextWindow === undefined ? {} : { contextWindow: decoded.data.contextWindow }),
+      ...(decoded.value.pressureTokens === undefined ? {} : { pressureTokens: decoded.value.pressureTokens }),
+      ...(decoded.value.projectedTokens === undefined ? {} : { projectedTokens: decoded.value.projectedTokens }),
+      ...(decoded.value.contextWindow === undefined ? {} : { contextWindow: decoded.value.contextWindow }),
     }
   }
 
@@ -229,6 +230,18 @@ export class ModelDirectory {
     if (!this.available()) {
       throw new Error('model selection is unavailable for addressed subagent sessions')
     }
+  }
+
+  /**
+   * Publish only a snapshot whose content differs: subscribing projections
+   * (context pressure, drafts, the catalog lifecycle) notify far more often
+   * than the picker's rows change, and every redundant publish re-renders the
+   * whole model list.
+   * @param next - the snapshot derived from the current inputs.
+   */
+  private publish(next: ModelDirectoryState): void {
+    if (sameSnapshot(this.store.getSnapshot(), next)) return
+    this.store.set(next)
   }
 
   private setSelection(selection: SelectionState): void {
@@ -250,7 +263,7 @@ export class ModelDirectory {
     const retainedEffort = effort === undefined ? undefined
       : reasoning?.efforts.find(level => level.id === effort)?.name ?? effort
     if (catalog.status !== 'ready' || catalog.value === null || (!local && projected === undefined)) {
-      this.store.set({
+      this.publish({
         current: local ? intended ?? this.store.getSnapshot().current
           : catalog.value === null ? null : this.store.getSnapshot().current,
         ...retainedEffort === undefined ? {} : { retainedEffort },
@@ -266,7 +279,7 @@ export class ModelDirectory {
     const selection = intended ?? catalog.value.default
     const routable = catalog.value.groups.some(group => group.id === selection.provider
       && group.models.some(model => model.id === selection.model))
-    this.store.set({
+    this.publish({
       current: selection,
       ...retainedEffort === undefined ? {} : { retainedEffort },
       routable,
@@ -278,6 +291,16 @@ export class ModelDirectory {
     })
   }
 }
+
+const sameSnapshot = (left: ModelDirectoryState, right: ModelDirectoryState): boolean =>
+  left.current === right.current
+  && left.retainedEffort === right.retainedEffort
+  && left.routable === right.routable
+  && left.groups === right.groups
+  && left.failures === right.failures
+  && left.status === right.status
+  && left.pending === right.pending
+  && left.error === right.error
 
 function modelSelectionProjection(value: unknown): ModelSelectionProjection | undefined {
   return value === undefined ? undefined : value as ModelSelectionProjection

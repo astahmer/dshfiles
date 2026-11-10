@@ -34,6 +34,10 @@
     "./entity-registry": {
       "types": "./src/entity-registry.ts",
       "default": "./dist/entity-registry.js"
+    },
+    "./entity-reference": {
+      "types": "./src/entity-reference.tsx",
+      "default": "./dist/entity-reference.js"
     }
   },
   "scripts": {

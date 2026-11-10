@@ -43,31 +43,64 @@ afterEach(() => {
 describe('revisionLocateMachine', () => {
   it('waits for a loaded repository before resolving or filtering a reference', () => {
     const actor = start()
-    actor.send({ type: 'reference', reference: reference('abcdef123456') })
+    actor.send({ type: 'reference', reference: reference('abcdef123456'), path: '/repo' })
     expect(actor.getSnapshot().matches('resolving')).toBe(true)
 
-    actor.send({ type: 'revisions', revisions: [], loaded: false })
+    actor.send({ type: 'revisions', revisions: [], loaded: false, root: '/repo' })
     expect(actor.getSnapshot().matches('resolving')).toBe(true)
     expect(actor.getSnapshot().context.searchKey).toBeNull()
 
-    actor.send({ type: 'revisions', revisions: [revision('abcdef123456', { changeId: 'llllllllllll' })], loaded: true })
+    actor.send({ type: 'revisions', revisions: [revision('abcdef123456', { changeId: 'llllllllllll' })], loaded: true, root: '/repo' })
     expect(actor.getSnapshot().matches('applying')).toBe(true)
     expect(actor.getSnapshot().context.target?.commitId).toBe('abcdef123456')
     expect(actor.getSnapshot().context.reference).toBeNull()
     actor.stop()
   })
 
+  it('keeps a waiting reference across the repository change that mounting a panel starts with', () => {
+    const actor = start()
+    actor.send({ type: 'reference', reference: reference('abcdef123456'), path: '/repo' })
+    actor.send({ type: 'repository.changed' })
+    expect(actor.getSnapshot().matches('resolving')).toBe(true)
+
+    actor.send({ type: 'revisions', revisions: [revision('abcdef123456')], loaded: true, root: '/repo' })
+    expect(actor.getSnapshot().matches('applying')).toBe(true)
+    actor.stop()
+  })
+
+  it('does not resolve a reference against the repository it is leaving', () => {
+    const actor = start()
+    actor.send({ type: 'revisions', revisions: [revision('shared')], loaded: true, root: '/old' })
+    actor.send({ type: 'reference', reference: reference('shared'), path: '/new' })
+    expect(actor.getSnapshot().matches('resolving')).toBe(true)
+    expect(actor.getSnapshot().context.searchKey).toBeNull()
+
+    actor.send({ type: 'repository.changed' })
+    actor.send({ type: 'revisions', revisions: [revision('shared')], loaded: true, root: '/new' })
+    expect(actor.getSnapshot().matches('applying')).toBe(true)
+    actor.stop()
+  })
+
+  it('goes idle on a repository change with no reference waiting', () => {
+    const actor = start()
+    actor.send({ type: 'locate', revision: revision('abc'), visible: false })
+    actor.send({ type: 'repository.changed' })
+    expect(actor.getSnapshot().matches('idle')).toBe(true)
+    expect(actor.getSnapshot().context.target).toBeNull()
+    actor.stop()
+  })
+
   it('filters the graph once for a reference the loaded revisions do not hold', () => {
     const actor = start()
-    actor.send({ type: 'reference', reference: bookmarkReference('missing-bookmark') })
-    actor.send({ type: 'revisions', revisions: [], loaded: true })
+    actor.send({ type: 'reference', reference: bookmarkReference('missing-bookmark'), path: '/repo' })
+    actor.send({ type: 'revisions', revisions: [], loaded: true, root: '/repo' })
 
     expect(actor.getSnapshot().context.searchKey).toBe('bookmark:missing-bookmark')
-    actor.send({ type: 'revisions', revisions: [], loaded: true })
+    actor.send({ type: 'revisions', revisions: [], loaded: true, root: '/repo' })
     expect(actor.getSnapshot().context.searchKey).toBe('bookmark:missing-bookmark')
     expect(actor.getSnapshot().matches('resolving')).toBe(true)
 
-    actor.send({ type: 'revisions', revisions: [revision('abcdef123456', { bookmarks: ['missing-bookmark'] })], loaded: true })
+    actor.send({ type: 'revisions', revisions: [revision('abcdef123456', { bookmarks: ['missing-bookmark'] })], loaded: true, root: '/repo' })
     expect(actor.getSnapshot().context.target?.commitId).toBe('abcdef123456')
     actor.stop()
   })
@@ -115,8 +148,8 @@ describe('revisionLocateMachine', () => {
     expect(actor.getSnapshot().matches('idle')).toBe(true)
     expect(actor.getSnapshot().context.target).toBeNull()
 
-    actor.send({ type: 'revisions', revisions: [revision('abcdef123456')], loaded: true })
-    actor.send({ type: 'reference', reference: reference('abcdef123456') })
+    actor.send({ type: 'revisions', revisions: [revision('abcdef123456')], loaded: true, root: '/repo' })
+    actor.send({ type: 'reference', reference: reference('abcdef123456'), path: '/repo' })
     expect(actor.getSnapshot().matches('applying')).toBe(true)
 
     actor.send({ type: 'reset' })

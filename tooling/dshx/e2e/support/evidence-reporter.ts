@@ -187,7 +187,8 @@ export default class EvidenceReporter implements Reporter {
       return
     } catch (error) {
       const errorName = error instanceof Error ? error.name : 'UnknownError'
-      process.stderr.write(`dshx E2E evidence could not be retained (${errorName}).\n`)
+      const detail = error instanceof Error ? `: ${error.message}` : ''
+      process.stderr.write(`dshx E2E evidence could not be retained (${errorName}${detail}).\n`)
       return { status: 'failed' }
     }
   }

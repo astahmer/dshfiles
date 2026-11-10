@@ -1,4 +1,5 @@
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /**
@@ -12,89 +13,142 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
  * (`state => state`).
  */
 
+/** Own enumerable key count, without materializing a key array (this runs per row on every list publish). */
+const ownKeyCount = <Value extends object>(value: Value): number => {
+  let count = 0
+  for (const key in value) if (Object.hasOwn(value, key)) count += 1
+  return count
+}
+
+/** Field-by-field equality of two plain objects, skipping `ignoredKey`; allocation-free. */
+const sameFields = <Value extends object>(left: Value, right: Value, ignoredKey: string | undefined): boolean => {
+  let leftCount = 0
+  for (const key in left) {
+    if (!Object.hasOwn(left, key)) continue
+    leftCount += 1
+    if (key === ignoredKey) continue
+    if (!Object.hasOwn(right, key) || !sameJsonValue(left[key], right[key])) return false
+  }
+  return leftCount === ownKeyCount(right)
+}
+
 /** Structural equality for the JSON values a summary carries (projection values, retain counts). */
 const sameJsonValue = (left: unknown, right: unknown): boolean => {
   if (Object.is(left, right)) return true
   if (Array.isArray(left) || Array.isArray(right)) {
     if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false
-    for (let index = 0; index < left.length; index += 1) if (!sameJsonValue(left.at(index), right.at(index))) return false
+    for (let index = 0; index < left.length; index += 1) if (!sameJsonValue(left[index], right[index])) return false
     return true
   }
   if (!(left instanceof Object) || !(right instanceof Object)) return false
-  const rightFields = new Map(Object.entries(right))
-  const leftFields = Object.entries(left)
-  return leftFields.length === rightFields.size && leftFields.every(([key, value]) => rightFields.has(key) && sameJsonValue(value, rightFields.get(key)))
+  return sameFields(left, right, undefined)
 }
 
-const sameSessionSummary = (left: SessionSummary, right: SessionSummary): boolean => left === right || sameJsonValue(left, right)
+/**
+ * Retain counts are not presentation: which views hold a Session changes on every thread switch (main view, side
+ * panel, kept views), and the thread on screen comes from uiSession's current binding. A row that differs only there
+ * keeps its previous object, so a switch does not re-derive every list consumer.
+ */
+const sameSessionSummary = (left: SessionSummary, right: SessionSummary): boolean => left === right || sameFields(left, right, 'retainedBy')
 
 const sameIds = (left: readonly SessionId[], right: readonly SessionId[]): boolean =>
-  left.length === right.length && left.every((id, index) => id === right.at(index))
+  left.length === right.length && left.every((id, index) => id === right[index])
 
-const stabilizeById = (
-  previous: Readonly<Record<SessionId, SessionSummary>> | undefined,
-  next: Readonly<Record<SessionId, SessionSummary>>,
-): Readonly<Record<SessionId, SessionSummary>> => {
-  // SAFETY: the keys of a record typed by SessionId are exactly that record's session ids.
-  const ids = Object.keys(next) as SessionId[]
-  const entries: [SessionId, SessionSummary][] = []
-  let reused = previous !== undefined
-  for (const id of ids) {
-    const summary = next[id]
-    if (summary === undefined) continue
-    const before = previous?.[id]
-    const stable = before !== undefined && sameSessionSummary(before, summary) ? before : summary
-    if (stable !== before) reused = false
-    entries.push([id, stable])
+/**
+ * Reuse unchanged rows of a record keyed by session id. The Session Controller client already keeps unchanged rows'
+ * identity, so the common publish allocates nothing: `next` itself is returned, or `previous` when every row is
+ * unchanged. A copy is made only to put back a previous row that arrived as an equal new object.
+ */
+const stabilizeRecord = <Row>(
+  previous: Readonly<Record<SessionId, Row>> | undefined,
+  next: Readonly<Record<SessionId, Row>>,
+  same: (left: Row, right: Row) => boolean,
+): Readonly<Record<SessionId, Row>> => {
+  if (previous === undefined || previous === next) return next
+  let restored: Record<SessionId, Row> | undefined
+  let allPrevious = true
+  let count = 0
+  for (const key in next) {
+    // SAFETY: the keys of a record typed by SessionId are exactly that record's session ids.
+    const id = key as SessionId
+    const row = next[id]
+    if (row === undefined) continue
+    count += 1
+    const before = previous[id]
+    if (before === row) continue
+    if (before !== undefined && same(before, row)) {
+      restored ??= { ...next }
+      restored[id] = before
+      continue
+    }
+    allPrevious = false
   }
-  if (reused && Object.keys(previous ?? {}).length === entries.length) return previous ?? next
-  return Object.fromEntries(entries)
+  if (allPrevious && count === ownKeyCount(previous)) return previous
+  return restored ?? next
 }
 
-const stabilizeProjections = (
-  previous: SessionListState['projectionsBySession'] | undefined,
-  next: SessionListState['projectionsBySession'],
-): SessionListState['projectionsBySession'] => {
-  if (previous === undefined) return next
-  // SAFETY: the keys of a record typed by SessionId are exactly that record's session ids.
-  const ids = Object.keys(next) as SessionId[]
-  if (ids.length !== Object.keys(previous).length) return next
-  const entries: [SessionId, SessionListState['projectionsBySession'][SessionId]][] = []
-  let reused = true
-  for (const id of ids) {
-    const projection = next[id]
-    if (projection === undefined) continue
-    const before = previous[id]
-    const stable = before !== undefined && sameJsonValue(before, projection) ? before : projection
-    if (stable !== before) reused = false
-    entries.push([id, stable])
+/**
+ * Whether two id-keyed records hold the same ids and every row matches on what `sameRow` compares, allocation-free. A
+ * consumer that reads a few fields keys its memo on the record this keeps, so a publish that changed other fields (a
+ * streaming turn's `updatedAt`, token usage) does not re-derive it.
+ */
+const sameRowsBy = <Row>(
+  left: Readonly<Record<SessionId, Row>>,
+  right: Readonly<Record<SessionId, Row>>,
+  sameRow: (left: Row, right: Row) => boolean,
+): boolean => {
+  if (left === right) return true
+  let count = 0
+  for (const key in right) {
+    // SAFETY: the keys of a record typed by SessionId are exactly that record's session ids.
+    const id = key as SessionId
+    const row = right[id]
+    if (row === undefined) continue
+    count += 1
+    const before = left[id]
+    if (before !== row && (before === undefined || !sameRow(before, row))) return false
   }
-  return reused ? previous : Object.fromEntries(entries)
+  return count === ownKeyCount(left)
 }
 
 /** Reuse every unchanged summary, id list and projection map so one changed row invalidates one row. */
 const stabilizeSessionListState = (previous: SessionListState | null, next: SessionListState): SessionListState => {
   if (previous === null) return next
-  const byId = stabilizeById(previous.byId, next.byId)
+  const byId = stabilizeRecord(previous.byId, next.byId, sameSessionSummary)
   const ids = previous.ids === next.ids || sameIds(previous.ids, next.ids) ? previous.ids : next.ids
-  const projectionsBySession = stabilizeProjections(previous.projectionsBySession, next.projectionsBySession)
+  const projectionsBySession = stabilizeRecord(previous.projectionsBySession, next.projectionsBySession, sameJsonValue)
   if (byId === previous.byId && ids === previous.ids && projectionsBySession === previous.projectionsBySession && next.phase === previous.phase) return previous
+  if (byId === next.byId && ids === next.ids && projectionsBySession === next.projectionsBySession) return next
   return { ids, byId, phase: next.phase, projectionsBySession }
 }
 
 /** Reuse every unchanged status row; a status change for one session must not rebuild the others. */
 const stabilizeStatusMap = <Status>(previous: ReadonlyMap<SessionId, Status> | null, next: ReadonlyMap<SessionId, Status>): ReadonlyMap<SessionId, Status> => {
-  if (previous === null) return next
-  if (previous.size !== next.size) return next
-  const entries: [SessionId, Status][] = []
-  let reused = true
+  if (previous === null || previous === next) return next
+  let restored: Map<SessionId, Status> | undefined
+  let allPrevious = previous.size === next.size
   for (const [id, status] of next) {
     const before = previous.get(id)
-    const stable = before !== undefined && sameJsonValue(before, status) ? before : status
-    if (stable !== before) reused = false
-    entries.push([id, stable])
+    if (before === status) continue
+    if (before !== undefined && sameJsonValue(before, status)) {
+      restored ??= new Map(next)
+      restored.set(id, before)
+      continue
+    }
+    allPrevious = false
   }
-  return reused ? previous : new Map(entries)
+  if (allPrevious) return previous
+  return restored ?? next
+}
+
+/**
+ * The workspace stream re-emits every item as a new object on each frame (a session attaching, a workspace touched), so
+ * the list arrives new while a turn streams. The previous list is kept while every item carries the same content.
+ */
+const stabilizeWorkspaceItems = (previous: readonly WorkspaceView[] | null, next: readonly WorkspaceView[]): readonly WorkspaceView[] => {
+  if (previous === null || previous === next || previous.length !== next.length) return next
+  for (let index = 0; index < next.length; index += 1) if (previous[index] !== next[index] && !sameJsonValue(previous[index], next[index])) return next
+  return previous
 }
 
 const createStableSelector = <Snapshot extends object>(stabilize: (previous: Snapshot | null, next: Snapshot) => Snapshot): ((next: Snapshot) => Snapshot) => {
@@ -125,9 +179,12 @@ export class HostSnapshotsModel {
     sessions.find(session => session.id === currentSessionId)
   static readonly sameJsonValue = sameJsonValue
   static readonly sameSessionSummary = sameSessionSummary
+  static readonly sameRowsBy = sameRowsBy
+  static readonly sameIds = sameIds
   static readonly stabilizeSessionListState = stabilizeSessionListState
   static readonly stabilizeStatusMap = stabilizeStatusMap
   static readonly selectStableSessionListState = createStableSelector(stabilizeSessionListState)
+  static readonly selectStableWorkspaceItems = createStableSelector(stabilizeWorkspaceItems)
   /** Selector for `useSessionStatus`; keeps the caller's status value type. */
   static readonly selectStableSessionStatus = <Status>(next: ReadonlyMap<SessionId, Status>): ReadonlyMap<SessionId, Status> =>
     // SAFETY: the cache returns `next` itself or a previous map whose every entry compared equal to `next`.

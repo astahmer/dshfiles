@@ -14,7 +14,8 @@
     "plugins/@dshfiles/ai-accounts/src/account-setup-service.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/claude-auth-status.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/claude-cli.ts": 1,
-    "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1
+    "plugins/@dshfiles/ai-accounts/src/codex-login-process.ts": 1,
+    "plugins/@dshfiles/session-log-window/src/window.ts": 1
   },
   "effect-migration(no-host-module-state)": {
     "plugins/@dshfiles/ai-accounts/src/account-credential-home-work.ts": 1,
@@ -22,7 +23,8 @@
     "plugins/@dshfiles/ai-accounts/src/account-session-host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/model-fallback-host.ts": 1,
     "plugins/@dshfiles/ai-accounts/src/native-providers.ts": 1,
-    "plugins/@dshfiles/hmr-gate/src/host.ts": 1
+    "plugins/@dshfiles/hmr-gate/src/host.ts": 1,
+    "plugins/@dshfiles/tool-search/src/search.ts": 1
   },
   "effect-migration(no-void-then)": {
     "plugins/@dshfiles/ai-accounts/src/account-connection-summary.tsx": 1,
@@ -31,7 +33,6 @@
     "plugins/@dshfiles/diff-viewed/src/viewed-marks.ts": 2,
     "plugins/@dshfiles/jj-integration/src/client.tsx": 1,
     "plugins/@dshfiles/settings-shell/src/client.tsx": 1,
-    "plugins/@dshfiles/settings-shell/src/schema-form/settings-form.tsx": 2,
     "plugins/@dshfiles/thread-sidebar/src/client.tsx": 3,
     "tooling/dshx/packages/dshx/src/client/app-services.ts": 1,
     "tooling/dshx/packages/dshx/src/communication/bridge.ts": 1,

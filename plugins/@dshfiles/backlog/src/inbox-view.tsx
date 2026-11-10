@@ -1,6 +1,6 @@
 import { useBacklogSelection } from './use-backlog-selection.js'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
-import { CheckIcon, CircleAlertIcon, CircleCheckIcon, CircleStopIcon, InboxIcon, MessagesSquareIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, CircleAlertIcon, CircleCheckIcon, CircleStopIcon, InboxIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useState, type ReactNode } from 'react'
@@ -9,6 +9,7 @@ import type { BacklogSummaryView } from './api.js'
 import type { BacklogSort } from './backlog-sort.js'
 import { inboxRows, type InboxFilter } from './inbox-model.js'
 import { linkedThreadIds, type InboxThread } from './inbox-threads.js'
+import { LinkedThreadChips } from './linked-thread-chips.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import type { StartThreadItem } from './start-thread.js'
@@ -64,6 +65,7 @@ export const InboxView = (props: {
   readonly cursorId: number | null
   readonly select: (id: number) => void
   readonly openThread: (sessionId: string) => void
+  readonly threadTitle: (sessionId: string) => string | undefined
   readonly openInbox?: (() => void) | undefined
   readonly acknowledgeThread: (thread: InboxThread) => void
   readonly inspector: ReactNode
@@ -85,7 +87,7 @@ export const InboxView = (props: {
         <div
           role="tablist"
           aria-label="Inbox filters"
-          className="dshx:flex dshx:h-10 dshx:shrink-0 dshx:items-end dshx:gap-4 dshx:border-b dshx:border-border dshx:px-4"
+          className="dshx:flex dshx:h-10 dshx:shrink-0 dshx:items-end dshx:gap-2 dshx:overflow-x-auto dshx:overflow-y-hidden dshx:border-b dshx:border-border dshx:px-4 dshx:[scrollbar-width:none] dshx:[&::-webkit-scrollbar]:hidden"
         >
           {filters.map(entry => {
             const count = inboxRows({ items: props.items, threads: props.threads, filter: entry.value }).length
@@ -97,7 +99,7 @@ export const InboxView = (props: {
                 aria-selected={filter === entry.value}
                 onClick={() => setFilter(entry.value)}
                 className={cn(
-                  'dshx:-mb-px dshx:flex dshx:h-full dshx:items-center dshx:gap-1 dshx:border-b-2 dshx:text-[13px] dshx:transition-colors',
+                  'dshx:flex dshx:h-full dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b-2 dshx:text-[13px] dshx:whitespace-nowrap dshx:transition-colors',
                   filter === entry.value
                     ? 'dshx:border-foreground dshx:font-medium dshx:text-foreground'
                     : 'dshx:border-transparent dshx:text-muted-foreground dshx:hover:text-foreground',
@@ -221,23 +223,13 @@ export const InboxView = (props: {
                       </div>
                     )
                   })}
-                  <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+                  <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
                     <ItemGlyphs.AttentionBadge attention={item.attention} compact />
-                    {linkedThreadIds(item)
-                      .filter(sessionId => !threads.some(thread => thread.sessionId === sessionId))
-                      .map(sessionId => (
-                        <button
-                          key={sessionId}
-                          type="button"
-                          onClick={event => {
-                            event.stopPropagation()
-                            props.openThread(sessionId)
-                          }}
-                          className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-foreground dshx:hover:underline"
-                        >
-                          <MessagesSquareIcon aria-hidden className="dshx:size-3" /> Open thread
-                        </button>
-                      ))}
+                    <LinkedThreadChips
+                      sessionIds={linkedThreadIds(item).filter(sessionId => !threads.some(thread => thread.sessionId === sessionId))}
+                      threadTitle={props.threadTitle}
+                      openThread={props.openThread}
+                    />
                     {item.project === null ? null : (
                       <>
                         <ItemGlyphs.ProjectLabel project={item.project} />·

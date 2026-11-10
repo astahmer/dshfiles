@@ -1,5 +1,5 @@
 /**
- * The attention contract: the one inbox every "needs you" signal goes through (plan `plans/ade-ux` §4.8).
+ * The attention contract: the one inbox every "needs you" signal goes through (plan `docs/ade-ux` §4.8).
  *
  * Providers (agent-questions, thread-sidebar, …) depend on this module and publish items from their Host halves with
  * `createHostApiClient(ctx, attentionApi, packageId)` / `HostApis.client(attentionApi)`. They resolve an item when its
@@ -186,7 +186,7 @@ export const attentionApi = defineApi({
       }),
       output: attentionListSchema,
       description:
-        'List inbox items that need the user: one view at a time plus the count of every view and the muted sources. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.',
+        'List inbox items that need the user: one view at a time plus the count of every view and the muted sources. An item published about a subagent Session lists as its parent thread, the one the user acts on. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.',
       tool: { name: 'attention_list', readOnly: true, render: compactJson },
     }),
     publish: method({

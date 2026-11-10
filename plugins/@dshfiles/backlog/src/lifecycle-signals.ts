@@ -5,6 +5,7 @@ import { Jj } from '@dshfiles/jj-cli'
 import { Cause, Clock, Effect, Layer, Option, Ref, Schedule } from 'effect'
 import { BacklogSettingsTag } from './backlog-settings.js'
 import { HostSessions } from './host-edge-promise.js'
+import { BacklogMainBranch } from './main-branch.js'
 import { BacklogQuestionReply } from './question-reply.js'
 import { BacklogSignals } from './signals.js'
 import { BacklogStore } from './store.js'
@@ -36,6 +37,7 @@ export const LifecycleSignals = Layer.effectDiscard(
     const settings = yield* BacklogSettingsTag
     const triage = yield* Triage
     const jj = yield* Jj
+    const mainBranch = yield* BacklogMainBranch
     const sessions = yield* HostSessions
     const seenMain = yield* Ref.make<ReadonlyMap<string, string>>(new Map())
     const lastPoll = yield* Ref.make(0)
@@ -56,10 +58,11 @@ export const LifecycleSignals = Layer.effectDiscard(
       yield* Effect.annotateCurrentSpan({ 'dshx.backlog.repositories': repositories.length })
       // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each repository advances its own seen-main map, so the polls stay in a stable order.
       for (const repository of repositories) {
-        const head = yield* Effect.option(readJj(repository, ['log', '--no-graph', '-r', 'main', '-T', 'commit_id']))
+        const main = yield* mainBranch.revsetFor(repository)
+        const head = yield* Effect.option(readJj(repository, ['log', '--no-graph', '-r', main, '-T', 'commit_id']))
         if (Option.isNone(head) || (yield* Ref.get(seenMain)).get(repository) === head.value) continue
         yield* Ref.update(seenMain, seen => new Map(seen).set(repository, head.value))
-        const log = yield* readJj(repository, ['log', '--no-graph', '-r', 'ancestors(main, 50) ~ root()', '-T', BacklogSignals.logTemplate]).pipe(
+        const log = yield* readJj(repository, ['log', '--no-graph', '-r', `ancestors(${main}, 50) ~ root()`, '-T', BacklogSignals.logTemplate]).pipe(
           Effect.orElseSucceed(() => ''),
         )
         for (const revision of BacklogSignals.parseLog(log))

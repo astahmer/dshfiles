@@ -325,7 +325,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
       <FailureRecoveryGroup readOnly={readOnly} write={write} />
       {!preferences.failureRecovery.exhausted.failover ? (
         <Group
-          description="For exhausted limits. Automatic resume needs a known provider reset and queues one minute later; an account failover still takes the request first."
+          description="For exhausted limits. Automatic resume queues one minute after a known provider reset, or backs off from 30 seconds up to every 10 minutes when the provider names none; an account failover still takes the request first."
           heading="Quota retry"
         >
           <Row hint="Pre-check the per-turn choice in every thread. The default is on." label="Automatically resume after reset by default">

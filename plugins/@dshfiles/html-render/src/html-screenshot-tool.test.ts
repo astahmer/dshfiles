@@ -99,8 +99,7 @@ describe('HtmlPageStore', () => {
     expect(store.find({ sessionId: 'a', callId: 'a2' })?.callId).toBe('a2')
     expect(store.find({ sessionId: 'a' })?.callId).toBe(`a${String(HtmlPageStoreLimits.maxPagesPerThread + 1)}`)
     expect(store.find({ sessionId: 'a', callId: 'b0' })).toBeUndefined()
-    store.forgetThread('b')
-    expect(store.find({ sessionId: 'b' })).toBeUndefined()
+    expect(store.find({ sessionId: 'b' })?.callId).toBe('b0')
   })
 })
 

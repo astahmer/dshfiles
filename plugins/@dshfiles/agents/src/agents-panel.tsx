@@ -28,7 +28,7 @@ import { AlertCircleIcon, CheckIcon, ChevronLeftIcon, CopyIcon, EllipsisIcon, Pl
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 
 import { agentEditorMachine, type AgentEditorSelection } from './agent-editor-machine.js'
 import { AgentFocusModel } from './agent-focus.js'
@@ -135,9 +135,12 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     sendEditor({ type: 'APPLY', selection: next })
   }
   /** Moving away from unsaved edits asks first, so a stray tap on another row never drops a long brief. */
-  const navigate = (next: AgentEditorSelection): void => {
-    sendEditor({ type: 'OPEN', selection: next, dirty })
-  }
+  const navigate = useCallback(
+    (next: AgentEditorSelection): void => {
+      sendEditor({ type: 'OPEN', selection: next, dirty })
+    },
+    [dirty, sendEditor],
+  )
 
   // The editor's own text follows the machine's selection; the machine owns which agent that is.
   useEffect(() => {
@@ -271,7 +274,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     enabled: agentThreadIds.length > 0,
   })
 
-  const routeLabel = (agent: AgentDraft): string => AgentEditor.routeLabel(agent.route, options)
+  const routeLabel = useCallback((agent: AgentDraft): string => AgentEditor.routeLabel(agent.route, options), [options])
   const presetLabel = (agent: AgentDraft): string =>
     agent.preset === null ? 'default tools' : `${presets.data?.find(preset => preset.id === agent.preset)?.name ?? agent.preset} tools`
   const patch = (next: Partial<AgentDraft>): void => setDraft(previous => ({ ...previous, ...next }))
@@ -282,15 +285,20 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     else if (action.kind === 'messaging-none') patch({ delegation: { ...draft.delegation, messaging: 'none' } })
     else patch({ route: null })
   }
-  const newAgent = (seed: AgentDraft = AgentEditor.draftOf(null)): void => navigate({ kind: 'new', base: seed })
+  const newAgent = useCallback((seed: AgentDraft = AgentEditor.draftOf(null)): void => navigate({ kind: 'new', base: seed }), [navigate])
   const fromTemplate = (template: AgentTemplate): void => newAgent(AgentEditor.fromTemplate(template, agents))
-  const listActions = {
-    select: (handle: string) => navigate({ kind: 'agent', handle }),
-    setEnabled: (agent: Agent, enabled: boolean) => toggle.mutate({ agent, enabled }),
-    startThread: (agent: Agent) => sendEditor({ type: 'ASK_START', agent }),
-    duplicate: (agent: Agent) => newAgent(AgentEditor.duplicate(agent, agents)),
-    remove: (agent: Agent) => sendEditor({ type: 'ASK_REMOVE', agent }),
-  }
+  const { mutate: setAgentEnabled } = toggle
+  // Stable while the registry, the selection and the dirty flag hold, so the memoized list skips an editor keystroke.
+  const listActions = useMemo(
+    () => ({
+      select: (handle: string) => navigate({ kind: 'agent', handle }),
+      setEnabled: (agent: Agent, enabled: boolean) => setAgentEnabled({ agent, enabled }),
+      startThread: (agent: Agent) => sendEditor({ type: 'ASK_START', agent }),
+      duplicate: (agent: Agent) => newAgent(AgentEditor.duplicate(agent, agents)),
+      remove: (agent: Agent) => sendEditor({ type: 'ASK_REMOVE', agent }),
+    }),
+    [agents, navigate, newAgent, sendEditor, setAgentEnabled],
+  )
 
   const onEditorKey = (event: KeyboardEvent<HTMLElement>): void => {
     if (event.key.toLowerCase() === 's' && (event.metaKey || event.ctrlKey)) {

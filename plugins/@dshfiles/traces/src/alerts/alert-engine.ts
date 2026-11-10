@@ -34,11 +34,6 @@ export class ThreadAttention extends Context.Service<ThreadAttention, { readonly
   '@dshfiles/traces/ThreadAttention',
 ) {}
 
-/** Sessions whose agent turn runs now: a long-turn rule only counts those. */
-export class RunningSessions extends Context.Service<RunningSessions, { readonly ids: Effect.Effect<ReadonlySet<string>> }>()(
-  '@dshfiles/traces/RunningSessions',
-) {}
-
 type EvaluationRun = Deferred.Deferred<EvaluationSummary>
 
 type Delivery = { readonly threadsMarked: number; readonly deliveryError: string | null }
@@ -61,7 +56,6 @@ export class AlertEngine extends Context.Service<
       const alerts = yield* AlertRepo
       const traces = yield* TraceRepo
       const attention = yield* ThreadAttention
-      const running = yield* RunningSessions
       const lastEvaluatedAt = yield* Ref.make<number | null>(null)
       const inFlight = yield* Ref.make(Option.none<EvaluationRun>())
       const scope = yield* Effect.scope
@@ -74,12 +68,7 @@ export class AlertEngine extends Context.Service<
           attribute: rule.filter.attribute,
           limit: MAX_SAMPLES_PER_RULE,
         })
-        if (rule.kind !== 'duration' || rule.filter.operation?.startsWith('invoke_agent') !== true) return AlertEvaluator.measure(rule, samples)
-        const runningSessionIds = yield* running.ids
-        return AlertEvaluator.measure(
-          rule,
-          samples.filter(sample => sample.sessionId !== null && runningSessionIds.has(sample.sessionId)),
-        )
+        return AlertEvaluator.measure(rule, samples)
       })
 
       const deliver = Effect.fnUntraced(function* (rule: AlertRule, sessionIds: readonly string[]) {

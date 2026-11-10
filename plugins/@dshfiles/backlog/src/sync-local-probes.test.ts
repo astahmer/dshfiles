@@ -1,9 +1,10 @@
+import { Duration } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { FilesMapping } from './provider-files.js'
 import { GithubMapping } from './provider-github.js'
 import { LinearMapping } from './provider-linear.js'
 import { BacklogProviders } from './provider-port.js'
-import { GithubRemotes } from './sync-local-probes.js'
+import { GithubRemotes, cliTokenCacheTtl } from './sync-local-probes.js'
 
 const descriptors = [LinearMapping.descriptor, GithubMapping.descriptor, FilesMapping.descriptor]
 const kindsOf = (reference: string) => descriptors.filter(descriptor => BacklogProviders.recognizes(descriptor, reference)).map(descriptor => descriptor.kind)
@@ -65,5 +66,12 @@ describe('GithubMapping.repositoryOfReference', () => {
     expect(GithubMapping.repositoryOfReference('acme/app#3')).toBe('acme/app')
     expect(GithubMapping.repositoryOfReference('https://github.com/acme/app/issues/3')).toBe('acme/app')
     expect(GithubMapping.repositoryOfReference('#3')).toBeUndefined()
+  })
+})
+
+describe('cliTokenCacheTtl', () => {
+  it('keeps a token for minutes but a miss only briefly, so a fresh `gh auth login` lands', () => {
+    expect(Duration.toMillis(cliTokenCacheTtl(true))).toBe(Duration.toMillis(Duration.minutes(5)))
+    expect(Duration.toMillis(cliTokenCacheTtl(false))).toBe(Duration.toMillis(Duration.seconds(30)))
   })
 })

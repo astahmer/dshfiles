@@ -41,7 +41,11 @@ import { LargePasteModel } from '../../large-paste.ts'
 import { isImageMediaType } from '../service.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { observeControlRow } from './control-row-layout.ts'
+import { observeRunRowPlacement } from './run-row-placement.ts'
 import css from './InputBar.module.css'
+
+/** `@dshfiles/workbench`'s `KeptThreadViews.shownEvent`: a kept thread view was shown again without remounting. */
+const THREAD_VIEW_SHOWN_EVENT = 'dshfiles:thread-view-shown'
 
 export type InputBarProps = ComposerBarProps
 
@@ -130,6 +134,11 @@ export const InputBar = memo(function InputBar({
   }, [])
   const cardRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  // The hero run row carries the model seat only while it fits beside its own
+  // segments; the same seat rides the tool row otherwise (see observeRunRowPlacement).
+  const runRowRef = useRef<HTMLDivElement | null>(null)
+  const modelSeatRef = useRef<HTMLElement | null>(null)
+  const [modelInRow, setModelInRow] = useState(true)
 
   // A continuable child without its live parent cannot accept human input,
   // but its independent Stop below stays available while it runs.
@@ -183,6 +192,18 @@ export const InputBar = memo(function InputBar({
     if (locked || editor === null) return
     focusDraftEditor(editor, revealSelection)
   }, [locked, sessionId, editor])
+
+  // A thread view the workbench kept mounted is shown again without remounting, so the unlock effect above does not
+  // run; take focus the same way. The draft's scroll offset survived with the view, so nothing needs revealing.
+  useEffect(() => {
+    if (locked || editor === null) return
+    const onShown = (event: Event): void => {
+      const root = editor.getRootElement()
+      if (root !== null && event.target instanceof Node && event.target.contains(root)) focusDraftEditor(editor, () => undefined)
+    }
+    document.addEventListener(THREAD_VIEW_SHOWN_EVENT, onShown)
+    return () => document.removeEventListener(THREAD_VIEW_SHOWN_EVENT, onShown)
+  }, [locked, editor])
 
   // A persisted draft arrives AFTER the unlock effect: DefaultConversationViews
   // adopts it in its own mount effect, and a parent's mount effect runs after
@@ -426,25 +447,36 @@ export const InputBar = memo(function InputBar({
         ? t('placeholder.steerQueue')
         : planActive ? t('placeholder.plan') : t('placeholder.default'))
 
-  // Hero: one run row above the card holds every pre-send choice (§4.5 of plans/ade-ux). File access and the model
-  // seat move up from the toolbar there; once the thread has started they return to the toolbar, where they stay
-  // changeable, and the row collapses to the summary chip on the meter line.
+  // Hero: one run row above the card holds the pre-send choices (§4.5 of docs/ade-ux). File access moves up from
+  // the toolbar there; the model seat follows it only while the row can hold it, because a seat that does not fit
+  // wraps alone onto a second line and its trailing auto margin strands it at the right edge. Once the thread has
+  // started the row collapses to the summary chip on the meter line and both seats return to the toolbar.
   const heroRunRow = variant === 'hero' && runRow !== undefined
+  const modelSeatInRow = heroRunRow && modelInRow
+  useLayoutEffect(() => {
+    const row = runRowRef.current
+    if (row === null || modelSeatRef.current === null) return
+    return observeRunRowPlacement({
+      row,
+      model: () => modelSeatRef.current,
+      onChange: setModelInRow,
+    })
+  }, [heroRunRow, modelInRow, sessionId])
   const queued = input?.queue.length ?? 0
 
   return (
     <div className={clsx(css.root, variant === 'hero' && css.hero)}>
       {heroRunRow && (
         <div className={css.runRowFrame}>
-        <div className={css.runRow} role="group" aria-label={t('runRow.label')} data-run-row="">
+        <div ref={runRowRef} className={css.runRow} role="group" aria-label={t('runRow.label')} data-run-row="">
           {runRow}
           {sessionId === undefined ? null : (
             <span className={css.runSegment} data-run-segment="file-access">
               {renderSlot('conversation.input.permission', { locked })}
             </span>
           )}
-          {sessionId === undefined ? null : (
-            <span className={clsx(css.runSegment, css.runModel)} data-run-segment="model">
+          {sessionId === undefined || !modelSeatInRow ? null : (
+            <span ref={modelSeatRef} className={clsx(css.runSegment, css.runModel)} data-run-segment="model" data-model-seat="">
               {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
             </span>
           )}
@@ -559,7 +591,11 @@ export const InputBar = memo(function InputBar({
               {input === undefined || sessionId === undefined
                 ? null
                 : renderSlot('conversation.input.right', {})}
-              {sessionId === undefined || heroRunRow ? null : renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+              {sessionId === undefined || modelSeatInRow ? null : (
+                <span ref={modelSeatRef} className={css.modelSeat} data-model-seat="">
+                  {renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+                </span>
+              )}
             </div>
             {input === undefined || sessionId === undefined ? null : <div className={activity ? css.activityExpanded : css.activity}>
               {renderSlot('conversation.input.activity', { locked, onActiveChange: setActivity })}

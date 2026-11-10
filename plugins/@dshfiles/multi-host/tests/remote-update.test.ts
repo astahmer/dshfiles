@@ -23,12 +23,14 @@ const readyFacts = (checkout: Partial<RemoteFacts['checkout']> = {}): RemoteFact
     commitId: 'def',
     description: 'x',
     conflicts: 0,
+    conflictedBookmarks: [],
     mainOrigin: 'def',
     ...checkout,
   },
 })
 
 type SyncOverrides = {
+  readonly status?: string
   readonly conflicts?: readonly string[]
   readonly rebuilt?: { readonly dshx: boolean; readonly plugins: readonly string[] }
   readonly restart?: { readonly needed: boolean; readonly reasons: readonly string[] }
@@ -50,9 +52,8 @@ describe('remote host update', () => {
     expect(RemoteUpdate.blockedReason({ facts: readyFacts(), nodePath })).toBeUndefined()
   })
 
-  test('fetches, then runs the host checkout sync with its own Node, dry-run unless applied', () => {
+  test('runs the host checkout sync with its own Node, dry-run unless applied', () => {
     const preview = RemoteUpdate.commands({ facts: readyFacts(), nodePath, bookmark: 'main', apply: false })
-    expect(preview.fetch).toBe("'/opt/homebrew/bin/jj' -R '/Users/me/dev/dshfiles' git fetch")
     expect(preview.sync).toContain("cd '/Users/me/dev/dshfiles' && env PATH=")
     expect(preview.sync).toContain(`'${nodePath}' tooling/dshx/packages/dshx/dist/cli/bin.js checkout sync --bookmark 'main' --json --dry-run`)
     expect(RemoteUpdate.commands({ facts: readyFacts(), nodePath, bookmark: 'main', apply: true }).sync).not.toContain('--dry-run')
@@ -73,6 +74,10 @@ describe('remote host update', () => {
       detail: 'rebuilt 1 plugin',
     })
     expect(RemoteUpdate.readSyncOutput({ stdout: envelope({}), apply: false, checkoutPath: '/x' })).toMatchObject({ ok: true, detail: 'already up to date' })
+    expect(RemoteUpdate.readSyncOutput({ stdout: envelope({ status: 'would-sync' }), apply: false, checkoutPath: '/x' })).toMatchObject({
+      ok: true,
+      detail: 'would rebase; nothing to rebuild',
+    })
   })
 
   test('a refused, conflicted or unreadable sync fails with its recovery', () => {
@@ -84,6 +89,13 @@ describe('remote host update', () => {
     expect(RemoteUpdate.readSyncOutput({ stdout: envelope({ conflicts: ['a'] }), apply: true, checkoutPath: '/x' })).toMatchObject({
       ok: false,
       detail: expect.stringContaining('resolve it on the host'),
+    })
+    const declined = JSON.stringify({ ok: false, data: { status: 'refused', to: 'f00d', hint: 'main@ carries described work main does not have yet.' } })
+    expect(RemoteUpdate.readSyncOutput({ stdout: declined, apply: true, checkoutPath: '/x' })).toMatchObject({
+      ok: false,
+      applied: false,
+      revision: 'f00d',
+      detail: 'main@ carries described work main does not have yet.',
     })
     expect(RemoteUpdate.readSyncOutput({ stdout: 'command not found', apply: true, checkoutPath: '/x' })).toMatchObject({
       ok: false,
