@@ -12,7 +12,6 @@ import {
   scheduleSuccessNoticeDismissal,
   SidebarNotificationDismissButton,
   SidebarNoticeAlert,
-  SidebarNoticeMessage,
   sidebarNoticeQueueReducer,
   SUCCESS_NOTICE_DURATION_MS,
   type SidebarNotice,
@@ -71,12 +70,20 @@ test('persistent route warnings can be dismissed', () => {
   assert.equal(dismissals, 1)
 })
 
-test('notice message uses the visible alert column and stays on one line', () => {
-  const html = renderToString(<SidebarNoticeMessage message="Thread link copied." />)
-  assert.match(html, /data-slot="alert-description"/)
-  assert.match(html, /dshx:col-start-2/)
-  assert.match(html, /dshx:whitespace-nowrap/)
-  assert.match(html, /Thread link copied\./)
+test('a persistent notice sits in the alert content column and wraps a long message', () => {
+  const html = renderToString(
+    <SidebarNoticeAlert
+      notice={{ tone: 'warning', message: 'This thread cannot resume from here: it has newer work, was dismissed, or its Session is unavailable.' }}
+      className="notice"
+      transient={false}
+      notification={false}
+      dismissLabel="Dismiss alert"
+      onDismiss={() => {}}
+    />,
+  )
+  assert.match(html, /data-slot="alert"[^>]*><div class="dshx:col-start-2 /)
+  assert.match(html, /data-slot="alert-description" class="[^"]*dshx:min-w-0[^"]*dshx:break-words/)
+  assert.doesNotMatch(html, /data-slot="alert-description" class="[^"]*whitespace-nowrap/)
 })
 
 test('partial resume notices open the first failed thread so its current state can be checked', () => {
