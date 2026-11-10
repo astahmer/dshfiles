@@ -48,3 +48,16 @@ Not targets: React portals for dialogs and menus, DOM reads for focus or geometr
 or theme (a popover reading its own `data-side`, focusing a field once it is visible). A plugin may also read a user
 gesture on its own terms — agents opens its card when a native `@handle` file chip is activated, without writing the
 transcript.
+
+## What is not a seat yet: the rich-composer editor
+
+`@dshfiles/backlog` wants item bodies and replies to use rich-composer's editor instead of its own capture-derived text
+box. Rich-composer cannot offer that today: its editor is session-scoped. `ComposerContentEditable` leases one DOM root
+per Lexical editor, and the input facade owns submit, draft persistence, attachments and the conversation, so mounting
+a live thread editor in an item would take the thread's root and draft.
+
+A real seat is a public dshx module from rich-composer: a per-occurrence editor instance with the Markdown input and
+the node set (mentions, references, images) but injected capabilities instead of thread services, built by `dshx build`
+like `conversation-contract`. Backlog would then keep its own Markdown, attachments, autosave, cancel and submit
+semantics and render that editor where `BacklogTextBox` is today; it would not import a session composer, and no
+plugin was made to depend on rich-composer's private source.

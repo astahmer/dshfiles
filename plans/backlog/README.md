@@ -5,16 +5,15 @@ SQLite op log, short aliases, providers, multi-host peers, backlinks on threads 
 item — is documented in the [plugin README](../../plugins/@dshfiles/backlog/README.md), and the reasoning behind it in
 [backlog redesign](../../plugins/@dshfiles/backlog/docs/redesign.md).
 
-Resume here: the items below are either open work or verification that needs a live Host restart, real accounts or a
-second machine. The one-off Discord TODO import was dropped on 2026-11-10: the user does not want it.
+Resume here: item 7 is the only open work. Pull-request descriptions now close the items they name, and the Hosts
+section shows where each peer runs automation (both in the plugin README). The one-off Discord TODO import was
+dropped on 2026-11-10: the user does not want it.
 
 ## Open
 
-| #   | Item                                                                                                                                               | State |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| 7   | Edit item bodies and replies with `@dshfiles/rich-composer` instead of the capture editor (quoting a reply into an item shipped)                   | open  |
-| 11  | `Closes b:<ref>` in a PR description: `@dshfiles/pull-requests` does not expose PR bodies; gate state and automation creation are unit-tested only | open  |
-| 14  | The Hosts settings section does not show peers' automation-Host choice (its screenshot shows a Host with no peers)                                 | open  |
+| #   | Item                                                                                                                                                                                                                                                                                           | State |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 7   | Edit item bodies and replies with `@dshfiles/rich-composer` instead of the capture editor: it exposes no embeddable editor yet, so this needs a public per-occurrence editor module (see [plugin boundaries](../../docs/plugin-boundaries.md#what-is-not-a-seat-yet-the-rich-composer-editor)) | open  |
 
 ## Unverified live
 
@@ -27,6 +26,9 @@ second machine. The one-off Discord TODO import was dropped on 2026-11-10: the u
   reads `backlog_peer_status`.
 - Pre-existing e2e failures, also on `main`: `workbench.repeated-plugin-views` (a contentEditable read with
   `toHaveValue`) and `main-tabs.backlog-capture-with-thread-tab` (the project dialog never opens).
+- `backlog.jev-secret-setup` fails on the secret setup offer: its value field renders without `type="password"`. The
+  offer and catalog belong to `@dshfiles/secret-catalog`, which this plan does not change; rerun after that plugin's
+  next fix.
 
 ## Open questions
 
