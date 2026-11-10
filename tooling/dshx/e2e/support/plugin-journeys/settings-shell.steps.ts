@@ -285,6 +285,103 @@ Then('the form shows Max tabs {int} marked modified', async ({ page }: { page: P
   })
 })
 
+Then('the page names its plugin entry, its bundle and a plugin switch', async ({ page }: { page: Page }) => {
+  const entry = mainTabsPage(page).locator('[data-plugin-entry$=":dshfiles-main-tabs"]')
+  await recordAssertion(page, 'settings-shell-plugin-entry-card', async () => {
+    await expect(entry).toContainText('dshfiles-main-tabs')
+    await expect(entry).toContainText('from @dshfiles/main-tabs')
+    await expect(entry.getByRole('switch', { name: 'Plugin enabled', exact: true })).toBeChecked()
+    await expect(entry.locator('[data-pending-restart]')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+const mainTabsResult = (page: Page) => page.locator('[data-results-page="plugin:dshfiles-main-tabs"] > button')
+
+When('Settings are searched for {string} and the Main tabs result is opened', async ({ page }: { page: Page }, query: string) => {
+  await searchField(page).fill(query)
+  await mainTabsResult(page).click()
+  await expect(searchField(page)).toHaveValue('')
+})
+
+Then('the Main tabs page still shows JSON', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-json-survives-search', async () => {
+    await expect(jsonEditor(page)).toBeVisible()
+    await expect(mainTabsPage(page).getByRole('radio', { name: 'JSON', exact: true })).toHaveAttribute('aria-checked', 'true')
+  })
+})
+
+When('a link opens the Max tabs setting', async ({ page }: { page: Page }) => {
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new CustomEvent('dshfiles:open-settings', { detail: { setting: { entryId: 'dshfiles-main-tabs', fieldPath: ['maxTabs'] } }, cancelable: true }),
+    ),
+  )
+})
+
+Then('the JSON editor selects the maxTabs key', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-json-focus-selects-key', async () => {
+    await expect(jsonEditor(page)).toBeFocused()
+    await expect.poll(() => jsonEditor(page).evaluate(element => element.value.slice(element.selectionStart, element.selectionEnd))).toBe('"maxTabs"')
+    await expect(settingRow(page, 'maxTabs')).toBeHidden()
+  })
+  await finishJourneyAssertions(page)
+})
+
+/** Presses Tab until the target holds focus: the keyboard-only path a person takes, bounded so a missing stop fails. */
+const tabTo = async (page: Page, target: ReturnType<Page['locator']>): Promise<void> => {
+  for (let presses = 0; presses < 80; presses += 1) {
+    if (await target.evaluate(element => element === document.activeElement).catch(() => false)) return
+    await page.keyboard.press('Tab')
+  }
+  throw new Error('Tab never reached the target')
+}
+
+When('the viewport is 390 pixels wide and Settings opens from its shortcut', async ({ page }: { page: Page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  // The native command binds Web Mod+Alt+, on macOS and Windows only; Linux Web has no default to press.
+  if (process.platform === 'linux') await openSettings(page)
+  else await page.keyboard.press(`${primary()}+Alt+Comma`)
+  await expect(settingsView(page)).toBeVisible()
+  await expect(searchField(page)).toBeFocused()
+})
+
+When('the Main tabs page is found and opened with the keyboard', async ({ page }: { page: Page }) => {
+  await page.keyboard.type('max tabs')
+  await tabTo(page, mainTabsResult(page))
+  await page.keyboard.press('Enter')
+  await expect(mainTabsPage(page)).toBeVisible()
+})
+
+When('the JSON view is chosen and an override is saved with the keyboard', async ({ page }: { page: Page }) => {
+  await tabTo(page, mainTabsPage(page).getByRole('radio', { name: 'Form', exact: true }))
+  await page.keyboard.press('ArrowRight')
+  // Radix roving focus moves focus on the next task: Enter before it lands would press Form again.
+  await expect(mainTabsPage(page).getByRole('radio', { name: 'JSON', exact: true })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(jsonEditor(page)).toBeVisible()
+  await tabTo(page, jsonEditor(page))
+  await page.keyboard.press(`${primary()}+A`)
+  await page.keyboard.type('{ "maxTabs": 7 }')
+  await tabTo(page, mainTabsPage(page).getByRole('button', { name: 'Save', exact: true }))
+  await page.keyboard.press('Enter')
+  await expect(mainTabsPage(page).getByText('Unsaved changes', { exact: true })).toHaveCount(0)
+})
+
+Then('the page fits the phone width and the form shows the saved override', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-json-phone-keyboard', async () => {
+    expect(await settingsView(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+    expect(await mainTabsPage(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+    await page.screenshot({ path: test.info().outputPath('settings-shell-json-phone.png') })
+    await tabTo(page, mainTabsPage(page).getByRole('radio', { name: 'JSON', exact: true }))
+    await page.keyboard.press('ArrowLeft')
+    await expect(mainTabsPage(page).getByRole('radio', { name: 'Form', exact: true })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(settingRow(page, 'maxTabs').getByRole('spinbutton', { name: 'Max tabs', exact: true })).toHaveValue('7')
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('only the Max tabs setting is listed', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'settings-shell-modified-filter', async () => {
     await expect(settingsView(page).getByText('1 Setting Found', { exact: true })).toBeVisible()

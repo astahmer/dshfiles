@@ -92,6 +92,31 @@ Feature: Settings shell
     When Settings are searched for "@modified"
     Then only the Max tabs setting is listed
 
+  @scenario:settings-shell.plugin-entry-card
+  Scenario: A plugin page names its Loader entry, the bundle that declares it and its switch
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When the Main tabs page is opened in Settings
+    Then the page names its plugin entry, its bundle and a plugin switch
+
+  @scenario:settings-shell.json-stays-on-focus
+  Scenario: A field opened from search or a link while JSON shows stays in JSON with its key selected
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When the Main tabs page is opened in Settings
+    And Max tabs is set to 8
+    And the Main tabs page is shown as JSON
+    And Settings are searched for "max tabs" and the Main tabs result is opened
+    Then the Main tabs page still shows JSON
+    When a link opens the Max tabs setting
+    Then the JSON editor selects the maxTabs key
+
+  @scenario:settings-shell.json-phone-keyboard
+  Scenario: At phone width the JSON view is reached, edited and saved with the keyboard alone
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When the viewport is 390 pixels wide and Settings opens from its shortcut
+    And the Main tabs page is found and opened with the keyboard
+    And the JSON view is chosen and an override is saved with the keyboard
+    Then the page fits the phone width and the form shows the saved override
+
   @scenario:settings-shell.reset-while-saving
   Scenario: Reset to default right after a change resets once the change is saved
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
