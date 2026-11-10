@@ -7,6 +7,8 @@ const registry = (source?: MirroredSessionSource, onResolve?: () => void): Sessi
   sources: () => (source === undefined ? [] : [source]),
   claim: () => {},
   ownerOf: () => undefined,
+  publishProjection: () => undefined,
+  onProjection: () => () => undefined,
   resolveOwner: async () => {
     onResolve?.()
     return source

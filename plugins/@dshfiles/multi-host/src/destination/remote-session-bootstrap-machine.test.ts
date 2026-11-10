@@ -28,6 +28,32 @@ describe('remote session bootstrap', () => {
     expect(opened).toEqual(['session-1'])
   })
 
+  it('starts a new Session on the next visit even though opening unmounted the first screen', async () => {
+    const target = 'runtime-a\u0000/visited-twice'
+    let creates = 0
+    const create = async () => {
+      creates += 1
+      return `session-${String(creates)}`
+    }
+    const opened: string[] = []
+    const first = start({
+      target,
+      create,
+      // Opening a thread leaves the New thread screen, which stops this machine before its own transition runs.
+      onStarted: sessionId => {
+        opened.push(sessionId)
+        first.stop()
+      },
+    })
+    first.start()
+    await expect.poll(() => opened).toEqual(['session-1'])
+
+    const second = start({ target, create, onStarted: sessionId => void opened.push(sessionId) })
+    second.start()
+    await waitFor(second, snapshot => snapshot.matches('started'))
+    expect(opened).toEqual(['session-1', 'session-2'])
+  })
+
   it('retries a refused create from scratch', async () => {
     let creates = 0
     const opened: string[] = []

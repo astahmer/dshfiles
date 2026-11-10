@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import * as Schema from 'effect/Schema'
 import { useAutoRefresh } from './auto-refresh.js'
 import { useOpenInEditor } from './open-in-editor.js'
-import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
+import { type ComposerBase, type ComposerRepository } from './composer-context-api.js'
 import type { FileStatus } from './api.js'
 import { ComposerContextModel, composerBaseSetting, PROJECT_BASE_SETTING } from './composer-context-core.js'
 import { composerSessionCwd } from './composer-context-session.js'
@@ -31,6 +31,7 @@ import { ChatReferenceLinks } from './chat-reference-links.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { decodePreferences } from './preferences.js'
 import { jujutsuSettings } from './settings.js'
+import { useComposerContextApi } from './use-jujutsu-api.js'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 
 export interface ComposerJujutsuServices {
@@ -109,7 +110,7 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   const base: ComposerBase = ComposerContextModel.composerBaseForProject(setting, projectBookmark)
   const choice = ComposerContextModel.composerBaseChoice(setting)
   const baseKey = composerBaseSetting(base)
-  const api = useApi(composerContextApi)
+  const api = useComposerContextApi(props.sessionId)
   // Chat reference links read the repository's bookmarks to decide which inline code is a link, so the
   // shared context query stays on for them even when this surface's own toggle is off.
   const loaded = (preferences[surface] || preferences.chatReferenceLinks) && cwd !== null
@@ -239,7 +240,7 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
   const context = useComposerContext(props, 'composerBar')
   const [expanded, setExpanded] = useState(false)
   const [fullDiffPath, setFullDiffPath] = useState<string | null | undefined>(undefined)
-  const api = useApi(composerContextApi)
+  const api = useComposerContextApi(props.sessionId)
   const openInEditor = useOpenInEditor()
   const repository = context.repository
   const diffQuery = useQuery({

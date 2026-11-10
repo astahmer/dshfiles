@@ -23,9 +23,8 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useApi } from '@dshfiles/dshx/client'
 import { useMemo, useState, type ReactNode } from 'react'
-import { jujutsuApi, type FileStat, type Mutation, type Revision } from './api.js'
+import { type FileStat, type Mutation, type Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, type FileView } from './changed-files.js'
 import { RevisionGraphModel } from './graph.js'
 import type { refreshQueryOptions } from './auto-refresh.js'
@@ -33,6 +32,7 @@ import { ANCESTOR_COUNT_OPTIONS } from './preferences.js'
 import { SourceControlModel } from './source-control.js'
 import { useOpenInEditor } from './open-in-editor.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
+import { useJujutsuApi } from './use-jujutsu-api.js'
 
 interface SourceControlViewProps {
   readonly repoId: string
@@ -80,7 +80,7 @@ const IconAction = (props: {
 
 /** jj-view style Source Control: a describe box for @, then the working copy and @-1 … @-N groups. */
 export const SourceControlView = (props: SourceControlViewProps): JSX.Element => {
-  const api = useApi(jujutsuApi)
+  const api = useJujutsuApi()
   const openInEditor = useOpenInEditor()
   const groups = useMemo(() => SourceControlModel.sourceControlGroups(props.revisions, props.ancestorCount), [props.revisions, props.ancestorCount])
   const commitIds = groups.map(group => group.revision.commitId)
