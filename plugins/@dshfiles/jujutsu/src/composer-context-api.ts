@@ -1,6 +1,7 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import { fileStatusSchema } from './api.js'
+import { API_PAYLOAD_BYTE_BUDGET } from './payload-budget.js'
 import { SchemaHelpers } from './schema-helpers.js'
 
 const bookmarkNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/))
@@ -67,7 +68,7 @@ export const composerContextApi = defineApi({
     diff: method({
       input: Schema.Struct({ cwd: cwdSchema, base: composerBaseSchema }),
       output: Schema.Struct({
-        patch: Schema.String.check(Schema.isMaxLength(1_200_000)),
+        patch: Schema.String.check(Schema.isMaxLength(API_PAYLOAD_BYTE_BUDGET)),
         truncated: Schema.Boolean,
         files: Schema.Array(
           Schema.Struct({

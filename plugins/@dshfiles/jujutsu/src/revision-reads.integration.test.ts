@@ -7,6 +7,7 @@ import { Clock, Effect } from 'effect'
 import { onTestFinished, test } from 'vitest'
 import { JujutsuCommandFailed, RevisionNotFound } from './errors.ts'
 import type { JjRun } from './jujutsu-commands.ts'
+import { API_PAYLOAD_BYTE_BUDGET, PayloadBudget } from './payload-budget.ts'
 import { makeEditTimeCache, makeRevisionDetailCache, RevisionReads } from './revision-reads.ts'
 
 const jjAt =
@@ -173,6 +174,22 @@ test('an unknown revision reports that it is no longer available', async () => {
   const error = await Effect.runPromise(Effect.flip(RevisionReads.details(run, missing)))
 
   assert.equal(error.message, 'Revision aaaaaaaaaaaa is no longer available. Refresh and try again.')
+})
+
+test('details of a revision whose patch overflows the 1 MiB API cap still load, truncated', async () => {
+  const { repo, jj, run } = await scratchRepo()
+  jj(['config', 'set', '--repo', 'snapshot.max-new-file-size', '8000000'])
+  await writeFile(join(repo, 'huge.txt'), `${'x'.repeat(120)}\n`.repeat(12_000))
+  jj(['status'])
+
+  const details = await Effect.runPromise(RevisionReads.details(run, workingCopyCommitId(jj)))
+
+  assert.equal(details.truncated, true)
+  assert.deepEqual(
+    details.files.map(file => file.path),
+    ['huge.txt'],
+  )
+  assert.ok(PayloadBudget.encodedBytes(details) <= API_PAYLOAD_BYTE_BUDGET)
 })
 
 test('changed-file stats and revision details mark the files a rebase left conflicted', async () => {

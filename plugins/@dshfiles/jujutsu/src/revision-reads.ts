@@ -4,6 +4,7 @@ import { JujutsuMutationModel, JujutsuOutputModel } from './core.js'
 import { OutputLimitExceeded, RevisionNotFound } from './errors.js'
 import type { JjRun } from './jujutsu-commands.js'
 import { EDIT_TIME_TEMPLATE, FILE_STATS_TEMPLATE } from './jj-templates.js'
+import { PayloadBudget } from './payload-budget.js'
 
 const fileStatsRowSchema = Schema.Struct({
   commitId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/)),
@@ -234,6 +235,13 @@ const readEvolution = Effect.fnUntraced(function* (run: JjRun, commitId: string)
   return evolution.truncated ? evolution.stdout + '\n[evolution output truncated]' : evolution.stdout
 })
 
+/** A patch larger than the whole API payload budget is cut to the largest prefix whose details response still fits. */
+const fitDetails = (content: RevisionContent, evolution: string): RevisionDetails => {
+  const fitted = PayloadBudget.fitText({ text: content.patch, response: patch => ({ ...content, patch, evolution, truncated: true }) })
+  if (!fitted.truncated) return { ...content, evolution }
+  return { ...content, patch: fitted.text, evolution, truncated: true }
+}
+
 /**
  * One revision's details. After the commit is proven visible, its content (paths, patch, file stats) and evolution
  * are read concurrently, so the critical path is the slowest read instead of their sum. Content is immutable for a
@@ -263,8 +271,7 @@ const details = Effect.fnUntraced(function* (
     if (cachedContent === undefined) options.cache.rememberContent(key, content)
     if (cachedEvolution === undefined) options.cache.rememberEvolution(key, evolution, yield* Clock.currentTimeMillis)
   }
-  const revisionDetails: RevisionDetails = { ...content, evolution }
-  return revisionDetails
+  return fitDetails(content, evolution)
 })
 
 /** When each commit's own content last changed: the newest evolution entry that edited it, or null when none did. */

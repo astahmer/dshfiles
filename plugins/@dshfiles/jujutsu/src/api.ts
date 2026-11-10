@@ -1,5 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
+import { API_PAYLOAD_BYTE_BUDGET } from './payload-budget.js'
 import { SchemaHelpers } from './schema-helpers.js'
 
 export const REVISION_PAGE_SIZE = 10
@@ -158,7 +159,8 @@ const detailsSchema = Schema.Struct({
   files: Schema.Array(fileChangeSchema).check(Schema.isMaxLength(1000)),
   additions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   deletions: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
-  patch: Schema.String.check(Schema.isMaxLength(1_200_000)),
+  /** A patch is cut to this character count only as a last resort; the Host trims it to the encoded payload budget. */
+  patch: Schema.String.check(Schema.isMaxLength(API_PAYLOAD_BYTE_BUDGET)),
   truncated: Schema.Boolean,
   evolution: Schema.String.check(Schema.isMaxLength(120_000)),
 })
@@ -433,7 +435,7 @@ export const jujutsuApi = defineApi({
     }),
     workingDiff: method({
       input: Schema.Struct({ repoId: repoIdSchema }),
-      output: Schema.Struct({ patch: Schema.String.check(Schema.isMaxLength(1_200_000)), truncated: Schema.Boolean }),
+      output: Schema.Struct({ patch: Schema.String.check(Schema.isMaxLength(API_PAYLOAD_BYTE_BUDGET)), truncated: Schema.Boolean }),
       description: 'The working-copy patch, for reading uncommitted changes without shelling out. Read-only.',
       tool: { name: 'jj_working_diff', readOnly: true, render: output => patchText(output.patch) },
     }),
