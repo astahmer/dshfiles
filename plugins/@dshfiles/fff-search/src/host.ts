@@ -1,7 +1,7 @@
 /**
  * Agent `grep` and `glob` on a resident fff index. The stock `@deepseek-ai/dsh-tool-fs-search` spawns ripgrep on every
  * call; on a loaded machine that measured 3.1 s median per DSH grep call, against a few hundred milliseconds on a warm
- * fff index (plans/fff-search). The stock tools stay registered globally: on each `agent/created` this plugin registers
+ * fff index (docs/benchmark.md). The stock tools stay registered globally: on each `agent/created` this plugin registers
  * its own through `agent.ctx`, and an Agent-scoped tool shadows the global tool of the same name.
  */
 import '@deepseek-ai/dsh-agent'

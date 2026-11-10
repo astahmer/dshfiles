@@ -1,13 +1,12 @@
-# fff search for Agents
+# fff search benchmark
 
-Question: should DSH Agents search code through [fff](https://github.com/dmtrKovalenko/fff)
-(a resident, frecency-ranked file and content index) instead of the native
-`grep`/`glob`, and if so as an MCP server or as an owned plugin?
+Why `fff-search` exists: DSH Agents searched code through the native `grep`/`glob`, and this benchmark asked whether they should search through [fff](https://github.com/dmtrKovalenko/fff)
+(a resident, frecency-ranked file and content index) instead, and if so as an MCP server or as an owned plugin.
 
 ## How it was measured
 
-- Harness: [`scripts/fff-bench.ts`](../../scripts/fff-bench.ts) with tasks in
-  [`scripts/fff-bench-tasks.json`](../../scripts/fff-bench-tasks.json). It runs
+- Harness: [`scripts/fff-bench.ts`](../../../../scripts/fff-bench.ts) with tasks in
+  [`scripts/fff-bench-tasks.json`](../../../../scripts/fff-bench-tasks.json). It runs
   headless `claude -p` sessions with no user/project settings, hooks, CLAUDE.md
   or other MCP servers, so only the arm differs. Each task has a known answer
   that the script grades.
@@ -23,7 +22,7 @@ Question: should DSH Agents search code through [fff](https://github.com/dmtrKov
 - DSH: the same tasks through DSH Agents on a scratch DSH (`dshx dev up`),
   OpenCode Go `opencode-go-alex` / `deepseek-v4.1-flash` (high), 3 parallel
   sessions, 3 reps per arm, driven by
-  [`scripts/fff-bench-dsh.ts`](../../scripts/fff-bench-dsh.ts). Raw rows:
+  [`scripts/fff-bench-dsh.ts`](../../../../scripts/fff-bench-dsh.ts). Raw rows:
   [`runs-dsh-flash-2026-10-19.jsonl`](runs-dsh-flash-2026-10-19.jsonl).
 
 ```sh
@@ -70,13 +69,13 @@ fff's first call pays the index build (4–8 s here).
 
 ## DSH results (DeepSeek V4.1 Flash)
 
-| Arm             | What the Agent has                                           | Accuracy | Median session | Search time per session (median) | `grep` per call (median / p90)    |
-| --------------- | ------------------------------------------------------------ | -------- | -------------- | -------------------------------- | --------------------------------- |
-| `stock`         | native `grep`/`glob`                                         | 21/21    | 37.2 s         | 5.5 s                            | 3.1 s / 9.4 s                     |
-| `stock-control` | native, same instance as the plugin runs                     | 20/21    | 32.8 s         | 5.6 s                            | 4.1 s / 6.3 s                     |
-| `fff-mcp`       | native plus the fff MCP row                                  | 21/21    | 39.5 s         | 4.9 s                            | native 4.1 s; fff 0.8 s (4 calls) |
-| `fff-only`      | fff MCP, `tool-fs-search` disabled                           | 21/21    | 34.2 s         | 0.3 s                            | 0.28 s / 1.7 s                    |
-| `fff-plugin-v3` | [`fff-search`](../../plugins/@dshfiles/fff-search/README.md) | 21/21    | 20.6 s         | 0.7 s                            | 0.36 s / 1.1 s                    |
+| Arm             | What the Agent has                       | Accuracy | Median session | Search time per session (median) | `grep` per call (median / p90)    |
+| --------------- | ---------------------------------------- | -------- | -------------- | -------------------------------- | --------------------------------- |
+| `stock`         | native `grep`/`glob`                     | 21/21    | 37.2 s         | 5.5 s                            | 3.1 s / 9.4 s                     |
+| `stock-control` | native, same instance as the plugin runs | 20/21    | 32.8 s         | 5.6 s                            | 4.1 s / 6.3 s                     |
+| `fff-mcp`       | native plus the fff MCP row              | 21/21    | 39.5 s         | 4.9 s                            | native 4.1 s; fff 0.8 s (4 calls) |
+| `fff-only`      | fff MCP, `tool-fs-search` disabled       | 21/21    | 34.2 s         | 0.3 s                            | 0.28 s / 1.7 s                    |
+| `fff-plugin-v3` | [`fff-search`](../README.md)             | 21/21    | 20.6 s         | 0.7 s                            | 0.36 s / 1.1 s                    |
 
 - **Native DSH `grep` is the slow part:** 3–4 s median per call with three
   Agents searching, because every call spawns ripgrep. Session time is mostly
@@ -106,15 +105,15 @@ fff's first call pays the index build (4–8 s here).
 
 ## Decision
 
-Port, through the owned [`fff-search`](../../plugins/@dshfiles/fff-search/README.md)
+Port, through the owned [`fff-search`](../README.md)
 bundle. It registers `grep`/`glob` per Agent through `agent.ctx`, which shadows
 the stock tools without restating the standard preset. The MCP route needs the
 preset restated without `tool-fs-search` and renames the tools, and the MCP row
 next to the native tools does not change what the model calls.
 
-## Open work
+## Not measured yet
 
-1. Benchmark a larger corpus (≥100k files) with more listing-style tasks at 5
-   reps, and a pass on a reasoning model, not only Flash.
-2. Watch for the fff-mcp hang on repeated identical `grep` calls through the
-   fff-node path, and report it upstream if it reproduces.
+- A larger corpus (≥100k files) with more listing-style tasks at 5 reps, and a
+  reasoning model, not only Flash.
+- Whether the fff-mcp hang on repeated identical `grep` calls reproduces through
+  the fff-node path; report it upstream if it does.
