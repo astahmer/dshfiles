@@ -1183,3 +1183,26 @@ should drop to one call per project per TTL.
 ```sh
 pnpm --dir plugins/@dshfiles/memory exec vitest run src/workspace-scripts.test.ts
 ```
+
+## Session residency bound (2026-11-10)
+
+A long-lived browser tab kept roughly twenty Session instances resident: every visited thread's Sidebar Session view
+stayed because its tabs are keep-mounted (Workbench side panel, editor tabs), and each view holds a whole Session with
+its live follow. `jj:okllznnp` pinned tab resources; this bound bounds the views themselves. The plugin now keeps a view,
+its resource pins and its kept-mounted bodies only for the on-screen Session plus the `residentThreads` most recently
+shown others (`dshfiles-sidebar-right`, default 4, `0` = the old unbounded behaviour).
+
+Scratch DSH (`dshx dev up`, 14 synthetic threads created through New thread, no provider turns), probe
+`.agents/skills/live-performance-audit/scripts/session-residency-probe.mjs` with `ASIDE=1`, 14 visits; the setting was
+changed live through Settings › Plugins › `@dshfiles/sidebar-right`. Fresh page per row; counts are after GC and a
+reconnect.
+
+| `residentThreads`       | instances | scopes | `sidebarView` retains | `threadSidebarAside` retains | open `session/follow` | heap  |
+| ----------------------- | --------- | ------ | --------------------- | ---------------------------- | --------------------- | ----- |
+| `4` (default)           | 9         | 9      | 5                     | 5                            | 9                     | 94 MB |
+| `0` (old, unbounded)    | 14        | 14     | 14                    | 13                           | 13                    | 94 MB |
+
+`workbenchPanel` stayed at 4 and `mainView` at 1 in both runs. Heap is flat because these synthetic threads carry no
+real history; the lever here is instance and follow-stream count, not bytes: the default held 5 thread views for 14
+visited threads instead of 14. Real history makes each resident Session cost its transcript window, which is what the
+~20-instance tab was holding. A live-tab after-number still needs the canonical build and a user restart.

@@ -44,6 +44,12 @@ export interface SidebarRightNavigator {
 /** `ctx.resources.pin`: hold an address's content open for as long as `signal` lives. */
 export type PinResource = (address: string, signal: AbortSignal) => void
 
+/** The Sessions whose records keep their content: every one (the setting is 0), or the on-screen and most recently shown ones. */
+export type ResidentSessions = { readonly all: true } | { readonly all: false; readonly ids: ReadonlySet<SessionId> }
+
+/** Whether a Session's records keep their content under this window. */
+export const holdsSession = (resident: ResidentSessions, sessionId: SessionId): boolean => resident.all || resident.ids.has(sessionId)
+
 /** Identity of one open lifetime; a restored tab receives a new value. */
 export type SidebarRightOccurrenceId = Branded<'SidebarRightOccurrenceId'>
 
@@ -78,7 +84,7 @@ interface Held extends TabOccurrence {
 /** Every session's occurrences. */
 export class TabDomain {
   private readonly bySession = new Map<SessionId, Map<TabId, Held>>()
-  private resident: ReadonlySet<SessionId> = new Set()
+  private resident: ResidentSessions = { all: false, ids: new Set() }
 
   /**
    * @param navigator - where tab actions go, aimed at the tab's session; the navigation controller.
@@ -108,21 +114,21 @@ export class TabDomain {
       const occurrence = held.get(tab.id) ?? this.hold(sessionId, tab.id, { address: tab.contentId, params: undefined, revision: 0 })
       const pane = findTabPane(layout, tab.id)
       occurrence.paneId = pane.host === 'dock' ? pane.id : undefined
-      if (this.resident.has(sessionId)) this.pinOccurrence(occurrence)
+      if (holdsSession(this.resident, sessionId)) this.pinOccurrence(occurrence)
     }
   }
 
   /**
    * Keep resource pins only for these sessions' records; the others release theirs until their session is resident
    * again, which reopens them. Open records, their navigation and their actions are untouched.
-   * @param sessionIds - the sessions whose records hold their content.
+   * @param resident - the sessions whose records hold their content.
    */
-  retainSessions(sessionIds: ReadonlySet<SessionId>): void {
-    this.resident = sessionIds
+  retainSessions(resident: ResidentSessions): void {
+    this.resident = resident
     for (const [sessionId, held] of this.bySession) {
-      const resident = sessionIds.has(sessionId)
+      const holds = holdsSession(resident, sessionId)
       for (const occurrence of held.values()) {
-        if (resident) this.pinOccurrence(occurrence)
+        if (holds) this.pinOccurrence(occurrence)
         else this.unpinOccurrence(occurrence)
       }
     }

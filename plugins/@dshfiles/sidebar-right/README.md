@@ -35,6 +35,18 @@ On reload, Workbench acquires real `sessions.retain` references only for Host-ca
 
 The bridge stores **presentation endpoints and derived metadata only**. Native session stores remain the single persisted membership authority; providers retain real file/diff content, terminal processes and reconnection. The Workbench controls only arrangement.
 
+## Resident Sessions
+
+A Sidebar Session view holds a whole Session with its live follow, and a kept-mounted editor or Workbench body holds its tab. Unbounded, a long-lived page keeps one of those per visited thread. The plugin therefore keeps a view, its resource pins and its kept-mounted bodies only for the on-screen Session plus the most recently shown others.
+
+| Setting (`dshfiles-sidebar-right`) | Default | Meaning |
+| ---------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| `residentThreads`                   | `4`     | Threads besides the on-screen one whose side-panel tabs stay loaded. `0` keeps every visited thread loaded (pre-bound). |
+
+The setting applies live, with no restart. A thread that leaves the window releases its resource pins and its Session reference; showing it again reopens its tabs and remounts their bodies. Workbench restored records follow the same window, so a record saved for a non-resident thread is not acquired on reload.
+
+A remounted editor body restores its file content and its own drafts: those live in the editor's per-session store, not in the view. Its text-editor view state does not survive: the cursor, selection and scroll of a pruned Monaco body are lost, because the native editor tab body publishes no view state for this fork to save and restore. Losing them costs a scroll after a thread returns; keeping them would need a native provider API this fork cannot add.
+
 ## Integration requirements
 
 The frame retains a hidden native `rightbar` carrier while Workbench owns the right column. This mints the genuine framework session store and supplies `SessionProvider` even though the slot body portals elsewhere. The owned frame's optional `ctx.mainSurface` identifies Workbench ownership; installs without that service retain the native presentation. Workbench mode suppresses all native chrome, including floating panes and geometry reports from a retiring native seat, and the selected real Session remains the public resource-navigation target even while a global panel is active.
@@ -49,7 +61,7 @@ The original per-tab contribution slots still render in each panel, including li
 
 ## Scope and verification
 
-Nine vendored delta files: native assembly, real saved-resource Session reference ownership, focused background-resource close/refresh identity, global Workbench expansion/explicit reveal routing and shortcut dispatch, tab-information composition, private TabSlot export, root visibility and native expand control. `service.ts` also publishes `expanded`, `isExpanded()` as a snapshot that follows adopted store commits, the on-screen Session and the Workbench dock, so dshx `layout.side.expanded` can be observed instead of polled. `tab-domain.ts` pins a record's resource only while its Session is on screen or was the one shown just before; the other Sessions' records stay open but release their pin until they come back, because a pinned thread aside, subagent chat or side chat holds a whole Session with its live follow (a long-lived page kept one per visited thread). A mounted body still holds its resource through `useResource`. The standalone bridge and portal seat live outside the vendored tree. There is no added Host work and no new model-facing verb; this is presentation of existing capabilities.
+The vendored delta files cover native assembly, real saved-resource Session reference ownership, focused background-resource close/refresh identity, global Workbench expansion/explicit reveal routing and shortcut dispatch, tab-information composition, private TabSlot export, root visibility and native expand control. `service.ts` also publishes `expanded`, `isExpanded()` as a snapshot that follows adopted store commits, the on-screen Session and the Workbench dock, so dshx `layout.side.expanded` can be observed instead of polled. `tab-domain.ts` pins a record's resource only while its Session is in the resident window (the on-screen one plus `residentThreads` recently shown); the other Sessions' records stay open but release their pin until they come back, because a pinned thread aside, subagent chat or side chat holds a whole Session with its live follow (a long-lived page kept one per visited thread). A mounted body still holds its resource through `useResource`. The standalone bridge and portal seat live outside the vendored tree. There is no added Host work and no new model-facing verb; this is presentation of existing capabilities.
 
 Focused tests cover presentation target replacement, cross-session identity, cleanup rejection, genuine native file/diff/terminal occurrences, lifetime preservation across thread selection and detach, four-at-once saved acquisition, suspension and final View-retirement release. The fresh assembled scratch journey opens a real Markdown file preview, reviews two tool-written files, starts a genuine terminal, reloads, and verifies all three provider bodies again. The screenshot above comes from that passing journey after the centralized build. This is scratch evidence; deploying it to the live Host still requires the user's restart decision.
 

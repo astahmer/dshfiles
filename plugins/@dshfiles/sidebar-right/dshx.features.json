@@ -14,16 +14,24 @@
         "click option \"New terminal*\"",
         "expect tab \"Terminal*\""
       ],
-      "surfaces": ["client", "integration"],
+      "surfaces": ["client", "integration", "settings"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "right-pane: native resources as workbench panels",
-      "configuration": [],
-      "states": ["native-absent-workbench-fallback", "workbench", "detached", "moved", "hidden", "closed", "cleanup-rejected"],
+      "configuration": [
+        {
+          "key": "residentThreads",
+          "defaultValue": "4",
+          "constraints": "Integer 0 to 50; how many threads besides the one on screen keep their side-panel tabs loaded. 0 keeps every visited thread loaded. Applies live.",
+          "coveredBy": ["sidebar-right.resident-window-default", "sidebar-right.resident-window-views"]
+        }
+      ],
+      "states": ["native-absent-workbench-fallback", "workbench", "detached", "moved", "hidden", "closed", "cleanup-rejected", "resident-pruned", "resident-restored"],
       "failureModes": [
         "A missing target leaves its native occurrence retained, never creates fake content.",
         "Provider cleanup rejection preserves the authoritative tab.",
-        "A missing provider uses the original unavailable-content fallback."
+        "A missing provider uses the original unavailable-content fallback.",
+        "A thread outside the resident window loses its editor's cursor, selection and scroll; its file content and drafts return with it, and its tabs reopen when it is shown again."
       ],
       "externalDependencies": [
         {
@@ -82,6 +90,18 @@
           "id": "sidebar-right.session-resources",
           "file": "plugins/@dshfiles/sidebar-right/src/resource-lifetime.test.ts",
           "testName": "preserves real per-session occurrences through target moves and invokes terminal cleanup on explicit close"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.resident-window-default",
+          "file": "plugins/@dshfiles/sidebar-right/src/resident-window.test.ts",
+          "testName": "keeps the on-screen Session plus the four most recently shown by default, moving a re-shown one to newest"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-right.resident-window-views",
+          "file": "plugins/@dshfiles/sidebar-right/src/resident-window.test.ts",
+          "testName": "keeps kept-mounted views only for the resident window, and every one at 0"
         }
       ],
       "telemetry": [

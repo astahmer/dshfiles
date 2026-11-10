@@ -3,6 +3,7 @@ import type { ISessions, SessionReference } from '@deepseek-ai/dsh-api-session-c
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { SidebarSessionView } from './session-view.ts'
+import { holdsSession, type ResidentSessions } from './tab-domain.ts'
 
 /** The reference is exclusively a framework SessionProvider target, not a business-component service. */
 export interface SidebarSessionViewSnapshot {
@@ -20,6 +21,7 @@ export class SidebarSessionViews {
   private readonly views = new Map<SessionId, SidebarSessionView>()
   private readonly viewsByReference = new Map<SessionReference, SidebarSessionView>()
   private resourceSessions = new Set<SessionId>()
+  private resident: ResidentSessions = { all: true }
   private readonly openingResources = new Map<SessionId, SessionReference>()
   private restoringResources = false
   private selected: SessionId | undefined
@@ -38,6 +40,17 @@ export class SidebarSessionViews {
     if (this.closed || this.selected === sessionId) return
     this.selected = sessionId
     if (sessionId !== undefined) this.ensure(sessionId, 'sidebarView')
+    for (const view of this.views.values()) this.prune(view)
+    this.publish()
+  }
+
+  /**
+   * Keep a view for its kept-mounted bodies only while its Session is in this window: each view holds a whole Session
+   * with its live follow, so an unbounded set keeps one per visited thread. A pruned view's bodies remount on return.
+   */
+  retainWithin(resident: ResidentSessions): void {
+    if (this.closed) return
+    this.resident = resident
     for (const view of this.views.values()) this.prune(view)
     this.publish()
   }
@@ -125,7 +138,13 @@ export class SidebarSessionViews {
   }
 
   private prune(view: SidebarSessionView): void {
-    if (view.sessionId === this.selected || this.resourceSessions.has(view.sessionId) || view.hasRetainedTabs || this.views.get(view.sessionId) !== view) return
+    if (
+      view.sessionId === this.selected ||
+      this.resourceSessions.has(view.sessionId) ||
+      (view.hasRetainedTabs && holdsSession(this.resident, view.sessionId)) ||
+      this.views.get(view.sessionId) !== view
+    )
+      return
     this.views.delete(view.sessionId)
     // Render targets must be withdrawn before an unmounted view can release its reference.
     this.publish()

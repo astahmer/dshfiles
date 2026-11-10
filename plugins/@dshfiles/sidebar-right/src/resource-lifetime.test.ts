@@ -89,7 +89,7 @@ it('preserves real per-session occurrences through target moves and invokes term
   owner.controller.tabDomain.dispose()
 })
 
-it('keeps tab resources pinned only for the on-screen and previously shown sessions, and pins them again on return', () => {
+it('keeps tab resources pinned only for the resident window of shown sessions, pins them again on return, and pins all at 0', () => {
   const ctx = new Context()
   const types = new SidebarRightTabRegistry(ctx)
   types.register({ id: 'aside-owner', kind: 'threadaside', patterns: ['dsh-resource://threadaside/**'], title: () => 'Thread' })
@@ -113,6 +113,11 @@ it('keeps tab resources pinned only for the on-screen and previously shown sessi
   const releases = ids.map(id => owner.adopt(id, createSidebarRightStore(() => ({ kind: 'guide', title: 'Start' })).create()))
   const live = (address: string): number => pins.filter(pin => pin.address === address && !pin.signal.aborted).length
   const asideOf = (id: SessionId): string => `dsh-resource://threadaside/session/${id}`
+  const residentIds = (): readonly SessionId[] => {
+    const resident = owner.resident.getSnapshot()
+    return resident.all ? ids : [...resident.ids]
+  }
+  owner.setResidentThreads(1)
   for (const id of ids) {
     owner.show(id)
     owner.controller.openResource(asideOf(id))
@@ -121,8 +126,15 @@ it('keeps tab resources pinned only for the on-screen and previously shown sessi
   if (tabA === undefined) throw new Error('expected the aside record of session a')
   const occurrenceA = owner.controller.tabDomain.occurrence(a, tabA)
   expect([live(asideOf(a)), live(asideOf(b)), live(asideOf(c))]).toEqual([0, 1, 1])
+  expect(residentIds()).toEqual([b, c])
   expect(occurrenceA.signal.aborted).toBe(false)
   owner.show(a)
+  expect([live(asideOf(a)), live(asideOf(b)), live(asideOf(c))]).toEqual([1, 0, 1])
+  expect(residentIds()).toEqual([c, a])
+  owner.setResidentThreads(0)
+  expect(owner.resident.getSnapshot().all).toBe(true)
+  expect([live(asideOf(a)), live(asideOf(b)), live(asideOf(c))]).toEqual([1, 1, 1])
+  owner.setResidentThreads(1)
   expect([live(asideOf(a)), live(asideOf(b)), live(asideOf(c))]).toEqual([1, 0, 1])
   expect(owner.controller.tabDomain.occurrence(a, tabA)).toBe(occurrenceA)
   owner.controller.closeIn(a, tabA.id)

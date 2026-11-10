@@ -31,6 +31,7 @@
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
+    "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/shared-runtime": "workspace:*",
     "effect": "catalog:",
     "picomatch": "4.0.7"
@@ -51,6 +52,7 @@
     "@deepseek-ai/dsh-client-ui-renderer": "catalog:",
     "@deepseek-ai/dsh-client-ui-session": "catalog:",
     "@deepseek-ai/dsh-client-ui-sidebar-right": "catalog:",
+    "@deepseek-ai/dsh-client-ui-settings": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-util-crypto": "0.2.1-rc.2",
@@ -76,7 +78,10 @@
     "@deepseek-ai/dsh-client-ui-dockkit": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-session": ">=0.2.1-rc.2 <0.3.0-0",
-    "@deepseek-ai/dsh-util-crypto": ">=0.2.1-rc.2 <0.3.0-0"
+    "@deepseek-ai/dsh-client-ui-settings": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-util-crypto": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/schemastery": "~3.18.4"
   },
   "dsh": {
     "bundle": {
@@ -91,7 +96,8 @@
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-session",
         "@deepseek-ai/dsh-client-shortcuts",
-        "@deepseek-ai/dsh-client-ui-dockkit"
+        "@deepseek-ai/dsh-client-ui-dockkit",
+        "@deepseek-ai/dsh-client-ui-settings"
       ],
       "external": [
         "@deepseek-ai/dsh-client-store",

@@ -49,6 +49,15 @@ above `wait` means the browser queue: what holds the six HTTP/1.1 sockets (other
 EventSources, slow reads) is only visible in the user's browser, through `chrome://net-export` with the tab count noted.
 The HAR's `_initiator.stack` names the calling function when a core method has several possible owners.
 
+The residency probe is scratch-only (it snapshots the page heap and refuses the live origin): it visits sidebar threads
+like a long-lived tab, then reports the Session Controller's resident instances by retain source, open `session/follow`
+streams, page heap after GC and what one reconnect sends. `ASIDE=1` also opens each visited thread's next row in the
+side panel, which is what makes keep-mounted bodies accumulate.
+
+```sh
+LAUNCH_URL=<scratch launch url> ASIDE=1 node $S/session-residency-probe.mjs 14
+```
+
 Use Node from `.node-version`. Discover the actual live URL/profile rather than assuming a particular port.
 The probes accept `LAUNCH_URL`; keep that token-bearing value in private process configuration and out of logs/source.
 The profiler attaches to the live process without restarting it; tell the user before

@@ -45,7 +45,7 @@ import { GUIDE_KIND, pageAddress } from './contract/seed.ts'
 import type { SidebarRightTabClaim, SidebarRightTabRegistry } from './tab-registry.ts'
 import { canCloseTab, type SidebarRightState, type SurfaceState } from './stores.ts'
 import type { createSidebarRightStore } from './stores.ts'
-import { TabDomain, type PinResource } from './tab-domain.ts'
+import { TabDomain, type PinResource, type ResidentSessions } from './tab-domain.ts'
 import { SidebarTabInventory } from './tab-inventory.ts'
 import { registerTabSubstitute, type TabSubstitute } from './tab-substitutes.ts'
 import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
@@ -66,8 +66,10 @@ interface Adoption {
   readonly unsubscribe: () => void
 }
 
-/** The on-screen Session and the one shown before it keep their tabs' resources open, so switching back is instant. */
-const RESIDENT_TAB_SESSIONS = 2
+/** Threads besides the on-screen one that stay resident until the `residentThreads` setting answers; its default. */
+export const DEFAULT_RESIDENT_THREADS = 4
+/** The longest `residentThreads` the setting accepts; the shown-thread history never grows past it. */
+const MAX_RESIDENT_THREADS = 50
 
 /** The room rule's verdict for a docked pane, as a seat's docking kit last measured it: whether two working halves would fit. */
 type RoomRule = (paneId: PaneId) => boolean
@@ -113,6 +115,10 @@ export function createSidebarRightController(
   adopt: (sessionId: SessionId, store: SidebarRightSurfaceStore) => () => void
   forget: (sessionId: SessionId) => void
   show: (sessionId: SessionId | undefined) => void
+  /** The on-screen Session and the most recently shown others: the only ones whose tabs keep their resources, kept-mounted bodies and Session views. */
+  resident: ObservableSnapshot<ResidentSessions>
+  /** How many threads besides the on-screen one stay resident; 0 keeps every one. */
+  setResidentThreads: (count: number) => void
   measure: (sessionId: SessionId, canSplitPane: RoomRule) => void
 } {
   const adopted = new Map<SessionId, Adoption>()
@@ -130,6 +136,12 @@ export function createSidebarRightController(
     },
   }
   const recentlyShown: SessionId[] = []
+  let residentThreads = DEFAULT_RESIDENT_THREADS
+  const resident = createSnapshotStore<ResidentSessions>({ all: false, ids: new Set() })
+  const settleResident = (): void => {
+    resident.set(residentThreads === 0 ? { all: true } : { all: false, ids: new Set(recentlyShown.slice(-(residentThreads + 1))) })
+    controller.tabDomain.retainSessions(resident.getSnapshot())
+  }
   const show = (sessionId: SessionId | undefined): void => {
     if (onScreen.getSnapshot() === sessionId) return
     onScreen.set(sessionId)
@@ -137,10 +149,16 @@ export function createSidebarRightController(
       const previous = recentlyShown.indexOf(sessionId)
       if (previous !== -1) recentlyShown.splice(previous, 1)
       recentlyShown.push(sessionId)
-      if (recentlyShown.length > RESIDENT_TAB_SESSIONS) recentlyShown.shift()
-      controller.tabDomain.retainSessions(new Set(recentlyShown))
+      if (recentlyShown.length > MAX_RESIDENT_THREADS + 1) recentlyShown.shift()
+      settleResident()
     }
     layoutChanged()
+  }
+  const setResidentThreads = (count: number): void => {
+    const next = Math.min(Math.max(Math.trunc(count), 0), MAX_RESIDENT_THREADS)
+    if (next === residentThreads) return
+    residentThreads = next
+    settleResident()
   }
   const controller = new SidebarRightController(tabs, pin, host, { adopted, rooms, onScreen, openTabs: inventory.source, layoutChanges, show })
   return {
@@ -150,6 +168,8 @@ export function createSidebarRightController(
       rooms.delete(sessionId)
     },
     show,
+    resident,
+    setResidentThreads,
     measure: (sessionId, canSplitPane) => {
       rooms.set(sessionId, canSplitPane)
     },

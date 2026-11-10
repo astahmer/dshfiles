@@ -234,7 +234,7 @@ export class SidebarRightTabRegistry {
   private guideEntries: readonly SidebarRightGuideBox[] = []
 
   /** @param ctx - Context whose effects own the contributed types. */
-  constructor(private readonly ctx: Context) {}
+  constructor(private readonly ctx: Pick<Context, 'effect'>) {}
 
   /**
    * Register one tab type for the caller's lifetime.

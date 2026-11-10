@@ -23,7 +23,8 @@
 import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
 import { SidebarFocus } from './focus.ts'
 import { registerSidebarShortcuts } from './shortcuts.ts'
-import type { ClientContext } from '@dshfiles/dshx/client'
+import { observeSettings, type ClientContext } from '@dshfiles/dshx/client'
+import { sidebarRightSettings } from '../../settings.js'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@dshfiles/frame-layout/regions'
 import { ResourceSeat, type ResourceSeatInjected } from '../../resource-seat.js'
@@ -43,7 +44,8 @@ import type { SidebarRightInjected } from './shell/SidebarRight.tsx'
 import { closeWithPaneFocus, openWithPaneFocus } from './shell/close-focus.ts'
 import { RightbarRoot, type RightbarRootInjected } from './shell/RightbarRoot.tsx'
 import { SidebarSessionViews } from './session-views.ts'
-import { createSidebarRightController } from './service.ts'
+import { createSidebarRightController, DEFAULT_RESIDENT_THREADS } from './service.ts'
+import { holdsSession } from './tab-domain.ts'
 import { SidebarRightTabRegistry } from './tab-registry.ts'
 import { createSidebarRightStore } from './stores.ts'
 import { en, zh } from './locales.ts'
@@ -107,7 +109,7 @@ export function apply(ctx: ClientContext): void {
   // hands them its width as owner props, and every seat reports the same rule.
   let autoFullscreen = false
   let mintStore: ((sessionId: SessionId) => void) | undefined
-  const { controller, adopt, forget, show, measure } = createSidebarRightController(
+  const { controller, adopt, forget, show, resident, setResidentThreads, measure } = createSidebarRightController(
     tabs,
     (address, signal) => {
       ctx.resources.pin(address, signal)
@@ -126,6 +128,8 @@ export function apply(ctx: ClientContext): void {
     },
   )
   ctx.effect(() => {
+    // Only the on-screen Session projects into the Workbench, so only the resident window keeps a view: each view holds
+    // a whole Session with its live follow, one per visited thread on a long-lived page otherwise.
     const sync = (): void => {
       const ids = workbenchMode.getSnapshot()
         ? [
@@ -135,18 +139,33 @@ export function apply(ctx: ClientContext): void {
                 .filter(tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel')
                 .map(tab => tab.sessionId),
             ),
-          ].filter(id => ctx.sessions.list.getSnapshot().ids.includes(id))
+          ].filter(id => holdsSession(resident.getSnapshot(), id) && ctx.sessions.list.getSnapshot().ids.includes(id))
         : []
       views.retainResourceSessions(ids)
     }
     const unsubscribeTabs = controller.openTabs.subscribe(sync)
     const unsubscribeMode = workbenchMode.subscribe(sync)
     const unsubscribeCatalog = ctx.sessions.list.subscribe(sync)
+    const unsubscribeResident = resident.subscribe(sync)
+    const residentViews = (): void => {
+      views.retainWithin(resident.getSnapshot())
+    }
+    const unsubscribeResidentViews = resident.subscribe(residentViews)
+    residentViews()
+    const settings = observeSettings(ctx, sidebarRightSettings)
+    const applySettings = (): void => {
+      setResidentThreads(settings.getSnapshot()?.residentThreads ?? DEFAULT_RESIDENT_THREADS)
+    }
+    const unsubscribeSettings = settings.subscribe(applySettings)
+    applySettings()
     sync()
     return () => {
       unsubscribeTabs()
       unsubscribeMode()
       unsubscribeCatalog()
+      unsubscribeResident()
+      unsubscribeResidentViews()
+      unsubscribeSettings()
       views.retainResourceSessions([])
     }
   }, 'sidebar-right: saved resource Session references')
