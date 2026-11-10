@@ -13,6 +13,22 @@ export const receiptSchema = Schema.Struct({
   results: Schema.Array(Schema.Struct({ sessionId: Schema.String, status: Schema.Literals(['deleted', 'skipped', 'failed']), message: Schema.String })),
 })
 
+const renderPreview = (preview: typeof previewSchema.Type): string =>
+  [
+    `Preview ${preview.previewId} expires ${new Date(preview.expiresAt).toISOString()}: ${preview.candidates.length} eligible, ${preview.protectedCount} protected, ${preview.remainingCount} remaining.`,
+    ...preview.candidates.map(
+      candidate => `${candidate.sessionId} archived=${candidate.archived} settled=${candidate.settled}`,
+    ),
+  ].join('\n')
+
+const renderReceipt = (receipt: typeof receiptSchema.Type): string => {
+  const countStatus = (status: (typeof receipt.results)[number]['status']) => receipt.results.filter(result => result.status === status).length
+  return [
+    `Deleted ${countStatus('deleted')}, skipped ${countStatus('skipped')}, failed ${countStatus('failed')}.`,
+    ...receipt.results.map(result => `${result.sessionId}: ${result.status}. ${result.message}`),
+  ].join('\n')
+}
+
 export const cleanupApi = defineApi({
   id: 'conversation-cleanup',
   owner: '@dshfiles/conversation-cleanup',
@@ -24,14 +40,14 @@ export const cleanupApi = defineApi({
       description:
         'Preview permanent deletion of up to 200 local settled OR archived conversations. Loaded sessions, background activity, migration-required logs and the caller are protected. Nothing is deleted. Read-only; preview expires after ten minutes.',
       readOnly: true,
-      tool: { name: 'conversation_cleanup_preview', readOnly: true },
+      tool: { name: 'conversation_cleanup_preview', readOnly: true, render: renderPreview },
     }),
     delete: method({
       input: Schema.Struct({ previewId: Schema.String, confirm: Schema.Literal(true) }),
       output: receiptSchema,
       description:
         'Permanently delete the exact conversations in a fresh cleanup preview, after rechecking their state and obtaining each persistence write lock. Irreversible: removes local JSONL generations, not shared attachments, workspaces, backups or derived indexes. Loaded or changed sessions are skipped; failures are reported individually. Agent calls require a root conversation with Full access; delegated or restricted agents are refused. Call only when the user explicitly asked to delete these conversations and confirmed permanent deletion.',
-      tool: { name: 'conversation_cleanup_delete', readOnly: false },
+      tool: { name: 'conversation_cleanup_delete', readOnly: false, render: renderReceipt },
     }),
   },
 })

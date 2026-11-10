@@ -6,7 +6,7 @@ Optional bulk cleanup of **settled OR archived** local conversations. Nothing ru
 
 ## Use
 
-1. Install this workspace bundle through DSH's Plugin Manager (local package directory), then load its Host half with a user-managed restart if required. It is not enabled in the shared Web profile.
+1. Install this bundle with `pnpm profile:sync --profile <name> --bundle @dshfiles/conversation-cleanup` or `dshx add @dshfiles/conversation-cleanup --profile <name>`, then load its Host half with a user-managed restart if required. The `dshx add` route also writes the profile row. A Plugin Manager local package install skips that row. It is not enabled in the shared Web profile.
 2. Open **Settings → Conversation cleanup → Preview cleanup**.
 3. Inspect the exact conversation IDs. Export anything worth keeping using DSH's conversation export before continuing.
 4. Choose **Delete previewed conversations**, then **Permanently delete**. Cancel changes nothing.
@@ -18,7 +18,7 @@ Optional bulk cleanup of **settled OR archived** local conversations. Nothing ru
 
 A loaded Session or Agent is never deleted, even when idle. The native `workspace/session-activity` providers also protect conversations with jobs, schedules or other reported activity. No turns, jobs or other work are stopped. To include those conversations, finish work and restart DSH yourself, then preview without opening those conversations first. Historical logs that need migration are protected too: open/migrate them through DSH, then restart and preview again.
 
-Only the exact snapshot in a single-use, ten-minute preview can be processed. Each conversation's lifecycle and storage revision are rechecked before deletion. A changed, reopened, loaded or absent conversation is skipped. A competing writer causes a per-item failure, not forced ownership. A failed item may have lost historical generations already; its current log is removed last. Generate a fresh preview after inspecting a failure.
+Only the exact snapshot in a single-use, ten-minute preview can be processed, and only by the caller that created it: the owner's Settings UI, each agent Session and each plugin keep their own latest preview. A new preview from the same caller replaces its previous one. Each conversation's lifecycle and storage revision are rechecked before deletion. A changed, reopened, loaded or absent conversation is skipped. A competing writer causes a per-item failure, not forced ownership. A failed item may have lost historical generations already; its current log is removed last. Generate a fresh preview after inspecting a failure.
 
 Archive and settled markers remain with their existing owners; they do not recreate a missing conversation log. Other windows or derived indexes can keep stale rows until they refresh/reconcile.
 
@@ -36,10 +36,10 @@ Path/revision encoding adapted from DeepSeek's MIT-licensed `dsh-session-persist
 
 ## Agent tools
 
-- `conversation_cleanup_preview`: read-only preview with eligible IDs, protected count and remaining count.
-- `conversation_cleanup_delete`: same Host operation; requires the exact `previewId` and explicit `confirm: true`. Call only after the user asks for and confirms permanent deletion. Agent calls additionally require an attached root conversation with native `danger-full-access` policy; missing policy, restricted modes and child/fork sessions are refused. The authenticated owner can always use the Settings UI without changing an agent’s permissions.
+- `conversation_cleanup_preview`: read-only preview with eligible IDs, protected count and remaining count. Any caller may preview, so any agent, including delegated or restricted ones, can list the Session IDs of settled or archived conversations across projects. Preview grants no deletion right.
+- `conversation_cleanup_delete`: same Host operation; requires the exact `previewId` and explicit `confirm: true`. Call only after the user asks for and confirms permanent deletion. Only the authenticated owner (Settings) bypasses the agent rules. Agent calls require an attached root conversation with native `danger-full-access` policy; missing policy, restricted modes and child/fork sessions are refused. Plugin callers are always refused with `cleanup-forbidden`.
 
-Previews are kept only in bounded plugin memory. They expire on Host restart or plugin unload; no stale request is automatically replayed.
+Previews are kept only in bounded plugin memory, one per caller. They expire after ten minutes, on Host restart or on plugin unload; no stale request is automatically replayed.
 
 ## Verification
 

@@ -7,15 +7,41 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import { apply as applyJsonlPersistence, name as jsonlPersistenceName } from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { createHostApiClient } from '@dshfiles/dshx/host'
-import { createTestHost } from '@dshfiles/dshx/testing'
+import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, FileSystem, Layer, Path, Schema } from 'effect'
 
-import { cleanupApi } from './cleanup-api.js'
+import { cleanupApi, previewSchema, receiptSchema } from './cleanup-api.js'
 import plugin from './host.js'
 
 const platform = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
+
+const cleanupEnvelope = Schema.Struct({
+  result: Schema.Struct({
+    value: Schema.optional(Schema.Struct({ output: Schema.Unknown })),
+    error: Schema.optional(Schema.Struct({ code: Schema.String, message: Schema.String })),
+  }),
+})
+
+const browserCall = async (host: TestHost, method: 'preview' | 'delete', input: object): Promise<unknown> => {
+  const response = await host.connection.requestApi({
+    packageId: '@dshfiles/conversation-cleanup',
+    apiId: cleanupApi.id,
+    method,
+    version: cleanupApi.version,
+    input,
+  })
+  const { result } = Schema.decodeUnknownSync(cleanupEnvelope)(await response.json())
+  if (result.error !== undefined) throw Object.assign(new Error(result.error.message), { remoteCode: result.error.code })
+  return result.value?.output
+}
+
+const browserClient = (host: TestHost) => ({
+  preview: async (input: object) => Schema.decodeUnknownSync(previewSchema)(await browserCall(host, 'preview', input)),
+  delete: async (input: { readonly previewId: string; readonly confirm: true }) =>
+    Schema.decodeUnknownSync(receiptSchema)(await browserCall(host, 'delete', input)),
+})
 
 const fixtureWithCompression = (compression: 'none' | 'zstd') =>
   Effect.gen(function* () {
@@ -50,7 +76,7 @@ const fixtureWithCompression = (compression: 'none' | 'zstd') =>
     // SAFETY: Loader options preserve the raw expression; only the active Fiber exposes validated resolved backend configuration.
     host.ctx.provide('configEditor', { entries: () => [entry], configuration: () => [{ entry, inherited: {}, override: entry.options.config }] } as never)
     yield* Effect.promise(() => host.mount(plugin, { packageId: '@dshfiles/conversation-cleanup' }))
-    const client = createHostApiClient(host.ctx, cleanupApi, '@test/cleanup')
+    const client = browserClient(host)
     const seed = (sessionId: string) =>
       Effect.promise(async () => {
         const handle = await host.ctx.sessionPersistence.create({
@@ -77,6 +103,16 @@ const deleteAsAgent = (test: Effect.Success<typeof fixture>, previewId: string, 
       signal: new AbortController().signal,
       agent: session === undefined ? undefined : { id: session.id, session },
     } as never)
+  })
+
+const previewAsAgent = (test: Effect.Success<typeof fixture>, session: Session) =>
+  Effect.promise(async () => {
+    const tool = test.host.tools.get('conversation_cleanup_preview')
+    if (tool === undefined) throw new Error('Cleanup preview tool was not registered')
+    // SAFETY: the real dshx tool adapter reads only signal and the calling Agent id/session to build ApiCaller; previews are bound to that caller.
+    return Schema.decodeUnknownSync(previewSchema)(
+      await tool.execute({}, { signal: new AbortController().signal, agent: { id: session.id, session } } as never),
+    )
   })
 
 describe('cleanup with native JSONL persistence', () => {
@@ -198,14 +234,15 @@ describe('cleanup with native JSONL persistence', () => {
         const target = yield* test.seed('protected-target')
         test.lifecycle.archivedSessionIds = [target]
         const session = test.host.ctx.sessions.create(SessionId('root-caller'), { meta: { cwd: test.root } })
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* previewAsAgent(test, session)
         for (const mode of ['read-only', 'workspace-write'] as const) {
           setSandboxMode(session, mode)
           const result = yield* Effect.exit(deleteAsAgent(test, preview.previewId, session))
           expect(result._tag).toBe('Failure')
           expect(yield* Effect.promise(() => test.host.ctx.sessionPersistence.stat(target))).toBeDefined()
         }
-        const ownerReceipt = yield* Effect.promise(() => test.client.delete({ previewId: preview.previewId, confirm: true }))
+        const ownerPreview = yield* Effect.promise(() => test.client.preview({}))
+        const ownerReceipt = yield* Effect.promise(() => test.client.delete({ previewId: ownerPreview.previewId, confirm: true }))
         expect(ownerReceipt.results).toMatchObject([{ sessionId: target, status: 'deleted' }])
       }).pipe(Effect.scoped),
     )
@@ -216,14 +253,16 @@ describe('cleanup with native JSONL persistence', () => {
         const target = yield* test.seed('missing-authority-target')
         test.lifecycle.archivedSessionIds = [target]
         const session = test.host.ctx.sessions.create(SessionId('no-policy'), { meta: { cwd: test.root } })
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* previewAsAgent(test, session)
         expect((yield* Effect.exit(deleteAsAgent(test, preview.previewId, session)))._tag).toBe('Failure')
         expect((yield* Effect.exit(deleteAsAgent(test, preview.previewId)))._tag).toBe('Failure')
         yield* Effect.promise(() => test.host.ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: test.root }))
         const detached = test.host.ctx.sessions.prepare(SessionId('not-published'), { meta: { cwd: test.root } })
-        expect((yield* Effect.exit(deleteAsAgent(test, preview.previewId, detached)))._tag).toBe('Failure')
+        const detachedPreview = yield* previewAsAgent(test, detached)
+        expect((yield* Effect.exit(deleteAsAgent(test, detachedPreview.previewId, detached)))._tag).toBe('Failure')
         expect(yield* Effect.promise(() => test.host.ctx.sessionPersistence.stat(target))).toBeDefined()
-        expect((yield* Effect.promise(() => test.client.delete({ previewId: preview.previewId, confirm: true }))).results).toMatchObject([
+        const ownerPreview = yield* Effect.promise(() => test.client.preview({}))
+        expect((yield* Effect.promise(() => test.client.delete({ previewId: ownerPreview.previewId, confirm: true }))).results).toMatchObject([
           { status: 'deleted' },
         ])
       }).pipe(Effect.scoped),
@@ -235,11 +274,12 @@ describe('cleanup with native JSONL persistence', () => {
         yield* Effect.promise(() => test.host.ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: test.root }))
         const target = yield* test.seed('root-authority-target')
         test.lifecycle.settledSessionIds = [target]
-        const preview = yield* Effect.promise(() => test.client.preview({}))
         const child = test.host.ctx.sessions.create(SessionId('child-caller'), { meta: { cwd: test.root, origin: 'subagent', delegationDepth: 1 } })
-        expect((yield* Effect.exit(deleteAsAgent(test, preview.previewId, child)))._tag).toBe('Failure')
+        const childPreview = yield* previewAsAgent(test, child)
+        expect((yield* Effect.exit(deleteAsAgent(test, childPreview.previewId, child)))._tag).toBe('Failure')
         const root = test.host.ctx.sessions.create(SessionId('permitted-root'), { meta: { cwd: test.root } })
-        const result = yield* deleteAsAgent(test, preview.previewId, root)
+        const rootPreview = yield* previewAsAgent(test, root)
+        const result = yield* deleteAsAgent(test, rootPreview.previewId, root)
         expect(result).toMatchObject({ results: [{ sessionId: target, status: 'deleted' }] })
         expect(yield* Effect.promise(() => test.host.ctx.sessionPersistence.stat(target))).toBeUndefined()
       }).pipe(Effect.scoped),
@@ -276,6 +316,20 @@ describe('cleanup with native JSONL persistence', () => {
         expect((yield* Effect.promise(() => test.client.delete({ previewId: preview.previewId, confirm: true }))).results).toMatchObject([
           { sessionId: target, status: 'skipped' },
         ])
+        expect(yield* Effect.promise(() => test.host.ctx.sessionPersistence.stat(target))).toBeDefined()
+      }).pipe(Effect.scoped),
+    )
+
+    it.effect('refuses plugin callers even with a fresh owner preview', () =>
+      Effect.gen(function* () {
+        const test = yield* fixture
+        const target = yield* test.seed('plugin-caller-target')
+        test.lifecycle.archivedSessionIds = [target]
+        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const pluginClient = createHostApiClient(test.host.ctx, cleanupApi, '@test/cleanup')
+        yield* Effect.promise(() =>
+          expect(pluginClient.delete({ previewId: preview.previewId, confirm: true })).rejects.toMatchObject({ remoteCode: 'cleanup-forbidden' }),
+        )
         expect(yield* Effect.promise(() => test.host.ctx.sessionPersistence.stat(target))).toBeDefined()
       }).pipe(Effect.scoped),
     )

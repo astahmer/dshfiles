@@ -15,15 +15,20 @@ interface JsonlFilesInput {
   readonly sessionId: string
 }
 
+export const SUPPORTED_SESSION_FORMAT = 4
+
 // Layout adapted from @deepseek-ai/dsh-session-persistence-jsonl 0.2.1-rc.2 (MIT), format.ts.
+const escapeCodeUnit = (code: number): string => {
+  const character = String.fromCharCode(code)
+  return /^[A-Za-z0-9._-]$/.test(character) ? character : `~${code.toString(16).toUpperCase().padStart(4, '0')}`
+}
+
 const encodeSegment = (raw: string): string => {
   if (raw === '.') return '~002E'
   if (raw === '..') return '~002E~002E'
   let encoded = ''
   for (let index = 0; index < raw.length; index++) {
-    const code = raw.charCodeAt(index)
-    const character = String.fromCharCode(code)
-    encoded += /^[A-Za-z0-9._-]$/.test(character) ? character : `~${code.toString(16).toUpperCase().padStart(4, '0')}`
+    encoded += escapeCodeUnit(raw.charCodeAt(index))
   }
   return encoded
 }
@@ -39,13 +44,13 @@ const projectKey = (cwd: string): string => {
       separatorRun = true
       continue
     }
-    readable += /^[A-Za-z0-9._-]$/.test(character) ? character : `~${code.toString(16).toUpperCase().padStart(4, '0')}`
+    readable += escapeCodeUnit(code)
     separatorRun = false
   }
   return `--${(readable.replace(/^-+/, '') || 'root').slice(0, 251)}--`
 }
 
-export const jsonlSessionDirectory = Effect.fn('conversation jsonl directory')(function* (input: JsonlFilesInput) {
+export const jsonlSessionDirectory = Effect.fn('conversation jsonl resolve')(function* (input: JsonlFilesInput) {
   const path = yield* Path.Path
   if (
     !path.isAbsolute(input.root) ||
@@ -89,7 +94,7 @@ export const purgeJsonlFiles = Effect.fn('conversation jsonl purge')(function* (
         const match = /^session(?:\.v([1-9][0-9]*))?\.jsonl(?:\.zstd)?$/u.exec(name)
         if (match === null) return
         const version = match[1] === undefined ? 0 : Number(match[1])
-        if (!Number.isSafeInteger(version) || version > 4) {
+        if (!Number.isSafeInteger(version) || version > SUPPORTED_SESSION_FORMAT) {
           return yield* new JsonlPurgeRefused({ reason: 'A log uses a generation newer than the supported session format.' })
         }
         if ((yield* fs.lstat(path.join(directory, name))).type !== 'File') {
@@ -100,7 +105,7 @@ export const purgeJsonlFiles = Effect.fn('conversation jsonl purge')(function* (
     { concurrency: 1 },
   )
   if (files.length === 0) return yield* new JsonlPurgeRefused({ reason: 'No canonical session log exists at the verified location.' })
-  const current = files.filter(file => file.version === 4)
+  const current = files.filter(file => file.version === SUPPORTED_SESSION_FORMAT)
   const selected = current.length === 1 ? current[0] : undefined
   if (selected === undefined) return yield* new JsonlPurgeRefused({ reason: 'Exactly one current-format log must exist at the verified location.' })
   // The pinned backend uses nanosecond metadata unavailable through Effect FileSystem; this is its exact 0.2.1-rc.2 revision adapter.
