@@ -270,15 +270,10 @@ export default defineClient({
                 if (key === undefined) return []
                 const nav = navigation.find(candidate => candidate.options.id === key)
                 const discoveryTitle = providedTitles.findLast(title => title.panelId === key)?.discoveryTitle
-                return [
-                  {
-                    key,
-                    title:
-                      panelTabTitle(key, resolveSlotLabel((nav ?? entry).options.label), providedTitles) ?? key.replace(/^dshfiles-/u, '').replaceAll('-', ' '),
-                    ...(discoveryTitle === undefined ? {} : { discoveryTitle }),
-                    hiddenFromAdd: nav === undefined,
-                  },
-                ]
+                const title =
+                  panelTabTitle(key, resolveSlotLabel((nav ?? entry).options.label), providedTitles) ?? key.replace(/^dshfiles-/u, '').replaceAll('-', ' ')
+                const hiddenFromAdd = nav === undefined
+                return [discoveryTitle === undefined ? { key, title, hiddenFromAdd } : { key, title, discoveryTitle, hiddenFromAdd }]
               }),
               props.renderMain,
             )

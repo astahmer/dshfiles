@@ -1,3 +1,4 @@
+import type * as Types from 'effect/Types'
 import type { ReactNode } from 'react'
 import type { WorkbenchPanelDefinition, WorkbenchPanelRegistry } from './registry.js'
 
@@ -47,14 +48,14 @@ export const createMainPanelSources = (registry: WorkbenchPanelRegistry) => {
           previous.definition.hiddenFromAdd === (entry.hiddenFromAdd ?? false)
         )
           continue
-        const definition: WorkbenchPanelDefinition = {
+        const definition: Types.Mutable<WorkbenchPanelDefinition> = {
           id: `main/${key}`,
           title,
-          ...(entry.discoveryTitle === undefined ? {} : { discoveryTitle: entry.discoveryTitle }),
           mainPanelId: key,
           hiddenFromAdd: entry.hiddenFromAdd ?? false,
           component: previous?.definition.component ?? (() => renderMain(key)),
         }
+        if (entry.discoveryTitle !== undefined) definition.discoveryTitle = entry.discoveryTitle
         const dispose = registry.register(definition)
         previous?.dispose()
         registrations.set(key, { definition, dispose })
