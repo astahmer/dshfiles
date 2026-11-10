@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { ChatTurnActionExtras } from '@dshfiles/chat/chat-focus'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { WorkbenchMainNavigation, workbenchPanels } from '@dshfiles/workbench/registry'
 import { AlertNotifier } from './alerts/alert-notifier.js'
 import { TRACES_ALERTS_LOCALE_NAMESPACE, tracesAlertsLocale } from './alerts/alerts-locale.js'
 import { TRACES_LOCALE_NAMESPACE, tracesLocale } from './locales.js'
@@ -19,7 +20,7 @@ import { SessionRequestsView } from './session-requests-view.js'
 import { SessionTracesView } from './session-view.js'
 import { ThreadLinks } from './thread-links.js'
 import { TurnTraceButton } from './turn-trace-button.js'
-import { storedTracesView } from './view-state.js'
+import { panelStores } from './panel-stores.js'
 
 const PANEL_ID = 'traces'
 
@@ -43,8 +44,13 @@ export default defineClient({
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (panelId: string): panelId is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === panelId)
     const openAlerts = (): void => {
-      storedTracesView.set({ ...storedTracesView.get(), tab: 'alerts' })
-      if (isMainPanelId(PANEL_ID)) ctx.layout.selectPanel(PANEL_ID)
+      void WorkbenchMainNavigation.open(PANEL_ID)
+        .then(result => {
+          const store = panelStores(result.kind === 'native' ? undefined : result.panelId).traces
+          store.set({ ...store.get(), tab: 'alerts' })
+          if (result.kind === 'native' && isMainPanelId(PANEL_ID)) ctx.layout.selectPanel(PANEL_ID)
+        })
+        .catch((error: unknown) => console.error('Could not open Traces alerts; open Traces from the sidebar and select Alerts.', error))
     }
     const openThread = createThreadOpener({
       sessions: ctx.sessions,
@@ -110,6 +116,27 @@ export default defineClient({
           </PluginQueryProvider>
         )),
       ),
+    )
+    ctx.effect(
+      () =>
+        workbenchPanels().register({
+          id: `main/${PANEL_ID}`,
+          mainPanelId: PANEL_ID,
+          title: label(),
+          component: decorate(props => (
+            <PluginQueryProvider>
+              <TracesPanel
+                panelId={props.panelId}
+                sessions={ctx.sessions}
+                workspaces={ctx.workspaces}
+                uiWorkspace={ctx.uiWorkspace}
+                t={translate}
+                tAlerts={translateAlerts}
+              />
+            </PluginQueryProvider>
+          )),
+        }),
+      'traces: workbench panel',
     )
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register(

@@ -22,15 +22,30 @@ interface QuotaLocation extends QuotaAccount {
   readonly visit: number
 }
 
-let location: QuotaLocation = { view: 'accounts', visit: 0 }
-const listeners = new Set<() => void>()
-const subscribe = (listener: () => void): (() => void) => {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
+const createLocation = () => {
+  let location: QuotaLocation = { view: 'accounts', visit: 0 }
+  const listeners = new Set<() => void>()
+  return {
+    get: () => location,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    set: (next: QuotaLocation) => {
+      location = next
+      for (const listener of listeners) listener()
+    },
+  }
 }
-const set = (next: QuotaLocation): void => {
-  location = next
-  for (const listener of listeners) listener()
+const locations = new Map<string | undefined, ReturnType<typeof createLocation>>()
+const locationFor = (panelId?: string) => {
+  const existing = locations.get(panelId)
+  if (existing !== undefined) return existing
+  const location = createLocation()
+  locations.set(panelId, location)
+  return location
 }
 
 /** The account fields that are set, without carrying an explicit `undefined` into the location. */
@@ -40,19 +55,20 @@ const accountOf = (source: { readonly accountId?: string | undefined; readonly d
   return displayName === undefined ? { accountId } : { accountId, displayName }
 }
 
-const go = (target: UsageQuotaTarget = {}): void => set({ view: target.view ?? location.view, ...accountOf(target), visit: location.visit + 1 })
+const go = (target: UsageQuotaTarget = {}, panelId?: string): void => {
+  const location = locationFor(panelId)
+  const current = location.get()
+  location.set({ view: target.view ?? current.view, ...accountOf(target), visit: current.visit + 1 })
+}
 
 /**
  * Usage › Quota: ai-accounts' quota views (one account, history, forecast) inside the Usage page. They come from
  * `@dshfiles/ai-accounts` through `AccountQuotaViews`; without it the tab says what to install instead of guessing.
  */
-const QuotaTab = (): JSX.Element => {
+const QuotaTab = (props: { readonly panelId?: string | undefined }): JSX.Element => {
   const views = useContract(AccountQuotaViews)
-  const current = useSyncExternalStore(
-    subscribe,
-    () => location,
-    () => location,
-  )
+  const location = locationFor(props.panelId)
+  const current = useSyncExternalStore(location.subscribe, location.get, location.get)
   if (views.status !== 'active')
     return (
       <EmptyState className="dshx:rounded-lg dshx:border dshx:border-border">
@@ -74,7 +90,7 @@ const QuotaTab = (): JSX.Element => {
           value={current.view}
           onValueChange={value => {
             const view = USAGE_QUOTA_VIEWS.find(candidate => candidate === value)
-            if (view !== undefined) set({ ...current, view })
+            if (view !== undefined) location.set({ ...current, view })
           }}
         >
           {USAGE_QUOTA_VIEWS.map(view => (
@@ -94,5 +110,5 @@ export class UsageQuota {
   /** Land on a view (and account) of the Quota tab; the caller selects the Usage page and its Quota tab. */
   static readonly go = go
   /** Where the Quota tab stands now. */
-  static readonly current = (): QuotaLocation => location
+  static readonly current = (panelId?: string): QuotaLocation => locationFor(panelId).get()
 }

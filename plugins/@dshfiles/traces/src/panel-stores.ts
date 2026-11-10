@@ -24,8 +24,14 @@ const boardIdFor = (panelId?: string) =>
   })
 export const storedBoardId = boardIdFor()
 
-export const panelStores = (panelId?: string) =>
-  panelId === undefined
-    ? { traces: storedTracesView, logs: storedLogsView, board: storedBoardId }
-    : { traces: tracesViewFor(panelId), logs: logsViewFor(panelId), board: boardIdFor(panelId) }
-export type PanelStores = ReturnType<typeof panelStores>
+const nativeStores = { traces: storedTracesView, logs: storedLogsView, board: storedBoardId }
+export type PanelStores = typeof nativeStores
+const occurrences = new Map<string, PanelStores>()
+export const panelStores = (panelId?: string): PanelStores => {
+  if (panelId === undefined) return nativeStores
+  const existing = occurrences.get(panelId)
+  if (existing !== undefined) return existing
+  const stores = { traces: tracesViewFor(panelId), logs: logsViewFor(panelId), board: boardIdFor(panelId) }
+  occurrences.set(panelId, stores)
+  return stores
+}

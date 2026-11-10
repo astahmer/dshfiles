@@ -43,11 +43,37 @@ type Preferences = typeof preferencesSchema.Type
 const DEFAULT_PREFERENCES: Preferences = { tab: 'charts', preset: '7d', customFrom: '', customTo: '', bucket: 'day', groupBy: 'model', purposes: [] }
 type UsageDateRange = { readonly from: number; readonly to: number }
 
-const storedPreferences = createStoredValue({
-  key: 'dshfiles-usage:view.v1',
-  schema: preferencesSchema,
-  fallback: DEFAULT_PREFERENCES,
-})
+const createPanelState = (panelId?: string) => {
+  const preferences = createStoredValue({
+    key: panelId === undefined ? 'dshfiles-usage:view.v1' : `dshfiles-usage:view.v1/panel/${encodeURIComponent(panelId)}`,
+    schema: preferencesSchema,
+    fallback: DEFAULT_PREFERENCES,
+  })
+  let thread: ThreadFilter | null = null
+  const listeners = new Set<() => void>()
+  return {
+    preferences,
+    thread: () => thread,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    setThread: (next: ThreadFilter | null) => {
+      thread = next
+      for (const listener of listeners) listener()
+    },
+  }
+}
+const panelStates = new Map<string | undefined, ReturnType<typeof createPanelState>>()
+const panelState = (panelId?: string) => {
+  const existing = panelStates.get(panelId)
+  if (existing !== undefined) return existing
+  const state = createPanelState(panelId)
+  panelStates.set(panelId, state)
+  return state
+}
 
 const startOfDay = (at: number): number => {
   const date = new Date(at)
@@ -92,8 +118,9 @@ type UsageTab = Preferences['tab']
 const USAGE_TABS: readonly UsageTab[] = ['charts', 'quota', 'log', 'activity']
 
 /** Select a tab of the Usage page from outside it (the Quota navigation contract, palette rows). */
-const showTab = (tab: UsageTab): void => {
-  storedPreferences.set({ ...storedPreferences.get(), tab })
+const showTab = (tab: UsageTab, panelId?: string): void => {
+  const store = panelState(panelId).preferences
+  store.set({ ...store.get(), tab })
 }
 
 /** Requests narrowed to one thread, set by its Cost facet; a session detail, so not stored. */
@@ -101,28 +128,21 @@ interface ThreadFilter {
   readonly sessionId: string
   readonly label: string
 }
-let threadFilter: ThreadFilter | null = null
-const threadFilterListeners = new Set<() => void>()
-const subscribeThreadFilter = (listener: () => void): (() => void) => {
-  threadFilterListeners.add(listener)
-  return () => threadFilterListeners.delete(listener)
-}
-const setThreadFilter = (next: ThreadFilter | null): void => {
-  threadFilter = next
-  for (const listener of threadFilterListeners) listener()
-}
 
 export class UsageTabs {
   static readonly show = showTab
   /** Requests of one thread: the Requests tab with that thread's filter on. */
-  static readonly showRequestsFor = (filter: ThreadFilter): void => {
-    setThreadFilter(filter)
+  static readonly showRequestsFor = (filter: ThreadFilter, panelId?: string): void => {
+    const state = panelState(panelId)
+    state.setThread(filter)
     // A thread's requests can be older than the current preset; the year preset holds its whole history.
-    storedPreferences.set({ ...storedPreferences.get(), tab: 'log', preset: '365d', bucket: 'day' })
+    state.preferences.set({ ...state.preferences.get(), tab: 'log', preset: '365d', bucket: 'day' })
   }
 }
 
-export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Element => {
+export const UsagePanel = (props: { readonly openThread: OpenThread; readonly panelId?: string }): JSX.Element => {
+  const state = panelState(props.panelId)
+  const storedPreferences = state.preferences
   const api = useApi(usageApi)
   const queryClient = useQueryClient()
   const preferences = storedPreferences.useValue()
@@ -130,11 +150,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
     storedPreferences.set({ ...storedPreferences.get(), ...patch })
   }
   const [logSearch, setLogSearch] = useState('')
-  const thread = useSyncExternalStore(
-    subscribeThreadFilter,
-    () => threadFilter,
-    () => threadFilter,
-  )
+  const thread = useSyncExternalStore(state.subscribe, state.thread, state.thread)
   const [mountedAt] = useState(() => Date.now())
 
   const statusQuery = useQuery({
@@ -219,7 +235,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
       )}
 
       {preferences.tab === 'quota' ? (
-        <UsageQuota.Tab />
+        <UsageQuota.Tab panelId={props.panelId} />
       ) : (
         <>
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" role="group" aria-label="Date range">
@@ -309,7 +325,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
                   <span className="dshx:min-w-0 dshx:truncate">
                     Thread: <span className="dshx:font-medium">{thread.label}</span>
                   </span>
-                  <Button size="xs" variant="ghost" onClick={() => setThreadFilter(null)}>
+                  <Button size="xs" variant="ghost" onClick={() => state.setThread(null)}>
                     Show every thread
                   </Button>
                 </div>

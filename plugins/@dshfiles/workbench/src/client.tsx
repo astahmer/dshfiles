@@ -26,6 +26,7 @@ import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
 import {
   workbenchPanels,
   NativeAsideOwners,
+  WorkbenchMainNavigation,
   panelTabTitle,
   type WORKBENCH_MAIN_PANEL_ID,
   type ThreadFacetObservable,
@@ -40,6 +41,7 @@ import { panelMainTarget } from './panel-main-target.js'
 import { createTabPanelAdapter } from './tab-panels.js'
 import { KeptThreadViews } from './kept-thread-views.js'
 import { createSemanticPanelOpener } from './semantic-panel-opener.js'
+import { createMainNavigation } from './main-navigation.js'
 import { createResettableAsidePlacement, WorkbenchReset } from './reset-layout.js'
 import { ConversationPanels } from './conversation-panels.js'
 import { semanticLayouts } from './semantic-layouts.js'
@@ -675,6 +677,25 @@ export default defineClient({
         openInRegion,
       })
     let semanticPanelOpener = newSemanticPanelOpener()
+    ctx.effect(() => {
+      const navigation = createMainNavigation({
+        isWorkbench: () => ctx.get('mainSurface')?.mode() === 'workbench',
+        definition: id => registry.list().find(panel => panel.mainPanelId === id && !panel.hiddenFromAdd),
+        definitionForTab: id => registry.list().find(panel => panel.tabId === id),
+        tabs: workbenchTabs,
+        subscribeRegistry: registry.subscribe,
+        requestSemantic: (id, title) => semanticPanelOpener.request('main', id, title),
+        reveal: id => {
+          const owner = regions.entries().find(([, api]) => api.getPanel(id) !== undefined)
+          openInRegion(owner?.[0] ?? 'main', id)
+        },
+      })
+      const unregister = WorkbenchMainNavigation.register(navigation.open)
+      return () => {
+        unregister()
+        navigation.dispose()
+      }
+    }, 'workbench: targeted main navigation')
 
     let revealLeftPanel: (() => void) | undefined
     const movePanelTo = (from: WorkbenchRegionId, api: DockviewApi, to: WorkbenchRegionId, panelId: string): void => {
