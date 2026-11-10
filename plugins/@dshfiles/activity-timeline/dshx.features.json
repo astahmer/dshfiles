@@ -178,7 +178,7 @@
     {
       "id": "verification-receipts",
       "title": "Inspect verification receipts in the Activity Timeline",
-      "summary": "Project Checks publishes a strict, bounded receipt summary after persistence; the timeline deduplicates replay, marks failures and timeouts for attention, and opens only a currently listed Session.",
+      "summary": "Project Checks publishes a strict, bounded v2 receipt summary with its verification stage after persistence; the timeline still accepts v1, keeps peer targets, workspaces and failure text out of storage, deduplicates replay, marks failures and timeouts for attention, and opens only a currently listed Session.",
       "reach": [
         "seed tool-call-thread",
         "click tab \"Observe\"",
@@ -194,6 +194,8 @@
       "states": ["passed", "failed", "timed-out", "cancelled", "backfilled", "deduplicated", "session-opened"],
       "failureModes": [
         "Unknown schema versions and extra payload fields are rejected before the timeline stores an event.",
+        "A v1 receipt's sshTarget, workspace and failure message are dropped before storage; v2 rejects those keys.",
+        "A receipt without a recorded stage reads not-recorded instead of an inferred stage.",
         "An archived or missing Session is reported unavailable without being revived or mutated.",
         "A missing Activity Timeline does not prevent Project Checks from persisting its authoritative receipt.",
         "Historical revisions are not presented as current source freshness, and configuration equivalence remains unknown."
@@ -225,7 +227,31 @@
           "kind": "unit-test",
           "id": "activity-timeline.receipts-versioned-envelope",
           "file": "plugins/@dshfiles/activity-timeline/src/receipt-activity.test.ts",
-          "testName": "accepts only the current version and exact bounded fields"
+          "testName": "accepts v1 and v2 with exact bounded fields and projects bounded metadata"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.receipts-v1-compatibility",
+          "file": "plugins/@dshfiles/activity-timeline/src/receipt-activity.test.ts",
+          "testName": "keeps decoding v1 events that carry peer keys, and drops them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.receipts-v2-no-peer-keys",
+          "file": "plugins/@dshfiles/activity-timeline/src/receipt-activity.test.ts",
+          "testName": "refuses peer keys and failure text in v2"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.receipts-stage",
+          "file": "plugins/@dshfiles/activity-timeline/src/receipt-activity.test.ts",
+          "testName": "shows every recorded stage and “not recorded” without one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.receipts-persisted-peer-sentinels",
+          "file": "plugins/@dshfiles/activity-timeline/src/receipt-activity.test.ts",
+          "testName": "persists a peer receipt without its target, workspace or stderr, and the stored event round-trips"
         },
         {
           "kind": "unit-test",
