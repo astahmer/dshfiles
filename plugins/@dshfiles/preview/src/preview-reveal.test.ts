@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PreviewPageView } from './api.js'
+import type { DevServerView, PreviewPageView } from './api.js'
 import { PreviewReveal } from './preview-reveal.js'
 
 const page = (input: { readonly pageId: string; readonly revealRequestedAt: number | null }): PreviewPageView => ({
@@ -76,5 +76,32 @@ describe('PreviewReveal.attempt', () => {
     const second = PreviewReveal.attempt({ sessionId: 's', pushed, pages, shown: new Set(['reveal:s:p2:30']), onScreen: true, open: browser.open })
     expect(second.shown).toBeUndefined()
     expect(browser.opened).toEqual(['http://localhost:5173/p2'])
+  })
+})
+
+const server = (input: { readonly pid: number; readonly port: number | null }): DevServerView => ({
+  pid: input.pid,
+  startedAt: 100,
+  name: 'vite',
+  command: 'vite',
+  cwd: '/repo',
+  ports: input.port === null ? [] : [{ address: '127.0.0.1', port: input.port, url: `http://127.0.0.1:${String(input.port)}/` }],
+  sessionIds: ['s'],
+  attribution: 'job',
+  jobId: null,
+})
+
+describe('PreviewReveal.offer', () => {
+  it('offers the first dev server with a port that was not handled yet', () => {
+    const servers = [server({ pid: 1, port: null }), server({ pid: 2, port: 5173 }), server({ pid: 3, port: 3000 })]
+    expect(PreviewReveal.offer({ sessionId: 's', servers, handled: new Set() })).toEqual({ key: 'server:s:2:100', url: 'http://127.0.0.1:5173/' })
+    expect(PreviewReveal.offer({ sessionId: 's', servers, handled: new Set(['server:s:2:100']) })).toEqual({
+      key: 'server:s:3:100',
+      url: 'http://127.0.0.1:3000/',
+    })
+  })
+
+  it('offers nothing once every server was handled', () => {
+    expect(PreviewReveal.offer({ sessionId: 's', servers: [server({ pid: 2, port: 5173 })], handled: new Set(['server:s:2:100']) })).toBeUndefined()
   })
 })

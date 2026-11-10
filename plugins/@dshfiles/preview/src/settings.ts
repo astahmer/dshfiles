@@ -18,6 +18,9 @@ export const previewSettings = defineSettings({
       .default(15)
       .description('Close a thread’s preview pages after this many minutes without a preview tool call.'),
     maxPagesPerThread: Schema.natural().min(1).max(16).default(4).description('Most preview pages one thread may keep open at once.'),
+    autoOpenDevServers: Schema.boolean()
+      .default(false)
+      .description('Open a dev server the thread on screen starts in the Browser tab beside it, instead of offering a Preview button in the thread header.'),
   }),
   applies: 'live',
 })

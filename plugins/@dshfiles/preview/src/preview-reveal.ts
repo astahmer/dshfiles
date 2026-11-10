@@ -1,4 +1,4 @@
-import type { PreviewPageView } from './api.js'
+import type { DevServerView, PreviewPageView } from './api.js'
 
 /** One `preview_reveal` (or `preview_open` with reveal) of a page. */
 export interface RevealRequest {
@@ -46,6 +46,30 @@ const attempt = (input: {
   return input.open(newest.url) ? { shown: key, retry: false } : { shown: undefined, retry: true }
 }
 
+const serverKey = (input: { readonly sessionId: string; readonly server: DevServerView }): string =>
+  `server:${input.sessionId}:${String(input.server.pid)}:${String(input.server.startedAt)}`
+
+/**
+ * The dev server to offer a **Preview** for: the first one with a port that this browser has not opened, previewed or
+ * dismissed. A restarted server has a new pid, so it is offered again.
+ * @param input - the thread, its dev servers, and the keys already handled.
+ * @returns the key to record once handled and the URL to open, or undefined.
+ */
+const offer = (input: {
+  readonly sessionId: string
+  readonly servers: readonly DevServerView[]
+  readonly handled: ReadonlySet<string>
+}): { readonly key: string; readonly url: string } | undefined => {
+  for (const server of input.servers) {
+    const url = server.ports[0]?.url
+    const key = serverKey({ sessionId: input.sessionId, server })
+    if (url !== undefined && !input.handled.has(key)) return { key, url }
+  }
+  return undefined
+}
+
 export class PreviewReveal {
   static readonly attempt = attempt
+  static readonly offer = offer
+  static readonly serverKey = serverKey
 }

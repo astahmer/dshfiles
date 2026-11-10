@@ -108,14 +108,22 @@
     {
       "id": "thread-dev-servers",
       "title": "Thread dev servers",
-      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on — processes from its jobs or bash calls, and processes running inside its workspace — plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop. The same list is the Dev servers tab of Observe › Processes (every thread that runs a job) and part of the thread panel's Jobs facet.",
+      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on — processes from its jobs or bash calls, and processes running inside its workspace — plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop. A dev server this browser has not opened yet gets a Preview button beside the chip, which opens it beside the thread; autoOpenDevServers opens it there without the click. The same list is the Dev servers tab of Observe › Processes (every thread that runs a job) and part of the thread panel's Jobs facet.",
       "reach": ["click button \"Dev servers and previews\"", "expect region \"Dev servers\""],
       "surfaces": ["host", "tool", "client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "thread-header: Dev servers and previews",
-      "configuration": [],
-      "states": ["hidden", "listed", "stop-armed", "stopped", "open-in-tab", "unsupported-platform"],
+      "configuration": [
+        {
+          "key": "autoOpenDevServers",
+          "defaultValue": "false",
+          "constraints": "Boolean, read live by the Client; an older Host without the field reads as false. Opens only in the pane beside the thread on screen, never a new browser tab.",
+          "choices": ["true", "false"],
+          "coveredBy": ["preview.dev-server-offer"]
+        }
+      ],
+      "states": ["hidden", "listed", "stop-armed", "stopped", "open-in-tab", "unsupported-platform", "preview-offered", "auto-opened"],
       "failureModes": [
         "The DSH Host and the processes that launched it are never listed, so their ports can never be stopped from here.",
         "A pid recycled between the list and the stop is refused because the stop re-reads the process table and matches pid and start time.",
@@ -158,6 +166,12 @@
           "id": "preview.processes-dev-servers",
           "file": "plugins/@dshfiles/preview/src/dev-servers-view.test.ts",
           "testName": "lists only threads that serve a port, in the order asked"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.dev-server-offer",
+          "file": "plugins/@dshfiles/preview/src/preview-reveal.test.ts",
+          "testName": "offers the first dev server with a port that was not handled yet"
         }
       ],
       "telemetry": [

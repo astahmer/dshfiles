@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { Browser, useApi, useApiEvent, useContract } from '@dshfiles/dshx/client'
+import { Browser, useApi, useApiEvent, useContract, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { ExternalLinkIcon, GlobeIcon, MonitorIcon, PanelRightIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
+import { ExternalLinkIcon, GlobeIcon, MonitorIcon, PanelRightIcon, SquareIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import * as Schema from 'effect/Schema'
@@ -12,16 +12,17 @@ import { previewApi, type DevServerView, type PreviewPageView } from './api.js'
 import { DevServerPoll } from './dev-server-poll.js'
 import { PreviewOpener } from './preview-opener.js'
 import { PreviewReveal, type RevealRequest } from './preview-reveal.js'
+import { previewSettings } from './settings.js'
 
-const SHOWN_LIMIT = 100
+const HANDLED_LIMIT = 100
 const REVEAL_RETRY_MS = 1_000
 const REVEAL_RETRIES = 20
 
-/** Reveals shown in this browser, so a reload does not repeat them. */
-const storedShown = createStoredValue({ key: 'dshfiles-preview:handled', schema: Schema.Array(Schema.String), fallback: [] })
+/** Reveals shown and dev servers previewed or dismissed in this browser, so a reload does not repeat them. */
+const storedHandled = createStoredValue({ key: 'dshfiles-preview:handled', schema: Schema.Array(Schema.String), fallback: [] })
 
-const recordShown = (key: string): void => {
-  storedShown.set([...storedShown.get().filter(entry => entry !== key), key].slice(-SHOWN_LIMIT))
+const recordHandled = (key: string): void => {
+  storedHandled.set([...storedHandled.get().filter(entry => entry !== key), key].slice(-HANDLED_LIMIT))
 }
 
 const portLabel = (servers: readonly DevServerView[], pages: readonly PreviewPageView[]): string => {
@@ -45,13 +46,14 @@ export const DevServersChip = (props: {
   const [armed, setArmed] = useState<number | null>(null)
   const [pushed, setPushed] = useState<RevealRequest | null>(null)
   const [retry, setRetry] = useState(0)
-  const shownList = storedShown.useValue()
-  const shown = useMemo(() => new Set(shownList), [shownList])
+  const handledList = storedHandled.useValue()
+  const handled = useMemo(() => new Set(handledList), [handledList])
+  // An older Host lacks the field, and a missing namespace reads as undefined: both keep auto-open off.
+  const autoOpen = useSettings(previewSettings).value?.autoOpenDevServers === true
   const key = useMemo(() => DevServerPoll.serversKey(props.sessionId), [props.sessionId])
   const pagesKey = useMemo(() => DevServerPoll.pagesKey(props.sessionId), [props.sessionId])
   const opener = PreviewOpener.use()
   const OpenIcon = opener.paneAvailable ? PanelRightIcon : ExternalLinkIcon
-  // An agent's reveal is not a click, so a new tab would be blocked: it only goes to the pane.
 
   const events = useApiEvent(previewApi, 'pagesChanged', payload => {
     if (payload.sessionId !== props.sessionId) return
@@ -89,15 +91,24 @@ export const DevServersChip = (props: {
       sessionId: props.sessionId,
       pushed,
       pages: pagesData?.pages ?? [],
-      shown,
+      shown: handled,
       onScreen: props.onScreen,
+      // An agent's reveal is not a click, so a new tab would be blocked: it only goes to the pane.
       open: url => pane?.open(url) === true,
     })
-    if (result.shown !== undefined) recordShown(result.shown)
+    if (result.shown !== undefined) recordHandled(result.shown)
     if (!result.retry || retry >= REVEAL_RETRIES) return
     const timer = setTimeout(() => setRetry(count => count + 1), REVEAL_RETRY_MS)
     return () => clearTimeout(timer)
-  }, [props.sessionId, props.onScreen, pushed, pagesData, shown, retry, pane, opener.paneAvailable])
+  }, [props.sessionId, props.onScreen, pushed, pagesData, handled, retry, pane, opener.paneAvailable])
+
+  const offer = PreviewReveal.offer({ sessionId: props.sessionId, servers: serversQuery.data?.servers ?? [], handled })
+  const offerKey = offer?.key
+  const offerUrl = offer?.url
+  useEffect(() => {
+    if (offerKey === undefined || offerUrl === undefined || !autoOpen || !props.onScreen) return
+    if (pane?.open(offerUrl) === true) recordHandled(offerKey)
+  }, [offerKey, offerUrl, autoOpen, props.onScreen, pane, opener.paneAvailable])
 
   const stop = useMutation({
     mutationFn: (server: DevServerView) => api.stopDevServer({ sessionId: props.sessionId, pid: server.pid, startedAt: server.startedAt, confirm: true }),
@@ -111,7 +122,7 @@ export const DevServersChip = (props: {
   const pages = pagesQuery.data?.pages ?? []
   if (servers.length === 0 && pages.length === 0) return null
 
-  return (
+  const popover = (
     <Popover
       open={open}
       onOpenChange={next => {
@@ -145,7 +156,15 @@ export const DevServersChip = (props: {
                 <span className="dshx:truncate dshx:text-muted-foreground dshx:text-xs">{server.command}</span>
               </div>
               {server.ports[0] === undefined ? null : (
-                <Button variant="outline" size="sm" className="dshx:h-6 dshx:px-2 dshx:text-xs" onClick={() => opener.open(server.ports[0]?.url ?? '')}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="dshx:h-6 dshx:px-2 dshx:text-xs"
+                  onClick={() => {
+                    recordHandled(PreviewReveal.serverKey({ sessionId: props.sessionId, server }))
+                    opener.open(server.ports[0]?.url ?? '')
+                  }}
+                >
                   <OpenIcon className="dshx:size-3" />
                   Open
                 </Button>
@@ -194,5 +213,26 @@ export const DevServersChip = (props: {
         </section>
       </PopoverContent>
     </Popover>
+  )
+  if (offer === undefined || autoOpen) return popover
+  return (
+    <div className="dshx-root dshx:flex dshx:items-center dshx:gap-0.5">
+      <Button
+        variant="outline"
+        size="sm"
+        className="dshx:h-6 dshx:gap-1 dshx:px-1.5 dshx:text-xs"
+        onClick={() => {
+          recordHandled(offer.key)
+          opener.open(offer.url)
+        }}
+      >
+        <OpenIcon className="dshx:size-3" />
+        Preview
+      </Button>
+      <Button variant="ghost" size="icon" className="dshx:size-6" aria-label="Dismiss preview" onClick={() => recordHandled(offer.key)}>
+        <XIcon className="dshx:size-3" />
+      </Button>
+      {popover}
+    </div>
   )
 }
