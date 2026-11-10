@@ -16,7 +16,8 @@ import { SearchIndex } from './index-db.js'
 import { IdleBackoff, indexSessions, runIngestPass } from './ingest.js'
 
 const IDLE_SLEEP = IdleBackoff.first
-import { SearchWorkerFailed, SearchWorkerRpcs, workerConfigSchema, type IndexHealth } from './protocol.js'
+import type { IndexHealth } from './api-schemas.js'
+import { SearchWorkerFailed, SearchWorkerRpcs, workerConfigSchema } from './protocol.js'
 
 const BUSY_SLEEP = Duration.millis(50)
 const BACKFILL_ROWIDS = 2_000

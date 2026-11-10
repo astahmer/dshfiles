@@ -8,12 +8,12 @@ import { dirname } from 'node:path'
 import { DatabaseSync, type SQLOutputValue, type StatementSync } from 'node:sqlite'
 import * as Schema from 'effect/Schema'
 import * as SchemaGetter from 'effect/SchemaGetter'
+import type { IndexHealth } from './api-schemas.js'
 import { withoutUndefined } from './optional-fields.js'
 import type {
   EventFilters,
   FindInSessionRequest,
   FindInSessionResult,
-  IndexHealth,
   SearchMatch,
   SessionEventSearchRequest,
   SessionHeaderRow,

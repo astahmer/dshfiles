@@ -8,12 +8,12 @@ import * as NodeWorker from '@effect/platform-node/NodeWorker'
 import { Context, Duration, Effect, FileSystem, Layer, Path } from 'effect'
 import { RpcClient, type RpcClientError } from 'effect/rpc'
 
+import type { IndexHealth } from './api-schemas.js'
 import {
   SearchWorkerFailed,
   SearchWorkerRpcs,
   type FindInSessionRequest,
   type FindInSessionResult,
-  type IndexHealth,
   type SearchEventsResult,
   type SearchSessionsResult,
   type SessionEventSearchRequest,

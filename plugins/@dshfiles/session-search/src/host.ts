@@ -14,7 +14,7 @@ import { findExpression } from './find-query.js'
 import { ProjectionCachePrune } from './projection-cache-prune.js'
 import { ProjectionCacheRebuild } from './projection-cache-rebuild.js'
 import { SessionQueryOwnership } from './engine-registration-promise.js'
-import type { IndexHealth } from './protocol.js'
+import type { IndexHealth } from './api-schemas.js'
 import { SearchWorker } from './worker-client.js'
 
 /** A Loader row may omit either index setting, so both keys stay optional. */

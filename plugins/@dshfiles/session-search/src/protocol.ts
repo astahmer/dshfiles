@@ -3,8 +3,6 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 
 import { FIND_LIMIT_MAX, findMatchSchema, indexHealthSchema } from './api-schemas.js'
 
-export { indexHealthSchema, type IndexHealth } from './api-schemas.js'
-
 /** A JSON value as a session log stores it. */
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
