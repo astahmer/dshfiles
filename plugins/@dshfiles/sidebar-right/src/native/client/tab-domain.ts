@@ -3,13 +3,15 @@
  *
  * One `TabOccurrence` per open record, keyed by (session, tab id): where the
  * tab was navigated to, an abort signal spanning the record's life, and the
- * actions the tab may take on itself. Holding a record also pins its address in
- * the resource model, so switching tabs unmounts a body without dropping its
- * content.
+ * actions the tab may take on itself. A record of a resident session also pins
+ * its address in the resource model, so switching tabs unmounts a body without
+ * dropping its content. Records of the other sessions stay open but unpinned: a
+ * pinned subagent chat or thread aside holds a whole Session with its event
+ * window and live follow, and a long-lived page visits hundreds of threads.
  *
  * `sync` reconciles occurrences against one session's layout after every
- * commit: a record that appeared is pinned, one that vanished (closed, or its
- * open undone) is aborted and dropped. A record restored by undo is a new
+ * commit: a record that appeared is pinned while its session is resident, one
+ * that vanished (closed, or its open undone) is aborted and dropped. A record restored by undo is a new
  * occurrence and is fetched again if the resource model already let it go. The
  * controller syncs each session from that session's adopted store on every
  * commit, on screen or not, so a record closed from another session's seat is
@@ -69,13 +71,14 @@ interface Held extends TabOccurrence {
   readonly controller: AbortController
   /** The docked pane holding the record at the last sync; `undefined` while it floats or before any sync. */
   paneId: PaneId | undefined
-  /** Whether the resource model has been asked to hold the address. */
-  pinned: boolean
+  /** Releases the resource model's hold on the address; `undefined` while unpinned. */
+  pin: AbortController | undefined
 }
 
 /** Every session's occurrences. */
 export class TabDomain {
   private readonly bySession = new Map<SessionId, Map<TabId, Held>>()
+  private resident: ReadonlySet<SessionId> = new Set()
 
   /**
    * @param navigator - where tab actions go, aimed at the tab's session; the navigation controller.
@@ -105,9 +108,23 @@ export class TabDomain {
       const occurrence = held.get(tab.id) ?? this.hold(sessionId, tab.id, { address: tab.contentId, params: undefined, revision: 0 })
       const pane = findTabPane(layout, tab.id)
       occurrence.paneId = pane.host === 'dock' ? pane.id : undefined
-      if (occurrence.pinned) continue
-      occurrence.pinned = true
-      this.pin(occurrence.navigation.getSnapshot().address, occurrence.signal)
+      if (this.resident.has(sessionId)) this.pinOccurrence(occurrence)
+    }
+  }
+
+  /**
+   * Keep resource pins only for these sessions' records; the others release theirs until their session is resident
+   * again, which reopens them. Open records, their navigation and their actions are untouched.
+   * @param sessionIds - the sessions whose records hold their content.
+   */
+  retainSessions(sessionIds: ReadonlySet<SessionId>): void {
+    this.resident = sessionIds
+    for (const [sessionId, held] of this.bySession) {
+      const resident = sessionIds.has(sessionId)
+      for (const occurrence of held.values()) {
+        if (resident) this.pinOccurrence(occurrence)
+        else this.unpinOccurrence(occurrence)
+      }
     }
   }
 
@@ -150,6 +167,18 @@ export class TabDomain {
     this.bySession.clear()
   }
 
+  private pinOccurrence(occurrence: Held): void {
+    if (occurrence.pin !== undefined || occurrence.signal.aborted) return
+    const pin = new AbortController()
+    occurrence.pin = pin
+    this.pin(occurrence.navigation.getSnapshot().address, AbortSignal.any([occurrence.signal, pin.signal]))
+  }
+
+  private unpinOccurrence(occurrence: Held): void {
+    occurrence.pin?.abort()
+    occurrence.pin = undefined
+  }
+
   private session(sessionId: SessionId): Map<TabId, Held> {
     let held = this.bySession.get(sessionId)
     if (held === undefined) {
@@ -180,7 +209,7 @@ export class TabDomain {
       signal: controller.signal,
       navigation: createSnapshotStore(navigation),
       paneId: undefined,
-      pinned: false,
+      pin: undefined,
       tabActions: {
         bindCommands: commands => {
           if (controller.signal.aborted) return () => {}

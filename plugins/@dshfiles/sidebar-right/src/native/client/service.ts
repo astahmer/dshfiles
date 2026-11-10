@@ -66,6 +66,9 @@ interface Adoption {
   readonly unsubscribe: () => void
 }
 
+/** The on-screen Session and the one shown before it keep their tabs' resources open, so switching back is instant. */
+const RESIDENT_TAB_SESSIONS = 2
+
 /** The room rule's verdict for a docked pane, as a seat's docking kit last measured it: whether two working halves would fit. */
 type RoomRule = (paneId: PaneId) => boolean
 
@@ -126,9 +129,17 @@ export function createSidebarRightController(
       return () => layoutListeners.delete(listener)
     },
   }
+  const recentlyShown: SessionId[] = []
   const show = (sessionId: SessionId | undefined): void => {
     if (onScreen.getSnapshot() === sessionId) return
     onScreen.set(sessionId)
+    if (sessionId !== undefined) {
+      const previous = recentlyShown.indexOf(sessionId)
+      if (previous !== -1) recentlyShown.splice(previous, 1)
+      recentlyShown.push(sessionId)
+      if (recentlyShown.length > RESIDENT_TAB_SESSIONS) recentlyShown.shift()
+      controller.tabDomain.retainSessions(new Set(recentlyShown))
+    }
     layoutChanged()
   }
   const controller = new SidebarRightController(tabs, pin, host, { adopted, rooms, onScreen, openTabs: inventory.source, layoutChanges, show })

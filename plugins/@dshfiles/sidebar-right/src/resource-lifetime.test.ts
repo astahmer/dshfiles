@@ -82,8 +82,52 @@ it('preserves real per-session occurrences through target moves and invokes term
   expect(cleanup).toHaveBeenCalledWith(a, terminal)
   expect(held.signal.aborted).toBe(true)
   expect(owner.controller.tabsIn(b)).toHaveLength(1)
-  expect(pin).toHaveBeenCalledWith(terminal.contentId, held.signal)
+  const terminalPin = pin.mock.calls.find(([address]) => address === terminal.contentId)
+  expect(terminalPin?.[1].aborted).toBe(true)
   releaseB()
   releaseA()
   owner.controller.tabDomain.dispose()
+})
+
+it('keeps tab resources pinned only for the on-screen and previously shown sessions, and pins them again on return', () => {
+  const ctx = new Context()
+  const types = new SidebarRightTabRegistry(ctx)
+  types.register({ id: 'aside-owner', kind: 'threadaside', patterns: ['dsh-resource://threadaside/**'], title: () => 'Thread' })
+  const pins: { address: string; signal: AbortSignal }[] = []
+  const owner = createSidebarRightController(types, (address, signal) => pins.push({ address, signal }), {
+    autoFullscreen: () => false,
+    openWithFocus: (_session, open) => {
+      open()
+    },
+    closeWithFocus: (_session, _pane, close) => {
+      close()
+    },
+  })
+  // SAFETY: deterministic fixture identities name the real stores adopted below.
+  const a = 'session-a' as SessionId
+  // SAFETY: distinct deterministic fixture identity for the second adopted store.
+  const b = 'session-b' as SessionId
+  // SAFETY: distinct deterministic fixture identity for the third adopted store.
+  const c = 'session-c' as SessionId
+  const ids = [a, b, c]
+  const releases = ids.map(id => owner.adopt(id, createSidebarRightStore(() => ({ kind: 'guide', title: 'Start' })).create()))
+  const live = (address: string): number => pins.filter(pin => pin.address === address && !pin.signal.aborted).length
+  const asideOf = (id: SessionId): string => `dsh-resource://threadaside/session/${id}`
+  for (const id of ids) {
+    owner.show(id)
+    owner.controller.openResource(asideOf(id))
+  }
+  const tabA = owner.controller.tabsIn(a)[0]
+  if (tabA === undefined) throw new Error('expected the aside record of session a')
+  const occurrenceA = owner.controller.tabDomain.occurrence(a, tabA)
+  expect([live(asideOf(a)), live(asideOf(b)), live(asideOf(c))]).toEqual([0, 1, 1])
+  expect(occurrenceA.signal.aborted).toBe(false)
+  owner.show(a)
+  expect([live(asideOf(a)), live(asideOf(b)), live(asideOf(c))]).toEqual([1, 0, 1])
+  expect(owner.controller.tabDomain.occurrence(a, tabA)).toBe(occurrenceA)
+  owner.controller.closeIn(a, tabA.id)
+  expect(live(asideOf(a))).toBe(0)
+  for (const release of releases) release()
+  owner.controller.tabDomain.dispose()
+  expect(pins.every(pin => pin.signal.aborted)).toBe(true)
 })

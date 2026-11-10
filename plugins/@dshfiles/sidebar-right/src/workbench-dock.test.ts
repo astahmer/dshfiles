@@ -122,7 +122,9 @@ it('preserves genuine resource occurrences, pins and native floating layout whil
   expect(store.getSnapshot()).toBe(snapshot)
   expect(owner.controller.tabDomain.occurrence(sessionId, resource)).toBe(occurrence)
   expect(occurrence.signal.aborted).toBe(false)
-  expect(owner.pin).toHaveBeenCalledWith(resource.contentId, occurrence.signal)
+  const pinned = owner.pin.mock.calls.find(([address]) => address === resource.contentId)
+  expect(pinned?.[1]).toBeInstanceOf(AbortSignal)
+  expect(pinned?.[1].aborted).toBe(false)
   workbench = false
   expect(owner.controller.isExpanded()).toBe(true)
   owner.controller.toggleExpanded()
