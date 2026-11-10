@@ -190,11 +190,11 @@ quota, …) and per-family alias words appended to every member (`backlog_*`: ta
 reminder, later, timer; …), with the name-token bonus lowered from 50 to 3. Top-5 recall, `ToolSearchModel.rank`
 over the 468 live schemas (`src/ranking-recall.test.ts`, `DSH_TOOL_SEARCH_CATALOG=<captured header>`):
 
-| Query set                                  | Before | After |
-| ------------------------------------------ | -----: | ----: |
-| The 20 queries above                       |  14/20 | 20/20 |
-| 20 new intent-phrased queries              |   6/20 | 17/20 |
-| Total                                      |  50 %  | 92.5 % |
+| Query set                     | Before |  After |
+| ----------------------------- | -----: | -----: |
+| The 20 queries above          |  14/20 |  20/20 |
+| 20 new intent-phrased queries |   6/20 |  17/20 |
+| Total                         |   50 % | 92.5 % |
 
 The new queries were written before the alias table, but the table was then tuned on all 40, so 92.5 % is an
 optimistic figure. The three remaining misses rank 7 to 11: "mark that item as done" (`backlog_update`), "which
@@ -213,12 +213,12 @@ means an accepted tool ran with acceptable arguments, the fixture side effect ha
 reminder, the renamed thread) and the answer carries the fixture fact. Tasks alternate the configuration order; each
 task is a fresh Session, as a new thread is.
 
-| Configuration                     | Success | Requests | Input tokens | Cached input | Uncached input | Billed-equivalent | Wall time |
-| --------------------------------- | ------: | -------: | -----------: | -----------: | -------------: | ----------------: | --------: |
-| No tool-search (468 tools)        |   17/20 |       47 |    2,969,123 | 2,079,744 (70 %) |      889,379 |         1,099,069 |     159 s |
-| Progressive tool-search (35–40)   |   18/20 |       59 |    1,362,406 | 1,072,512 (79 %) |      289,894 |           399,924 |     202 s |
-| Cache-safe tool-search (36)       |   18/20 |       64 |    1,486,656 | 1,123,328 (76 %) |      363,328 |           478,634 |     209 s |
-| Cache-safe with family hints (36) |   19/20 |       67 |    1,559,237 | 1,193,600 (77 %) |      365,637 |           487,915 |     208 s |
+| Configuration                     | Success | Requests | Input tokens |     Cached input | Uncached input | Billed-equivalent | Wall time |
+| --------------------------------- | ------: | -------: | -----------: | ---------------: | -------------: | ----------------: | --------: |
+| No tool-search (468 tools)        |   17/20 |       47 |    2,969,123 | 2,079,744 (70 %) |        889,379 |         1,099,069 |     159 s |
+| Progressive tool-search (35–40)   |   18/20 |       59 |    1,362,406 | 1,072,512 (79 %) |        289,894 |           399,924 |     202 s |
+| Cache-safe tool-search (36)       |   18/20 |       64 |    1,486,656 | 1,123,328 (76 %) |        363,328 |           478,634 |     209 s |
+| Cache-safe with family hints (36) |   19/20 |       67 |    1,559,237 | 1,193,600 (77 %) |        365,637 |           487,915 |     208 s |
 
 The first three rows are one interleaved run (170 provider requests); the last is a cache-safe-only rerun after the
 family hints landed. Input tokens are provider-reported prompt tokens (uncached plus cached); billed-equivalent is
@@ -231,12 +231,12 @@ tokens, at 43 % more requests and 31 % more wall time: one `tool_search` round t
 
 Failures, by cause:
 
-| Configuration                | Fixture gap (an exploratory call the fixtures do not answer)                                            | Tool-search                                   |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| No tool-search               | `backlog-open` (`backlog_projects` empty), `thread-archive` (`thread_list` empty), `edit-port` (8-request cap) | —                                             |
-| Progressive                  | —                                                                                                       | `settings-read`, `subscription-left`: never searched |
-| Cache-safe                   | `whiteboards` (`project_list` empty)                                                                     | `subscription-left`: never searched           |
-| Cache-safe with family hints | `backlog-open` (`backlog_projects` empty)                                                                | —                                             |
+| Configuration                | Fixture gap (an exploratory call the fixtures do not answer)                                                   | Tool-search                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| No tool-search               | `backlog-open` (`backlog_projects` empty), `thread-archive` (`thread_list` empty), `edit-port` (8-request cap) | —                                                    |
+| Progressive                  | —                                                                                                              | `settings-read`, `subscription-left`: never searched |
+| Cache-safe                   | `whiteboards` (`project_list` empty)                                                                           | `subscription-left`: never searched                  |
+| Cache-safe with family hints | `backlog-open` (`backlog_projects` empty)                                                                      | —                                                    |
 
 ### Decision
 
