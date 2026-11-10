@@ -87,6 +87,104 @@
           "reason": "Client-only: Start time and duration on every tool call renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "read-code-card",
+      "title": "File reads as a syntax-highlighted code card",
+      "summary": "A settled `read` renders as the shared CodeBlock instead of the native preview: the header names the file and how much of it this window holds (\"Showing 40 of 210 lines\"), the gutter counts from the offset the call asked for, the grammar follows the file extension, and wrap, copy and an open-at-the-line path are there. The card starts closed, a long window scrolls inside it, and a failed, running, nested or metadata-less read keeps the native row.",
+      "surfaces": ["client", "settings"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: file read as a code card",
+      "configuration": [
+        {
+          "key": "fileCards",
+          "defaultValue": "true",
+          "constraints": "Boolean; show a `read` result as a code card instead of the native row.",
+          "choices": ["true", "false"],
+          "coveredBy": ["tool-meta.read-card-renders", "tool-meta.read-window"]
+        }
+      ],
+      "states": ["settled", "closed", "open", "running", "failed", "nested", "no-metadata", "disabled"],
+      "failureModes": [
+        "A read whose result metadata is missing (a replayed call from before the metadata existed) keeps the native row.",
+        "A window the read tool cut by bytes but not by lines still renders; the footer line the tool appended is part of the model-facing text, not of the card.",
+        "The card highlights through the Host grammars, so an extension with no grammar renders as plain text.",
+        "Nested calls inside a `workflow` or subagent call keep the native row."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.read-window",
+          "file": "plugins/@dshfiles/tool-meta/src/file-tool-models.test.ts",
+          "testName": "numbers a window from the requested offset and relativizes the path to the session root"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.read-card-renders",
+          "file": "plugins/@dshfiles/tool-meta/src/read-tool-card.test.tsx",
+          "testName": "numbers the window from the offset once opened, and opens the file where the call looked"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the read card renders already-persisted tool metadata and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "file-diff-card",
+      "title": "File edits as collapsible diffs",
+      "summary": "A settled `edit` or `write` and every stage of an `apply_patch` render as one card with the added/removed totals and one collapsible unified diff per hunk, through the shared PatchView. A failed apply_patch shows its rejection text. Calls with no applied hunks (a running edit, a failed one) keep the native row; `apply_patch` has no native card, so it always uses this one.",
+      "surfaces": ["client", "settings"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: file edit as a collapsible diff",
+      "configuration": [
+        {
+          "key": "fileCards",
+          "defaultValue": "true",
+          "constraints": "Boolean; show `edit` / `write` as a diff card instead of the native row. `apply_patch` keeps its diff either way, because DSH has no other card for it.",
+          "choices": ["true", "false"],
+          "coveredBy": ["tool-meta.diff-card-hunks", "tool-meta.hunk-totals"]
+        }
+      ],
+      "states": ["edit", "write", "apply-patch", "running", "failed", "no-hunks", "closed", "hunk-closed", "disabled"],
+      "failureModes": [
+        "A `apply_patch` call whose arguments left the loaded history shows its recorded result text instead of the hunks.",
+        "The hunk text the tools persist is the change plus three context lines, so a collapsed context block cannot be expanded into the rest of the file here; the review surfaces do that from full file contents.",
+        "A write whose metadata lists no hunk (a new file, an identical overwrite) shows its whole content as additions.",
+        "A field of the applied metadata this model cannot decode keeps the native row."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.hunk-totals",
+          "file": "plugins/@dshfiles/tool-meta/src/file-tool-models.test.ts",
+          "testName": "counts the changed lines only, and renders a created file as an all-addition diff"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.diff-card-hunks",
+          "file": "plugins/@dshfiles/tool-meta/src/diff-tool-card.test.tsx",
+          "testName": "renders one collapsible unified diff per hunk, each hunk closing on its own"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.diff-card-patch",
+          "file": "plugins/@dshfiles/tool-meta/src/diff-tool-card.test.tsx",
+          "testName": "shows every hunk of an apply_patch call, which has no native row to fall back to"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the diff card parses persisted tool metadata in the browser and starts no Host work."
+        }
+      ]
     }
   ]
 }
