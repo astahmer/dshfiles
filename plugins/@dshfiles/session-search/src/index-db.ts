@@ -6,7 +6,9 @@
 import { mkdirSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync, type SQLOutputValue, type StatementSync } from 'node:sqlite'
+import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
+import { SqlClient } from 'effect/sql'
 import * as SchemaGetter from 'effect/SchemaGetter'
 import type { IndexHealth } from './api-schemas.js'
 import { withoutUndefined } from './optional-fields.js'
@@ -81,6 +83,15 @@ CREATE TABLE IF NOT EXISTS meta (
   value TEXT NOT NULL
 ) STRICT;
 `
+
+export const indexMigrations = {
+  '1_initial_schema': Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    for (const statement of SCHEMA.split(';').map(part => part.trim())) {
+      if (statement.length > 0) yield* sql.unsafe(statement)
+    }
+  }),
+}
 
 /** SQLite hands back an integer as either a number or a bigint depending on its size. */
 const numberLike = Schema.Union([Schema.Number, Schema.BigInt]).pipe(

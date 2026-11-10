@@ -7015,6 +7015,9 @@ importers:
       '@dshfiles/session-log-window':
         specifier: workspace:*
         version: link:../session-log-window
+      '@dshfiles/sqlite-store':
+        specifier: workspace:*
+        version: link:../sqlite-store
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.2(effect@4.1.2)(redis@6.3.1)

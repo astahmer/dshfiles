@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@dshfiles/session-log-window": "workspace:*",
+    "@dshfiles/sqlite-store": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
