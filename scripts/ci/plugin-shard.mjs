@@ -26,6 +26,7 @@ import { existsSync } from 'node:fs'
 import { readFile, readdir } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { bootWithRetry } from './boot-retry.mjs'
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const pluginsRoot = resolve(workspaceRoot, 'plugins/@dshfiles')
@@ -101,13 +102,13 @@ if (mode === 'boot') {
   const owners = slice.map(item => item.name.replace('@dshfiles/', ''))
   if (index === 0 || slice.length === 0) owners.push(composedOwner)
   console.log(`plugin boot shard ${String(index)}/${String(count)}: ${owners.join(', ')} (composed: ${String(index === 0 || slice.length === 0)})`)
-  const first = await run('node', ['scripts/check-browser.mjs', 'boot', ...owners])
-  if (first === 0 || process.env.CI === undefined) process.exit(first)
-  // On a 4 vCPU runner a Client entry occasionally stays `pending` past the 45 s settle window although the same owner
-  // boots in seconds locally and on a rerun. Retry once: Turbo replays every owner that passed, so only the failed ones
-  // boot again, and an owner that fails twice still fails the shard.
-  console.log(`plugin boot shard ${String(index)}/${String(count)}: retrying the owners that failed once`)
-  process.exit(await run('node', ['scripts/check-browser.mjs', 'boot', ...owners]))
+  process.exit(
+    await bootWithRetry({
+      boot: () => run('node', ['scripts/check-browser.mjs', 'boot', ...owners]),
+      ci: process.env.CI !== undefined,
+      log: message => console.log(`plugin boot shard ${String(index)}/${String(count)}: ${message}`),
+    }),
+  )
 }
 
 if (mode === 'smoke') {
