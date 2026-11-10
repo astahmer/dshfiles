@@ -28,7 +28,7 @@ describe('Project Checks activity summary', () => {
     const event = ProjectChecksActivityModel.event(receipt)
     expect(event).toEqual({
       kind: 'verification-receipt',
-      version: 1,
+      version: 2,
       value: {
         receiptId: receipt.id,
         sessionId: receipt.sessionId,
@@ -48,7 +48,7 @@ describe('Project Checks activity summary', () => {
       },
     })
     expect(JSON.stringify(event)).not.toMatch(/command|args|stdout|stderr|environment|prompt/i)
-    expect(Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })({ ...event, version: 2 })._tag === 'Success').toBe(false)
+    expect(Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })({ ...event, version: 1 })._tag === 'Success').toBe(false)
     expect(
       Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })({
         ...event,
@@ -70,19 +70,16 @@ describe('Project Checks activity summary', () => {
     const event = ProjectChecksActivityModel.event(remote)
     const serialized = JSON.stringify(event)
     for (const sentinel of sentinels) expect(serialized).not.toContain(sentinel)
-    expect(event.value.executor).toEqual({ kind: 'remote', remoteId: 'm1', sshTarget: '', workspace: '' })
-    expect(event.value.remoteFailure).toEqual({ remoteId: 'm1', code: 'peer-unreachable', message: 'the remote was unreachable' })
-
-    const unknownCode = ProjectChecksActivityModel.event({ ...remote, remoteFailure: { remoteId: 'm1', code: 'peer-novel', message: sentinels[2] ?? '' } })
-    expect(unknownCode.value.remoteFailure?.message).toBe('remote execution failed')
+    expect(event.value.executor).toEqual({ kind: 'remote', remoteId: 'm1' })
+    expect(event.value.remoteFailure).toEqual({ remoteId: 'm1', code: 'peer-unreachable' })
     expect(ProjectChecksActivityModel.event({ ...remote, remoteFailure: null }).value.remoteFailure).toBe(null)
     expect(ProjectChecksActivityModel.event({ ...remote, executor: { kind: 'local' } }).value.executor).toEqual({ kind: 'local' })
 
     const decode = Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })
-    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: sentinels[0], workspace: '' } } })._tag).toBe(
+    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: sentinels[0] } } })._tag).toBe(
       'Failure',
     )
-    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: '', workspace: sentinels[1] } } })._tag).toBe(
+    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', workspace: sentinels[1] } } })._tag).toBe(
       'Failure',
     )
     expect(decode({ ...event, value: { ...event.value, remoteFailure: { remoteId: 'm1', code: 'peer-unreachable', message: sentinels[2] } } })._tag).toBe(
@@ -90,13 +87,13 @@ describe('Project Checks activity summary', () => {
     )
   })
 
-  it('does not add the stage to the v1 Activity payload for any stage or for legacy receipts', () => {
-    for (const stage of ['manual', 'completion', 'rebase', undefined] as const) {
-      const stored: StoredReceipt = stage === undefined ? receipt : { ...receipt, verificationStage: stage }
-      const event = ProjectChecksActivityModel.event(stored)
-      expect(event.version).toBe(1)
-      expect(Object.keys(event.value)).not.toContain('verificationStage')
+  it('carries every recorded stage in the v2 Activity payload and omits it for legacy receipts', () => {
+    for (const stage of ['manual', 'completion', 'rebase'] as const) {
+      const event = ProjectChecksActivityModel.event({ ...receipt, verificationStage: stage })
+      expect(event.version).toBe(2)
+      expect(event.value.verificationStage).toBe(stage)
     }
+    expect(Object.keys(ProjectChecksActivityModel.event(receipt).value)).not.toContain('verificationStage')
   })
 
   it('waits for durable receipt persistence before publishing and keeps projection failures optional', async () => {
