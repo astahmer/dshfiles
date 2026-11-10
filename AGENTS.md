@@ -396,6 +396,12 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
 workspaces, multi-select only for a batchable row verb — are in the
 [kit README](plugins/@dshfiles/plugin-ui/README.md#rules-that-break-silently).
 
+Repeated panel instances own their presentation state independently: changing a
+view, filter, selection, sort or layout in one must not change another. Carry the
+stable occurrence identity through panel adapters and key persisted presentation
+state by it. Shared domain data and explicitly shared settings or saved views stay
+with their existing owners. Cover simultaneous instances and restoration in tests.
+
 ### Credentials: store a reference, never a value
 
 DSH never echoes a secret value back, so a setting or form field cannot hold one
