@@ -2,7 +2,7 @@
 
 What shipped is documented in the
 [multi-host README](../../plugins/@dshfiles/multi-host/README.md): the Hosts
-page fix, Diagnose with per-hop recovery, **Update hosts** and
+page fix, Diagnose with per-hop recovery (also on the Run on picker), **Update hosts** and
 `multi_host_update` (sync and rebuild, restart left to the user), the core
 version drift line on Hosts rows and remote thread headers, **Reconnecting…**
 grace and **Hide this host**, **Open on remote host** on the exact thread, Auto
@@ -26,9 +26,6 @@ jj in sync across hosts).
    against a real SSH host.
 3. **Browser proof of the version drift line** in a mirrored thread header (needs
    a second runtime on another core version).
-4. **Per-hop failure on the Run on picker**: the picker still shows the
-   runtime's last error, not the failed hop that Diagnose shows on the Hosts
-   page.
 
 Deliberately not done: restarting a host or updating its DSH core from here
 (the user's call on that machine), rebasing a host checkout before a thread
