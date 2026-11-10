@@ -7,6 +7,7 @@ export default defineConfig({
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/credential-port'] },
   client: {
     entry: 'src/client.tsx',
+    dshxRuntime: 'shared',
     shared: '@dshfiles/shared-runtime',
     bundleDependencies: ['@dshfiles/credential-port'],
     vite: { plugins: [pluginUiVite()] },

@@ -33,6 +33,10 @@
     "./no-folder": {
       "types": "./src/no-folder.ts",
       "default": "./dist/no-folder.js"
+    },
+    "./revision-sections": {
+      "types": "./src/revision-sections.ts",
+      "default": "./dist/revision-sections.js"
     }
   },
   "scripts": {

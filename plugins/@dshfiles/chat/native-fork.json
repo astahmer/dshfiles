@@ -48,6 +48,7 @@
     "src/native/chat/ReasoningContent.tsx",
     "src/native/chat/ReasoningRow.module.css",
     "src/native/chat/ReasoningRow.tsx",
+    "src/native/chat/StatsPills.tsx",
     "src/native/chat/TurnTailNodeView.tsx",
     "src/native/chat/TurnUsagePanel.tsx",
     "src/native/chat/UserContent.tsx",
@@ -70,6 +71,8 @@
     "src/native/chat/use-chat-scroll.ts"
   ],
   "added": [
+    "src/native/chat/AnnotateSelection.module.css",
+    "src/native/chat/AnnotateSelection.tsx",
     "src/native/chat/ReasoningTiming.tsx",
     "src/native/chat/external-link-opening.ts",
     "src/native/chat/follow-policy.ts",

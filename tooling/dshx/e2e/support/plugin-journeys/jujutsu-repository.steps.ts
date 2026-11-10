@@ -488,14 +488,16 @@ Then('clicking the foreign reference opens the panel on the other repository foc
   await finishJourneyAssertions(page)
 })
 
-Then('the composer dock names the project, thread workspace and bookmark in one chip', async ({ page }: { page: Page }) => {
-  const chip = page.getByRole('button', { name: /^repo \(thread-[0-9a-f]{6} \/ main\+\)$/ })
+Then('the composer run summary names the project, thread workspace and bookmark in one chip', async ({ page }: { page: Page }) => {
+  const summary = page.locator('[data-run-summary]')
+  const chip = summary.locator('[data-jujutsu-location]').getByRole('button', { name: /^main\+$/ })
   const viewport = page.viewportSize()
-  await recordAssertion(page, 'jujutsu-composer-dock-has-one-context-chip', async () => {
+  await recordAssertion(page, 'jujutsu-composer-run-summary-has-one-context-chip', async () => {
+    await expect(summary).toHaveCount(1)
+    await expect(summary).toContainText('repo')
+    await expect(summary).toContainText(/thread-[0-9a-f]{6}/u)
     await expect(chip).toBeVisible()
-    await expect(page.getByRole('button', { name: 'repo', exact: true })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /^thread-[0-9a-f]{6}$/ })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /^@ \w+ · main\+$/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^thread-[0-9a-f]{6}/u })).toHaveCount(0)
   })
   for (const width of [360, 480, 768, 1024]) {
     await page.setViewportSize({ width, height: viewport?.height ?? 900 })

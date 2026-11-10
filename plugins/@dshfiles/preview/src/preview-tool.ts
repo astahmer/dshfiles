@@ -6,7 +6,7 @@ import { PreviewRefused } from './preview-errors.js'
 import { PreviewImages } from './preview-images-promise.js'
 
 const pageIdSchema = Schema.String.check(Schema.isPattern(/^p\d{1,4}$/)).annotate({
-  description: 'Preview page id from preview_open or preview_list, e.g. "p1".',
+  description: 'Page id from preview_open or preview_list ("p1").',
 })
 
 const outputSchema = Schema.Struct({

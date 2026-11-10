@@ -57,14 +57,4 @@ export class ThreadSelectionModel {
     if (orderedIds.length === 0) return EMPTY_THREAD_SELECTION
     return stateOf([...new Set(orderedIds)], orderedIds[0])
   }
-
-  /** Paint the selection onto rows the list already rendered, without re-rendering every row on each toggle. */
-  static applyToDom(input: { readonly list: HTMLElement; readonly sessionIds: readonly string[] }): void {
-    const selected = new Set(input.sessionIds)
-    for (const button of input.list.querySelectorAll<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)) {
-      const sessionId = button.dataset.threadId
-      if (sessionId !== undefined && selected.has(sessionId)) button.dataset.multiSelected = 'true'
-      else delete button.dataset.multiSelected
-    }
-  }
 }

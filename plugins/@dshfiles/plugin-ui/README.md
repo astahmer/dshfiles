@@ -136,6 +136,49 @@ more plugins repeat the same behavior; otherwise compose the existing kit.
 | Empty and loading states                                        | muted `<p>` texts in ~30 files                                                                                                                                                                      | Rejected: one-line copy in context; the kit `Empty` covers full empty panels.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `window.confirm`                                                | 1 (backlog reply delete)                                                                                                                                                                            | Kept: a single case; `AlertDialog` is the kit answer when it next changes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
+## Gallery components in use
+
+The [component gallery](../component-gallery/README.md) demos every composite below. Each one replaced local markup on
+the screen named; when a screen needs a prop the component lacks, add it here rather than forking the component.
+
+| Component                                          | Used by                                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `TraceWaterfall`, `AgentTimeline`, `CallStackTree` | traces: span tree, session traces, span exception frames                        |
+| `MergeChecks`                                      | pulls-review Land card                                                          |
+| `MergeConflictGraph`                               | jj-integration workspace menu conflict notice                                   |
+| `FallbackChain`                                    | model-effort-picker fallbacks, with a "Serving now" rung                        |
+| `CreditsUsage`                                     | ai-accounts quota windows                                                       |
+| `SpendMap`                                         | usage › Cost                                                                    |
+| `ActivityFeed`                                     | activity-timeline rows                                                          |
+| `RoutineList`                                      | project-automations rows                                                        |
+| `BulkSelectList`                                   | jujutsu workspace cleanup selection                                             |
+| `AgentRoster`                                      | agent-communication live agent list                                             |
+| `StepTrail`, `AgentRunSteps`                       | agent-plan activity strip and plan steps                                        |
+| `PipelineRun`                                      | project-checks receipts                                                         |
+| `CheckpointGraph`, `CostWaterfall`, `PresenceList` | session-undo rewind preview, usage thread Cost facet, agent-plan activity strip |
+| `Page`, `PageSection`, `EmptyState`, `EntityList`  | most owned pages                                                                |
+
+Deleted rather than adopted: `MergeChecklist` (overlapped `MergeChecks`), `TestRunResults` (a streaming view, while
+test-runs shows finished runs and its counts would be wrong for Vitest's default reporter), `QuotaMeter`, `Typewriter`
+and `SessionRecap` (no caller).
+
+Kept with no caller yet, each for a named future feature: `PipelineDag` (project actions with dependencies),
+`WorkflowRun` (an owned `workflow` tool card), `DelegationBoard`, `ApprovalRun` and `AgentRunStatus` (fan-out approval
+and child status pills, [ADE UX](../../../docs/ade-ux/README.md) Phase 7), `DelegatorBoard` (Inbox grouped by source),
+`AgentQueue` (host-pool work queue), `ClarifyPrompt` (an owned ask_user_question card), `ToolbarWalkthrough`
+(plugin-guide onboarding), `ShapeshiftCard` (palette actions that morph into a form), `RevisionScrubber` (rewind any
+turn), `RevisionAvatarGraph`, `AgentCursors` and `AgentPresenceBar` (thread-share v2 presence), `AccessMap` (a
+policies scope view). Not done: `ContextGraph` as an optional graph view of agent-toolkit's Context facet. `ActivityDock` was
+deleted once turn-summary's walkthrough became a row toggle; its `DockChanges` list stays in `motion/activity-dock`
+for that walkthrough.
+
+Recount a component's callers outside the kit and the gallery:
+
+```sh
+cd plugins/@dshfiles
+grep -rlE --include='*.tsx' '<TraceWaterfall([ >/]|$)' */src | grep -v '^component-gallery/\|^plugin-ui/\|\.test\.'
+```
+
 ## Motion
 
 Every animated component uses one engine and one feel, and every one is visible in the
@@ -263,6 +306,10 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
   semantic-component allowlist.
 - `@dshfiles/ui-styles` is the only bundle that compiles the shared sheet;
   after **any** class change, rebuild it and the plugin you changed.
+- The touch baseline in `@dshfiles/ui-styles/src/client.css` is the one deliberate page-global element rule set: it
+  sets `touch-action` on every native button, link, tab and menu item, and a 16px floor on every native field under a
+  coarse pointer. Keep it inside `@layer base`; an unlayered rule there beats `dshx:touch-none` and every other
+  `dshx:` utility. Add a new page-global rule to that file only with the same reason, and list it here.
 - Avoid native JSX `<select>` controls; use `Combobox` from
   `@dshfiles/plugin-ui/components/ui/combobox` instead, matching the New Thread
   picker for consistent, searchable selection. The `no-native-select` lint rule

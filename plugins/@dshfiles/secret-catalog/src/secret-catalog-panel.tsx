@@ -21,7 +21,7 @@ import { secretCatalogSettings } from './settings.js'
 import { secretCatalogApi } from './api.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
-import { SecretCatalogTable, type RevealedSecret } from './secret-catalog-table.js'
+import { SecretCatalogTable, type RevealedSecret, type SecretRowActions } from './secret-catalog-table.js'
 import { SecretQuickAddRow } from './secret-quick-add-row.js'
 import { useSecretReveal } from './use-secret-reveal.js'
 import { CatalogNavigation } from './catalog-navigation.js'
@@ -73,6 +73,11 @@ type SecretCopyVariables = {
   readonly cwd: string | null
   readonly scope: SecretMutationScope
   readonly environment: SecretMetadata['environment']
+}
+
+const mutationScopeFor = (row: SecretMetadata): SecretMutationScope | null => {
+  if (row.scope === 'global' || row.scope === 'project' || row.scope === 'local') return row.scope
+  return null
 }
 
 export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element => {
@@ -137,9 +142,12 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     },
     onSuccess: (_result, input) => setNotice(t('copied', { alias: input.alias })),
   })
-  const resetCopyMutation = (): void => {
-    if (!copyMutation.isPending) copyMutation.reset()
-  }
+  const copySecret = copyMutation.mutate
+  const copyPending = copyMutation.isPending
+  const copyReset = copyMutation.reset
+  const resetCopyMutation = useCallback((): void => {
+    if (!copyPending) copyReset()
+  }, [copyPending, copyReset])
 
   const listQuery = useQuery({
     queryKey: secretListQueryKey(cwd),
@@ -197,30 +205,32 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
 
   const filteredRows = useMemo(() => SecretCatalogRules.filterSecretMetadata(rows, scope, search), [rows, scope, search])
   const canActOnRow = useMemo(() => SecretCatalogRules.createSecretActionPolicy(rows, cwd !== null), [rows, cwd])
-  const mutationScopeFor = (row: SecretMetadata): SecretMutationScope | null => {
-    if (row.scope === 'global' || row.scope === 'project' || row.scope === 'local') return row.scope
-    return null
-  }
 
-  const onReveal = (row: SecretMetadata): void => {
-    if (!canActOnRow(row)) return
-    const rowScope = mutationScopeFor(row)
-    if (rowScope === null) return
-    resetCopyMutation()
-    sendReveal({
-      type: 'toggle',
-      rowId: row.id,
-      payload: { alias: row.alias, cwd, scope: rowScope, environment: row.environment },
-      revealMs,
-    })
-  }
+  const onReveal = useCallback(
+    (row: SecretMetadata): void => {
+      if (!canActOnRow(row)) return
+      const rowScope = mutationScopeFor(row)
+      if (rowScope === null) return
+      resetCopyMutation()
+      sendReveal({
+        type: 'toggle',
+        rowId: row.id,
+        payload: { alias: row.alias, cwd, scope: rowScope, environment: row.environment },
+        revealMs,
+      })
+    },
+    [canActOnRow, cwd, resetCopyMutation, revealMs, sendReveal],
+  )
 
-  const onCopy = (row: SecretMetadata): void => {
-    if (copyMutation.isPending || !canActOnRow(row)) return
-    const rowScope = mutationScopeFor(row)
-    if (rowScope === null) return
-    copyMutation.mutate({ rowId: row.id, alias: row.alias, cwd, scope: rowScope, environment: row.environment })
-  }
+  const onCopy = useCallback(
+    (row: SecretMetadata): void => {
+      if (copyPending || !canActOnRow(row)) return
+      const rowScope = mutationScopeFor(row)
+      if (rowScope === null) return
+      copySecret({ rowId: row.id, alias: row.alias, cwd, scope: rowScope, environment: row.environment })
+    },
+    [canActOnRow, copyPending, copySecret, cwd],
+  )
 
   const afterMutation = async (message: string): Promise<void> => {
     setNotice(message)
@@ -301,6 +311,34 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     setSelection(next)
     setPickerOpen(false)
   }
+
+  /**
+   * The row actions keep one identity until a field a row renders changes. A keystroke only narrows the visible rows,
+   * so the table's context value stays put and the cells that did not change are not re-rendered.
+   */
+  const rowActionHandlers = useRef({ onReveal, onCopy, openDialog })
+  rowActionHandlers.current = { onReveal, onCopy, openDialog }
+  const rowActions = useMemo<SecretRowActions>(() => {
+    const busyRowId = copyPending ? (copyMutation.variables?.rowId ?? null) : null
+    const loadingRowId = revealSnapshot.matches('loading') ? (revealSnapshot.context.request?.rowId ?? null) : null
+    return {
+      t,
+      revealed,
+      canActOnRow,
+      isRowBusy: row =>
+        (busyRowId !== null && copyMutation.variables?.cwd === cwd && busyRowId === row.id) || loadingRowId === row.id,
+      copyPending,
+      isRevealing: row => loadingRowId === row.id,
+      onReveal: row => void rowActionHandlers.current.onReveal(row),
+      onRevealedBlur: () => {
+        if (hideOnBlur) clearRevealed()
+      },
+      onHide: clearRevealed,
+      onCopy: row => rowActionHandlers.current.onCopy(row),
+      onEdit: row => rowActionHandlers.current.openDialog({ mode: 'edit', row }),
+      onRemove: row => rowActionHandlers.current.openDialog({ mode: 'remove', row }),
+    }
+  }, [t, revealed, canActOnRow, copyPending, copyMutation.variables, cwd, revealSnapshot, hideOnBlur, clearRevealed])
 
   return (
     <TooltipProvider>
@@ -423,24 +461,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           {showCatalog ? (
             <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto" onKeyDown={focusRowFromKey}>
               <SecretCatalogTable
-                actions={{
-                  t,
-                  revealed,
-                  canActOnRow,
-                  isRowBusy: row =>
-                    (copyMutation.isPending && copyMutation.variables?.rowId === row.id && copyMutation.variables?.cwd === cwd) ||
-                    (revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id),
-                  copyPending: copyMutation.isPending,
-                  isRevealing: row => revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id,
-                  onReveal: row => void onReveal(row),
-                  onRevealedBlur: () => {
-                    if (hideOnBlur) clearRevealed()
-                  },
-                  onHide: clearRevealed,
-                  onCopy,
-                  onEdit: row => openDialog({ mode: 'edit', row }),
-                  onRemove: row => openDialog({ mode: 'remove', row }),
-                }}
+                actions={rowActions}
                 append={
                   draftIds.length === 0
                     ? undefined

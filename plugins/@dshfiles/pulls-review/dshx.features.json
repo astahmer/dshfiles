@@ -68,6 +68,11 @@
           "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "pulls-review.git-thread-scopes",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "pulls-review.thread-review-scopes-unit-rules",
           "file": "plugins/@dshfiles/pulls-review/tests/scopes.spec.ts",

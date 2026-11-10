@@ -11,6 +11,7 @@ export default defineConfig({
   host: false,
   client: {
     entry: 'src/client.ts',
+    dshxRuntime: 'shared',
     shared: '@dshfiles/shared-runtime',
     vite: { plugins: [pluginUiVite()] },
   },

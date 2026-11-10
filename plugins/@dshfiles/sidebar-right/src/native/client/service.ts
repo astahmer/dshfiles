@@ -47,6 +47,7 @@ import { canCloseTab, type SidebarRightState, type SurfaceState } from './stores
 import type { createSidebarRightStore } from './stores.ts'
 import { TabDomain, type PinResource } from './tab-domain.ts'
 import { SidebarTabInventory } from './tab-inventory.ts'
+import { registerTabSubstitute, type TabSubstitute } from './tab-substitutes.ts'
 import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
 
 /** The seat's bound action set. */
@@ -332,6 +333,16 @@ export class SidebarRightController implements ISidebarRight {
    * @param handler - saves any background cleanup before returning and allowing removal.
    * @returns an effect-scoped unregister callback.
    */
+  /**
+   * Let a plugin answer for one tab kind, per Session.
+   * @param kind - the tab kind.
+   * @param substitute - resolves the keyed entry to show instead, or undefined to keep the kind's own body.
+   * @returns the disposer.
+   */
+  substituteTab(kind: string, substitute: TabSubstitute): () => void {
+    return registerTabSubstitute(kind, substitute)
+  }
+
   registerCloseHandler(kind: string, handler: SidebarRightCloseHandler): () => void {
     if (this.closeHandlers.has(kind)) throw new Error(`sidebarRight: close handler already registered for ${kind}`)
     this.closeHandlers.set(kind, handler)

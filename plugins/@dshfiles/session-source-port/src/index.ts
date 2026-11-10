@@ -2,6 +2,10 @@ import type {} from '@deepseek-ai/cordis'
 import type {
   SessionCancelRequest,
   SessionCancelValue,
+  SessionForkRequest,
+  SessionForkValue,
+  SessionRenameRequest,
+  SessionRenameValue,
   SessionSelectModelRequest,
   SessionSelectModelValue,
   SessionFollowFrame,
@@ -20,7 +24,15 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import * as SessionPayload from './payload.ts'
 
-export { SessionSourceRegistryError, SessionSources, type EffectSessionSource } from './effect.ts'
+export {
+  isSessionPromptRefused,
+  isSessionForkUnavailable,
+  SessionForkUnavailable,
+  SessionPromptRefused,
+  SessionSourceRegistryError,
+  SessionSources,
+  type EffectSessionSource,
+} from './effect.ts'
 export { fromEffect } from './session-source-promise.ts'
 export * as SessionPayload from './payload.ts'
 export { SessionPayloadError } from './payload.ts'
@@ -51,6 +63,8 @@ export interface MirroredSessionSource {
   updateQueue?(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue>
   projections?(request: SessionProjectionsRequest, signal: AbortSignal): Promise<SessionProjectionsValue>
   selectModel?(request: SessionSelectModelRequest): Promise<SessionSelectModelValue>
+  fork?(request: SessionForkRequest): Promise<SessionForkValue>
+  rename?(request: SessionRenameRequest): Promise<SessionRenameValue>
 }
 
 /** The registry the Session controller provides as `sessionSources`. */
@@ -65,6 +79,21 @@ export interface SessionSourceRegistry {
   ownerOf(sessionId: string): MirroredSessionSource | undefined
   /** The claiming source, asking every source's cheap `owns` when nothing is cached. */
   resolveOwner(sessionId: SessionId): Promise<MirroredSessionSource | undefined>
+  /**
+   * Hand on one finished projection value of a mirrored Session. Live projection values travel on the Session control
+   * stream, not on `follow`, so without this a mirrored Session's values stop at its opening baseline.
+   */
+  publishProjection(update: MirroredProjectionUpdate): void
+  /** Receive what sources publish; the Session controller is the one listener, for as long as it runs. */
+  onProjection(listener: (update: MirroredProjectionUpdate) => void): () => void
+}
+
+/** One finished projection value at the owning runtime's event sequence. */
+export interface MirroredProjectionUpdate {
+  readonly sessionId: SessionId
+  readonly key: string
+  readonly value: unknown
+  readonly seq: number
 }
 
 /**
@@ -74,6 +103,7 @@ export interface SessionSourceRegistry {
 export const createSessionSourceRegistry = (): SessionSourceRegistry => {
   const registered: MirroredSessionSource[] = []
   const claims = new Map<string, MirroredSessionSource>()
+  const projectionListeners = new Set<(update: MirroredProjectionUpdate) => void>()
   const registeredSources = (): readonly MirroredSessionSource[] => [...registered]
   const forget = (source: MirroredSessionSource): void => {
     for (const [sessionId, owner] of claims) if (owner === source) claims.delete(sessionId)
@@ -92,6 +122,15 @@ export const createSessionSourceRegistry = (): SessionSourceRegistry => {
       for (const sessionId of sessionIds) claims.set(sessionId, source)
     },
     ownerOf: sessionId => claims.get(sessionId),
+    publishProjection: update => {
+      for (const listener of projectionListeners) listener(update)
+    },
+    onProjection: listener => {
+      projectionListeners.add(listener)
+      return () => {
+        projectionListeners.delete(listener)
+      }
+    },
     resolveOwner: async sessionId => {
       const cached = claims.get(sessionId)
       if (cached !== undefined && registered.includes(cached)) return cached

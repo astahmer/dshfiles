@@ -61,6 +61,10 @@ layout, arranged by the user instead of replacing each other.
 Switching between already-open threads measured 32.8 ms p50 in Workbench against 111.9 ms in the native centre
 ([performance](../../../../docs/performance.md#workbench-main-seat-baseline-2026-10-26)).
 
+The live `web` Host serves this centre since its 2026-11-10 restart: the thread's conversation and composer render in a
+Dockview panel (`dv-shell` with the Workbench theme, inside the frame's main surface), the thread tabs are Dockview tabs,
+the right pane (Browser tab included) is Dockview too, and no native main-tabs strip is mounted.
+
 ## Things that bit
 
 - Dockview reports layout changes only for later gestures, so a freshly applied default layout was never saved and a

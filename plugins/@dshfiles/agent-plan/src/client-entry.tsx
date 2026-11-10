@@ -4,7 +4,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { Composer, defineClientPlugin, useContract, useSettings } from '@dshfiles/dshx/client'
 import { createElement, useMemo, type ComponentType, type ReactNode } from 'react'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ActivityStrip } from './activity-strip.js'
+import { CompactionMeter } from './compaction-meter.js'
 import { ConversationTargets } from './conversation-targets.js'
 import { FailureActions, type FailureComposer } from './failure-actions.js'
 import { Failure } from './failure.js'
@@ -26,6 +28,8 @@ interface SessionSeatProps {
   readonly sessionId: SessionId
   readonly useSession?: <Selected>(select: (session: { readonly running: boolean }) => Selected) => Selected
 }
+
+const isProjectionHook = (value: unknown): value is (key: string) => unknown => typeof value === 'function'
 
 const useRunning = (props: SessionSeatProps): boolean => props.useSession?.(session => session.running) ?? false
 
@@ -69,6 +73,17 @@ const createViews = (targets: AgentTargets<SessionId>) => {
     return <ActivityStrip activity={activity} />
   }
 
+  const CompactionSeat = (props: SessionSeatProps & { readonly useProjection?: unknown }): ReactNode => {
+    const settings = useSettings(agentPlanSettings).value
+    const useProjection = props.useProjection
+    if (!on(settings, 'compactionMeter') || !isProjectionHook(useProjection)) return null
+    return (
+      <PluginQueryProvider>
+        <CompactionMeter sessionId={props.sessionId} useProjection={useProjection} />
+      </PluginQueryProvider>
+    )
+  }
+
   /** The native occupant first, ours beside it, so the native control keeps its place and behaviour. */
   const beside = <Props extends SessionSeatProps>(Seat: ComponentType<SessionSeatProps>, Native: ComponentType<Props>): ComponentType<Props> =>
     function AgentPlanBeside(props: Props): ReactNode {
@@ -105,7 +120,7 @@ const createViews = (targets: AgentTargets<SessionId>) => {
       )
     }
 
-  return { wrapTodoView, PlanPinSeat, ActivitySeat, beside, wrapFailure }
+  return { wrapTodoView, PlanPinSeat, ActivitySeat, CompactionSeat, beside, wrapFailure }
 }
 
 export default defineClientPlugin({
@@ -147,6 +162,9 @@ export default defineClientPlugin({
     // Where no native control holds a seat, our own entry (losing to any native one) shows the chip alone.
     api.ui.register({ name: 'conversation.input.plan', priority: FALLBACK_PRIORITY, registrant: REGISTRANT }, PlanPinSeat)
     api.ui.register({ name: 'conversation.input.activity', priority: FALLBACK_PRIORITY, registrant: REGISTRANT }, ActivitySeat)
+
+    // The composer meter line, before the AI Accounts cost estimate (order 10).
+    api.ui.register({ name: 'conversation.composer.dock', id: 'agent-plan-compaction', order: 5 }, api.bind(views.CompactionSeat))
 
     // Failure rows: the native row stays as drawn; the retry count and actions go under it.
     for (const kind of ['turn-error', 'model-retry'] as const) {

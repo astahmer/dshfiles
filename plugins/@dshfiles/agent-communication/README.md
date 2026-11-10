@@ -39,3 +39,7 @@ When a second DSH instance shares the same `DSH_HOME`, only one process can own 
 A report or activity-history gap is not proof of non-use. The Host bridge only reports Agents registered with DSH. Host source changes require a user-controlled restart; do not restart the live web profile as part of plugin development. See the [full communication design and activation guide](../../../tooling/dshx/docs/agent-communication.md).
 
 Open the reusable **Messages** view from navigation or the Workbench chooser.
+
+## Removed Session reads
+
+Two earlier tools were removed on purpose on 2026-11-04: `dshx_comm_workspace` (a descendant's DSH Workspace id and title) and `dshx_comm_history` (bounded visible-message search of one live descendant). Inside one parent/child tree, native `send_message` was faster and cheaper, so the peer tools now serve only separate top-level threads. Their models (`session-history.ts`, `LiveAgentDirectoryModel.findOwnedLiveAgent`, `SessionCorpus.workspaceAt`) stay in the source with their unit tests, but no surface calls them. Reading other Sessions belongs to the [Agent Session History plan](../../../plans/agent-session-history.md); observation must never wake, message or modify an inspected Session.

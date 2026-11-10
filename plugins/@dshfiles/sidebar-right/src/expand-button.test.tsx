@@ -47,7 +47,7 @@ function fixture(workbench = true, copy = en) {
   const shortcuts = createSnapshotStore<readonly []>([])
   const visibility = createStoredValue({ key: 'header-right-pane', schema: Schema.NullOr(Schema.Boolean), fallback: null })
   // Exercise the real Workbench factory through its explicit StoredValue injection seam.
-  const dock = createDockPaneActions(visibility)
+  const dock = createDockPaneActions(visibility, { panels: () => [], close: () => {} })
   const unsubscribe = vi.fn()
   const subscribe = vi.spyOn(dock, 'subscribe').mockImplementation(listener => {
     const release = visibility.subscribe(listener)
@@ -175,7 +175,10 @@ it('keeps native expand-only semantics and localized accessible copy without dri
 
 it('resolves current dock actions on click and never falls back to hidden native expansion', () => {
   const f = fixture()
-  const replacement = createDockPaneActions(createStoredValue({ key: 'replacement-pane', schema: Schema.NullOr(Schema.Boolean), fallback: null }))
+  const replacement = createDockPaneActions(createStoredValue({ key: 'replacement-pane', schema: Schema.NullOr(Schema.Boolean), fallback: null }), {
+    panels: () => [],
+    close: () => {},
+  })
   f.replaceDock(replacement)
   act(() => f.button()?.click())
   expect(replacement.isOpen()).toBe(true)

@@ -5,6 +5,6 @@ export default defineConfig({
   name: '@dshfiles/resource-packs',
   modules: { api: 'src/api.ts', model: 'src/model.ts' },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/sqlite-store'] },
-  client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
+  client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true },
 })

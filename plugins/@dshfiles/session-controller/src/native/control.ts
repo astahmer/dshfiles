@@ -52,6 +52,15 @@ export class SessionControlController {
     }
   }
 
+  /**
+   * Publish one projection value of a Session another runtime owns. Its value and sequence are that runtime's, and a
+   * mirrored Session is never in this Host's baseline, so the opening `follow` snapshot stays what it is compared with.
+   * @param update - the owning runtime's finished value.
+   */
+  publishMirrored(update: { readonly sessionId: SessionId; readonly key: string; readonly value: JsonValue; readonly seq: number }): void {
+    this.broadcast({ type: 'projection', ...update })
+  }
+
   private baseline(): SessionControlBaseline {
     const sessions = this.ctx.sessions.list()
     return {

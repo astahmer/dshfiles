@@ -113,3 +113,15 @@ Then('Ask to fix puts the failure into the composer', async ({ page }: { page: P
   })
   await finishJourneyAssertions(page)
 })
+
+When('the fake model answers once in a fresh workspace', async ({ page }: { page: Page }) => {
+  await openFreshThread(page, 'compaction')
+  await send(page, 'Summarize the pricing module')
+})
+
+Then('the meter line says how many tokens are left before compaction', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'agent-plan-compaction-meter-visible', async () => {
+    await expect(page.locator('[data-dshfiles-compaction-meter]')).toHaveText(/^compacts in ~\d+K$/, { timeout: 60_000 })
+  })
+  await finishJourneyAssertions(page)
+})

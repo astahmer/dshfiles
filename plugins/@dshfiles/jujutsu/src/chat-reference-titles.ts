@@ -9,6 +9,7 @@ export interface ChatReferenceTitleRow {
 }
 
 export type ChatReferenceTitleLoader = (input: {
+  readonly sessionId: string
   readonly paths: readonly string[]
   readonly references: readonly ChatReference[]
 }) => Promise<{ readonly titles: readonly ChatReferenceTitleRow[] }>
@@ -19,6 +20,7 @@ export type ChatReferenceTitleEntry = { readonly state: 'pending' } | { readonly
 const BATCH_LIMIT = 100
 
 interface Queued {
+  readonly sessionId: string
   readonly paths: readonly string[]
   readonly references: Map<string, { readonly key: string; readonly reference: ChatReference }>
 }
@@ -69,8 +71,8 @@ export class ChatReferenceTitleStore {
     this.entries.set(key, { state: 'pending' })
     const projectPath = this.options.projectPathForSession(sessionId)
     const paths = projectPath === undefined || projectPath === cwd ? [cwd] : [projectPath, cwd]
-    const pathsKey = paths.join('\u0000')
-    const queued = this.queue.get(pathsKey) ?? { paths, references: new Map() }
+    const pathsKey = [sessionId, ...paths].join('\u0000')
+    const queued = this.queue.get(pathsKey) ?? { sessionId, paths, references: new Map() }
     queued.references.set(key, { key, reference })
     this.queue.set(pathsKey, queued)
     this.schedule()
@@ -102,15 +104,19 @@ export class ChatReferenceTitleStore {
         const items = [...group.references.values()]
         const batches: (typeof items)[] = []
         for (let index = 0; index < items.length; index += BATCH_LIMIT) batches.push(items.slice(index, index + BATCH_LIMIT))
-        return batches.map(batch => this.load(group.paths, batch))
+        return batches.map(batch => this.load(group.sessionId, group.paths, batch))
       }),
     )
   }
 
-  private async load(paths: readonly string[], batch: readonly { readonly key: string; readonly reference: ChatReference }[]): Promise<void> {
+  private async load(
+    sessionId: string,
+    paths: readonly string[],
+    batch: readonly { readonly key: string; readonly reference: ChatReference }[],
+  ): Promise<void> {
     let rows: readonly ChatReferenceTitleRow[] = []
     try {
-      rows = (await this.options.load({ paths, references: batch.map(item => item.reference) })).titles
+      rows = (await this.options.load({ sessionId, paths, references: batch.map(item => item.reference) })).titles
     } catch {
       // An unreadable batch shows its references by name; nothing retries until the page reloads.
     }

@@ -17,19 +17,26 @@ When('the pulls.review panel is opened from the sidebar', async ({ page }: { pag
   await expect(page.getByRole('heading', { name: 'Review', exact: true })).toBeVisible()
 })
 
+const expectPanelReadsThreadWorkspace = async ({ page, base, range }: { page: Page; base: string; range: string }): Promise<void> => {
+  const projectPicker = page.getByRole('button', { name: 'Choose project or workspace', exact: true })
+  await expect(projectPicker).toBeVisible()
+  // The picker names the project or workspace; the absolute path stays out of the label.
+  await expect(projectPicker).toContainText(threadWorkspacePathFor(page).split('/').filter(Boolean).at(-1) ?? '')
+  await expect(projectPicker).not.toContainText(threadWorkspacePathFor(page))
+  const baseSelector = page.getByRole('textbox', { name: 'Base branch or bookmark', exact: true })
+  await expect(baseSelector).toBeVisible()
+  await baseSelector.fill(base)
+  await expect(page.getByText(range, { exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/^\d+ files?$/).first()).toBeVisible({ timeout: 30_000 })
+}
+
 Then('the pulls.review panel reads the thread workspace against {string}', async ({ page }: { page: Page }, base: string) => {
-  await recordAssertion(page, 'pulls-review-reads-thread-workspace', async () => {
-    const projectPicker = page.getByRole('button', { name: 'Choose project or workspace', exact: true })
-    await expect(projectPicker).toBeVisible()
-    // The picker names the project or workspace; the absolute path stays out of the label.
-    await expect(projectPicker).toContainText(threadWorkspacePathFor(page).split('/').filter(Boolean).at(-1) ?? '')
-    await expect(projectPicker).not.toContainText(threadWorkspacePathFor(page))
-    const baseSelector = page.getByRole('textbox', { name: 'Base branch or bookmark', exact: true })
-    await expect(baseSelector).toBeVisible()
-    await baseSelector.fill(base)
-    await expect(page.getByText(`${base}..@`, { exact: true })).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText(/^\d+ files?$/).first()).toBeVisible({ timeout: 30_000 })
-  })
+  await recordAssertion(page, 'pulls-review-reads-thread-workspace', () => expectPanelReadsThreadWorkspace({ page, base, range: `${base}..@` }))
+})
+
+/** A git worktree has no working-copy revision: the review runs from the merge base to `HEAD` plus the worktree. */
+Then('the pulls.review panel reads the git thread worktree against {string}', async ({ page }: { page: Page }, base: string) => {
+  await recordAssertion(page, 'pulls-review-reads-git-thread-worktree', () => expectPanelReadsThreadWorkspace({ page, base, range: `${base}..HEAD` }))
 })
 
 /** Cucumber reads a bare `/` as an alternation, so the command name escapes it. */

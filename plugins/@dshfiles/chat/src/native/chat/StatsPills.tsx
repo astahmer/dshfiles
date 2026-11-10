@@ -8,7 +8,7 @@ import { memo, useMemo, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { IconDatabaseOutlineRegular, IconGaugeOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { InjectFace, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsRenderSlots, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: merges the sessionStats key into SessionProjectionMap for useProjection.
 import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
@@ -18,6 +18,7 @@ import { formatTokensPerSecond } from './message-chrome.ts'
 import { assistantStepReading } from '../contract/turn-metrics.ts'
 import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
 import { MEASURE_STYLE, useStatDialog } from './stat-dialog.ts'
+import type { SessionUsageCostPlacement } from '../../session-usage-cost.ts'
 import css from './StatsPills.module.css'
 import dialogCss from './stat-dialog.module.css'
 
@@ -278,8 +279,15 @@ export const ActivityPill = memo(function ActivityPill({ useChat, useProjection,
   )
 })
 
-/** Whole-log token total and cache hit; Compact keeps only the cache hit. */
-export const UsagePill = memo(function UsagePill({ useProjection, usePerformanceUsage, t }: StatPillProps) {
+/** Usage pill props: the shared pill props plus the cost seat it renders after its label and beside each bucket. */
+export type UsagePillProps = StatPillProps & Partial<PropsRenderSlots<'conversation.composer.usageCost'>>
+
+/**
+ * Whole-log token total and cache hit; Compact keeps only the cache hit.
+ * `conversation.composer.usageCost` contributors add a cost after the label
+ * and beside each bucket row; they bring their own separator and spacing.
+ */
+export const UsagePill = memo(function UsagePill({ useProjection, usePerformanceUsage, t, renderSlot }: UsagePillProps) {
   const mode = usePerformanceUsage(value => value)
   const usage = useProjection('tokenUsage')
   // Gated on actual token activity: a session whose steps all settled without
@@ -294,11 +302,13 @@ export const UsagePill = memo(function UsagePill({ useProjection, usePerformance
   // Same aggregate as the Turn pill's totalTokens: every prompt-side billing bucket plus output.
   const total = billedInputTokens(usage) + usage.outputTokens
   const totalText = t('message.turnUsage.count', { count: formatTokens(total, t) })
+  const cost = (placement: SessionUsageCostPlacement): ReactNode =>
+    renderSlot?.('conversation.composer.usageCost', { placement, useProjection }) ?? null
   return (
     <DialogPill
       stat="usage"
       icon={icon}
-      label={joined(totalText, cacheHitText)}
+      label={<>{joined(totalText, cacheHitText)}{cost('pill')}</>}
       ariaLabel={cacheHitText === null ? totalText : `${totalText} · ${cacheHitText}`}
       title={t('stats.dialog.usageTitle')}
       titleValue={exactCount(total, t)}
@@ -316,17 +326,17 @@ export const UsagePill = memo(function UsagePill({ useProjection, usePerformance
           </>
         )}
         <dt>{t('message.turnUsage.input')}</dt>
-        <dd>{exactCount(usage.uncachedInputTokens, t)}</dd>
+        <dd>{exactCount(usage.uncachedInputTokens, t)}{cost('input')}</dd>
         <dt>{t('message.turnUsage.cacheRead')}</dt>
-        <dd>{exactCount(usage.cacheReadTokens, t)}</dd>
+        <dd>{exactCount(usage.cacheReadTokens, t)}{cost('cacheRead')}</dd>
         {usage.cacheWriteTokens !== 0 && (
           <>
             <dt>{t('message.turnUsage.cacheWrite')}</dt>
-            <dd>{exactCount(usage.cacheWriteTokens, t)}</dd>
+            <dd>{exactCount(usage.cacheWriteTokens, t)}{cost('cacheWrite')}</dd>
           </>
         )}
         <dt>{t('message.turnUsage.output')}</dt>
-        <dd>{exactCount(usage.outputTokens, t)}</dd>
+        <dd>{exactCount(usage.outputTokens, t)}{cost('output')}</dd>
       </dl>
       {/* jscpd:ignore-end */}
     </DialogPill>

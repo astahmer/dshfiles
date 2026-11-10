@@ -1,3 +1,4 @@
+import { PhoneMenuScope } from '../../phone-menu-scope.tsx'
 import type { ConversationSlotProps } from '../contract/slots.ts'
 import { conversationPhase } from '../contract/snapshot.ts'
 import css from './ConversationRoot.module.css'
@@ -41,13 +42,15 @@ export function ConversationMainPanel(props: ConversationSlotProps) {
   const phase = settling ? 'settling' : hero ? 'hero' : 'active'
 
   return (
-    <div className={css.root} data-phase={phase}>
-      {renderFactorySlot('dshfiles.workbench.conversation-header', {})}
-      {renderFactorySlot('conversation.content', {
-        variant: 'main',
-        phase,
-        hero,
-      })}
-    </div>
+    <PhoneMenuScope>
+      <div className={css.root} data-phase={phase}>
+        {renderFactorySlot('dshfiles.workbench.conversation-header', {})}
+        {renderFactorySlot('conversation.content', {
+          variant: 'main',
+          phase,
+          hero,
+        })}
+      </div>
+    </PhoneMenuScope>
   )
 }

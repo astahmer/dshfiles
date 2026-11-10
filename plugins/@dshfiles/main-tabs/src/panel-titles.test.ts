@@ -10,6 +10,11 @@ describe('main tab titles', () => {
     expect(PanelTitlesModel.titleOf('my-page', 'Mine: Page', titles)).toBe('My page')
   })
 
+  it('qualifies discovery labels for built-in and contributed sections', () => {
+    expect(titles.find(title => title.panelId === 'dshfiles-agents')?.discoveryTitle).toBe('Agents › Directory')
+    expect(titles.find(title => title.panelId === 'my-page')?.discoveryTitle).toBe('Observe › My page')
+  })
+
   it('drops the plugin prefix of any other page and keeps a plain label', () => {
     expect(PanelTitlesModel.titleOf('unknown', 'Some Plugin: Things', titles)).toBe('Things')
     expect(PanelTitlesModel.titleOf('unknown', 'Things', titles)).toBe('Things')

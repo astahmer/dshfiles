@@ -79,22 +79,4 @@ describe('thread selection model', () => {
     expect(isThreadSelectionBackgroundClick({ target: row, surface })).toBe(false)
     expect(isThreadSelectionBackgroundClick({ target: menuItem, surface })).toBe(false)
   })
-
-  it('paints and unpaints only the rows currently selected', () => {
-    const list = document.createElement('div')
-    const buttons = ['a', 'b', 'c'].map(sessionId => {
-      const button = document.createElement('button')
-      button.dataset.threadId = sessionId
-      button.dataset.threadMainAction = ''
-      list.append(button)
-      return button
-    })
-    document.body.append(list)
-
-    ThreadSelectionModel.applyToDom({ list, sessionIds: ['a', 'c'] })
-    expect(buttons.map(button => button.dataset.multiSelected)).toEqual(['true', undefined, 'true'])
-
-    ThreadSelectionModel.applyToDom({ list, sessionIds: ['b'] })
-    expect(buttons.map(button => button.dataset.multiSelected)).toEqual([undefined, 'true', undefined])
-  })
 })

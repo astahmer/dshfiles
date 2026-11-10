@@ -17,6 +17,6 @@ export default defineConfig({
     // Usage › Quota: the quota views ai-accounts provides and the navigation usage provides (one way: usage → ai-accounts).
     'quota-views': 'src/quota-views.tsx',
   },
-  client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
+  client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

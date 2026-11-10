@@ -11,6 +11,7 @@ import { ReferenceGraphModel } from './reference-graph.js'
 import { Repositories } from './repositories.js'
 import { RepositoryIdentity, type RegisteredRepo } from './repository-identity.js'
 import { makeEditTimeCache, makeRevisionDetailCache, RevisionReads } from './revision-reads.js'
+import { PayloadBudget } from './payload-budget.js'
 
 const MAX_WORKSPACE_HEAD_CANDIDATES = 32
 const EVOLUTION_LIMIT = 100
@@ -431,7 +432,11 @@ const make = Effect.gen(function* () {
 
   const workingDiff = Effect.fn('jujutsu working diff')(function* (repoId: string) {
     const patch = yield* repositories.run(yield* repositories.resolve(repoId))(['diff', '--revisions', '@', '--git'])
-    return { patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout, truncated: patch.truncated }
+    const fitted = PayloadBudget.fitText({
+      text: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
+      response: text => ({ patch: text, truncated: true }),
+    })
+    return { patch: fitted.text, truncated: patch.truncated || fitted.truncated }
   })
 
   return {

@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import { defineClientPlugin } from '@dshfiles/dshx/client'
+import { createTestClient } from '@dshfiles/dshx/testing'
+import { PhoneThreadMenu, usePhoneThreadTool } from './phone-thread-menu.tsx'
+import { createPhoneThreadMenu } from './phone-thread-menu-service.ts'
 import { act, type ReactNode, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createEditor } from 'lexical'
@@ -307,6 +311,119 @@ describe('fixed Conversation content factory composition', () => {
     await press('Enter')
     expect(rename).toHaveBeenNthCalledWith(2, header.sessionId, 'second try')
     expect(titleInput()).toBeNull()
+  })
+
+  it.each([false, true])('opens only its own phone menu with hideChrome=%s', async hideChrome => {
+    const slotMarker: ConversationSessionHeaderSlotProps['renderSlot'] = name => <span data-test-slot={name} />
+    const chat = fixture('menu-chat')
+    const other = fixture('menu-other', 'other')
+    const toolInput = document.createElement('input')
+    document.body.append(toolInput)
+    const openPrompts = vi.fn(() => toolInput.focus())
+    const menu = createPhoneThreadMenu()
+    const client = await createTestClient()
+    await client.mount(defineClientPlugin({ id: 'phone-menu', uses: ['ui'], setup: api => void api.provide(PhoneThreadMenu, menu) }), {
+      packageId: '@dshfiles/rich-composer',
+    })
+    dispose.push(() => {
+      void client.dispose()
+    })
+    const Scope = menu.scope.Provider
+    const Tool = () => {
+      const props = usePhoneThreadTool({ id: 'test/prompts', label: 'Saved prompts', open: openPrompts })
+      return <button type="button" {...props.triggerProps} />
+    }
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    const html = document.documentElement
+    dispose.push(() => {
+      html.removeAttribute('data-shell-phone-nav')
+    })
+    act(() =>
+      root.render(
+        <>
+          <Scope value="chat-reader">
+            <section data-bound-session="menu-chat">
+              <ConversationSessionHeader {...chat.header} hideChrome={hideChrome} renderSlot={slotMarker} />
+              <Tool />
+            </section>
+          </Scope>
+          <section data-bound-session="menu-other">
+            <ConversationSessionHeader {...other.header} renderSlot={slotMarker} />
+          </section>
+        </>,
+      ),
+    )
+    await act(async () => {
+      const release = menu.attachLauncher('chat-reader')
+      dispose.push(() => act(release))
+    })
+    const inChat = (selector: string) => element.querySelector(`[data-bound-session="menu-chat"] ${selector}`)
+    const inOther = (selector: string) => element.querySelector(`[data-bound-session="menu-other"] ${selector}`)
+    const slot = (name: string) => `[data-test-slot="conversation.session.header.${name}"]`
+    expect(inChat(slot('utilities')) === null).toBe(hideChrome)
+
+    await act(async () => html.setAttribute('data-shell-phone-nav', ''))
+    expect(Array.from(element.querySelectorAll('button'), button => button.textContent)).not.toContain('menu-chat')
+    for (const name of ['actions', 'utilities', 'corner']) expect(inChat(slot(name))).toBeNull()
+    expect(inChat('[data-conversation-tabs]')).toBeNull()
+    expect(inOther('[data-conversation-tabs]')).not.toBeNull()
+
+    const opener = document.createElement('button')
+    document.body.append(opener)
+    opener.focus()
+    await act(async () => menu.toggle('chat-reader'))
+    expect(document.activeElement).toBe(inChat('[role="dialog"]'))
+    await act(async () => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(inChat('[role="dialog"]')).toBeNull()
+    expect(document.activeElement).toBe(opener)
+    await act(async () => menu.toggle('chat-reader'))
+    for (const name of ['actions', 'utilities', 'corner']) expect(inChat(`[data-phone-thread-menu] ${slot(name)}`) === null).toBe(hideChrome)
+    const views = Array.from(element.querySelectorAll('[data-bound-session="menu-chat"] [data-phone-thread-menu] [role="tab"]'), tab => tab.textContent)
+    expect(views).toEqual(hideChrome ? [] : ['Chat', 'Other'])
+    expect(inOther('[data-phone-thread-tool-proxy]')).toBeNull()
+    expect(inOther('[data-phone-thread-menu]')).toBeNull()
+    const proxy = inChat('[data-phone-thread-tool-proxy]')
+    expect(proxy?.textContent).toBe('Saved prompts')
+
+    await act(async () => {
+      if (proxy instanceof HTMLButtonElement) proxy.click()
+      await new Promise(resolve => requestAnimationFrame(resolve))
+    })
+    expect(menu.state.get().openReader).toBeNull()
+    expect(inChat('[data-phone-thread-menu]')).toBeNull()
+    expect(inChat('[data-phone-thread-tool]')?.hasAttribute('data-phone-thread-tool-hidden')).toBe(true)
+    expect(openPrompts).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).toBe(toolInput)
+  })
+
+  it('keeps draft tools visible without a reachable menu launcher', async () => {
+    const menu = createPhoneThreadMenu()
+    const client = await createTestClient()
+    await client.mount(defineClientPlugin({ id: 'phone-menu', uses: ['ui'], setup: api => void api.provide(PhoneThreadMenu, menu) }), {
+      packageId: '@dshfiles/rich-composer',
+    })
+    dispose.push(() => {
+      void client.dispose()
+    })
+    const Scope = menu.scope.Provider
+    dispose.push(menu.registerReader({ id: 'draft', sessionId: 'local-draft' }))
+    const Tool = () => <button {...usePhoneThreadTool({ id: 'test/prompts', label: 'Saved prompts', open: () => undefined }).triggerProps}>Prompts</button>
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    await act(async () =>
+      root.render(
+        <Scope value="draft">
+          <Tool />
+        </Scope>,
+      ),
+    )
+    expect(menu.state.get().launcherReader).toBeNull()
+    expect(element.querySelector('button')?.hasAttribute('data-phone-thread-tool-hidden')).toBe(false)
   })
 
   it('selects native child views independently in two fixed Sessions without replacing either editor', () => {

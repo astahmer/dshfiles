@@ -18,9 +18,50 @@ patterns keep it bounded. Numbers below were measured on this machine (2026-11-0
 - **Compare like with like.** A scratch Host needs the same profile, Session corpus and storages; a scratch
   without an attached client is the _steady_ state, and a live Host's extra heap is what clients cost.
 
-## What the memory is
+## The live Host now (2026-11-10)
 
-Measured on 2026-11-09 after a fresh restart, the sweep's 610 MB baseline no longer holds. The live Host reachived
+The multi-GB heaps described below are gone. Read on the live Host 1 h 38 min after its 16:15 restart (Node 22,
+DSH 0.2.1-rc.2, every change in this file on `main`), with RSS only, no inspector attached:
+
+```sh
+ps -o rss,etime -p <verified Host pid>      # or the worktree_memory_snapshot agent tool
+du -sh ~/.dsh ~/.dsh/plugins/* ~/.dsh/storages/*
+```
+
+| Measure                        | 2026-11-08 / 11-09                                                                | 2026-11-10                                  |
+| ------------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------- |
+| Host heap / RSS                | 3,151 MB `heapUsed` after GC (76 % of the 4.14 GB limit); 2.82 GB after a restart | RSS 409–579 MB across two reads 2 min apart |
+| `~/.dsh` on disk               | 11 GB                                                                             | 4.2 GB, of which 3.0 GB is the Session logs |
+| `plugins/session-search`       | 3.8 GB, 1,236,334 Session documents                                               | 332 MB, 106,020 documents                   |
+| `plugins/session-query-sqlite` | 874 MB                                                                            | gone                                        |
+| `plugins/fff-search`           | 584 MB                                                                            | 38 MB                                       |
+| `plugins/usage`                | 356 MB (82 MB WAL)                                                                | 250 MB (4 MB WAL)                           |
+| `plugins/traces`               | 271 MB (50 MB WAL)                                                                | 79 MB (19 MB WAL)                           |
+| `plugins/optmem`               | 334 MB (orphan, no owning package)                                                | gone                                        |
+| `storages/session_projcache`   | 317 MB                                                                            | 45 MB                                       |
+| `session list read` span       | p50 8.7 s, p95 10 s                                                               | p50 47 ms, p95 320 ms (78 reads in 100 min) |
+
+What closed the gap, in order of size:
+
+- **Decoded logs held by prepared Sessions.** A sampling heap profile started at boot (never a snapshot of the live
+  Host) named one site for 1,376 MB of a 3,045 MB heap: `SessionLogScanner.write` in the session-log restore path, i.e.
+  whole decoded logs (the largest are 283 / 199 / 157 MB uncompressed) kept by the native `SessionQueryEngine`'s
+  prepared-session cache. `profiles/web` sets `preparedSessionCacheSize: 1`; the byte-bounded cache needs the core
+  engine (Host gap 102). The `session-controller` fork stopped open follows from pinning decoded logs and frames and
+  disposes an Agent idle for five minutes.
+- **Search over the hot set only.** 2,079 of 2,820 Sessions were archived, so `session-search` drops archived Sessions'
+  documents and indexes one back only for a targeted search. Age was not a usable cutoff: 2,294 of 2,406 logs were
+  younger than 30 days. The FTS `_content` tables were not a duplicate of the index (2,336 MB content + 1,312 MB index
+  for 1.24 M documents is normal FTS sizing), so a contentless index was never needed.
+- **Dead stores.** `fff-search` records each store's root (`root.txt`) and prunes stores whose root is gone at worker
+  start (2,099 of 2,152 stores were dead); the WAL limits and demand gates below keep `usage` and `traces` small.
+
+A scratch Host with the identical corpus, stores and profile held 519 MB after GC against the live 3,156 MB at the
+time, and 293 MB without the plugin stores: store work is a disk lever (about 226 MB resident), not the heap.
+
+## What the memory was
+
+Measured on 2026-11-09 after a fresh restart, the sweep's 610 MB baseline no longer holds. The live Host reached
 **2.82 GB live heap** (`heapUsed` after `HeapProfiler.collectGarbage`, 8.5 minutes uptime, 6 attached clients), and one
 Chrome renderer for the DSH tab held **3.3 GB RSS** with another at 1.7 GB during the same window.
 
@@ -155,6 +196,10 @@ this one.
 | Lazy Host halves for panel rows                | 0.9 MB / 7 ms per unopened row   | the opt-in `lazy` mode keeps the layer out (§ above); the remaining 80 MB is each row's module graph (3.0 MB marginal) and the services an activation enables downstream, which need a facade row with a split manifest artifact |
 | Per-session client state LRU                   | 100–110 MB per tab at 20 threads | the session-controller client fork keeps every opened thread resident                                                                                                                                                            |
 | One shared Effect `HostContext` per activation | 20–40 (est.)                     | dshx builds a fresh tracer/host layer per plugin                                                                                                                                                                                 |
+| Byte-bounded prepared-session cache            | up to ~1.4 GB at count 5         | core `SessionQueryEngine` (Host gap 102); `profiles/web` caps the count at 1 meanwhile                                                                                                                                           |
+| `memory` / `backlog` retention and VACUUM      | disk: 113 MB / 12 MB + 8 MB WAL  | unexamined: whether pruning leaves free pages worth a VACUUM                                                                                                                                                                     |
+| Projection-cache size cap                      | disk: 45 MB (317 MB before)      | the native projection cache owns `storages/session_projcache`; only orphans are pruned here, a cap is a core change                                                                                                              |
+| Legacy `storages/ai_accounts_usage.json`       | disk: 14 MB                      | quota history moved to SQLite on 2026-11-10; the JSON document is no longer written (last write 2026-11-09) but stays on disk                                                                                                    |
 
 ## Ruled out
 

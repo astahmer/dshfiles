@@ -1,8 +1,7 @@
-import { useApi } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo } from 'react'
-import { jujutsuApi, type Revision } from './api.js'
+import { type Revision } from './api.js'
 import { GraphLandmarksQuery } from './graph-landmarks-query.js'
 import { GraphNavigationModel } from './graph-navigation.js'
 import { resolveGraphSelection } from './graph-selection.js'
@@ -17,6 +16,7 @@ import {
 } from './graph-navigation-machine.js'
 import { ProjectBookmarkRequest } from './project-bookmark-request.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME } from './repository-query-cache.js'
+import { useJujutsuApi } from './use-jujutsu-api.js'
 
 interface GraphNavigationInput {
   readonly repoId: string | null
@@ -31,7 +31,7 @@ interface GraphNavigationInput {
 }
 
 export const useGraphNavigation = (input: GraphNavigationInput) => {
-  const api = useApi(jujutsuApi)
+  const api = useJujutsuApi()
   const scope = `${input.root}:${input.repoId ?? ''}`
   const sliceClient = useMemo<GraphNavigationClient>(
     () => ({

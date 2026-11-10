@@ -6,12 +6,13 @@
       "id": "phone-pairing",
       "title": "Pair a phone over a self-provisioned HTTPS tunnel",
       "summary": "Opt-in public phone access with agent tools: the persisted setting decides whether DSH exposes the gateway, the tools enable, disable, print a fresh code and revoke devices, and the chosen provider provisions the tunnel (Tailscale first, public tunnel fallback). Redemption issues a persistent per-device cookie; the gateway proxies to the loopback native listener with its own exchanged cookie.",
-      "surfaces": ["host", "tool"],
+      "surfaces": ["host", "tool", "client"],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "host: terminal QR plus loopback gateway",
+      "currentSurface": "host: loopback gateway, terminal QR and the sidebar footer's pairing popover",
+      "reach": ["click button \"Show pairing QR code\"", "expect text \"Phone access is off. Ask the agent to enable it, then open this again.\""],
       "configuration": [],
-      "states": ["disabled", "tunnel-ready", "offer-printed", "paired", "unpaired", "revoked", "no-provider"],
+      "states": ["disabled", "tunnel-ready", "offer-printed", "qr-popover-open", "paired", "unpaired", "revoked", "no-provider"],
       "failureModes": [
         "Nothing is published until settings.json enables phone access; the disabled startup only prints the enable path and detected providers.",
         "A missing tunnel provider or unusable native cookie reports on the terminal and never exposes the native listener.",
@@ -63,15 +64,20 @@
           "testName": "pairs by code and proxies the authenticated app"
         },
         {
-          "kind": "not-applicable",
-          "id": "phone-pairing.no-browser-surface",
-          "reason": "The Host prints to the terminal and serves a standalone pairing page; no DSH client slot is registered."
+          "kind": "unit-test",
+          "id": "phone-pairing.offer-contract",
+          "file": "plugins/@dshfiles/phone-pairing/tests/offer-contract.test.ts",
+          "testName": "serves one single-use offer to the sidebar popover and reports disabled phone access"
         }
       ],
       "telemetry": [
         {
           "kind": "automatic",
           "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         },
         {
           "kind": "custom",

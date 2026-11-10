@@ -6,7 +6,7 @@
 
 ![On a phone the rail becomes a bottom tab bar; More lists the other destinations](docs/screenshots/phone-tab-bar.png)
 
-![On a phone the stage is a stack: a top bar names the thread or page, Back returns to the list it came from, and Thread panels opens the thread panel](docs/screenshots/phone-stack-navigation.png)
+![On a phone the stage is a stack: a top bar names the thread or page, Back returns to the list it came from, and Thread menu offers the thread-panel opener when its reader is mounted](docs/screenshots/phone-stack-navigation.png)
 
 ![On a touch screen each thread row has a ⋯ button that opens its actions menu](docs/screenshots/touch-row-menu.png)
 
@@ -167,8 +167,13 @@ Use the scratch executable/browser overrides described by `verify-dsh` when the
 personal launcher rewrites the scratch home or bundled Chromium is unavailable.
 The six affected packages pass focused tests/typechecks and Host bundle imports.
 The four scratch journeys pass without a provider response or live-instance restart.
-This does not establish cross-device draft sync, arbitrary plugin compatibility,
-or deployment into an existing profile. New profile rows require user-controlled
+The live `web` profile was checked after its restart (2026-11-10): an empty New
+thread adds no Host Session, two typed drafts in one project reopen with their own
+text from their **Draft: …** rows, and both survive a page reload. In a project
+that isolates new threads, the first typed text also provisions that draft's
+thread workspace, so an abandoned typed draft leaves a blank Session and an empty
+workspace to archive. This does not establish cross-device draft sync or
+arbitrary plugin compatibility. New profile rows require user-controlled
 activation/restart; merely building an isolated worktree does not update the GUI.
 
 **Moving a row between sections.** Drag a thread row onto another section header
@@ -211,7 +216,9 @@ selects every visible row. Shift+click and Ctrl/Cmd+click do the same from the
 pointer, ←/→ fold the containing group section or the row's subagent children,
 and Escape or a plain click clears the selection. A selected row paints in the
 info tone, and an "N selected" bar above the list offers Pin, Settle, Archive
-and Clear.
+and Clear. Rows read their selected state from a small store on the shared row
+actions (`src/thread-multi-selection.ts`), so a toggle re-renders only the rows
+whose state changed; nothing writes the rendered rows' attributes.
 
 The context menu of a row inside a multi-selection applies the whole batch:
 pin/unpin, park/unpark, settle/unsettle, mute/unmute, mark unread, copy thread
@@ -698,7 +705,10 @@ do not bake in that depth. Change the native Subagent depth setting when deeper
 delegation is desired.
 **Mention a thread.** A row's context menu, a `@dshfiles/main-tabs` thread
 tab's menu, and a drag from either source all insert that thread as the same
-native reference chip in the composer on screen. The drag carries only
+native reference chip in the composer on screen: the menus send an unaddressed
+request, which the composer of the Session `uiSession`'s current binding shows
+takes (never an aside's composer, and nothing when no thread is on stage). The
+drag carries only
 `application/x-dshfiles-thread-mention` (`{ "sessionId": … }`), never plain text,
 so the rich editor cannot paste a stray title: the composer under the pointer
 outlines, a _Drop to mention thread_ hint follows it, and only the composer whose

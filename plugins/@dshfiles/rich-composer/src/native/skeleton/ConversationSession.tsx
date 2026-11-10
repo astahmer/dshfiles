@@ -1,7 +1,7 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
 import clsx from 'clsx'
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
@@ -9,6 +9,8 @@ import type {
 } from '../contract/slots.ts'
 import { resolveActiveView } from '../view-selection.ts'
 import { DefaultConversationViews } from './DefaultConversationViews.tsx'
+import { usePhoneShell } from './phone-thread-tools.ts'
+import { phoneMenuScope, usePhoneMenuReader, usePhoneThreadMenu } from '../../phone-thread-menu.tsx'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -123,6 +125,41 @@ export function ConversationSessionHeader({
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
+  const phone = usePhoneShell()
+  const { service: phoneMenu, snapshot: phoneMenuState } = usePhoneThreadMenu()
+  const readerId = useContext(phoneMenu?.scope ?? phoneMenuScope())
+  usePhoneMenuReader(readerId === null ? null : { id: readerId, sessionId })
+  const phoneToolsOpen = readerId !== null && phoneMenuState.openReader === readerId
+  const phoneTools = phoneMenuState.tools.filter(tool => tool.readerId === readerId)
+  const closePhoneThreadTools = () => phoneMenu?.close()
+  const phoneMenuRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!phone || !phoneToolsOpen) return
+    const previousFocus = document.activeElement
+    phoneMenuRef.current?.focus()
+    const keydown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        phoneMenu?.close()
+      }
+      if (event.key !== 'Tab') return
+      const controls = Array.from(phoneMenuRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input, [tabindex="0"]') ?? [])
+      const first = controls[0]
+      const last = controls.at(-1)
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === phoneMenuRef.current)) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === phoneMenuRef.current)) {
+        event.preventDefault()
+        first?.focus()
+      }
+    }
+    document.addEventListener('keydown', keydown)
+    return () => {
+      document.removeEventListener('keydown', keydown)
+      if (phoneMenu?.state.get().closeReason !== 'pick' && previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus()
+    }
+  }, [phone, phoneToolsOpen, phoneMenu])
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string>()
   useEffect(() => {
@@ -141,6 +178,90 @@ export function ConversationSessionHeader({
     }
   }
   const showTabs = !hideChrome && tabs.length > 1
+  // A selected view other than the first keeps its strip on a phone, so the way back to it is never hidden.
+  const secondaryViewActive = active !== undefined && active.id !== tabs[0]?.id
+  const renderViewTabs = (className: string | undefined, activeClassName: string | undefined, onPicked?: () => void) => tabs.map(viewTab => (
+    <button key={viewTab.id} type="button" role="tab" aria-selected={viewTab.id === active?.id}
+      className={clsx(className, viewTab.id === active?.id && activeClassName)}
+      onClick={() => { selectView(viewTab.id); onPicked?.() }}>
+      {viewTab.label}
+    </button>
+  ))
+  const tabStrip = (
+    // data-conversation-tabs: marks the tab strip, which the window-chrome
+    // geometry and the browser coverage lane anchor on.
+    <div className={css.tabs} role="tablist" data-conversation-tabs="">
+      {renderViewTabs(css.tab, css.tabActive)}
+    </div>
+  )
+  const headerActions = (
+    <div className={css.headerActions}>
+      {renderSlot('conversation.session.header.actions', {})}
+    </div>
+  )
+  const headerUtilities = (
+    <div className={css.headerUtilities}>
+      {renderSlot('conversation.session.header.utilities', {})}
+    </div>
+  )
+  const headerCorner = (
+    <div className={css.headerCorner} data-conversation-header-corner="">
+      {renderSlot('conversation.session.header.corner', {})}
+    </div>
+  )
+  // The phone top bar names the thread and owns the menu button: no second title row here.
+  if (phone && !phoneToolsOpen) return showTabs && secondaryViewActive && tabStrip
+  if (phone)
+    return (
+      <div className={css.phoneMenuLayer} data-phone-thread-menu="">
+        <button type="button" className={css.phoneMenuScrim} aria-label={t('session.phoneMenuClose')} tabIndex={-1} onClick={closePhoneThreadTools} />
+        <div
+          className={css.phoneMenu}
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          ref={phoneMenuRef}
+          aria-label={t('session.phoneTools')}
+        >
+          {showTabs && (
+            <section className={css.phoneMenuSection}>
+              <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuViews')}</h3>
+              <div role="tablist" className={css.phoneMenuList}>
+                {renderViewTabs(css.phoneMenuItem, css.phoneMenuItemActive, closePhoneThreadTools)}
+              </div>
+            </section>
+          )}
+          {!hideChrome && <section className={css.phoneMenuSection}>
+            <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuThread')}</h3>
+            <div className={css.phoneMenuRow}>
+              {headerActions}
+              {headerUtilities}
+              <div className={css.phoneMenuCorner} onClickCapture={() => requestAnimationFrame(closePhoneThreadTools)}>
+                {headerCorner}
+              </div>
+            </div>
+          </section>}
+          {phoneTools.length > 0 && (
+            <section className={css.phoneMenuSection}>
+              <h3 className={css.phoneMenuHeading}>{t('session.phoneMenuComposer')}</h3>
+              <div className={css.phoneMenuList}>
+                {phoneTools.map(tool => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    className={css.phoneMenuItem}
+                    data-phone-thread-tool-proxy=""
+                    onClick={() => { phoneMenu?.pick(tool) }}
+                  >
+                    {tool.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      </div>
+    )
   return (
     <>
       <div className={css.titleRow}>
@@ -227,37 +348,14 @@ export function ConversationSessionHeader({
                 })}
                 {ancestry.length === 0 && <span className={css.crumbCurrent}>{sessionId}</span>}
               </nav>
-              <div className={css.headerActions}>
-                {renderSlot('conversation.session.header.actions', {})}
-              </div>
+              {headerActions}
             </div>
-            <div className={css.headerUtilities}>
-              {renderSlot('conversation.session.header.utilities', {})}
-            </div>
+            {headerUtilities}
           </>
         )}
-        <div className={css.headerCorner} data-conversation-header-corner="">
-          {renderSlot('conversation.session.header.corner', {})}
-        </div>
+        {headerCorner}
       </div>
-      {showTabs && (
-        // data-conversation-tabs: marks the tab strip, which the window-chrome
-        // geometry and the browser coverage lane anchor on.
-        <div className={css.tabs} role="tablist" data-conversation-tabs="">
-          {tabs.map(viewTab => (
-            <button
-              key={viewTab.id}
-              type="button"
-              role="tab"
-              aria-selected={viewTab.id === active?.id}
-              className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-              onClick={() => { selectView(viewTab.id) }}
-            >
-              {viewTab.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {showTabs && tabStrip}
     </>
   )
 }

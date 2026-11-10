@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { defineClientPlugin } from '@dshfiles/dshx/client'
+import { createTestClient } from '@dshfiles/dshx/testing'
+import { PhoneThreadMenu, createPhoneThreadMenu } from '@dshfiles/rich-composer/phone-thread-menu'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DestinationSelection, DestinationShell, type DestinationShellProps } from './destination-shell.js'
@@ -71,6 +74,66 @@ afterEach(() => {
 })
 
 describe('DestinationShell', () => {
+  it('offers no dead menu without a matching reader, then toggles and closes on page/list/unmount', async () => {
+    setPhone(true)
+    const menu = createPhoneThreadMenu()
+    const client = await createTestClient()
+    await client.mount(defineClientPlugin({ id: 'phone-menu', uses: ['ui'], setup: api => void api.provide(PhoneThreadMenu, menu) }), {
+      packageId: '@dshfiles/rich-composer',
+    })
+    const shell = props({ collapsed: true, selectedThreadId: 'a' })
+    const view = render(
+      <TooltipProvider>
+        <DestinationShell {...shell} />
+      </TooltipProvider>,
+    )
+    try {
+      expect(screen.queryByRole('button', { name: 'Thread menu' })).toBeNull()
+      let remove: () => void = () => undefined
+      act(() => {
+        remove = menu.registerReader({ id: 'main', sessionId: 'a' })
+      })
+      const toggle = () => screen.getByRole('button', { name: 'Thread menu' })
+      expect(toggle().getAttribute('aria-expanded')).toBe('false')
+      fireEvent.click(toggle())
+      expect(toggle().getAttribute('aria-expanded')).toBe('true')
+      expect(menu.state.get().openReader).toBe('main')
+      fireEvent.click(toggle())
+      expect(toggle().getAttribute('aria-expanded')).toBe('false')
+      fireEvent.click(toggle())
+      view.rerender(
+        <TooltipProvider>
+          <DestinationShell {...shell} activePanelId="traces" />
+        </TooltipProvider>,
+      )
+      expect(menu.state.get().openReader).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Thread menu' })).toBeNull()
+      view.rerender(
+        <TooltipProvider>
+          <DestinationShell {...shell} />
+        </TooltipProvider>,
+      )
+      fireEvent.click(toggle())
+      view.rerender(
+        <TooltipProvider>
+          <DestinationShell {...shell} collapsed={false} />
+        </TooltipProvider>,
+      )
+      expect(menu.state.get().openReader).toBeNull()
+      view.rerender(
+        <TooltipProvider>
+          <DestinationShell {...shell} />
+        </TooltipProvider>,
+      )
+      fireEvent.click(toggle())
+      view.unmount()
+      expect(menu.state.get().openReader).toBeNull()
+      act(remove)
+    } finally {
+      await client.dispose()
+    }
+  })
+
   it('shows a labelled rail, the thread list for Threads and a section index elsewhere', () => {
     setPhone(false)
     const shell = renderShell()

@@ -71,6 +71,7 @@ import {
   decodeThreadMentionInsertRequest,
   summarizeThreadMentionFailure,
   ThreadMentionDrag,
+  ThreadMentionModel,
   threadMentionFailureCodeSchema,
   THREAD_MENTION_CAPTURE_EVENT,
   THREAD_MENTION_INSERT_EVENT,
@@ -445,7 +446,7 @@ export default defineClient({
         const insert = (event: Event): void => {
           const request = event instanceof CustomEvent ? decodeThreadMentionInsertRequest(event.detail) : null
           if (request === null) return
-          if (request.hostSessionId !== undefined && request.hostSessionId !== props.sessionId) return
+          if (!ThreadMentionModel.composerTakesInsert({ request, composerSessionId: props.sessionId, stageSessionId: readStageSession() })) return
           const span = insertion.current ?? props.inputActions.captureInsertion()
           insertion.current = null
           insertMention(request.sessionId, span)

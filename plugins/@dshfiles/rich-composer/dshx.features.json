@@ -3,9 +3,50 @@
   "kind": "bundle",
   "features": [
     {
+      "id": "phone-thread-menu",
+      "title": "Open a scoped phone thread menu",
+      "summary": "The phone top bar offers a menu only for its mounted Conversation reader. The typed PhoneThreadMenu dshx contract lists this occurrence's views, header controls and composer tools by stable id. Blank selected threads keep Composer tools; missing launchers never hide mounted controls; selected blank threads keep menu access. Escape and scrim dismiss with focus return; tool picks hand focus to the tool and its popover returns focus to the visible menu opener when closed.",
+      "surfaces": ["client"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "phone top bar: Thread menu",
+      "configuration": [],
+      "states": ["reader-absent", "closed", "open", "tool-open", "blank-thread", "sessionless-draft"],
+      "failureModes": [
+        "Without a matching reader there is no menu toggle and no hidden composer control.",
+        "View-only Conversation occurrences do not supply a composer scope and cannot list another thread's tools."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "rich-composer.phone-menu-browser",
+          "reason": "The shared Gherkin fixture uses a desktop viewport. The phone-specific real browser regression is docs/ade-ux/phase6/capture/phone-menu.mjs, driven against a seeded disposable dshx dev profile: keyboard/scrim dismissal, Saved prompts focus handoff and return, Workbench sheet, sessionless and blank-thread availability, desktop fallback and screenshot."
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.phone-menu-lifecycle",
+          "file": "plugins/@dshfiles/rich-composer/src/phone-thread-menu-service.test.ts",
+          "testName": "toggles only live readers and closes when their occurrence leaves"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.phone-menu-draft",
+          "file": "plugins/@dshfiles/rich-composer/src/conversation-composition.test.tsx",
+          "testName": "keeps draft tools visible without a reachable menu launcher"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only presentation; tool picks call each composer's existing owned callback."
+        }
+      ]
+    },
+    {
       "id": "workbench-conversation-views",
       "title": "Dock an independently bound Conversation view",
-      "summary": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Factory: a single native header declaration, original session-targeted controls and native per-session child-view selection over the same resident editor. Native main mode shares the renderer; the Workbench-only host-corner clearance prevents row recovery from covering the original toolbar.",
+      "summary": "Restore existing independently bound Conversation views without an extra composer. Per-thread occurrences remain addressable for saved layouts but are excluded from reusable view pickers. Fixed conversations also render the original authorized header through the owned public Factory: a single native header declaration, original session-targeted controls and native per-session child-view selection over the same resident editor. Native main mode shares the renderer; the Workbench-only host-corner clearance prevents row recovery from covering the original toolbar. In the phone shell the main occurrence's typed PhoneThreadMenu contract opens only its own header and tools by stable id and real open callbacks; blank selected threads retain Composer tools, missing launchers never hide mounted controls, and view-only headers cannot borrow another composer. Escape and scrim close with focus return; a selected secondary view keeps its tab strip.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -40,6 +81,12 @@
           "id": "rich-composer.header-host-clearance",
           "file": "plugins/@dshfiles/rich-composer/src/conversation-header.test.tsx",
           "testName": "reserves only the host recovery corner while keeping native callers and original header actions unchanged"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.phone-thread-menu",
+          "file": "plugins/@dshfiles/rich-composer/src/conversation-composition.test.tsx",
+          "testName": "opens only its own phone menu with hideChrome=%s"
         },
         {
           "kind": "unit-test",

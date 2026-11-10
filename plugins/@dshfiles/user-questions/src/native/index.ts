@@ -25,9 +25,14 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { UserQuestionPanels, UserQuestionRecord } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import { createWaterfallRequest, PendingQuestion, type QuestionRpcChannel } from './contract/slots.ts'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { createApiClient } from '@dshfiles/dshx/api/client'
+import { multiHostApi } from '@dshfiles/multi-host/api'
+import { watchRemoteInteractions } from '@dshfiles/multi-host/interaction-feed'
+import { createWaterfallRequest, PendingQuestion, type QuestionAnswer, type QuestionRpcChannel } from './contract/slots.ts'
 import { createCardSeat } from '../card-visibility.ts'
 import { createForegroundRequest } from '../foreground-request.ts'
+import { RemoteQuestions } from '../remote-questions.ts'
 import { createQuestionDraftStore } from './draft-store.ts'
 import { QuestionComposer } from './QuestionComposer.tsx'
 import { questionReplyDefinition } from './question-reply.ts'
@@ -212,6 +217,25 @@ class QuestionCards {
   }
 }
 
+type MultiHost = ReturnType<typeof createApiClient<typeof multiHostApi.methods, NonNullable<typeof multiHostApi.events>>>
+
+/** A failed Host call as the card shows it: the message already says how to recover. */
+const unwrapMultiHost = <Result extends { readonly ok: boolean; readonly message?: string }>(result: Result): Extract<Result, { readonly ok: true }> => {
+  if (!result.ok) throw new Error(result.message)
+  // SAFETY: `ok` is the discriminant of every multi-host result.
+  return result as Extract<Result, { readonly ok: true }>
+}
+
+/** The runtime that owns a Session, or null for one this Host owns, including a Host without multi-host. */
+const owningRuntime = async (multiHost: MultiHost, sessionId: SessionId): Promise<string | null> => {
+  try {
+    return unwrapMultiHost(await multiHost.sessionRuntime({ sessionId })).runtimeId
+  } catch (error) {
+    if (error instanceof Error && isApiOwnerMissing(error)) return null
+    throw error
+  }
+}
+
 /** Present one forwarded request through its card until the waterfall settles. */
 async function answerQuestion(
   ctx: ClientContext,
@@ -252,7 +276,10 @@ async function answerQuestion(
  * Mirror answerable calls onto cards. A submitted reply in the durable Inbox
  * removes the editable card until the reply is admitted or discarded.
  */
-function publishContinuedQuestions(ctx: ClientContext, cards: QuestionCards): () => void {
+function publishContinuedQuestions(ctx: ClientContext, cards: QuestionCards, multiHost: MultiHost): {
+  readonly stop: () => void
+  readonly reconcile: () => void
+} {
   const sessions = ctx.sessions
   const stopProjections = new Map<SessionId, () => void>()
 
@@ -271,7 +298,11 @@ function publishContinuedQuestions(ctx: ClientContext, cards: QuestionCards): ()
 
   const rpcFor = (sessionId: SessionId, callId: ToolCallId): QuestionRpcChannel => ({
     answer: async (answer) => {
-      const accepted = unwrap(await ctx.remote.userQuestions.answer(sessionId, callId, answer))
+      // A mirrored Session's agent lives on its owner, so this Host's own answer path cannot reach it.
+      const runtimeId = await owningRuntime(multiHost, sessionId)
+      const accepted = runtimeId === null
+        ? unwrap(await ctx.remote.userQuestions.answer(sessionId, callId, answer))
+        : unwrapMultiHost(await multiHost.sessionQuestionAnswer({ sessionId, callId, answer: remoteAnswer(answer) })).accepted
       if (accepted) answered.set(PendingQuestion.keyOf(sessionId, callId), sessionId)
       return accepted
     },
@@ -342,10 +373,46 @@ function publishContinuedQuestions(ctx: ClientContext, cards: QuestionCards): ()
 
   reconcile()
   const stopList = sessions.list.subscribe(reconcile)
+  return {
+    reconcile,
+    stop: () => {
+      stopList()
+      for (const stop of stopProjections.values()) stop()
+      stopProjections.clear()
+    },
+  }
+}
+
+/** The batch as the multi-host contract spells it: an absent `custom` stays absent. */
+const remoteAnswer = (answer: QuestionAnswer) => ({
+  answers: answer.answers.map(item => ({ id: item.id, selected: item.selected, ...(item.custom === undefined ? {} : { custom: item.custom }) })),
+})
+
+/** Present what the runtimes that own mirrored Sessions hold open, through the same cards. */
+function publishRemoteQuestions(input: {
+  readonly cards: QuestionCards
+  readonly multiHost: MultiHost
+  readonly reconcile: () => void
+}): () => void {
+  const { cards, multiHost, reconcile } = input
+  const remote = new RemoteQuestions({
+    cardFor: ({ sessionId, questions, callId }) => {
+      const card = cards.ensure(sessionId, questions, callId)
+      return {
+        attachWaterfall: (channel) => { card.pending.attachWaterfall(channel) },
+        detachWaterfall: (channel) => { card.pending.detachWaterfall(channel) },
+        trackRequest: (completion) => card.trackRequest(completion),
+        remove: () => { card.remove() },
+      }
+    },
+    answer: async (request) => { unwrapMultiHost(await multiHost.sessionQuestionAnswer(request)) },
+    decline: async (request) => { unwrapMultiHost(await multiHost.sessionQuestionDecline(request)) },
+    ended: reconcile,
+  })
+  const stop = watchRemoteInteractions({ client: multiHost, onChange: rows => { remote.sync(rows) } })
   return () => {
-    stopList()
-    for (const stop of stopProjections.values()) stop()
-    stopProjections.clear()
+    stop()
+    remote.dispose()
   }
 }
 
@@ -369,7 +436,15 @@ export function apply(ctx: ClientContext): void {
     review: (sessionId, callId, record) => cards.review(sessionId, callId, record),
   } satisfies UserQuestionPanels)
   ctx.effect(() => disposePanels, 'ui-user-questions: answer panels')
-  ctx.effect(() => publishContinuedQuestions(ctx, cards), 'ui-user-questions: continued questions')
+  const multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
+  ctx.effect(() => {
+    const continued = publishContinuedQuestions(ctx, cards, multiHost)
+    const stopRemote = publishRemoteQuestions({ cards, multiHost, reconcile: continued.reconcile })
+    return () => {
+      stopRemote()
+      continued.stop()
+    }
+  }, 'ui-user-questions: continued and remote questions')
   ctx.slots.inject('conversation.composer', () => ctx.slots.register(
     {
       name: 'conversation.composer',

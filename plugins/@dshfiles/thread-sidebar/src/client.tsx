@@ -115,6 +115,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -179,6 +180,7 @@ import {
   ThreadSelectionModel,
   type ThreadSelectionState,
 } from './thread-selection.js'
+import { createThreadMultiSelectionStore, useThreadMultiSelected, useThreadMultiSelectedIds, type ThreadMultiSelectionStore } from './thread-multi-selection.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -207,7 +209,7 @@ import {
   threadViewPresetLabel,
 } from './thread-view-manager.js'
 import { useCompactViewTabs } from './thread-view-tabs.js'
-import { captureThreadMentionInsertion, requestThreadMentionInsertion, ThreadMentionDrag } from './thread-mention.js'
+import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
 import {
   ThreadNotificationModel,
   legacyNotificationPreferences,
@@ -482,6 +484,8 @@ interface BatchSelectionSnapshot {
 interface RowActions {
   readonly open: (sessionId: SessionSummary['id']) => void
   readonly selection: () => ThreadSelectionState
+  /** Rows read their own multi-selected state here, so a toggle re-renders only the rows it changes. */
+  readonly multiSelection: ThreadMultiSelectionStore
   readonly selectForContext: (sessionId: SessionSummary['id']) => void
   readonly clearSelection: () => void
   readonly batch: () => BatchSelectionSnapshot
@@ -715,6 +719,10 @@ const ChildThreadList = (props: {
     selectedId: props.selectedChildId,
   })
   const compact = props.rowStyle.density === 'compact'
+  const multiSelectedChildIds = useThreadMultiSelectedIds(
+    props.actions.multiSelection,
+    [...props.childThreads, ...props.finishedChildThreads].map(child => child.id),
+  )
   const lineClass = cn(
     'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:outline-none dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
     compact ? 'dshx:h-6 dshx:text-xs' : 'dshx:h-7 dshx:text-sm',
@@ -734,6 +742,7 @@ const ChildThreadList = (props: {
           )}
           data-thread-id={child.id}
           data-thread-main-action=""
+          data-multi-selected={multiSelectedChildIds.has(child.id) ? 'true' : undefined}
           data-selected={child.id === props.selectedChildId}
           aria-current={child.id === props.selectedChildId ? 'page' : undefined}
           title={new Date(child.updatedAt).toLocaleString()}
@@ -919,9 +928,7 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   }
   return (
     <>
-      <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id, ThreadMentionDrag.activeComposerSessionId())}>
-        {t('threadSidebarInsertMention')}
-      </ContextMenuItem>
+      <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
       <ContextMenuItem disabled={props.workspaceId === undefined} onSelect={() => props.actions.followUp(session.id, props.workspaceId)}>
         {t('threadSidebarFollowUp')}
       </ContextMenuItem>
@@ -1093,6 +1100,7 @@ const ThreadRowMenu = {
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, settled, rowStyle } = props
   const rowRef = useRef<HTMLElement | null>(null)
+  const multiSelected = useThreadMultiSelected(props.actions.multiSelection, session.id)
   // Offscreen rows keep their content and layout box; only their menus and hover actions wait for the viewport.
   const nearViewport = useNearViewport(rowRef)
   const t = props.actions.translate
@@ -1287,6 +1295,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
               data-thread-id={session.id}
               data-thread-main-action=""
+              data-multi-selected={multiSelected ? 'true' : undefined}
               aria-current={props.selected ? 'page' : undefined}
               title={new Date(session.updatedAt).toLocaleString()}
               onClick={() => props.actions.open(session.id)}
@@ -1712,6 +1721,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null)
   const selectionRef = useRef(threadSelection)
   selectionRef.current = threadSelection
+  const [multiSelection] = useState(createThreadMultiSelectionStore)
+  useLayoutEffect(() => multiSelection.set(threadSelection.sessionIds), [multiSelection, threadSelection.sessionIds])
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
@@ -4398,6 +4409,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     return {
       open: sessionId => latestRowActions.current.openThread(sessionId),
       selection: () => latestRowActions.current.selection(),
+      multiSelection,
       selectForContext: sessionId => latestRowActions.current.selectForContext(sessionId),
       clearSelection: () => latestRowActions.current.clearSelection(),
       batch: () => latestRowActions.current.batch(),
@@ -4459,22 +4471,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       toggleNotify: target => latestRowActions.current.toggleSubscription(target),
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
-  }, [])
+  }, [multiSelection])
 
   // Kept for this component's lifetime: the per-parent child rows must outlive a render to stay identical.
   const childRowCacheRef = useRef<ThreadChildRowCache | null>(null)
   childRowCacheRef.current ??= createThreadChildRowCache()
   const childRowCache = childRowCacheRef.current
-
-  useEffect(() => {
-    const list = scrollAreaRef.current
-    if (list === null) return
-    ThreadSelectionModel.applyToDom({ list, sessionIds: threadSelection.sessionIds })
-    if (threadSelection.sessionIds.length === 0) return
-    const observer = new MutationObserver(() => ThreadSelectionModel.applyToDom({ list, sessionIds: threadSelection.sessionIds }))
-    observer.observe(list, { childList: true, subtree: true })
-    return () => observer.disconnect()
-  }, [threadSelection.sessionIds])
 
   const orderedVisibleThreadIds = (list: HTMLElement): string[] => ThreadListNavigationModel.visibleRows(list).map(row => row.id)
 

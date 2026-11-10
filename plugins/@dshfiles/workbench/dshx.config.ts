@@ -13,6 +13,6 @@ export default defineConfig({
     'thread-on-screen': 'src/thread-on-screen.ts',
   },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
-  client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite(), dockviewCssVite()] } },
+  client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite(), dockviewCssVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

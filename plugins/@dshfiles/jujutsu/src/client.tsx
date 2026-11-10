@@ -76,8 +76,8 @@ import * as Schema from 'effect/Schema'
 import { REVISION_PAGE_SIZE, type GraphLandmark, type Mutation, type ReadFailure, type Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { RevisionGraphModel, reverseHexChangeId, type RevisionGraphRow } from './graph.js'
+import { RevisionSectionList } from './revision-section-list.js'
 import { GraphPagingModel } from './graph-paging.js'
-import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { useOpenInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
@@ -111,6 +111,7 @@ import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './grap
 import { ReviewSelectionModel } from './review-selection.js'
 import { useGraphNavigation } from './use-graph-navigation.js'
 import { WorkspaceLabels } from './workspace-labels.js'
+import { useJujutsuApi } from './use-jujutsu-api.js'
 
 type View = 'graph' | 'source'
 
@@ -265,7 +266,7 @@ const hasDragType = (event: DragEvent, type: string): boolean => [...event.dataT
 
 export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const sidePanel = props.surface === 'side-panel'
-  const api = useApi(jujutsuApi)
+  const api = useJujutsuApi()
   const openInEditor = useOpenInEditor()
   const queryClient = useQueryClient()
   const [preferences, setPreference] = usePreferences()
@@ -1405,6 +1406,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </Button>
           )}
         </div>
+        <RevisionSectionList
+          repositoryRoot={repositoryRoot}
+          changeId={reverseHexChangeId(revision.changeId, revision.changeId.length)}
+          commitId={revision.commitId}
+        />
         {details === undefined && detailsQuery.error !== null ? (
           <Alert className="dshx:px-3 dshx:py-2" variant="destructive">
             <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">

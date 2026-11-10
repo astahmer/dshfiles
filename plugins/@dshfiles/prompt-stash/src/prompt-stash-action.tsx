@@ -1,3 +1,4 @@
+import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
 import { BookmarkIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
@@ -76,6 +77,8 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
     send({ type: 'open', span: props.inputActions.captureInsertion() })
   }
 
+  const phoneTool = usePhoneThreadTool({ id: '@dshfiles/prompt-stash/prompts', label: 'Saved prompts', open: openLibrary, active: isOpen })
+
   const closeLibrary = (): void => send({ type: 'close' })
 
   const beginNewPrompt = (): void => send({ type: 'editor.new' })
@@ -105,6 +108,7 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
     <Popover open={isOpen} onOpenChange={next => (next ? openLibrary() : closeLibrary())}>
       <PopoverTrigger asChild>
         <Button
+          {...phoneTool.triggerProps}
           type="button"
           variant="ghost"
           size="sm"
@@ -117,6 +121,7 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
         </Button>
       </PopoverTrigger>
       <PopoverContent
+        onCloseAutoFocus={phoneTool.onCloseAutoFocus}
         align="end"
         side="top"
         className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-[26rem] dshx:flex-col dshx:overflow-y-auto dshx:p-0"

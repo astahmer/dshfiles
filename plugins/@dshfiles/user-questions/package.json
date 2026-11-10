@@ -55,6 +55,7 @@
     "@deepseek-ai/dsh-util-workspace-path": "0.2.1-rc.2",
     "@dshfiles/chat": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/multi-host": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "clsx": "catalog:",

@@ -213,6 +213,50 @@
           "reason": "Client-only: the failure card renders browser state from Session events and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "compaction-meter",
+      "title": "Tokens left before automatic compaction",
+      "summary": "In the composer's meter line, after the native context ring and before the cost estimate, a chip says how many tokens remain before automatic compaction (\"compacts in ~40K\", then \"compacts next step\"); its tooltip gives the trigger and window. The trigger comes from the running context-compaction engine through its threshold API; the live prompt size is the native contextPressure projection the ring reads.",
+      "reach": ["seed jev-setup-chat-thread", "expect text \"compacts in*\""],
+      "surfaces": ["client", "settings"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: meter line",
+      "configuration": [
+        {
+          "key": "compactionMeter",
+          "defaultValue": "true",
+          "constraints": "Boolean; show tokens left before automatic compaction beside the context meter.",
+          "choices": ["true", "false"],
+          "coveredBy": ["agent-plan.compaction-reading"]
+        }
+      ],
+      "states": ["hidden-before-usage", "counting-down", "due", "auto-off-hidden", "owner-missing-hidden", "disabled"],
+      "failureModes": [
+        "Without @dshfiles/context-compaction (stock compaction-basic) the threshold API has no owner and the chip stays hidden.",
+        "The count is approximate: the ring's projected size and the engine's own measure can differ by the response tokens."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-plan.compaction-meter",
+          "featureFile": "tooling/dshx/e2e/features/agent-plan.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-plan.compaction-reading",
+          "file": "plugins/@dshfiles/agent-plan/src/compaction-reading.test.ts",
+          "testName": "counts down from the trigger with the size the context ring shows"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the chip renders a projection and one context-compaction API read, whose Host work is traced there."
+        }
+      ]
     }
   ]
 }

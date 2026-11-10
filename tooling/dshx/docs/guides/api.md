@@ -162,10 +162,30 @@ leaves with an `aborted` error while the others keep waiting; the request itself
 left. Calls of any other method always send their own request, so a mutation never runs fewer times than it was
 called. Host-to-Host calls (`createHostApiClient`) are in process and are not coalesced.
 
-Calls are not batched into one HTTP request. Each method is its own exact Connection route, admitted and traced on
-its own; a batch route would re-implement dispatch, per-call abort and trace propagation inside one envelope, and
-every call of a tick would wait for the slowest one. Coalescing removes the duplicate-read storms batching was meant
-for without that head-of-line blocking.
+## Several reads of one tick share one HTTP request
+
+HTTP/1.1 gives a page six sockets per origin, shared with every other DSH tab and the `shared-streams` worker. With one
+POST per read, a fresh load of the live GUI queued 99 % of its request time and its first read left the browser after
+115 s while the Host answered in 5 ms; the same load now queues nothing (numbers in
+[performance.md](../../../../docs/performance.md#live-page-load-after-the-data-fetching-work-2026-11-10)).
+
+In a browser page, read-only calls (the same test as the in-flight join above) issued within 8 ms, up to 32, go as one
+`POST /api/dshx-batch`, which the leading dshx Host bundle serves beside `/api/dshx-events`. The body is
+`{ entries: [{ id, endpoint, payload }] }` (at most 64, schema-validated); each entry runs through its API's own
+`dispatch` with the per-channel route's caller, browser peer and traceparent, so it keeps its own validation and
+`api-dispatch` span. The answer is `application/x-ndjson`, one `{ id, result }` line per entry as it settles, so a slow
+read never holds a fast one back; an endpoint no API serves answers `{ id, status: 404 }` and one failing entry never
+fails the batch. The in-flight join stays in front of the batcher. An abort inside the window drops the entry; after the
+flush the caller stops waiting and the POST is cancelled once no entry waits on it. Writes keep their own route.
+
+When the route answers 404, 405 or 501 or not as NDJSON (an older Host), the page falls back to per-channel POSTs for
+good; any other failure resends that batch per channel and keeps batching, and an entry the stream left unanswered is
+sent per channel once. `localStorage['dshx:batch'] = 'off'` keeps one page on per-channel requests, to compare counts.
+The batcher lives on `globalThis` under `Symbol.for('@dshfiles/dshx.api-batch.v1')`, so every bundle's inlined dshx
+copy shares it. Carrying the batch and the events stream over the `/api/remote.mux` WebSocket instead is not reachable
+from a plugin (Host gap 98 in [`plans/dsh-host-gaps.md`](../../../../plans/dsh-host-gaps.md)).
+
+## Native reads shared by several owners
 
 Native core reads through `ctx.remote` (`session/modelCatalog`, `agentPresets/list`) bypass this. When several
 owners read the same core method, wrap the call in `joinPageRead({ key, read, notBefore })` from

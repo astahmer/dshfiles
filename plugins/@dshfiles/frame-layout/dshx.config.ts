@@ -4,7 +4,7 @@ import { defineConfig } from '@dshfiles/dshx'
 export default defineConfig({
   name: '@dshfiles/frame-layout',
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
-  client: { entry: 'src/client-entry.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
+  client: { entry: 'src/client-entry.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   // Public frame seats (including shell.main's authorized keyed renderer):
   // occupants import the SlotMap, owner props and observable mode contract here.
   // The status strip registry (docs/ade-ux §4.1 R5): plugins add at most one item each.

@@ -348,6 +348,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     }, ActivityPill)
     yield ctx.slots.register({
       name: 'conversation.composer.dock', id: 'usage', order: 1, locale: NS, inject: statPillInject,
+      children: { 'conversation.composer.usageCost': { kind: 'list', scope: 'session' } },
     }, UsagePill)
   })
 

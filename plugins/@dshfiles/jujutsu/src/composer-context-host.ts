@@ -13,6 +13,7 @@ import {
 import { JujutsuOutputModel, JujutsuPathModel } from './core.js'
 import { WorkspaceNotFound, type JjRunError } from './errors.js'
 import { JujutsuCommands, type JjRunResult } from './jujutsu-commands.js'
+import { PayloadBudget } from './payload-budget.js'
 
 const headSchema = Schema.Struct({
   changeId: Schema.String.check(Schema.isMaxLength(64)),
@@ -190,11 +191,12 @@ const make = Effect.gen(function* () {
     const located = yield* workspaceRoot(input.cwd)
     if (Option.isNone(located)) return yield* new WorkspaceNotFound({})
     const patch = yield* run({ cwd: located.value, args: ['diff', ...ComposerContextModel.composerDiffRange(input.base), '--git'], outputLimit: 1_160_000 })
-    return {
-      patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
-      truncated: patch.truncated,
-      files: ComposerContextModel.parsePatchFileStats(patch.stdout).slice(0, 2000),
-    }
+    const files = ComposerContextModel.parsePatchFileStats(patch.stdout).slice(0, 2000)
+    const fitted = PayloadBudget.fitText({
+      text: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
+      response: text => ({ patch: text, truncated: true, files }),
+    })
+    return { patch: fitted.text, truncated: patch.truncated || fitted.truncated, files }
   })
 
   return { context, diff }
