@@ -24,6 +24,7 @@ import { RepoLocks } from './repo-locks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
 import { jjIntegrationSettings } from './settings.js'
+import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { ThreadWorkspaces } from './thread-workspaces.js'
 import { WorkspaceSync } from './workspace-sync.js'
@@ -70,7 +71,21 @@ const handlers = Api.handlers(jjIntegrationApi, {
   classifyWorkspaces: input => ThreadLifecycle.use(lifecycle => lifecycle.classifyWorkspaces(input)),
   projects: () => ThreadLifecycle.use(lifecycle => lifecycle.projects),
   noFolder: () => ThreadLifecycle.use(lifecycle => lifecycle.noFolder),
-  repositories: () => RepositoryViews.use(views => views.snapshot),
+  repositories: input =>
+    RepositoryViews.use(views => views.snapshot).pipe(
+      Effect.map(snapshot => {
+        const limit = input.revisionLimit
+        if (limit === undefined) return snapshot
+        return {
+          refreshing: snapshot.refreshing,
+          refreshFailed: snapshot.refreshFailed,
+          repositories: snapshot.repositories.map(repository => ({
+            ...repository,
+            threads: repository.threads.map(thread => ThreadIntegrationModel.withRevisionLimit(thread, limit)),
+          })),
+        }
+      }),
+    ),
   refreshRepositories: () => RepositoryViews.use(views => Effect.map(views.startRefresh, started => ({ started }))),
   threadAt: input => ThreadLifecycle.use(lifecycle => lifecycle.threadAt(input)),
   revisionGraph: input => ThreadWorkspaces.use(threads => Effect.map(threads.revisionGraph(input.path), graph => ({ graph }))),

@@ -299,6 +299,17 @@ export const jjThreadEffectSchema = Schema.Struct({
     ).check(Schema.isMaxLength(10_000)),
   ),
   unlanded: Schema.Array(jjRevisionEffectSchema).check(Schema.isMaxLength(10_000)),
+  /**
+   * Totals over every unlanded revision, present when `unlanded` holds only the newest of them (a `repositories` read
+   * with `revisionLimit`); `threadAt` keeps the full list.
+   */
+  unlandedSummary: Schema.optional(
+    Schema.Struct({
+      total: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+      conflicted: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+      undescribed: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+    }),
+  ),
 })
 
 export const jjRepositoryEffectSchema = Schema.Struct({

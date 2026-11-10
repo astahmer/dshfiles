@@ -11,10 +11,11 @@ type Progress = OutputOf<typeof integrationProgress>
 type DiscardResult = OutputOf<typeof discard>
 type PathInput = { readonly path: string; readonly bookmark?: string }
 type DiscardInput = { readonly path: string; readonly force: boolean }
+type RepositoriesInput = { readonly revisionLimit?: number }
 
 /** What the Land page calls on this Host. */
 export interface LocalLandApi {
-  readonly repositories: (input: Record<string, never>, options?: ApiCallOptions) => Promise<Repositories>
+  readonly repositories: (input: RepositoriesInput, options?: ApiCallOptions) => Promise<Repositories>
   readonly land: (input: PathInput, options?: ApiCallOptions) => Promise<LandResult>
   readonly integrationProgress: (input: { readonly path: string }, options?: ApiCallOptions) => Promise<Progress>
   readonly discard: (input: DiscardInput, options?: ApiCallOptions) => Promise<DiscardResult>
@@ -72,7 +73,7 @@ export const landRepositoriesApi = (input: { readonly local: LocalLandApi; reado
     return Schema.decodeUnknownSync(call.output)(result.value)
   }
   return {
-    repositories: async (request: Record<string, never>, options?: ApiCallOptions): Promise<LandRepositories> => {
+    repositories: async (request: RepositoriesInput, options?: ApiCallOptions): Promise<LandRepositories> => {
       const [mine, theirs] = await Promise.all([
         local.repositories(request, options),
         remote.remoteRepositories({}, options).catch((error: unknown) => {

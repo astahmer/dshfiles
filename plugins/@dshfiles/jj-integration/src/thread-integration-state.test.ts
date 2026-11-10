@@ -151,3 +151,35 @@ describe('thread integration assessment', () => {
     expect(legacy.category).toBe('no-changes')
   })
 })
+
+describe('revision limit', () => {
+  const unlanded = [
+    revision({ commitId: 'c3', description: 'feat: newest' }),
+    revision({ commitId: 'c2', description: '' }),
+    revision({ commitId: 'c1', description: 'fix: oldest', conflict: true }),
+  ]
+
+  it('keeps the newest revisions and carries totals over all of them', () => {
+    const limited = ThreadIntegrationModel.withRevisionLimit(createThread({ unlanded }), 1)
+    expect(limited.unlanded.map(entry => entry.commitId)).toEqual(['c3'])
+    expect(limited.unlandedSummary).toEqual({ total: 3, conflicted: 1, undescribed: 1 })
+  })
+
+  it('leaves a thread within the limit as it is', () => {
+    const thread = createThread({ unlanded })
+    expect(ThreadIntegrationModel.withRevisionLimit(thread, 3)).toBe(thread)
+  })
+
+  it('assesses a limited thread from its totals, not the revisions it kept', () => {
+    const full = ThreadIntegrationModel.assess({ thread: createThread({ unlanded }), running: false, waitingForInput: false, integrationAllowed: true })
+    const limited = ThreadIntegrationModel.assess({
+      thread: ThreadIntegrationModel.withRevisionLimit(createThread({ unlanded }), 1),
+      running: false,
+      waitingForInput: false,
+      integrationAllowed: true,
+    })
+    expect(limited).toEqual(full)
+    expect(limited.pendingRevisions).toBe(3)
+    expect(limited.blockers).toEqual(expect.arrayContaining(['conflict', 'description']))
+  })
+})

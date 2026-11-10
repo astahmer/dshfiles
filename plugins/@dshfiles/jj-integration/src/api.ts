@@ -282,7 +282,10 @@ export const jjIntegrationApi = defineApi({
       tool: { name: 'jj_set_project_bookmark', render: output => renderProjectBookmark(output) },
     }),
     repositories: method({
-      input: emptyInputSchema,
+      input: Schema.Struct({
+        /** Keep only the newest revisions of each thread and add `unlandedSummary`; `threadAt` reads one thread in full. */
+        revisionLimit: Schema.optional(Schema.Number.check(Schema.isInt()).check(Schema.isBetween({ minimum: 0, maximum: 10_000 }))),
+      }),
       output: jjRepositoriesEffectSchema,
       description:
         'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.',
@@ -299,7 +302,9 @@ export const jjIntegrationApi = defineApi({
                     thread.finished ? 'finished' : undefined,
                     thread.missing ? 'missing workspace' : undefined,
                     thread.canRebase === true ? 'can rebase' : thread.canRebase === false ? 'blocked' : 'activity unknown',
-                    thread.unlanded.length === 0 ? 'no pending revisions' : `${String(thread.unlanded.length)} pending`,
+                    (thread.unlandedSummary?.total ?? thread.unlanded.length) === 0
+                      ? 'no pending revisions'
+                      : `${String(thread.unlandedSummary?.total ?? thread.unlanded.length)} pending`,
                     (thread.behindCount ?? (thread.behind ? 1 : 0)) === 0 ? undefined : `${String(thread.behindCount ?? 1)} behind`,
                   ].filter(flag => flag !== undefined)
                   return `  ${thread.name} · ${thread.path}${thread.sessionIds.length === 0 ? '' : ` · ${thread.sessionIds.join(', ')}`}${flags.length === 0 ? '' : ` · ${flags.join(' · ')}`}`

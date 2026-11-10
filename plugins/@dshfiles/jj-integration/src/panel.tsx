@@ -74,6 +74,9 @@ import { threadAtQueryKey } from './thread-query-keys.js'
 import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
+/** The Land page lists the newest revisions of each thread; the full list of one thread is `threadAt`. */
+const LAND_REVISION_LIMIT = 10
+
 export const threadQueryKeys = {
   repositories: ['jj-integration', 'repositories'] as const,
   threadAt: threadAtQueryKey,
@@ -413,6 +416,7 @@ const ThreadRow = (props: {
     return latest === undefined || updated > latest ? updated : latest
   }, undefined)
   const tip = thread.unlanded[0]
+  const olderRevisions = ThreadIntegrationModel.unlandedTotals(thread).total - thread.unlanded.length
   const title = workspaceTitlePrefix(thread.workspaceTitle) ?? props.repositoryTitle
   /** A durable title only: displayTitle falls back to the folder basename, which is never a thread's name. */
   const sessionTitle = mainSession?.title?.trim() || undefined
@@ -490,6 +494,7 @@ const ThreadRow = (props: {
               {revision.conflict ? <Badge variant="destructive">{t('conflict')}</Badge> : null}
             </li>
           ))}
+          {olderRevisions > 0 ? <li className="dshx:text-xs dshx:text-muted-foreground">{t('moreRevisions', { count: olderRevisions })}</li> : null}
         </ul>
       ) : null}
       {listedSessionIds.length > 0 ? (
@@ -825,7 +830,12 @@ export const ThreadWorkspacesPanel = (props: {
   }
   const repositories = useQuery({
     queryKey: threadQueryKeys.repositories,
-    queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => landApi.repositories({}, { signal: hostSignal }) }),
+    queryFn: ({ signal }) =>
+      runHostRequest({
+        signal,
+        timeoutMs: 60_000,
+        request: hostSignal => landApi.repositories({ revisionLimit: LAND_REVISION_LIMIT }, { signal: hostSignal }),
+      }),
     staleTime: 15_000,
     refetchInterval: query => (query.state.data?.refreshing === true ? 5_000 : 60_000),
   })
@@ -859,7 +869,16 @@ export const ThreadWorkspacesPanel = (props: {
             repositories: previous.repositories.map(repository => ({
               ...repository,
               threads: repository.threads.map(thread =>
-                thread.path === input.path ? { ...thread, unlanded: [], behind: false, behindCount: 0, rebasedAt: Date.now() } : thread,
+                thread.path === input.path
+                  ? {
+                      ...thread,
+                      unlanded: [],
+                      unlandedSummary: { total: 0, conflicted: 0, undescribed: 0 },
+                      behind: false,
+                      behindCount: 0,
+                      rebasedAt: Date.now(),
+                    }
+                  : thread,
               ),
             })),
           }
@@ -937,7 +956,12 @@ export const ThreadWorkspacesPanel = (props: {
     () =>
       threads
         .filter(
-          ({ thread }) => !ThreadSessionSelection.isUnusedThread({ sessionIds: thread.sessionIds, pendingRevisions: thread.unlanded.length, sessionById }),
+          ({ thread }) =>
+            !ThreadSessionSelection.isUnusedThread({
+              sessionIds: thread.sessionIds,
+              pendingRevisions: ThreadIntegrationModel.unlandedTotals(thread).total,
+              sessionById,
+            }),
         )
         .map(({ repository, thread }) => {
           const cwdActivity = sessionActivity.activityAt(thread.path)
@@ -1342,7 +1366,11 @@ export const ThreadWorkspacesPanel = (props: {
                                 onSelect={() => toggleSelectedPath(entry.thread.path)}
                                 onIntegrate={bookmark => rebase.mutate({ path: entry.thread.path, bookmark, signal: new AbortController().signal })}
                                 onDiscard={() =>
-                                  discard.request({ path: entry.thread.path, name: entry.thread.name, unlandedCount: entry.thread.unlanded.length })
+                                  discard.request({
+                                    path: entry.thread.path,
+                                    name: entry.thread.name,
+                                    unlandedCount: ThreadIntegrationModel.unlandedTotals(entry.thread).total,
+                                  })
                                 }
                               />
                             ))}

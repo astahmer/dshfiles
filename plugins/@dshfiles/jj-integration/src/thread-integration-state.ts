@@ -62,6 +62,22 @@ const liveCategoryOf = (props: {
 export class ThreadIntegrationModel {
   static readonly isPlaceholderRevisionDescription = (description: string): boolean => PLACEHOLDER_DESCRIPTIONS.has(description.trim().toLowerCase())
 
+  /** Totals over every unlanded revision, whether `unlanded` is the full list or only its newest (`unlandedSummary`). */
+  static readonly unlandedTotals = (
+    thread: Pick<ThreadView, 'unlanded' | 'unlandedSummary'>,
+  ): { readonly total: number; readonly conflicted: number; readonly undescribed: number } =>
+    thread.unlandedSummary ?? {
+      total: thread.unlanded.length,
+      conflicted: thread.unlanded.filter(revision => revision.conflict).length,
+      undescribed: thread.unlanded.filter(revision => ThreadIntegrationModel.isPlaceholderRevisionDescription(revision.description)).length,
+    }
+
+  /** The newest `limit` unlanded revisions of a thread, with totals over all of them; a thread within the limit is unchanged. */
+  static readonly withRevisionLimit = (thread: ThreadView, limit: number): ThreadView =>
+    thread.unlanded.length <= limit
+      ? thread
+      : { ...thread, unlanded: thread.unlanded.slice(0, limit), unlandedSummary: ThreadIntegrationModel.unlandedTotals(thread) }
+
   /**
    * A workspace nobody ever opened is not finished, and neither is one with an active Session: only every conversation
    * being archived makes a thread inactive. A blank New-thread slot is not a conversation, so it never keeps a thread
@@ -87,9 +103,10 @@ export class ThreadIntegrationModel {
     readonly jobPhase?: IntegrationJobPhase | undefined
   }): ThreadIntegrationAssessment => {
     const thread = input.thread
-    const conflictedRevisions = thread.unlanded.filter(revision => revision.conflict).length
-    const undescribedRevisions = thread.unlanded.filter(revision => ThreadIntegrationModel.isPlaceholderRevisionDescription(revision.description)).length
-    const pendingRevisions = thread.unlanded.length
+    const totals = ThreadIntegrationModel.unlandedTotals(thread)
+    const conflictedRevisions = totals.conflicted
+    const undescribedRevisions = totals.undescribed
+    const pendingRevisions = totals.total
     const behindBookmark = thread.behindCount ?? (thread.behind ? 1 : 0)
     const blockers: ThreadIntegrationBlocker[] = []
     const hasPendingWork = pendingRevisions > 0
