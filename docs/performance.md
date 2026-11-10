@@ -969,3 +969,40 @@ others: the Host settings namespace is the Loader row id (`ui-settings`, read by
 `agent-preset` and `settings-shell`) and the Loader keys rows by id, so a replacement row would move that preference.
 The other repeats in a 15 s reload window (`quotaContinuations`, `threadList`, `multi-host/list`, `traces-alerts/feed`)
 are polls, not boot duplicates.
+
+## Live page load after the data-fetching work (2026-11-10)
+
+The 2026-11-06 fresh-load HAR of the live GUI (158 requests in 143 s, 99 % of request time queued, the first request
+left the browser queue after 115.6 s) drove a batched dshx transport (`/api/dshx-batch`, see
+[the API guide](../tooling/dshx/docs/guides/api.md#several-reads-of-one-tick-share-one-http-request)), the page-wide
+resource store ([guide](../tooling/dshx/docs/sdk/resource-store.md)), `joinPageRead` for shared native reads, the
+`settings-models` / `settings-web-search` forks and the P0 poll fixes. All of it is on `main` and was served by the live
+Host restarted on 2026-11-10 at 16:15. One headless load of that Host, 100 minutes after the restart, machine load
+9–13 (other agents running):
+
+```sh
+node .agents/skills/live-performance-audit/scripts/har-capture.mjs --seconds 60 --summary --out <scratch>/fresh.har
+```
+
+| Measure                                   | 2026-11-06 (user's browser, 143 s)       | 2026-11-10 (headless, 60 s)                       |
+| ----------------------------------------- | ---------------------------------------- | ------------------------------------------------- |
+| `/api` requests                           | 158                                      | 53 (27 of them `dshx-batch` POSTs)                |
+| first request left the browser queue      | 115.6 s after the first was issued       | 0 ms                                              |
+| share of request time queued (`blocked`)  | 99 %, p95 113 s                          | 0 %, p95 0 ms                                     |
+| request time p50 / p95                    | 4.3 s / 113 s                            | 43 ms / 2.77 s                                    |
+| server time (`wait`) p50 / p95            | 5 ms / 1.4 s                             | 35 ms / 2.52 s                                    |
+| aborted in the queue                      | 26                                       | 0                                                 |
+| `session/modelCatalog`                    | 16                                       | 1                                                 |
+| `credentials/describe`                    | 13                                       | 2 (one body)                                      |
+| `llm/listProviders` + `listConfigurable…` | 8 + 8                                    | 1 + 1                                             |
+| `changes.summary` 404s                    | 8                                        | 0                                                 |
+| bytes received                            | 7.8 MB                                   | 6.1 MB (`session/list` 3.5 MB, batches 2.0 MB)    |
+
+The two captures differ in browser (the user's, with every other tab and the `shared-streams` worker, against a
+headless page with none), so the queue numbers compare the page's own demand, not the user's socket pool. The slow
+reads left in this load are Host-side, not queueing: `session/list` 3.5 s server time for 3.5 MB (core),
+`worktree-memory/scratchHosts` 3.7 s ×2, `ai-accounts/read` 2.5 s, `permissionPresets/catalog` 2.1 s (core).
+
+Two things `har-summary.mjs` cannot see yet: the entries inside a `dshx-batch` POST (bodies are digested, so the 27
+batches map to "unmapped dshx-batch"), and which read is the 174 KB batch answer that repeats every ~15 s (at 17.7,
+31.3 and three times at 55.3–55.7 s). Attributing them needs the capture to keep each entry's endpoint hash.
