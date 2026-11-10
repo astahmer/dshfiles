@@ -124,6 +124,10 @@ interface SettingsState<HostValue, ClientValue> {
 
 The mutation Promise resolves when the official queue and recovery sequence finishes; it does not promise that a remote persistence backend committed the value. Mutations are not optimistic, do not retain submitted values, and do not retry. Concurrent writes increment a Hook-local pending counter, so `mutation.pending` stays true until all calls settle.
 
+## Observing outside React
+
+`observeSettings(ctx, contract)` exposes `getSnapshot()` and `subscribe(listener)` for Client services that cannot use a React hook. It uses the same official Settings mirror and decoder as `useSettings`; its snapshot is `undefined` while loading, unavailable, or invalid, so callers must supply a safe default. Call the subscription's returned function on disposal. Use `useSettings` when detailed errors or writes are needed.
+
 ## Read errors and write refusal
 
 | `error.kind`             | Meaning                                                     |
@@ -137,7 +141,7 @@ Provider or namespace absence sets `writable: false`; `set`/`unset` reject befor
 
 ## Automatic Client wiring
 
-If `useSettings` survives final tree-shaking, compiler module metadata adds the `settingsScope` service. The project must declare `@deepseek-ai/dsh-client-ui-settings` in `dsh.client.inject`; `dshx check` reports a missing edge and `build` is authoritative. Multiple components using the same contract reuse one official bound scope inside the current Client Fiber.
+If `useSettings` or `observeSettings` survives final tree-shaking, compiler module metadata adds the `settingsScope` service. The project must declare `@deepseek-ai/dsh-client-ui-settings` in `dsh.client.inject`; `dshx check` reports a missing edge and `build` is authoritative. Multiple components using the same contract reuse one official bound scope inside the current Client Fiber.
 
 ## Plugins page form
 

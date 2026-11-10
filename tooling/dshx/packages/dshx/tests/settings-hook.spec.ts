@@ -2,7 +2,8 @@ import Schema from '@deepseek-ai/schemastery'
 import React from 'react'
 import type { SettingsContract } from '../src/settings/index.js'
 import type { SettingsClientRuntime } from '../src/settings/client.js'
-import { createSettingsClientRuntime, observeSettings, useSettings } from '../src/settings/client.js'
+import { createSettingsClientRuntime, useSettings } from '../src/settings/client.js'
+import { observeSettings } from '../src/settings/observe.js'
 import { defineSettings } from '../src/settings/index.js'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as EffectSchema from 'effect/Schema'
@@ -203,7 +204,7 @@ describe('observeSettings', () => {
       mutate: async () => true,
     }
     const configForms = { get: () => scope, describe: () => ({ getSnapshot: () => ({}), subscribe: () => () => undefined, ensure: () => Promise.resolve() }) }
-    const observed = observeSettings({ get: name => (name === 'configForms' ? configForms : undefined) }, contract)
+    const observed = observeSettings({ get: (name: string) => (name === 'configForms' ? configForms : undefined) }, contract)
     expect(observed.getSnapshot()).toBeUndefined()
     const changed = vi.fn()
     const unsubscribe = observed.subscribe(changed)
@@ -211,6 +212,8 @@ describe('observeSettings', () => {
     for (const listener of listeners) listener()
     expect(changed).toHaveBeenCalledTimes(1)
     expect(observed.getSnapshot()).toEqual({ limit: 0 })
+    snapshot = { ...snapshot, value: { limit: 'invalid' } }
+    expect(observed.getSnapshot()).toBeUndefined()
     unsubscribe()
     expect(listeners.size).toBe(0)
   })

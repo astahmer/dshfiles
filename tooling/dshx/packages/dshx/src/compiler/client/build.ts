@@ -70,6 +70,7 @@ const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta
 const API_ZOD_VIEW_PATH = fileURLToPath(new URL('../../api/zod-view.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_CLIENT_PATH = fileURLToPath(new URL('../../settings/client.js', import.meta.url))
+const SETTINGS_OBSERVE_PATH = fileURLToPath(new URL('../../settings/observe.js', import.meta.url))
 const SETTINGS_PAGE_RENDERER_PATH = fileURLToPath(new URL('../../settings/page-renderer.js', import.meta.url))
 const SETTINGS_SECTION_ENTRIES_PATH = fileURLToPath(new URL('../../settings/section-entries.js', import.meta.url))
 const SETTINGS_WRITE_JOURNAL_PATH = fileURLToPath(new URL('../../settings/write-journal.js', import.meta.url))
@@ -104,6 +105,7 @@ const CLIENT_RUNTIME_ENTRIES = [
   API_ZOD_VIEW_PATH,
   SETTINGS_DEFINE_PATH,
   SETTINGS_CLIENT_PATH,
+  SETTINGS_OBSERVE_PATH,
   SETTINGS_PAGE_RENDERER_PATH,
   SETTINGS_SECTION_ENTRIES_PATH,
   SETTINGS_WRITE_JOURNAL_PATH,
@@ -315,7 +317,8 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
       }
       if (id === VIRTUAL_CLIENT_SETTINGS_HOOK) {
         return [
-          `import { observeSettings as observeSettingsImplementation, useSettings as useSettingsImplementation } from ${JSON.stringify(SETTINGS_CLIENT_PATH)}`,
+          `import { useSettings as useSettingsImplementation } from ${JSON.stringify(SETTINGS_CLIENT_PATH)}`,
+          `import { observeSettings as observeSettingsImplementation } from ${JSON.stringify(SETTINGS_OBSERVE_PATH)}`,
           'export function useSettings(...args) { return useSettingsImplementation(...args) }',
           'export function observeSettings(...args) { return observeSettingsImplementation(...args) }',
           '',
