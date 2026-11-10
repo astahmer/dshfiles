@@ -25,12 +25,10 @@ const installCommand = (provider: Provider): string | undefined => {
 
 const entry = (input: { provider: Provider; available: boolean; setup?: string }): Availability => {
   const command = input.available ? undefined : installCommand(input.provider)
-  return {
-    provider: input.provider,
-    available: input.available,
-    ...(command === undefined ? {} : { install: command }),
-    ...(input.setup === undefined ? {} : { setup: input.setup }),
-  }
+  const availability: { -readonly [Key in keyof Availability]: Availability[Key] } = { provider: input.provider, available: input.available }
+  if (command !== undefined) availability.install = command
+  if (input.setup !== undefined) availability.setup = input.setup
+  return availability
 }
 
 export const detectProviders = async (): Promise<Availability[]> => {

@@ -19,7 +19,7 @@ const listen = async (server: http.Server): Promise<number> => {
 const post = (port: number, path: string, body: unknown, cookie?: string) =>
   new Promise<{ status: number; cookie?: string }>((resolve, reject) => {
     const request = http.request(
-      { hostname: '127.0.0.1', port, path, method: 'POST', headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) } },
+      { hostname: '127.0.0.1', port, path, method: 'POST', headers: cookie ? { 'content-type': 'application/json', cookie } : { 'content-type': 'application/json' } },
       response => {
         response.resume()
         const header = response.headers['set-cookie']
