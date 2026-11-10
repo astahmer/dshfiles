@@ -5,6 +5,24 @@ we own. It runs on stock DSH 0.2.1-rc.2 with no core patches. The global
 contract (`~/.dsh/AGENTS.md`) holds harness-neutral defaults; this file holds
 dshfiles and DSH rules.
 
+## Baseline rules
+
+These apply even without the global contract.
+
+1. Use `jj`, not `git`, in a JJ checkout. One logical change per revision:
+   Conventional Commit title, body says why, no `Co-Authored-By` or agent
+   handles.
+2. Before a history edit, run `jj status` in each affected workspace. Never
+   rewrite a revision another workspace holds as `@` or builds on. After a
+   rebase, check `jj log -r 'conflicts()'`.
+3. Read a file before you overwrite it. Fix the cause with the smallest edit.
+4. Done means a fresh, focused check passed. A regression check fails before the
+   fix and passes after. Report `Verified: <command> → <result>` and
+   `Unverified: <what>`.
+5. Never `sleep` or loop a tool to pass time. Wait on a notification, or end the
+   turn with a named wake.
+6. Never print secrets. Refer to them by env var name or `secret:ALIAS`.
+
 ## The core boundary
 
 1. Never patch DSH core from this repository.
