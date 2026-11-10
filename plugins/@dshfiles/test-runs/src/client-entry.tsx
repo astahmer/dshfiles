@@ -3,9 +3,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { Composer, defineClientPlugin, useContract, useSettings } from '@dshfiles/dshx/client'
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
+import { StackFrames } from '@dshfiles/plugin-ui/lib/stack-frames'
 import { Result, Schema } from 'effect'
 import { createElement, useMemo, type ComponentType } from 'react'
 import { testRunsSettings } from './settings.js'
+import { StackTraceCard } from './stack-trace-card.js'
 import { TestRunCard, TestRunPending, type TestRunActions } from './test-run-card.js'
 import { VitestReport } from './vitest-report.js'
 
@@ -44,6 +46,7 @@ export default defineClientPlugin({
       const command = props.phase === 'start' ? commandOf(props.block.argsRaw) : props.phase === 'result' ? commandOf(props.block.call?.argsRaw) : undefined
       const output = props.phase === 'result' && !props.block.isError && props.block.content.length === 1 ? props.block.content[0] : undefined
       const run = useMemo(() => (output?.type === 'text' ? VitestReport.parse(output.text) : undefined), [output])
+      const resultText = props.phase === 'result' ? props.block.content.flatMap(part => (part.type === 'text' ? [part.text] : []))[0] : undefined
       const sessionId = props.sessionId
       const settings = useSettings(testRunsSettings).value
       const composer = useContract(Composer)
@@ -51,6 +54,7 @@ export default defineClientPlugin({
         () => (composer.status === 'active' ? { askToFix: text => composer.value.insert({ sessionId, text }) } : undefined),
         [composer, sessionId],
       )
+      const trace = useMemo(() => (run === undefined && resultText !== undefined ? StackFrames.extract(resultText) : undefined), [run, resultText])
       if (run !== undefined && settings?.enabled !== false)
         return (
           <TestRunCard
@@ -63,7 +67,14 @@ export default defineClientPlugin({
       if (props.phase === 'start' && settings?.enabled !== false && settings?.runningCard !== false && command !== undefined && TEST_COMMAND.test(command))
         return <TestRunPending command={command} />
       const Native = nativeBashView()
-      return Native === undefined ? null : createElement(Native, props)
+      const native = Native === undefined ? null : createElement(Native, props)
+      if (trace === undefined || settings?.stackTraces === false) return native
+      return (
+        <>
+          {native}
+          <StackTraceCard defaultOpen={settings?.openFailures !== false} openFile={props.openFile} report={trace} />
+        </>
+      )
     }
 
     api.ui.register({ name: 'tool.call.toolview', key: 'bash', priority: PRIORITY, registrant: REGISTRANT, locale: 'conversation' }, BashTestRuns)

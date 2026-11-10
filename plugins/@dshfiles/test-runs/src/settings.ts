@@ -8,6 +8,9 @@ export const testRunsSettings = defineSettings({
     runningCard: Schema.boolean().default(true).description('While a Vitest command runs, show a running test card instead of the bash row.'),
     composerActions: Schema.boolean().default(true).description('Offer Ask to fix and Rerun on a failing test; both fill the composer without sending.'),
     openFailures: Schema.boolean().default(true).description('Open the card, its failing files and their failing tests as soon as the run settles.'),
+    stackTraces: Schema.boolean()
+      .default(true)
+      .description('When any other command prints an error with a stack trace (Node, Python, JVM), add a stack trace card under its output.'),
   }),
   applies: 'live',
 })

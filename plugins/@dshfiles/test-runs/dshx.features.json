@@ -92,6 +92,63 @@
           "reason": "Client-only: Vitest runs as a test-results card renders browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "bash-stack-trace",
+      "title": "Stack traces under failed commands",
+      "summary": "A bash call that is not a Vitest run but printed an error with a stack trace (Node, Deno, Bun, JVM or Python) keeps its native card and gains a Stack trace card under it: the error headline, your frames innermost first with library frames one toggle away, and each frame opening its file at its line.",
+      "reach": ["seed tool-call-thread", "expect text \"Tool finished.\""],
+      "surfaces": ["client", "settings"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: Stack trace card under a bash call",
+      "configuration": [
+        {
+          "key": "stackTraces",
+          "defaultValue": "true",
+          "constraints": "Boolean; add a stack trace card under a command whose output holds one.",
+          "choices": ["true", "false"],
+          "coveredBy": ["test-runs.stack-trace-extract"]
+        }
+      ],
+      "states": ["node", "python", "jvm", "no-trace", "disabled"],
+      "failureModes": [
+        "Only the first trace in the output is read; a Caused by chain ends it.",
+        "A single frame-like line with no error header above it is not taken for a crash.",
+        "Frames open through the Host file opener; a path outside the workspace may not open."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "test-runs.stack-trace",
+          "featureFile": "tooling/dshx/e2e/features/test-runs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "test-runs.stack-trace-extract",
+          "file": "plugins/@dshfiles/plugin-ui/tests/stack-frames.test.ts",
+          "testName": "finds a Node crash in command output with its header and multi-line message"
+        },
+        {
+          "kind": "unit-test",
+          "id": "test-runs.stack-trace-none",
+          "file": "plugins/@dshfiles/plugin-ui/tests/stack-frames.test.ts",
+          "testName": "ignores output with no trace or one stray frame-like line"
+        },
+        {
+          "kind": "unit-test",
+          "id": "test-runs.stack-trace-frames",
+          "file": "plugins/@dshfiles/plugin-ui/tests/code-block.test.tsx",
+          "testName": "hides library frames behind a toggle and opens a frame at its line"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the stack trace card parses the settled tool result in the browser and starts no Host work."
+        }
+      ]
     }
   ]
 }

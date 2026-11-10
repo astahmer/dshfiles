@@ -1,5 +1,6 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { FilePath, StackTrace } from '@dshfiles/plugin-ui/components/stack-trace'
+import { FilePath } from '@dshfiles/plugin-ui/components/code-block'
+import { locationFrame, StackTrace } from '@dshfiles/plugin-ui/components/stack-trace'
 import { StatusIcon, ToolCard } from '@dshfiles/plugin-ui/components/tool-card'
 import { HeightReveal } from '@dshfiles/plugin-ui/components/motion/height-reveal'
 import { ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
@@ -91,7 +92,7 @@ const FailureDetail = (props: {
           </div>
         </div>
       )}
-      <StackTrace codeFrame={failure.codeFrame} frames={failure.frames} location={failure.location} openFile={props.openFile} />
+      <StackTrace codeFrame={failure.codeFrame} frames={failure.frames.map(locationFrame)} location={failure.location} openFile={props.openFile} />
       <div className="dshx:flex dshx:items-center dshx:gap-1">
         {props.actions !== undefined && (
           <>

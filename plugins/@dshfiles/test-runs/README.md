@@ -7,9 +7,12 @@ A `bash` call that runs Vitest renders as a test-results card in the chat transc
 - a header with the tally (`2 failed · 40 passed · 1 skipped`) and the run's duration, over a pass/fail/skip bar;
 - `All`, `Failed`, `Skipped` and `Slow` filters (slow is Vitest's own `slowTestThreshold` default, 300 ms);
 - one row per test file, failing files open first;
-- for each failing test: the error, the `- Expected` / `+ Received` diff, the source location, the code frame with the failing line highlighted, any further stack frames, and **Ask to fix**, **Rerun** and **Copy**.
+- for each failing test: the error, the `- Expected` / `+ Received` diff, the source location, the code frame with the failing line highlighted (plugin-ui `CodeBlock`), any further stack frames (plugin-ui `StackTrace`), and **Ask to fix**, **Rerun** and **Copy**.
 
-Any other command, or Vitest output the parser cannot read, keeps the native bash card.
+Any other command, or Vitest output the parser cannot read, keeps the native bash card. When that command printed an
+error with a stack trace (Node, Deno, Bun, a JVM exception or a Python traceback), a **Stack trace** card follows the
+native card: the error headline, your frames innermost first with library frames one toggle away, and each frame
+opening its file at its line. It reads the first trace only, through `StackFrames.extract` from `@dshfiles/plugin-ui`.
 
 Built with dshx (no port). The design follows the "agent test runs" block from hextaui; nothing is vendored from it.
 
@@ -25,6 +28,7 @@ All apply live.
 | `runningCard`     | `true`  | While a Vitest command runs, show the running test card instead of the bash row.        |
 | `composerActions` | `true`  | Offer Ask to fix and Rerun on failing tests.                                            |
 | `openFailures`    | `true`  | Open the card, its failing files and their failing tests as soon as the run settles.    |
+| `stackTraces`     | `true`  | Add a Stack trace card under any other command whose output holds a stack trace.        |
 
 ## How it takes over the bash card
 

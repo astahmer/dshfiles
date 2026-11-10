@@ -9,3 +9,10 @@ Feature: Vitest runs render as test-results cards
     When a Command Code account backed by a local fake provider is added
     And the fake model runs the test-runs Vitest suite in the selected workspace
     Then the finished tool call shows a Vitest results card
+
+  @scenario:test-runs.stack-trace
+  Scenario: A command that crashes with a stack trace gains a stack trace card
+    Given the isolated plugin composition of "@dshfiles/test-runs, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model runs a crashing Node script in the selected workspace
+    Then the finished tool call shows a stack trace card
