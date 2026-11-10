@@ -6,16 +6,16 @@ import { Effect, Layer } from 'effect'
 import { undoSessionsLayer } from './host-edge-promise.js'
 import { UndoSessions } from './undo-service.js'
 
-const hostWith = (ctx: CordisContext, archived: readonly string[]) => {
+const hostWith = (ctx: CordisContext, archived: readonly string[], plugin: CordisContext) => {
   // SAFETY: liveThreads reads only archivedSessionIds from the workspace registry.
   ctx.provide('workspaceRegistry', { archivedSessionIds: archived } as never)
-  return Layer.succeed(HostContext, HostContext.of({ ctx, packageId: '@dshfiles/session-undo' }))
+  return Layer.succeed(HostContext, HostContext.of({ ctx: plugin, packageId: '@dshfiles/session-undo' }))
 }
 
-const liveThreadsOf = (ctx: CordisContext, archived: readonly string[]) =>
+const liveThreadsOf = (ctx: CordisContext, archived: readonly string[], plugin: CordisContext = ctx) =>
   Effect.provide(
     UndoSessions.use(sessions => sessions.liveThreads),
-    Layer.provide(undoSessionsLayer, hostWith(ctx, archived)),
+    Layer.provide(undoSessionsLayer, hostWith(ctx, archived, plugin)),
   )
 
 describe('undo sessions', () => {
@@ -62,6 +62,24 @@ describe('undo sessions', () => {
         const session = ctx.sessions.create(SessionId('session-live'), { meta: { cwd: '/workspace/shared' } })
         session.append('turn/start', { turn: 1 })
         expect(yield* liveThreadsOf(ctx, [])).toEqual([{ sessionId: 'session-live', cwd: '/workspace/shared', parentSessionId: null }])
+      }),
+    ),
+  )
+
+  it.effect('reads the Sessions from a plugin context that does not inject them, as the Host activates this plugin', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const root = yield* Effect.acquireRelease(
+          Effect.promise(async () => new CordisContext()),
+          context => Effect.promise(() => context.fiber.dispose()),
+        )
+        yield* Effect.promise(() => root.plugin(SessionStore))
+        const session = root.sessions.create(SessionId('session-live'), { meta: { cwd: '/workspace/shared' } })
+        session.append('turn/start', { turn: 1 })
+        const plugin = yield* Effect.promise(
+          () => new Promise<CordisContext>(resolve => void root.plugin({ name: 'session-undo-probe', apply: resolve })),
+        )
+        expect(yield* liveThreadsOf(root, [], plugin)).toEqual([{ sessionId: 'session-live', cwd: '/workspace/shared', parentSessionId: null }])
       }),
     ),
   )

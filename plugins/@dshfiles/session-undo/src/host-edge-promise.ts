@@ -22,6 +22,7 @@ export const undoSessionsLayer = Layer.effect(
     const host = yield* HostContext
     const controller = Effect.provideService(hostService('sessionController'), HostContext, host)
     const registry = Effect.provideService(hostService('workspaceRegistry'), HostContext, host)
+    const attached = Effect.provideService(hostService('sessions'), HostContext, host)
     const bestEffort = (operation: string) => (effect: Effect.Effect<unknown, unknown>) =>
       effect.pipe(
         Effect.asVoid,
@@ -57,10 +58,11 @@ export const undoSessionsLayer = Layer.effect(
         Effect.flatMap(registry, found => Effect.tryPromise(() => found.unarchiveSession(SessionId(sessionId)))).pipe(bestEffort('unarchive')),
       // A thread that has started a turn may hold edits; blank and archived ones hold none. Only attached Sessions
       // count: `sessionController.list` folds every Session log stored on the Host (seconds at a few thousand), and
-      // every Session it returns that is not attached is discarded here anyway.
+      // every Session it returns that is not attached is discarded here anyway. The plugin does not inject `sessions`,
+      // so its context refuses `ctx.sessions`; `hostService` reads the store without that guard.
       liveThreads: Effect.gen(function* () {
         const archived = new Set<string>((yield* registry).archivedSessionIds)
-        return host.ctx.sessions.list().flatMap((session): LiveThread[] => {
+        return (yield* attached).list().flatMap((session): LiveThread[] => {
           const cwd = session.header.cwd
           const sessionId = String(session.id)
           if (cwd === undefined || session.seq === 0 || archived.has(sessionId)) return []
