@@ -216,7 +216,9 @@ selects every visible row. Shift+click and Ctrl/Cmd+click do the same from the
 pointer, ←/→ fold the containing group section or the row's subagent children,
 and Escape or a plain click clears the selection. A selected row paints in the
 info tone, and an "N selected" bar above the list offers Pin, Settle, Archive
-and Clear.
+and Clear. Rows read their selected state from a small store on the shared row
+actions (`src/thread-multi-selection.ts`), so a toggle re-renders only the rows
+whose state changed; nothing writes the rendered rows' attributes.
 
 The context menu of a row inside a multi-selection applies the whole batch:
 pin/unpin, park/unpark, settle/unsettle, mute/unmute, mark unread, copy thread
@@ -703,7 +705,10 @@ do not bake in that depth. Change the native Subagent depth setting when deeper
 delegation is desired.
 **Mention a thread.** A row's context menu, a `@dshfiles/main-tabs` thread
 tab's menu, and a drag from either source all insert that thread as the same
-native reference chip in the composer on screen. The drag carries only
+native reference chip in the composer on screen: the menus send an unaddressed
+request, which the composer of the Session `uiSession`'s current binding shows
+takes (never an aside's composer, and nothing when no thread is on stage). The
+drag carries only
 `application/x-dshfiles-thread-mention` (`{ "sessionId": … }`), never plain text,
 so the rich editor cannot paste a stray title: the composer under the pointer
 outlines, a _Drop to mention thread_ hint follows it, and only the composer whose

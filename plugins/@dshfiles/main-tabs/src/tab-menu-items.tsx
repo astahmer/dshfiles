@@ -7,7 +7,7 @@ import {
   ContextMenuSubTrigger,
 } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { CopyIcon, PanelRightOpenIcon } from '@dshfiles/plugin-ui/icons'
-import { requestThreadMentionInsertion, ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
+import { requestThreadMentionInsertion } from '@dshfiles/thread-sidebar/thread-mention'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { useSyncExternalStore, type ReactElement } from 'react'
 import type { MainTabsTranslate } from './locales.js'
@@ -95,9 +95,7 @@ export const TabMenuItems = (props: {
               </ContextMenuSubContent>
             </ContextMenuSub>
           ) : null}
-          <ContextMenuItem onSelect={() => requestThreadMentionInsertion(tab.sessionId, ThreadMentionDrag.activeComposerSessionId())}>
-            {t('mentionThread')}
-          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => requestThreadMentionInsertion(tab.sessionId)}>{t('mentionThread')}</ContextMenuItem>
           <ContextMenuSub>
             <ContextMenuSubTrigger>{t('threadStatus')}</ContextMenuSubTrigger>
             <ContextMenuSubContent className="dshx-root dshx:min-w-44">

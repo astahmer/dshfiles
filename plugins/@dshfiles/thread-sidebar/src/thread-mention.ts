@@ -61,16 +61,6 @@ const decodeMentionInsertRequest = (value: unknown): ThreadMentionInsertRequest 
   return Result.isSuccess(parsed) ? parsed.success : null
 }
 
-/** The seat a Composer drag lands on: one conversation's composer, never the attachment rail or the dock. */
-const COMPOSER_SEAT = '[data-composer-seat]'
-const CONVERSATION_SESSION = '[data-conversation-session]'
-const THREAD_ASIDE = '[data-dshfiles-thread-aside]'
-
-const composerSessionId = (seat: Element): string | undefined => {
-  const value = seat.closest(CONVERSATION_SESSION)?.getAttribute('data-conversation-session') ?? ''
-  return value === '' ? undefined : value
-}
-
 export class ThreadMentionModel {
   static readonly THREAD_MENTION_CAPTURE_EVENT = 'dshfiles:thread-sidebar:mention-capture'
   static readonly THREAD_MENTION_INSERT_EVENT = 'dshfiles:thread-sidebar:mention-insert'
@@ -105,17 +95,14 @@ export class ThreadMentionModel {
     dataTransfer !== null && dataTransfer !== undefined && dataTransfer.types.includes(ThreadMentionModel.THREAD_MENTION_MIME)
 
   /**
-   * The session of the main view's composer, skipping an aside's embedded conversation.
-   * @returns The composer host session id, or undefined when no main composer is on screen.
+   * Whether one mounted composer takes an insert request: the addressed composer, or for an unaddressed request the
+   * composer of the Session the stage shows (`uiSession`'s current binding), never an aside's embedded conversation.
    */
-  static readonly mainComposerSessionId = (): string | undefined => {
-    for (const seat of document.querySelectorAll(COMPOSER_SEAT)) {
-      if (seat.closest(THREAD_ASIDE) !== null) continue
-      const sessionId = composerSessionId(seat)
-      if (sessionId !== undefined) return sessionId
-    }
-    return undefined
-  }
+  static readonly composerTakesInsert = (input: {
+    readonly request: ThreadMentionInsertRequest
+    readonly composerSessionId: string
+    readonly stageSessionId: string | undefined
+  }): boolean => (input.request.hostSessionId ?? input.stageSessionId) === input.composerSessionId
 
   static readonly readThreadMentionDrag = (dataTransfer: ThreadMentionDragSource | null | undefined): string | null => {
     if (dataTransfer === null || dataTransfer === undefined || !ThreadMentionModel.hasThreadMentionDrag(dataTransfer)) return null
@@ -183,7 +170,6 @@ export const hasThreadMentionDrag = ThreadMentionModel.hasThreadMentionDrag
 /** The `application/x-dshfiles-thread-mention` drag payload a Composer accepts. */
 export const ThreadMentionDrag = {
   MIME: ThreadMentionModel.THREAD_MENTION_MIME,
-  activeComposerSessionId: ThreadMentionModel.mainComposerSessionId,
   has: ThreadMentionModel.hasThreadMentionDrag,
   read: ThreadMentionModel.readThreadMentionDrag,
   write: ThreadMentionModel.writeThreadMentionDrag,
