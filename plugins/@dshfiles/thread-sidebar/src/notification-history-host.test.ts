@@ -9,6 +9,7 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import ApprovalService, { setApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import { HostContext, tracerLayer } from '@dshfiles/dshx/effect'
+import { defineHost, type HostHooks } from '@dshfiles/dshx/host'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -25,7 +26,7 @@ import { type SidebarSettingsValue } from './sidebar-settings.js'
 import { threadSidebarSettings } from './settings.js'
 import { jsonStorageDomain } from './storage.test-support.js'
 
-const fixture = (root: string) =>
+const fixture = (root: string, permissionHook?: NonNullable<HostHooks['permission']>) =>
   Effect.acquireRelease(
     Effect.promise(async () => {
       const host = await createTestHost()
@@ -39,6 +40,9 @@ const fixture = (root: string) =>
       await host.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
       await host.ctx.plugin(ApprovalService)
       await host.ctx.plugin(UserQuestionService)
+      if (permissionHook !== undefined) {
+        await host.mount(defineHost({ hooks: { permission: permissionHook } }), { packageId: '@test/permission-hook' })
+      }
       const handle = await host.ctx.agents.create({ sessionId: SessionId(randomUUID()) })
       handle.agent.session.append('turn/start', { turn: 1 })
       const answer = { answers: [{ id: 'question', selected: ['Continue'] }] }
@@ -54,11 +58,12 @@ const withRecorder = <A, E>(
     readonly fixture: Effect.Success<ReturnType<typeof fixture>>
     readonly history: NotificationHistory['Service']
   }) => Effect.Effect<A, E, Scope.Scope>,
+  permissionHook?: NonNullable<HostHooks['permission']>,
 ) =>
   Effect.gen(function* () {
     yield* TestClock.setTime(10_000)
     const root = yield* (yield* FileSystem.FileSystem).makeTempDirectoryScoped({ prefix: 'notification-history-host-' })
-    const created = yield* fixture(root)
+    const created = yield* fixture(root, permissionHook)
     const layer = notificationHistoryRecorder.pipe(
       Layer.provideMerge(NotificationHistory.layer),
       Layer.provideMerge(SessionEvents.layer),
@@ -120,6 +125,18 @@ describe('notification history Host collection', () => {
         expect(JSON.stringify(snapshot)).not.toContain('question-call')
         expect(snapshot.entries.every(entry => Object.keys(entry).sort().join(',') === 'at,category,dismissed,id,read,sessionId')).toBe(true)
       }),
+    ),
+  )
+
+  it.effect('records a request before an automatic permission hook answers it', () =>
+    withRecorder(
+      ({ fixture: created, history }) =>
+        Effect.gen(function* () {
+          const outcome = yield* Effect.promise(() => created.host.ctx.approval.request({ agent: created.handle.agent, toolName: 'private-tool' }))
+          expect(outcome).toBe('rejected')
+          expect((yield* history.snapshot).entries.map(entry => entry.category)).toEqual(['approval-needed'])
+        }),
+      () => 'rejected',
     ),
   )
 
