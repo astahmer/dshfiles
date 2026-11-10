@@ -18,6 +18,8 @@ describe('jj-integration tool exposure', () => {
     expect(tools.filter(tool => tool !== undefined).map(tool => tool.name)).toEqual([
       'jj_thread_destination',
       'jj_thread_projects',
+      'jj_project_bookmark',
+      'jj_set_project_bookmark',
       'jj_thread_repositories',
       'jj_thread_refresh_repositories',
       'jj_thread_isolate',
@@ -41,6 +43,7 @@ describe('jj-integration tool exposure', () => {
     expect(readOnly).toEqual([
       'jj_thread_destination',
       'jj_thread_projects',
+      'jj_project_bookmark',
       'jj_thread_repositories',
       'jj_thread_refresh_repositories',
       'jj_thread_review_history',
@@ -69,6 +72,35 @@ describe('jj-integration tool exposure', () => {
     } as const
     const text = render({ applied: false, workspaces: [{ ...row, integratedInto: ['release'] }], skipped: [], untracked: [], emptyRevisions: [] })
     expect(text).toContain('thread-aaaaaa (integrated into release)')
+  })
+
+  test('the cleanup trail tool names the owning project and the safe recovery of a failure', async () => {
+    const method = jjIntegrationApi.methods.cleanupJobs
+    const render = method.tool?.render
+    if (typeof render !== 'function' || method.input === undefined || method.output === undefined)
+      throw new Error('jj_thread_cleanup_jobs must take input, declare output and render its trail')
+    expect(await validate(method.input, { path: '/work/project-threads/thread-aaaaaa' })).toBe(false)
+    expect(await validate(method.input, {})).toBe(false)
+    const job = {
+      id: 'cleanup-1',
+      state: 'failed',
+      phase: 'failed',
+      request: { path: '/work/project-threads/thread-aaaaaa', olderThanHours: 0, kinds: ['empty'], trigger: 'manual' },
+      repoRoot: '/work/project',
+      startedAt: 1,
+      finishedAt: 2,
+      progress: { total: 0, processed: 0, removed: 0, kept: 0, failed: 0, current: null },
+      error: 'jj workspace forget exited 1',
+      result: null,
+      recovery: 'Run Clean up thread workspaces… again.',
+    } as const
+    const text = render({ repoRoot: '/work/project', jobs: [job] })
+    expect(text).toContain('cleanup-1 · /work/project · failed/failed')
+    expect(text).toContain('jj workspace forget exited 1')
+    expect(text).toContain('Recovery: Run Clean up thread workspaces… again.')
+    // A Host from before ownership omits the new fields.
+    const { repoRoot: _repoRoot, recovery: _recovery, ...older } = job
+    expect(await validate(method.output, { jobs: [older] })).toBe(false)
   })
 
   test('repository inventory accepts old Host output and reports background refresh state', async () => {

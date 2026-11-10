@@ -138,8 +138,14 @@ function providedModuleGuardPlugin(options: {
   }
 }
 
-/** Fail when a build violates the selected DSH client bundle protocol. */
-function singleClientChunkPlugin(): Plugin {
+/** A synchronous require of a sibling `client*.js` output, which the DSH loader cannot resolve. */
+const SIBLING_REQUIRE = /\brequire\(\s*["'`]\.\/client[^"'`]*\.js["'`]\s*\)/
+
+/**
+ * Fail when a build violates the selected DSH client bundle protocol: one entry chunk, plus only the self-contained
+ * lazy chunks (and their maps) DSHX emitted for import() targets.
+ */
+function singleClientChunkPlugin(lazyChunks: ReadonlySet<string> = new Set()): Plugin {
   const validate = (bundle: Rollup.OutputBundle): void => {
     const chunks = Object.values(bundle).filter(output => output.type === 'chunk')
     const assets = Object.values(bundle).filter(output => output.type === 'asset')
@@ -162,7 +168,20 @@ function singleClientChunkPlugin(): Plugin {
     if (containsPrivateDshxImport(chunk.code)) {
       throw new DshxError('DSHX1101', 'The DSH Client artifact retained a private DSHX runtime import.')
     }
-    const unexpectedAssets = assets.filter(asset => !asset.fileName.endsWith('.js.map'))
+    const lazyAssets = assets.filter(asset => lazyChunks.has(asset.fileName) && !asset.fileName.endsWith('.map'))
+    for (const asset of [chunk, ...lazyAssets]) {
+      const code = asset.type === 'chunk' ? asset.code : typeof asset.source === 'string' ? asset.source : Buffer.from(asset.source).toString('utf8')
+      if (SIBLING_REQUIRE.test(code)) {
+        throw new DshxError('DSHX1101', `${asset.fileName} synchronously requires another client*.js output; DSH chunks must be self-contained.`)
+      }
+      if (asset.type === 'asset' && !/window\.__ModuleLoader__\.load\(\{\s*id\s*:[^,]+,\s*chunk\s*:/.test(code)) {
+        throw new DshxError('DSHX1101', `Lazy chunk ${asset.fileName} lost its DSH chunk registration.`)
+      }
+      if (asset.type === 'asset' && containsPrivateDshxImport(code)) {
+        throw new DshxError('DSHX1101', `Lazy chunk ${asset.fileName} retained a private DSHX runtime import.`)
+      }
+    }
+    const unexpectedAssets = assets.filter(asset => !asset.fileName.endsWith('.js.map') && !lazyChunks.has(asset.fileName))
     if (unexpectedAssets.length > 0) {
       throw new DshxError('DSHX1102', `A DSH Client build emitted unsupported assets: ${unexpectedAssets.map(asset => asset.fileName).join(', ')}.`)
     }

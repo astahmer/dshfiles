@@ -7,7 +7,7 @@ import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { HostDirectory, JobTracker } from './host-edge-promise.js'
 import { nodeProcessCwdPids, summarizeNodeProcesses } from './node-process-summary.js'
 import { ProcessTable, type ProcessRow } from './process-table.js'
-import { ScratchHostDetector, type ScratchProcessRow } from './scratch-hosts.js'
+import { decodeRecord, detect, guardStop, type ScratchProcessRow } from './scratch-hosts.js'
 import { SessionMetadata } from './session-metadata-cache.js'
 import { worktreeMemorySettings } from './settings.js'
 import {
@@ -139,7 +139,7 @@ export class ProcessProbe extends Context.Service<
           files,
           name =>
             fs.readFileString(join(directory, name)).pipe(
-              Effect.map(ScratchHostDetector.decodeRecord),
+              Effect.map(decodeRecord),
               Effect.orElseSucceed(() => Option.none()),
             ),
           { concurrency: 8 },
@@ -153,7 +153,7 @@ export class ProcessProbe extends Context.Service<
           const [records, configured, now] = yield* Effect.all([scratchRecords, settings.get, Clock.currentTimeMillis], {
             concurrency: 'unbounded',
           })
-          const summary = ScratchHostDetector.detect({
+          const summary = detect({
             rows,
             records,
             now,
@@ -328,7 +328,7 @@ export class ProcessStopper extends Context.Service<
             signalled,
             target => {
               if (!target.group) return alive.get(target.pid) === target.startedAt ? sendSignal(target.pid, 'SIGKILL') : Effect.void
-              return ScratchHostDetector.guardStop({ target, rows, hostPid: process.pid }) === 'signal-group' ? sendSignal(-target.pid, 'SIGKILL') : Effect.void
+              return guardStop({ target, rows, hostPid: process.pid }) === 'signal-group' ? sendSignal(-target.pid, 'SIGKILL') : Effect.void
             },
             { discard: true },
           )
@@ -342,7 +342,7 @@ export class ProcessStopper extends Context.Service<
         const byPid = new Map(rows.map(row => [row.pid, row]))
         const verdicts = summary.hosts
           .filter(host => host.orphan)
-          .map(host => ({ host, verdict: ScratchHostDetector.guardStop({ target: host, rows, hostPid: process.pid }) }))
+          .map(host => ({ host, verdict: guardStop({ target: host, rows, hostPid: process.pid }) }))
         const targets = verdicts.flatMap(({ host, verdict }): OrphanSignal[] => {
           if (verdict === 'signal-group') return [{ pid: host.pid, startedAt: host.startedAt, group: true }]
           if (verdict !== 'signal-tree') return []

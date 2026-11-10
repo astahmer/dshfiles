@@ -3,7 +3,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { GoalView } from '@deepseek-ai/dsh-goal'
-import { z } from 'zod'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
@@ -22,10 +23,10 @@ export type GoalToolAuthority =
   | { readonly kind: 'direct-human' }
   | { readonly kind: 'goal-round'; readonly goal: GoalView }
 
-const userQuestionReplySourceSchema = z.object({
-  kind: z.literal('user-question-reply'),
-  callId: z.string().min(1),
-  outcome: z.literal('answered'),
+const userQuestionReplySourceSchema = Schema.Struct({
+  kind: Schema.Literal('user-question-reply'),
+  callId: Schema.NonEmptyString,
+  outcome: Schema.Literal('answered'),
 })
 
 /** Accept only an admitted answer that the native projection settled for this exact continued call. */
@@ -33,10 +34,10 @@ export function isAcceptedQuestionReply(
   source: unknown,
   questions: UserQuestionProjectionView | undefined,
 ): boolean {
-  const parsedSource = userQuestionReplySourceSchema.safeParse(source)
-  if (!parsedSource.success) return false
+  const parsedSource = Schema.decodeUnknownOption(userQuestionReplySourceSchema)(source)
+  if (Option.isNone(parsedSource)) return false
   return questions?.settled.some(question =>
-    question.callId === parsedSource.data.callId && question.answers.length > 0) ?? false
+    question.callId === parsedSource.value.callId && question.answers.length > 0) ?? false
 }
 
 /** Throw one structured tool-policy failure. */

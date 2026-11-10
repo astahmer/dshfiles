@@ -17,7 +17,8 @@ import type {} from '@deepseek-ai/dsh-token-meter/client'
 import type {} from '@dshfiles/session-controller/draft-client'
 import { Service } from '@deepseek-ai/cordis'
 import { createRegisteredApiClient } from '@dshfiles/dshx/client'
-import { z } from 'zod'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
@@ -30,6 +31,31 @@ import { ModelDirectory } from './directory.ts'
 interface LiveState {
   /** Directories keyed by Client binding, removed by their scope disposer. */
   readonly directories: WeakMapWithValues<SessionBinding, ModelDirectory>
+}
+
+const contextWindowSchema = Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0)))
+
+/** The part of the Client `connection` service read here; its Context property is only typed on the Host side. */
+interface ConnectionGenerationView {
+  readonly interactions: string
+  readonly generation: { getSnapshot(): unknown }
+}
+const connectionGenerationSchema = Schema.declare<ConnectionGenerationView>(
+  (value): value is ConnectionGenerationView =>
+    typeof value === 'object' && value !== null
+    && 'interactions' in value && typeof value.interactions === 'string'
+    && 'generation' in value && typeof value.generation === 'object' && value.generation !== null
+    && 'getSnapshot' in value.generation && typeof value.generation.getSnapshot === 'function',
+)
+
+/**
+ * Whether Host change events already reach this page. The gateway starts the connection after every boot row loaded,
+ * so a boot-time plugin sees no generation yet; without a live event stream (`interactions: 'none'`) none ever comes.
+ */
+const isConnected = (ctx: Context): boolean => {
+  const connection = Schema.decodeUnknownOption(connectionGenerationSchema)(ctx.get('connection'))
+  if (Option.isNone(connection)) return true
+  return connection.value.interactions === 'none' || connection.value.generation.getSnapshot() !== undefined
 }
 
 /** The `ctx.modelDirectories` session model-selection service. */
@@ -51,10 +77,10 @@ export class ModelDirectoryResolver extends Service {
       version: 1,
       methods: ['contextWindow'],
     })
-    this.catalog = new ModelCatalogDirectory(ctx)
+    this.catalog = new ModelCatalogDirectory(ctx, isConnected(ctx))
     void this.catalog.load().catch(() => { /* selectors expose the shared error */ })
     ctx.on('connection/reset', () => {
-      this.catalog.resetGeneration()
+      this.catalog.connectionReset()
       for (const directory of this.live.directories.values) directory.resetConnected()
     })
     ctx.remote.$on('llm/adapters-updated', () => { this.catalog.scheduleRefresh() })
@@ -74,8 +100,8 @@ export class ModelDirectoryResolver extends Service {
     if (contextWindow === undefined) return null
     const result = await contextWindow(route)
     if (!result.ok) return null
-    const decoded = z.number().int().positive().nullable().safeParse(result.value)
-    return decoded.success ? decoded.data : null
+    const decoded = Schema.decodeUnknownOption(contextWindowSchema)(result.value)
+    return Option.getOrNull(decoded)
   }
 
   directoryFor(sessionId: SessionId): ModelDirectory {

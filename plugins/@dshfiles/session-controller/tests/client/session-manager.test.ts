@@ -128,3 +128,40 @@ describe('SessionManager provisional records', () => {
     await manager.dispose()
   })
 })
+
+describe('SessionManager list projections', () => {
+  it('updates only the row whose projection moved and keeps lineage order and depth', async () => {
+    const { manager, pulls } = createManager()
+    const parent = SessionId('session-parent')
+    const child = SessionId('session-child')
+    const other = SessionId('session-other')
+    const pull = manager.refreshList()
+    pulls[0]?.resolve(listResult([summary(other), summary(child, { parentSessionId: parent }), summary(parent)]))
+    await pull
+    const before = manager.getListSnapshot().items
+    expect(before.map(item => [item.sessionId, item.depth])).toEqual([
+      [other, 0],
+      [parent, 0],
+      [child, 1],
+    ])
+
+    manager.handleControlFrame({ type: 'projection', sessionId: child, key: 'title', value: 'Child title', seq: 3 })
+    const after = manager.getListSnapshot().items
+    expect(after.map(item => [item.sessionId, item.depth, item.title])).toEqual([
+      [other, 0, undefined],
+      [parent, 0, undefined],
+      [child, 1, 'Child title'],
+    ])
+    expect(after[0]).toBe(before[0])
+    expect(after[1]).toBe(before[1])
+    expect(after[2]?.projectionValues?.title).toBe('Child title')
+
+    manager.handleSessionStatus(other, true)
+    expect(manager.getListSnapshot().items.map(item => [item.sessionId, item.running, item.title])).toEqual([
+      [other, true, undefined],
+      [parent, false, undefined],
+      [child, false, 'Child title'],
+    ])
+    await manager.dispose()
+  })
+})

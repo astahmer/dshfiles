@@ -30,6 +30,8 @@ export interface ProjectRow {
 /** Host services the thread and project actions call, decoded to plain ids at this boundary. */
 export interface ThreadActionDeps {
   readonly listSessions: () => HostEffect<readonly ThreadSummary[]>
+  /** Whether the Host still stores this Session, from its metadata alone: no log read, no list. */
+  readonly sessionExists: (sessionId: string) => HostEffect<boolean>
   readonly readTitles: (sessionIds: readonly string[]) => HostEffect<ReadonlyMap<string, string>>
   /** Fork lineage as the Host records it: one entry per session, without reading any log. */
   readonly listThreadRelations: () => HostEffect<readonly ThreadReferenceThread[]>
@@ -91,6 +93,9 @@ export interface ThreadListInput {
   readonly query?: string | undefined
   readonly includeArchived?: boolean | undefined
   readonly limit?: number | undefined
+}
+export interface ThreadStatusInput {
+  readonly sessionIds: readonly string[]
 }
 export interface ThreadArchiveInput {
   readonly sessionId?: string | undefined
@@ -183,6 +188,7 @@ export interface ThreadListRow {
 }
 
 const DEFAULT_LIMIT = 50
+const STATUS_CONCURRENCY = 8
 /** Title folding is a per-session log read; cap the batch so one listing stays bounded. */
 const TITLE_BUDGET = 300
 const MAX_ERROR_MESSAGE = 300
@@ -352,6 +358,23 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     const threads = rows.slice(0, limit)
     const total = searched ? rows.length : listed.length
     return { threads, total, truncated: total > threads.length }
+  }),
+
+  status: Effect.fn('thread actions status')(function* ({ input }: ThreadActionContext<ThreadStatusInput>) {
+    const archived = new Set(deps.archivedSessionIds())
+    const settled = new Set(deps.settledSessionIds())
+    const threads = yield* Effect.forEach(
+      input.sessionIds,
+      sessionId =>
+        Effect.map(attempt(deps.sessionExists(sessionId), 'Could not read thread status.'), exists => ({
+          sessionId,
+          exists,
+          archived: archived.has(sessionId),
+          settled: settled.has(sessionId),
+        })),
+      { concurrency: STATUS_CONCURRENCY },
+    )
+    return { threads }
   }),
 
   references: Effect.fn('thread actions references')(function* ({ input, caller }: ThreadActionContext<ThreadReferencesInput>) {

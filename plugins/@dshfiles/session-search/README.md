@@ -73,6 +73,26 @@ Two gotchas worth knowing before editing:
 - **Node cannot resolve `.js` specifiers inside a `.ts` module.** The worker therefore runs from the built
   `dist/search-worker.js`; `resolveWorkerEntry` also looks for `../dist/search-worker.js` from the source tree.
 
+## Archived Sessions are cold
+
+A Session the user archived is dropped from the index: the ingest pass deletes its documents and keeps no cursor, so
+archived history costs neither disk nor page cache. A **targeted** search (`sessionIds`) still works — the worker indexes
+just those Sessions for that request, which is the slow path back into cold history. Broad searches cover the hot set
+only. On this machine 2,079 of 2,820 Sessions were archived, so the index only has to hold the ~740 the user still
+works with.
+
+Age is not the cutoff: every log here is younger than 60 days (2,294 of 2,406 within 30 days), so an age window would
+prune almost nothing while archived state is the user's own statement about what is cold.
+
+## Projection checkpoints
+
+The Host's projection cache keeps one checkpoint per Session under `storages/session_projcache/sessions/` and is the
+zero-I/O source of a cold Session's list metadata and title. Two minutes after boot this plugin removes only orphans
+(checkpoints whose Session persistence no longer stores), then runs a one-time rebuild for Sessions whose checkpoint a
+former 14-day prune deleted: one cold log of at most 8 MB at a time through the cache's own `coldSnapshot`, two seconds
+apart, skipping live Sessions. Progress lives in `plugins/session-search/checkpoint-rebuild.json`, so a restart resumes;
+once a pass completes it never runs again. Larger logs get their checkpoint when someone opens them.
+
 ## Current limitations
 
 - Refused filters are `text` event predicates and the session filters other than `id`; they raise

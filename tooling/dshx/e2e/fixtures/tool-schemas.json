@@ -70,12 +70,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 589,
-  "apiToolBindings": 406,
-  "apiToolNameCount": 406,
-  "apiToolSchemas": 405,
+  "apiMethods": 591,
+  "apiToolBindings": 408,
+  "apiToolNameCount": 408,
+  "apiToolSchemas": 407,
   "definedTools": 24,
-  "tools": 429,
+  "tools": 431,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -4796,11 +4796,14 @@
     },
     {
       "name": "jj_graph_navigation",
-      "description": "Resolve the current, main@origin, main and default-workspace landmarks in one call. Read-only.",
+      "description": "Resolve the current, main@origin, main and default-workspace landmarks in one call; `bookmark` names the project main branch the main landmarks use (main by default). Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
           "repoId": {
+            "type": "string"
+          },
+          "bookmark": {
             "type": "string"
           }
         },
@@ -5357,8 +5360,24 @@
       }
     },
     {
+      "name": "jj_project_bookmark",
+      "description": "The main branch of the project holding a path: the bookmark its thread workspaces start from, Land advances, and source control and Changes compare against, with the layer that chose it (Settings › Projects choice, dsh.project.json, origin’s default branch, or the global setting). Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "jj_reference_graph",
-      "description": "A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks. Read-only.",
+      "description": "A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks; `bookmark` names the project main branch those main landmarks use (main by default). Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -5366,6 +5385,9 @@
             "type": "string"
           },
           "reference": {
+            "type": "string"
+          },
+          "bookmark": {
             "type": "string"
           }
         },
@@ -5478,6 +5500,26 @@
           "repoId",
           "commitId",
           "targetCommitId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jj_set_project_bookmark",
+      "description": "Choose the main branch of the project holding a path, as Settings › Projects does: new thread workspaces start from it, Land advances it, and source control and Changes compare against it. `bookmark: null` removes the choice so dsh.project.json, origin’s default branch or the global setting decide again (reverse it the same way). Returns the new resolution. Call only when the user asked to change that project’s main branch.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "bookmark": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "bookmark"
         ],
         "additionalProperties": false
       }
@@ -5647,7 +5689,7 @@
     },
     {
       "name": "jj_thread_rebase",
-      "description": "Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.",
+      "description": "Integrate this thread’s described work into the project’s main branch (Settings › Projects) unless another bookmark is named: rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -5698,7 +5740,7 @@
     },
     {
       "name": "jj_thread_status",
-      "description": "Show this thread’s jj workspace: its revisions not yet on the target bookmark (main by default), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.",
+      "description": "Show this thread’s jj workspace: its revisions not yet on the project’s main branch (Settings › Projects), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8402,7 +8444,7 @@
             "type": "string"
           },
           "base": {
-            "description": "Base bookmark or revision; defaults to the first of main, master or trunk.",
+            "description": "Base bookmark or revision; defaults to the project’s main branch (Settings › Projects, dsh.project.json or origin’s default branch), else the first of main, master or trunk.",
             "type": "string"
           },
           "fromChangeId": {

@@ -56,7 +56,7 @@ import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settin
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
-import { createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, settingsWorkbenchPanelId } from './workbench-panels.js'
+import { createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, type SettingsOpenRequest, settingsWorkbenchPanelId } from './workbench-panels.js'
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
@@ -156,6 +156,8 @@ export default defineClient({
     const settingsOpen: ObservableSnapshot<boolean> = { getSnapshot: () => !actor.getSnapshot().matches('closed'), subscribe: subscribeActor }
     const activeSection: ObservableSnapshot<string | undefined> = { getSnapshot: () => actor.getSnapshot().context.sectionId, subscribe: subscribeActor }
     const inStage: ObservableSnapshot<boolean> = { getSnapshot: () => actor.getSnapshot().matches('tab'), subscribe: subscribeActor }
+    /** The latest section or field asked for; the Settings pane keeps its own navigation, so it follows these too. */
+    const openRequests = createSnapshotStore<SettingsOpenRequest | undefined>(undefined)
 
     // Settings follows the main view: a Settings tab picked in the strip, or a reload landing on it, opens it there.
     ctx.effect(() => {
@@ -189,6 +191,7 @@ export default defineClient({
      */
     const openSettings = (sectionId?: string): void => {
       actor.send(sectionId === undefined ? { type: 'open' } : { type: 'open', sectionId })
+      openRequests.set(sectionId === undefined ? undefined : { sectionId })
     }
     /** Opens another plugin's page in the stage: Settings links AI accounts, MCP servers, Secrets and Hosts. */
     const openPanel = (panelId: string): void => {
@@ -244,7 +247,9 @@ export default defineClient({
           labels: labels.getSnapshot(),
           text: SettingsPluginPages.localizedTextReader(ctx.locale.getSnapshot().active),
         }),
-      () => `${String(describe.getSnapshot().view?.namespaces.length)}:${ctx.locale.getSnapshot().revision}:${labelsVersion()}:${describeVersion()}`,
+      // The pages read only the active locale's text; keying on the revision rebuilt them for every namespace a plugin
+      // registered during boot (~130 ms of the reload's main thread).
+      () => `${String(describe.getSnapshot().view?.namespaces.length)}:${ctx.locale.getSnapshot().active}:${labelsVersion()}:${describeVersion()}`,
       listener => {
         const offDescribe = describe.subscribe(listener)
         const offLabels = labels.subscribe(listener)
@@ -276,6 +281,7 @@ export default defineClient({
       const field = fieldTargetFor(target)
       if (field === undefined) return false
       actor.send({ type: 'open', field })
+      openRequests.set({ sectionId: field.sectionId, field })
       return true
     }
 
@@ -540,6 +546,7 @@ export default defineClient({
             title: t('title'),
             component: createSettingsWorkbenchHub({
               groups,
+              openRequests,
               closeSettings: deps.closeSettings,
               view: input =>
                 settingsViewProps({
@@ -660,6 +667,7 @@ export default defineClient({
       if (request.section !== undefined) openEvent.sectionId = request.section
       if (request.target !== undefined) openEvent.target = request.target
       actor.send(openEvent)
+      openRequests.set(request.section === undefined ? undefined : { sectionId: request.section })
       if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
     }
 
@@ -784,16 +792,18 @@ export default defineClient({
     const api = createApiClient(ctx, settingsShellApi, metadata?.packageId)
     // `settings_list` searches the same section entries for an Agent; a Host without the method just refuses it.
     ctx.effect(() => {
-      let published: readonly SectionEntryRow[] | undefined
+      let published: string | undefined
       let pending: ReturnType<typeof setTimeout> | undefined
       // Every section that registers changes the list, so boot would send one request per section; send the settled set.
+      // A locale revision rebuilds an equal list, so compare contents: identity sent six equal sets per page load.
       const publish = (): void => {
         if (pending !== undefined) clearTimeout(pending)
         pending = setTimeout(() => {
           pending = undefined
           const entries = sectionEntries.getSnapshot()
-          if (entries === published) return
-          published = entries
+          const serialized = JSON.stringify(entries)
+          if (serialized === published) return
+          published = serialized
           void api.safe.publishSearchEntries({ entries: [...entries] })
         }, PUBLISH_SETTLE_MS)
       }

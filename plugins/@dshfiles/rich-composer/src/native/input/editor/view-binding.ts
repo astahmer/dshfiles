@@ -28,12 +28,29 @@ interface DraftViewGate {
 }
 
 /**
- * Reveal the DOM selection within the draft's own scrollport.
+ * Reveal the DOM selection within the draft's own scrollport, after the browser's next layout: a fresh
+ * ResizeObserver observation is delivered then, before paint, so the caret is measured without forcing the layout
+ * the restored draft just invalidated.
  * @param scrollRef - the InputBar-owned scrollport reference.
  */
 export function revealDraftSelection(scrollRef: RefObject<HTMLDivElement>): void {
   const scrollEl = scrollRef.current
-  if (scrollEl === null || scrollEl.scrollHeight <= scrollEl.clientHeight) return
+  if (scrollEl === null) return
+  if (typeof ResizeObserver === 'undefined') {
+    revealSelectionNow(scrollEl)
+    return
+  }
+  const observer = new ResizeObserver(() => {
+    observer.disconnect()
+    revealSelectionNow(scrollEl)
+  })
+  observer.observe(scrollEl)
+  // A hidden (0×0) scrollport gets no observation and has nothing to reveal.
+  requestAnimationFrame(() => requestAnimationFrame(() => { observer.disconnect() }))
+}
+
+function revealSelectionNow(scrollEl: HTMLDivElement): void {
+  if (scrollEl.scrollHeight <= scrollEl.clientHeight) return
   const selection = window.getSelection()
   if (selection === null || selection.rangeCount === 0) return
   const range = selection.getRangeAt(0)

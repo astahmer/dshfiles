@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "settled-stream-size",
+      "title": "Store a settled attempt's replay metadata once",
+      "summary": "Owned fork of the native agent loop. A settled assistant message carries the provider's replay envelope on its message source; the same envelope's per-block list was also written into the durable compact stream, so every assistant message kept its block signatures twice. This fork stores the stream copy without the block list, leaving the response-level envelope and the message source untouched. Everything else is the pinned upstream code.",
+      "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: no UI",
+      "configuration": [
+        {
+          "key": "agents",
+          "defaultValue": "[]",
+          "constraints": "Restated from the stock row because a patch replaces whole configs.",
+          "coveredBy": ["agent-loop.settled-stream"]
+        }
+      ],
+      "states": ["streaming", "settled", "interrupted"],
+      "failureModes": [
+        "A consumer that reads per-block replay metadata from the durable stream instead of the message source sees only the response-level envelope. The browser already receives neither copy, and the provider replay path reads the message source \u2014 asserted by tests/agent-loop.integration.test.ts.",
+        "Every other behaviour is the pinned upstream code; drift is checked with scripts/native-fork-diff.mjs."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agent-loop.settled-stream",
+          "file": "plugins/@dshfiles/agent-loop/tests/settled-stream.test.ts",
+          "testName": "a settled message stores the response envelope once"
+        },
+        {
+          "kind": "host-test",
+          "id": "agent-loop.integration",
+          "file": "plugins/@dshfiles/agent-loop/tests/agent-loop.integration.test.ts",
+          "testName": "stores the replay envelope once and still replays it to the provider"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agent-loop.no-ui",
+          "reason": "Host-only fork with no surface of its own: it changes what one durable event stores, and the Session conversation that would show it belongs to the chat plugin."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "The model stream already opens the native `llm request` span; this fork only changes what one durable event stores."
+        }
+      ]
+    }
+  ]
+}

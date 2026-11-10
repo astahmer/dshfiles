@@ -290,6 +290,24 @@ export const threadActionsApi = defineApi({
           `Thread ${output.sessionId} now uses ${output.provider}/${output.model}${output.reasoningEffort === undefined ? '' : ` at ${output.reasoningEffort} effort`}.`,
       },
     }),
+    status: method({
+      input: Schema.Struct({ sessionIds: Schema.Array(sessionIdSchema).check(Schema.isMinLength(1)).check(Schema.isMaxLength(100)) }),
+      output: Schema.Struct({
+        threads: Schema.Array(
+          Schema.Struct({ sessionId: Schema.String, exists: Schema.Boolean, archived: Schema.Boolean, settled: Schema.Boolean }),
+        ).check(Schema.isMaxLength(100)),
+      }),
+      description:
+        'Point lookup of named threads (DSH Sessions): whether each is still stored, archived or settled, without listing or reading any log. Read-only.',
+      tool: {
+        name: 'thread_status',
+        readOnly: true,
+        render: output =>
+          output.threads
+            .map(thread => `${thread.sessionId} · ${thread.exists ? (thread.archived ? 'archived' : thread.settled ? 'settled' : 'open') : 'gone'}`)
+            .join('\n'),
+      },
+    }),
     references: method({
       input: Schema.Struct({
         sessionId: Schema.optional(sessionIdSchema),

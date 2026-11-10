@@ -53,8 +53,8 @@ const deferred = <Value,>() => {
 }
 
 let latest: ReturnType<typeof useAccountsUsage>
-const Probe = (props: { readonly report: (value: ReturnType<typeof useAccountsUsage>) => void }): null => {
-  const value = useAccountsUsage()
+const Probe = (props: { readonly report: (value: ReturnType<typeof useAccountsUsage>) => void; readonly ambient: boolean }): null => {
+  const value = useAccountsUsage({ ambient: props.ambient })
   useEffect(() => props.report(value))
   return null
 }
@@ -65,8 +65,8 @@ const flush = async (ms = 1): Promise<void> => {
 }
 
 const mounted: { root: Root; client: QueryClient; container: HTMLElement }[] = []
-const mount = async (): Promise<QueryClient> => {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+const mount = async (options: { readonly ambient?: boolean; readonly client?: QueryClient } = {}): Promise<QueryClient> => {
+  const client = options.client ?? new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   const container = document.createElement('div')
   const root = createRoot(container)
   mounted.push({ root, client, container })
@@ -74,6 +74,7 @@ const mount = async (): Promise<QueryClient> => {
     root.render(
       <PluginQueryProvider client={client}>
         <Probe
+          ambient={options.ambient === true}
           report={value => {
             latest = value
           }}
@@ -237,5 +238,30 @@ describe('background to foreground', () => {
     await flush(USAGE_REFRESH_MS)
     expect(latest.failure).toBeNull()
     expect(percents(latest.usage)).toEqual(KINDS.map(() => 30))
+  })
+})
+
+describe('ambient polling', () => {
+  it('reads every five minutes while only an ambient surface is mounted, and on the configured interval once a view opens', async () => {
+    host.usage.mockResolvedValue(everyProvider(40, 1_000))
+    const client = await mount({ ambient: true })
+    expect(host.usage).toHaveBeenCalledTimes(1)
+    await flush(4 * USAGE_REFRESH_MS)
+    expect(host.usage).toHaveBeenCalledTimes(1)
+    await flush(USAGE_REFRESH_MS)
+    expect(host.usage).toHaveBeenCalledTimes(2)
+
+    await mount({ client })
+    const afterViewOpened = host.usage.mock.calls.length
+    await flush(USAGE_REFRESH_MS)
+    expect(host.usage).toHaveBeenCalledTimes(afterViewOpened + 1)
+  })
+
+  it('stops ambient polling while the page is hidden', async () => {
+    host.usage.mockResolvedValue(everyProvider(40, 1_000))
+    await mount({ ambient: true })
+    await setVisibility('hidden')
+    await flush(10 * USAGE_REFRESH_MS)
+    expect(host.usage).toHaveBeenCalledTimes(1)
   })
 })

@@ -460,6 +460,26 @@ test('After a reload the saved record still offers Cancel, which restores the or
   assert.equal(world.records, null)
 })
 
+test('A reload whose stored attachment is gone explains why it could not reload it', async () => {
+  const { world, ports, enqueueRow, editor } = createWorld()
+  enqueueRow([text('original [Image 1]'), image('shot.png')])
+  const first = editor()
+  const row = rowsOf(world)[0]
+  assert.ok(row)
+  await first.begin(row)
+  first.dispose()
+
+  // The Host no longer holds the queued file the record points at.
+  world.drafts.clear()
+  world.stored.clear()
+  world.composer = { draft: 'original [Image 1]', attachmentIds: [], idle: true }
+  const reloaded = createQueueEditor(ports)
+  await settle()
+
+  assert.equal(reloaded.getSnapshot().record?.status, 'editing')
+  assert.match(reloaded.getSnapshot().notice ?? '', /Could not reload this message's attachments into the composer \(missing image\)/u)
+})
+
 test('A reload while a submission was settling still puts the message back in its place', async () => {
   const { world, ports, enqueueRow, enqueueWithRpc } = createWorld()
   const ahead = enqueueRow([text('first')])

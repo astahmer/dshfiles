@@ -32,7 +32,9 @@ interface ProjectGroup<Item> {
 const THREADS_DIRECTORY_SUFFIX = '-threads'
 const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 
-const segments = (path: string): readonly string[] => path.replace(/\/+$/u, '').split('/')
+// Host paths arrive with the Host's separator: `/` on POSIX, `\` on Windows.
+const trimSeparators = (path: string): string => path.replace(/[\\/]+$/u, '')
+const segments = (path: string): readonly string[] => trimSeparators(path).split(/[\\/]/u)
 
 const hasThreadsDirectory = (name: string | undefined): boolean =>
   name !== undefined && name.length > THREADS_DIRECTORY_SUFFIX.length && name.endsWith(THREADS_DIRECTORY_SUFFIX)
@@ -61,8 +63,10 @@ export class EntityLabels {
 
   /** The repository checkout a thread workspace belongs to; the path itself for anything else. */
   static repositoryPath(path: string): string {
-    if (!EntityLabels.isThreadWorkspace(path)) return path.replace(/\/+$/u, '')
-    const parent = segments(path).slice(0, -1).join('/')
+    const trimmed = trimSeparators(path)
+    if (!EntityLabels.isThreadWorkspace(path)) return trimmed
+    // Slice rather than re-join, so the result keeps the Host's own separator and matches registered paths.
+    const parent = trimmed.slice(0, Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\')))
     return parent.endsWith(THREADS_DIRECTORY_SUFFIX) ? parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length) : parent
   }
 
@@ -116,7 +120,7 @@ export class EntityLabels {
   static useWorkspaceLabel(workspaces: WorkspaceStore): (target: { readonly workspaceId: string } | { readonly path: string }) => string {
     const items = useListSnapshot(workspaces).items
     const projectsByPath = useMemo(
-      () => new Map(items.filter(item => !EntityLabels.isThreadWorkspace(item.path)).map(item => [item.path.replace(/\/+$/u, ''), item.title])),
+      () => new Map(items.filter(item => !EntityLabels.isThreadWorkspace(item.path)).map(item => [trimSeparators(item.path), item.title])),
       [items],
     )
     return useCallback(

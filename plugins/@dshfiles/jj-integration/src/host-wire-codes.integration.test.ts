@@ -155,7 +155,7 @@ describe.skipIf(!jjAvailable)('jj-integration wire error codes', () => {
         },
         "provision: no such destination": {
           "code": "destination-rejected",
-          "message": ""no-such-revision" is not a bookmark or revision in this repository, so no workspace was created. Pick another bookmark in the destination bar, or set the bookmark in Settings › Workspaces, then retry.",
+          "message": ""no-such-revision" is not a bookmark or revision in this repository, so no workspace was created. Pick another bookmark in the destination bar, or choose the project’s main branch in Settings › Projects, then retry.",
         },
         "queueLand: folder outside jj": {
           "code": "not-a-thread",

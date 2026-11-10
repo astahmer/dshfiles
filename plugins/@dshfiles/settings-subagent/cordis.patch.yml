@@ -1,0 +1,5 @@
+- id: ui-settings-subagent
+  disabled: true
+- insert:
+    - id: dshfiles-settings-subagent
+      name: '@dshfiles/settings-subagent'

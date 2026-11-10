@@ -59,14 +59,31 @@ export interface ConversationWorkbenchSession {
 }
 
 /** Source identities and presentation registrations; the Controller remains the only Session owner. */
+const utf8 = new TextEncoder()
+const HEX_BYTES = Array.from({ length: 256 }, (_, byte) => byte.toString(16).padStart(2, '0'))
+/** Each session id is encoded once per view on every reload; a cached UTF-8 hex string keeps that pass cheap. */
+const hexCache = new Map<string, string>()
+const hexOf = (value: string): string => {
+  const cached = hexCache.get(value)
+  if (cached !== undefined) return cached
+  let hex = ''
+  for (const byte of utf8.encode(value)) hex += HEX_BYTES[byte] ?? ''
+  hexCache.set(value, hex)
+  return hex
+}
+
 export class ConversationWorkbenchSources {
   static id(sessionId: SessionId, viewId: string): string {
-    const encode = (value: string): string => Array.from(new TextEncoder().encode(value), byte => byte.toString(16).padStart(2, '0')).join('')
-    return `dshfiles-conversation.view/${encode(sessionId)}/${encode(viewId)}`
+    return `dshfiles-conversation.view/${hexOf(sessionId)}/${hexOf(viewId)}`
+  }
+
+  /** Whether two catalogs list the same Sessions, in order, under the same titles. */
+  static sameCatalog(left: readonly ConversationWorkbenchSession[], right: readonly ConversationWorkbenchSession[]): boolean {
+    return left.length === right.length && left.every((session, index) => session.id === right[index]?.id && session.title === right[index]?.title)
   }
 
   static create(ports: {
-    readonly registry: Pick<WorkbenchPanelRegistry, 'register'>
+    readonly registry: Pick<WorkbenchPanelRegistry, 'register' | 'batch'>
     readonly sessions: ObservableSnapshot<readonly ConversationWorkbenchSession[]>
     readonly views: ObservableSnapshot<readonly ViewTab[]>
     readonly retain: (sessionId: SessionId) => SessionReference
@@ -84,6 +101,7 @@ export class ConversationWorkbenchSources {
     }
     const snapshot = (): AuthorizedViews | undefined => authorized
     const registrations = new Map<string, { readonly definition: WorkbenchPanelDefinition; readonly dispose: () => void }>()
+    const panelIds = new Map<string, string>()
 
     const componentFor = (sessionId: SessionId, viewId: string): WorkbenchPanelDefinition['component'] =>
       function ConversationViewPanel() {
@@ -113,12 +131,17 @@ export class ConversationWorkbenchSources {
         return <Provider session={state.reference}>{capability.renderSlot(WORKBENCH_VIEW_SLOT, { viewId })}</Provider>
       }
 
-    const sync = (): void => {
+    // One panel per session × view: workbench listeners re-read every source per notification, so the whole pass is
+    // one registry batch (a registry created by an older bundle has none and notifies per registration, as before).
+    const sync = (): void => (ports.registry.batch === undefined ? syncPanels() : ports.registry.batch(syncPanels))
+    const syncPanels = (): void => {
       const desired = new Set<string>()
       for (const session of ports.sessions.getSnapshot())
         for (const view of ports.views.getSnapshot()) {
           if (view.id === 'chat') continue
-          const id = ConversationWorkbenchSources.id(session.id, view.id)
+          const key = `${session.id}\u0000${view.id}`
+          const id = panelIds.get(key) ?? ConversationWorkbenchSources.id(session.id, view.id)
+          panelIds.set(key, id)
           desired.add(id)
           const previous = registrations.get(id)
           const title = `${view.label} — ${session.title}`
@@ -138,6 +161,7 @@ export class ConversationWorkbenchSources {
           registration.dispose()
           registrations.delete(id)
         }
+      for (const [key, id] of panelIds) if (!desired.has(id)) panelIds.delete(key)
     }
     const disposeSessions = ports.sessions.subscribe(sync)
     const disposeViews = ports.views.subscribe(sync)

@@ -1,6 +1,6 @@
 import type { ModelDirectory, ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { defineClientPlugin } from '@dshfiles/dshx/client'
+import { defineClientPlugin, joinPageRead } from '@dshfiles/dshx/client'
 import { multiHostApi } from '@dshfiles/multi-host/api'
 import { ModelEffortPicker } from './model-effort-picker.js'
 import { RemoteModelDirectory } from './remote-model-directory.js'
@@ -30,7 +30,11 @@ export default defineClientPlugin({
             remoteDirectories.get(directory) ??
             new RemoteModelDirectory(directory, async () => {
               // A profile without Multi-host keeps the local catalog instead of failing the whole list.
-              const ownership = await remoteApi.sessionRuntime({ sessionId }).catch(cause => {
+              // Multi-host's remote-host fallback reads the same owner when the Session opens; one request answers both.
+              const ownership = await joinPageRead({
+                key: `multi-host:sessionRuntime:${sessionId}`,
+                read: () => remoteApi.sessionRuntime({ sessionId }),
+              }).catch(cause => {
                 if (isApiOwnerMissing(cause)) return undefined
                 throw cause
               })

@@ -372,6 +372,225 @@ describe('DshxPlugin.make', () => {
   )
 })
 
+describe('DshxPlugin.make({ lazy: true })', () => {
+  it.effect('builds the layer on the first call once, with its tools registered from mount', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const log: string[] = []
+      const api = journalApi('journal-lazy-a')
+      const tool = Tool.make({
+        name: 'lazy_prefix',
+        description: 'Read the journal prefix.',
+        input: Schema.Struct({}),
+        output: Schema.String,
+        render: output => output,
+        execute: Effect.fn('lazy prefix')(function* () {
+          const journal = yield* Journal
+          return journal.prefix
+        }),
+      })
+      const plugin = yield* mount(
+        DshxPlugin.make({
+          name: 'test-journal-lazy-a',
+          lazy: true,
+          layer: journalLayer({ prefix: 'Lazy', log }),
+          apis: [Api.bind(api, journalHandlers(api, {}))],
+          tools: [tool],
+        }),
+        '@test/journal-lazy-a',
+      )
+      expect(log).toEqual([])
+      expect(host.tools.get('lazy_prefix')?.name).toBe('lazy_prefix')
+      const client = createHostApiClient(host.ctx, api, '@test/caller')
+      expect(yield* Effect.promise(() => client.greet({ name: 'Ada' }))).toBe('Lazy Ada (plugin)')
+      expect(yield* Effect.promise(() => client.greet({ name: 'Bob' }))).toBe('Lazy Bob (plugin)')
+      expect(log).toEqual(['acquire @test/journal-lazy-a'])
+      yield* Effect.promise(() => plugin.dispose())
+      expect(log).toEqual(['acquire @test/journal-lazy-a', 'release @test/journal-lazy-a'])
+    }).pipe(Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('shares one in-flight build between concurrent first calls', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const gate = yield* Deferred.make<void>()
+      const building = yield* Deferred.make<void>()
+      const builds: string[] = []
+      const slow = Layer.effect(
+        Journal,
+        Effect.gen(function* () {
+          builds.push('build')
+          yield* Deferred.succeed(building, undefined)
+          yield* Deferred.await(gate)
+          return Journal.of({ entries: Ref.makeUnsafe<ReadonlyArray<string>>([]), prefix: 'Slow' })
+        }),
+      )
+      const api = journalApi('journal-lazy-b')
+      yield* mount(
+        DshxPlugin.make({ name: 'test-journal-lazy-b', lazy: true, layer: slow, apis: [Api.bind(api, journalHandlers(api, {}))] }),
+        '@test/journal-lazy-b',
+      )
+      const client = createHostApiClient(host.ctx, api, '@test/caller')
+      const calls = yield* Effect.all([Effect.promise(() => client.greet({ name: 'a' })), Effect.promise(() => client.greet({ name: 'b' }))], {
+        concurrency: 2,
+      }).pipe(Effect.forkScoped)
+      yield* Deferred.await(building)
+      expect(builds).toEqual(['build'])
+      yield* Deferred.succeed(gate, undefined)
+      expect(yield* Fiber.join(calls)).toEqual(['Slow a (plugin)', 'Slow b (plugin)'])
+      expect(builds).toEqual(['build'])
+    }).pipe(Effect.scoped, Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('answers a tool call that arrives before activation, in the built services', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const log: string[] = []
+      const tool = Tool.make({
+        name: 'lazy_prefix_tool',
+        description: 'Read the journal prefix.',
+        input: Schema.Struct({}),
+        output: Schema.String,
+        render: output => output,
+        execute: Effect.fn('lazy prefix tool')(function* () {
+          const journal = yield* Journal
+          return journal.prefix
+        }),
+      })
+      yield* mount(
+        DshxPlugin.make({ name: 'test-journal-lazy-c', lazy: true, layer: journalLayer({ prefix: 'Tool', log }), tools: [tool] }),
+        '@test/journal-lazy-c',
+      )
+      expect(log).toEqual([])
+      const result = yield* Effect.promise(() =>
+        host.tools.execute({ callId: 'call-1' as never, name: 'lazy_prefix_tool', arguments: {}, signal: new AbortController().signal }),
+      )
+      expect(result).toMatchObject({ isError: false, content: [{ type: 'text', text: 'Tool' }] })
+      expect(log).toEqual(['acquire @test/journal-lazy-c'])
+    }).pipe(Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('starts main with the deferred build, not at mount', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const running = yield* Deferred.make<void>()
+      const api = journalApi('journal-lazy-main')
+      yield* mount(
+        DshxPlugin.make({
+          name: 'test-journal-lazy-main',
+          lazy: true,
+          layer: journalLayer({ prefix: 'Main', log: [] }),
+          main: Deferred.succeed(running, undefined).pipe(Effect.andThen(Effect.never)),
+          apis: [Api.bind(api, journalHandlers(api, {}))],
+        }),
+        '@test/journal-lazy-main',
+      )
+      expect(Option.isNone(yield* Deferred.poll(running))).toBe(true)
+      expect(yield* Effect.promise(() => createHostApiClient(host.ctx, api, '@test/caller').greet({ name: 'a' }))).toBe('Main a (plugin)')
+      yield* Effect.yieldNow
+      expect(Option.isSome(yield* Deferred.poll(running))).toBe(true)
+    }).pipe(Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('fails the first call when the deferred build fails, and refuses later calls without rebuilding', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const log: string[] = []
+      const api = journalApi('journal-lazy-fail')
+      const failing = Layer.effectDiscard(Effect.fail(new JournalLocked({ reason: 'boot' })))
+      yield* mount(
+        DshxPlugin.make({
+          name: 'test-journal-lazy-fail',
+          lazy: true,
+          layer: Layer.merge(journalLayer({ prefix: '', log }), failing.pipe(Layer.provide(journalLayer({ prefix: '', log: [] })))),
+          apis: [Api.bind(api, journalHandlers(api, {}))],
+        }),
+        '@test/journal-lazy-fail',
+      )
+      expect(log).toEqual([])
+      const client = createHostApiClient(host.ctx, api, '@test/caller')
+      expect(yield* rejection(() => client.greet({ name: 'a' }))).toMatchObject({ kind: 'remote', remoteCode: 'plugin-inactive', retryable: false })
+      expect(log).toEqual(['acquire @test/journal-lazy-fail', 'release @test/journal-lazy-fail'])
+      expect(yield* rejection(() => client.greet({ name: 'b' }))).toMatchObject({ kind: 'remote', remoteCode: 'plugin-inactive' })
+      expect(log).toEqual(['acquire @test/journal-lazy-fail', 'release @test/journal-lazy-fail'])
+    }).pipe(Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('fails the row at mount when its Config is invalid, and builds nothing', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const log: string[] = []
+      const outcome = yield* Effect.exit(
+        Effect.promise(() =>
+          host.mount(
+            DshxPlugin.make({
+              name: 'test-journal-lazy-config',
+              lazy: true,
+              Config: Schema.Struct({ prefix: Schema.String }),
+              layer: config => journalLayer({ prefix: config.prefix, log }),
+            }),
+            { packageId: '@test/journal-lazy-config', config: {} },
+          ),
+        ),
+      )
+      expect(Exit.isFailure(outcome)).toBe(true)
+      expect(log).toEqual([])
+    }).pipe(Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('builds nothing when unloaded before the first call, and refuses the first call after it', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const log: string[] = []
+      const api = journalApi('journal-lazy-unload')
+      const plugin = yield* mount(
+        DshxPlugin.make({
+          name: 'test-journal-lazy-unload',
+          lazy: true,
+          layer: journalLayer({ prefix: '', log }),
+          apis: [Api.bind(api, journalHandlers(api, {}))],
+        }),
+        '@test/journal-lazy-unload',
+      )
+      yield* Effect.promise(() => plugin.dispose())
+      expect(log).toEqual([])
+      expect(yield* rejection(() => createHostApiClient(host.ctx, api, '@test/caller').greet({ name: 'a' }))).toMatchObject({ kind: 'unavailable' })
+      expect(log).toEqual([])
+    }).pipe(Effect.provide(TestHost.layer)),
+  )
+
+  it.effect('interrupts an in-flight deferred build on unload and refuses the call that started it', () =>
+    Effect.gen(function* () {
+      const host = yield* TestHost
+      const building = yield* Deferred.make<void>()
+      const released: string[] = []
+      const slow = Layer.effect(
+        Journal,
+        Effect.gen(function* () {
+          yield* Deferred.succeed(building, undefined)
+          yield* Effect.acquireRelease(Effect.void, () => Effect.sync(() => void released.push('release')))
+          return yield* Effect.never
+        }),
+      )
+      const api = journalApi('journal-lazy-race')
+      const plugin = yield* mount(
+        DshxPlugin.make({ name: 'test-journal-lazy-race', lazy: true, layer: slow, apis: [Api.bind(api, journalHandlers(api, {}))] }),
+        '@test/journal-lazy-race',
+      )
+      const client = createHostApiClient(host.ctx, api, '@test/caller')
+      const pending = client.greet({ name: 'a' }).then(
+        () => 'resolved',
+        (error: unknown) => error,
+      )
+      yield* Deferred.await(building)
+      yield* Effect.promise(() => plugin.dispose())
+      expect(yield* Effect.promise(() => pending)).toMatchObject({ kind: 'remote', remoteCode: 'plugin-inactive' })
+      expect(released).toEqual(['release'])
+      expect(yield* rejection(() => client.greet({ name: 'b' }))).toMatchObject({ kind: 'unavailable' })
+    }).pipe(Effect.provide(TestHost.layer)),
+  )
+})
+
 class Missing extends Context.Service<Missing, { readonly value: string }>()('@dshfiles/dshx/tests/Missing') {}
 
 describe('DshxPlugin.make types', () => {

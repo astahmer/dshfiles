@@ -12,7 +12,7 @@ export default defineConfig({
     'conversation-header': 'src/conversation-header.ts',
     'thread-on-screen': 'src/thread-on-screen.ts',
   },
-  host: { entry: 'src/host.ts' },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite(), dockviewCssVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

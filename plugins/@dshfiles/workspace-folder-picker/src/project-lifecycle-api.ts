@@ -6,7 +6,8 @@ import { WorkspaceFolderPickerSchema } from './schema.js'
 const MAX_PATH_LENGTH = 4_096
 
 const cloneUrlPattern = /^(?:https:\/\/[^\s]+|ssh:\/\/[^\s]+|git@[A-Za-z0-9.-]+:[^\s]+|file:\/\/\/[^\s]+)$/u
-const absolutePathPattern = /^(?:\/|~\/)/u
+// `/…`, `~/…`, or on a Windows Host a drive-absolute `C:\…` (either separator).
+const absolutePathPattern = /^(?:\/|~[\\/]|[A-Za-z]:[\\/])/u
 const folderNamePattern = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/u
 
 /** https, ssh (`ssh://` or `git@host:path`) or a local `file:///` URL; never a leading `-` git would read as an option. */
@@ -19,8 +20,8 @@ export const localCloneUrlSchema = WorkspaceFolderPickerSchema.trimmedText.check
 const parentPathSchema = WorkspaceFolderPickerSchema.trimmedText.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(MAX_PATH_LENGTH),
-  Schema.makeFilter(value => (absolutePathPattern.test(value) ? true : 'Use an absolute or ~/ folder path.')),
-  Schema.makeFilter(value => (value.split('/').includes('..') ? 'The folder path cannot contain "..".' : true)),
+  Schema.makeFilter(value => (absolutePathPattern.test(value) ? true : 'Use an absolute (/… or C:\\…) or ~/ folder path.')),
+  Schema.makeFilter(value => (value.split(/[\\/]/u).includes('..') ? 'The folder path cannot contain "..".' : true)),
 )
 
 /** One new folder name: no separators, no leading dot or dash, so it cannot escape the parent or read as an option. */

@@ -4,13 +4,16 @@ import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
-import type { ImageAttachmentLimits } from '@deepseek-ai/dsh-attachment'
 import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type { ProjectionSnapshot, SessionProjectionMap } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
-import { SessionQueryError, type SessionRecord, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
+import { readColdSessionLog, SessionQueryError, type SessionRecord, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { z } from 'zod'
+import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
+import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
+import * as Schema from 'effect/Schema'
+import { coldReads } from './cold-reads.ts'
+import { ListMetadataStore, type RecoveredListMetadata } from './list-metadata-store.ts'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
   SESSION_SEARCH_SNIPPET_MAX_CODE_POINTS,
@@ -24,6 +27,16 @@ const SEARCH_PROVIDER_CALL_LIMIT = 100
 const SESSION_SEARCH_QUERY_MAX_CHARS = 500
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 const LIST_METADATA_KEY = 'sessionListMetadata'
+/**
+ * Only a log this small can be an abandoned draft worth folding. Measured on the live home (2026-11-09): of 1,890
+ * checkpoint-less logs, 647 were under 16 KiB and the median was 300 KB (largest 90 MB). A larger log already holds
+ * turns, so it keeps the visible fallback instead of being decoded on every Host start.
+ */
+const DRAFT_LOG_MAX_BYTES = 16 * 1024
+/** Recovery answers written per store rewrite during a long first pass, so a restart mid-pass keeps most of them. */
+const RECOVERY_SAVE_EVERY = 256
+/** What a metadata-less cold row shows: unknown, so visible and dated by its creation. */
+const UNKNOWN_METADATA: SessionListMetadata = { blank: false, lastPromptAt: null }
 
 /** A caller's projection allowlist; `undefined` reads every registered column. */
 type ProjectionSelection = ReadonlySet<string> | undefined
@@ -34,19 +47,21 @@ interface ProjectionRead {
   readonly metadata?: SessionListMetadata
 }
 
-const sessionListMetadataSchema: z.ZodType<SessionListMetadata> = z.object({
-  blank: z.boolean(),
-  lastPromptAt: z.number().nullable(),
-})
+const sessionListMetadataSchema = zodSchemaFromEffect(Schema.Struct({
+  blank: Schema.Boolean,
+  lastPromptAt: Schema.NullOr(Schema.Finite),
+}))
 
-const imageLimitsSchema = z.object({
-  maxImageBytes: z.number().int().positive(),
-  maxImagesPerMessage: z.number().int().positive(),
-  maxMessageImageBytes: z.number().int().positive(),
-  maxImagePixels: z.number().int().positive(),
-  maxImageDimension: z.number().int().positive(),
-  mediaTypes: z.array(z.string()),
-}) as unknown as z.ZodType<ImageAttachmentLimits>
+const positiveInt = Schema.Int.check(Schema.isGreaterThan(0))
+
+const imageLimitsSchema = zodSchemaFromEffect(Schema.Struct({
+  maxImageBytes: positiveInt,
+  maxImagesPerMessage: positiveInt,
+  maxMessageImageBytes: positiveInt,
+  maxImagePixels: positiveInt,
+  maxImageDimension: positiveInt,
+  mediaTypes: Schema.Array(Schema.Literals(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])),
+}))
 
 /**
  * Advance the Session-list metadata projection by one committed event.
@@ -94,19 +109,44 @@ export class ApiSessionList {
   private readonly coldProjections = new Map<string, SessionProjectionHints>()
 
   /**
-   * Persisted Session records, read once and kept until this Host creates or disposes a Session.
+   * List metadata folded from the stored log of a cold row whose projection checkpoint has no row: an abandoned New
+   * thread or a start interrupted before its first turn. Without it such a row defaults to `blank: false` and sits in
+   * the sidebar as an untitled draft forever. `undefined` records a log that could not be read. Dropped on attach.
+   */
+  private readonly coldMetadata = new Map<string, SessionListMetadata | undefined>()
+
+  /**
+   * Cold rows waiting for that fold. A list never waits on it: reading every checkpoint-less log inline kept the first
+   * list of a 793-Session home (2.9 GB of logs) loading for minutes, so one background reader works through this queue
+   * and pushes each corrected row with `api-session/added`.
+   */
+  private readonly metadataQueue = new Map<string, SessionRecord>()
+  private metadataDrain: Promise<void> | undefined
+
+  /**
+   * The recovery answers of earlier Host starts, keyed by Session id: a start re-stats only the small logs, folds only
+   * the ones whose persistence revision moved, and serves the stored answer to the first list while it checks.
+   */
+  private readonly metadataStore: ListMetadataStore
+  private recovered: Map<string, RecoveredListMetadata> | undefined
+
+  /**
+   * Persisted Session records by id, read once. A Session this Host creates or disposes is patched in place:
    * `sessionQuery.listSessions` re-enumerates every project directory and then reads each Session's header and stats
    * its log at a concurrency of three, so a 1 000-Session corpus costs thousands of filesystem round-trips per call
-   * (Host gap 71). Those headers never change after the Session is written, and every list field comes from the header
-   * or the projection cache, which keeps its own invalidation.
+   * (Host gap 71), and every subagent spawn used to pay it again. Those headers never change after the Session is
+   * written, and every list field comes from the header or the projection cache, which keeps its own invalidation.
    */
-  private persisted: readonly SessionRecord[] | undefined
+  private persisted: Map<string, SessionRecord> | undefined
 
   /** The read every caller waits on, so concurrent lists fold one corpus instead of one each. */
-  private persistedRead: Promise<readonly SessionRecord[]> | undefined
+  private persistedRead: Promise<ReadonlyMap<string, SessionRecord>> | undefined
 
-  /** Bumped on every invalidation so a read that started earlier cannot cache a corpus it predates. */
+  /** Bumped on every change while no corpus is cached, so a read that started earlier cannot cache a corpus it predates. */
   private persistedGeneration = 0
+  private lastInvalidation: 'none' | 'created' | 'disposed' = 'none'
+  private createdInvalidations = 0
+  private disposedInvalidations = 0
 
   private readonly lifetime = new AbortController()
 
@@ -115,15 +155,25 @@ export class ApiSessionList {
    * @param workSliceMs - Resolved positive integral list-work budget in milliseconds.
    */
   constructor(private readonly ctx: Context, private readonly workSliceMs: number) {
-    const forgetProjections = (session: Session): void => { this.coldProjections.delete(session.id) }
-    const forgetSession = (session: Session): void => {
-      forgetProjections(session)
-      this.invalidatePersisted()
+    this.metadataStore = new ListMetadataStore(ctx)
+    const forgetProjections = (session: Session): void => {
+      this.coldProjections.delete(session.id)
+      this.coldMetadata.delete(session.id)
+      this.recovered?.delete(session.id)
     }
-    ctx.on('session/created', forgetSession)
+    ctx.on('session/created', session => {
+      forgetProjections(session)
+      this.persistedChanged('created', session)
+    })
     ctx.on('session/event', forgetProjections)
-    ctx.on('session/disposed', forgetSession)
-    ctx.effect(() => () => { this.lifetime.abort() }, 'session-controller.list: stop a background corpus read')
+    ctx.on('session/disposed', session => {
+      forgetProjections(session)
+      this.persistedChanged('disposed', session)
+    })
+    ctx.effect(() => () => {
+      this.lifetime.abort()
+      void this.metadataStore.close()
+    }, 'session-controller.list: stop a background corpus read')
     ctx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
       stateSchema: sessionListMetadataSchema,
@@ -135,7 +185,7 @@ export class ApiSessionList {
     ctx.inject(['attachments'], (attachmentCtx) => {
       ctx.sessionProjections.register<'imageLimits', null>({
         key: 'imageLimits',
-        stateSchema: z.null(),
+        stateSchema: zodSchemaFromEffect(Schema.Null),
         init: () => null,
         apply: state => state,
         wire: {
@@ -174,6 +224,14 @@ export class ApiSessionList {
    * @returns visible Session summaries ordered by activity.
    */
   async list(request: SessionListRequest = {}, signal?: AbortSignal): Promise<SessionSummary[]> {
+    return withSpan('session list read', {}, async span => {
+    const cache = this.persisted !== undefined ? 'hit' : this.persistedRead !== undefined ? 'shared' : 'miss'
+    span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: {
+      corpus_cache: cache,
+      last_invalidation: this.lastInvalidation,
+      created_invalidations: this.createdInvalidations,
+      disposed_invalidations: this.disposedInvalidations,
+    } }))
     const selection = projectionSelectionOf(request.projections)
     signal?.throwIfAborted()
     const records = await this.persistedSessions(signal)
@@ -181,7 +239,7 @@ export class ApiSessionList {
     const items: SessionSummary[] = []
     const cold: SessionRecord[] = []
     let yieldDeadline = performance.now() + this.workSliceMs
-    for (const record of records) {
+    for (const record of records.values()) {
       signal?.throwIfAborted()
       const live = this.ctx.sessions.get(record.header.id)
       if (live !== undefined) {
@@ -195,6 +253,10 @@ export class ApiSessionList {
         yieldDeadline = performance.now() + this.workSliceMs
       }
     }
+    if (cold.length > 0) {
+      this.recovered ??= await this.metadataStore.load()
+      signal?.throwIfAborted()
+    }
     for (const record of cold) {
       signal?.throwIfAborted()
       items.push(this.summarizeCold(record, selection))
@@ -206,7 +268,9 @@ export class ApiSessionList {
     }
     signal?.throwIfAborted()
     items.sort((left, right) => right.updatedAt - left.updatedAt)
+    span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { records: records.size, cold_records: cold.length } }))
     return items
+    })
   }
 
   /**
@@ -214,7 +278,7 @@ export class ApiSessionList {
    * @param signal - caller's cancellation, which stops this caller waiting but not the shared read.
    * @returns the persisted Session records.
    */
-  private async persistedSessions(signal: AbortSignal | undefined): Promise<readonly SessionRecord[]> {
+  private async persistedSessions(signal: AbortSignal | undefined): Promise<ReadonlyMap<string, SessionRecord>> {
     signal?.throwIfAborted()
     const persisted = this.persisted
     if (persisted !== undefined) return persisted
@@ -222,48 +286,176 @@ export class ApiSessionList {
     return signal === undefined ? read : abortable(read, signal)
   }
 
-  private startPersistedRead(): Promise<readonly SessionRecord[]> {
+  private startPersistedRead(): Promise<ReadonlyMap<string, SessionRecord>> {
     const generation = this.persistedGeneration
-    const read = this.ctx.sessionQuery.listSessions(this.lifetime.signal).then(records => {
-      if (this.persistedGeneration === generation) this.persisted = records
+    const read = withSpan('session corpus read', {}, async span => {
+      const listed = await this.ctx.sessionQuery.listSessions(this.lifetime.signal)
+      const records = new Map(listed.map(record => [record.header.id, record]))
+      const current = this.persistedGeneration === generation
+      if (current) this.persisted = records
+      span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { records: records.size, current } }))
       return records
     })
     this.persistedRead = read
     const settle = (): void => {
       if (this.persistedRead === read) this.persistedRead = undefined
     }
-    void read.then(settle, settle)
+    // The read is a Promise the caller already awaits; settling only drops the shared handle, so its rejection is the
+    // caller's to observe and this chain stays silent.
+    read.then(settle, settle).catch(() => undefined)
     return read
   }
 
-  private invalidatePersisted(): void {
-    this.persisted = undefined
-    this.persistedRead = undefined
-    this.persistedGeneration += 1
+  private persistedChanged(reason: 'created' | 'disposed', session: Session): void {
+    this.lastInvalidation = reason
+    if (reason === 'created') this.createdInvalidations += 1
+    else this.disposedInvalidations += 1
+    const records = this.persisted
+    if (records === undefined) {
+      this.persistedRead = undefined
+      this.persistedGeneration += 1
+      return
+    }
+    if (!records.has(session.id)) {
+      records.set(session.id, { header: structuredClone(session.header), live: false, persisted: true, formatStatus: 'current' })
+    }
+    // A disposed Session stays stored unless it never reached persistence; only persistence can tell which.
+    if (reason === 'disposed') void this.settleDisposed(records, session.id)
   }
 
-  private summarizeCold({ header, formatStatus }: SessionRecord, selection?: ProjectionSelection): SessionSummary {
-    const cached = this.coldProjections.get(header.id)
-    const read = cached === undefined
-      ? this.projectionsFor(header, undefined, selection)
-      : projectionReadOf(cached, selection, cached.values[LIST_METADATA_KEY])
-    // Only a full read is memoized: a filtered read must never answer a later full read with missing columns. A miss
-    // stays unmemoized so the persisted cache can gain this Session's record later.
-    if (cached === undefined && selection === undefined && read.projections !== undefined) {
-      this.coldProjections.set(header.id, read.projections)
+  private async settleDisposed(records: Map<string, SessionRecord>, id: SessionId): Promise<void> {
+    const persistence = this.ctx.get('sessionPersistence')
+    if (persistence === undefined) return
+    let stored
+    try {
+      stored = await persistence.stat(id, { signal: this.lifetime.signal })
+    } catch {
+      return
     }
-    const metadata = read.metadata
+    if (this.persisted !== records || this.ctx.sessions.get(id) !== undefined) return
+    if (stored === undefined) {
+      records.delete(id)
+      return
+    }
+    records.set(id, {
+      header: stored.header,
+      live: false,
+      persisted: true,
+      ...(stored.formatStatus === undefined ? {} : { formatStatus: stored.formatStatus }),
+    })
+  }
+
+  private summarizeCold(record: SessionRecord, selection?: ProjectionSelection): SessionSummary {
+    const { header, formatStatus } = record
+    // A cold row always reads its whole block once and every selection is cut from it, so a filtered list neither re-reads
+    // the checkpoint per call nor memoizes a partial block a later full read would trust. A miss stays unmemoized so the
+    // persisted cache can gain this Session's record later.
+    const block = this.coldProjections.get(header.id) ?? this.projectionsFor(header, undefined).projections
+    if (block !== undefined) this.coldProjections.set(header.id, block)
+    const read = projectionReadOf(block, selection, block?.values[LIST_METADATA_KEY])
+    const metadata = read.metadata ?? this.recoveredMetadata(record)
     return {
       sessionId: header.id,
       updatedAt: updatedAt(header, metadata),
       agentAvailable: false,
       ...(formatStatus === undefined ? {} : { formatStatus }),
       running: false,
-      // A large, metadata-less, or inaccessible cache miss remains unknown and visible.
+      // Until its log is folded, or when it cannot be read, a metadata-less row stays unknown and visible.
       blank: metadata?.blank ?? false,
       ...listFields(header),
       ...(read.projections === undefined ? {} : { projections: read.projections }),
     }
+  }
+
+  private recoveredMetadata(record: SessionRecord): SessionListMetadata | undefined {
+    const id = record.header.id
+    if (this.coldMetadata.has(id)) return this.coldMetadata.get(id)
+    if (!this.metadataQueue.has(id)) this.metadataQueue.set(id, record)
+    this.metadataDrain ??= this.drainMetadataQueue()
+      .catch((error: unknown) => { this.ctx.logger.warn(`api-session.list: list metadata recovery stopped: ${String(error)}`) })
+      .finally(() => { this.metadataDrain = undefined })
+    // Served until the drain confirms it; a changed log is re-folded and its corrected row pushed.
+    return this.storedRecovery(record.header)?.metadata ?? undefined
+  }
+
+  private storedRecovery(header: SessionHeader): RecoveredListMetadata | undefined {
+    const stored = this.recovered?.get(header.id)
+    return stored?.createdAt === header.createdAt ? stored : undefined
+  }
+
+  private async drainMetadataQueue(): Promise<void> {
+    await withSpan('session list metadata recovery', {}, async span => {
+      const recovered = this.recovered ??= await this.metadataStore.load()
+      let skipped = 0
+      let reused = 0
+      let folded = 0
+      let corrected = 0
+      let unsaved = 0
+      const remember = (id: string, entry: RecoveredListMetadata): void => {
+        recovered.set(id, entry)
+        unsaved += 1
+      }
+      // A Map iterator also visits rows queued while it runs, so one drain serves every list that arrives meanwhile.
+      for (const [id, record] of this.metadataQueue) {
+        this.metadataQueue.delete(id)
+        if (this.lifetime.signal.aborted) break
+        if (this.coldMetadata.has(id) || this.ctx.sessions.get(record.header.id) !== undefined) continue
+        if (unsaved >= RECOVERY_SAVE_EVERY) {
+          unsaved = 0
+          await this.metadataStore.save(recovered)
+        }
+        const known = this.storedRecovery(record.header)
+        if (known?.revision === null) {
+          this.coldMetadata.set(id, undefined)
+          skipped += 1
+          continue
+        }
+        const served = known?.metadata ?? UNKNOWN_METADATA
+        let metadata: SessionListMetadata | undefined
+        try {
+          const persistence = this.ctx.get('sessionPersistence')
+          const stored = await persistence?.stat(record.header.id, { signal: this.lifetime.signal })
+          if (persistence === undefined || stored?.sizeBytes === undefined || stored.sizeBytes > DRAFT_LOG_MAX_BYTES) {
+            this.coldMetadata.set(id, undefined)
+            if (stored?.sizeBytes !== undefined) remember(id, { createdAt: record.header.createdAt, revision: null, metadata: null })
+            skipped += 1
+            continue
+          }
+          if (known !== undefined && known.revision === stored.revision) {
+            metadata = known.metadata ?? undefined
+            reused += 1
+          } else {
+            // `sessionQuery.readSession` lists the whole persisted corpus before each read; this opens only the one log.
+            const { events } = await coldReads.use(() => readColdSessionLog(persistence, record.header.id, this.lifetime.signal))
+            metadata = events.reduce(applySessionListMetadata, { blank: true, lastPromptAt: null })
+            remember(id, { createdAt: record.header.createdAt, revision: stored.revision, metadata })
+            folded += 1
+          }
+        } catch (error) {
+          this.ctx.logger.warn(
+            `api-session.list: the stored log of "${id}" could not be read; serving the row without its list metadata: ${String(error)}`,
+          )
+        }
+        await scheduler.yield()
+        // The Session attached while its log was read: it now owns a live projection cut, so this fold is stale.
+        if (this.lifetime.signal.aborted || this.ctx.sessions.get(record.header.id) !== undefined) continue
+        this.coldMetadata.set(id, metadata)
+        const shown = metadata ?? UNKNOWN_METADATA
+        if (shown.blank === served.blank && shown.lastPromptAt === served.lastPromptAt) continue
+        corrected += 1
+        this.ctx.emit('api-session/added', this.summarizeCold(record))
+      }
+      const corpus = this.persisted
+      if (corpus !== undefined) {
+        for (const id of recovered.keys()) {
+          if (corpus.has(id)) continue
+          recovered.delete(id)
+          unsaved += 1
+        }
+      }
+      if (unsaved > 0 && !this.lifetime.signal.aborted) await this.metadataStore.save(recovered)
+      span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { skipped, reused, folded, corrected } }))
+    })
   }
 
   /**

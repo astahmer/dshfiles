@@ -50,7 +50,9 @@ profile, install globally, restart DSH, or update the running Host.
   draft staging; [registration](src/native/index.ts) also marks a Host roster change before its refresh, and the
   [settings store](src/native/settings-store.ts) and [section store](src/native/section-store.ts) read the roster
   through one shared `agentPresets.list` request (dshx `joinPageRead`), so a refresh that reloads the label, the
-  section and every seat sends one request instead of one per store. [Locales](src/native/locales.ts) carry the
+  section and every seat sends one request instead of one per store. At boot that request waits for the page's
+  first connected generation, whose `connection/reset` then only releases it instead of reloading every surface.
+  [Locales](src/native/locales.ts) carry the
   recorded copy delta. Native components and styles are unchanged.
 
 On an upstream bump, run `node scripts/native-fork-diff.mjs agent-preset --to <new-tag>`, copy unchanged

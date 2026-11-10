@@ -274,7 +274,8 @@ export class Session implements SessionFace {
     this.address = options.address
     this.parentAvailable = options.parentAvailable
     this.notifier = new Notifier(() => {
-      this.snapshotCache = this.buildSnapshot()
+      const next = this.buildSnapshot()
+      if (!sameSessionSnapshot(this.snapshotCache, next)) this.snapshotCache = next
     })
     this.snapshotCache = this.buildSnapshot()
     this.stopObservingInbox = this.projections.faceOf('inbox').subscribe(() => {
@@ -298,6 +299,14 @@ export class Session implements SessionFace {
   /** Release the bound scope at prune time (a later rebind accompanies a freshly minted scope). */
   unbindScope(): void {
     this.actx = undefined
+  }
+
+  /**
+   * True while a live ClientSessions scope holds this instance. A view retains its scope before it subscribes (React
+   * subscribes after commit), so `mounted` alone misses a Session that is opening on screen.
+   */
+  get scoped(): boolean {
+    return this.actx !== undefined
   }
 
   // ---- Operations ----
@@ -633,6 +642,11 @@ export class Session implements SessionFace {
     return this.notifier.subscribe(listener)
   }
 
+  /** True while a view subscribes or a retained scope owns this Session. */
+  get retainedOrSubscribed(): boolean {
+    return this.notifier.listenerCount > 0 || this.actx !== undefined
+  }
+
   /**
    * Cached Session snapshot (rebuilt lazily when dirty with no listeners).
    * @returns the cached reference (stable until the next flush).
@@ -876,8 +890,9 @@ export class Session implements SessionFace {
       if (result.retireAttemptId !== undefined) this.eventSource.settleAssistant(result.retireAttemptId)
       if (changed || result.retireAttemptId !== undefined) this.notifier.markDirty()
     } else if (result?.type === 'transient') {
+      // A live chunk changes only the event window, which notifies its own subscribers;
+      // no SessionSnapshot field depends on it, so every useSession consumer stays put.
       this.eventSource.append(result.entry)
-      this.notifier.markDirty()
     }
   }
 
@@ -1063,6 +1078,21 @@ export class Session implements SessionFace {
       ? { kind: 'session', sessionId: this.sessionId }
       : { kind: 'subagent', ...this.address }
   }
+}
+
+/** Field-equal snapshots keep the previous identity: `useSession(s => s)` consumers re-render only on a real change. */
+function sameSessionSnapshot(previous: SessionSnapshot, next: SessionSnapshot): boolean {
+  for (const key of Object.keys(next) as (keyof SessionSnapshot)[]) {
+    if (key === 'subagent') continue
+    if (previous[key] !== next[key]) return false
+  }
+  const left = previous.subagent
+  const right = next.subagent
+  if (left === null || right === null) return left === right
+  return left.parentAvailable === right.parentAvailable
+    && left.address.mode === right.address.mode
+    && left.address.parentSessionId === right.address.parentSessionId
+    && left.address.childSessionId === right.address.childSessionId
 }
 
 /** Run one callback on the next animation frame, or a macrotask where no frame clock exists. */

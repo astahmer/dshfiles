@@ -58,7 +58,7 @@ function turnLocation(context: ConversationNodeContext<TurnTailState>): TurnLoca
 
 function hasText(data: AssistantChatData): data is FinalAssistantChatData {
   return data.finalNode !== undefined
-    && data.blocks.some(block => block.kind === 'text' && block.text.trim() !== '')
+    && data.blocks.some(block => block.kind === 'text' && /\S/u.test(block.text))
 }
 
 function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChatData | null {

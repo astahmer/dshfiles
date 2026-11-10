@@ -1191,7 +1191,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:192",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:199",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -2418,7 +2418,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "projectLifecycleApi",
       "importFrom": "@dshfiles/workspace-folder-picker/project-lifecycle-api",
       "owner": "@dshfiles/workspace-folder-picker",
-      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:130",
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-lifecycle-api.ts:131",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/workspace-folder-picker:workspace-folder-picker.project-lifecycle",
@@ -2916,13 +2916,13 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "riskNote": "Catalog metadata only; features:check validates the surface/destination pair.",
       "occupancy": "static",
       "occupants": [
+        "@dshfiles/agent-loop › settled-stream-size",
         "@dshfiles/agent-telemetry › agent-turn-spans",
         "@dshfiles/agent-telemetry › nested-tool-spans",
-        "@dshfiles/agent-telemetry › subagent-traces",
-        "@dshfiles/agent-telemetry › auxiliary-and-wait-spans"
+        "@dshfiles/agent-telemetry › subagent-traces"
       ],
       "details": [
-        "Used by 100 catalog feature(s)",
+        "Used by 104 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

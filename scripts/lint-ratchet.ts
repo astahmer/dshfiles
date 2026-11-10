@@ -9,6 +9,11 @@ const lintRoots = ['tooling/dshx/packages', 'plugins', 'scripts']
 // surface of that package), a deliberate vendor shim, or the single JSON decode boundary that turns
 // text into a value. Everything else imports the defining module directly.
 const astGrepBoundaries = [
+  'plugins/@dshfiles/storage-json/src/host.ts',
+  'plugins/@dshfiles/session-persistence-jsonl/src/host.ts',
+  'plugins/@dshfiles/storage-domain/src/native/index.ts',
+  'plugins/@dshfiles/storage-domain/src/host.ts',
+  'plugins/@dshfiles/session-log-window/src/index.ts',
   'scripts/json.ts',
   'tooling/dshx/packages/dshx/src/json.ts',
   'plugins/@dshfiles/agents/src/contract.ts',
@@ -57,6 +62,11 @@ const astGrepBoundaries = [
 
 // Vendored upstream source: kept byte-comparable to its pinned revision, so this repository's rules do not apply.
 const astGrepVendored = [
+  'plugins/@dshfiles/storage-domain/src/native/**',
+  'plugins/@dshfiles/storage-json/src/native/**',
+  'plugins/@dshfiles/session-persistence-jsonl/src/native/**',
+  'plugins/@dshfiles/storage-domain/tests/**',
+  'plugins/@dshfiles/storage-json/tests/**',
   'plugins/@dshfiles/model-selection/src/native/**',
   'plugins/@dshfiles/agent-preset/src/native/**',
   'plugins/@dshfiles/rich-composer/src/native/**',
@@ -79,6 +89,17 @@ const astGrepVendored = [
   'plugins/@dshfiles/settings-web-search/src/native/**',
   'plugins/@dshfiles/settings-web-search/src/host.ts',
   'plugins/@dshfiles/settings-web-search/src/css-modules.d.ts',
+  'plugins/@dshfiles/schedule/src/native/**',
+  'plugins/@dshfiles/schedule/src/host.ts',
+  'plugins/@dshfiles/schedule/src/css-modules.d.ts',
+  'plugins/@dshfiles/settings-subagent/src/native/**',
+  'plugins/@dshfiles/settings-subagent/src/host.ts',
+  'plugins/@dshfiles/settings-subagent/src/css-modules.d.ts',
+  'plugins/@dshfiles/cordis-client-runner/src/native/**',
+  'plugins/@dshfiles/cordis-client-runner/src/host.ts',
+  'plugins/@dshfiles/cordis-cards/src/native/**',
+  'plugins/@dshfiles/cordis-cards/src/host.ts',
+  'plugins/@dshfiles/cordis-cards/src/css-modules.d.ts',
 ]
 
 const ruleCapsSchema = Schema.Record(Schema.String, Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)))

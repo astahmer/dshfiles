@@ -613,6 +613,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stepNavigation = (direction: -1 | 1): void => goToHistoryEntry(history.index + direction)
   const latestStepNavigation = useRef(stepNavigation)
   latestStepNavigation.current = stepNavigation
+  // The palette reads availability when it opens; a ref keeps every thread switch from re-registering its actions.
+  const latestHistory = useRef(history)
+  latestHistory.current = history
 
   useEffect(() => {
     const onNavigate = (event: Event): void => {
@@ -928,7 +931,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         label: text(props.t, 'threadSidebarBack'),
         aliases: ['history', 'previous'],
         icon: <ArrowLeftIcon className="dshx:size-4" />,
-        isAvailable: () => ThreadNavigationHistoryModel.canStep(history, -1),
+        isAvailable: () => ThreadNavigationHistoryModel.canStep(latestHistory.current, -1),
         run: () => latestStepNavigation.current(-1),
       },
       {
@@ -937,7 +940,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         label: text(props.t, 'threadSidebarForward'),
         aliases: ['history', 'next'],
         icon: <ArrowRightIcon className="dshx:size-4" />,
-        isAvailable: () => ThreadNavigationHistoryModel.canStep(history, 1),
+        isAvailable: () => ThreadNavigationHistoryModel.canStep(latestHistory.current, 1),
         run: () => latestStepNavigation.current(1),
       },
       ...(restartAvailable
@@ -989,7 +992,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       pendingUpdatesLabel,
       hostShortcuts,
       runCommand,
-      history,
       headerIconFor,
       activateHeaderEntry,
       openCustomize,

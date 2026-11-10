@@ -1,3 +1,6 @@
+import { setFlagsFromString } from 'node:v8'
+import { runInNewContext } from 'node:vm'
+
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
@@ -127,6 +130,38 @@ plainDescribe('search index parity', () => {
     expect(index.candidates(['db'])).toBeNull()
     expect(index.candidates([])).toBeNull()
     expect(index.candidates(['no-such-text'])?.size).toBe(0)
+  })
+})
+
+plainDescribe('search index heap', () => {
+  plainIt('stays within a small multiple of the text it indexes', () => {
+    setFlagsFromString('--expose-gc')
+    const collect = runInNewContext('gc') as () => void
+    const random = seeded(5)
+    const alphabet = 'abcdefghijklmnopqrstuvwxyzeeeaaoottiinnss0123456789-_/.:'
+    const vocabulary = Array.from({ length: 12_000 }, () =>
+      Array.from({ length: 3 + Math.floor(random() * 9) }, () => alphabet[Math.floor(random() * alphabet.length)]).join(''),
+    )
+    const prose = (length: number) => {
+      const parts: string[] = []
+      for (let size = 0; size < length; ) {
+        const word = vocabulary[Math.floor(vocabulary.length * random() ** 2.5)] ?? ''
+        parts.push(word)
+        size += word.length + 1
+      }
+      return parts.join(' ')
+    }
+    const items = corpus(200, random).map(item => ({ ...item, body: prose(2_400), events: [{ at: 0, actor: 'user', kind: 'created' as const, detail: prose(700) }] }))
+    const textLength = items.reduce((total, item) => total + item.body.length + (item.events[0]?.detail.length ?? 0), 0)
+    const records = new Map(items.map(item => [item.id, item]))
+    collect()
+    const before = process.memoryUsage().heapUsed
+    const index = new BacklogSearchIndex()
+    index.sync(records)
+    collect()
+    // A Set per gram plus a gram set per item took ~70x the text; ascending id arrays take ~11x.
+    expect((process.memoryUsage().heapUsed - before) / textLength).toBeLessThan(20)
+    expect(index.size).toBe(items.length)
   })
 })
 

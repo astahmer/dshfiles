@@ -5,3 +5,5 @@ coverage/
 .dshx/
 *.tsbuildinfo
 output/
+runtime-store/
+client-runtime/

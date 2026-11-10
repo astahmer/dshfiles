@@ -1,5 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { jjIntegrationApi, type ProjectBookmarkView } from '@dshfiles/jj-integration/api'
+import { ProjectBookmarkQuery } from '@dshfiles/jj-integration/project-bookmark'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -7,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { jujutsuApi } from './api.js'
 import { ChatReferenceModel, chatReferenceQueryKeys } from './chat-reference.js'
 import { ChatReferenceLinks } from './chat-reference-links.js'
+import { ProjectBookmarkRequest } from './project-bookmark-request.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { ReferenceGraphView } from './reference-graph-view.js'
 import {
@@ -70,14 +72,30 @@ export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (s
 
   const referenced = request?.reference.value
   const projectPath = request === null ? undefined : props.projectPathForSession(request.sessionId)
+  /** The graph around `reference`, with the main landmarks on `bookmark` (the repository's project main branch). */
+  const readGraph = (repoId: string, reference: string, bookmark: string | undefined, signal: AbortSignal) =>
+    ProjectBookmarkRequest.withProjectBookmark({
+      bookmark,
+      read: projectBookmark =>
+        api.referenceGraph(projectBookmark === undefined ? { repoId, reference } : { repoId, reference, bookmark: projectBookmark }, { signal }),
+    })
+  /** The thread's own project names its main branch; without jj-integration, or on an older Host, the landmarks stay on main. */
+  const projectBookmarkAt = (path: string): Promise<string | undefined> =>
+    queryClient
+      .fetchQuery(ProjectBookmarkQuery.options({ api: jjIntegration, path }))
+      .then(resolved => resolved.bookmark)
+      .catch(() => undefined)
   const readLocalReference = async (cwd: string, reference: string, signal: AbortSignal) => {
     try {
-      const repository = await queryClient.fetchQuery({
-        queryKey: chatReferenceQueryKeys.repository(cwd),
-        queryFn: ({ signal: querySignal }) => api.registerRepository({ path: cwd }, { signal: querySignal }),
-        staleTime: 30_000,
-      })
-      const graph = await api.referenceGraph({ repoId: repository.repoId, reference }, { signal })
+      const [repository, bookmark] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: chatReferenceQueryKeys.repository(cwd),
+          queryFn: ({ signal: querySignal }) => api.registerRepository({ path: cwd }, { signal: querySignal }),
+          staleTime: 30_000,
+        }),
+        projectBookmarkAt(cwd),
+      ])
+      const graph = await readGraph(repository.repoId, reference, bookmark, signal)
       return 'graph' in graph ? { repository, graph } : null
     } catch {
       return null
@@ -122,7 +140,9 @@ export const ChatReferenceOverlay = (props: { readonly projectPathForSession: (s
     const matches = await Promise.all(
       candidates.map(async candidate => {
         try {
-          const graph = await api.referenceGraph({ repoId: candidate.repository.repoId, reference }, { signal })
+          // Searching every project must stay one read per repository: a branch already known is used, otherwise main.
+          const known = queryClient.getQueryData<ProjectBookmarkView>(ProjectBookmarkQuery.key(candidate.path))?.bookmark
+          const graph = await readGraph(candidate.repository.repoId, reference, known, signal)
           return 'graph' in graph ? { repository: candidate.repository, graph } : undefined
         } catch {
           return undefined
