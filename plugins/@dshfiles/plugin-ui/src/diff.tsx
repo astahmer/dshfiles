@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useSyncExternalStore, type ComponentProps, 
 import { cn } from './lib/utils.js'
 import { bundledLanguages } from './shiki-slim.js'
 
-export { parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
+export { parseDiffFromFile, parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
 
 export type PatchLayout = 'unified' | 'split'
 

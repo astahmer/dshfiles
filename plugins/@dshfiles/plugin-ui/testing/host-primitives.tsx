@@ -154,3 +154,35 @@ export const languageForPath = (path: string): string | undefined => path.split(
 
 /** Highlights nothing, as the Host does while a grammar loads: callers render plain text. */
 export const useCodeHighlighter = (_language: string | undefined) => (_code: string) => undefined
+
+/** Controlled disclosure row: the row toggles (a div with role button, as the Host renders it), and the body mounts only while open. */
+export const DisclosureRow = (props: {
+  icon: ReactNode
+  title: string
+  open: boolean
+  expandable: boolean
+  onToggle: () => void
+  expandOnRowClick?: boolean | undefined
+  keepContentWhenOpen?: boolean | undefined
+  collapsedContent?: ReactNode
+  children?: ReactNode
+  className?: string | undefined
+}): JSX.Element => {
+  const rowExpands = props.expandable && props.expandOnRowClick === true
+  return (
+    <div className={props.className} data-open={props.open || undefined}>
+      <div
+        aria-expanded={rowExpands ? props.open : undefined}
+        data-disclosure-row=""
+        onClick={rowExpands ? props.onToggle : undefined}
+        role={rowExpands ? 'button' : undefined}
+        tabIndex={rowExpands ? 0 : undefined}
+      >
+        {props.icon}
+        <span>{props.title}</span>
+        {props.keepContentWhenOpen === true || !props.open ? props.collapsedContent : null}
+      </div>
+      {props.open && props.expandable ? props.children : null}
+    </div>
+  )
+}
