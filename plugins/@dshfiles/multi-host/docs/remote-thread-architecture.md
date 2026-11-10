@@ -208,13 +208,25 @@ source), provided by this fork's `MirroredSessions` and filled by multi-host's
 `remote-session-source.ts`. The model picker reads the remote catalog and reasoning
 efforts, uploads are staged on the owning Host, and `@` file references are listed
 from that runtime with Session ownership checked before forwarding. Drafts stay in the
-client; questions/approvals and terminal interactions still require the host UI.
+client. Questions, approvals and the thread's JJ actions are answered on the owner (see
+the sections below); terminals stay on the host.
+
+Mirrored frames are read-only copies: nothing here writes a remote thread's log, and
+every write goes through the owning runtime's own command surface. A runtime whose
+connection drops restricts submission and keeps the composer; it never swaps in a
+reduced input. The mirror re-emits frames from the same DSH version; frames from an
+older remote that stop decoding are the stop condition above, not something to
+translate.
 
 Validation: `DSHX_E2E_ONLY=@dshfiles/multi-host node --run check:e2e` covers remote
 Session creation, file-reference results, a file upload over loopback SSH, and the
-browser's model picker and file picker on a remote thread (`multi-host.auto-destination`).
-Focused unit tests cover Session ownership authorization, mirrored model selection and
-the cross-machine refusals below.
+browser's model picker and file picker on a remote thread (`multi-host.auto-destination`:
+the chip opens the runtime's catalog and selects a model, and a file chosen through the
+composer is stored under the remote host's home and nowhere under the manager's), plus
+questions, approvals and JJ actions (`multi-host.remote-question`, `-timed`, `-approval`,
+`-jj`). The journeys reach Hosts through the rail helper and select the mirrored row by
+`[data-remote-thread-id]`. Focused unit tests cover Session ownership authorization,
+mirrored model selection and the cross-machine refusals below.
 
 ## Cross-machine references
 
