@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { installShortcuts, ShortcutKeyboardModel, type Shortcut } from './keyboard.js'
 
 const searchShortcut = (run: Shortcut['run'] = () => {}): Shortcut => ({ id: 'search', key: 'KeyP', modifier: 'primary', label: 'Search', run })
@@ -68,6 +68,31 @@ describe('isEditableTarget', () => {
   })
 })
 
+/** xterm's own shape: a hidden textarea inside the `.xterm` root the Host names terminal. */
+const termInput = (): HTMLTextAreaElement => {
+  const terminal = document.createElement('div')
+  terminal.className = 'xterm'
+  const input = document.createElement('textarea')
+  input.className = 'xterm-helper-textarea'
+  terminal.append(input)
+  document.body.append(terminal)
+  onTestFinished(() => terminal.remove())
+  return input
+}
+
+describe('regionOf', () => {
+  it('resolves the terminal before the text field it holds, then editable, then page', () => {
+    const input = termInput()
+    expect(ShortcutKeyboardModel.regionOf(input)).toBe('terminal')
+    // The terminal's own input is still a text field for anything that asks directly.
+    expect(ShortcutKeyboardModel.isEditableTarget(input)).toBe(true)
+    input.closest('.xterm')?.remove()
+    expect(ShortcutKeyboardModel.regionOf(document.createElement('textarea'))).toBe('editable')
+    expect(ShortcutKeyboardModel.regionOf(document.createElement('button'))).toBe('page')
+    expect(ShortcutKeyboardModel.regionOf(null)).toBe('page')
+  })
+})
+
 describe('installShortcuts', () => {
   const disposers: Array<() => void> = []
   afterEach(() => {
@@ -106,6 +131,26 @@ describe('installShortcuts', () => {
     document.body.dispatchEvent(chord)
     expect(chord.defaultPrevented).toBe(false)
     expect(bubbled).toHaveBeenCalledOnce()
+  })
+
+  it('leaves the key to the shell when the chord opts out of the terminal', () => {
+    const run = vi.fn()
+    disposers.push(installShortcuts(window, [{ ...searchShortcut(run), allowInTerminal: false }]))
+    const input = termInput()
+    const chord = press(primaryHeld())
+    input.dispatchEvent(chord)
+    expect(run).not.toHaveBeenCalled()
+    expect(chord.defaultPrevented).toBe(false)
+  })
+
+  it('keeps claiming the chord in the terminal when it does not opt out', () => {
+    const run = vi.fn()
+    disposers.push(installShortcuts(window, [{ ...searchShortcut(run), allowInEditable: false }]))
+    const input = termInput()
+    const chord = press(primaryHeld())
+    input.dispatchEvent(chord)
+    expect(run).toHaveBeenCalledOnce()
+    expect(chord.defaultPrevented).toBe(true)
   })
 
   it('stops listening once disposed', () => {
