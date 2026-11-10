@@ -1,4 +1,5 @@
-import { Option } from 'effect'
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
+import { Option, Result } from 'effect'
 import * as Schema from 'effect/Schema'
 import { SchemaFields } from './schema.js'
 import type { ModelSelection, TranscriptEntry } from './api.js'
@@ -45,7 +46,6 @@ const decodeUserMessage = Schema.decodeUnknownOption(userMessageSchema)
 const decodeAssistant = Schema.decodeUnknownOption(assistantSchema)
 const decodeToolCall = Schema.decodeUnknownOption(toolCallSchema)
 const decodeToolResult = Schema.decodeUnknownOption(toolResultSchema)
-const decodeToolArguments = Schema.decodeUnknownOption(toolArgumentsSchema)
 
 const maxText = 8_000
 const maxToolOutput = 1_200
@@ -53,7 +53,8 @@ const maxToolOutput = 1_200
 const toolSummary = (call: Schema.Schema.Type<typeof toolCallSchema>): string => {
   let parsed: Schema.Schema.Type<typeof toolArgumentsSchema> | undefined
   try {
-    parsed = Option.getOrUndefined(decodeToolArguments(JSON.parse(call.arguments ?? '{}')))
+    const decoded = decodeJsonSafe(toolArgumentsSchema, call.arguments ?? '{}')
+    parsed = Result.isSuccess(decoded) ? decoded.success : undefined
   } catch {
     parsed = undefined
   }

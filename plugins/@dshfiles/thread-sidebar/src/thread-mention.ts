@@ -1,4 +1,5 @@
 import type { SessionReferenceMentionCandidate } from '@deepseek-ai/dsh-api-remotes/client'
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import * as Schema from 'effect/Schema'
 import type { ReferenceInsert } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import * as Result from 'effect/Result'
@@ -75,14 +76,12 @@ export class ThreadMentionModel {
   static readonly encodeThreadMentionDrag = (sessionId: string): string => JSON.stringify({ sessionId } satisfies ThreadMentionDragPayload)
 
   static readonly decodeThreadMentionDrag = (value: string): string | null => {
-    let payload: unknown
     try {
-      payload = JSON.parse(value)
+      const parsed = decodeJsonSafe(threadMentionDragPayloadSchema, value)
+      return Result.isSuccess(parsed) ? parsed.success.sessionId : null
     } catch {
       return null
     }
-    const parsed = Schema.decodeUnknownResult(threadMentionDragPayloadSchema)(payload)
-    return Result.isSuccess(parsed) ? parsed.success.sessionId : null
   }
 
   /** Put one thread on the drag payload a Composer accepts, without plain text that a rich editor would insert. */

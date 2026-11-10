@@ -1,4 +1,5 @@
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 
 export interface ToolCallRecord {
   readonly callId: string
@@ -195,7 +196,7 @@ export class TurnActivity {
   static editLines(tool: string, argumentsText: string): LineCounts {
     let parsed: unknown
     try {
-      parsed = JSON.parse(argumentsText)
+      parsed = decodeJson(jsonValueSchema, argumentsText)
     } catch {
       return { added: 0, removed: 0 }
     }

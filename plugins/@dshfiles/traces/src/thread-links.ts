@@ -1,4 +1,5 @@
 import { ChatFocusModel, type ChatFocus } from '@dshfiles/chat/chat-focus'
+import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { AttributeValue } from './types.js'
@@ -16,7 +17,7 @@ const encodeFocus = (focus: TracesFocus): string => `${FOCUS_PREFIX}${JSON.strin
 const decodeFocus = (value: string): TracesFocus | null => {
   if (!value.startsWith(FOCUS_PREFIX)) return null
   try {
-    const parsed = Schema.decodeUnknownResult(tracesFocusSchema)(JSON.parse(value.slice(FOCUS_PREFIX.length)))
+    const parsed = decodeJsonSafe(tracesFocusSchema, value.slice(FOCUS_PREFIX.length))
     return parsed._tag === 'Success' ? parsed.success : null
   } catch {
     return null
