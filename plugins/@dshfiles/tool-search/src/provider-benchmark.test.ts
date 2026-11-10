@@ -87,7 +87,7 @@ const tasks: readonly BenchmarkTask[] = [
   {
     id: 'release-date',
     prompt: 'Read docs/release-notes.txt in the project and report the scheduled release date. Do not guess; the date is only in that file.',
-    discoveryQuery: 'find the release schedule in the project notes file',
+    discoveryQuery: 'read the release schedule from a project file',
     expectedTool: 'read_project_file',
     toolArguments: { path: 'docs/release-notes.txt' },
     expectedAnswer: '2026-10-31',
