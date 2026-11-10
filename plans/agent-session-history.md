@@ -2,8 +2,10 @@
 
 > Not started on stock DSH. The first attempt extended upstream `@deepseek-ai/dsh-tool-session-query` and added a
 > latest-page read to `sessionController.page` in a DSH core fork; this repository carries no core patches, so that
-> route is closed until upstream exposes the read. Discovery already ships in `@dshfiles/memory` (see Context), and
-> `dshx_comm_history` covers live descendants only.
+> route is closed until upstream exposes the read. Discovery already ships in `@dshfiles/memory` (see Context). No
+> Agent tool reads another Session's messages: `dshx_comm_history` (live descendants only) was removed with
+> `dshx_comm_workspace` on 2026-11-04 (see the
+> [agent-communication README](../plugins/@dshfiles/agent-communication/README.md#removed-session-reads)).
 
 ## Status
 
@@ -208,6 +210,22 @@ Avoid storing duplicate Session content or a second index unless Host contracts 
 7. **Permission configuration and requests:** add Host-enforced presets and explain denied grants with a human configuration path. Use native `approval` for one-operation escalation only when policy permits, with no persisted elevation.
 8. **Scratch-profile verification:** build/import-check, sync/boot an isolated profile, confirm tool discovery for multiple Agents, test history reads and permission denials, and verify no profile/live-instance mutation.
 9. **Docs and promotion decision:** document tool contracts and limits; only promote to the web profile after verification and explicit approval.
+
+## Related open items
+
+Carried over from the retired agent-session-observability plan. Observation must never wake, message or modify an
+inspected Session.
+
+- [ ] **History beyond live descendants.** Do not call Remote Session Controller methods from plugin code: they
+      bypass transport authorization, and Session event reads expose transcript content, so a wider read needs the
+      explicit, bounded authorization path this plan defines.
+- [ ] **JJ change associations.** `workspaceChanges` is a recorder summary, not proof of a jj workspace or revision,
+      and the opaque `workspace_topic` hash is neither. Find a verifiable source before associating a Session with a
+      change.
+- [ ] **Orchestration writes** (prompt, queue, cancel, resume, acknowledge) on another Session need the write presets
+      above; none exist as Agent tools beyond the native subagent and thread tools.
+- [ ] **Descendant-workspace lookup.** Re-adding a `dshx_comm_workspace`-style lookup (descendant → DSH Workspace id
+      and title) is a new decision for this plan; `SessionCorpus.workspaceAt` still exists in agent-communication.
 
 ## Open questions
 
