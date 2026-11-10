@@ -66,6 +66,22 @@ describe('TranscriptWindow', () => {
     expect(view.result.current.entries).toHaveLength(24)
   })
 
+  it('trims the rows read up the transcript to a bounded tail window, also while new rows stream in', () => {
+    const view = renderWindow({ entries: rows(400) })
+    while (view.result.current.hidden > 0) act(() => view.result.current.loadOlder())
+    expect(view.result.current.entries).toHaveLength(400)
+
+    act(() => view.result.current.keepTail())
+    expect(view.result.current.entries).toHaveLength(TranscriptWindow.followingRows)
+    expect(view.result.current.entries.at(-1)?.key).toBe('n399')
+    expect(view.result.current.hasMore).toBe(true)
+
+    view.rerender({ entries: rows(430) })
+    act(() => view.result.current.keepTail())
+    expect(view.result.current.entries).toHaveLength(TranscriptWindow.followingRows)
+    expect(view.result.current.entries.at(-1)?.key).toBe('n429')
+  })
+
   it('widens to a Turn jump target without asking the Host when the row is loaded', async () => {
     const view = renderWindow({ entries: rows(100) })
     await act(() => view.result.current.loadThrough(SessionSeq(205)))

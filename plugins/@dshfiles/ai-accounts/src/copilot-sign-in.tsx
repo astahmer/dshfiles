@@ -1,10 +1,11 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { aiAccountsApi, type CopilotLoginState } from './api.js'
+import { useDeviceSignIn } from './device-sign-in.js'
 import { beginLoginQuery } from './login-query.js'
 
 export const CopilotSignIn = (props: {
@@ -14,43 +15,55 @@ export const CopilotSignIn = (props: {
   readonly onConnected?: () => void
   readonly onCancelled?: () => void
 }): JSX.Element => {
-  const { instanceId, onConnected, operationId } = props
+  const { instanceId, operationId } = props
   const accounts = useApi(aiAccountsApi)
   const queryClient = useQueryClient()
-  const operation = props.operationId === undefined ? {} : { operationId: props.operationId }
+  const operation = operationId === undefined ? {} : { operationId }
   const queryKey =
-    props.operationId === undefined
-      ? (['ai-accounts', 'copilot-login', instanceId] as const)
-      : (['ai-accounts', 'copilot-login', instanceId, props.operationId] as const)
-  const alive = useRef(true)
-  const ownsAttempt = useRef(false)
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-      if (ownsAttempt.current)
-        void accounts.cancelCopilotLogin({ instanceId, confirm: true, ...(operationId !== undefined && { operationId }) }).catch(() => undefined)
-    }
-  }, [accounts, instanceId, operationId])
-  const begin = useMutation({
-    mutationFn: () => beginLoginQuery(queryClient, queryKey, () => accounts.beginCopilotLogin({ instanceId: instanceId, ...operation })),
-    onSuccess: next => {
-      ownsAttempt.current = next.status === 'starting' || next.status === 'waiting'
-      if (!alive.current) {
-        if (ownsAttempt.current) void accounts.cancelCopilotLogin({ instanceId, confirm: true, ...operation }).catch(() => undefined)
-        return
-      }
-      queryClient.setQueryData(queryKey, next)
+    operationId === undefined ? (['ai-accounts', 'copilot-login', instanceId] as const) : (['ai-accounts', 'copilot-login', instanceId, operationId] as const)
+  const { snapshot, send } = useDeviceSignIn({
+    instanceId,
+    ...(operationId !== undefined && { operationId }),
+    ports: {
+      begin: async () => {
+        const next = await beginLoginQuery(queryClient, queryKey, () => accounts.beginCopilotLogin({ instanceId: instanceId, ...operation }))
+        queryClient.setQueryData(queryKey, next)
+        return next
+      },
+      cancel: async () => {
+        await accounts.cancelCopilotLogin({ instanceId, confirm: true, ...operation })
+      },
+      signOut: async () => {
+        await accounts.signOutCopilot({ instanceId: instanceId })
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['ai-accounts', 'file'] }),
+          queryClient.invalidateQueries({ queryKey: ['ai-accounts', 'usage'] }),
+        ])
+        queryClient.setQueryData(queryKey, {
+          instanceId: instanceId,
+          status: 'idle',
+          userCode: null,
+          verificationUri: null,
+          message: 'GitHub Copilot was disconnected.',
+        } satisfies CopilotLoginState)
+      },
+      onConnected: () => props.onConnected?.(),
+      onCancelled: () => {
+        props.onCancelled?.()
+        void queryClient.invalidateQueries({ queryKey, exact: true })
+      },
     },
   })
+  const starting = snapshot.matches('starting')
   const statusQuery = useQuery({
     queryKey,
     queryFn: ({ signal }) => accounts.copilotLoginStatus({ instanceId: instanceId }, { signal }),
-    enabled: !begin.isPending,
+    enabled: !starting,
     refetchInterval: query => {
       const status = query.state.data?.status
       return status === 'starting' || status === 'waiting' ? 1_000 : false
     },
+    staleTime: 1_000,
     retry: false,
   })
   const status: CopilotLoginState = statusQuery.data ?? {
@@ -60,30 +73,10 @@ export const CopilotSignIn = (props: {
     verificationUri: null,
     message: null,
   }
-  const cancel = useMutation({
-    mutationFn: () => accounts.cancelCopilotLogin({ instanceId, confirm: true, ...operation }),
-    onSuccess: () => {
-      ownsAttempt.current = false
-      props.onCancelled?.()
-      return queryClient.invalidateQueries({ queryKey, exact: true })
-    },
-  })
-  const signOut = useMutation({
-    mutationFn: () => accounts.signOutCopilot({ instanceId: instanceId }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['ai-accounts', 'file'] }),
-        queryClient.invalidateQueries({ queryKey: ['ai-accounts', 'usage'] }),
-      ])
-      queryClient.setQueryData(queryKey, {
-        instanceId: instanceId,
-        status: 'idle',
-        userCode: null,
-        verificationUri: null,
-        message: 'GitHub Copilot was disconnected.',
-      } satisfies CopilotLoginState)
-    },
-  })
+  useEffect(() => {
+    if (statusQuery.data === undefined) return
+    send({ type: 'observed', status: statusQuery.data.status })
+  }, [send, statusQuery.data])
 
   useEffect(() => {
     if (status.status !== 'complete') return
@@ -93,31 +86,22 @@ export const CopilotSignIn = (props: {
     ])
   }, [queryClient, status.status])
 
-  const connected = useRef(false)
-  useEffect(() => {
-    if (status.status === 'complete' && begin.isSuccess && !connected.current) {
-      connected.current = true
-      ownsAttempt.current = false
-      onConnected?.()
-    }
-  }, [status.status, begin.isSuccess, onConnected])
-
   const active = status.status === 'starting' || status.status === 'waiting'
-  const error = begin.error !== null || cancel.error !== null || signOut.error !== null || status.status === 'error'
+  const error = snapshot.context.failure !== null || status.status === 'error'
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3">
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         {!props.signedIn ? (
-          <Button disabled={begin.isPending || active} onClick={() => begin.mutate()} size="sm" type="button">
+          <Button disabled={starting || active} onClick={() => send({ type: 'begin' })} size="sm" type="button">
             {active ? 'Waiting for GitHub…' : status.status === 'error' ? 'Try sign-in again' : 'Sign in with GitHub'}
           </Button>
         ) : (
-          <Button disabled={signOut.isPending} onClick={() => signOut.mutate()} size="sm" type="button" variant="outline">
-            {signOut.isPending ? 'Disconnecting…' : 'Disconnect GitHub'}
+          <Button disabled={snapshot.matches('disconnecting')} onClick={() => send({ type: 'signOut' })} size="sm" type="button" variant="outline">
+            {snapshot.matches('disconnecting') ? 'Disconnecting…' : 'Disconnect GitHub'}
           </Button>
         )}
         {active ? (
-          <Button disabled={cancel.isPending} onClick={() => cancel.mutate()} size="sm" type="button" variant="outline">
+          <Button disabled={snapshot.matches('cancelling')} onClick={() => send({ type: 'cancel' })} size="sm" type="button" variant="outline">
             Cancel sign-in
           </Button>
         ) : null}
@@ -147,11 +131,11 @@ export const CopilotSignIn = (props: {
           {status.message}
         </p>
       )}
-      {begin.isError || cancel.isError || signOut.isError ? (
+      {snapshot.context.failure === null ? null : (
         <p className="dshx:text-xs dshx:text-destructive" role="alert">
           Could not update GitHub Copilot sign-in. Try again.
         </p>
-      ) : null}
+      )}
       {statusQuery.isError ? (
         <p className="dshx:text-xs dshx:text-muted-foreground" role="status">
           Sign-in status will refresh when the Host is available.

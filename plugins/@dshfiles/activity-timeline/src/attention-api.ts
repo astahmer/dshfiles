@@ -1,5 +1,5 @@
 /**
- * The attention contract: the one inbox every "needs you" signal goes through (plan `plans/ade-ux` §4.8).
+ * The attention contract: the one inbox every "needs you" signal goes through (plan `docs/ade-ux` §4.8).
  *
  * Providers (agent-questions, thread-sidebar, …) depend on this module and publish items from their Host halves with
  * `createHostApiClient(ctx, attentionApi, packageId)` / `HostApis.client(attentionApi)`. They resolve an item when its
@@ -47,9 +47,13 @@ export const ATTENTION_PROVIDER_VERBS = ['Answer', 'Approve', 'Land', 'Retry', '
 export const attentionProviderVerbSchema = Schema.Literals(ATTENTION_PROVIDER_VERBS)
 export type AttentionProviderVerb = typeof attentionProviderVerbSchema.Type
 
+export const ATTENTION_SUBJECT_KINDS = ['session', 'backlog-item', 'host', 'workspace', 'revision', 'url'] as const
+export const attentionSubjectKindSchema = Schema.Literals(ATTENTION_SUBJECT_KINDS)
+export type AttentionSubjectKind = typeof attentionSubjectKindSchema.Type
+
 /** What an item is about, in a form the inbox can link with a native reference. */
 export const attentionSubjectSchema = Schema.Struct({
-  kind: Schema.Literals(['session', 'backlog-item', 'host', 'workspace', 'revision', 'url']),
+  kind: attentionSubjectKindSchema,
   id: text(1, 512),
   /** A human label when the provider knows one; the inbox resolves session titles itself. */
   label: Schema.optionalKey(text(1, 200)),
@@ -182,7 +186,7 @@ export const attentionApi = defineApi({
       }),
       output: attentionListSchema,
       description:
-        'List inbox items that need the user: one view at a time plus the count of every view and the muted sources. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.',
+        'List inbox items that need the user: one view at a time plus the count of every view and the muted sources. An item published about a subagent Session lists as its parent thread, the one the user acts on. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.',
       tool: { name: 'attention_list', readOnly: true, render: compactJson },
     }),
     publish: method({

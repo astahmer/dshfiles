@@ -175,6 +175,115 @@ describe('editor store change coalescing', () => {
     store.dispose()
   })
 
+  it('discards a stat that resolves after its document was closed and reopened', async () => {
+    let tooLarge = true
+    let body = 'fresh'
+    let releaseStat: (() => void) | undefined
+    const feed = changeFeed()
+    const store = createEditorStore({
+      // SAFETY: the fake serves exactly the readBytes/stat/changes calls the store makes.
+      remote: {
+        workspaceFiles: {
+          readBytes: async (_sessionId: SessionId, path: string) => {
+            if (tooLarge) return { ok: false as const, error: { code: 'workspace-file/too-large', message: 'too large' } }
+            return { ok: true as const, value: { absolutePath: `/real/w/${path}`, version: 'v2', bytes: body.length, offset: 0, data: text(body), eof: true } }
+          },
+          stat: async (_sessionId: SessionId, path: string) => {
+            await new Promise<void>(resolve => (releaseStat = resolve))
+            return { ok: true as const, value: { absolutePath: `/real/w/${path}`, version: 'v2', bytes: 9 } }
+          },
+          changes: feed.changes,
+        },
+      } as never,
+      workspaceRoot: () => '/real/w',
+    })
+    store.open(session, { path: 'src/a.ts' })
+    await vi.waitFor(() => expect(releaseStat).toBeDefined())
+
+    const opened = store.getSnapshot().documents[0]
+    if (opened === undefined) throw new Error('fixture')
+    store.close(opened.id)
+    tooLarge = false
+    store.open(session, { path: 'src/a.ts' })
+    await vi.waitFor(() => expect(store.getSnapshot().documents[0]?.text).toBe('fresh'))
+
+    releaseStat?.()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(store.getSnapshot().documents[0]).toMatchObject({ content: { kind: 'text' }, text: 'fresh', status: 'ready' })
+    store.dispose()
+  })
+
+  it('keeps the newest reload when an earlier one resolves last', async () => {
+    let body = 'one'
+    let gateNextRead = false
+    let releaseRead: (() => void) | undefined
+    const feed = changeFeed()
+    const store = createEditorStore({
+      // SAFETY: as above.
+      remote: {
+        workspaceFiles: {
+          readBytes: async (_sessionId: SessionId, path: string) => {
+            const value = { absolutePath: `/real/w/${path}`, version: body, bytes: body.length, offset: 0, data: text(body), eof: true }
+            if (gateNextRead) {
+              gateNextRead = false
+              await new Promise<void>(resolve => (releaseRead = resolve))
+            }
+            return { ok: true as const, value }
+          },
+          changes: feed.changes,
+        },
+      } as never,
+      workspaceRoot: () => '/real/w',
+    })
+    store.open(session, { path: 'src/a.ts' })
+    await loaded(store)
+    const opened = store.getSnapshot().documents[0]
+    if (opened === undefined) throw new Error('fixture')
+
+    body = 'two'
+    gateNextRead = true
+    void store.reload(opened.id)
+    await vi.waitFor(() => expect(releaseRead).toBeDefined())
+
+    body = 'three'
+    void store.reload(opened.id)
+    await vi.waitFor(() => expect(store.getSnapshot().documents[0]?.text).toBe('three'))
+
+    releaseRead?.()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(store.getSnapshot().documents[0]?.text).toBe('three')
+    store.dispose()
+  })
+
+  it('clears the buffer it can no longer show when a reload fails', async () => {
+    let failing = false
+    const feed = changeFeed()
+    const store = createEditorStore({
+      // SAFETY: as above.
+      remote: {
+        workspaceFiles: {
+          readBytes: async (_sessionId: SessionId, path: string) =>
+            failing
+              ? { ok: false as const, error: { code: 'workspace-file/outside-workspace', message: 'gone' } }
+              : { ok: true as const, value: { absolutePath: `/real/w/${path}`, version: 'v1', bytes: 5, offset: 0, data: text('hello'), eof: true } },
+          changes: feed.changes,
+        },
+      } as never,
+      workspaceRoot: () => '/real/w',
+    })
+    store.open(session, { path: 'src/a.ts' })
+    await loaded(store)
+    const opened = store.getSnapshot().documents[0]
+    if (opened === undefined) throw new Error('fixture')
+    expect(opened.text).toBe('hello')
+
+    failing = true
+    void store.reload(opened.id)
+    await vi.waitFor(() => expect(store.getSnapshot().documents[0]?.status).toBe('error'))
+    expect(store.getSnapshot().documents[0]).toMatchObject({ text: '', sha256: null, dirty: false, diskChanged: false })
+    store.dispose()
+  })
+
   it('discards a read that resolves after its document was reopened', async () => {
     let body = 'stale'
     const reads: string[] = []

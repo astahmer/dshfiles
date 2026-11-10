@@ -92,6 +92,12 @@
           "id": "usage.cost-catalog",
           "file": "plugins/@dshfiles/usage/src/cost.test.ts",
           "testName": "prices routes from the AI Accounts catalog file and re-prices when the catalog changes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.store-opens-on-first-read",
+          "file": "plugins/@dshfiles/usage/src/store-lazy.test.ts",
+          "testName": "opens the SQLite file on the first read, not when the plugin activates"
         }
       ],
       "telemetry": [
@@ -416,7 +422,7 @@
     {
       "id": "usage-quota-tab",
       "title": "Usage › Quota: account quota, history and forecast in the Usage page",
-      "summary": "Observe › Usage has four tabs, Cost · Quota · Requests · Tools (plans/ade-ux §6). Quota hosts ai-accounts' views through the `@dshfiles/ai-accounts/quota-views` contract: Accounts (one account's current limits and its recorded requests and cost), History (quota snapshots, pace, banked resets) and Forecast (forecast, pace, table, coverage, hand-off). Usage provides `UsageNavigation`, so the quota status item, the account Usage tab, saved tabs of the former Usage history and Quota forecast pages and the palette rows (by their old names too) land on the right view and account. Without ai-accounts the tab says to turn it on.",
+      "summary": "Observe › Usage has four tabs, Cost · Quota · Requests · Tools (docs/ade-ux §6). Quota hosts ai-accounts' views through the `@dshfiles/ai-accounts/quota-views` contract: Accounts (one account's current limits and its recorded requests and cost), History (quota snapshots, pace, banked resets) and Forecast (forecast, pace, table, coverage, hand-off). Usage provides `UsageNavigation`, so the quota status item, the account Usage tab, saved tabs of the former Usage history and Quota forecast pages and the palette rows (by their old names too) land on the right view and account. Without ai-accounts the tab says to turn it on.",
       "reach": ["click tab \"Observe\"", "click button \"Usage\"", "click tab \"Quota\"", "click radio \"Forecast\"", "expect radio \"Accounts\""],
       "surfaces": ["client"],
       "surface": "destinationSection",

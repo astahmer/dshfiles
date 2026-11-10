@@ -67,4 +67,36 @@ describe('RemoteModelDirectory status', () => {
     await remote.load()
     expect(remote.store.getSnapshot()).toMatchObject({ status: 'error', error: 'remote catalog unavailable' })
   })
+
+  it('answers a reload right after a successful load from the catalog it has, and retries after a failure', async () => {
+    let fetches = 0
+    let fails = true
+    const { remote } = fixture(async () => {
+      fetches += 1
+      if (fails) throw new Error('unreachable')
+      return catalog
+    })
+    await remote.load()
+    expect(remote.store.getSnapshot().status).toBe('error')
+    fails = false
+    await remote.load()
+    await remote.load()
+    expect(fetches).toBe(2)
+    expect(remote.store.getSnapshot()).toMatchObject({ status: 'ready', routable: true })
+  })
+
+  it('serves pickers that load the same Session at once from one catalog read', async () => {
+    let fetches = 0
+    const pending = deferredCatalog()
+    const { remote } = fixture(() => {
+      fetches += 1
+      return pending.fetchCatalog()
+    })
+    const first = remote.load()
+    const second = remote.load()
+    pending.settle()
+    await Promise.all([first, second])
+    expect(fetches).toBe(1)
+    expect(remote.store.getSnapshot()).toMatchObject({ status: 'ready', routable: true })
+  })
 })

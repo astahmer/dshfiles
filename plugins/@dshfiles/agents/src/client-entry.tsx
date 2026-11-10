@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -14,8 +15,10 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
 import { AgentFocusModel } from './agent-focus.js'
 import { AgentInlineReference } from './agent-inline-reference.js'
+import { AgentMentionChip } from './agent-mention-chip.js'
 import { AgentMentions } from './agent-mentions.js'
 import { AgentReference } from './agent-reference.js'
+import { agentUserTextRule } from './agent-user-text.js'
 import { AgentReferenceDecorations, AgentReferencePreview } from './agent-reference-preview.jsx'
 import { AgentsPanel, type AgentsPanelProps } from './agents-panel.js'
 import { agentsApi } from './api.js'
@@ -37,9 +40,13 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 
 export default defineClient({
   name: '@dshfiles/agents',
-  inject: ['slots', 'layout', 'sessions', 'remote', 'remote.session', 'uiWorkspace', 'workspaces'],
+  inject: ['slots', 'layout', 'sessions', 'remote', 'remote.session', 'uiWorkspace', 'workspaces', 'uiConversation'],
   setup(ctx, decorate, metadata) {
     metadata?.plugin?.add(InlineReferences, AgentInlineReference.reference)
+    ctx.effect(() => ctx.uiConversation.userText.register(agentUserTextRule), 'agents: sent mentions render as chips')
+    ctx.slots.inject('conversation.user.text.node', () =>
+      ctx.slots.register({ name: 'conversation.user.text.node', key: 'agent', priority: 100 }, AgentMentionChip),
+    )
     const api = createApiClient(ctx, agentsApi)
 
     const startThread = async (request: AgentDispatchRequest): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> => {

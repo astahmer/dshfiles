@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { LoaderCircleIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import type { MessageImageGallery } from '@dshfiles/chat/message-images'
@@ -76,8 +76,10 @@ function useNearViewport(enabled: boolean): [(element: HTMLElement | null) => vo
   return [setElement, near]
 }
 
-function MessageImage({
+const MessageImage = memo(function MessageImage({
   image,
+  imageKey,
+  index,
   load,
   queue,
   variant,
@@ -86,12 +88,16 @@ function MessageImage({
   onPreview,
 }: {
   image: MessageImageSource
+  /** Stable gallery key of this image, handed back with its loaded URL. */
+  imageKey: string
+  /** Position of this image inside the whole preview group. */
+  index: number
   load: MessageImageLoader
   queue: ImageLoadQueue
   variant: ImageVariant
   labels: ImageLabels
-  onLoaded: (url: string) => void
-  onPreview: () => void
+  onLoaded: (key: string, url: string) => void
+  onPreview: (index: number) => void
 }) {
   const attachment = 'attachment' in image ? image.attachment : undefined
   const preview = 'preview' in image ? image.preview : undefined
@@ -121,7 +127,7 @@ function MessageImage({
       .then(url => {
         if (!live) return
         setLoaded(url)
-        onLoadedRef.current(url)
+        onLoadedRef.current(imageKey, url)
       })
       .catch(() => {
         if (live) setError(true)
@@ -130,7 +136,7 @@ function MessageImage({
       live = false
       scheduled.cancel()
     }
-  }, [attachment, load, queue, attempt, near])
+  }, [attachment, load, queue, attempt, near, imageKey])
 
   const src = preview?.url ?? loaded
   const label = sourceLabel(image, labels.image)
@@ -160,7 +166,7 @@ function MessageImage({
       aria-label={loadingThumbnail ? labels.loading : labels.openNamed(label)}
       aria-busy={loadingThumbnail || undefined}
       onClick={() => {
-        if (src !== null) onPreview()
+        if (src !== null) onPreview(index)
       }}
     >
       {src === null ? (
@@ -172,7 +178,7 @@ function MessageImage({
       )}
     </button>
   )
-}
+})
 
 export function ImageGallery({
   images,
@@ -245,20 +251,19 @@ export function ImageGallery({
       <div className={`${styles.gallery} dshx-root`} data-align={align}>
         {images.map((image, index) => {
           const groupIndex = groupOffset + index
+          const key = sourceKey(image, groupIndex)
           return (
             <MessageImage
-              key={sourceKey(image, groupIndex)}
+              key={key}
               image={image}
+              imageKey={key}
+              index={groupIndex}
               load={load}
               queue={queue}
               variant={variant}
               labels={labels}
-              onLoaded={url => {
-                recordLoaded(sourceKey(image, groupIndex), url)
-              }}
-              onPreview={() => {
-                setPreviewIndex(groupIndex)
-              }}
+              onLoaded={recordLoaded}
+              onPreview={setPreviewIndex}
             />
           )
         })}

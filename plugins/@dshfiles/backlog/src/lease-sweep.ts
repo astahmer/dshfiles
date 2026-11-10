@@ -1,4 +1,4 @@
-import { DshxPlugin } from '@dshfiles/dshx/effect'
+import { DshxPlugin, type EffectApiClient } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { threadActionsApi } from '@dshfiles/thread-sidebar/thread-actions-api'
 import { Cause, Clock, Effect, Layer, Option, Schedule } from 'effect'
@@ -24,6 +24,38 @@ const endings = (input: {
   })
 
 const sessionOf = (holder: string): string => holder.replace(/^agent:/u, '')
+
+type ThreadActionsClient = Pick<EffectApiClient<typeof threadActionsApi.methods>, 'list' | 'status'>
+
+/**
+ * Looks up one claim holder's thread with the point `status` call. A Host still running a thread-sidebar from before
+ * `status` answers through the listing search instead. A failed lookup keeps the claim.
+ */
+const holderLookup =
+  (input: { readonly threadActions: ThreadActionsClient; readonly hasStatus: boolean }) =>
+  (sessionId: string): Effect.Effect<readonly [string, HolderThread]> => {
+    const thread = input.hasStatus
+      ? input.threadActions.status({ sessionIds: [sessionId] }).pipe(
+          Effect.map((result): HolderThread => {
+            const row = result.threads.find(candidate => candidate.sessionId === sessionId)
+            if (row === undefined || !row.exists) return 'gone'
+            if (row.archived) return 'archived'
+            return row.settled ? 'settled' : 'live'
+          }),
+        )
+      : input.threadActions.list({ query: sessionId, includeArchived: true, limit: 10 }).pipe(
+          Effect.map((result): HolderThread => {
+            const row = result.threads.find(candidate => candidate.sessionId === sessionId)
+            if (row === undefined) return 'gone'
+            if (row.archived) return 'archived'
+            return row.settled ? 'settled' : 'live'
+          }),
+        )
+    return thread.pipe(
+      Effect.option,
+      Effect.map(found => [sessionId, Option.getOrElse(found, (): HolderThread => 'live')] as const),
+    )
+  }
 
 /**
  * One sweep: every live claim's thread is looked up (when `lookup` can answer), and each claim that lapsed or lost its
@@ -55,21 +87,11 @@ export const LeaseSweep = Layer.effectDiscard(
     const hostApis = yield* HostApis
     const threadActions = hostApis.client(threadActionsApi)
 
-    const holderThread = (sessionId: string) =>
-      threadActions.list({ query: sessionId, includeArchived: true, limit: 10 }).pipe(
-        Effect.map((result): HolderThread => {
-          const row = result.threads.find(thread => thread.sessionId === sessionId)
-          if (row === undefined) return 'gone'
-          if (row.archived) return 'archived'
-          return row.settled ? 'settled' : 'live'
-        }),
-        Effect.option,
-        Effect.map(found => [sessionId, Option.getOrElse(found, (): HolderThread => 'live')] as const),
-      )
-
     const sweep = Effect.gen(function* () {
-      const served = yield* hostApis.isServed(threadActionsApi)
-      return yield* sweepOnce({ store, lookup: served ? Option.some(holderThread) : Option.none() })
+      const served = (yield* hostApis.list).find(api => api.owner === threadActionsApi.owner && api.id === threadActionsApi.id)
+      if (served === undefined) return yield* sweepOnce({ store, lookup: Option.none() })
+      const hasStatus = served.methods.some(method => method.name === 'status')
+      return yield* sweepOnce({ store, lookup: Option.some(holderLookup({ threadActions, hasStatus })) })
     })
 
     const tick = sweep.pipe(
@@ -82,4 +104,5 @@ export const LeaseSweep = Layer.effectDiscard(
 export class LeaseEndings {
   static readonly endings = endings
   static readonly sweepOnce = sweepOnce
+  static readonly holderLookup = holderLookup
 }

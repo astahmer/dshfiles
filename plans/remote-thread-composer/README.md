@@ -8,7 +8,7 @@ the usual thread composer") is the symptom.
 
 Investigation, the three product models, and why the composer cannot simply be
 reused: [remote-thread-architecture.md](../../plugins/@dshfiles/multi-host/docs/remote-thread-architecture.md).
-Research notes: [docs/research/remote-thread-composer](../../docs/research/remote-thread-composer/).
+Research notes: [multi-host research](../../plugins/@dshfiles/multi-host/docs/research/remote-thread-composer/).
 
 ## Decision (2026-10-21)
 

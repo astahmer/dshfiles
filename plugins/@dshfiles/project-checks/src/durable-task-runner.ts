@@ -200,11 +200,8 @@ export class DurableTasks extends Context.Service<
       })
 
       const list = Effect.fn('project-checks tasks list')(function* (sessionId: string) {
-        const tasks = yield* store.all
-        return tasks
-          .filter(task => task.sessionId === sessionId)
-          .toSorted((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id))
-          .slice(0, MAX_LISTED_TASKS)
+        const tasks = yield* store.listForSession({ sessionId, limit: MAX_LISTED_TASKS })
+        return tasks.toSorted((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id))
       })
 
       const cancel = Effect.fn('project-checks task cancel')(function* (taskId: string) {
@@ -223,7 +220,7 @@ export class DurableTasks extends Context.Service<
             const validation = yield* handler.validate(current.value)
             if (!validation.runnable) return yield* new HandlerUnavailable({ taskId: input.taskId })
             const status = current.value.status
-            if (status !== 'unknown' && status !== 'failed' && status !== 'timed-out' && status !== 'cancelled') return yield* new RetryNotAllowed({ status })
+            if (!DurableTaskModel.canRetry(status)) return yield* new RetryNotAllowed({ status })
             const task = yield* updateNow(input.taskId, DurableTaskModel.retry)
             yield* launch(input.taskId)
             return task

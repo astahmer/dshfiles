@@ -21,14 +21,13 @@ import type { TracesLocaleKey, TracesTranslate } from './locales.js'
 import { LogRow, type LogCorrelation } from './log-list.js'
 import { tracesQueries } from './queries.js'
 import { EmptyStoreGuide, receiverEndpoint } from './receiver-status.js'
+import { SessionReadingModel, TURN_TRACE_RETRY_MS, type SessionReading } from './session-reading.js'
 import { SessionTimelineModel } from './session-timeline.js'
 import { TraceDetailView } from './trace-detail.js'
 import { TraceList } from './trace-list.js'
 import type { SessionSummary, TraceDetail } from './types.js'
 
 const countFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
-const TURN_TRACE_RETRY_MS = 1_500
-const TURN_TRACE_WAIT_MS = 20_000
 /** The newest traces the turn timeline draws; older turns stay one click away in the list below it. */
 const TIMELINE_TRACES = 20
 const TIMELINE_STALE_MS = 30_000
@@ -125,10 +124,8 @@ export const SessionTracesView = (
   const t = props.t
   const client = useApi(tracesApi)
   const [section, setSection] = useState<Section>('turns')
-  const [traceId, setTraceId] = useState<string | null>(null)
+  const [reading, setReading] = useState<SessionReading>(SessionReadingModel.idle())
   const [correlation, setCorrelation] = useState<LogCorrelation | null>(null)
-  const [turnFocus, setTurnFocus] = useState<{ readonly turn: number; readonly since: number } | null>(null)
-  const [missingTurn, setMissingTurn] = useState<number | null>(null)
   const { viewRequest, completeViewRequest, openView, sessionId } = props
 
   // A Turn footer's Trace button addresses this tab with one of the thread's turns.
@@ -138,9 +135,7 @@ export const SessionTracesView = (
     const focus = ThreadLinks.decodeFocus(viewRequest.focus)
     if (focus === null) return
     setSection('turns')
-    setMissingTurn(null)
-    setTraceId(null)
-    setTurnFocus({ turn: focus.turn, since: Date.now() })
+    setReading(SessionReadingModel.seek({ turn: focus.turn, now: Date.now() }))
   }, [viewRequest, completeViewRequest])
 
   // A panel that opened this thread for Chat while it reopened on this tab: hand the focus on to Chat.
@@ -151,23 +146,21 @@ export const SessionTracesView = (
   }, [sessionId, openView])
 
   // A just-finished turn is exported a moment later, so the lookup retries for a while before saying it has no trace.
+  const seekingTurn = SessionReadingModel.seekingTurn(reading)
   const turnQuery = useQuery({
-    ...tracesQueries.turnTrace(client, { sessionId, turn: turnFocus?.turn ?? 0 }),
-    enabled: turnFocus !== null,
+    ...tracesQueries.turnTrace(client, { sessionId, turn: seekingTurn ?? 0 }),
+    enabled: seekingTurn !== null,
     refetchInterval: TURN_TRACE_RETRY_MS,
   })
   useEffect(() => {
-    if (turnFocus === null || turnQuery.isFetching || turnQuery.isPending) return
-    const found = turnQuery.data?.traces[0]
-    if (found !== undefined) {
-      setTurnFocus(null)
-      setTraceId(found.traceId)
-      return
-    }
-    if (!turnQuery.isError && Date.now() - turnFocus.since < TURN_TRACE_WAIT_MS) return
-    setTurnFocus(null)
-    setMissingTurn(turnFocus.turn)
-  }, [turnFocus, turnQuery.isFetching, turnQuery.isPending, turnQuery.isError, turnQuery.data, turnQuery.dataUpdatedAt])
+    if (seekingTurn === null || turnQuery.isFetching || turnQuery.isPending) return
+    setReading(current =>
+      SessionReadingModel.settle({ reading: current, foundTraceId: turnQuery.data?.traces[0]?.traceId ?? null, failed: turnQuery.isError, now: Date.now() }),
+    )
+  }, [seekingTurn, turnQuery.isFetching, turnQuery.isPending, turnQuery.isError, turnQuery.data, turnQuery.dataUpdatedAt])
+  const traceId = SessionReadingModel.traceId(reading)
+  const pendingTurn = SessionReadingModel.seekingTurn(reading)
+  const missingTurn = SessionReadingModel.missingTurn(reading)
 
   const showInThread: OpenThread = target => {
     if (target.sessionId !== sessionId || openView === undefined) return props.openThread(target)
@@ -206,7 +199,7 @@ export const SessionTracesView = (
   const empty = summary === undefined ? listQuery.isSuccess && traces.length === 0 : summary.traces === 0
   const openTrace = (openedTraceId: string): void => {
     setSection('turns')
-    setTraceId(openedTraceId)
+    setReading(SessionReadingModel.open(openedTraceId))
   }
 
   return (
@@ -250,14 +243,14 @@ export const SessionTracesView = (
                 </Button>
               ) : null}
               {section === 'turns' && traceId !== null ? (
-                <Button variant="ghost" size="sm" onClick={() => setTraceId(null)}>
+                <Button variant="ghost" size="sm" onClick={() => setReading(SessionReadingModel.idle())}>
                   <ArrowLeftIcon /> {t('back')}
                 </Button>
               ) : null}
             </div>
-            {turnFocus === null ? null : (
+            {pendingTurn === null ? null : (
               <p className="dshx:text-sm dshx:text-muted-foreground" data-testid="traces-turn-pending">
-                {t('turnTraceLoading', { turn: turnFocus.turn })}
+                {t('turnTraceLoading', { turn: pendingTurn })}
               </p>
             )}
             {missingTurn === null ? null : (
@@ -283,10 +276,7 @@ export const SessionTracesView = (
                   hasMore={listQuery.hasNextPage}
                   loadingMore={listQuery.isFetchingNextPage}
                   onLoadMore={() => void listQuery.fetchNextPage()}
-                  onOpen={openedTraceId => {
-                    setMissingTurn(null)
-                    setTraceId(openedTraceId)
-                  }}
+                  onOpen={openedTraceId => setReading(SessionReadingModel.open(openedTraceId))}
                   t={t}
                 />
               </>

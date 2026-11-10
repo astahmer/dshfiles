@@ -6,6 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { claudeAccountService, createClaudeAccountService } from './claude-account.js'
 import { CredentialModel } from './credentials.js'
 
+const deferred = () => {
+  let resolve = (): void => undefined
+  const promise = new Promise<void>(done => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
 describe('Claude Code login', () => {
   let configDir: string
   const login = (accessToken: string): void =>
@@ -50,9 +58,15 @@ describe('Claude usage reads', () => {
 
     answers.push(usage)
     const first = await service.readUsage(configDir)
-    await service.readUsage(configDir)
+    now += 30_000
+    const reused = await service.readUsage(configDir)
     expect(first.status).toBe('ok')
     expect(requests).toBe(1)
+    // A refresh answered from the shared reading stays dated when it was really read.
+    expect(first).toMatchObject({ readAt: 1_000_000, nextReadAt: 1_120_000 })
+    expect(reused).toMatchObject({ readAt: 1_000_000, nextReadAt: 1_120_000 })
+    expect(reused.readFailure).toBeUndefined()
+    now -= 30_000
 
     now += 3 * 60_000
     answers.push(new Response('{}', { status: 429, headers: { 'retry-after': '60' } }))
@@ -60,12 +74,55 @@ describe('Claude usage reads', () => {
     now += 30_000
     await service.readUsage(configDir)
     expect(requests).toBe(2)
-    expect(limited).toMatchObject({ status: 'ok', windows: first.windows, message: expect.stringContaining('min ago') })
+    expect(limited).toMatchObject({
+      status: 'ok',
+      windows: first.windows,
+      message: expect.stringContaining('min ago'),
+      readAt: 1_000_000,
+      nextReadAt: 1_000_000 + 3 * 60_000 + 60_000,
+      readFailure: { status: 'rate-limited' },
+    })
 
     now += 31_000
     answers.push(new Response('{}', { status: 500 }))
     await service.readUsage(configDir)
     expect(requests).toBe(3)
+    rmSync(configDir, { recursive: true, force: true })
+  })
+
+  it('keeps a shared usage read alive when the caller that started it cancels', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'claude-usage-'))
+    writeFileSync(
+      join(configDir, '.credentials.json'),
+      JSON.stringify({ claudeAiOauth: { accessToken: 'sk-ant-oat-test', refreshToken: 'r', expiresAt: 9_999_999_999_999 } }),
+    )
+    const usage = new Response(JSON.stringify({ five_hour: { utilization: 31, resets_at: '2026-10-08T15:00:00Z' } }), { status: 200 })
+    const started = deferred()
+    const release = deferred()
+    let requests = 0
+    const service = createClaudeAccountService({
+      readFile,
+      readKeyFromEnv: CredentialModel.readKeyFromEnv,
+      readKeychainSecret: async () => undefined,
+      now: () => 1_000_000,
+      fetch: async (_url, init) => {
+        requests += 1
+        started.resolve()
+        return new Promise<Response>((resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')), { once: true })
+          void release.promise.then(() => resolve(usage))
+        })
+      },
+    })
+    const controller = new AbortController()
+    const cancelled = service.readUsage(configDir, controller.signal)
+    const shared = service.readUsage(configDir)
+    await started.promise
+    controller.abort()
+    release.resolve()
+    expect((await shared).status).toBe('ok')
+    expect((await cancelled).status).toBe('error')
+    expect(requests).toBe(1)
     rmSync(configDir, { recursive: true, force: true })
   })
 })

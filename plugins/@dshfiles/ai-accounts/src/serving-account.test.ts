@@ -7,7 +7,7 @@ import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { successfulAccountSchema } from './serving-account-api.js'
 import { servingAccountSessionForCaller } from './serving-account-host.js'
@@ -15,6 +15,7 @@ import {
   createServingAccountService,
   ServingAccountModel,
   MAX_SERVING_ACCOUNT_SESSIONS,
+  SERVING_ACCOUNT_PRUNE_INTERVAL_MS,
   SERVING_ACCOUNT_RETENTION_MS,
   type ServingAccountService,
 } from './serving-account.js'
@@ -139,6 +140,25 @@ describe('actual serving account ownership', () => {
       }),
     )
     expect(ServingAccountModel.pruneKeys(entries, MAX_SERVING_ACCOUNT_SESSIONS + 3)).toEqual(['chat-2', 'chat-1', 'chat-0'])
+  })
+  it('prunes on open and then at most once per interval, not after every successful step', async () => {
+    let clock = 1000
+    const root = await mkdtemp(join(tmpdir(), 'serving-account-'))
+    roots.push(root)
+    const pruneKeys = vi.spyOn(ServingAccountModel, 'pruneKeys')
+    try {
+      const { service } = await open(root, () => clock)
+      await drain(service, [usage, success])
+      await drain(service, [usage, success])
+      await service.read(route.sessionId)
+      expect(pruneKeys).toHaveBeenCalledTimes(1)
+      clock += SERVING_ACCOUNT_PRUNE_INTERVAL_MS
+      await drain(service, [usage, success])
+      await service.read(route.sessionId)
+      expect(pruneKeys).toHaveBeenCalledTimes(2)
+    } finally {
+      pruneKeys.mockRestore()
+    }
   })
 })
 

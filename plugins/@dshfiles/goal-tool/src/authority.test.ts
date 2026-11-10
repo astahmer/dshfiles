@@ -28,6 +28,24 @@ describe('continued user-question goal authority', () => {
     ).toBe(true)
   })
 
+  it('rejects an empty call id', () => {
+    const emptyCallQuestions = {
+      active: [],
+      settled: [{ callId: ToolCallId(''), answers: [{ id: 'resume', selected: ['Resume'] }] }],
+    } satisfies UserQuestionProjectionView
+
+    expect(
+      isAcceptedQuestionReply(
+        {
+          kind: 'user-question-reply',
+          callId: '',
+          outcome: 'answered',
+        },
+        emptyCallQuestions,
+      ),
+    ).toBe(false)
+  })
+
   it('rejects a reply without the answered outcome', () => {
     expect(
       isAcceptedQuestionReply(

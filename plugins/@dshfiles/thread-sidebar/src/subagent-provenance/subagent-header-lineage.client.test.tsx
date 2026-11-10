@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { SessionListState, SessionSnapshot, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
@@ -166,7 +166,41 @@ describe('SubagentHeaderLineage route provenance', () => {
     expect(within(inactiveRow).queryByRole('status')).toBeNull()
   })
 
-  it('opens a catalog whose rows show a duration without an ambient tooltip provider', () => {
+  it('hovers the catalog open and closed with its delays, and a click pins it open', () => {
+    vi.useFakeTimers()
+    try {
+      render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(sessionList)} />)
+      const trigger = screen.getByRole('button', { name: /subagent/ })
+
+      fireEvent.mouseOver(trigger)
+      expect(trigger.getAttribute('aria-expanded')).toBe('false')
+      act(() => {
+        vi.advanceTimersByTime(150)
+      })
+      expect(trigger.getAttribute('aria-expanded')).toBe('true')
+
+      fireEvent.mouseOut(trigger, { relatedTarget: document.body })
+      act(() => {
+        vi.advanceTimersByTime(120)
+      })
+      expect(trigger.getAttribute('aria-expanded')).toBe('false')
+
+      fireEvent.click(trigger)
+      expect(trigger.getAttribute('aria-expanded')).toBe('true')
+      fireEvent.mouseOut(trigger, { relatedTarget: document.body })
+      act(() => {
+        vi.advanceTimersByTime(500)
+      })
+      expect(trigger.getAttribute('aria-expanded')).toBe('true')
+
+      fireEvent.pointerDown(document.body)
+      expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('opens the catalog whose rows show a duration without an ambient tooltip provider', () => {
     const timed: SessionListState = {
       ...sessionList,
       byId: { [CHILD]: { ...childSummary, projectionValues: { ...childSummary.projectionValues, subagentTiming: { settledMs: 65_000 } } } },

@@ -173,7 +173,15 @@ export class Receiver extends Context.Service<
         lastReceivedAt: null,
       })
       const server = yield* FiberHandle.make()
-      const setStatus = (patch: Partial<ListenStatus>) => SubscriptionRef.update(listenStatus, current => ({ ...current, ...patch }))
+      const publish = (next: ListenStatus) => SubscriptionRef.set(listenStatus, next)
+      const baseStatus = (config: ListenConfig): ListenStatus => ({
+        state: 'disabled',
+        address: config.host,
+        configuredPort: config.port,
+        boundPort: null,
+        message: null,
+        startedAt: null,
+      })
       const rejected = Ref.update(counters, current => ({ ...current, rejectedRequests: current.rejectedRequests + 1 }))
 
       const store = Effect.fnUntraced(function* (input: {
@@ -252,26 +260,27 @@ export class Receiver extends Context.Service<
               close,
             )
             const address = bound.address()
-            yield* setStatus({
+            yield* publish({
+              ...baseStatus(config),
               state: 'listening',
               boundPort: typeof address === 'object' && address !== null ? address.port : config.port,
               startedAt: yield* Clock.currentTimeMillis,
-              message: null,
             })
             return yield* Effect.never
           }),
         )
 
       const serve = Effect.fnUntraced(function* (config: ListenConfig) {
-        const listening = { address: config.host, configuredPort: config.port, boundPort: null }
-        if (!config.enabled) return yield* setStatus({ ...listening, state: 'disabled', message: null })
+        if (!config.enabled) return yield* publish(baseStatus(config))
         if (!isLoopbackHost(config.host) && !config.allowNonLoopback)
-          return yield* setStatus({ ...listening, state: 'failed', message: new NonLoopbackRefused({ host: config.host }).message })
-        yield* setStatus({ ...listening, state: 'starting', message: null })
+          return yield* publish({ ...baseStatus(config), state: 'failed', message: new NonLoopbackRefused({ host: config.host }).message })
+        yield* publish({ ...baseStatus(config), state: 'starting' })
         yield* bind(config).pipe(
-          Effect.tapError(error => (error._tag === 'PortInUse' ? setStatus({ state: 'port-in-use', message: error.message }) : Effect.void)),
+          Effect.tapError(error =>
+            error._tag === 'PortInUse' ? publish({ ...baseStatus(config), state: 'port-in-use', message: error.message }) : Effect.void,
+          ),
           Effect.retry({ while: error => error._tag === 'PortInUse', schedule: Schedule.spaced(Duration.seconds(PORT_RETRY_SECONDS)) }),
-          Effect.catch(error => setStatus({ state: 'failed', message: error.message })),
+          Effect.catch(error => publish({ ...baseStatus(config), state: 'failed', message: error.message })),
         )
       })
 

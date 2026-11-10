@@ -1,5 +1,5 @@
 /**
- * What the thread panel's **Context** facet shows (plan `plans/ade-ux` §4.4): every source that puts text into a
+ * What the thread panel's **Context** facet shows (plan `docs/ade-ux` §4.4): every source that puts text into a
  * thread's model context, each with an approximate token cost. The facet is read-only; this module turns the owners'
  * existing answers into rows, so the arithmetic and wording are tested without a browser.
  *

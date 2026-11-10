@@ -3,10 +3,11 @@ import * as Schema from 'effect/Schema'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { PromptLibraryMigration, type PromptLibraryLocalStatus, type PromptLibraryMigrationClient } from './library-migration-machine.js'
+import { PromptLibraryMigration, type PromptLibraryMigrationClient } from './library-migration-machine.js'
 import { PromptLibraryQueries } from './library-queries.js'
 import { promptStashApi, promptStashMutationSchema, promptStashStateSchema, type PromptStashMutation, type PromptStashSnapshot } from './library-api.js'
 import { PROMPT_LIBRARY_LOCAL_STORAGE_KEY, PROMPT_LIBRARY_STORAGE_KEY, PromptLibrary, type PromptLibraryStore, type SavedPrompt } from './library.js'
+import { LocalLibraryStore } from './local-library-store.js'
 
 export type PromptLibraryState = 'loading' | 'ready' | 'invalid' | 'unavailable'
 
@@ -39,11 +40,6 @@ export interface PromptLibraryClient {
   readonly now: () => number
 }
 
-interface LocalLibraryStatus {
-  readonly read: PromptLibraryLocalStatus
-  readonly writable: boolean
-}
-
 interface SavePromptVariables {
   readonly prompt: SavedPrompt
   readonly expectedRevision: string | null
@@ -56,83 +52,14 @@ interface RemovePromptVariables {
   readonly signal?: AbortSignal
 }
 
-let localLibraryStatus: LocalLibraryStatus = { read: 'ready', writable: true }
-let localLibrarySerializedFingerprint: string | null = null
-let localLibraryStoreFingerprint: string | null = null
-let importedLegacySerialized: string | null = null
-let importedLegacyStoreFingerprint: string | null = null
-let legacyLibraryUnresolved = false
-const localLibraryStatusListeners = new Set<() => void>()
-
-const setLocalLibraryStatus = (read: PromptLibraryLocalStatus, writable: boolean): void => {
-  if (localLibraryStatus.read === read && localLibraryStatus.writable === writable) return
-  localLibraryStatus = { read, writable }
-  for (const listener of localLibraryStatusListeners) listener()
-}
-
-const subscribeLocalLibraryStatus = (listener: () => void): (() => void) => {
-  localLibraryStatusListeners.add(listener)
-  return () => localLibraryStatusListeners.delete(listener)
-}
-
-const getLocalLibraryStatus = (): LocalLibraryStatus => localLibraryStatus
-
-const useLocalLibraryStatus = (): LocalLibraryStatus => useSyncExternalStore(subscribeLocalLibraryStatus, getLocalLibraryStatus, getLocalLibraryStatus)
-
-const readLegacyLibrary = (storage: Storage): string => {
-  const serialized = storage.getItem(PROMPT_LIBRARY_STORAGE_KEY)
-  const result = PromptLibrary.readStoredWithSource(serialized)
-  if (result.kind === 'library' && serialized !== null) {
-    importedLegacySerialized = serialized
-    importedLegacyStoreFingerprint = JSON.stringify(result.store)
-    localLibraryStoreFingerprint = importedLegacyStoreFingerprint
-    localLibrarySerializedFingerprint = null
-    legacyLibraryUnresolved = false
-    setLocalLibraryStatus('ready', localLibraryStatus.writable)
-    return JSON.stringify(result.store)
-  }
-  importedLegacySerialized = null
-  importedLegacyStoreFingerprint = null
-  localLibrarySerializedFingerprint = null
-  localLibraryStoreFingerprint = null
-  legacyLibraryUnresolved = result.kind === 'invalid'
-  setLocalLibraryStatus(result.kind === 'invalid' ? 'invalid' : 'ready', localLibraryStatus.writable)
-  return result.kind === 'invalid' && serialized !== null ? serialized : JSON.stringify(PromptLibrary.emptyStore())
-}
-
-const readPrimaryLibrary = (storage: Storage, serialized: string): string => {
-  const result = PromptLibrary.readStoredWithSource(serialized)
-  if (result.kind !== 'library') {
-    localLibrarySerializedFingerprint = null
-    localLibraryStoreFingerprint = null
-    legacyLibraryUnresolved = result.kind !== 'legacy-drafts'
-    setLocalLibraryStatus('invalid', localLibraryStatus.writable)
-    return serialized
-  }
-
-  localLibrarySerializedFingerprint = serialized
-  localLibraryStoreFingerprint = JSON.stringify(result.store)
-  const legacySerialized = storage.getItem(PROMPT_LIBRARY_STORAGE_KEY)
-  const legacy = PromptLibrary.readStoredWithSource(legacySerialized)
-  if (legacy.kind === 'library' && legacySerialized !== null) {
-    importedLegacySerialized = legacySerialized
-    importedLegacyStoreFingerprint = JSON.stringify(legacy.store)
-    legacyLibraryUnresolved = importedLegacyStoreFingerprint !== localLibraryStoreFingerprint
-  } else {
-    importedLegacySerialized = null
-    importedLegacyStoreFingerprint = null
-    legacyLibraryUnresolved = legacy.kind === 'invalid'
-  }
-  setLocalLibraryStatus('ready', localLibraryStatus.writable)
-  return JSON.stringify(result.store)
-}
+const localLibraryStore = new LocalLibraryStore()
 
 const localLibraryStorage = () => {
   let storage: Storage
   try {
     storage = window.localStorage
   } catch {
-    setLocalLibraryStatus('unavailable', false)
+    localLibraryStore.setStatus('unavailable', false)
     return null
   }
 
@@ -141,36 +68,29 @@ const localLibraryStorage = () => {
       try {
         if (key !== PROMPT_LIBRARY_LOCAL_STORAGE_KEY) return storage.getItem(key)
         const serialized = storage.getItem(PROMPT_LIBRARY_LOCAL_STORAGE_KEY)
-        return serialized === null ? readLegacyLibrary(storage) : readPrimaryLibrary(storage, serialized)
+        return serialized === null
+          ? localLibraryStore.readLegacy(storage, PROMPT_LIBRARY_STORAGE_KEY)
+          : localLibraryStore.readPrimary(storage, PROMPT_LIBRARY_STORAGE_KEY, serialized)
       } catch (error) {
-        setLocalLibraryStatus('unavailable', false)
+        localLibraryStore.setStatus('unavailable', false)
         throw error
       }
     },
     setItem: (key: string, value: string) => {
       try {
         storage.setItem(key, value)
-        if (key === PROMPT_LIBRARY_LOCAL_STORAGE_KEY) {
-          localLibrarySerializedFingerprint = value
-          localLibraryStoreFingerprint = value
-          legacyLibraryUnresolved = importedLegacySerialized !== null && importedLegacyStoreFingerprint !== value
-          setLocalLibraryStatus('ready', true)
-        }
+        if (key === PROMPT_LIBRARY_LOCAL_STORAGE_KEY) localLibraryStore.write(value)
       } catch (error) {
-        setLocalLibraryStatus(localLibraryStatus.read, false)
+        localLibraryStore.setStatus(localLibraryStore.getSnapshot().status.read, false)
         throw error
       }
     },
     removeItem: (key: string) => {
       try {
         storage.removeItem(key)
-        if (key === PROMPT_LIBRARY_LOCAL_STORAGE_KEY) {
-          localLibrarySerializedFingerprint = null
-          localLibraryStoreFingerprint = null
-          setLocalLibraryStatus('ready', true)
-        }
+        if (key === PROMPT_LIBRARY_LOCAL_STORAGE_KEY) localLibraryStore.remove()
       } catch (error) {
-        setLocalLibraryStatus(localLibraryStatus.read, false)
+        localLibraryStore.setStatus(localLibraryStore.getSnapshot().status.read, false)
         throw error
       }
     },
@@ -187,40 +107,14 @@ const storedLibrary = createStoredValue({
 const completeLocalLibraryMigration = (expectedStore: PromptLibraryStore): void => {
   let shouldReload = false
   try {
-    const storage = window.localStorage
-    const legacyCleared =
-      importedLegacySerialized !== null &&
-      PromptLibrary.clearStoredIfUnchanged({
-        storage,
-        key: PROMPT_LIBRARY_STORAGE_KEY,
-        serialized: importedLegacySerialized,
-        storeFingerprint: importedLegacyStoreFingerprint,
-        expectedStore,
-      })
-    if (legacyCleared) {
-      shouldReload = true
-      importedLegacySerialized = null
-      importedLegacyStoreFingerprint = null
-      legacyLibraryUnresolved = false
-    }
-
-    if (!legacyLibraryUnresolved && (importedLegacySerialized === null || legacyCleared)) {
-      const localCleared = PromptLibrary.clearStoredIfUnchanged({
-        storage,
-        key: PROMPT_LIBRARY_LOCAL_STORAGE_KEY,
-        serialized: localLibrarySerializedFingerprint,
-        storeFingerprint: localLibraryStoreFingerprint,
-        expectedStore,
-      })
-      if (localCleared) {
-        shouldReload = true
-        localLibrarySerializedFingerprint = null
-        localLibraryStoreFingerprint = null
-      }
-    }
-    setLocalLibraryStatus('ready', true)
+    shouldReload = localLibraryStore.completeMigration({
+      storage: window.localStorage,
+      primaryKey: PROMPT_LIBRARY_LOCAL_STORAGE_KEY,
+      legacyKey: PROMPT_LIBRARY_STORAGE_KEY,
+      expectedStore,
+    })
   } catch {
-    setLocalLibraryStatus('unavailable', false)
+    localLibraryStore.setStatus('unavailable', false)
     shouldReload = true
   }
   if (shouldReload) storedLibrary.reload()
@@ -237,7 +131,7 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
   const api = useApi(promptStashApi)
   const queryClient = useQueryClient()
   const localStore = storedLibrary.useValue()
-  const localStatus = useLocalLibraryStatus()
+  const localStatus = useSyncExternalStore(localLibraryStore.subscribe, localLibraryStore.getSnapshot, localLibraryStore.getSnapshot).status
   const query = useQuery({
     queryKey: PromptLibraryQueries.key,
     queryFn: async ({ signal }) =>

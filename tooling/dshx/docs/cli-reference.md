@@ -51,10 +51,12 @@ Each finding names `file:line`, the rule and a `fix`. `--json` prints `{ schemaV
 ## `dshx build`
 
 ```bash
-dshx build [--cwd <project>] [--verbose]
+dshx build [--cwd <project>] [--no-typecheck] [--verbose]
 ```
 
 Build runs the offline manifest, migration, compatibility, and TypeScript checks before compiling. It builds enabled Host and Client faces through the bounded Vite kernel, emits declarations by default, and verifies the artifact shape. Its only writes are build outputs.
+
+The TypeScript check runs in its own compiler process beside the bundler and reuses incremental state under the project's `node_modules/.cache/dshx/typecheck/`, so a rebuild re-reads only what changed; deleting that directory forces a full run. `--no-typecheck` skips the check (the bundler already rejects syntax errors, and `dshx check` still typechecks), which suits a pipeline whose own `typecheck` task runs the compiler once for the whole change.
 
 Every face writes into a hidden sibling staging directory (`.dist.dshx-<pid>-<id>/`). Only when all faces succeed does the build replace `dist/` with it, by renaming the old directory away and the staged one in. A running Host that polls bundles therefore sees one complete change per plugin, and a file the build no longer produces (a renamed module, a disabled face, a sourcemap or declaration turned off) leaves with the old directory. A failed build keeps the last good `dist/`. Anything else written into `dist/` is replaced too, so keep other generators' output elsewhere. `dshx dev` watchers still write in place.
 
@@ -82,7 +84,7 @@ dshx dev down [--dry-run] [--json]
 dshx scratch sweep [--dry-run] [--json]
 ```
 
-These drive a disposable DSH from this checkout (they need the dshfiles repository and Node from `.node-version`). `up` builds the owned bundles under test, installs a scratch profile in a temp `DSH_HOME`, seeds a jj project with a `main` bookmark (or registers `--project`) in the scratch workspace storage, starts `dsh` on a free port and a headless Chromium, and records pids and paths in `$TMPDIR/dshx-dev/<name>/state.json` (mode 600; it is the only place the tokenized launch URL is written). `open` walks a feature's `reach` steps from its `dshx.features.json` catalog in that browser; `shot` saves a screenshot and a grouped console/network error summary; `down` stops the recorded process groups only while their command lines still match, deletes the scratch home and state, and keeps the evidence directory. `up` also starts a detached watchdog (recorded in the state, stopped by `down`) that runs `down` in two phases once the instance went `--idle-timeout` minutes (default 30, `0` = never) without a `dshx dev` command — each one renews the lease, which is the state file's mtime: it first enters a warning phase for `--warn-minutes` (default 10, `0` = stop at once, as before), recording `warnedAt` in the state and one line in `<state-dir>/watchdog.log`, and stops the instance only when that grace ends with no keep. During the grace the instance keeps running. Any `dshx dev` command that reaches it — `doctor`, `open`, `shot`, `keep`, or `up` for that name — answers the warning and renews the lease; `dshx dev keep [--name <name>] [--forever]` does it on purpose, and `--forever` pins the instance (`idleTimeoutMinutes` 0, `kept` in the state) so no idle stop ever runs until `down`. `doctor` prints the lease, the pending or answered warning with its remaining grace, and the keep command. Before starting, `up` runs `down` on every instance under the state root (`DSHX_DEV_STATE_ROOT`, default `$TMPDIR/dshx-dev`) whose lease and grace expired or whose `dsh` exited, and lists the ones waiting in their warning grace so they can be kept. Total lifetime without a command is idle + grace (40 min by default). `--name` runs several side by side; every action has `--help`, and failures print a `fix` (`error.hint` with `--json`).
+These drive a disposable DSH from this checkout (they need the dshfiles repository and Node from `.node-version`). `up` builds the owned bundles under test, installs a scratch profile in a temp `DSH_HOME`, seeds a jj project with a `main` bookmark (or registers `--project`) in the scratch workspace storage, starts `dsh` on a free port and a headless Chromium, and records pids and paths in `$TMPDIR/dshx-dev/<name>/state.json` (mode 600; it is the only place the tokenized launch URL is written). `open` walks a feature's `reach` steps from its `dshx.features.json` catalog in that browser; `shot` saves a screenshot and a grouped console/network error summary; `down` stops the recorded process groups only while their command lines still match, deletes the scratch home and state, and keeps the evidence directory. `up` also starts a detached watchdog (recorded in the state, stopped by `down`) that runs `down` in two phases once the instance went `--idle-timeout` minutes (default 30, `0` = never) without a `dshx dev` command — each one renews the lease, which is the state file's mtime: it first enters a warning phase for `--warn-minutes` (default 10, `0` = stop at once, as before), recording `warnedAt` in the state and one line in `<state-dir>/watchdog.log`, and stops the instance only when that grace ends with no keep. During the grace the instance keeps running. Any `dshx dev` command that reaches it — `doctor`, `open`, `shot`, `keep`, or `up` for that name — answers the warning and renews the lease; `dshx dev keep [--name <name>] [--forever]` does it on purpose, and `--forever` pins the instance (`idleTimeoutMinutes` 0, `kept` in the state) so no idle stop ever runs until `down`. `doctor` prints the lease, the pending or answered warning with its remaining grace, and the keep command. Its plugin check demands an active entry only for a bundle that owns a Loader row: a bundle the seed composes from inside another row (an agent-preset child such as `@dshfiles/tool-ask-user`) never appears in the Host's plugin list, so it is named as composed by a preset row instead of failing the check. Before starting, `up` runs `down` on every instance under the state root (`DSHX_DEV_STATE_ROOT`, default `$TMPDIR/dshx-dev`) whose lease and grace expired or whose `dsh` exited, and lists the ones waiting in their warning grace so they can be kept. Total lifetime without a command is idle + grace (40 min by default). `--name` runs several side by side; every action has `--help`, and failures print a `fix` (`error.hint` with `--json`).
 
 Every scratch process (`dsh`, Chromium, the fake model provider) starts under a parent-death guard (`src/scratch/parent-guard.ts`): the guard leads its own process group and stops it — SIGTERM, then SIGKILL after 3 s — when the pipe its starter holds closes (however the starter died) or when the owner named in `DSHX_SCRATCH_OWNER=<pid>:<startedAtMs>:<workspace>` exits or its pid is recycled. A `dshx dev up` instance's owner is its watchdog, started before the Host; `up` holds the pipe until it has written the state. Each scratch Host also gets a record `$TMPDIR/dshx-scratch/<host-pid>.json` (`hostPid`, `hostStartedAt`, `ownerPid`, `ownerStartedAt`, `workspace`, `kind` `e2e`|`dev`, `command`; mode 600, removed on a clean stop), readable through `@dshfiles/dshx/scratch-registry` (`ScratchRegistry.readRecords`, `ScratchRegistry.isOrphan`). `dshx scratch sweep` stops the process group of every recorded Host whose owner is gone, after checking its command line still carries `--profile dshx-boot`, plus unrecorded `--profile dshx-boot` processes with parent pid 1 older than 2 h; it drops records of exited Hosts, deletes `$TMPDIR/dshx-dev/<name>` dirs untouched for 24 h with no live process, and keeps each instance's newest 20 evidence runs. `up`, `pnpm check:e2e` and the first E2E boot of a Playwright worker run it first; `down` applies the state-dir retention.
 
@@ -116,7 +118,7 @@ All scaffold targets accept `--file`, `--dry-run`, and `--json`. They generate s
 ### `dshx add <package>`: install a plugin into a profile
 
 ```bash
-dshx add <package[@version]|path> [--profile <name>] [--option key=value ...] [--home <dir>] [--dry-run] [--json]
+dshx add <package[@version]|path|registry-item> [--profile <name>] [--option key=value ...] [--project <dir>] [--force] [--home <dir>] [--dry-run] [--json]
 ```
 
 Any operand that is not a scaffold target installs one plugin into a DSH profile in one step. One package carries every half of a plugin: its Host entry, its Client entry and the contract modules other plugins import install together, and the plan lists them as `parts` (`host, client, ./tabs-contract`).
@@ -124,6 +126,7 @@ Any operand that is not a scaffold target installs one plugin into a DSH profile
 - An owned bundle (`@dshfiles/<name>`, or a path to `plugins/@dshfiles/<name>`) is linked and installed with `scripts/profile-sync.ts --bundle <name>`, the same path as `pnpm profile:sync --bundle`. It follows this checkout, so it takes no version.
 - Any other plugin directory (a path, optionally written `link:<path>`) goes through `dsh plugin --profile <name> add link:<absolute path>`. The directory's `package.json` must declare `dsh.bundle`; otherwise DSH would install it as a plain dependency, so `dshx add` refuses it.
 - A registry package goes through `dsh plugin --profile <name> add <package>`, pinned when the spec names a version or range (`dsh-plugin-example@1.2.0`, `@scope/name@^1`). DSH checks the named version's compatibility before pnpm runs. A listed package whose installed version satisfies the requested range is left alone.
+- A [registry item](./registry.md#addresses) (an `https://` URL, a path ending in `.json`, or `alias:item`) is fetched first. A `dsh:plugin` item installs its registry dependencies and then itself through `dsh plugin add`; a tarball is verified against the item's `integrity` before DSH sees it. A `dsh:source` item copies files into `--project` (default: the current directory) and needs no profile. `--force` accepts a release whose content changed in place, or a copy that overwrites files the item did not write.
 - Each `--option key=value` (value parsed as a YAML scalar) merges into the plugin's Loader row config in the profile's `cordis.patch.yml`. The row id is read from the bundle's own `cordis.patch.yml` insert (the scope-kept slug, e.g. `dshfiles-shortcuts`). A patch entry replaces the row's whole `config`, so a new override starts from the bundle's row config; an existing override keeps its other keys. Comments and `!!js` values elsewhere in the patch are preserved.
 - Options are validated against the `Config` the plugin's built Host entry exports (Standard Schema, or a callable Schemastery schema). A local package is validated before anything is installed; a registry package once it is installed. When the entry is not built or exports none, options pass through with a warning.
 - Client `dsh.client.inject` edges come from the bundle's own manifest; the plan lists them.
@@ -133,14 +136,14 @@ The plan names every command and file. Running it twice changes nothing and repo
 ### `dshx update` and `dshx remove`: the rest of a plugin's lifecycle
 
 ```bash
-dshx update <package[@version]> [--latest] [--profile <name>] [--home <dir>] [--dry-run] [--json]
-dshx remove <package> [--profile <name>] [--home <dir>] [--dry-run] [--json]
+dshx update <package[@version]|registry-item> [--latest] [--profile <name>] [--project <dir>] [--force] [--home <dir>] [--dry-run] [--json]
+dshx remove <package|registry-item> [--profile <name>] [--project <dir>] [--force] [--home <dir>] [--dry-run] [--json]
 ```
 
 Both read where the plugin came from out of the profile manifest and print the same plan as `dshx add`, with `version before → after`:
 
-- `update` moves a registry package within its declared range (`dsh plugin update <package>`), past it with `--latest` (`dsh plugin update --latest <package>`), or to the version you name (`dsh plugin add <package>@<version>`, compatibility-checked by DSH first). An owned bundle linked to another checkout is relinked to this one with profile-sync; one already linked here is up to date. A plugin linked from another directory loads what is built there, so `update` only says to rebuild it in place. A plugin the profile does not list exits 1 and names the `dshx add` to run.
-- `remove` runs `dsh plugin --profile <name> remove <package>`, which drops the dependency and its `dsh.profile.bundles` entry, then removes the plugin's row override from `cordis.patch.yml` so the patch does not target a row nothing inserts. A second run reports `up to date`. When the repository's checked-in seed for that profile still lists the plugin, the plan warns that the next profile-sync adds it back.
+- `update` moves a registry package within its declared range (`dsh plugin update <package>`), past it with `--latest` (`dsh plugin update --latest <package>`), or to the version you name (`dsh plugin add <package>@<version>`, compatibility-checked by DSH first). `--latest` honours pnpm's minimum release age, so a release under a day old stays out of reach until you name it. A plugin installed from a registry item moves to what its registry now publishes, so it refuses `@version` and `--latest`; with `--project`, `update` works on a `dsh:source` item and stops at files you edited. An owned bundle linked to another checkout is relinked to this one with profile-sync; one already linked here is up to date. A plugin linked from another directory loads what is built there, so `update` only says to rebuild it in place. A plugin the profile does not list exits 1 and names the `dshx add` to run.
+- `remove` runs `dsh plugin --profile <name> remove <package>`, which drops the dependency and its `dsh.profile.bundles` entry, then removes the plugin's row override from `cordis.patch.yml` so the patch does not target a row nothing inserts. It also drops a registry item's record and kept tarball, and never cascades to its dependencies; with `--project`, it deletes a `dsh:source` item's unedited files instead. A second run reports `up to date`. When the repository's checked-in seed for that profile still lists the plugin, the plan warns that the next profile-sync adds it back.
 
 Neither restarts DSH; a change needs **Restart the DSH host process**. These are profile-file commands and need no running DSH; `dshx plugins` and `dshx bundles` change the running Host instead.
 
@@ -150,25 +153,39 @@ Neither restarts DSH; a change needs **Restart the DSH host process**. These are
 dshx publish --dry-run
 ```
 
-Runs `dshx package`'s build and package-target checks, then npm's real pack list (`npm pack --dry-run`), and checks what a registry install needs: no `"private": true` (`DSHX6405`), a semver `version` (`DSHX6406`), no `link:`/`file:` dependency (`DSHX6407` error; `workspace:`/`catalog:` is a `DSHX6407` warning because only `pnpm publish` rewrites them), and a `license` (`DSHX6408` warning). It prints the tarball name and file count it would publish, writes no tarball and never uploads. Without `--dry-run` it exits 2: dshx has no upload step, so a release is `npm publish` (or `pnpm publish`) of a package that passed this check.
+Runs `dshx package`'s build and package-target checks, then npm's real pack list (`npm pack --dry-run`), and checks what a registry install needs: no `"private": true` (`DSHX6405`), a semver `version` (`DSHX6406`), no `link:`/`file:` dependency (`DSHX6407` error; `workspace:`/`catalog:` is a `DSHX6407` warning because only `pnpm publish` rewrites them), a `license` (`DSHX6408` warning), and a Host bundle whose every import an install can resolve (`DSHX6409`: a package outside `@deepseek-ai/*` must be in `dependencies` or `host.bundleDependencies`, because a peer is installed by nothing and DSH would report `did not activate`). It prints the tarball name and file count it would publish, writes no tarball and never uploads. Without `--dry-run` it exits 2: dshx has no upload step, so a release is `npm publish` (or `pnpm publish`) of a package that passed this check.
+
+### `dshx registry`: discover and publish
+
+```bash
+dshx registry add <alias> <url|path> [--home <dir>]
+dshx registry remove <alias> [--home <dir>]
+dshx registry list [--home <dir>]
+dshx registry search [term] [--registry <alias|url|path>] [--home <dir>]
+dshx registry build [--source <file>] [--out <dir>]
+```
+
+`add` reads the index before saving the alias, so a bad URL fails at once. `remove` forgets the alias; installed items keep their recorded URL. `search` reads every alias, or one with `--registry`, and flags items whose `engines.dsh` excludes the running DSH; one unreachable registry is a warning unless it was the only target. `build` reads `dshx.registry.json` and writes `registry.json`, `r/` and `tarballs/` into `--out` (default `public/registry`); it builds no plugin, so run `dshx build` first, and it uploads nothing. All accept `--json`. The format is in [the registry guide](./registry.md).
+
+Exit codes: 0 ok, 1 failed, 2 usage.
 
 ## Shared options
 
-| Option                | Commands                                                   | Effect                                                                    |
-| --------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `--cwd <path>`        | project commands; sessions create/start                    | Resolve another project or create a Session in a working directory        |
-| `--verbose`           | all                                                        | Include underlying provider/process causes                                |
-| `--json`              | check, inspect, add, update, remove, DSH platform commands | Stable machine-readable output                                            |
-| `--quiet`             | all                                                        | Suppress human success output; preserve JSON and errors                   |
-| `--no-color`          | all                                                        | Disable terminal styling                                                  |
-| `--url <launch-url>`  | DSH platform commands                                      | Override `DSHX_URL` for this invocation                                   |
-| `--title <title>`     | sessions start                                             | Name the new Session; otherwise the Host titles it from its first message |
-| `--runtime`           | check                                                      | Enable Profile/Composition/runtime validation                             |
-| `--fix`               | check                                                      | Apply deterministic manifest repairs                                      |
-| `--dry-run`           | check --fix, add, update, remove, publish                  | Produce a plan/diff without writing                                       |
-| `--open`              | dev                                                        | Open the development URL                                                  |
-| `--port <0-65535>`    | dev                                                        | Select the DSH Web port; `0` allocates one                                |
-| `--help`, `--version` | all                                                        | Print CLI metadata                                                        |
+| Option                | Commands                                                             | Effect                                                                    |
+| --------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `--cwd <path>`        | project commands; sessions create/start                              | Resolve another project or create a Session in a working directory        |
+| `--verbose`           | all                                                                  | Include underlying provider/process causes                                |
+| `--json`              | check, inspect, add, update, remove, registry, DSH platform commands | Stable machine-readable output                                            |
+| `--quiet`             | all                                                                  | Suppress human success output; preserve JSON and errors                   |
+| `--no-color`          | all                                                                  | Disable terminal styling                                                  |
+| `--url <launch-url>`  | DSH platform commands                                                | Override `DSHX_URL` for this invocation                                   |
+| `--title <title>`     | sessions start                                                       | Name the new Session; otherwise the Host titles it from its first message |
+| `--runtime`           | check                                                                | Enable Profile/Composition/runtime validation                             |
+| `--fix`               | check                                                                | Apply deterministic manifest repairs                                      |
+| `--dry-run`           | check --fix, add, update, remove, publish                            | Produce a plan/diff without writing                                       |
+| `--open`              | dev                                                                  | Open the development URL                                                  |
+| `--port <0-65535>`    | dev                                                                  | Select the DSH Web port; `0` allocates one                                |
+| `--help`, `--version` | all                                                                  | Print CLI metadata                                                        |
 
 ## DSH platform control plane
 
@@ -369,7 +386,11 @@ package spec names without installing it. `bundles install/remove` use DSH's
 package manager; Ctrl-C sends its cancellation request, and a cancelled install
 restores the profile manifest and lockfile. `models list` shows currently
 routable models and provider lookup failures. `models select` selects a model
-for a Session; DSH may also persist it as the new default. `presets list/show`
+for one Session's upcoming requests through `@dshfiles/session-controller`'s
+`thread-model` API and leaves the default model unchanged; it fails when that
+API is not served. It refuses a thread mirrored from another DSH (run it against
+that DSH's launch URL instead) and a thread whose queued input has not settled
+(retry once the turn has picked it up). `presets list/show`
 reads Agent preset declarations. `skills list --session` returns only the
 user-invocable skill metadata visible to that Session, never skill bodies.
 

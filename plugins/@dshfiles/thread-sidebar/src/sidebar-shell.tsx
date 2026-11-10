@@ -53,6 +53,7 @@ import {
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
+import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
   useCallback,
@@ -319,7 +320,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stageTitle = props.useSessions(state =>
     stageThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === stageThread)?.displayTitle,
   )
-  // Fixed (default): the rail and one list; the Workbench left panes render only in free docking (plans/ade-ux §4.1).
+  // Fixed (default): the rail and one list; the Workbench left panes render only in free docking (docs/ade-ux §4.1).
   const docking = preferences.layoutMode === 'docking'
   const contentOverridden = props.contentOverridden && docking
   const contributedSections = useRegistry(DestinationSections)
@@ -341,76 +342,50 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const fanOutApi = useApi(threadActionsApi)
   const fanOutWorkspaceId = useSyncExternalStore(PaletteBridge.subscribeFanOut, PaletteBridge.readFanOutWorkspaceId, () => undefined)
   const fanOutOpen = fanOutWorkspaceId !== undefined
-  const [fanOutCatalog, setFanOutCatalog] = useState<ModelCatalog | null>(null)
-  const [fanOutCatalogError, setFanOutCatalogError] = useState<string | null>(null)
+  const loadModelCatalog = props.loadModelCatalog
+  const fanOutCatalog = useQuery({
+    queryKey: ['thread-sidebar', 'fan-out-catalog'],
+    queryFn: () => loadModelCatalog(),
+    enabled: fanOutOpen,
+    staleTime: 0,
+  })
   const [fanOutText, setFanOutText] = useState('')
   const [fanOutModels, setFanOutModels] = useState<readonly { provider: string; model: string; reasoningEffort?: string }[]>([])
-  const [fanOutBusy, setFanOutBusy] = useState(false)
-  const [fanOutError, setFanOutError] = useState<string | null>(null)
-  const loadModelCatalog = props.loadModelCatalog
-  useEffect(() => {
-    if (!fanOutOpen) return
-    setFanOutCatalog(null)
-    setFanOutCatalogError(null)
-    void loadModelCatalog()
-      .then(setFanOutCatalog)
-      .catch(error => setFanOutCatalogError(error instanceof Error ? error.message : 'Could not load model catalog.'))
-  }, [fanOutOpen, loadModelCatalog])
+  const sendFanOut = useMutation({
+    mutationFn: async () => {
+      const result = await fanOutApi.fanOut({
+        ...(fanOutWorkspaceId === null ? undefined : { projectId: fanOutWorkspaceId }),
+        text: fanOutText.trim(),
+        models: fanOutModels,
+      })
+      const firstCreated = result.results.find(item => item.ok && item.sessionId !== undefined)
+      if (firstCreated?.sessionId !== undefined) props.openSession(SessionId(firstCreated.sessionId))
+      const failures = result.results.filter(item => !item.ok)
+      if (failures.length > 0) throw new Error(failures.map(item => `${item.provider}/${item.model}: ${item.error ?? 'failed'}`).join(' · '))
+    },
+    onSuccess: () => PaletteBridge.closeFanOut(),
+  })
   const [restartSnapshot, sendRestart] = useRestartMachine(restartApi)
-  const restartRequestPending = restartSnapshot.matches('requesting')
+  const restartRequestPending = restartSnapshot.matches('requesting') || restartSnapshot.matches('requestingIdle')
   const restartRequestFailed = restartSnapshot.matches('failed')
   const restartWaitingHost = restartSnapshot.matches('restarting')
   const restartStalled = restartSnapshot.matches('stalled')
-  const restartDialogOpen = !restartSnapshot.matches('closed')
+  const restartDialogOpen = restartSnapshot.context.dialogOpen
   const restartAvailability = useApiQuery(threadSidebarRestartApi, 'availability')
   const restartAvailable = restartAvailability.data?.available === true
-  const restartPending = restartAvailability.data?.pending ?? null
-  const restartRun = restartAvailability.data?.run
-  const restartAvailabilityFailed = restartAvailability.error !== null
-  const refetchRestartAvailability = restartAvailability.refetch
+  const restartPending = restartSnapshot.context.pending
+  const reportedPendingRestart = restartAvailability.data?.pending
+  // A restart waiting for idle that this page never asked for still ends with a new Host to watch.
   useEffect(() => {
-    if (restartPending === null) return
-    const timer = globalThis.setInterval(() => void refetchRestartAvailability(), 3_000)
-    return () => globalThis.clearInterval(timer)
-  }, [restartPending, refetchRestartAvailability])
-  // A restart waiting for idle ends when the Host drops its pending state or stops answering: from then on the page
-  // waits for the new Host like a Restart now does, and says so when it does not come back.
-  const idleRestartSeen = useRef<{ run: string | undefined } | null>(null)
-  const idleRestartCanceled = useRef(false)
-  useEffect(() => {
-    if (restartPending !== null && !restartAvailabilityFailed) {
-      idleRestartSeen.current = { run: restartRun }
-      return
+    if (reportedPendingRestart !== null && reportedPendingRestart !== undefined) {
+      sendRestart({ type: 'pendingSeen', pending: reportedPendingRestart })
     }
-    const seen = idleRestartSeen.current
-    if (seen === null) return
-    idleRestartSeen.current = null
-    if (idleRestartCanceled.current) {
-      idleRestartCanceled.current = false
-      return
-    }
-    sendRestart({ type: 'watch', run: seen.run })
-  }, [restartPending, restartAvailabilityFailed, restartRun, sendRestart])
-  const [idleRestartFailed, setIdleRestartFailed] = useState(false)
+  }, [reportedPendingRestart, sendRestart])
   const restartWhenIdle = (): void => {
-    setIdleRestartFailed(false)
-    void restartApi
-      .requestRestartWhenIdle()
-      .then(() => {
-        sendRestart({ type: 'cancel' })
-        void refetchRestartAvailability()
-      })
-      .catch(() => {
-        setIdleRestartFailed(true)
-        sendRestart({ type: 'open' })
-      })
+    sendRestart({ type: 'whenIdle' })
   }
   const cancelPendingRestart = (): void => {
-    idleRestartCanceled.current = true
-    void restartApi
-      .cancelPendingRestart()
-      .catch(() => undefined)
-      .then(() => void refetchRestartAvailability())
+    sendRestart({ type: 'cancelWhenIdle' })
   }
   const restartPendingLabel =
     restartPending === null
@@ -638,6 +613,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stepNavigation = (direction: -1 | 1): void => goToHistoryEntry(history.index + direction)
   const latestStepNavigation = useRef(stepNavigation)
   latestStepNavigation.current = stepNavigation
+  // The palette reads availability when it opens; a ref keeps every thread switch from re-registering its actions.
+  const latestHistory = useRef(history)
+  latestHistory.current = history
 
   useEffect(() => {
     const onNavigate = (event: Event): void => {
@@ -953,7 +931,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         label: text(props.t, 'threadSidebarBack'),
         aliases: ['history', 'previous'],
         icon: <ArrowLeftIcon className="dshx:size-4" />,
-        isAvailable: () => ThreadNavigationHistoryModel.canStep(history, -1),
+        isAvailable: () => ThreadNavigationHistoryModel.canStep(latestHistory.current, -1),
         run: () => latestStepNavigation.current(-1),
       },
       {
@@ -962,7 +940,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         label: text(props.t, 'threadSidebarForward'),
         aliases: ['history', 'next'],
         icon: <ArrowRightIcon className="dshx:size-4" />,
-        isAvailable: () => ThreadNavigationHistoryModel.canStep(history, 1),
+        isAvailable: () => ThreadNavigationHistoryModel.canStep(latestHistory.current, 1),
         run: () => latestStepNavigation.current(1),
       },
       ...(restartAvailable
@@ -1014,7 +992,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       pendingUpdatesLabel,
       hostShortcuts,
       runCommand,
-      history,
       headerIconFor,
       activateHeaderEntry,
       openCustomize,
@@ -1105,27 +1082,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       if (current.length >= 6) return current
       return [...current, { provider, model, ...(reasoningEffort === undefined ? undefined : { reasoningEffort }) }]
     })
-  }
-  const sendFanOut = async (): Promise<void> => {
-    if (fanOutModels.length < 2 || fanOutModels.length > 6 || fanOutText.trim().length === 0 || fanOutBusy) return
-    setFanOutBusy(true)
-    setFanOutError(null)
-    try {
-      const result = await fanOutApi.fanOut({
-        ...(fanOutWorkspaceId === null ? undefined : { projectId: fanOutWorkspaceId }),
-        text: fanOutText.trim(),
-        models: fanOutModels,
-      })
-      const firstCreated = result.results.find(item => item.ok && item.sessionId !== undefined)
-      if (firstCreated?.sessionId !== undefined) props.openSession(SessionId(firstCreated.sessionId))
-      const failures = result.results.filter(item => !item.ok)
-      if (failures.length > 0) setFanOutError(failures.map(item => `${item.provider}/${item.model}: ${item.error ?? 'failed'}`).join(' · '))
-      else PaletteBridge.closeFanOut()
-    } catch (error) {
-      setFanOutError(error instanceof Error ? error.message : 'Could not start the model threads.')
-    } finally {
-      setFanOutBusy(false)
-    }
   }
 
   const paletteHint = parseChord(preferences.paletteChord)
@@ -1670,7 +1626,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </PopoverContent>
               </Popover>
             )}
-            {/* The fixed layout's status strip carries the account preview (plans/ade-ux §4.1 R5); free docking keeps the
+            {/* The fixed layout's status strip carries the account preview (docs/ade-ux §4.1 R5); free docking keeps the
                 footer preview seat, which Workbench also offers as a movable view. */}
             {docking ? <SidebarPreviewFallback renderSlot={props.renderSlot} contentOverridden={contentOverridden} /> : null}
           </div>
@@ -1890,7 +1846,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </ul>
               </div>
             )}
-            {restartRequestFailed || idleRestartFailed ? (
+            {restartRequestFailed ? (
               <p role="alert" className="dshx:px-6 dshx:text-sm dshx:text-destructive">
                 {text(props.t, 'threadSidebarRestartFailure')}
               </p>
@@ -1923,7 +1879,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           </DialogHeader>
           <Textarea aria-label="Prompt" value={fanOutText} onChange={event => setFanOutText(event.target.value)} />
           <div className="dshx:max-h-64 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:p-2">
-            {fanOutCatalog?.groups.map(group => (
+            {fanOutCatalog.data?.groups.map(group => (
               <section key={group.id} className="dshx:mb-2">
                 <h3 className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.name}</h3>
                 {group.models.map(model => {
@@ -1944,29 +1900,33 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 })}
               </section>
             ))}
-            {fanOutCatalog === null && fanOutCatalogError === null ? <p role="status">Loading models…</p> : null}
-            {fanOutCatalog !== null && fanOutCatalog.groups.length === 0 && fanOutCatalogError === null ? (
+            {fanOutCatalog.isPending ? <p role="status">Loading models…</p> : null}
+            {fanOutCatalog.data !== undefined && fanOutCatalog.data.groups.length === 0 && fanOutCatalog.error === null ? (
               <p role="status" className="dshx:p-2 dshx:text-sm dshx:text-muted-foreground">
                 No available models
               </p>
             ) : null}
-            {fanOutCatalogError === null ? null : (
+            {fanOutCatalog.error === null ? null : (
               <p role="alert" className="dshx:text-sm dshx:text-destructive">
-                {fanOutCatalogError}
+                {errorMessage(fanOutCatalog.error, 'Could not load model catalog.')}
               </p>
             )}
           </div>
-          {fanOutError === null ? null : (
+          {sendFanOut.error === null ? null : (
             <p role="alert" className="dshx:text-sm dshx:text-destructive">
-              {fanOutError}
+              {errorMessage(sendFanOut.error, 'Could not start the model threads.')}
             </p>
           )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => PaletteBridge.closeFanOut()}>
               Cancel
             </Button>
-            <Button type="button" disabled={fanOutBusy || fanOutModels.length < 2 || fanOutText.trim().length === 0} onClick={() => void sendFanOut()}>
-              {fanOutBusy ? 'Sending…' : 'Send'}
+            <Button
+              type="button"
+              disabled={sendFanOut.isPending || fanOutModels.length < 2 || fanOutText.trim().length === 0}
+              onClick={() => sendFanOut.mutate()}
+            >
+              {sendFanOut.isPending ? 'Sending…' : 'Send'}
             </Button>
           </DialogFooter>
         </DialogContent>

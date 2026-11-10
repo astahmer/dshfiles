@@ -335,6 +335,20 @@ it('refuses a webhook whose secret does not resolve and a paused one, and record
   expect(created).toHaveLength(1)
 })
 
+it('lists the newest valid runs across automations before applying the limit', async () => {
+  const { ctx, automations } = await fixture()
+  const storage = pluginStorage(ctx, NAMESPACE)
+  const older = { id: 'run_old', automationId: 'auto_zzzzzzzz', automationTitle: 'old', trigger: 'manual', outcome: 'started', startedAt: 100, finishedAt: 100 }
+  const newer = { id: 'run_new', automationId: 'auto_aaaaaaaa', automationTitle: 'new', trigger: 'manual', outcome: 'started', startedAt: 200, finishedAt: 200 }
+  for (const run of [older, newer]) {
+    await storage.set(`run/${run.automationId}/${String(run.startedAt).padStart(15, '0')}-${run.id}`, run)
+  }
+  await storage.set('run/auto_zzzzzzzz/999999999999999-invalid', { invalid: true })
+  expect((await automations.runs({ limit: 1 })).runs.map(run => run.id)).toEqual(['run_new'])
+  expect((await automations.runs({ limit: 2 })).runs.map(run => run.id)).toEqual(['run_new', 'run_old'])
+  expect((await automations.runs({ automationId: older.automationId, limit: 1 })).runs.map(run => run.id)).toEqual(['run_old'])
+})
+
 it('runs an automation now and records a start that failed with what to do next', async () => {
   const { automations, created, rewrite } = await fixture()
   const saved = await automations.save({

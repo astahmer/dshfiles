@@ -41,6 +41,14 @@ describe('inbox view', () => {
     expect('until' in tomorrow && new Date(tomorrow.until).getHours()).toBe(9)
   })
 
+  it('takes only the still-open items whose provider offers Resume for a bulk resume', () => {
+    const resumable = item({ id: 'resumable', verbs: ['Resume', 'Open', 'Done', 'Snooze', 'MuteSource'] })
+    const answered = item({ id: 'answered' })
+    const done = item({ id: 'done', verbs: ['Resume', 'Open'], doneAt: 5 })
+    const resolved = item({ id: 'resolved', verbs: ['Resume', 'Open'], resolvedAt: 5 })
+    expect(InboxView.resumableIds([resumable, answered, done, resolved])).toEqual(['resumable'])
+  })
+
   it('names known sources in words and keeps unknown ids', () => {
     expect(InboxView.sourceLabel('agent-questions.child-question')).toBe('Subagent question')
     expect(InboxView.sourceLabel('jj-integration.ready-to-land')).toBe('Ready to land')

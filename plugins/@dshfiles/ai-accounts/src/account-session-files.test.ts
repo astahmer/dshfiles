@@ -28,7 +28,8 @@ describe('real filesystem boundary with synthetic credentials only', () => {
     expect(() => AccountSessionFilePolicy.assertOwned({ uid: uid + 1, mode: 0o40700 })).toThrow()
     expect(() => AccountSessionFilePolicy.assertOwned({ uid, mode: 0o40720 })).toThrow()
   })
-  it('refuses unsafe writable ancestors and a writable Claude credential file without mutating either', async () => {
+  // POSIX-only: Windows has no group/other mode bits (chmod only toggles read-only), so its ACLs are the boundary there.
+  it.skipIf(process.platform === 'win32')('refuses unsafe writable ancestors and a writable Claude credential file without mutating either', async () => {
     await chmod(root, 0o777)
     await expect(createAccountSessionFiles().validateClaude(layout.effectiveHomePath)).rejects.toThrow()
     await chmod(root, 0o700)
@@ -66,7 +67,8 @@ describe('real filesystem boundary with synthetic credentials only', () => {
     await expect(createAccountSessionFiles().finishCodexLogout(layout)).rejects.toThrow()
     expect(await readFile(source, 'utf8')).toBe(fakeShared)
   })
-  it('refuses a group/world-writable selected home without touching its contents', async () => {
+  // POSIX-only, as above.
+  it.skipIf(process.platform === 'win32')('refuses a group/world-writable selected home without touching its contents', async () => {
     await chmod(layout.effectiveHomePath, 0o777)
     const files = createAccountSessionFiles()
     await expect(files.validateCodex(layout)).rejects.toThrow()

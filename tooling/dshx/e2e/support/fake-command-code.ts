@@ -7,12 +7,13 @@ import { startFakeCommandCode as startFakeServer, type FakeCommandCode } from '.
 export type { FakeChatRequest, FakeCommandCode } from '../../packages/dshx/src/scratch/fake-command-code.js'
 
 const fakes = new WeakMap<Page, FakeCommandCode>()
-const quotaControls = new WeakMap<Page, { readonly status: Map<string, 200 | 401>; readonly reads: Map<string, number> }>()
+type FakeQuotaStatus = 200 | 401 | 503
+const quotaControls = new WeakMap<Page, { readonly status: Map<string, FakeQuotaStatus>; readonly reads: Map<string, number> }>()
 
 /** Read-only loopback metadata proxy: a quota can expire after admission without replacing the saved key. */
 export const startControllableQuotaCommandCode = async (page: Page): Promise<FakeCommandCode> => {
   const upstream = await startFakeServer()
-  const control = { status: new Map<string, 200 | 401>(), reads: new Map<string, number>() }
+  const control = { status: new Map<string, FakeQuotaStatus>(), reads: new Map<string, number>() }
   const server = createServer(async (request, response) => {
     try {
       if (request.method !== 'GET') {
@@ -29,6 +30,10 @@ export const startControllableQuotaCommandCode = async (page: Page): Promise<Fak
         control.reads.set(key, (control.reads.get(key) ?? 0) + 1)
         if (control.status.get(key) === 401) {
           response.writeHead(401, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Synthetic quota login expired' }))
+          return
+        }
+        if (control.status.get(key) === 503) {
+          response.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Synthetic quota outage' }))
           return
         }
       }
@@ -70,7 +75,7 @@ export const startControllableQuotaCommandCode = async (page: Page): Promise<Fak
   }
 }
 
-export const setFakeQuotaStatus = (page: Page, key: string, status: 200 | 401): number => {
+export const setFakeQuotaStatus = (page: Page, key: string, status: FakeQuotaStatus): number => {
   const control = quotaControls.get(page)
   if (control === undefined) throw new Error('Controllable quota fixture was not started.')
   control.status.set(key, status)

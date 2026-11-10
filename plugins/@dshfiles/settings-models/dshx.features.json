@@ -32,6 +32,11 @@
       ],
       "verification": [
         {
+          "kind": "gherkin",
+          "id": "settings-models.models-settings",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "settings-models.registration",
           "file": "plugins/@dshfiles/settings-models/tests/registration.test.ts",

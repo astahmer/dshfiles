@@ -24,7 +24,9 @@ import {
   ownWorkspaceForInputSchema,
   ownWorkspaceForOutputSchema,
   pathInputSchema,
+  projectBookmarkOutputSchema,
   projectsOutputSchema,
+  setProjectBookmarkInputSchema,
   provisionInputSchema,
   provisionOutputSchema,
   queuedAtOutputSchema,
@@ -32,10 +34,14 @@ import {
   reviewHistoryOutputSchema,
   revisionGraphOutputSchema,
   startedOutputSchema,
+  workspaceSetupInputSchema,
+  workspaceSetupSchema,
+  workspaceSetupTaskSchema,
+  cancelWorkspaceSetupInputSchema,
   workspaceSyncOutputSchema,
   workspaceSyncSchema,
 } from './api-effect-schemas.js'
-import { CleanupJobModel } from './cleanup-jobs.js'
+import { CleanupJobModel, MAX_CLEANUP_MESSAGE_LENGTH, MAX_CLEANUP_RECOVERY_LENGTH } from './cleanup-jobs.js'
 import { strictStandardSchema } from './schema.js'
 
 /**
@@ -52,6 +58,21 @@ const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Out
 export type ThreadRevisionView = JjRevisionView
 export type ThreadView = JjThreadView
 export type RepositoryView = JjRepositoryView
+/** One project's main branch and the layer that chose it, as `projectBookmark` returns it. */
+export type ProjectBookmarkView = typeof projectBookmarkOutputSchema.Type
+
+/** One line an agent reads: the branch, the layer that chose it, and every layer that could have. */
+const renderProjectBookmark = (output: ProjectBookmarkView): string =>
+  [
+    `${output.repositoryRoot}: main branch ${output.bookmark}`,
+    `chosen by ${{ project: 'the project setting', file: 'dsh.project.json', detected: 'origin’s default branch', global: 'the global setting' }[output.source]}`,
+    output.override === null ? undefined : `project setting ${output.override}`,
+    output.declared === null ? undefined : `dsh.project.json ${output.declared}`,
+    output.detected === null ? undefined : `origin default ${output.detected}`,
+    `global ${output.fallback}`,
+  ]
+    .filter(part => part !== undefined)
+    .join(' · ')
 
 const landResultSchema = Schema.Struct({
   status: Schema.Literals(['landed', 'nothing-to-land', 'needs-description', 'conflicted']),
@@ -65,6 +86,8 @@ const landResultSchema = Schema.Struct({
 export type LandResult = typeof landResultSchema.Type
 
 export type WorkspaceSyncView = typeof workspaceSyncSchema.Type
+export type WorkspaceSetupTask = typeof workspaceSetupTaskSchema.Type
+export type WorkspaceSetup = typeof workspaceSetupSchema.Type
 export type DestinationView = typeof destinationSchema.Type
 
 export const threadWorkspaceNameEffect = Schema.String.check(Schema.isPattern(/^thread-[0-9a-f]{6}$/u))
@@ -74,7 +97,7 @@ export const threadWorkspaceName = threadWorkspaceNameEffect
 const cleanupRequestSchema = Schema.Struct({
   path: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   olderThanHours: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(24 * 90)),
-  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(4)),
+  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(5)),
   targets: Schema.optional(Schema.Array(cleanupTargetSchema).check(Schema.isMaxLength(500))),
 })
 
@@ -91,17 +114,21 @@ const cleanupWorkspaceSchema = Schema.Struct({
   repoRoot: Schema.String,
   name: Schema.String,
   path: Schema.String,
-  kind: Schema.Literals(['empty', 'integrated', 'secondary']),
+  kind: Schema.Literals(['empty', 'integrated', 'merged', 'secondary']),
   lastUsedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   missing: Schema.Boolean,
+  /** Other bookmarks that each hold all of this workspace's work: why a workspace with revisions is removable. */
+  integratedInto: Schema.optional(Schema.Array(Schema.String)),
   outcome: Schema.Literals(['would-remove', 'removed', 'has-work', 'failed']),
-  message: Schema.optional(Schema.String.check(Schema.isMaxLength(400))),
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_MESSAGE_LENGTH))),
 })
 
 const cleanupSkippedSchema = Schema.Struct({
   repoRoot: Schema.String,
   name: Schema.String,
   reason: Schema.Literals(['has-work', 'busy', 'activity-unknown', 'queued', 'too-recent', 'kind-excluded', 'working-copy-dirty', 'workspace-state-unknown']),
+  /** The same reason in words, so a report says why one workspace was kept without decoding an enum. */
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
 })
 
 const cleanupUntrackedSchema = Schema.Struct({
@@ -110,7 +137,7 @@ const cleanupUntrackedSchema = Schema.Struct({
   path: Schema.String,
   modifiedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   outcome: Schema.Literals(['would-remove', 'removed', 'failed']),
-  message: Schema.optional(Schema.String.check(Schema.isMaxLength(400))),
+  message: Schema.optional(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_MESSAGE_LENGTH))),
 })
 
 const cleanupResultSchema = Schema.Struct({
@@ -139,6 +166,11 @@ const cleanupJobSchema = Schema.Struct({
     /** `automatic` is the Host's interval run (setting autoCleanup); a Host from before it omits the field. */
     trigger: Schema.optional(Schema.Literals(['manual', 'automatic'])),
   }),
+  /**
+   * The repository that owns request.path, even when the cleanup was asked from one of its thread workspaces; null for a
+   * run over every repository. A Host from before it omits the field.
+   */
+  repoRoot: Schema.optional(Schema.NullOr(Schema.String)),
   startedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   finishedAt: Schema.NullOr(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
   progress: Schema.Struct({
@@ -148,25 +180,33 @@ const cleanupJobSchema = Schema.Struct({
     removed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
     kept: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
     failed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
-    current: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
+    current: Schema.NullOr(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_MESSAGE_LENGTH))),
   }),
-  error: Schema.NullOr(Schema.String.check(Schema.isMaxLength(400))),
-  /** Only the newest job carries its rows, so a poll of the whole trail stays small. */
+  error: Schema.NullOr(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_MESSAGE_LENGTH))),
+  /** Only the newest job of each repository carries its rows, so a poll of the whole trail stays small. */
   result: Schema.NullOr(cleanupResultSchema),
+  /** The safe next step after a failed job or a workspace it could not remove; never a forced removal. */
+  recovery: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_RECOVERY_LENGTH)))),
 })
 export type CleanupJobView = typeof cleanupJobSchema.Type
+
+const describeRemoved = (workspace: CleanupResult['workspaces'][number]): string => {
+  if (workspace.missing) return 'folder missing; registration forgotten'
+  return workspace.integratedInto === undefined ? workspace.kind : `${workspace.kind} into ${workspace.integratedInto.join(', ')}`
+}
 
 const renderCleanup = (output: CleanupResult): string => {
   const verb = output.applied ? 'Removed' : 'Would remove'
   const removed = output.workspaces.filter(workspace => workspace.outcome === 'removed' || workspace.outcome === 'would-remove')
   const refused = output.workspaces.filter(workspace => workspace.outcome === 'has-work' || workspace.outcome === 'failed')
   return [
-    `${verb} ${String(removed.length)} workspace(s)${removed.length === 0 ? '' : `: ${removed.map(workspace => `${workspace.name} (${workspace.missing ? 'folder missing; registration forgotten' : workspace.kind})`).join(', ')}`}.`,
+    `${verb} ${String(removed.length)} workspace(s)${removed.length === 0 ? '' : `: ${removed.map(workspace => `${workspace.name} (${describeRemoved(workspace)})`).join(', ')}`}.`,
     refused.length === 0 ? undefined : `Kept ${refused.map(workspace => `${workspace.name} (${workspace.message ?? workspace.outcome})`).join(', ')}.`,
     output.untracked.length === 0
       ? undefined
       : `${verb} ${String(output.untracked.length)} untracked entr(ies): ${output.untracked.map(entry => (entry.outcome === 'failed' ? `${entry.name} (failed)` : entry.name)).join(', ')}.`,
     `${output.applied ? 'Abandoned' : 'Would abandon'} ${String(output.emptyRevisions.length)} dangling empty revision(s).`,
+    ...output.skipped.slice(0, 12).map(row => `${row.name}: ${row.message ?? row.reason}`),
     CleanupJobModel.skippedSummary(output),
   ]
     .filter(line => line !== undefined)
@@ -202,6 +242,7 @@ export const jjIntegrationApi = defineApi({
             output.vcs === 'jj' ? 'Jujutsu repository' : output.vcs === 'git' ? 'Git repository' : 'No jj or git repository',
             output.isolated ? 'isolated thread workspace' : undefined,
             `bookmark ${output.bookmark ?? 'none'}`,
+            output.targetBookmark === undefined ? undefined : `main branch ${output.targetBookmark}`,
             output.bookmarks.length === 0 ? undefined : `available: ${output.bookmarks.join(', ')}`,
             output.ownedByAnotherSession === true ? 'owned by another thread' : undefined,
           ]
@@ -226,6 +267,20 @@ export const jjIntegrationApi = defineApi({
       },
     }),
     noFolder: method({ input: emptyInputSchema, output: noFolderOutputSchema }),
+    projectBookmark: method({
+      input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) }),
+      output: projectBookmarkOutputSchema,
+      description:
+        'The main branch of the project holding a path: the bookmark its thread workspaces start from, Land advances, and source control and Changes compare against, with the layer that chose it (Settings › Projects choice, dsh.project.json, origin’s default branch, or the global setting). Read-only.',
+      tool: { name: 'jj_project_bookmark', readOnly: true, render: output => renderProjectBookmark(output) },
+    }),
+    setProjectBookmark: method({
+      input: setProjectBookmarkInputSchema,
+      output: projectBookmarkOutputSchema,
+      description:
+        'Choose the main branch of the project holding a path, as Settings › Projects does: new thread workspaces start from it, Land advances it, and source control and Changes compare against it. `bookmark: null` removes the choice so dsh.project.json, origin’s default branch or the global setting decide again (reverse it the same way). Returns the new resolution. Call only when the user asked to change that project’s main branch.',
+      tool: { name: 'jj_set_project_bookmark', render: output => renderProjectBookmark(output) },
+    }),
     repositories: method({
       input: emptyInputSchema,
       output: jjRepositoriesEffectSchema,
@@ -348,7 +403,7 @@ export const jjIntegrationApi = defineApi({
       input: threadPathInputSchema,
       output: Schema.Struct({ bookmark: Schema.String, thread: Schema.NullOr(jjThreadEffectSchema) }),
       description:
-        'Show this thread’s jj workspace: its revisions not yet on the target bookmark (main by default), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.',
+        'Show this thread’s jj workspace: its revisions not yet on the project’s main branch (Settings › Projects), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.',
       tool: {
         name: 'jj_thread_status',
         readOnly: true,
@@ -362,14 +417,34 @@ export const jjIntegrationApi = defineApi({
       input: Schema.Struct({ ...threadPathInputSchema.fields, bookmark: Schema.optional(Schema.String.check(Schema.isMinLength(1))) }),
       output: Schema.Struct({ summary: Schema.String, result: Schema.NullOr(landResultSchema) }),
       description:
-        'Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',
+        'Integrate this thread’s described work into the project’s main branch (Settings › Projects) unless another bookmark is named: rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',
       tool: { name: 'jj_thread_rebase', render: output => output.summary },
+    }),
+    workspaceSetup: method({
+      input: workspaceSetupInputSchema,
+      output: workspaceSetupSchema,
+      description:
+        'Prepare a new thread workspace with the trusted setup actions this project flags: dispatch each once through the durable project-check queue and report their phases. Runs nothing outside a thread workspace of a local repository, and nothing from dsh.project.json. Call only when the user asked to start that setup.',
+      tool: {
+        name: 'jj_workspace_setup',
+        render: output =>
+          output.tasks.length === 0
+            ? 'No trusted setup action is flagged for a new workspace of this project.'
+            : output.tasks.map(task => `${task.label}: ${task.status} (${task.phase})`).join('\n'),
+      },
+    }),
+    cancelWorkspaceSetup: method({
+      input: cancelWorkspaceSetupInputSchema,
+      output: workspaceSetupSchema,
+      description:
+        'Cancel one queued or running setup action of a thread workspace. The durable task reports cancelled only after its process group exits, and effects applied before cancellation are not undone. Call only when the user asked to stop it.',
+      tool: { name: 'jj_cancel_workspace_setup', render: output => output.tasks.map(task => `${task.label}: ${task.status}`).join('\n') },
     }),
     workspaceSync: method({
       input: emptyInputSchema,
       output: workspaceSyncOutputSchema,
       description:
-        'State of the last sync of the DSH checkout onto main after a rebase: running, done or failed, which plugins were rebuilt, conflicts, and whether DSH needs a restart. Read-only.',
+        'State of the last sync of the DSH checkout onto main after a rebase: queued, running, done or failed, which plugins were rebuilt, conflicts, and whether DSH needs a restart. Read-only.',
       tool: {
         name: 'jj_thread_workspace_sync',
         readOnly: true,
@@ -439,7 +514,7 @@ export const jjIntegrationApi = defineApi({
       input: Schema.Struct({ ...cleanupRequestSchema.fields, apply: Schema.Boolean }),
       output: cleanupResultSchema,
       description:
-        'Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision, no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left). Other JJ workspaces are manual-only and opt-in: present checkouts must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. Missing secondary checkouts can only be forgotten when their root stays absent and no unlanded work or live Session remains; cleanup never deletes their path. JJ snapshots present working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. When targets is present, only matching preview rows are removed. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.',
+        'Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision unless one other local bookmark holds all of it (preview rows name it in integratedInto, and the bookmark stays), no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left, or held by another bookmark). Other JJ workspaces are manual-only and opt-in: present checkouts must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. Missing secondary checkouts can only be forgotten when their root stays absent and no unlanded work or live Session remains; cleanup never deletes their path. JJ snapshots present working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. When targets is present, only matching preview rows are removed. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.',
       tool: { name: 'jj_thread_cleanup', render: renderCleanup },
     }),
     startCleanup: method({
@@ -449,10 +524,20 @@ export const jjIntegrationApi = defineApi({
         'Start removing idle workspaces in the background. Returns at once with the job, so a UI click never waits on node_modules deletion; cleanupJobs reports its progress and outcome, and the newest job carries the full result. The same scope already queued or running is returned instead of queued twice. Secondary JJ workspaces are manual-only and opt-in; cleanupWorkspaces documents their safety checks. Call only when the user asked to clean up.',
     }),
     cleanupJobs: method({
-      input: emptyInputSchema,
-      output: Schema.Struct({ jobs: Schema.Array(cleanupJobSchema).check(Schema.isMaxLength(32)) }),
+      input: Schema.Struct({
+        path: Schema.optional(
+          Schema.String.annotate({
+            description: 'A project or one of its thread workspaces: only the cleanup jobs of the repository that owns it, plus runs over every repository.',
+          }),
+        ),
+      }),
+      output: Schema.Struct({
+        /** The repository `path` was traced to; null without a path or when it belongs to no known repository. */
+        repoRoot: Schema.optional(Schema.NullOr(Schema.String)),
+        jobs: Schema.Array(cleanupJobSchema).check(Schema.isMaxLength(32)),
+      }),
       description:
-        'Progress and recent trail of background workspace cleanup jobs, newest first: state, phase, counts, the item in flight, the failure, and the newest job’s full result. Read-only.',
+        'Progress and recent trail of background workspace cleanup jobs, newest first: state, phase, owning repository, counts, the item in flight, the failure with its safe recovery, and the full result of the newest job of each repository. Pass path to see one project’s jobs, including those asked from its thread workspaces. Read-only.',
       tool: {
         name: 'jj_thread_cleanup_jobs',
         readOnly: true,
@@ -464,7 +549,9 @@ export const jjIntegrationApi = defineApi({
               const failure = job.error === null ? '' : ` · ${job.error}`
               const result = job.result === null ? '' : ` · ${renderCleanup(job.result).replaceAll('\n', ' · ')}`
               const trigger = job.request.trigger === 'automatic' ? ' · automatic' : ''
-              return `${job.id}${trigger} · ${job.state}/${job.phase} · ${progress} · ${String(job.progress.removed)} removed, ${String(job.progress.kept)} kept, ${String(job.progress.failed)} failed${running}${failure}${result}`
+              const repository = job.repoRoot === undefined || job.repoRoot === null ? '' : ` · ${job.repoRoot}`
+              const recovery = job.recovery === undefined || job.recovery === null ? '' : ` · Recovery: ${job.recovery}`
+              return `${job.id}${trigger}${repository} · ${job.state}/${job.phase} · ${progress} · ${String(job.progress.removed)} removed, ${String(job.progress.kept)} kept, ${String(job.progress.failed)} failed${running}${failure}${result}${recovery}`
             })
             .join('\n') || 'No thread-workspace removal has run.',
       },

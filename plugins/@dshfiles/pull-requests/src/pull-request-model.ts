@@ -117,6 +117,67 @@ export const pullRequestLinkViewSchema = Schema.Struct({
 
 export type PullRequestLinkView = Schema.Schema.Type<typeof pullRequestLinkViewSchema>
 
+/** What one poll of a watched pull request came back with: the three outcomes the monitor can act on. */
+export type WatcherPollOutcome =
+  | { readonly kind: 'ok'; readonly snapshot: PullRequestSnapshot; readonly now: number }
+  | { readonly kind: 'rate-limited'; readonly now: number; readonly retryAfterAt: number; readonly count: number }
+  | { readonly kind: 'failed'; readonly now: number; readonly error: NonNullable<PullRequestRecord['lastError']> }
+
+/** Where a watched pull request stands right now, read once from its stored record. */
+export type WatcherStatus =
+  | { readonly kind: 'unwatched' }
+  | { readonly kind: 'watching' }
+  | { readonly kind: 'backoff'; readonly until: number; readonly count: number }
+  | { readonly kind: 'failed'; readonly error: NonNullable<PullRequestRecord['lastError']> }
+  | { readonly kind: 'terminal'; readonly state: 'MERGED' | 'CLOSED' }
+
+const terminalState = (record: Pick<PullRequestRecord, 'lastKnownState'>): 'MERGED' | 'CLOSED' | undefined => {
+  const state = record.lastKnownState?.state
+  return state === 'MERGED' || state === 'CLOSED' ? state : undefined
+}
+
+/**
+ * A watcher is in backoff while its retry is ahead, failed after a poll that could not read GitHub, watching while it
+ * polls on the regular interval, and terminal once its pull request merged or closed.
+ */
+export class PullRequestWatcher {
+  static readonly statusOf = (
+    record: Pick<PullRequestRecord, 'watching' | 'lastKnownState' | 'retryAfterAt' | 'consecutiveRateLimits' | 'lastError'>,
+    now: number,
+  ): WatcherStatus => {
+    if (record.watching) {
+      if (record.retryAfterAt !== null && record.retryAfterAt > now) return { kind: 'backoff', until: record.retryAfterAt, count: record.consecutiveRateLimits }
+      if (record.lastError !== null) return { kind: 'failed', error: record.lastError }
+      return { kind: 'watching' }
+    }
+    const state = terminalState(record)
+    return state === undefined ? { kind: 'unwatched' } : { kind: 'terminal', state }
+  }
+
+  /** The record after one poll: the one place the watcher fields move, so no combination of them can be stored. */
+  static readonly afterPoll = (record: PullRequestRecord, outcome: WatcherPollOutcome): PullRequestRecord => {
+    if (outcome.kind === 'rate-limited')
+      return {
+        ...record,
+        lastCheckedAt: outcome.now,
+        lastError: 'gh-command-failed',
+        retryAfterAt: outcome.retryAfterAt,
+        consecutiveRateLimits: outcome.count,
+      }
+    if (outcome.kind === 'failed') return { ...record, lastCheckedAt: outcome.now, lastError: outcome.error, retryAfterAt: null, consecutiveRateLimits: 0 }
+    const terminal = outcome.snapshot.state === 'MERGED' || outcome.snapshot.state === 'CLOSED'
+    return {
+      ...record,
+      watching: terminal ? false : true,
+      lastKnownState: outcome.snapshot,
+      lastCheckedAt: outcome.now,
+      retryAfterAt: null,
+      consecutiveRateLimits: 0,
+      lastError: null,
+    }
+  }
+}
+
 const urlLocatorSchema = Schema.Struct({
   sessionId: Schema.optional(sessionIdSchema),
   url: githubPullRequestUrlSchema,

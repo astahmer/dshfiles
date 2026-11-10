@@ -22,9 +22,11 @@ import { announceRepositoryChange, describeLandResult } from './land-feedback.js
 import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
 import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { SessionLogDownloadRow, type SessionLogDownloadPort } from './session-log-download.js'
+import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { threadStatusPollMs } from './thread-status-poll.js'
 import { useToast } from './toast.js'
+import { useProjectBookmark } from './project-bookmark-query.js'
 
 export interface ThreadWorkspaceControlProps {
   readonly sessionId: SessionSummary['id']
@@ -83,6 +85,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const read = useCallback(() => props.sessions.list.getSnapshot().byId[props.sessionId]?.cwd ?? null, [props.sessions, props.sessionId])
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
+  const bookmark = useProjectBookmark(cwd, props.bookmark)
   const toast = useToast()
   const thread = useQuery({
     queryKey: threadQueryKeys.threadAt(cwd ?? '', props.sessionId),
@@ -108,7 +111,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path, sessionId: props.sessionId }, { signal }) }),
     onError: (error, path) => {
       if (IntegrationRecovery.isQueued(error)) {
-        toast.show({ text: props.t('integrationQueuedHint', { bookmark: props.bookmark }), success: true })
+        toast.show({ text: props.t('integrationQueuedHint', { bookmark }), success: true })
         announceRepositoryChange()
         void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(path) })
         return
@@ -157,7 +160,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const current = thread.data?.thread
   const sessionIds = useMemo(() => current?.sessionIds ?? [props.sessionId], [current?.sessionIds, props.sessionId])
   const readSessionRunning = useCallback(
-    () => Object.values(props.sessions.list.getSnapshot().byId).some(session => session.cwd === current?.path && session.running),
+    () => WorkspaceActivityIndex.isRunning({ byId: props.sessions.list.getSnapshot().byId, sessionIds: [], path: current?.path }),
     [current?.path, props.sessions],
   )
   const readClientCanRebase = useCallback(() => {
@@ -171,13 +174,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   }, [props.sessions, sessionIds])
   const readClientQuestionPending = useCallback(() => {
     const sessions = props.sessions.list.getSnapshot().byId
-    return (
-      sessionIds.some(sessionId => ThreadRebaseEligibilityModel.hasPendingUserQuestion(sessions[SessionId(sessionId)]?.projectionValues) === true) ||
-      (current?.path !== undefined &&
-        Object.values(sessions).some(
-          session => session.cwd === current.path && ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) === true,
-        ))
-    )
+    return WorkspaceActivityIndex.hasQuestion({ byId: sessions, sessionIds, path: current?.path })
   }, [current?.path, props.sessions, sessionIds])
   const sessionRunning = useSyncExternalStore(subscribe, readSessionRunning, () => true)
   const clientCanRebase = useSyncExternalStore(subscribe, readClientCanRebase, () => false)
@@ -211,7 +208,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   // `current` is undefined until the status query answers and null when the path is not a thread workspace.
   const loading = current === undefined && cwd !== null
   const name = current?.name ?? (cwd === null || cwd.length === 0 ? props.t('unknownWorkspace') : folderName(cwd))
-  const label = props.t('rebaseThread', { bookmark: props.bookmark })
+  const label = props.t('rebaseThread', { bookmark })
   const triggerLabel = isThread ? props.t('currentThreadWorkspace', { name }) : props.t('workspaceMenuShared', { name })
   const rebaseDisabled = rebasesPending || !isThread || unlanded === 0 || !canRebase
   const integrationQueued = current?.integrationQueuedAt !== undefined
@@ -233,7 +230,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     if (!isThread) return props.t('sharedCheckoutHint')
     if (conflicted) return props.t('conflictHint', { count: unlanded })
     if (unlanded > 0) return props.t('toRebase', { count: unlanded })
-    if (current.behind) return props.t('behind', { bookmark: props.bookmark })
+    if (current.behind) return props.t('behind', { bookmark })
     return props.t('upToDate')
   }
 
@@ -278,7 +275,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
           ) : (
             <RevisionGraphHoverCard
               path={current.path}
-              bookmark={props.bookmark}
+              bookmark={bookmark}
               disabled={workspaceMenuOpen}
               t={props.t}
               trigger={<PopoverTrigger asChild>{trigger}</PopoverTrigger>}
@@ -308,7 +305,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                   revisions={conflictGraphRows(current.unlanded)}
                   state={null}
                   target={{
-                    label: props.t('rebaseThread', { bookmark: props.bookmark }),
+                    label: props.t('rebaseThread', { bookmark }),
                     status: 'conflicts',
                     conflicts: current.unlanded.filter(revision => revision.conflict).length,
                   }}
@@ -322,11 +319,11 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                 <div className="dshx:px-3 dshx:pb-3">
                   <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:py-1 dshx:pr-1 dshx:pl-2">
                     <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-                    <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">{props.t('integrationQueuedHint', { bookmark: props.bookmark })}</p>
+                    <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">{props.t('integrationQueuedHint', { bookmark })}</p>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          aria-label={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
+                          aria-label={props.t('undoQueuedIntegrationLabel', { bookmark })}
                           className="dshx-root dshx:shrink"
                           disabled={undoQueuedIntegration.isPending}
                           onClick={() => undoQueuedIntegration.mutate(current.path)}
@@ -338,7 +335,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                           {props.t('undoQueuedIntegration')}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="right">{props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}</TooltipContent>
+                      <TooltipContent side="right">{props.t('undoQueuedIntegrationLabel', { bookmark })}</TooltipContent>
                     </Tooltip>
                   </div>
                 </div>
@@ -347,7 +344,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        aria-label={props.t('queueIntegration', { bookmark: props.bookmark })}
+                        aria-label={props.t('queueIntegration', { bookmark })}
                         className="dshx-root dshx:w-full"
                         disabled={queueIntegration.isPending}
                         onClick={() => queueIntegration.mutate(current.path)}
@@ -356,7 +353,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                         variant="outline"
                       >
                         {queueIntegration.isPending ? <Spinner /> : <ClockIcon aria-hidden="true" className="dshx:size-3.5" />}
-                        {props.t('queueIntegration', { bookmark: props.bookmark })}
+                        {props.t('queueIntegration', { bookmark })}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="right">{props.t('queueIntegrationHint')}</TooltipContent>
@@ -379,7 +376,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                         variant="outline"
                       >
                         {rebasesPending ? <Spinner /> : <RefreshCwIcon aria-hidden="true" className="dshx:size-3.5" />}
-                        {props.t('rebaseOnto', { bookmark: props.bookmark })}
+                        {props.t('rebaseOnto', { bookmark })}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="right">

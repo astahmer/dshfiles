@@ -32,17 +32,44 @@ interface RecordedEvent {
   readonly sessionId: string | undefined
 }
 
+/**
+ * One path's integration lifecycle: waiting for its queue slot, an attempt in flight after its guard passed, or the
+ * tail of an attempt that holds no queue entry. A cancel answers `integrating` only while an attempt in flight still
+ * owns a queue entry, so a new queued request is never mistaken for an attempt that already ended.
+ */
+export type IntegrationRequestState =
+  | { readonly _tag: 'queued'; readonly entry: QueuedIntegration; readonly progress: IntegrationProgress }
+  | { readonly _tag: 'integrating'; readonly entry: QueuedIntegration; readonly progress: IntegrationProgress }
+  | { readonly _tag: 'running'; readonly progress: IntegrationProgress }
+
 interface RequestsState {
-  readonly entries: ReadonlyMap<string, QueuedIntegration>
-  /** Paths whose current attempt passed its guard: a cancel now answers `integrating`. */
-  readonly passedGuard: ReadonlySet<string>
+  readonly paths: ReadonlyMap<string, IntegrationRequestState>
   readonly events: readonly RecordedEvent[]
 }
 
 const withEvent = (events: readonly RecordedEvent[], event: RecordedEvent): readonly RecordedEvent[] => [...events, event].slice(-MAX_EVENTS)
 
-const freshProgress = (progress: ReadonlyMap<string, IntegrationProgress>, now: number): Map<string, IntegrationProgress> =>
-  new Map([...progress].filter(([, entry]) => now - entry.updatedAt <= INTEGRATION_PROGRESS_TTL_MS))
+const withProgress = (state: IntegrationRequestState, progress: IntegrationProgress): IntegrationRequestState => {
+  if (state._tag === 'running') return { _tag: 'running', progress }
+  if (state._tag === 'integrating') return { _tag: 'integrating', entry: state.entry, progress }
+  return { _tag: 'queued', entry: state.entry, progress }
+}
+
+const withoutEntry = (state: IntegrationRequestState): IntegrationRequestState => ({ _tag: 'running', progress: state.progress })
+
+/** A progress phase older than the TTL is forgotten, and only the paths that hold no queue entry are bounded. */
+const prunedProgress = (paths: ReadonlyMap<string, IntegrationRequestState>, now: number): ReadonlyMap<string, IntegrationRequestState> => {
+  const fresh = new Map<string, IntegrationRequestState>()
+  for (const [key, state] of paths) {
+    if (state._tag !== 'running' || now - state.progress.updatedAt <= INTEGRATION_PROGRESS_TTL_MS) fresh.set(key, state)
+  }
+  const runningKeys = [...fresh].flatMap(([key, state]) => (state._tag === 'running' ? [key] : []))
+  for (const key of runningKeys.slice(0, Math.max(0, runningKeys.length - MAX_INTEGRATION_PROGRESS_ENTRIES))) fresh.delete(key)
+  return fresh
+}
+
+const entryOf = (state: IntegrationRequestState | undefined): QueuedIntegration | undefined =>
+  state === undefined || state._tag === 'running' ? undefined : state.entry
 
 /**
  * Integrations the user asked for while the thread was still busy, and the phase of every integration in flight. Each
@@ -63,6 +90,7 @@ export class IntegrationRequests extends Context.Service<
     readonly isCurrent: (entry: QueuedIntegration) => Effect.Effect<boolean>
     /** Drop `entry` once its attempt settled, unless it was cancelled or replaced meanwhile. */
     readonly settle: (entry: QueuedIntegration) => Effect.Effect<boolean>
+    /** An attempt that ended without settling returns its entry to the queue, so a later attempt can retry or cancel it. */
     readonly endAttempt: (path: string) => Effect.Effect<void>
     readonly recordProgress: (input: { readonly path: string; readonly phase: IntegrationProgressPhase }) => Effect.Effect<void>
     readonly progress: (path: string) => Effect.Effect<IntegrationProgress | null>
@@ -73,21 +101,21 @@ export class IntegrationRequests extends Context.Service<
   static readonly layer = Layer.effect(
     IntegrationRequests,
     Effect.gen(function* () {
-      const state = yield* Ref.make<RequestsState>({ entries: new Map(), passedGuard: new Set(), events: [] })
-      const progressByPath = yield* Ref.make<ReadonlyMap<string, IntegrationProgress>>(new Map())
+      const state = yield* Ref.make<RequestsState>({ paths: new Map(), events: [] })
       const queuedSignals = yield* Queue.sliding<void>(1)
 
       const queue = Effect.fn('integration requests queue')(function* (input: { readonly path: string; readonly sessionId: string | undefined }) {
         const now = yield* Clock.currentTimeMillis
         const entry = yield* Ref.modify(state, (current): readonly [QueuedIntegration, RequestsState] => {
-          const existing = current.entries.get(input.path)
-          if (existing !== undefined) return [existing, current]
+          const existing = current.paths.get(input.path)
+          if (existing !== undefined && existing._tag !== 'running') return [existing.entry, current]
           const entry: QueuedIntegration = { path: input.path, sessionId: input.sessionId, queuedAt: now }
+          const progress = existing?.progress ?? { phase: 'queued', updatedAt: now }
           return [
             entry,
             {
               ...current,
-              entries: new Map([...current.entries, [input.path, entry]]),
+              paths: new Map([...current.paths, [input.path, { _tag: 'queued', entry, progress }]]),
               events: withEvent(current.events, { path: input.path, at: now, kind: 'queued', sessionId: input.sessionId }),
             },
           ]
@@ -99,23 +127,26 @@ export class IntegrationRequests extends Context.Service<
       const cancel = Effect.fn('integration requests cancel')(function* (path: string) {
         const now = yield* Clock.currentTimeMillis
         return yield* Ref.modify(state, (current): readonly [QueuedIntegrationCancel, RequestsState] => {
-          if (current.passedGuard.has(path)) return ['integrating', current]
-          const entry = current.entries.get(path)
-          if (entry === undefined) return ['not-queued', current]
-          const entries = new Map(current.entries)
-          entries.delete(path)
-          return ['cancelled', { ...current, entries, events: withEvent(current.events, { path, at: now, kind: 'unqueued', sessionId: entry.sessionId }) }]
+          const existing = current.paths.get(path)
+          if (existing === undefined || existing._tag === 'running') return ['not-queued', current]
+          if (existing._tag === 'integrating') return ['integrating', current]
+          return [
+            'cancelled',
+            {
+              ...current,
+              paths: new Map([...current.paths, [path, withoutEntry(existing)]]),
+              events: withEvent(current.events, { path, at: now, kind: 'unqueued', sessionId: existing.entry.sessionId }),
+            },
+          ]
         })
       })
-
-      const isCurrent = (entry: QueuedIntegration) => Effect.map(Ref.get(state), current => current.entries.get(entry.path) === entry)
 
       return IntegrationRequests.of({
         queued: Stream.fromQueue(queuedSignals),
         queue,
         cancel,
-        get: path => Effect.map(Ref.get(state), current => current.entries.get(path)),
-        entries: Effect.map(Ref.get(state), current => [...current.entries.values()]),
+        get: path => Effect.map(Ref.get(state), current => entryOf(current.paths.get(path))),
+        entries: Effect.map(Ref.get(state), current => [...current.paths.values()].flatMap(current => (current._tag === 'running' ? [] : [current.entry]))),
         history: path =>
           Effect.map(Ref.get(state), current =>
             current.events
@@ -128,34 +159,52 @@ export class IntegrationRequests extends Context.Service<
           ),
         passGuard: entry =>
           Ref.modify(state, (current): readonly [boolean, RequestsState] => {
-            if (current.entries.get(entry.path) !== entry) return [false, current]
-            return [true, { ...current, passedGuard: new Set([...current.passedGuard, entry.path]) }]
+            const existing = current.paths.get(entry.path)
+            if (existing === undefined || existing._tag !== 'queued' || existing.entry !== entry) return [false, current]
+            return [true, { ...current, paths: new Map([...current.paths, [entry.path, { _tag: 'integrating', entry, progress: existing.progress }]]) }]
           }),
-        hasPassedGuard: path => Effect.map(Ref.get(state), current => current.passedGuard.has(path)),
-        isCurrent,
+        hasPassedGuard: path => Effect.map(Ref.get(state), current => current.paths.get(path)?._tag === 'integrating'),
+        isCurrent: entry =>
+          Effect.map(Ref.get(state), current => {
+            const existing = current.paths.get(entry.path)
+            return existing !== undefined && existing._tag !== 'running' && existing.entry === entry
+          }),
         settle: entry =>
           Ref.modify(state, (current): readonly [boolean, RequestsState] => {
-            if (current.entries.get(entry.path) !== entry) return [false, current]
-            const entries = new Map(current.entries)
-            entries.delete(entry.path)
-            return [true, { ...current, entries }]
+            const existing = current.paths.get(entry.path)
+            if (existing === undefined || existing._tag === 'running' || existing.entry !== entry) return [false, current]
+            return [true, { ...current, paths: new Map([...current.paths, [entry.path, withoutEntry(existing)]]) }]
           }),
         endAttempt: path =>
-          Ref.update(state, current => ({ ...current, passedGuard: new Set([...current.passedGuard].filter(candidate => candidate !== path)) })),
+          Ref.update(state, current => {
+            const existing = current.paths.get(path)
+            if (existing === undefined || existing._tag !== 'integrating') return current
+            return {
+              ...current,
+              paths: new Map([...current.paths, [path, { _tag: 'queued', entry: existing.entry, progress: existing.progress }]]),
+            }
+          }),
         recordProgress: input =>
           Effect.flatMap(Clock.currentTimeMillis, now =>
-            Ref.update(progressByPath, current => {
-              const next = freshProgress(current, now)
-              next.delete(input.path)
-              next.set(input.path, { phase: input.phase, updatedAt: now })
-              return new Map([...next].slice(-MAX_INTEGRATION_PROGRESS_ENTRIES))
+            Ref.update(state, current => {
+              const existing = current.paths.get(input.path)
+              const progress: IntegrationProgress = { phase: input.phase, updatedAt: now }
+              const paths =
+                existing === undefined
+                  ? new Map([...current.paths, [input.path, { _tag: 'running', progress }]] as const)
+                  : new Map([...current.paths, [input.path, withProgress(existing, progress)]])
+              return { ...current, paths: prunedProgress(paths, now) }
             }),
           ),
         progress: path =>
           Effect.flatMap(Clock.currentTimeMillis, now =>
-            Ref.modify(progressByPath, (current): readonly [IntegrationProgress | null, ReadonlyMap<string, IntegrationProgress>] => {
-              const next = freshProgress(current, now)
-              return [next.get(path) ?? null, next]
+            Ref.modify(state, (current): readonly [IntegrationProgress | null, RequestsState] => {
+              const paths = prunedProgress(current.paths, now)
+              const progress = paths.get(path)?.progress
+              return [
+                progress === undefined || now - progress.updatedAt > INTEGRATION_PROGRESS_TTL_MS ? null : progress,
+                paths === current.paths ? current : { ...current, paths },
+              ]
             }),
           ),
       })

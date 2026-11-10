@@ -33,7 +33,7 @@
           "kind": "unit-test",
           "id": "btw.failure-archives",
           "file": "plugins/@dshfiles/btw/src/side-chat-machine.test.ts",
-          "testName": "archives the fork when asking fails, and reports why"
+          "testName": "archives the fork and releases its session when asking fails, and reports why"
         },
         {
           "kind": "unit-test",
@@ -124,7 +124,7 @@
           "kind": "unit-test",
           "id": "btw.ask-started",
           "file": "plugins/@dshfiles/btw/src/side-chat-machine.test.ts",
-          "testName": "reports success once the fork is configured, before the answer arrives"
+          "testName": "reports success once the fork is retained, before the answer arrives"
         },
         {
           "kind": "unit-test",

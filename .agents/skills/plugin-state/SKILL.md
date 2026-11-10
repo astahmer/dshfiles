@@ -7,24 +7,43 @@ description: Pick and write client state in DSH plugins with the plugin-ui bindi
 
 Rule of thumb (current audit decisions: `plugins/@dshfiles/plugin-ui/docs/state-ownership.md`):
 
-| State | Use | Import |
-|---|---|---|
-| Host / async data | `useQuery` / `useMutation` | `@dshfiles/plugin-ui/query` |
-| Multi-field form | `useAppForm` + zod schema | `@dshfiles/plugin-ui/form` |
-| Flow with ≥3 tangled states | xstate v5 machine | `@dshfiles/plugin-ui/machine` |
-| localStorage | `createStoredValue` | `@dshfiles/plugin-ui/hooks/stored-value` |
-| Debounced input | `useDebouncedValue` | `@dshfiles/plugin-ui/hooks/debounced-value` |
+| State                       | Use                        | Import                                      |
+| --------------------------- | -------------------------- | ------------------------------------------- |
+| Host / async data           | `useQuery` / `useMutation` | `@dshfiles/plugin-ui/query`                 |
+| Multi-field form            | `useAppForm` + zod schema  | `@dshfiles/plugin-ui/form`                  |
+| Flow with ≥3 tangled states | xstate v5 machine          | `@dshfiles/plugin-ui/machine`               |
+| localStorage                | `createStoredValue`        | `@dshfiles/plugin-ui/hooks/stored-value`    |
+| Debounced input             | `useDebouncedValue`        | `@dshfiles/plugin-ui/hooks/debounced-value` |
 
 Do not add `@tanstack/*`, `xstate` or `zod` UI deps to a plugin directly — plugin-ui pins them.
+
+## Flow ownership
+
+A lifecycle split across flags, refs and timers is the bug, even before it fires: every reachable bad
+combination eventually is. The rules, and the reasoning, live in
+[state ownership](../../@dshfiles/plugin-ui/docs/state-ownership.md#one-owner-per-flow):
+
+- Pick the smallest owner that makes the bad state unrepresentable: a union for two or three states with no
+  timers, a machine for three or more tangled states or any timer/cancellation/child work, Query for Host data,
+  `Ref.modify` / `Effect.ensuring` / a pure `transition` on the Host side.
+- A machine owns all of its flow. When a component wraps one, its parallel flags, refs and effects move in; a
+  second source of truth beside a machine is the bug.
+- Per-key state is per key: anything fed by events from several Sessions, accounts or paths keys by that id.
+- Reproduce first, and leave a flow alone with one line saying why when it is already contained.
 
 ## Query
 
 Wrap each slot root once inside dshx `decorate(...)` (one client per plugin bundle):
 
 ```tsx
-ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(props => (
-  <PluginQueryProvider><SecretCatalogPanel t={props.t} /></PluginQueryProvider>
-)))
+ctx.slots.register(
+  { name: 'main', key: PANEL_ID },
+  decorate(props => (
+    <PluginQueryProvider>
+      <SecretCatalogPanel t={props.t} />
+    </PluginQueryProvider>
+  )),
+)
 ```
 
 Keys start with the plugin id, `signal` is forwarded, mutations invalidate by key, polling is `refetchInterval`
@@ -78,15 +97,18 @@ actors: {
 
 ```tsx
 const [snapshot, send, actor] = useMachine(workspaceRestoreMachine, { input: { client, workspacePath, targetCommitId } })
-useEffect(() => { const sub = actor.on('restored', () => onRestored.current()); return () => sub.unsubscribe() }, [actor])
+useEffect(() => {
+  const sub = actor.on('restored', () => onRestored.current())
+  return () => sub.unsubscribe()
+}, [actor])
 ```
 
 ## Storage and debounce
 
 ```ts
 const storedRepoHistory = createStoredValue({ key: REPO_HISTORY_KEY, schema: z.array(z.string()), fallback: [] })
-const history = storedRepoHistory.useValue()          // invalid/missing → fallback; synced across tabs
-storedRepoHistory.set(nextHistory)                      // false if schema or quota rejects
+const history = storedRepoHistory.useValue() // invalid/missing → fallback; synced across tabs
+storedRepoHistory.set(nextHistory) // false if schema or quota rejects
 
-const query = useDebouncedValue({ value: search, delayMs: 200 })   // feed into a query key
+const query = useDebouncedValue({ value: search, delayMs: 200 }) // feed into a query key
 ```

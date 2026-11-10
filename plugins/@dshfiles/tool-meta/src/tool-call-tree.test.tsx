@@ -15,6 +15,7 @@ interface Call {
 interface FakeTreeProps {
   readonly renderSlot: (key: 'tool.call.toolview', owner: Pick<ToolCallOwnerProps, 'callId'>) => ReactNode
   readonly root?: Call
+  readonly sessionId?: string
 }
 
 /** Stands in for the native tree: every call, nested ones included, goes through renderSlot('tool.call.toolview'). */
@@ -57,6 +58,19 @@ const renderWrapped = (entry: StoredEntry, props: FakeTreeProps): void => {
 }
 
 describe('installToolCallTreeWrapper', () => {
+  it('renders contributed sections under each card, nested calls included', () => {
+    const entry = toolCallEntry(NativeTree)
+    const Sections = ({ owner, sessionId }: { readonly owner: Pick<ToolCallOwnerProps, 'callId'>; readonly sessionId: string }) => (
+      <span role="status">
+        {sessionId} section {owner.callId}
+      </span>
+    )
+    const dispose = installToolCallTreeWrapper({ slots: ledger([entry]), Meta, Sections })
+    renderWrapped(entry, { sessionId: 'thread-1', renderSlot: nativeRenderSlot, root: { callId: 'parent', subCalls: [{ callId: 'child' }] } })
+    expect(screen.getAllByRole('status').map(section => section.textContent)).toEqual(['thread-1 section parent', 'thread-1 section child'])
+    dispose()
+  })
+
   it('adds a meta line under every dispatched tool card, nested calls included', () => {
     const entry = toolCallEntry(NativeTree)
     installToolCallTreeWrapper({ slots: ledger([entry]), Meta })

@@ -121,7 +121,7 @@ describe('receiver listen lifecycle', () => {
     Effect.gen(function* () {
       const port = (yield* ReceiverHarness.untilState('listening')).boundPort ?? 0
       yield* ReceiverHarness.updateSettings({ mode: 'external' })
-      expect(yield* ReceiverHarness.untilState('disabled')).toMatchObject({ boundPort: null, message: null })
+      expect(yield* ReceiverHarness.untilState('disabled')).toMatchObject({ boundPort: null, message: null, startedAt: null })
       expect(yield* ReceiverHarness.accepts(port)).toBe(false)
     }).pipe(Effect.provide(ReceiverHarness.receiverLayer())),
   )

@@ -200,6 +200,28 @@ describe('managed Codex login with injected subprocess and filesystem', () => {
     expect(h.onComplete).not.toHaveBeenCalled()
     expect(h.files.cleanup).toHaveBeenCalledOnce()
   })
+  it.each(['cancel', 'reconcile'] as const)('stops the running CLI when a saved-account lookup overlaps %s', async action => {
+    const secondLookup = deferred<AccountLoginAccount | undefined>()
+    let lookups = 0
+    const h = harness({
+      accountLookup: async () => {
+        lookups += 1
+        return lookups === 1 ? { instanceId: 'work', kind: 'codex', layout } : secondLookup.promise
+      },
+    })
+    await h.service.begin('work')
+    await h.started
+    const overlapping = h.service.begin('work')
+    if (action === 'cancel') expect(h.service.cancel('work').status).toBe('cancelled')
+    else h.service.reconcile([])
+    expect(h.aborted()).toBe(true)
+    secondLookup.resolve({ instanceId: 'work', kind: 'codex', layout })
+    await overlapping
+    h.exit.resolve(0)
+    await h.service.settled()
+    expect(h.files.adopt).not.toHaveBeenCalled()
+    expect(h.service.state('work').status).toBe('cancelled')
+  })
   it('times out, aborts the subprocess and never adopts its late success', async () => {
     vi.useFakeTimers()
     const h = harness({ timeoutMs: 100 })

@@ -64,6 +64,24 @@ describe('memory repo', () => {
     ),
   )
 
+  it.effect('reads the digest metadata of a whole Session list at once', () =>
+    withStore(store =>
+      Effect.gen(function* () {
+        yield* store.putThread(digest('session-a', '/p/halyard', 'Northwind Freight account ACC-77341 moved to the Enterprise tier.', start))
+        yield* store.putThread(digest('session-b', '/p/halyard', 'Rebalancing consumers after the coordinator restarted.', start + day))
+        expect(yield* store.threadsByIds([])).toEqual([])
+        const summaries = yield* store.threadsByIds(['session-b', 'session-a', 'session-missing'])
+        expect(summaries).toHaveLength(2)
+        for (const summary of summaries) {
+          const stored = yield* store.thread(summary.id)
+          expect(summary.title).toBe(stored?.title)
+          expect(summary.updatedAt).toBe(stored?.updatedAt)
+        }
+        expect(summaries.find(summary => summary.id === 'session-b')?.updatedAt).toBe(start + day)
+      }),
+    ),
+  )
+
   it.effect('stores identical digests and notes once', () =>
     withStore(store =>
       Effect.gen(function* () {

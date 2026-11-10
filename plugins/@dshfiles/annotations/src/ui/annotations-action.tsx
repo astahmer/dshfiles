@@ -1,22 +1,23 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { CrosshairIcon, SquareDashedIcon } from '@dshfiles/plugin-ui/icons'
-import { useApi, usePlugin, useResource, type ComposerActionProps } from '@dshfiles/dshx/client'
+import { useApi, usePlugin, useResource, type ComposerToolProps } from '@dshfiles/dshx/client'
 import { retryOnceUnlessTimedOut, runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { annotationsApi } from '../api.js'
 import { INGEST_PATH } from '../limits.js'
 import { formatAnnotationBlock } from '../draft.js'
-import { annotationsListPollMs, annotationsListResource } from '../list-poll.js'
+import { annotationsListInput, annotationsListPollMs, annotationsListResource } from '../list-poll.js'
 import type { Annotation } from '../schema.js'
 import { staleAnnotations } from '../stale.js'
-import { annotationsUi } from './state.js'
+import { annotationsUi, useAnnotationsUi } from './state.js'
+import { pairingMachine } from './pairing-machine.js'
 import { PreviewDialog } from './preview-dialog.js'
-
-const OPEN_STATUSES = ['pending', 'acknowledged', 'stale'] as const
+import { noRowAction, rowActionReducer } from './row-action.js'
 
 const selectorLabel = (annotation: Annotation): string => annotation.target.selector.split(' > ').slice(-1)[0] ?? annotation.target.tag
 
@@ -25,6 +26,11 @@ const statusVariant = (annotation: Annotation): 'default' | 'secondary' | 'outli
   if (annotation.severity === 'blocking') return 'destructive'
   if (annotation.status === 'acknowledged') return 'secondary'
   return 'outline'
+}
+
+const describeError = (error: unknown, fallback: string): string | null => {
+  if (error === null || error === undefined) return null
+  return error instanceof Error ? error.message : fallback
 }
 
 const pickFailureMessage = ({
@@ -40,32 +46,32 @@ const pickFailureMessage = ({
   return 'Could not reach that tab.'
 }
 
-export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
+export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
   const api = useApi(annotationsApi)
   const plugin = usePlugin()
   const queryClient = useQueryClient()
-  const sessionId = props.sessionId
+  const { scope, scopeLabel, hold } = props
+  const owner = useId()
+  const ui = useAnnotationsUi()
   const [open, setOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
-  const [pairingArmed, setPairingArmed] = useState(false)
-  const [dismissing, setDismissing] = useState<string | null>(null)
-  const [reason, setReason] = useState('')
-  const [replying, setReplying] = useState<string | null>(null)
-  const [reply, setReply] = useState('')
+  const [pairing, sendPairing] = useMachine(pairingMachine)
+  const [rowAction, dispatchRowAction] = useReducer(rowActionReducer, noRowAction)
   const checked = useRef(new Set<string>())
 
   useEffect(() => {
-    annotationsUi.setSession(sessionId)
-    return () => annotationsUi.setSession(null)
-  }, [sessionId])
+    annotationsUi.registerDraftWriter({ owner, insertText: props.insertText })
+  }, [owner, props.insertText])
+  useEffect(() => () => annotationsUi.release(owner), [owner, scope])
 
-  const list = useResource(
-    annotationsApi,
-    'list',
-    { sessionId, statuses: [...OPEN_STATUSES], limit: 50 },
-    { ...annotationsListResource, subscriberPollInterval: annotationsListPollMs(open) },
-  )
+  // A layout effect: the popover moves focus out of the draft in its own effect, and a draft saving on blur must already be held.
+  const working = open || previewOpen || (ui.owner === owner && (ui.pickMode || ui.picked !== null))
+  useLayoutEffect(() => (working ? hold() : undefined), [hold, working])
+
+  const list = useResource(annotationsApi, 'list', annotationsListInput({ scope }), {
+    ...annotationsListResource,
+    subscriberPollInterval: annotationsListPollMs(open),
+  })
   const rows = useMemo(() => list.data?.annotations ?? [], [list.data])
   const count = rows.length
 
@@ -77,8 +83,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     retry: retryOnceUnlessTimedOut,
   })
   const attach = useMutation({
-    mutationFn: async (ids: readonly string[]) => runHostRequest({ request: signal => api.attach({ sessionId, ids: [...ids] }, { signal }) }),
-    onError: (cause: unknown) => setActionError(cause instanceof Error ? cause.message : 'Could not attach that annotation.'),
+    mutationFn: async (ids: readonly string[]) => runHostRequest({ request: signal => api.attach({ sessionId: scope, ids: [...ids] }, { signal }) }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['annotations', 'intake'] })
       await refresh()
@@ -93,17 +98,17 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
   const pairStatus = useQuery({
     queryKey: ['annotations', 'pair'],
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.pair({ action: 'status' }, { signal: hostSignal }) }),
-    enabled: open && pairingArmed,
+    enabled: open && pairing.matches('armed'),
     refetchInterval: 2_000,
     retry: 0,
   })
   useEffect(() => {
-    if (pairingArmed && pairStatus.data?.pairedAt !== undefined) setPairingArmed(false)
-  }, [pairingArmed, pairStatus.data])
+    if (pairing.matches('armed') && pairStatus.data?.pairedAt !== undefined) sendPairing({ type: 'paired' })
+  }, [pairing, pairStatus.data, sendPairing])
   const armPairing = useMutation({
     mutationFn: async () => runHostRequest({ request: signal => api.pair({ action: 'arm' }, { signal }) }),
-    onSuccess: () => setPairingArmed(true),
-    onError: (cause: unknown) => setActionError(cause instanceof Error ? cause.message : 'Could not open the pairing window.'),
+    onSuccess: () => sendPairing({ type: 'armed' }),
+    onError: () => sendPairing({ type: 'arm.failed' }),
   })
   const chromeStatus = useQuery({
     queryKey: ['annotations', 'chrome'],
@@ -115,35 +120,29 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
   const launchChrome = useMutation({
     mutationFn: async () => runHostRequest({ request: signal => api.chromeLaunch({}, { signal }) }),
     onSuccess: () => void chromeStatus.refetch(),
-    onError: (cause: unknown) => setActionError(cause instanceof Error ? cause.message : 'Could not start Chrome.'),
   })
   const stopChrome = useMutation({
     mutationFn: async () => runHostRequest({ request: signal => api.chromeStop({}, { signal }) }),
     onSuccess: () => void chromeStatus.refetch(),
   })
+  const pickInChrome = async ({ pageId, noPage }: { readonly pageId?: string; readonly noPage: string }) => {
+    const result = await runHostRequest({ request: signal => api.chromePick(pageId === undefined ? {} : { pageId }, { signal }) })
+    if (result.ok) return { target: result.target, point: result.point }
+    const message = pickFailureMessage({ reason: result.reason, noPage })
+    if (message === null) return null
+    throw new Error(message)
+  }
+  const acceptPick = (picked: Awaited<ReturnType<typeof pickInChrome>>): void => {
+    if (picked === null) return
+    annotationsUi.pickedFrom({ scope, owner, picked: { target: picked.target, point: picked.point, mode: 'element' } })
+  }
   const pickActiveTab = useMutation({
-    mutationFn: async () => runHostRequest({ request: signal => api.chromePick({}, { signal }) }),
-    onSuccess: result => {
-      if (!result.ok) {
-        setActionError(pickFailureMessage({ reason: result.reason, noPage: 'No annotatable tab yet; open a page in that window.' }))
-        return
-      }
-      setActionError(null)
-      annotationsUi.picked({ target: result.target, point: result.point, mode: 'element' })
-    },
-    onError: (cause: unknown) => setActionError(cause instanceof Error ? cause.message : 'Could not pick in that tab.'),
+    mutationFn: () => pickInChrome({ noPage: 'No annotatable tab yet; open a page in that window.' }),
+    onSuccess: acceptPick,
   })
   const pickOnChrome = useMutation({
-    mutationFn: async (pageId: string) => runHostRequest({ request: signal => api.chromePick({ pageId }, { signal }) }),
-    onSuccess: result => {
-      if (!result.ok) {
-        setActionError(pickFailureMessage({ reason: result.reason, noPage: 'That tab is gone; refresh the list.' }))
-        return
-      }
-      setActionError(null)
-      annotationsUi.picked({ target: result.target, point: result.point, mode: 'element' })
-    },
-    onError: (cause: unknown) => setActionError(cause instanceof Error ? cause.message : 'Could not pick in that tab.'),
+    mutationFn: (pageId: string) => pickInChrome({ pageId, noPage: 'That tab is gone; refresh the list.' }),
+    onSuccess: acceptPick,
   })
   const tokenQuery = useQuery({
     queryKey: ['annotations', 'token'],
@@ -158,32 +157,32 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
 
   const stale = useMutation({
     mutationFn: async (check: { readonly id: string; readonly revision: number; readonly reason: 'element-missing' | 'text-changed' | 'route-changed' }) =>
-      runHostRequest({ request: signal => api.stale({ sessionId, id: check.id, reason: check.reason }, { signal }) }),
+      runHostRequest({ request: signal => api.stale({ sessionId: scope, id: check.id, reason: check.reason }, { signal }) }),
     onSuccess: refresh,
   })
 
   const resolve = useMutation({
     mutationFn: async (annotation: Annotation) =>
-      runHostRequest({ request: signal => api.resolve({ sessionId, id: annotation.id, revision: annotation.revision }, { signal }) }),
-    onSuccess: refresh,
+      runHostRequest({ request: signal => api.resolve({ sessionId: scope, id: annotation.id, revision: annotation.revision }, { signal }) }),
+    onSuccess: async () => {
+      await refresh()
+    },
   })
 
   const dismiss = useMutation({
     mutationFn: async ({ id, text }: { readonly id: string; readonly text: string }) =>
-      runHostRequest({ request: signal => api.dismiss({ sessionId, id, reason: text }, { signal }) }),
+      runHostRequest({ request: signal => api.dismiss({ sessionId: scope, id, reason: text }, { signal }) }),
     onSuccess: async () => {
-      setDismissing(null)
-      setReason('')
+      dispatchRowAction({ type: 'settled' })
       await refresh()
     },
   })
 
   const sendReply = useMutation({
     mutationFn: async ({ id, body }: { readonly id: string; readonly body: string }) =>
-      runHostRequest({ request: signal => api.reply({ sessionId, id, body, role: 'human' }, { signal }) }),
+      runHostRequest({ request: signal => api.reply({ sessionId: scope, id, body, role: 'human' }, { signal }) }),
     onSuccess: async () => {
-      setReplying(null)
-      setReply('')
+      dispatchRowAction({ type: 'settled' })
       await refresh()
     },
   })
@@ -198,16 +197,24 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
     }
   }, [rows, stale])
 
+  const actionErrors = [
+    describeError(attach.error, 'Could not attach that annotation.'),
+    describeError(armPairing.error, 'Could not open the pairing window.'),
+    describeError(launchChrome.error, 'Could not start Chrome.'),
+    describeError(pickActiveTab.error, 'Could not pick in that tab.'),
+    describeError(pickOnChrome.error, 'Could not pick in that tab.'),
+    describeError(resolve.error, 'Could not resolve that annotation.'),
+  ].filter((message): message is string => message !== null)
+
   const pick = ({ mode }: { readonly mode: 'element' | 'region' }): void => {
     setOpen(false)
-    annotationsUi.beginPick({ sessionId, mode })
+    annotationsUi.beginPick({ scope, owner, mode })
   }
 
   const insert = (): void => {
     const block = formatAnnotationBlock({ annotations: rows })
     if (block.length === 0) return
-    const span = props.inputActions.captureInsertion()
-    if (!props.inputActions.insertText(block, span)) return
+    if (!props.insertText(block)) return
     setOpen(false)
   }
 
@@ -220,6 +227,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
             variant="ghost"
             size="sm"
             aria-label="Annotate an element"
+            onMouseDown={event => event.preventDefault()}
             className="dshx-root dshx:relative dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent"
           >
             <CrosshairIcon className="dshx:size-4" />
@@ -234,7 +242,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
           <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-2">
             <div>
               <h2 className="dshx:text-sm dshx:font-semibold">Annotations</h2>
-              <p className="dshx:text-xs dshx:text-muted-foreground">{count === 0 ? 'None yet in this thread' : `${count} open`}</p>
+              <p className="dshx:text-xs dshx:text-muted-foreground">{count === 0 ? `None yet in this ${scopeLabel}` : `${count} open`}</p>
             </div>
             <div className="dshx:flex dshx:items-center dshx:gap-1">
               <Button type="button" size="sm" variant="secondary" onClick={() => pick({ mode: 'element' })}>
@@ -262,7 +270,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                     disabled={attach.isPending}
                     onClick={() => attach.mutate([item.id])}
                   >
-                    Add to this thread
+                    Add to this {scopeLabel}
                   </Button>
                 </div>
               ))}
@@ -355,11 +363,20 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
               </li>
             </ol>
             <div className="dshx:mt-1 dshx:flex dshx:items-center dshx:gap-2">
-              <Button type="button" size="sm" variant="secondary" disabled={armPairing.isPending} onClick={() => armPairing.mutate()}>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={armPairing.isPending}
+                onClick={() => {
+                  sendPairing({ type: 'arm' })
+                  armPairing.mutate()
+                }}
+              >
                 Pair extension
               </Button>
               {pairStatus.data?.pairedAt === undefined ? (
-                pairingArmed ? (
+                pairing.matches('armed') ? (
                   <span className="dshx:text-[11px] dshx:text-muted-foreground">Waiting for the extension…</span>
                 ) : null
               ) : (
@@ -392,7 +409,15 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
               )}
             </details>
           </details>
-          {actionError === null ? null : <p className="dshx:border-b dshx:px-3 dshx:py-1 dshx:text-[11px] dshx:text-destructive">{actionError}</p>}
+          {actionErrors.length === 0 ? null : (
+            <div className="dshx:border-b dshx:px-3 dshx:py-1">
+              {actionErrors.map(message => (
+                <p key={message} className="dshx:text-[11px] dshx:text-destructive">
+                  {message}
+                </p>
+              ))}
+            </div>
+          )}
           <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
             {rows.length === 0 ? (
               <p className="dshx:px-3 dshx:py-6 dshx:text-center dshx:text-xs dshx:text-muted-foreground">
@@ -424,12 +449,12 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                         ))}
                       </ul>
                     )}
-                    {dismissing === annotation.id ? (
+                    {rowAction.kind === 'dismissing' && rowAction.id === annotation.id ? (
                       <div className="dshx:flex dshx:items-center dshx:gap-1">
                         <Input
                           autoFocus
-                          value={reason}
-                          onChange={event => setReason(event.target.value)}
+                          value={rowAction.reason}
+                          onChange={event => dispatchRowAction({ type: 'reason', reason: event.target.value })}
                           placeholder="Why dismiss it?"
                           className="dshx:h-7 dshx:text-xs"
                         />
@@ -437,27 +462,27 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                           type="button"
                           size="sm"
                           variant="destructive"
-                          disabled={reason.trim().length === 0 || dismiss.isPending}
-                          onClick={() => dismiss.mutate({ id: annotation.id, text: reason.trim() })}
+                          disabled={rowAction.reason.trim().length === 0 || dismiss.isPending}
+                          onClick={() => dismiss.mutate({ id: annotation.id, text: rowAction.reason.trim() })}
                         >
                           Dismiss
                         </Button>
                       </div>
                     ) : null}
-                    {replying === annotation.id ? (
+                    {rowAction.kind === 'replying' && rowAction.id === annotation.id ? (
                       <div className="dshx:flex dshx:items-center dshx:gap-1">
                         <Input
                           autoFocus
-                          value={reply}
-                          onChange={event => setReply(event.target.value)}
+                          value={rowAction.body}
+                          onChange={event => dispatchRowAction({ type: 'body', body: event.target.value })}
                           placeholder="Reply to this annotation"
                           className="dshx:h-7 dshx:text-xs"
                         />
                         <Button
                           type="button"
                           size="sm"
-                          disabled={reply.trim().length === 0 || sendReply.isPending}
-                          onClick={() => sendReply.mutate({ id: annotation.id, body: reply.trim() })}
+                          disabled={rowAction.body.trim().length === 0 || sendReply.isPending}
+                          onClick={() => sendReply.mutate({ id: annotation.id, body: rowAction.body.trim() })}
                         >
                           Reply
                         </Button>
@@ -478,10 +503,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                         size="sm"
                         variant="ghost"
                         className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
-                        onClick={() => {
-                          setReason('')
-                          setDismissing(annotation.id)
-                        }}
+                        onClick={() => dispatchRowAction({ type: 'dismiss', id: annotation.id })}
                       >
                         Dismiss
                       </Button>
@@ -490,10 +512,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
                         size="sm"
                         variant="ghost"
                         className="dshx:h-6 dshx:px-1.5 dshx:text-[11px]"
-                        onClick={() => {
-                          setReply('')
-                          setReplying(annotation.id)
-                        }}
+                        onClick={() => dispatchRowAction({ type: 'reply', id: annotation.id })}
                       >
                         Reply
                       </Button>
@@ -513,7 +532,7 @@ export const AnnotationsAction = (props: ComposerActionProps): JSX.Element => {
           </div>
         </PopoverContent>
       </Popover>
-      <PreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} sessionId={sessionId} />
+      <PreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} scope={scope} />
     </>
   )
 }

@@ -138,6 +138,16 @@ export interface ReferenceCodec {
   serialize(ref: string, signal: AbortSignal, label: string): Promise<string>
 }
 
+/** One reference a plain-text message still names: the chip fields plus the span they replace in the text. */
+export interface RestoredReference extends ReferenceInsert {
+  /**
+   * One reference this source's own serialized text still names, as a text span and the chip that replaces it.
+   * `clipboardText` must equal the matched text so the draft text is unchanged by the restore.
+   */
+  readonly start: number
+  readonly end: number
+}
+
 /**
  * One trigger source. Every callback receives the session's
  * ClientSessionContext projection; sources keep no copy across calls.
@@ -224,6 +234,12 @@ export interface InputTriggerSource {
    * @returns whether this source accepted the preview, possibly awaiting its catalog; false leaves the editor gesture unchanged.
    */
   openReference?(session: ClientSessionContext, reference: Pick<ReferenceInsert, 'ref' | 'appearance'>): boolean
+  /**
+   * Rebuildable spans of this source's own serialized text (a queued message's plain text, for example). Every
+   * returned chip must keep its matched text as `clipboardText`, so restoring references never rewrites the draft.
+   * Synchronous and pure; errors are ignored by the caller.
+   */
+  restore?(session: ClientSessionContext, text: string): readonly RestoredReference[]
   /** Reference codec; required for sources producing insert outcomes. */
   readonly codec?: ReferenceCodec
 }

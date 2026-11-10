@@ -72,18 +72,22 @@ const tracked =
       const finishedAt = yield* Clock.currentTimeMillis
       const outcome = Exit.isSuccess(exit) ? ('success' as const) : ('failure' as const)
       const errorCode = Exit.isFailure(exit) ? errorCodeOf(exit.cause) : null
-      yield* CommunicationHub.use(hub =>
-        hub.enqueueActivity({
-          principal: { kind: 'agent', id: agent.id },
-          operation,
-          outcome,
-          occurredAt: finishedAt,
-          durationMs: Math.min(3_600_000, Math.max(0, finishedAt - startedAt)),
-          callId: call.callId,
-          rootCallId: null,
-          errorCode,
-        }),
-      ).pipe(Effect.catch(error => Effect.logWarning(`agent-communication: activity record failed (tool=${operation}, code=${error.code})`)))
+      // The record is best-effort telemetry: awaiting its durable write would add the store's batch delay and a
+      // whole-snapshot write to every tool response, so it is queued off the response path.
+      yield* Effect.forkDetach(
+        CommunicationHub.use(hub =>
+          hub.enqueueActivity({
+            principal: { kind: 'agent', id: agent.id },
+            operation,
+            outcome,
+            occurredAt: finishedAt,
+            durationMs: Math.min(3_600_000, Math.max(0, finishedAt - startedAt)),
+            callId: call.callId,
+            rootCallId: null,
+            errorCode,
+          }),
+        ).pipe(Effect.catch(error => Effect.logWarning(`agent-communication: activity record failed (tool=${operation}, code=${error.code})`))),
+      )
       yield* HostAgents.use(agents =>
         agents.emitActivity({
           kind: 'communication-activity',

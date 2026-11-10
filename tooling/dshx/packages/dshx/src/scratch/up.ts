@@ -148,7 +148,9 @@ export const scratchUp = async (
     )
   const existing = await ScratchStateRuntime.read(options.stateDir, options.name).catch(() => undefined)
   // Reaching for an instance answers its warning, even when up then refuses to start a second one beside it.
-  if (existing !== undefined && existing.warnedAt !== undefined) await ScratchStateRuntime.cancelWarning(existing)
+  if (existing !== undefined && ScratchStateRuntime.leaseOf(existing).kind === 'warned') {
+    await ScratchStateRuntime.cancelWarning({ stateDir: options.stateDir, name: options.name })
+  }
   if (existing !== undefined && ScratchStateRuntime.ownedProcessStatus(existing.host) === 'running') {
     throw new ScratchError(
       'already-up',
@@ -285,6 +287,7 @@ export const scratchUp = async (
       origin: new URL(launchUrl).origin,
       launchUrl,
       bundles: bundles.map(bundle => bundle.packageId),
+      expectedEntries: bundles.filter(bundle => bundle.composesLoaderRows).map(bundle => bundle.packageId),
       expectedClientEntries: bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId),
       project: { path: project, workspaceId, ownedByScratch: options.project === undefined },
       host: { pid: hostPid, signature: [`--profile ${prepared.profile}`, `--port ${port}`] },

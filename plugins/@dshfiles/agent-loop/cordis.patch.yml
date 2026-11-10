@@ -1,0 +1,12 @@
+# Replaces the stock agent-loop row with this fork: a settled attempt stores its
+# per-block replay metadata once (on the message source) instead of a second copy
+# inside the durable stream. The native row is disabled, never patched in place —
+# DSH core stays untouched.
+#
+# The stock row ships `agents: []` and the web overlay creates sessions on client
+# request, so the replaced row keeps that default instead of restating it.
+- id: agent-loop
+  disabled: true
+- insert:
+    - id: dshfiles-agent-loop
+      name: '@dshfiles/agent-loop'

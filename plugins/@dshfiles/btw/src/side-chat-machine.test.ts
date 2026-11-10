@@ -12,8 +12,17 @@ const ports = (overrides: Partial<SideChatPorts> = {}) => {
     configure: vi.fn(async input => {
       calls.push(`configure ${input.childId} "${input.title}" ${input.route?.model ?? 'default'}`)
     }),
-    ask: vi.fn(async input => {
-      calls.push(`ask ${input.childId} ${input.question}`)
+    retain: vi.fn(childId => {
+      calls.push(`retain ${childId}`)
+      return {
+        ready: Promise.resolve(),
+        submit: async (question: string) => {
+          calls.push(`ask ${childId} ${question}`)
+        },
+        release: () => {
+          calls.push(`release ${childId}`)
+        },
+      }
     }),
     openPanel: vi.fn(childId => {
       calls.push(`open ${childId}`)
@@ -32,15 +41,37 @@ describe('side chat', () => {
     await waitFor(actor, snapshot => snapshot.matches('open'))
     actor.send({ type: 'close' })
     await waitFor(actor, snapshot => snapshot.status === 'done')
-    expect(calls).toEqual(['fork source', 'configure child "btw · why is this slow?" v4', 'open child', 'ask child why  is\nthis slow?', 'archive child'])
+    expect(calls).toEqual([
+      'fork source',
+      'configure child "btw · why is this slow?" v4',
+      'open child',
+      'retain child',
+      'ask child why  is\nthis slow?',
+      'release child',
+      'archive child',
+    ])
   })
 
-  it('archives the fork when asking fails, and reports why', async () => {
-    const { calls, ports: sideChatPorts } = ports({ ask: async () => Promise.reject(new Error('model refused')) })
+  it('releases the retained session when the flow is closed while asking', async () => {
+    const { calls, ports: sideChatPorts } = ports({
+      retain: () => ({ ready: Promise.resolve(), submit: () => new Promise<void>(() => {}), release: () => calls.push('release') }),
+    })
+    const actor = startSideChat({ ports: sideChatPorts, sourceId: 'source', question: 'q', route: null })
+    await waitFor(actor, snapshot => snapshot.matches('asking'))
+    actor.send({ type: 'close' })
+    await waitFor(actor, snapshot => snapshot.status === 'done')
+    expect(calls).toEqual(['fork source', 'configure child "btw · q" default', 'open child', 'release', 'archive child'])
+  })
+
+  it('archives the fork and releases its session when asking fails, and reports why', async () => {
+    const { calls, ports: sideChatPorts } = ports({
+      retain: () => ({ ready: Promise.resolve(), submit: () => Promise.reject(new Error('model refused')), release: () => calls.push('release') }),
+    })
     const actor = startSideChat({ ports: sideChatPorts, sourceId: 'source', question: 'q', route: null })
     await waitFor(actor, snapshot => snapshot.matches('failed'))
     expect(actor.getSnapshot().context.error).toBe('model refused')
     expect(calls.at(-1)).toBe('archive child')
+    expect(calls).toContain('release')
   })
 
   it('creates nothing to archive when the fork itself fails', async () => {
@@ -56,9 +87,11 @@ describe('side chat', () => {
 })
 
 describe('side chat start', () => {
-  it('reports success once the fork is configured, before the answer arrives', async () => {
+  it('reports success once the fork is retained, before the answer arrives', async () => {
     let answer: () => void = () => undefined
-    const { ports: sideChatPorts } = ports({ ask: () => new Promise<void>(resolve => (answer = resolve)) })
+    const { ports: sideChatPorts } = ports({
+      retain: () => ({ ready: Promise.resolve(), submit: () => new Promise<void>(resolve => (answer = resolve)), release: () => undefined }),
+    })
     const actor = startSideChat({ ports: sideChatPorts, sourceId: 'source', question: 'q', route: null })
     expect(await SideChatModel.started(actor)).toEqual({ ok: true })
     expect(actor.getSnapshot().matches('asking')).toBe(true)

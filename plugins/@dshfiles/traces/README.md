@@ -109,11 +109,12 @@ it), a severity, and three switches: enabled, announce, mark threads.
   carry (`dsh.session.id`, at most five) are marked unread through thread-sidebar's `thread-sidebar-attention`
   contract; without thread-sidebar the event records why nothing was marked. A muted rule (1 h, 4 h, 24 h) still
   evaluates and records events but announces and marks nothing.
-- **Built-in rules**, seeded once when `alerts.db` is created (edits and deletions stick), enabled with conservative
-  thresholds: model call error rate (`chat *`) over 20% in 10 min with at least 5 calls, marking threads; jj p95
-  (`jj *`) over 5 s in 15 min with at least 5 runs; an agent turn (`invoke_agent*`) over 15 min, marking its thread
-  (only currently running sessions qualify; turn spans are exported when they finish); and, off by default, plugin API
-  error rate (`rpc.system=dshx`) over 20% with at least 20 calls.
+- **Built-in rules**, seeded once when `alerts.db` is created (edits and deletions stick), enabled only where the rule
+  names a failure: model call error rate (`chat *`) over 20% in 10 min with at least 5 calls, marking threads; and jj p95
+  (`jj *`) over 5 s in 15 min with at least 5 runs. Two ship off because they would report expected work: an agent turn
+  (`invoke_agent*`) over 15 min (a turn span is exported when the turn ends, so a long turn that finished successfully is
+  work already done, not a failure) and plugin API error rate (`rpc.system=dshx`) over 20% with at least 20 calls. Enable
+  either in the Alerts tab; a file that still carries the unedited long-turn rule has it turned off once by migration.
 - **Storage.** `$DSH_HOME/plugins/traces/alerts.db`, apart from the span store so alert changes never migrate it. At
   most 50 rules; an evaluation samples the newest 20,000 matching spans per rule.
 - **Its own telemetry.** Each evaluation is a `traces alerts evaluate` span with `dshx.traces.rules`, `.transitions`

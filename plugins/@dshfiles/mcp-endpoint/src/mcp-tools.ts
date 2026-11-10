@@ -168,3 +168,6 @@ export const mcpTools: ReadonlyArray<McpTool> = [
     handle: args => McpSessions.use(sessions => sessions.interrupt(args)),
   }),
 ]
+
+/** Every tool's JSON Schema, built once: the registry is static, so a listing never re-encodes it. */
+export const describedMcpTools = mcpTools.map(describeTool)

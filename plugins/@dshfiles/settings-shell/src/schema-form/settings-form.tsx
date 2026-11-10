@@ -22,6 +22,7 @@ import {
   type SettingControl,
   type SettingField,
 } from './schema-model.js'
+import { savingOutcome, settleSave, type SaveOutcome, type SaveOutcomes } from './save-outcome.js'
 
 const numberSchema = Schema.Union([Schema.Number, Schema.NumberFromString]).check(Schema.isFinite())
 
@@ -460,11 +461,12 @@ const SettingRow = (props: {
   readonly disabled: boolean
   readonly highlight: string | undefined
   readonly focused: boolean
+  /** The Host refused this row's last write. */
+  readonly refused: boolean
   readonly t: ShellTranslate
   readonly write: (field: SettingField, value: JsonValue) => Promise<boolean>
 }): JSX.Element => {
   const { field } = props
-  const [refused, setRefused] = useState(false)
   const row = useRef<HTMLDivElement>(null)
   const [flashing, setFlashing] = useState(false)
   useEffect(() => {
@@ -475,18 +477,10 @@ const SettingRow = (props: {
     return () => window.clearTimeout(timeout)
   }, [props.focused])
   const save = (value: JsonValue): void => {
-    setRefused(false)
-    void props.write(field, value).then(
-      accepted => setRefused(!accepted),
-      () => setRefused(true),
-    )
+    void props.write(field, value)
   }
   const reset = (): void => {
-    setRefused(false)
-    void props.reset(field).then(
-      accepted => setRefused(!accepted),
-      () => setRefused(true),
-    )
+    void props.reset(field)
   }
   const block = isBlockControl(field.control)
   const control = <SettingControlInput control={field.control} disabled={props.disabled} label={field.title} onChange={save} t={props.t} value={props.value} />
@@ -540,7 +534,7 @@ const SettingRow = (props: {
         {!block && <div className="dshx:shrink-0">{control}</div>}
       </div>
       {block && control}
-      {refused && (
+      {props.refused && (
         <span className="dshx:text-xs dshx:text-destructive" role="alert">
           {props.t('form.refused')}
         </span>
@@ -565,17 +559,21 @@ export const SettingsForm = (props: {
   const values = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.value))
   const disabled = snapshot.status !== 'ready' || !snapshot.writable
   // A Host write settles in seconds (it persists the profile and reloads the entry), so a row shows what was asked for
-  // until the write settles: `set` holds the new value, `reset` the cleared override.
-  const [pending, setPending] = useState<ReadonlyMap<string, PendingEdit>>(new Map())
+  // until the write settles, then only a refusal stays visible. The entry itself identifies the write, so an older
+  // settlement cannot overwrite a newer one.
+  const [outcomes, setOutcomes] = useState<SaveOutcomes<PendingEdit>>(new Map())
   const settle = (key: string, edit: PendingEdit, write: Promise<boolean>): Promise<boolean> => {
-    setPending(current => new Map(current).set(key, edit))
-    return write.finally(() =>
-      setPending(current => {
-        if (current.get(key) !== edit) return current
-        const next = new Map(current)
-        next.delete(key)
-        return next
-      }),
+    const outcome: SaveOutcome<PendingEdit> = savingOutcome(edit)
+    setOutcomes(current => new Map(current).set(key, outcome))
+    return write.then(
+      accepted => {
+        setOutcomes(current => settleSave(current, key, outcome, accepted))
+        return accepted
+      },
+      () => {
+        setOutcomes(current => settleSave(current, key, outcome, false))
+        return false
+      },
     )
   }
   // No revision of our own: the form queues writes per namespace and fences each with the revision the previous one
@@ -595,7 +593,8 @@ export const SettingsForm = (props: {
       {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
       {snapshot.status === 'ready' && !snapshot.writable && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.readOnly')}</p>}
       {props.fields.map((field, index) => {
-        const edit = pending.get(field.path.join('.'))
+        const outcome = outcomes.get(field.path.join('.'))
+        const edit = outcome?.status === 'saving' ? outcome.edit : undefined
         const group = field.groups.join(' › ')
         const previous = props.fields[index - 1]?.groups.join(' › ')
         return (
@@ -609,6 +608,7 @@ export const SettingsForm = (props: {
               focused={focusKey === field.path.join('.')}
               highlight={props.highlight}
               modified={edit === undefined ? user !== undefined && SettingsSchemaModel.hasValueAt(user, field.path) : edit.kind === 'set'}
+              refused={outcome?.status === 'refused'}
               reset={reset}
               t={props.t}
               value={displayedValue({ edit, field, values, base })}

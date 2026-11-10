@@ -73,7 +73,7 @@ describe('account provider profiles', () => {
       additionalModelIds: [],
     })
 
-    expect(opencodeGo.streamIdleTimeoutMs).toBe(120_000)
+    expect(opencodeGo.streamIdleTimeoutMs).toBe(300_000)
     expect(codex.streamIdleTimeoutMs).toBe(300_000)
   })
 

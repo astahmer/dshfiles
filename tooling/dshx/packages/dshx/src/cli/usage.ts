@@ -192,7 +192,7 @@ const presetsHelp = actionHelpGroup('presets', {
 const modelsHelp = actionHelpGroup('models', {
   list: { description: "List DSH's currently routable provider models and any lookup failures." },
   select: {
-    description: 'Select a model for one Session; DSH may persist it as the new default.',
+    description: "Select a model for one Session's upcoming requests; the default model is unchanged.",
     positionals: {
       provider: positional('Model provider.'),
       model: positional('Model identifier.'),
@@ -458,6 +458,7 @@ const helpCommands = {
   add: addHelp,
   update: simpleHelpCommand('update'),
   remove: simpleHelpCommand('remove'),
+  registry: simpleHelpCommand('registry'),
   status: simpleHelpCommand('status'),
   info: simpleHelpCommand('info'),
   doctor: simpleHelpCommand('doctor'),

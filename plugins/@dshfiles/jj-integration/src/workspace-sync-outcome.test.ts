@@ -21,6 +21,7 @@ const refusalHint = 'default@ carries described work that main does not have yet
 describe('workspaceSyncOutcome', () => {
   it('names each dshx checkout sync status', () => {
     expect(workspaceSyncOutcome(view({ state: 'running', finishedAt: null }))).toBe('running')
+    expect(workspaceSyncOutcome(view({ state: 'queued', finishedAt: null }))).toBe('running')
     expect(workspaceSyncOutcome(view({ status: 'refused' }))).toBe('kept')
     expect(workspaceSyncOutcome(view({ status: 'conflicted' }))).toBe('conflicted')
     expect(workspaceSyncOutcome(view({ status: 'build-failed' }))).toBe('failed')

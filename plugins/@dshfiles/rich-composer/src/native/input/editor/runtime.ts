@@ -270,18 +270,14 @@ export class DraftEditorRuntime {
    * Insert a reference chip with the existing trailing-space rule.
    * @param span - detect-coordinate range.
    * @param ref - reference fields.
-   * @param tail - the character following the range before editing.
+   * @param tail - the character following the range before editing; undefined restores a chip over text that
+   * already carries its own spacing.
    * @returns whether the range mapped and the edit applied.
    */
-  insertReference(span: DetectSpan, ref: ReferenceInsert, tail: string): boolean {
-    console.error('[rich-composer diagnostic] reference insert context', {
-      editorUpdating: this.editor._updating,
-      start: span.start,
-      end: span.end,
-    })
+  insertReference(span: DetectSpan, ref: ReferenceInsert, tail: string | undefined): boolean {
     let applied = false
     this.applyEdit(() => {
-      const nodes = tail === ' '
+      const nodes = tail === undefined || tail === ' '
         ? [$createReferenceChipNode(ref)]
         : [$createReferenceChipNode(ref), $createTextNode(' ')]
       applied = $replaceDetectSpanWithNodes(span, nodes)

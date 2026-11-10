@@ -1,4 +1,4 @@
-import { useApi } from '@dshfiles/dshx/client'
+import { ComposerTools, useApi } from '@dshfiles/dshx/client'
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
 import {
   DropdownMenu,
@@ -38,6 +38,7 @@ import { audioBase64, startVoiceCapture } from './composer-audio.js'
 import { useVoiceCapture } from './composer-voice.js'
 import { useComposerDraft } from './composer-draft.js'
 import { composerLinkLabel } from './composer-link-label.js'
+import { BacklogComposerScope, useComposerToolHold } from './composer-tools.js'
 import { BacklogImageEditor } from './image-reference-editor.js'
 import type { BacklogImageEditorHandle } from './image-reference-editor.js'
 import { fileInput } from './composer-files.js'
@@ -217,6 +218,7 @@ export const Composer = (props: {
   const ownRef = useRef<BacklogImageEditorHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const input = props.inputRef ?? ownRef
+  const toolHold = useComposerToolHold(() => input.current?.focus())
 
   useEffect(() => {
     if (props.status !== undefined && props.status !== null) setStatus(props.status)
@@ -642,6 +644,15 @@ export const Composer = (props: {
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
           {recording ? <span className="dshx:text-[11px] dshx:text-destructive">Recording…</span> : null}
           {transcribing ? <span className="dshx:text-[11px] dshx:text-muted-foreground">Transcribing…</span> : null}
+          <ComposerTools
+            {...BacklogComposerScope.capture(props.draftKey)}
+            insertText={value => {
+              if (input.current === null) return false
+              insert(value)
+              return true
+            }}
+            hold={toolHold.hold}
+          />
           <button
             type="button"
             aria-label={recording ? 'Stop recording' : 'Dictate'}

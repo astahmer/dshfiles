@@ -4,17 +4,35 @@
  * the fallback poll; this keeps that read to one per Turn and skips Tails mounted after their Turn already ended,
  * which the query read fresh on mount.
  */
-export class TurnEndStatusRefresh {
-  private refreshedEndAt: number | null
 
-  constructor(mountedEndAt: number | undefined) {
-    this.refreshedEndAt = mountedEndAt ?? null
+/** Where the newest Turn's refresh stands: nothing yet, one read in flight, or that Turn end already read. */
+export type TurnEndStatusRefresh =
+  | { readonly phase: 'waiting' }
+  | { readonly phase: 'refreshing'; readonly endedAt: number; readonly baseline: number }
+  | { readonly phase: 'settled'; readonly endedAt: number }
+
+export class TurnEndStatusRefreshModel {
+  /** A tail mounted after its Turn ended reads the fresh status on mount, so it never asks for the refresh. */
+  static turnEndRefreshOnMount = (endedAt: number | undefined): TurnEndStatusRefresh =>
+    endedAt === undefined ? { phase: 'waiting' } : { phase: 'settled', endedAt }
+
+  /**
+   * A new Turn end takes one read, identified by the last update time it starts from.
+   * @returns `state` itself when this end was already taken or the Turn is not over.
+   */
+  static turnEndRefreshOnEnd = (
+    state: TurnEndStatusRefresh,
+    input: { readonly newestTurnHasEnded: boolean; readonly endedAt: number | undefined; readonly baseline: number },
+  ): TurnEndStatusRefresh => {
+    if (!input.newestTurnHasEnded || input.endedAt === undefined) return state
+    if (state.phase !== 'waiting' && state.endedAt === input.endedAt) return state
+    return { phase: 'refreshing', endedAt: input.endedAt, baseline: input.baseline }
   }
 
-  /** @returns whether the caller should refetch the status for this Turn end. */
-  take(input: { readonly newestTurnHasEnded: boolean; readonly endedAt: number | undefined }): boolean {
-    if (!input.newestTurnHasEnded || input.endedAt === undefined || this.refreshedEndAt === input.endedAt) return false
-    this.refreshedEndAt = input.endedAt
-    return true
-  }
+  /** A status read newer than the one the refresh started from settles it. */
+  static turnEndRefreshStatusRead = (state: TurnEndStatusRefresh, dataUpdatedAt: number): TurnEndStatusRefresh =>
+    state.phase === 'refreshing' && dataUpdatedAt > state.baseline ? { phase: 'settled', endedAt: state.endedAt } : state
+
+  /** The offer waits for the refresh it asked for, so a stale cached status cannot hide it. */
+  static turnEndRefreshPending = (state: TurnEndStatusRefresh): boolean => state.phase === 'refreshing'
 }

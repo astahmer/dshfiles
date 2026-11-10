@@ -1,5 +1,6 @@
 import { Schema } from 'effect'
 import { defineApi, event, method } from '@dshfiles/dshx/api'
+import { renderBoard } from './board-render.js'
 import { jobBoardFilterSchema, jobBoardSchema, jobIndexingSchema, jobKillSchema, jobOutputSchema, jobWaitInputSchema, jobWaitSchema } from './types.js'
 
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
@@ -28,7 +29,7 @@ export const backgroundJobsApi = defineApi({
       output: jobBoardSchema,
       description:
         'List background jobs across every Session on this Host: what is still running and, opt-in, what already finished. Rows carry a category derived from the job kind and label. Read-only.',
-      tool: { name: 'background_jobs_board', readOnly: true, render: compactJson },
+      tool: { name: 'background_jobs_board', readOnly: true, render: renderBoard },
     }),
     output: method({
       input: outputInputSchema,

@@ -32,6 +32,14 @@ const deferred = <Value>() => {
 }
 
 describe('welcome notice machine', () => {
+  it('resolves the scope answer before it starts, so the notice selects the snapshot directly', () => {
+    const actor = createActor(providedMachine, { input: { scope: hostScope({ status: 'loading' }), write: async () => true } })
+
+    expect(actor.getSnapshot().matches('loading')).toBe(true)
+    expect(actor.getSnapshot().context.acknowledged).toBe(false)
+    actor.stop()
+  })
+
   it('keeps an acknowledgement process-local when the settings scope is in memory', () => {
     let writes = 0
     const actor = start({ mode: 'memory', status: 'unavailable', acknowledged: false }, async () => {

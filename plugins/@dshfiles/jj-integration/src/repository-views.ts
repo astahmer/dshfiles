@@ -5,6 +5,7 @@ import type { HostCallFailed, ThreadWorkspaceError } from './errors.js'
 import { SessionReads, WorkspaceRegistry, type SessionActivityMap } from './host-edges-promise.js'
 import { IntegrationAttribution } from './integration-attribution.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { SessionActivity } from './session-activity.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
@@ -12,7 +13,7 @@ import { ThreadWorkspaces, type ThreadStatus } from './thread-workspaces.js'
 import type { ThreadLocation } from './thread-workspace-model.js'
 
 /**
- * A repository scan costs one `jj` process per workspace and two more per thread, while the New thread screen and the
+ * A repository scan costs a few `jj` processes per repository, while the New thread screen and the
  * sidebar ask for it. Every layer is cached and every scan is single-flight: a poll storm shares one scan instead of
  * pinning one browser connection per caller, and a mutation is the only thing that reads them all again. A registered
  * folder's repository and workspace identity never change, so it outlives the statuses that do.
@@ -20,7 +21,7 @@ import type { ThreadLocation } from './thread-workspace-model.js'
 const LOCATION_TTL = Duration.minutes(30)
 const THREAD_STATUS_TTL = Duration.seconds(30)
 const REPOSITORY_VIEW_TTL_MS = 60_000
-/** One `jj workspace list` plus two revsets per thread, so repositories are scanned a bounded few at a time. */
+/** A few `jj` reads per repository, so repositories are scanned a bounded few at a time. */
 const REPOSITORY_SCAN_CONCURRENCY = 4
 /** One `jj` process each, and the scan runs while the user is working. */
 const LOCATE_CONCURRENCY = 8
@@ -69,6 +70,8 @@ export class RepositoryViews extends Context.Service<
     readonly locatedWorkspaces: Effect.Effect<readonly LocatedWorkspace[], HostCallFailed>
     /** The last scan, refreshing in the background when it is stale. */
     readonly snapshot: Effect.Effect<RepositoriesSnapshot>
+    /** The last scan as it is, never starting one: for reads polled often enough that a refresh would cost jj processes. */
+    readonly cached: Effect.Effect<readonly RepositoryView[]>
     /** Start a scan; false when one is already running. */
     readonly startRefresh: Effect.Effect<boolean>
     /** A fresh scan, shared with any scan already running. */
@@ -100,6 +103,7 @@ export class RepositoryViews extends Context.Service<
     RepositoryViews,
     Effect.gen(function* () {
       const threads = yield* ThreadWorkspaces
+      const projectBookmarks = yield* ProjectBookmarks
       const registry = yield* WorkspaceRegistry
       const sessions = yield* SessionReads
       const activity = yield* SessionActivity
@@ -121,11 +125,22 @@ export class RepositoryViews extends Context.Service<
           ),
         { capacity: MAX_LOCATIONS, timeToLive: exit => (Exit.isSuccess(exit) ? LOCATION_TTL : Duration.zero) },
       )
+      /**
+       * Keyed on the store's operation heads as well: an operation that lands is read at once instead of up to the TTL
+       * later. Re-listing an unchanged repository after the TTL spawns nothing, since its jj reads are view reads cached
+       * per operation head; the TTL only bounds how stale its files (rebase records, spares, deleted folders) can be.
+       */
       const statuses = yield* Cache.make({
-        lookup: (repoRoot: string) => threads.list(repoRoot),
+        lookup: (key: string) => threads.list(key.slice(key.indexOf('\n') + 1)),
         capacity: MAX_STATUS_REPOSITORIES,
         timeToLive: THREAD_STATUS_TTL,
       })
+      const operationHeads = (repoRoot: string) =>
+        fileSystem.readDirectory(path.join(repoRoot, '.jj', 'repo', 'op_heads', 'heads')).pipe(
+          Effect.map(heads => [...heads].sort().join(',')),
+          Effect.orElseSucceed(() => ''),
+        )
+      const threadStatusesOf = (repoRoot: string) => Effect.flatMap(operationHeads(repoRoot), heads => Cache.get(statuses, `${heads}\n${repoRoot}`))
 
       const location = (target: string) => Cache.get(locations, target)
       const bestEffortLocation = (target: string) => location(target).pipe(Effect.orElseSucceed(() => Option.none<ThreadLocation>()))
@@ -199,13 +214,14 @@ export class RepositoryViews extends Context.Service<
           repoRoots,
           repoRoot =>
             Effect.gen(function* () {
-              const threadStatuses = yield* Cache.get(statuses, repoRoot)
+              const threadStatuses = yield* threadStatusesOf(repoRoot)
               const bookmarks = yield* threads.bookmarks(repoRoot)
               const owner = byPath.get(repoRoot)
               return {
                 repoRoot,
                 title: owner?.title ?? path.basename(repoRoot),
                 workspaceId: owner?.id ?? null,
+                bookmark: yield* projectBookmarks.bookmarkFor(repoRoot),
                 bookmarks: [...bookmarks.names],
                 threads: yield* Effect.forEach(threadStatuses, status =>
                   threadView({ status, workspace: byPath.get(status.path), archived, activity: currentActivity }),
@@ -265,7 +281,10 @@ export class RepositoryViews extends Context.Service<
         forgetLocation: target => Cache.invalidate(locations, target),
         locatedWorkspaces,
         snapshot,
-        startRefresh: Effect.map(startScan, started => started.started),
+        cached: Effect.map(SynchronizedRef.get(views), current => current.cached?.value ?? []),
+        // An explicit refresh means "look again": a folder that became a repository since the last miss must be found,
+        // so the memoized locations (including cached misses) are dropped with the views.
+        startRefresh: Effect.flatMap(Cache.invalidateAll(locations), () => Effect.map(startScan, started => started.started)),
         list: Effect.flatMap(startScan, started => Fiber.join(started.fiber)),
         invalidateViews,
         invalidate: Effect.all([invalidateViews, Cache.invalidateAll(statuses), activity.reset], { discard: true }),
@@ -274,12 +293,14 @@ export class RepositoryViews extends Context.Service<
           const threadName = input.location.threadName
           if (threadName === undefined) return undefined
           const workspace = yield* registry.resolveByPath(input.location.workspaceRoot)
+          const activitySessionIds =
+            workspace === undefined ? [] : [...new Set([...workspace.sessionIds, ...(yield* isolated.sessionIdsAt(input.location.workspaceRoot))])]
           const shouldReadActivity = input.includeActivity !== false && workspace !== undefined && workspace.sessionIds.length > 0
           const viewerSessionId = input.viewerSessionId
           const [status, currentActivity, forkCutAt] = yield* Effect.all(
             [
               threads.status(input.location.repoRoot, threadName),
-              shouldReadActivity ? activity.display : Effect.succeed(undefined),
+              shouldReadActivity ? activity.workspaceDisplay(activitySessionIds) : Effect.succeed(undefined),
               viewerSessionId === undefined ? Effect.succeed(undefined) : sessions.forkCutAt(viewerSessionId),
             ],
             { concurrency: 'unbounded' },

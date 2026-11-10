@@ -617,7 +617,8 @@ function renderConfig(style: ProjectStyle, hostOnly = false): string {
   return `${tailwindImport}import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
-  host: { entry: 'src/host.ts' },
+  // Bundled so the package runs wherever it is installed, not only beside this project's node_modules.
+  host: { entry: 'src/host.ts', bundleDependencies: ['effect', 'zod'] },
   ${hostOnly ? '' : client + ','}
   build: {
     sourcemap: true,

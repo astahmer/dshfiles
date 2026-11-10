@@ -1,12 +1,8 @@
-import { errorMessage } from '@dshfiles/plugin-ui/query'
+import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
 
-import type { AgentDispatchOutcome } from './agent-dispatch.js'
+import { createReplyMachine, type ReplyDispatch } from './reply-machine.js'
 
-interface ReplyDispatch {
-  readonly dispatch: (input: { readonly text: string }) => Promise<AgentDispatchOutcome>
-  readonly answerReply: (input: { readonly text: string }) => Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
-  readonly smartReplyAnswers: boolean
-}
+const SETTLE_TIMEOUT_MS = 60_000
 
 interface ReplyView<File> {
   readonly clear: () => void
@@ -14,12 +10,13 @@ interface ReplyView<File> {
   readonly fail: (message: string) => void
 }
 
-const SAVED = 'Your reply was saved'
-
 /**
  * Saves the reply before any agent dispatch, so it shows (with its files) at send time instead of once a thread has
  * started; the dispatch then only routes it. A failed save puts the text and files back, a failed dispatch keeps the
  * saved reply and says what did not happen.
+ *
+ * The sequence itself belongs to `replyMachine`; this runs one reply to its end for callers that only await the
+ * outcome, and reports failures through the same view the machine writes.
  */
 export const submitReply = async <File>(input: {
   readonly text: string
@@ -29,34 +26,20 @@ export const submitReply = async <File>(input: {
   readonly view: ReplyView<File>
   readonly onAnswering?: (answering: boolean) => void
 }): Promise<void> => {
-  input.view.clear()
-  try {
-    await input.save(input.files)
-  } catch (error) {
-    input.view.restore({ text: input.text, files: input.files })
-    input.view.fail(errorMessage(error, 'The reply was not saved.'))
-    return
-  }
-  if (input.dispatch === null || input.text.trim() === '') return
-  let outcome: AgentDispatchOutcome
-  try {
-    outcome = await input.dispatch.dispatch({ text: input.text })
-  } catch (error) {
-    input.view.fail(`${SAVED}, but it was not sent to an agent: ${errorMessage(error, 'The dispatch failed.')}`)
-    return
-  }
-  if (outcome.kind === 'failed') {
-    input.view.fail(`${SAVED}, but no thread started: ${outcome.reason}`)
-    return
-  }
-  if (outcome.kind !== 'skipped' || outcome.reason !== 'reply-only' || !input.dispatch.smartReplyAnswers || input.files.length > 0) return
-  input.onAnswering?.(true)
-  try {
-    const answered = await input.dispatch.answerReply({ text: input.text })
-    if (!answered.ok) input.view.fail(`${SAVED}, but an AI answer could not be generated: ${answered.reason}`)
-  } catch (error) {
-    input.view.fail(`${SAVED}, but an AI answer could not be generated: ${errorMessage(error, 'Generation failed.')}`)
-  } finally {
-    input.onAnswering?.(false)
-  }
+  const actor = createActor(createReplyMachine<File>()).start()
+  actor.send({
+    type: 'SUBMIT',
+    text: input.text,
+    files: input.files,
+    ports: {
+      save: input.save,
+      dispatch: input.dispatch,
+      clear: input.view.clear,
+      restore: input.view.restore,
+      reportFailure: input.view.fail,
+      onAnswering: input.onAnswering,
+    },
+  })
+  await waitFor(actor, snapshot => snapshot.value === 'idle' || snapshot.value === 'failed', { timeout: SETTLE_TIMEOUT_MS })
+  actor.stop()
 }

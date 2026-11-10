@@ -20,6 +20,9 @@
     "tooling/antislop/effect/repo-rules/fixtures/**",
     "plugins/@dshfiles/multi-host/tests/fixtures/**",
     "plugins/@dshfiles/thread-sidebar/src/restart-controller.ts",
+    // Vendored upstream test helper (src/native/testing/generation.ts) kept for byte-parity
+    // with the pinned package; `native-fork-diff` reports it missing if it is deleted.
+    "plugins/@dshfiles/session-persistence-jsonl/src/native/testing/**",
     "tooling/dshx/packages/dshx/bench/**",
     "tooling/antislop/effect/tests/oxlint/**",
     // Hand-run helpers and a hand-written boot fixture, loaded by path rather than imported: the pull-requests
@@ -35,11 +38,19 @@
   "workspaces": {
     ".": {
       // Measurement scripts under .agents, docs and plans run by hand with the arguments in their headers.
-      "entry": ["scripts/*.{ts,mjs}!", "scripts/dsh-lkg/*.mjs!", ".agents/skills/*/scripts/*.mjs", "docs/ade-performance/*.mjs", "plans/**/*.mjs"],
+      "entry": [
+        "scripts/*.{ts,mjs}!",
+        "scripts/dsh-lkg/*.mjs!",
+        ".agents/skills/*/scripts/*.mjs",
+        "docs/ade-performance/*.mjs",
+        "docs/ade-ux/**/*.mjs",
+        "plans/**/*.mjs",
+      ],
       // oxlint runs through `pnpm exec` inside scripts/lint-ratchet.ts. Cordis and the typert generator are
       // unreferenced, but removing them re-resolves dsh peer variants in the undeduped lockfile (docs/guardrails.md).
       // The measurement scripts resolve Playwright from the tooling/dshx workspace they are run with.
-      "ignoreDependencies": ["oxlint", "@playwright/test", "playwright"],
+      // Built Host bundles keep zod as a bare import and resolve it from this root at runtime, which knip cannot see.
+      "ignoreDependencies": ["oxlint", "@playwright/test", "playwright", "zod"],
     },
     "plugins": {
       "entry": ["scripts/*.ts!"],
@@ -52,9 +63,7 @@
     "plugins/@dshfiles/frame-layout": {
       // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
-      // @deepseek-ai/dsh-client-store's node build imports zustand and immer without declaring them; the
-      // persisted-widths unit test drives that store, so the engine's own deps stay in devDependencies.
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "zustand", "immer"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/whiteboard": {
       // The Excalidraw editor is its own Vite build (vite.editor.config.ts → src/editor/entry.tsx) the Host serves
@@ -98,8 +107,10 @@
     },
     "plugins/@dshfiles/backlog": {
       // devDependency copy of the jj-integration peer the Host provides; listed in docs/guardrails.md for review.
+      // @effect/sql-sqlite-node is imported by the bundled @dshfiles/sqlite-store, so the Host entry keeps it external
+      // and the bundle needs it at runtime; no source file of this plugin names it.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
-      "ignoreDependencies": ["@dshfiles/usage", "@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@dshfiles/jj-integration"],
+      "ignoreDependencies": ["@dshfiles/usage", "@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@dshfiles/jj-integration", "@effect/sql-sqlite-node"],
     },
     "plugins/@dshfiles/chat": {
       // dshx.config.ts bundles util-crypto into the client by name, so no module import references it.

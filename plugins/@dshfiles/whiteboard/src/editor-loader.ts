@@ -55,7 +55,7 @@ export const loadEditor = (origin: string = window.location.origin): Promise<Edi
     },
     (cause: unknown) => {
       throw new EditorLoadFailed(
-        `The whiteboard editor could not be downloaded (${cause instanceof Error ? cause.message : String(cause)}). Check the connection to DSH and retry.`,
+        `The whiteboard editor could not be downloaded (${cause instanceof Error ? cause.message : String(cause)}). Retry once the connection to DSH is back; if the file stays missing, rebuild @dshfiles/whiteboard so its dist/editor/ build is in place.`,
       )
     },
   )

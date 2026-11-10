@@ -61,3 +61,24 @@ describe('durable Project Checks task transitions', () => {
     expect(cancelled.status).toBe('cancelled')
   })
 })
+
+describe('durable Project Checks task verb table', () => {
+  const statuses = ['queued', 'running', 'cancel-requested', 'succeeded', 'failed', 'cancelled', 'timed-out', 'unknown', 'blocked'] as const
+  const withStatus = (status: (typeof statuses)[number]): DurableTask =>
+    Schema.decodeUnknownSync(durableTaskSchema)({ ...DurableTaskModel.begin(queuedTask(), { attemptId: firstAttemptId, now: 2 }), status })
+
+  it('refuses a verb from a status it does not apply to, leaving the task untouched', () => {
+    for (const status of statuses) {
+      const task = withStatus(status)
+      const terminal = DurableTaskModel.isTerminal(status)
+      expect(DurableTaskModel.retry(task, 9) === task).toBe(!DurableTaskModel.canRetry(status))
+      expect(DurableTaskModel.block(task, { errorCode: 'handler-unavailable', now: 9 }) === task).toBe(terminal)
+      expect(DurableTaskModel.cancel(task, 9) === task).toBe(status !== 'queued' && status !== 'running')
+    }
+  })
+
+  it('names the statuses a caller may retry before it writes anything', () => {
+    expect(statuses.filter(status => DurableTaskModel.canRetry(status))).toEqual(['failed', 'cancelled', 'timed-out', 'unknown'])
+    expect(statuses.filter(status => DurableTaskModel.isTerminal(status))).toEqual(['succeeded', 'failed', 'cancelled', 'timed-out', 'blocked'])
+  })
+})

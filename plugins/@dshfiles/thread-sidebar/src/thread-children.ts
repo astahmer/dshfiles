@@ -79,25 +79,28 @@ export class ThreadChildrenModel {
      * its whole branch is detached and nesting under it would hide the branch.
      * `missingAncestor` is the nearest ancestor with no listed row.
      */
-    const ancestryOf = (thread: Thread): { root?: Thread; missingAncestor?: string } => {
-      let root: Thread | undefined
-      let cursor = thread.parentId
-      const visited = new Set<string>([thread.id])
-      while (cursor !== undefined && !visited.has(cursor)) {
-        visited.add(cursor)
-        const ancestor = listed.get(cursor)
-        if (ancestor === undefined) return { missingAncestor: cursor }
-        root = ancestor
-        cursor = ancestor.parentId
-      }
-      return root === undefined ? {} : { root }
-    }
-
     const roots: Thread[] = []
     const childrenByRoot = new Map<string, Thread[]>()
     const detachedByMissingAncestor = new Map<string, Thread[]>()
     for (const thread of options.threads) {
-      const { root, missingAncestor } = ancestryOf(thread)
+      // Runs over every row on each list publish: a top-level row allocates nothing, a direct child no visited set.
+      let root: Thread | undefined
+      let missingAncestor: string | undefined
+      let firstAncestor: string | undefined
+      let visited: Set<string> | undefined
+      let cursor = thread.parentId
+      while (cursor !== undefined && cursor !== thread.id && cursor !== firstAncestor && visited?.has(cursor) !== true) {
+        if (firstAncestor === undefined) firstAncestor = cursor
+        else (visited ??= new Set()).add(cursor)
+        const ancestor = listed.get(cursor)
+        if (ancestor === undefined) {
+          missingAncestor = cursor
+          root = undefined
+          break
+        }
+        root = ancestor
+        cursor = ancestor.parentId
+      }
       if (root !== undefined) {
         const children = childrenByRoot.get(root.id) ?? []
         children.push(thread)

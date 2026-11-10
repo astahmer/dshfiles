@@ -27,6 +27,20 @@ const bundleRoot = Effect.gen(function* () {
 
 const resolverFor = Effect.flatMap(bundleRoot, root => SourceResolver.make({ roots: [root] }))
 
+/** A bundle whose only mapping decodes to source line 0, the way a minified chunk's segment can. */
+const unreadableMappingRoot = Effect.gen(function* () {
+  const fileSystem = yield* FileSystem.FileSystem
+  const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: 'dsh-annotations-unreadable-' })
+  const dist = join(root, 'fake-plugin', 'dist')
+  yield* fileSystem.makeDirectory(dist, { recursive: true })
+  yield* fileSystem.writeFileString(join(dist, 'client.js'), 'const styles={"bad":"_unreadable_abc12"};export{styles}\n')
+  yield* fileSystem.writeFileString(
+    join(dist, 'client.js.map'),
+    JSON.stringify({ version: 3, sources: ['../src/tab-strip.module.css'], mappings: 'AADA', names: [] }),
+  )
+  return root
+})
+
 describe('source resolver', () => {
   it.layer(NodeFileSystem.layer)(it => {
     it.effect('lists built client bundles', () =>
@@ -42,6 +56,13 @@ describe('source resolver', () => {
         expect(matches).toHaveLength(1)
         expect(matches[0]?.file.endsWith('src/tab-strip.module.css')).toBe(true)
         expect(matches[0]?.confidence).toBe('map')
+      }).pipe(Effect.scoped),
+    )
+
+    it.effect('answers no match when the mapped line is one an annotation cannot hold', () =>
+      Effect.gen(function* () {
+        const resolver = yield* SourceResolver.make({ roots: [yield* unreadableMappingRoot] })
+        expect(yield* resolver.resolve(['_unreadable_abc12'])).toEqual([])
       }).pipe(Effect.scoped),
     )
 
@@ -88,6 +109,19 @@ describe('source resolver', () => {
 describe('classCandidates', () => {
   it('keeps CSS-module names and drops bare utilities', () => {
     expect(classCandidates('div.uV2eYG_row > button.dshx\\:inline-flex.cta')).toEqual(['uV2eYG_row'])
+  })
+
+  it('reads every CSS-module class of one compound as its own name', () => {
+    expect(classCandidates('div._actions_1mjtw_5._actions_100cw_7 > div > button')).toEqual(['_actions_1mjtw_5', '_actions_100cw_7'])
+  })
+
+  it('keeps a single-class target and drops the bare descendants around it', () => {
+    expect(classCandidates('div._actions_1mjtw_5 > div > div.dshx-root.dshx\\:flex > button.dshx\\:flex.dshx\\:items-center')).toEqual(['_actions_1mjtw_5'])
+    expect(classCandidates('button._row_1mjtw_3')).toEqual(['_row_1mjtw_3'])
+  })
+
+  it('unescapes a dot that belongs to the class name instead of splitting on it', () => {
+    expect(classCandidates('div._weird\\.name_abc12 > span')).toEqual(['_weird.name_abc12'])
   })
 
   it('returns nothing for a selector without a module class', () => {

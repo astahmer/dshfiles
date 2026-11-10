@@ -320,7 +320,7 @@ export class SessionCommandController {
     let child: Agent
     try {
       const { provider, model } = this.ctx.agentDefaultModel.currentSelection()
-      child = (await this.ctx.agents.create({
+      child = this.agents.own(await this.ctx.agents.create({
         sessionId: childId,
         seed,
         inheritedEventCount: SessionLogOffset(boundary + 1),
@@ -334,7 +334,7 @@ export class SessionCommandController {
         },
         agentOptions: { provider, model },
         setup: composition.setup,
-      })).agent
+      }))
     } catch (error) {
       throw new RemoteError(
         'gateway/internal',

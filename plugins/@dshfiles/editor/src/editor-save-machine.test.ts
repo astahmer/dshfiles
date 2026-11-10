@@ -45,7 +45,10 @@ const harness = () => {
   return { actor, writes }
 }
 
-const waitForState = (actor: ActorRefFrom<typeof editorSaveMachine>, state: 'idle' | 'approval' | 'writing' | 'conflict' | 'failed'): Promise<void> => {
+const waitForState = (
+  actor: ActorRefFrom<typeof editorSaveMachine>,
+  state: 'idle' | 'approval' | 'writing' | 'conflict' | 'failed' | 'discard',
+): Promise<void> => {
   if (actor.getSnapshot().matches(state)) return Promise.resolve()
   return new Promise(resolve => {
     let unsubscribe = (): void => undefined
@@ -127,6 +130,51 @@ describe('editor save machine', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(actor.getSnapshot().matches('idle')).toBe(true)
     expect(actor.getSnapshot().context.pending).toBeNull()
+  })
+
+  it('confirms discarding a dirty document through the same dialog owner', () => {
+    const { actor, writes } = harness()
+    actor.send({ type: 'document.changed', documentId: 'doc-1' })
+    actor.send({ type: 'discard.request', document: { documentId: 'doc-1', path: 'src/file.ts' } })
+
+    expect(actor.getSnapshot().matches('discard')).toBe(true)
+    expect(actor.getSnapshot().context.discard).toEqual({ documentId: 'doc-1', path: 'src/file.ts' })
+
+    actor.send({ type: 'cancel' })
+    expect(actor.getSnapshot().matches('idle')).toBe(true)
+    expect(actor.getSnapshot().context.discard).toBeNull()
+    expect(writes).toHaveLength(0)
+  })
+
+  it('holds a discard request until the save dialog in front of it settles', async () => {
+    const { actor, writes } = harness()
+    actor.send({ type: 'document.changed', documentId: 'doc-1' })
+    actor.send({ type: 'save.request', request: request() })
+    actor.send({ type: 'discard.request', document: { documentId: 'doc-2', path: 'src/other.ts' } })
+
+    expect(actor.getSnapshot().matches('approval')).toBe(true)
+    expect(actor.getSnapshot().context.discard).toEqual({ documentId: 'doc-2', path: 'src/other.ts' })
+
+    actor.send({ type: 'approve' })
+    await vi.waitFor(() => expect(writes).toHaveLength(1))
+    expect(actor.getSnapshot().matches('writing')).toBe(true)
+    writes[0]?.resolve({ status: 'saved', absolutePath: '/work/src/file.ts', sha256: 'e'.repeat(64), bytes: 7 })
+    await waitForState(actor, 'discard')
+    expect(actor.getSnapshot().context.discard).toEqual({ documentId: 'doc-2', path: 'src/other.ts' })
+  })
+
+  it('keeps an in-flight write when the active document is reported again', async () => {
+    const { actor, writes } = harness()
+    actor.send({ type: 'document.changed', documentId: 'doc-1' })
+    actor.send({ type: 'save.request', request: request() })
+    actor.send({ type: 'approve' })
+    await vi.waitFor(() => expect(writes).toHaveLength(1))
+
+    actor.send({ type: 'document.changed', documentId: 'doc-1' })
+
+    expect(actor.getSnapshot().matches('writing')).toBe(true)
+    expect(writes[0]?.signal.aborted).toBe(false)
+    expect(writes).toHaveLength(1)
   })
 
   it('keeps a failed save retryable without asking for approval again', async () => {

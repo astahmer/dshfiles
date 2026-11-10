@@ -3,7 +3,14 @@ import { Cause, Effect, Exit } from 'effect'
 import type { ThreadWorkspaces, LandCandidate, LandCandidateVerification, LandPhase, VerifiedLandOptions } from './thread-workspaces.js'
 import type { ThreadLocation } from './thread-workspace-model.js'
 
-export type ThreadErrorCode = 'not-a-repository' | 'not-a-thread' | 'jj-failed' | 'git-failed' | 'unsafe-path' | 'workspace-files-failed'
+export type ThreadErrorCode =
+  | 'not-a-repository'
+  | 'not-a-thread'
+  | 'jj-failed'
+  | 'git-failed'
+  | 'unsafe-path'
+  | 'workspace-files-failed'
+  | 'destination-rejected'
 
 /** A `ThreadWorkspaces` failure as the Promise half of the Host still reads it: a `PluginApiError` with its wire code. */
 export class ThreadError extends PluginApiError {
@@ -19,6 +26,7 @@ const codeByTag = {
   GitFailed: 'git-failed',
   UnsafePath: 'unsafe-path',
   WorkspaceFilesFailed: 'workspace-files-failed',
+  DestinationRejected: 'destination-rejected',
 } satisfies Readonly<Record<string, ThreadErrorCode>>
 
 const isTaggedWithCode = (tag: string): tag is keyof typeof codeByTag => tag in codeByTag
@@ -93,7 +101,9 @@ export const promiseThreads = (input: { readonly service: Service; readonly run:
         }),
       ),
     discard: (target: { readonly repoRoot: string; readonly name: string; readonly force: boolean }) => call(service.discard(target)),
-    discardMany: (target: { readonly repoRoot: string; readonly names: readonly string[]; readonly force: boolean }) => call(service.discardMany(target)),
+    discardMany: (target: { readonly repoRoot: string; readonly names: readonly string[]; readonly force: boolean; readonly acceptBookmarkedWork?: boolean }) =>
+      call(service.discardMany(target)),
+    containingBookmarks: (target: { readonly repoRoot: string; readonly name: string }) => call(service.containingBookmarks(target)),
     secondaryWorkspaces: (repoRoot: string) => call(service.secondaryWorkspaces(repoRoot)),
     discardSecondaryMany: (target: Parameters<Service['discardSecondaryMany']>[0]) => call(service.discardSecondaryMany(target)),
     workingCopyChangedAt: (repoRoot: string) => call(service.workingCopyChangedAt(repoRoot)),

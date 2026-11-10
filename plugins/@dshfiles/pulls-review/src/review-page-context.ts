@@ -2,6 +2,8 @@
 export interface PageReviewContext {
   readonly workspacePath?: string | undefined
   readonly sessionId?: string | undefined
+  /** Review these revisions together instead of the workspace against its base. */
+  readonly revisions?: readonly string[] | undefined
 }
 
 export interface WorkspaceReviewRequest {

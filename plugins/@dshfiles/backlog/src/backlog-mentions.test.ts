@@ -63,4 +63,20 @@ describe('backlog @ mentions', () => {
       'b:12 "Composer drops chips" (backlog item; backlog_get has its details)',
     )
   })
+
+  it('restores the full serialized mention as a chip and leaves a bare token as text', async () => {
+    const source = BacklogMentions.createSource({ section: 'Backlog', search: async () => [] })
+    const session = { sessionId: 'session-abc123' } as never
+    const text = 'Fix b:12 "Composer drops chips" (backlog item; backlog_get has its details), and note b:13 by hand.'
+    expect(source.restore?.(session, text)).toEqual([
+      {
+        source: 'backlog',
+        ref: '{"ref":"12","title":"Composer drops chips"}',
+        label: 'b:12 Composer drops chips',
+        clipboardText: 'b:12 "Composer drops chips" (backlog item; backlog_get has its details)',
+        start: 4,
+        end: 75,
+      },
+    ])
+  })
 })

@@ -17,7 +17,7 @@ import type { JobRow } from './types.js'
 const LIMIT = 50
 
 /**
- * The thread panel's Jobs facet (plans/ade-ux §4.4): this thread's background jobs, then each Processes view that can
+ * The thread panel's Jobs facet (docs/ade-ux §4.4): this thread's background jobs, then each Processes view that can
  * filter to one thread (dev servers from @dshfiles/preview, RAM from @dshfiles/worktree-memory). The whole host's
  * picture stays Observe › Processes.
  */

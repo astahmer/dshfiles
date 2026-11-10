@@ -24,6 +24,7 @@ import {
   type BacklogStatus,
 } from './item.js'
 import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item-relations.js'
+import { StartThreadForm } from './start-thread.js'
 import type { LeaseWrite } from './backlog-repo.js'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
@@ -233,7 +234,7 @@ const summarize = (
   freshness: BacklogItems.freshness(item, now, dormantDays),
   createdAt: item.createdAt,
   lastActivityAt: item.lastActivityAt,
-  preview: item.body.slice(0, 280),
+  preview: StartThreadForm.preview(item.body, 280),
   proposal: item.proposal ?? null,
   attention: item.attention ?? 'none',
   acknowledgedAt: item.acknowledgedAt ?? null,
@@ -345,8 +346,9 @@ const listIn = (view: StoreView, query: BacklogListQuery, index?: BacklogSearchI
   const at = view.at
   const search = BacklogSearch.parse(query.query ?? '')
   // The index only narrows which items get scored; the scorer below still ranks them, so results match a full scan.
-  index?.sync(view.records)
-  const candidates = index?.candidates(search.terms) ?? null
+  const narrowing = index !== undefined && BacklogSearchIndex.narrows(search.terms)
+  if (narrowing) index.sync(view.records)
+  const candidates = narrowing ? index.candidates(search.terms) : null
   const pool = candidates === null ? [...view.records.values()] : [...candidates].flatMap(id => view.records.get(id) ?? [])
   const freshnessFilter = query.freshness ?? 'active'
   // A caller may still ask for the workspace an item was captured in; the item is filed under its project.
@@ -1707,15 +1709,15 @@ export class BacklogStore extends Context.Service<
         return yield* withItem(input.id, item =>
           Effect.gen(function* () {
             const system = { kind: 'system' } as const
-            const attention = item.attention ?? 'none'
-            if (item.humanFields.includes('attention')) return yield* unchanged(item)
+            const attention = ThreadLifecycle.attentionOf(item)
+            if (attention.owner.kind === 'user') return yield* unchanged(item)
             if (input.attention === 'waiting') {
-              if (item.status !== 'doing' || attention !== 'none') return yield* unchanged(item)
+              if (item.status !== 'doing' || attention.value !== 'none') return yield* unchanged(item)
               if (item.events.some(event => isIdleNudge(event) && event.threadId === threadId)) return yield* unchanged(item)
               return found(yield* touch(item, system, { kind: 'commented', detail: reason, threadId }, { attention: 'waiting', acknowledgedAt: null }))
             }
             if (input.attention === 'blocked') {
-              if (attention !== 'none' || item.status === 'done' || item.status === 'dropped') return yield* unchanged(item)
+              if (attention.value !== 'none' || item.status === 'done' || item.status === 'dropped') return yield* unchanged(item)
               return found(
                 yield* touch(
                   item,
@@ -1725,11 +1727,8 @@ export class BacklogStore extends Context.Service<
                 ),
               )
             }
-            const last = item.events.at(-1)
-            const stalledHere = last?.actor === 'system' && last.kind === 'edited' && last.detail.startsWith('attention: blocked (')
-            const waitingHere = item.events.findLast(event => event.actor === 'system' && isIdleNudge(event))?.threadId === threadId
-            const clears = (attention === 'blocked' && stalledHere) || (attention === 'waiting' && waitingHere)
-            if (!clears) return yield* unchanged(item)
+            const stalled = attention.value === 'blocked' || attention.value === 'waiting'
+            if (!stalled || !ThreadLifecycle.ownedByThread(attention, threadId)) return yield* unchanged(item)
             return found(yield* touch(item, system, { kind: 'edited', detail: `attention: none (${reason})`, threadId }, { attention: 'none' }))
           }),
         )

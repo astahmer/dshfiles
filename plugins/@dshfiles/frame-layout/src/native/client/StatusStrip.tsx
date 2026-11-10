@@ -6,7 +6,7 @@ import { useRegistry } from '@dshfiles/dshx/client'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { EyeOffIcon } from '@dshfiles/plugin-ui/icons'
-import { Component, createContext, useContext, useMemo, useState } from 'react'
+import { Component, createContext, memo, useContext, useMemo, useState } from 'react'
 import type { ComponentType, ErrorInfo, ReactNode } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { openStatusBarSettings } from '../../status-bar.ts'
@@ -181,7 +181,7 @@ export const SettingsStatusStrip = (props: StatusStripProps): ReactNode => <Stat
 /** Which strip the frame renders: the decorated settings strip once the client provides it, the default order before. */
 export const StatusStripSeat = createContext<ComponentType<StatusStripProps>>(DefaultStatusStrip)
 
-export function StatusStrip(props: StatusStripProps) {
+export const StatusStrip = memo((props: StatusStripProps) => {
   const Seat = useContext(StatusStripSeat)
   return <Seat {...props} />
-}
+})

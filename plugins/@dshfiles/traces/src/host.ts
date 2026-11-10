@@ -15,7 +15,7 @@ import { tracesBoardsApi } from './boards/boards-api.js'
 import { SpanBreakdown } from './boards/breakdown.js'
 import { ReceiverDiagnosis } from './diagnosis.js'
 import { Forwarder, pointsAt } from './forwarder.js'
-import { dialableEndpoint, LocalEndpointLive, RunningSessionsLive, ThreadAttentionLive } from './host-edges.js'
+import { dialableEndpoint, LocalEndpointLive, ThreadAttentionLive } from './host-edges.js'
 import { OtlpIngest } from './otlp-ingest.js'
 import { Receiver } from './receiver.js'
 import { tracesSettings, TracesSettingsService } from './settings.js'
@@ -42,7 +42,7 @@ const Storage = Layer.unwrap(
 const ReceiverLive = Receiver.layer.pipe(Layer.provide(Layer.mergeAll(OtlpIngest.layer, Forwarder.layer.pipe(Layer.provide(FetchHttpClient.layer)))))
 
 const TracesLive = Layer.mergeAll(RetentionWorker, AlertWorker, LocalEndpointLive, AlertAttention.layer.pipe(Layer.provide(HostApis.layer))).pipe(
-  Layer.provideMerge(Layer.mergeAll(ReceiverLive, AlertEngine.layer.pipe(Layer.provide(Layer.mergeAll(ThreadAttentionLive, RunningSessionsLive))))),
+  Layer.provideMerge(Layer.mergeAll(ReceiverLive, AlertEngine.layer.pipe(Layer.provide(ThreadAttentionLive)))),
   Layer.provideMerge(Layer.mergeAll(TraceRepo.layer, AlertRepo.layer).pipe(Layer.provide(Storage))),
   Layer.provideMerge(Settings.layer(tracesSettings)),
 )

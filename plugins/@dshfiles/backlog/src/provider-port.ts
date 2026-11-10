@@ -295,7 +295,7 @@ export class BacklogProviderFailed extends Schema.TaggedError<BacklogProviderFai
       case 'invalid-response':
         return `${this.provider} answered in an unexpected shape${detail}. Retry with Sync now; if it keeps failing, check the Host log and report it.`
       case 'credential-missing':
-        return `The ${this.provider} key does not resolve${detail}. ${settings}, set the connection's key to a Secret Catalog reference (secret:ALIAS), then retry.`
+        return `The ${this.provider} key does not resolve${detail}. ${settings}, set the connection's key to a Secret Catalog reference (secret:ALIAS), or sign its CLI in on the Host, then retry.`
       case 'target-missing':
         return `${this.provider} has no container to use${detail}. ${settings}, pick one for the binding, then retry.`
       case 'unsupported':

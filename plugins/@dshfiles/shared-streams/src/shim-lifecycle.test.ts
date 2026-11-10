@@ -11,7 +11,7 @@ type ShimMessage =
   | { readonly kind: 'unsubscribe'; readonly url: string }
   | { readonly kind: 'disconnect' }
   | { readonly kind: 'ready'; readonly url: string }
-  | { readonly kind: 'open'; readonly url: string }
+  | { readonly kind: 'open'; readonly url: string; readonly replay?: boolean }
   | { readonly kind: 'error'; readonly url: string }
   | { readonly kind: 'event'; readonly url: string; readonly event: string; readonly data: string; readonly lastEventId?: string }
 
@@ -50,6 +50,8 @@ class NativeEventSourceStub extends EventTarget {
   readonly url: string
   readyState = 0
   closed = false
+  onopen: (() => void) | null = null
+  onerror: (() => void) | null = null
 
   constructor(url: string) {
     super()
@@ -156,6 +158,38 @@ describe('shared event source worker', () => {
     second.deliver({ kind: 'unsubscribe', url: 'http://localhost/events' })
     expect(sandbox.nativeSources[0]?.closed).toBe(true)
   })
+
+  it('replays an already-open stream to a tab that joins later', () => {
+    const sandbox = createWorkerSandbox()
+    const first = new TestPort()
+    sandbox.connect(first)
+    first.deliver({ kind: 'subscribe', url: 'http://localhost/events', types: ['alpha'] })
+    sandbox.nativeSources[0]?.onopen?.()
+    expect(postedOfKind(first, 'open')).toHaveLength(1)
+
+    const second = new TestPort()
+    sandbox.connect(second)
+    second.deliver({ kind: 'subscribe', url: 'http://localhost/events', types: ['alpha'] })
+
+    expect(postedOfKind(second, 'open')).toEqual([{ kind: 'open', url: 'http://localhost/events', replay: true }])
+    expect(postedOfKind(first, 'open')).toHaveLength(1)
+  })
+
+  it('does not replay a stream that failed', () => {
+    const sandbox = createWorkerSandbox()
+    const first = new TestPort()
+    sandbox.connect(first)
+    first.deliver({ kind: 'subscribe', url: 'http://localhost/events', types: [] })
+    sandbox.nativeSources[0]?.onopen?.()
+    sandbox.nativeSources[0]?.onerror?.()
+
+    const second = new TestPort()
+    sandbox.connect(second)
+    second.deliver({ kind: 'subscribe', url: 'http://localhost/events', types: [] })
+
+    expect(postedOfKind(second, 'open')).toHaveLength(0)
+    expect(postedOfKind(second, 'ready')).toHaveLength(1)
+  })
 })
 
 describe('shared event source page shim', () => {
@@ -208,5 +242,33 @@ describe('shared event source page shim', () => {
     source.close()
     source.close()
     expect(postedOfKind(sandbox.port, 'unsubscribe')).toHaveLength(1)
+  })
+
+  it('replays an open only to the instances that have not opened yet', () => {
+    const sandbox = createPageSandbox()
+    const opened: string[] = []
+    const first = sandbox.open('http://localhost/events')
+    first.addEventListener('open', () => opened.push('first'))
+    sandbox.port.deliver({ kind: 'ready', url: 'http://localhost/events' })
+    sandbox.port.deliver({ kind: 'open', url: 'http://localhost/events' })
+    expect(opened).toEqual(['first'])
+
+    const second = sandbox.open('http://localhost/events')
+    second.addEventListener('open', () => opened.push('second'))
+    sandbox.port.deliver({ kind: 'open', url: 'http://localhost/events', replay: true })
+
+    expect(opened).toEqual(['first', 'second'])
+  })
+
+  it('stops talking to the worker once it fell back, a late ready frame included', () => {
+    const sandbox = createPageSandbox()
+    sandbox.open('http://localhost/events')
+    sandbox.runTimers()
+    const subscribed = postedOfKind(sandbox.port, 'subscribe').length
+
+    sandbox.port.deliver({ kind: 'ready', url: 'http://localhost/events' })
+    sandbox.open('http://localhost/events')
+
+    expect(postedOfKind(sandbox.port, 'subscribe')).toHaveLength(subscribed)
   })
 })

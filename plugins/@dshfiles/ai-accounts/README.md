@@ -59,6 +59,16 @@ Disabled saved accounts stay in the sidebar preview with their measured percenta
 
 Disabling is not hiding: **Hide** in the context menu still removes a card from the preview until **Show** or **Show all hidden** is used. Quota visibility is separate from routing availability: measured windows remain visible while OFF, but the account is not used for model routing or chosen as the most critical enabled account. Missing quota still shows its ordinary unavailable status rather than an invented percentage. Enabling does not sign in, send a message, change the thread model or resume work. Agent parity remains the existing `ai_accounts_save_account` tool; there is no separate enable-state store.
 
+## Usage freshness and refresh
+
+![A failed provider keeps its last reading, says why and offers Retry](docs/screenshots/usage-refresh-failure.png)
+
+Every quota card says how current it is. **Updated 3m ago** is the time that provider last answered, per card: a failed read keeps the last good figures under their original time, names the provider's reason, and offers **Retry**. If the whole sweep fails, the popover, Usage › Quota views and the account page show a notice with the reason and **Retry** beside the last reading.
+
+**Refresh** always bypasses the Host's 30-second sweep cache. Claude's usage endpoint rate-limits after a few calls a minute, so one Claude reading is deliberately shared for two minutes, and a 429 waits for `Retry-After` (or 10 minutes). A refresh inside either hold reuses that reading: the card keeps its real age and shows **Next reading in 1m**, and a 429 replaces **Retry** with that time, because a retry could not reach the provider.
+
+The page polls in the background on the configured interval and reads again when it returns to the foreground; that read uses the Host's shared sweep, so it can be up to 30 seconds old.
+
 ## Quick setup and account workspace
 
 The small **AI account settings** button beside **+** in the sidebar account strip opens the AI Accounts page. It closes an open quota popover without starting sign-in or changing the active chat.
@@ -384,8 +394,11 @@ the turn that hit it.
 When a turn stops on an exhausted quota, the Session is listed under **Quota
 recovery** in the account's panel. **Resume now** queues a recovery prompt;
 **Snooze** (1 h, 4 h, 1 day) pushes it back. If the provider declared a reset
-time and the Schedule service is loaded, the prompt is scheduled for that time;
-an unknown reset gets no invented timer and waits for a manual resume. Any newer
+time and the Schedule service is loaded, the prompt is scheduled for that time.
+A provider that declares nothing still leaves a workable timer: the retry backs
+off 30 s, 1 min, 3 min, 5 min, then every 10 min, and a recovery that ran and hit
+the same wall again takes the next rung, so an unannounced reset is picked up
+without the user watching the thread. Any newer
 user message, other queued work, or stopping the Session invalidates the
 pending recovery, so an old continuation never runs over newer work. Records live
 in Host storage, so they survive a restart; finished ones are pruned after 30
@@ -396,7 +409,8 @@ exhausted-limit failover is off, and also when failover is on and the ladder
 still stored a recovery for the turn — which happens when no other account
 could take the request. It dates the reset and offers **Automatically
 resume 1 minute after reset**, which schedules the saved request for one minute
-past the reset instead of at the reset instant. **Resume with another model**
+past the reset instead of at the reset instant; when the provider named no reset
+the same checkbox offers the backoff above instead. **Resume with another model**
 opens the currently available provider/account, model, and reasoning-effort
 selects, defaulting to the same model on another provider when one offers it;
 **Resume with this selection** applies that route to the Session and then queues

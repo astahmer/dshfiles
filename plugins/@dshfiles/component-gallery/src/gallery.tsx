@@ -72,7 +72,7 @@ export function GalleryPage({ categories }: GalleryPageProps) {
   )
 }
 
-function DemoCard({ demo }: { readonly demo: GalleryDemo }) {
+const DemoCard = React.memo(function DemoCard({ demo }: { readonly demo: GalleryDemo }) {
   const [run, setRun] = React.useState(0)
   const headingId = `gallery-${demo.id}`
   return (
@@ -105,7 +105,7 @@ function DemoCard({ demo }: { readonly demo: GalleryDemo }) {
       </div>
     </section>
   )
-}
+})
 
 interface DemoBoundaryState {
   readonly error: string | null

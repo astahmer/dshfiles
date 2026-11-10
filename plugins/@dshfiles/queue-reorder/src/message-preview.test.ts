@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { MessagePreviewModel } from './message-preview.js'
-import type { QueuedBlock } from './queue-edit.js'
+import type { QueuedBlock } from './queue-edit-model.js'
 
 test('preserves complete text blocks for rich reference rendering', () => {
   const reference = 'b:412 "queue refs rendering" (backlog item; backlog_get has its details)'
@@ -21,6 +21,11 @@ test('flattens text and named blocks while excluding attachments', () => {
 test('clips by Unicode code point and appends one ellipsis', () => {
   assert.equal(MessagePreviewModel.messagePreview([{ type: 'text', text: 'A🦊B🦊C' }], 4), 'A🦊B🦊…')
   assert.equal(MessagePreviewModel.messagePreview([{ type: 'text', text: 'A🦊B🦊C' }], 5), 'A🦊B🦊C')
+})
+
+test('previews a long body from its head, and still finds text behind a long whitespace run', () => {
+  assert.equal(MessagePreviewModel.messagePreview([{ type: 'text', text: `${'a'.repeat(20_000)}🦊` }], 40), `${'a'.repeat(40)}…`)
+  assert.equal(MessagePreviewModel.messagePreview([{ type: 'text', text: `${'\n'.repeat(20_000)}behind the spaces` }], 40), 'behind the spaces')
 })
 
 test('previews each image and file in message order and skips text', () => {

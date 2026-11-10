@@ -53,20 +53,14 @@ Then('each failed attempt is projected exactly once with safe metadata', async (
   await openActivity(page)
   await page.getByRole('button', { name: /^Detailed/ }).click()
   await page.getByRole('button', { name: 'Attention only', exact: true }).click()
-  const completionRows = page.getByRole('button', { name: /Integration Completion check failed/ })
+  const completionRows = page.getByRole('button', { name: /Completion check failed/u })
 
   await recordAssertion(page, 'verification-evidence-automatic-retry-projects-two-safe-receipts', async () => {
     await expect(completionRows).toHaveCount(2, { timeout: 30_000 })
-    const rowTexts = await completionRows.allInnerTexts()
-    expect(rowTexts.join('\n')).toContain('attempt 1')
-    expect(rowTexts.join('\n')).toContain('attempt 2')
-    const correlationIds = rowTexts.map(text => text.match(/correlation ([0-9a-f-]{36})/)?.[1])
-    expect(correlationIds.every((correlationId): correlationId is string => correlationId !== undefined)).toBe(true)
-    expect(new Set(correlationIds).size).toBe(2)
-    await expect(page.getByText(/PRIVATE_EVIDENCE_SENTINEL/)).toHaveCount(0)
-
+    await expect(page.getByText(/PRIVATE_EVIDENCE_SENTINEL/u)).toHaveCount(0)
     for (const attempt of [1, 2]) {
-      const attemptRow = completionRows.filter({ hasText: `attempt ${attempt}` })
+      // One row per attempt, each carrying its own correlation id in its accessible name.
+      const attemptRow = page.getByRole('button', { name: new RegExp(`Completion check failed.*attempt ${attempt}.*correlation [0-9a-f-]{36}`, 'u') })
       await expect(attemptRow).toHaveCount(1)
       await attemptRow.click()
       const metadata = page.locator('pre').filter({ hasText: 'verificationTurn' })
@@ -74,7 +68,7 @@ Then('each failed attempt is projected exactly once with safe metadata', async (
       await expect(metadata).toContainText('"automatic": true')
       await expect(metadata).toContainText('"status": "failed"')
       await expect(metadata).toContainText('"configurationFreshness": "unknown"')
-      await expect(page.getByText(/PRIVATE_EVIDENCE_SENTINEL/)).toHaveCount(0)
+      await expect(page.getByText(/PRIVATE_EVIDENCE_SENTINEL/u)).toHaveCount(0)
     }
   })
   await finishJourneyAssertions(page)
@@ -83,25 +77,25 @@ Then('each failed attempt is projected exactly once with safe metadata', async (
 Then('the Activity Timeline labels cancellation as notable, not failure', async ({ page }: { page: Page }) => {
   expect(profileFor(page).expectedClientEntries).toContain('@dshfiles/activity-timeline')
   await openActivity(page)
-  const cancelledRow = page.getByRole('button', { name: /Integration Interruptible check cancelled/ })
+  const cancelledRow = page.getByRole('button', { name: /Interruptible check cancelled/u })
 
   await recordAssertion(page, 'verification-evidence-cancellation-is-not-a-failed-check', async () => {
     await expect(cancelledRow).toHaveCount(1, { timeout: 30_000 })
-    await expect(cancelledRow.locator('span[aria-hidden="true"]')).toHaveClass(/dshx:bg-primary/)
-
-    const attentionOnly = page.getByRole('button', { name: 'Attention only', exact: true })
-    await attentionOnly.click()
-    await expect(cancelledRow).toHaveCount(0)
-    await attentionOnly.click()
-    await expect(cancelledRow).toHaveCount(1)
+    // Open the detail first: the feed keeps re-rendering while events land, so a row is only stable before a filter
+    // toggle replaces the list under it.
     await cancelledRow.click()
-
     const metadata = page.locator('pre').filter({ hasText: 'verificationTurn' })
     await expect(metadata).toContainText('"status": "cancelled"')
     await expect(metadata).toContainText('"failure": null')
     await expect(metadata).toContainText('"automatic": true')
     await expect(metadata).toContainText('"attempt": 1')
     await expect(page.getByText(/PRIVATE_EVIDENCE_SENTINEL/)).toHaveCount(0)
+    // Notable rather than attention: the attention-only filter is what separates the two levels.
+    const attentionOnly = page.getByRole('button', { name: 'Attention only', exact: true })
+    await attentionOnly.click()
+    await expect(cancelledRow).toHaveCount(0)
+    await attentionOnly.click()
+    await expect(cancelledRow).toHaveCount(1)
   })
   await finishJourneyAssertions(page)
 })

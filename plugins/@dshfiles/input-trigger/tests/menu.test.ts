@@ -29,3 +29,50 @@ describe('input trigger menu model', () => {
     expect(InputTriggerMenuModel.reduce(ready, { type: 'source-settled', generation: 0, source: 'files' })).toBe(ready)
   })
 })
+
+describe('input trigger menu dismissal and launcher records', () => {
+  const opened = InputTriggerMenuModel.reduce(InputTriggerMenuModel.seedGroups(MENU_CLOSED, [{ name: 'files' }]), { type: 'hit', hit })
+
+  it('records a dismissal that survives the close and matches only the same token', () => {
+    const dismissed = InputTriggerMenuModel.reduce(opened, { type: 'dismiss' })
+    expect(dismissed.open).toBe(false)
+    expect(dismissed.dismissed).toEqual({ trigger: '/', query: 'readme', quoted: false, start: 0, end: 7 })
+    const record = dismissed.dismissed
+    if (record === null) throw new Error('expected a recorded dismissal')
+    expect(InputTriggerMenuModel.dismissedHit(record, hit)).toBe(true)
+    expect(InputTriggerMenuModel.dismissedHit(record, { ...hit, query: 'read' })).toBe(false)
+    expect(InputTriggerMenuModel.reduce(dismissed, { type: 'close' })).toBe(dismissed)
+  })
+
+  it('clears the dismissal on request and ignores the request when none is recorded', () => {
+    const dismissed = InputTriggerMenuModel.reduce(opened, { type: 'dismiss' })
+    expect(InputTriggerMenuModel.reduce(dismissed, { type: 'dismissed-cleared' }).dismissed).toBeNull()
+    expect(InputTriggerMenuModel.reduce(opened, { type: 'dismissed-cleared' })).toBe(opened)
+  })
+
+  it('keeps the launcher source on the open menu and ends it with the close', () => {
+    const launched = InputTriggerMenuModel.reduce(InputTriggerMenuModel.seedGroups(MENU_CLOSED, [{ name: 'command' }]), {
+      type: 'hit',
+      hit,
+      launcher: 'command',
+    })
+    expect(launched.launcher).toBe('command')
+    expect(InputTriggerMenuModel.reduce(launched, { type: 'launcher-cleared' }).launcher).toBeNull()
+    expect(InputTriggerMenuModel.reduce(launched, { type: 'close' }).launcher).toBeNull()
+    expect(InputTriggerMenuModel.reduce(launched, { type: 'close' }).drilled).toBe(false)
+  })
+
+  it('keeps the drill record through the hit that follows a descent until the menu closes', () => {
+    const closed = InputTriggerMenuModel.reduce(opened, { type: 'close' })
+    const drilled = InputTriggerMenuModel.reduce(closed, { type: 'drilled', value: true })
+    expect(drilled.open).toBe(false)
+    expect(drilled.drilled).toBe(true)
+
+    const descended = InputTriggerMenuModel.reduce(InputTriggerMenuModel.seedGroups(drilled, [{ name: 'files' }]), { type: 'hit', hit })
+    expect(descended.drilled).toBe(true)
+
+    const refused = InputTriggerMenuModel.reduce(descended, { type: 'drilled', value: false })
+    expect(refused.drilled).toBe(false)
+    expect(InputTriggerMenuModel.reduce(descended, { type: 'close' }).drilled).toBe(false)
+  })
+})

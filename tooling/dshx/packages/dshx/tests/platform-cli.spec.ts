@@ -3,6 +3,7 @@ import type { JsonValue } from '../src/json.js'
 import * as Schema from 'effect/Schema'
 import { describe, expect, it, vi } from 'vitest'
 import { parseCliArgs } from '../src/cli/args.js'
+import { withUnknownProperties } from '../src/schema.js'
 import { runCli } from '../src/cli/run.js'
 import { connectDshPlatformClient, createDshPlatformClientFromTransport, DshPlatformError } from '../src/platform/client.js'
 import type { DshPlatformClient, DshPlatformTransport } from '../src/platform/client.js'
@@ -47,6 +48,74 @@ function clientWith(rpc: DshPlatformTransport['rpc']): DshPlatformClient {
     rpc,
     sessionCursor: async () => 3,
   })
+}
+
+const selectionFields = { provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optionalKey(Schema.String) }
+type Selection = Schema.Struct<typeof selectionFields>['Type']
+const nativeSelectModelSchema = withUnknownProperties({ request: withUnknownProperties(selectionFields) })
+const threadModelSelectSchema = withUnknownProperties({
+  input: Schema.Struct({
+    sessionId: Schema.String,
+    selection: Schema.Struct(selectionFields),
+    expectedRevision: Schema.Number,
+    preferSelectedProvider: Schema.Boolean,
+  }),
+})
+
+/**
+ * A DSH that keeps both model settings, like the real Host: native `session/selectModel` also saves the
+ * deployment default, while session-controller's `thread-model` API changes only the Session.
+ */
+function modelHost(registry: 'thread-model' | 'empty' | 'expired') {
+  const reasoner: Selection = { provider: 'deepseek', model: 'reasoner' }
+  const paths: string[] = []
+  const selectInputs: (typeof threadModelSelectSchema.Type)['input'][] = []
+  const host = { defaultModel: reasoner, sessionModel: reasoner, revision: 4, paths, selectInputs }
+  const respond = (rpcId: string | undefined, value: JsonValue) =>
+    new Response(JSON.stringify({ type: 'server-response', rpcId, result: { ok: true, value } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  const snapshot = () => ({
+    version: 1,
+    output: { sessionId: 'session-1', selection: host.sessionModel, revision: host.revision, running: false, preferSelectedProvider: false },
+  })
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : String(input))
+    if (url.searchParams.has('token')) return new Response(null, { status: 302, headers: { 'set-cookie': 'dsh.session=example-cookie; Path=/api; HttpOnly' } })
+    host.paths.push(url.pathname)
+    const body = decodeRequestBody(init?.body)
+    if (url.pathname === '/api/session/modelCatalog')
+      return respond(body.rpcId, { default: host.defaultModel, routableProviders: ['deepseek'], groups: [], failures: [] })
+    if (url.pathname === '/api/session/selectModel') {
+      const request = Schema.decodeUnknownSync(nativeSelectModelSchema)(body.payload?.args).request
+      host.sessionModel = host.defaultModel = { provider: request.provider, model: request.model }
+      return respond(body.rpcId, { selected: host.sessionModel })
+    }
+    const method = url.pathname.startsWith('/api/dshx-') ? url.pathname.split('/').at(-1) : undefined
+    if (method === 'list' && registry === 'expired') return new Response(null, { status: 401 })
+    if (method === 'list')
+      return respond(body.rpcId, {
+        version: 1,
+        output: {
+          apis:
+            registry === 'thread-model'
+              ? [{ owner: '@dshfiles/session-controller', id: 'thread-model', version: 1, methods: [{ name: 'snapshot' }, { name: 'select' }] }]
+              : [],
+        },
+      })
+    if (method === 'snapshot') return respond(body.rpcId, snapshot())
+    if (method === 'select') {
+      const request = Schema.decodeUnknownSync(threadModelSelectSchema)(body.payload).input
+      host.selectInputs.push(request)
+      if (request.expectedRevision !== host.revision) throw new Error('stale thread-model revision')
+      host.sessionModel = request.selection
+      host.revision += 1
+      return respond(body.rpcId, snapshot())
+    }
+    throw new Error(`Unexpected request ${url.pathname}`)
+  })
+  return { host, fetch }
 }
 
 describe('DSH platform CLI', () => {
@@ -680,14 +749,6 @@ describe('DSH platform CLI', () => {
           ],
           failures: [],
         }
-      if (namespace === 'session' && method === 'selectModel')
-        return {
-          selected: {
-            provider: 'deepseek',
-            model: 'reasoner',
-            reasoningEffort: 'high',
-          },
-        }
       if (namespace === 'skills' && method === 'list')
         return {
           skills: [
@@ -737,16 +798,8 @@ describe('DSH platform CLI', () => {
       default: { provider: 'deepseek' },
       groups: [{ id: 'deepseek' }],
     })
-    expect(
-      await client.models.select('session-1', {
-        provider: 'deepseek',
-        model: 'reasoner',
-        reasoningEffort: 'high',
-      }),
-    ).toEqual({
-      provider: 'deepseek',
-      model: 'reasoner',
-      reasoningEffort: 'high',
+    await expect(client.models.select('session-1', { provider: 'deepseek', model: 'reasoner' })).rejects.toMatchObject({
+      code: 'session-model-unavailable',
     })
     expect(await client.skills.list('session-1')).toEqual([{ name: 'review', description: 'Review code', modelInvocable: true }])
     expect(calls.map(call => `${call.namespace}/${call.method}`)).toEqual([
@@ -761,7 +814,6 @@ describe('DSH platform CLI', () => {
       'agentPresets/list',
       'agentPresets/read',
       'session/modelCatalog',
-      'session/selectModel',
       'skills/list',
     ])
     expect(calls[2]?.args).toEqual({ request: { sessionId: 'session-1' } })
@@ -771,6 +823,59 @@ describe('DSH platform CLI', () => {
       mode: 'queue',
       content: [{ type: 'text', text: 'synthetic prompt' }],
     })
+  })
+
+  it('selects a model for one Session without changing the default model', async () => {
+    const { host, fetch } = modelHost('thread-model')
+    const client = await connectDshPlatformClient({ url: 'http://127.0.0.1:3080/?token=synthetic-token', fetch })
+    const streams = io()
+    const stdout = capture(streams.out)
+
+    const exitCode = await runCli(['models', 'select', '--session', 'session-1', 'deepseek', 'chat', '--reasoning-effort', 'high', '--json'], {
+      io: streams,
+      version: 'test-version',
+      runtime: { connectPlatform: async () => client },
+    })
+
+    expect(exitCode).toBe(0)
+    expect(decodeCliEnvelope(stdout())).toMatchObject({
+      ok: true,
+      data: { sessionId: 'session-1', selected: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' } },
+    })
+    expect(host.sessionModel).toEqual({ provider: 'deepseek', model: 'chat', reasoningEffort: 'high' })
+    expect(host.defaultModel).toEqual({ provider: 'deepseek', model: 'reasoner' })
+    expect((await client.models.list()).default).toEqual({ provider: 'deepseek', model: 'reasoner' })
+    expect(host.selectInputs).toEqual([
+      {
+        sessionId: 'session-1',
+        selection: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' },
+        expectedRevision: 4,
+        preferSelectedProvider: false,
+      },
+    ])
+    expect(host.paths).not.toContain('/api/session/selectModel')
+  })
+
+  it.each([
+    ['DSH does not serve the thread-model API', 'empty', 'session-model-unavailable'],
+    ['the DSH session expired', 'expired', 'authentication-expired'],
+  ] as const)('refuses a Session model selection without touching either model when %s', async (_reason, registry, code) => {
+    const { host, fetch } = modelHost(registry)
+    const client = await connectDshPlatformClient({ url: 'http://127.0.0.1:3080/?token=synthetic-token', fetch })
+    const streams = io()
+    const stdout = capture(streams.out)
+
+    const exitCode = await runCli(['models', 'select', '--session', 'session-1', 'deepseek', 'chat', '--json'], {
+      io: streams,
+      version: 'test-version',
+      runtime: { connectPlatform: async () => client },
+    })
+
+    expect(exitCode).toBe(1)
+    expect(decodeCliEnvelope(stdout())).toMatchObject({ ok: false, error: { code } })
+    expect(host.defaultModel).toEqual({ provider: 'deepseek', model: 'reasoner' })
+    expect(host.sessionModel).toEqual({ provider: 'deepseek', model: 'reasoner' })
+    expect(host.paths).not.toContain('/api/session/selectModel')
   })
 
   it('cancels a DSH bundle install through the matching manager request id', async () => {

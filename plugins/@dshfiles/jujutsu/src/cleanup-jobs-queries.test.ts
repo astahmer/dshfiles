@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { CleanupJobView, CleanupResult } from '@dshfiles/jj-integration/api'
-import { CleanupJobTrailModel, requestWorkspaceCleanup, type CleanupStartClient } from './cleanup-jobs-queries.js'
+import {
+  CleanupJobTrailModel,
+  createCleanupJobsReader,
+  requestWorkspaceCleanup,
+  type CleanupJobsClient,
+  type CleanupStartClient,
+} from './cleanup-jobs-queries.js'
 
 const job = (overrides: Partial<CleanupJobView> = {}): CleanupJobView => ({
   id: 'cleanup-1',
@@ -89,6 +95,101 @@ describe('CleanupJobTrailModel.isActive', () => {
     expect(CleanupJobTrailModel.isActive(job())).toBe(true)
     expect(CleanupJobTrailModel.isActive(job({ state: 'done', phase: 'done' }))).toBe(false)
     expect(CleanupJobTrailModel.isActive(job({ state: 'failed', phase: 'failed' }))).toBe(false)
+  })
+})
+
+describe('CleanupJobTrailModel failures', () => {
+  const failedRows = { total: 2, processed: 2, removed: 1, kept: 0, failed: 1, current: null }
+
+  it('treats a stopped job and a job that left a workspace behind as failures, and nothing else', () => {
+    expect(CleanupJobTrailModel.hasFailure(job({ state: 'failed', phase: 'failed', error: 'boom' }))).toBe(true)
+    expect(CleanupJobTrailModel.hasFailure(job({ state: 'done', phase: 'done', progress: failedRows }))).toBe(true)
+    expect(CleanupJobTrailModel.hasFailure(job({ state: 'done', phase: 'done' }))).toBe(false)
+    expect(CleanupJobTrailModel.hasFailure(job({ progress: failedRows }))).toBe(false)
+  })
+
+  it('shows the Host recovery, and a guarded rerun from a Host that predates it', () => {
+    const recovery = 'thread-a stayed in place. Fix what blocked the removal, then run Clean up thread workspaces… again.'
+    expect(CleanupJobTrailModel.recovery(job({ state: 'done', phase: 'done', progress: failedRows, recovery }))).toBe(recovery)
+    expect(CleanupJobTrailModel.recovery(job({ state: 'failed', phase: 'failed', error: 'boom' }))).toContain('never forces unlanded work')
+    expect(CleanupJobTrailModel.recovery(job({ state: 'done', phase: 'done' }))).toBeNull()
+  })
+
+  it('heads a failure with what stayed, and keeps the Host reason apart so a long path cannot hide it', () => {
+    const failedRow = (name: string) =>
+      ({
+        repoRoot: '/work/sample',
+        name,
+        path: `/work/sample-threads/${name}`,
+        kind: 'empty',
+        lastUsedAt: 1,
+        missing: false,
+        outcome: 'failed',
+        message: `Could not remove /work/sample-threads/${name}. PermissionDenied`,
+      }) as const
+    const partial = job({
+      state: 'done',
+      phase: 'done',
+      progress: failedRows,
+      result: { ...cleanupResult(), workspaces: [failedRow('thread-a'), failedRow('thread-b')] },
+    })
+
+    expect(CleanupJobTrailModel.failure(partial)).toEqual({
+      headline: 'Could not remove thread-a and 1 more',
+      reason: 'Could not remove /work/sample-threads/thread-a. PermissionDenied',
+    })
+    expect(CleanupJobTrailModel.failure(job({ state: 'done', phase: 'done', progress: failedRows }))).toEqual({
+      headline: 'Could not remove 1 workspace',
+      reason: null,
+    })
+    expect(CleanupJobTrailModel.failure(job({ state: 'failed', phase: 'failed', error: 'boom' }))).toEqual({ headline: 'Cleanup failed', reason: 'boom' })
+    expect(CleanupJobTrailModel.failure(job({ state: 'done', phase: 'done' }))).toBeNull()
+  })
+
+  it('remembers a dismissal by job and start time, since job ids restart with the Host', () => {
+    expect(CleanupJobTrailModel.dismissKey(job())).toBe('cleanup-1@1000')
+    expect(CleanupJobTrailModel.dismissKey(job({ startedAt: 2_000 }))).not.toBe(CleanupJobTrailModel.dismissKey(job()))
+  })
+})
+
+describe('createCleanupJobsReader', () => {
+  const signal = new AbortController().signal
+  const owned = job({ id: 'cleanup-2', repoRoot: '/work/sample', request: { path: '/work/sample-threads/thread-aaaaaa', olderThanHours: 0, kinds: ['empty'] } })
+
+  it('asks for the project of the panel path, which the Host traces from a thread workspace', async () => {
+    const cleanupJobs = vi.fn<CleanupJobsClient['cleanupJobs']>(async () => ({ repoRoot: '/work/sample', jobs: [owned] }))
+    const read = createCleanupJobsReader()
+
+    expect((await read({ cleanupJobs }, '/work/sample-threads/thread-aaaaaa', signal)).jobs).toEqual([owned])
+    expect(cleanupJobs).toHaveBeenCalledWith({ path: '/work/sample-threads/thread-aaaaaa' }, { signal })
+  })
+
+  it('falls back to the whole trail once when the Host predates the project filter', async () => {
+    class Refused extends Error {}
+    const cleanupJobs = vi.fn<CleanupJobsClient['cleanupJobs']>(async input => {
+      if (input.path !== undefined) throw new Refused('Unexpected key "path"')
+      return { jobs: [job()] }
+    })
+    const read = createCleanupJobsReader({ isRefusal: error => error instanceof Refused })
+
+    expect((await read({ cleanupJobs }, '/work/sample', signal)).jobs).toHaveLength(1)
+    await read({ cleanupJobs }, '/work/sample', signal)
+
+    expect(cleanupJobs.mock.calls.map(([input]) => input)).toEqual([{ path: '/work/sample' }, {}, {}])
+  })
+
+  it('reports any other failure and keeps asking for the project on the next poll', async () => {
+    let calls = 0
+    const cleanupJobs = vi.fn<CleanupJobsClient['cleanupJobs']>(async () => {
+      calls += 1
+      if (calls === 1) throw new Error('API handler failed. See Host diagnostics.')
+      return { repoRoot: '/work/sample', jobs: [owned] }
+    })
+    const read = createCleanupJobsReader()
+
+    await expect(read({ cleanupJobs }, '/work/sample', signal)).rejects.toThrow('API handler failed')
+    expect((await read({ cleanupJobs }, '/work/sample', signal)).jobs).toEqual([owned])
+    expect(cleanupJobs.mock.calls.map(([input]) => input)).toEqual([{ path: '/work/sample' }, { path: '/work/sample' }])
   })
 })
 

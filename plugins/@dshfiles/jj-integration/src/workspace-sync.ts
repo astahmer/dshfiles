@@ -5,6 +5,7 @@ import type { WorkspaceSyncView } from './api.js'
 import { ActivityLog } from './host-edges-promise.js'
 import { JjSettings } from './jj-settings.js'
 import { ThreadWorkspaceModel } from './thread-workspace-model.js'
+import { queuedSyncView, syncView } from './workspace-sync-view.js'
 import { workspaceSyncActivity } from './workspace-sync-outcome.js'
 
 const MAX_OUTPUT_BYTES = 512 * 1024
@@ -41,19 +42,6 @@ export interface WorkspaceSyncRequest {
 interface WorkspaceSyncInput extends WorkspaceSyncRequest {
   readonly workspace: string
 }
-
-const syncView = (input: WorkspaceSyncInput, state: WorkspaceSyncView['state'], message: string | null, finishedAt: number): WorkspaceSyncView => ({
-  workspace: input.workspace,
-  bookmark: input.bookmark,
-  state,
-  status: null,
-  pluginsRebuilt: [],
-  hotPlugins: [],
-  restartNeeded: false,
-  conflicts: [],
-  message,
-  finishedAt: state === 'running' ? null : new Date(finishedAt).toISOString(),
-})
 
 const collectText = (stream: Stream.Stream<Uint8Array, unknown>, maxBytes: number) =>
   stream.pipe(
@@ -161,7 +149,7 @@ export class WorkspaceSync extends Context.Service<
           if (!(yield* fileSystem.exists(path.join(request.repoRoot, '.jj')).pipe(Effect.orElseSucceed(() => false)))) return
           const input: WorkspaceSyncInput = { ...request, workspace }
           yield* Ref.update(pending, current => new Map([...current, [input.repoRoot, input]]))
-          yield* Ref.set(view, syncView(input, 'running', null, 0))
+          yield* Ref.update(view, current => queuedSyncView(current, input))
           yield* Queue.offer(wakes, undefined)
         }),
         current: Ref.get(view),

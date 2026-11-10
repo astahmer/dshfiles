@@ -29,12 +29,31 @@ export interface TriggerHit {
  */
 export type DetectTrigger = (draft: string, caret: number, guard: TriggerGuard) => TriggerHit | null
 
+/** Token identity a dismissal sticks to: the same trigger, query, and span bounds. */
+export interface DismissedHit {
+  readonly trigger: string
+  readonly query: string
+  readonly quoted: boolean
+  readonly start: number
+  readonly end: number
+}
+
 /** Menu state: one group per source; empty ready groups auto-close the menu. */
 export interface MenuState {
   readonly open: boolean
   readonly hit: TriggerHit | null
   /** Monotonic per-hit generation; stale source settlements are dropped. */
   readonly generation: number
+  /** Source opened through the programmatic launcher, or null for a typed menu. */
+  readonly launcher: string | null
+  /** Whether the menu was reached by a drill pick; cleared when the menu closes. */
+  readonly drilled: boolean
+  /**
+   * Identity of the hit whose menu the user dismissed: "not this one, not now".
+   * Survives the close, so restoring the caret cannot reopen that token, and is
+   * cleared by typing or by moving to another token.
+   */
+  readonly dismissed: DismissedHit | null
   readonly groups: readonly {
     readonly source: string
     /** False when candidate section rows own all visible group labeling. */
@@ -47,7 +66,11 @@ export interface MenuState {
 
 /** Menu reduction events. Source failure = silent group removal (log only; no error UI tier). */
 export type MenuEvent =
-  | { readonly type: 'hit'; readonly hit: TriggerHit | null }
+  | { readonly type: 'hit'; readonly hit: TriggerHit | null; readonly launcher?: string | null }
+  | { readonly type: 'dismiss' }
+  | { readonly type: 'dismissed-cleared' }
+  | { readonly type: 'launcher-cleared' }
+  | { readonly type: 'drilled'; readonly value: boolean }
   | { readonly type: 'source-settled'; readonly generation: number; readonly source: string; readonly items?: readonly InputTriggerCandidate[] }
   | { readonly type: 'source-failed'; readonly generation: number; readonly source: string }
   | { readonly type: 'move'; readonly dir: 1 | -1 }

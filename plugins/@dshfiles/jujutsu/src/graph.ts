@@ -154,6 +154,7 @@ const byGroupRecency = (left: Branch, right: Branch): number => left.groupRecenc
  */
 const orderBranches = (input: {
   readonly revisions: readonly LayoutRevision[]
+  readonly trunkBookmark: string | undefined
   readonly firstParent: (commitId: string) => string | undefined
   readonly listedParents: (commitId: string) => readonly string[]
   readonly children: ReadonlyMap<string, readonly string[]>
@@ -176,7 +177,11 @@ const orderBranches = (input: {
     return branch
   }
 
-  const trunkHead = input.revisions.find(revision => revision.bookmarks.some(name => TRUNK_BOOKMARKS.has(name)))
+  // The project's main branch first; a repository without one still gets a trunk from the conventional names.
+  const trunkBookmark = input.trunkBookmark
+  const trunkHead =
+    (trunkBookmark === undefined ? undefined : input.revisions.find(revision => revision.bookmarks.includes(trunkBookmark))) ??
+    input.revisions.find(revision => revision.bookmarks.some(name => TRUNK_BOOKMARKS.has(name)))
   const trunk = trunkHead === undefined ? undefined : claim(trunkHead.commitId, Number.POSITIVE_INFINITY, true)
   if (trunk !== undefined) trunk.fork = undefined
 
@@ -288,6 +293,7 @@ const layoutRevisionGraph = (
   revisions: readonly LayoutRevision[],
   revisionsById: ReadonlyMap<string, ParentRevision>,
   hideImmutable: boolean,
+  trunkBookmark?: string,
 ): readonly RevisionGraphRow[] => {
   const listed = new Set(revisions.map(revision => revision.commitId))
   const parentLinks = new Map(revisions.map(revision => [revision.commitId, graphParentLinks(revision, revisionsById, hideImmutable, listed)]))
@@ -301,7 +307,7 @@ const layoutRevisionGraph = (
     for (const parent of new Set(listedParents(revision.commitId))) children.set(parent, [...(children.get(parent) ?? []), revision.commitId])
   }
 
-  const { order, owner, trunk, branches } = orderBranches({ revisions, firstParent, listedParents, children })
+  const { order, owner, trunk, branches } = orderBranches({ revisions, trunkBookmark, firstParent, listedParents, children })
   const row = new Map(order.map((commitId, index) => [commitId, index]))
   const rowOf = (commitId: string): number => row.get(commitId) ?? 0
   const sideLaneFloor = trunk === undefined ? 0 : 1

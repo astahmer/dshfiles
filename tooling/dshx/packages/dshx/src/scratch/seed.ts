@@ -53,7 +53,7 @@ const seedBacklogJevEnabled = async (page: Page, timeoutMs: number): Promise<voi
 }
 
 /**
- * Open a former left-nav page through the thread sidebar's fixed rail (plans/ade-ux Phase 3a): the destination tab,
+ * Open a former left-nav page through the thread sidebar's fixed rail (docs/ade-ux Phase 3a): the destination tab,
  * then its section in the list. Resolves false when the rail is absent (free docking, native sidebar), so the caller
  * keeps its older path.
  */
@@ -258,8 +258,11 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
     await page.getByRole('option', { name: projectName }).first().waitFor({ state: 'visible', timeout: timeoutMs })
     await page.keyboard.press('Enter')
   }
-  const workspaceToggle = page.getByRole('checkbox', { name: 'workspace', exact: true })
-  if ((await workspaceToggle.getAttribute('aria-checked', { timeout: timeoutMs })) !== 'true') await workspaceToggle.click({ timeout: timeoutMs })
+  const workspacePicker = page.getByRole('button', { name: /^Workspace: / })
+  if (!/^Workspace: Own workspace/u.test((await workspacePicker.getAttribute('aria-label', { timeout: timeoutMs })) ?? '')) {
+    await workspacePicker.click({ timeout: timeoutMs })
+    await page.getByRole('option', { name: /^Own workspace/ }).click({ timeout: timeoutMs })
+  }
   const threadLabel = new RegExp(`^${projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} · (thread-[\\w-]+)$`)
   const deadline = Date.now() + timeoutMs
   let threadName: string | undefined

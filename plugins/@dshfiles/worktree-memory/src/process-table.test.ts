@@ -24,17 +24,33 @@ const baseInput = (overrides: Partial<SnapshotInput>): SnapshotInput => ({
 })
 
 describe('ProcessTable', () => {
-  it('parses ps rows with their start time and full arguments', () => {
+  it('parses ps rows with their process group, cpu share, start time and full arguments', () => {
     const rows = ProcessTable.parsePs(
       [
-        '  501     1  10240 Mon Oct 19 14:02:03 2026     node /x/node_modules/vite/bin/vite.js --port 5173',
+        '  501     1     1  10240   1.5 Mon Oct 19 14:02:03 2026     node /x/node_modules/vite/bin/vite.js --port 5173',
         'garbage line',
-        '  502   501   2048 Mon Oct  5 09:00:00 2026     bash -c set -o pipefail\\012pnpm test',
+        '  502   501   501   2048   0.0 Mon Oct  5 09:00:00 2026     bash -c set -o pipefail\\012pnpm test',
       ].join('\n'),
     )
     expect(rows).toEqual([
-      { pid: 501, ppid: 1, rssKb: 10240, startedAt: Date.parse('Mon Oct 19 14:02:03 2026'), command: 'node /x/node_modules/vite/bin/vite.js --port 5173' },
-      { pid: 502, ppid: 501, rssKb: 2048, startedAt: Date.parse('Mon Oct 5 09:00:00 2026'), command: 'bash -c set -o pipefail\\012pnpm test' },
+      {
+        pid: 501,
+        ppid: 1,
+        pgid: 1,
+        rssKb: 10240,
+        cpuPercent: 1.5,
+        startedAt: Date.parse('Mon Oct 19 14:02:03 2026'),
+        command: 'node /x/node_modules/vite/bin/vite.js --port 5173',
+      },
+      {
+        pid: 502,
+        ppid: 501,
+        pgid: 501,
+        rssKb: 2048,
+        cpuPercent: 0,
+        startedAt: Date.parse('Mon Oct 5 09:00:00 2026'),
+        command: 'bash -c set -o pipefail\\012pnpm test',
+      },
     ])
   })
 

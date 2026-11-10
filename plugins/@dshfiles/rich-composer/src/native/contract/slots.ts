@@ -50,6 +50,7 @@ export interface ComposerFileAttachment {
 
 /** Upload lifecycle of one picked file draft (files upload on pick, not on send). */
 export type DraftFileUpload =
+  | { readonly status: 'queued' }
   | { readonly status: 'uploading'; readonly loaded: number; readonly total?: number }
   | { readonly status: 'ready'; readonly receiptId: FileUploadReceiptId; readonly file: FileAttachmentRef }
   | { readonly status: 'error'; readonly message: string }

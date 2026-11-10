@@ -1,4 +1,5 @@
-import { access } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
+import { isBuiltin } from 'node:module'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { dirname, resolve } from 'node:path'
@@ -121,10 +122,34 @@ const publishManifestSchema = withUnknownProperties({
   version: Schema.optional(Schema.String),
   private: Schema.optional(Schema.Boolean),
   license: Schema.optional(Schema.String),
+  main: Schema.optional(Schema.String),
   dependencies: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefaultType(Effect.succeed({}))),
   optionalDependencies: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefaultType(Effect.succeed({}))),
   peerDependencies: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefaultType(Effect.succeed({}))),
 })
+
+/** Line-anchored so the docs that bundled packages keep in comments never read as imports; rolldown writes each import on one line. */
+const staticImportPattern = /^(?:import\s*|(?:import|export)\b[^'"\n]*?\bfrom\s*)["']([^"'\n]+)["']/gmu
+
+const bareImports = (source: string): readonly string[] => {
+  const packages = [...source.matchAll(staticImportPattern)].flatMap(([, specifier]) => {
+    if (specifier === undefined || specifier.startsWith('.') || specifier.startsWith('/') || isBuiltin(specifier)) return []
+    const [first = '', second] = specifier.split('/')
+    return [first.startsWith('@') && second !== undefined ? `${first}/${second}` : first]
+  })
+  return [...new Set(packages)]
+}
+
+/**
+ * A package name the Host bundle imports but no install would provide. The monorepo resolves these by accident; an
+ * installed package only sees its own `dependencies`, and `@deepseek-ai/*` from the DSH that loads it. A peer does
+ * not help: profiles keep `autoInstallPeers` off, so nothing installs it.
+ */
+const undeclaredHostImports = async (root: string, hostEntry: string, declared: Readonly<Record<string, string>>): Promise<readonly string[]> => {
+  const source = await readFile(resolve(root, hostEntry), 'utf8').catch(() => undefined)
+  if (source === undefined) return []
+  return bareImports(source).filter(name => !name.startsWith('@deepseek-ai/') && !Object.hasOwn(declared, name))
+}
 
 export interface PublishPreview {
   readonly name: string | null
@@ -174,6 +199,14 @@ export const previewPublish = async (root: string, manifest: JsonObject, require
         hint: 'Publish with pnpm publish, or replace the specifier with a version range.',
       })
   }
+  for (const name of await undeclaredHostImports(root, fields.main ?? 'dist/index.js', fields.dependencies))
+    diagnostics.push({
+      code: 'DSHX6409',
+      severity: 'error',
+      message: `The Host bundle imports ${name}, which an installed package cannot resolve, so DSH would report "did not activate".`,
+      file,
+      hint: `Add ${name} to host.bundleDependencies in dshx.config.ts, or to "dependencies" in package.json.`,
+    })
   if (fields.license === undefined)
     diagnostics.push({
       code: 'DSHX6408',

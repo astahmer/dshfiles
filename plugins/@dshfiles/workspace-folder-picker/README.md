@@ -18,7 +18,44 @@ choosing one that already exists. The New-thread project picker also lets you
 remove a project registration after confirmation; its folder and files stay on
 disk, while its threads lose their project grouping.
 
+## Native folder dialog and Windows paths
+
+**Browse…** appears when the Host's global `directoryPicker` is native (the
+desktop app). Choosing a folder in that dialog adds it as a workspace, or in the
+New-thread picker registers and selects it; cancelling changes nothing. The
+read-only `workspace_folder_browser_capabilities` agent tool reports the same
+capability, and the Host's path style, without opening the dialog. A
+browse-only Host, a Host without a picker, or an older Host that cannot answer
+the read hides **Browse…** and keeps the in-app browser and absolute-path entry.
+
+On a Windows Host, paths can be typed or pasted as drive paths
+(`C:\projects\game` or `C:/projects/game`), UNC paths (`\\server\share\game`),
+Unix-style absolute paths or home-relative paths (`~/game`, `~\game`). They
+compare case-insensitively across both separators; drive-relative (`C:game`)
+and device (`\\?\`, `\\.\`) paths are not absolute and are never browsed. The
+picker learns the Host's style from the capability read, or else from the home
+folder the Host lists. On macOS and Linux, and before the style is known, drive,
+UNC and `~\` text stays a project search, as it always was.
+
+The cross-plugin onboarding behavior, its trust boundary and the full
+verification list live in
+[project onboarding](../../../docs/project-onboarding.md).
+
+## Inspect a folder before adding it
+
+Choosing a folder opens one step that says what it is, instead of registering it blind:
+
+- **No repository**: **Initialize repository** runs `jj git init --colocate` in place, keeps the files already there as the first revision, writes a `README.md` when the folder has none, commits it and creates `main`; **Add without a repository** registers the folder as a plain project.
+- **Git checkout**: shows the checkout root and its `origin`; **Enable Jujutsu and add** calls the Jujutsu bundle's guarded initializer (the same one the graph uses: colocated, history and files preserved), then registers the project, so the composer's bookmark and workspace controls appear. **Add project** registers it without Jujutsu.
+- **Jujutsu repository**: shows the root and offers the plain add.
+
+A folder inside another checkout is reported with that checkout's root and never initialized; broken `.jj` metadata is reported and never repaired. The Host side is read-only: `project_inspect` (folder → kind, root, origin, default branch, whether Jujutsu can be enabled) and `project_init` (in-place initialization, refusing a folder that is already a repository or sits inside one).
+
+The Enable action is a dshx contract (`@dshfiles/workspace-folder-picker/repository-setup-contract`), provided by `@dshfiles/jujutsu`. Without that bundle, the panel keeps the plain add and says why Jujutsu cannot be enabled.
+
 ## Clone a repository
+
+![Inspect a folder before adding it](docs/screenshots/workspace-folder-setup.png)
 
 ![Clone a repository as a project](docs/screenshots/project-clone.png)
 
@@ -28,11 +65,22 @@ folder `<parent>/<name>` on this machine. The clone runs as a background Host
 job: `git clone --progress` feeds the progress bar, **Cancel clone** stops it
 and deletes the partial folder, then `jj git init --colocate` runs when jj is
 installed and the clone is registered as a project and selected. Closing the
-dialog leaves the job running; it still registers the project when it ends.
+dialog does not hide the job: a shell notice keeps its phase, **Cancel clone**
+and **Retry clone** on screen, and it still registers the project when it ends.
+
+The progress row follows git's own stages (connecting, counting, receiving,
+resolving, checkout) next to the percent, and a failed or cancelled clone shows
+**Retry clone**, which starts a fresh job for the same repository and folder.
+
+A failure before Git checks files out removes the folder it made, so a retry
+(or the form again) finds the destination free. A failure during or after
+checkout keeps the partial tree, says that retrying clears it, and **Retry
+clone** removes only that incomplete checkout before starting again.
 
 The same jobs are agent tools: `project_clone` (URL, parent folder, folder
-name), `project_clone_jobs` (read-only trail, newest first) and
-`project_clone_cancel` (requires `confirm: true`). An existing destination is
+name), `project_clone_jobs` (read-only trail, newest first),
+`project_clone_cancel` (requires `confirm: true`) and `project_clone_retry` (a
+failed or cancelled job only). An existing destination is
 refused, a second start for the same folder returns the running job, and each
 clone leaves one `project clone` span with its final state and phase. Jobs live
 in Host memory, so a Host restart drops the trail. `multi_host_clone_project`
@@ -56,6 +104,41 @@ job. The `project_create` agent tool takes the same inputs, with
 `createGitHubRepository` required so an agent never creates a GitHub repository
 by default, and `project_tools_status` reports which of git, jj and gh are
 installed. Each run leaves one `project create` span.
+
+## Publish an existing repository
+
+`project_publish` gives a local checkout that has no `origin` a GitHub repository:
+`gh repo create <name> --private|--public --source . --remote origin`, then
+`jj git push --bookmark <bookmark> --remote origin` for a Jujutsu repository
+(`git push --set-upstream origin HEAD` for a plain checkout). The visibility is a
+required argument, so nothing is created by default. A folder that is not a
+repository, one whose `origin` already exists, and one without commits are
+refused before anything is created, each naming the next command. A failed push
+keeps the repository and returns the command that finishes it.
+
+## Project config file (`dsh.project.json`)
+
+A repository can check in `dsh.project.json` at its root. Only non-executable
+settings are honoured:
+
+```json
+{
+  "iconPath": "assets/logo.svg",
+  "defaultThreadWorkspace": "isolated",
+  "bookmark": "main",
+  "checks": ["test", "typecheck"],
+  "scripts": [{ "name": "Setup", "command": "pnpm install", "hint": "Run after cloning" }]
+}
+```
+
+`project_config_read` reports what was declared; a missing, unreadable or
+invalid file is reported (never thrown), so a broken file cannot stop a thread
+from starting. `defaultThreadWorkspace` decides where new threads start for
+that repository and outranks the profile's isolate-by-default only in that
+direction: an explicit `isolate: true` at a call site still wins. `checks`
+lists ids of profile-trusted `project-checks` actions to offer. `scripts` are
+suggestions only — nothing from the file runs until the user imports it into
+the trusted actions, so cloning a repository can never execute its commands.
 
 ## Runtime support
 
@@ -111,11 +194,12 @@ port, and a workspace registration callback.
 
 Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
 `initialTab`, `pinnedWorkspaceIds`, `disabled`, `mode`, `showNativePicker`,
+`pathStyle` (`'windows'` or `'posix'`, when the caller knows the Host's),
 `onUseAbsolutePath`, and `onRemoveProject`. When supplied, each registered
 project has a separate remove control. It asks for confirmation before calling
 `onRemoveProject`; consumers decide how to unregister the project. The default
 `projects` mode shows registered projects and switches to browsing when the
-query starts with `/` or `~/`. A unique matching folder opens as the path is
+query is an absolute or home-relative path. A unique matching folder opens as the path is
 typed; ambiguous matches remain available for keyboard selection, and truncated
 listings never trigger a guess. Home-relative paths resolve against the Host's
 reported home directory. While an absolute query is not the current listing,
@@ -126,7 +210,8 @@ the Host-canonical path.
 registration. It offers direct path submission only when `onUseAbsolutePath` is
 provided, so the caller can validate the uncanonicalized path. Set
 `showNativePicker` to `false` when the injected Host backend has no native
-chooser.
+chooser. A native pick selects the folder in `directories` mode and registers it through
+`onRegisterWorkspace` in `projects` mode.
 
 Project mode opens on the **Projects** tab: registered projects without JJ thread
 workspaces (any project carrying `isJjWorkspace: true`). Tabs mirror the command
@@ -145,7 +230,7 @@ Selection is a discriminated union:
 - `{ kind: 'directory', canonicalPath, title }`
 
 The component filters registered projects by title/path, enters path browsing
-when the query starts with `/` or `~/`, and supports arrows, Enter, and
+when the query is an absolute or home-relative path, and supports arrows, Enter, and
 Command/Ctrl+1–9. An absolute path can also be submitted without browsing: project
 mode uses the workspace-registration callback, and directory mode calls the
 opt-in `onUseAbsolutePath` callback. The callback owner must validate and

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { createQueueEditor, QueueEditModel, type QueueEditRecord, type QueuedBlock } from './queue-edit.js'
+import { createQueueEditor } from './queue-edit.js'
+import { QueueEditModel, type QueueEditRecord, type QueuedBlock } from './queue-edit-model.js'
 
 interface RawRow {
   readonly id: string
@@ -30,6 +31,21 @@ const text = (value: string): QueuedBlock => ({ type: 'text', text: value })
 const image = (name: string): QueuedBlock => ({ type: 'image', attachment: { attachmentId: `stored:${name}`, mediaType: 'image/png', name } })
 const file = (name: string): QueuedBlock => ({ type: 'file', attachment: { attachmentId: `stored:${name}`, name, bytes: 3 } })
 
+/** The in-memory DSH the tests drive: queue rows, the composer draft, and the attachments both share. */
+interface FakeWorld {
+  running: boolean
+  failNextSubmit: boolean
+  rows: RawRow[]
+  started: RawRow[]
+  pending: string[]
+  composer: { draft: string; attachmentIds: string[]; idle: boolean }
+  references: { label: string; clipboardText: string }[]
+  drafts: Map<string, File>
+  released: string[]
+  stored: Map<string, File>
+  records: QueueEditRecord | null
+}
+
 /**
  * A working in-memory DSH: a queue that drains when a turn ends, a composer that sends through pending submissions
  * like the real one, and draft attachments backed by real `File`s.
@@ -40,17 +56,23 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
   const composerSubject = subject()
   let sequence = 0
   const nextId = (prefix: string) => `${prefix}-${(sequence += 1)}`
-  const world = {
+  const rows: RawRow[] = []
+  const started: RawRow[] = []
+  const pending: string[] = []
+  const released: string[] = []
+  const attachmentIds: string[] = []
+  const world: FakeWorld = {
     running: options.running ?? true,
     failNextSubmit: false,
-    rows: [] as RawRow[],
-    started: [] as RawRow[],
-    pending: [] as string[],
-    composer: { draft: '', attachmentIds: [] as string[], idle: true },
+    rows,
+    started,
+    pending,
+    composer: { draft: '', attachmentIds, idle: true },
+    references: [],
     drafts: new Map<string, File>(),
-    released: [] as string[],
+    released,
     stored: new Map<string, File>(),
-    records: null as QueueEditRecord | null,
+    records: null,
   }
 
   const toBlock = (draftFile: File): QueuedBlock =>
@@ -85,6 +107,14 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
         world.composer = { ...world.composer, attachmentIds: [...world.composer.attachmentIds, ...ids] }
         composerSubject.notify()
         return true
+      },
+      // The real composer asks its trigger sources; this world only proves the editor calls the verb on the right text.
+      restoreReferences: () => {
+        world.references = [...world.composer.draft.matchAll(/\[Image (\d+)\]/gu)].map(token => ({
+          label: `Image ${token[1]}`,
+          clipboardText: token[0],
+        }))
+        composerSubject.notify()
       },
       removeAttachment: (id: string) => {
         world.composer = { ...world.composer, attachmentIds: world.composer.attachmentIds.filter(candidate => candidate !== id) }
@@ -194,7 +224,15 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
     queueSubject.notify()
   }
 
-  return { world, ports, enqueueRow, finishTurn, editor: () => createQueueEditor(ports) }
+  /** A queued row that already carries the request id a persisted record refers to. */
+  const enqueueWithRpc = (content: readonly QueuedBlock[], rpcId: string) => {
+    const row: RawRow = { id: nextId('message'), content, source: { kind: 'user', rpcId } }
+    world.rows = [...world.rows, row]
+    queueSubject.notify()
+    return row
+  }
+
+  return { world, ports, enqueueRow, enqueueWithRpc, finishTurn, editor: () => createQueueEditor(ports) }
 }
 
 const rowsOf = (world: { readonly rows: readonly RawRow[] }) => QueueEditModel.decodeQueuedRows({ 'next-turn': world.rows })
@@ -250,6 +288,23 @@ test('Edit moves the text and attachments into the composer and keeps the user d
   assert.equal(record?.status, 'editing')
   assert.equal(record?.backupDraft, 'unsent idea')
   assert.equal(QueueEditModel.restoredIndex({ rows: rowsOf(world), before: record?.before ?? [] }), 1)
+})
+
+test('Edit rebuilds the reference chips a queued message carried, without changing its text', async () => {
+  const { world, enqueueRow, editor } = createWorld()
+  enqueueRow([text('look at [Image 1]'), image('shot.png')])
+  const queueEditor = editor()
+  const row = rowsOf(world)[0]
+  assert.ok(row)
+
+  await queueEditor.begin(row)
+
+  assert.equal(world.composer.draft, 'look at [Image 1]')
+  assert.deepEqual(world.references, [{ label: 'Image 1', clipboardText: '[Image 1]' }])
+  assert.deepEqual(
+    world.composer.attachmentIds.map(id => world.drafts.get(id)?.name),
+    ['shot.png'],
+  )
 })
 
 test('Submit queues the edited message, with its attachments, back at the same position', async () => {
@@ -378,7 +433,7 @@ test('A rejected submit keeps the edit open with the draft in the composer', asy
 test('After a reload the saved record still offers Cancel, which restores the original once', async () => {
   const { world, ports, enqueueRow, editor } = createWorld()
   enqueueRow([text('first')])
-  enqueueRow([text('original'), image('shot.png')])
+  enqueueRow([text('original [Image 1]'), image('shot.png')])
   const first = editor()
   const row = rowsOf(world)[1]
   assert.ok(row)
@@ -387,7 +442,7 @@ test('After a reload the saved record still offers Cancel, which restores the or
 
   // A reload keeps the persisted draft text and record, but not the page-owned draft attachments.
   world.drafts.clear()
-  world.composer = { draft: 'original', attachmentIds: [], idle: true }
+  world.composer = { draft: 'original [Image 1]', attachmentIds: [], idle: true }
   const reloaded = createQueueEditor(ports)
   await settle()
   assert.equal(reloaded.getSnapshot().record?.status, 'editing')
@@ -395,13 +450,77 @@ test('After a reload the saved record still offers Cancel, which restores the or
     world.composer.attachmentIds.map(id => world.drafts.get(id)?.name),
     ['shot.png'],
   )
+  assert.deepEqual(world.references, [{ label: 'Image 1', clipboardText: '[Image 1]' }])
 
   await reloaded.cancel()
   await reloaded.cancel()
   await settle()
 
-  assert.deepEqual(textsOf(world), ['first', 'original [shot.png]'])
+  assert.deepEqual(textsOf(world), ['first', 'original [Image 1] [shot.png]'])
   assert.equal(world.records, null)
+})
+
+test('A reload whose stored attachment is gone explains why it could not reload it', async () => {
+  const { world, ports, enqueueRow, editor } = createWorld()
+  enqueueRow([text('original [Image 1]'), image('shot.png')])
+  const first = editor()
+  const row = rowsOf(world)[0]
+  assert.ok(row)
+  await first.begin(row)
+  first.dispose()
+
+  // The Host no longer holds the queued file the record points at.
+  world.drafts.clear()
+  world.stored.clear()
+  world.composer = { draft: 'original [Image 1]', attachmentIds: [], idle: true }
+  const reloaded = createQueueEditor(ports)
+  await settle()
+
+  assert.equal(reloaded.getSnapshot().record?.status, 'editing')
+  assert.match(reloaded.getSnapshot().notice ?? '', /Could not reload this message's attachments into the composer \(missing image\)/u)
+})
+
+test('A reload while a submission was settling still puts the message back in its place', async () => {
+  const { world, ports, enqueueRow, enqueueWithRpc } = createWorld()
+  const ahead = enqueueRow([text('first')])
+  enqueueWithRpc([text('edited')], 'request-9')
+  world.records = {
+    itemId: 'message-gone',
+    blocks: [text('edited')],
+    before: [ahead.id],
+    backupDraft: 'unsent idea',
+    status: 'submitting',
+    submissions: ['request-9'],
+    composerRestored: true,
+  }
+  const reloaded = createQueueEditor(ports)
+  await settle()
+
+  assert.deepEqual(textsOf(world), ['first', 'edited'])
+  assert.equal(reloaded.getSnapshot().record, null)
+  assert.equal(world.composer.draft, 'unsent idea')
+})
+
+test('A reload while restoring waits for the queued original and places it back', async () => {
+  const { world, ports, enqueueRow, enqueueWithRpc } = createWorld()
+  const ahead = enqueueRow([text('first')])
+  enqueueWithRpc([text('original')], 'request-7')
+  enqueueRow([text('last')])
+  world.records = {
+    itemId: 'message-gone',
+    blocks: [text('original')],
+    before: [ahead.id],
+    backupDraft: '',
+    status: 'restoring',
+    submissions: [],
+    restoreRequestId: 'request-7',
+    composerRestored: true,
+  }
+  const reloaded = createQueueEditor(ports)
+  await settle()
+
+  assert.deepEqual(textsOf(world), ['first', 'original', 'last'])
+  assert.equal(reloaded.getSnapshot().record, null)
 })
 
 test('A restore that fails stays recoverable until retried', async () => {

@@ -172,4 +172,68 @@ describe('API-key setup machine', () => {
     expect(actor.getSnapshot().context.operationId).toBe(currentOperationId)
     actor.stop()
   })
+
+  it('clears every dialog field and the pending confirmation on reset', () => {
+    const actor = start()
+    let writes = 0
+    actor.send({ type: 'manual.changed', value: 'synthetic-input-only-key' })
+    actor.send({ type: 'catalog.changed', key: '["global","ANTHROPIC_API_KEY","prod",null]' })
+    actor.send({ type: 'folder.open' })
+    actor.send({ type: 'folder.chosen', cwd: '/synthetic/project' })
+    actor.send({
+      type: 'catalog.submit',
+      requiresConfirmation: true,
+      write: async () => {
+        writes += 1
+        return true
+      },
+    })
+    expect(actor.getSnapshot().matches('confirming')).toBe(true)
+
+    actor.send({ type: 'reset' })
+    const snapshot = actor.getSnapshot()
+    expect(snapshot.matches('idle')).toBe(true)
+    expect(snapshot.context.operation).toBe(null)
+    expect(snapshot.context.manualValue).toBe('')
+    expect(snapshot.context.selectedCatalogKey).toBe('')
+    expect(snapshot.context.folderPickerOpen).toBe(false)
+    expect(snapshot.context.cwd).toBe(null)
+    expect(writes).toBe(0)
+    actor.stop()
+  })
+
+  it('keeps the typed key when a catalog entry is selected and drops it when a folder is chosen', () => {
+    const actor = start()
+    actor.send({ type: 'folder.chosen', cwd: '/synthetic/project' })
+    actor.send({ type: 'manual.changed', value: 'synthetic-input-only-key' })
+    actor.send({ type: 'catalog.changed', key: '["global","ANTHROPIC_API_KEY","prod",null]' })
+
+    expect(actor.getSnapshot().context.manualValue).toBe('synthetic-input-only-key')
+    expect(actor.getSnapshot().context.selectedCatalogKey).toBe('["global","ANTHROPIC_API_KEY","prod",null]')
+    expect(actor.getSnapshot().context.cwd).toBe('/synthetic/project')
+
+    actor.send({ type: 'folder.chosen', cwd: '/synthetic/other' })
+
+    expect(actor.getSnapshot().context.manualValue).toBe('')
+    expect(actor.getSnapshot().context.selectedCatalogKey).toBe('')
+    expect(actor.getSnapshot().context.cwd).toBe('/synthetic/other')
+    expect(actor.getSnapshot().context.folderPickerOpen).toBe(false)
+    actor.stop()
+  })
+
+  it('clears the typed key after a refused manual save and keeps a refused catalog import selection', async () => {
+    const actor = start()
+    actor.send({ type: 'manual.changed', value: 'synthetic-input-only-key' })
+    actor.send({ type: 'manual.submit', write: async () => false })
+    await waitFor(actor, snapshot => snapshot.matches('error'))
+
+    expect(actor.getSnapshot().context.manualValue).toBe('')
+
+    actor.send({ type: 'catalog.changed', key: '["global","ANTHROPIC_API_KEY","prod",null]' })
+    actor.send({ type: 'catalog.submit', requiresConfirmation: false, write: async () => false })
+    await waitFor(actor, snapshot => snapshot.matches('error'))
+
+    expect(actor.getSnapshot().context.selectedCatalogKey).toBe('["global","ANTHROPIC_API_KEY","prod",null]')
+    actor.stop()
+  })
 })

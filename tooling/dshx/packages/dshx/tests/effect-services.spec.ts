@@ -8,7 +8,7 @@ import * as StorageDomainPlugin from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { describe, expect, it } from '@effect/vitest'
-import { Effect, Exit, Fiber, Layer, Option, Schema, Stream } from 'effect'
+import { Context, Effect, Exit, Fiber, Layer, Option, Schema, Stream } from 'effect'
 import { defineApi, method } from '../src/api/index.js'
 import { connectCommunicationClient, startHostCommunicationBridge } from '../src/communication/bridge.js'
 import { createCommunicationService } from '../src/communication/service.js'
@@ -147,6 +147,8 @@ describe('PluginStorage', () => {
         expect(yield* storage.set('records/one', { value: 1 })).toMatchObject({ key: 'records/one', value: { value: 1 } })
         expect(yield* storage.get('records/one')).toEqual(Option.some(expect.objectContaining({ value: { value: 1 } })))
         expect((yield* storage.list({ prefix: 'records/' })).entries.map(entry => entry.key)).toEqual(['records/one'])
+        expect((yield* storage.listAll({ prefix: 'records/' })).map(entry => entry.key)).toEqual(['records/one'])
+        expect((yield* storage.listAll()).map(entry => entry.key)).toEqual(['other', 'records/one'])
         expect(yield* storage.delete('records/one')).toBe(true)
 
         expect([...(yield* Fiber.join(changes))]).toEqual([
@@ -212,6 +214,38 @@ describe('Settings', () => {
       }),
     )
   })
+
+  it.effect('keeps a revision committed right after the layer is built', () =>
+    Effect.gen(function* () {
+      const namespace = 'dshfiles-committed-early'
+      const contract = defineSettings({ namespace, schema: SchemaStery.object({ limit: SchemaStery.natural().default(3) }) })
+      let document = { ns: namespace, value: { limit: 1 }, revision: 1 }
+      const context = yield* Layer.build(
+        Settings.layer(contract).pipe(
+          Layer.provideMerge(
+            cordisHost('@test/settings-committed-early', async ctx => {
+              ctx.provide('settings', {
+                configure: () => () => undefined,
+                describe: () => [document],
+                update: async () => undefined,
+                replace: async () => undefined,
+              })
+            }),
+          ),
+        ),
+      )
+      const settings = Context.get(context, Settings.Tag<SettingsValue<(typeof contract)['schema']>>(namespace))
+      document = { ns: namespace, value: { limit: 2 }, revision: 2 }
+      // SAFETY: SettingsNamespace is a type-only brand over the namespace string.
+      Context.get(context, HostContext).ctx.emit('settings/document-updated', namespace as never, 2)
+
+      const next = yield* settings.changes.pipe(
+        Stream.filter(value => value.limit === 2),
+        Stream.runHead,
+      )
+      expect(Option.getOrThrow(next)).toEqual({ limit: 2 })
+    }).pipe(Effect.scoped),
+  )
 
   it.effect('keeps the deprecated SettingsRead failure cause', () =>
     Effect.gen(function* () {

@@ -3,9 +3,10 @@ import type { AlertRuleDraft } from './alert-types.js'
 type BuiltinDraft = AlertRuleDraft & { readonly id: string }
 
 /**
- * Shipped enabled with conservative thresholds: each one names a failure a person would want to hear about, needs enough
- * spans to mean it, and only announces in-app (browser notifications need the user's permission first). Edits and removals
- * stick: the rules are seeded once, when the alert store is created.
+ * Shipped enabled only when a rule names a failure a person would want to hear about, needs enough spans to mean it, and
+ * only announces in-app (browser notifications need the user's permission first). A rule that would report expected work
+ * ships off and can be enabled in the Alerts tab. Edits and removals stick: the rules are seeded once, when the alert
+ * store is created.
  */
 export const DEFAULT_ALERT_RULES: readonly BuiltinDraft[] = [
   {
@@ -49,7 +50,7 @@ export const DEFAULT_ALERT_RULES: readonly BuiltinDraft[] = [
     percentile: 95,
     minSamples: 1,
     severity: 'info',
-    enabled: true,
+    enabled: false,
     notify: true,
     markThreads: true,
   },

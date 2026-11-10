@@ -33,17 +33,30 @@ export interface SubmitSnapshot {
   readonly claim?: InputState['claim']
 }
 
+/** One restored command chip whose claim the trigger pipeline must still resolve. */
+interface RestoreRequest {
+  readonly token: string
+  readonly rev: number
+  readonly controller: AbortController | undefined
+}
+
 /** Pure phase, claim, and attempt owner for one Session input. */
 export class SubmitMachine {
   private phase: InputState['phase'] = 'plain'
   private claim: CommandClaim | undefined
   private seq = 0
+  private restore: RestoreRequest | undefined
   private inflight: {
     readonly attempt: SubmitAttempt
     readonly controller: AbortController
   } | undefined
   /** Ordinary sends detached from the editor, retained for settlement validation until release. */
   private readonly detached = new Map<number, AbortController>()
+
+  /** True while a frozen command attempt holds the submit slot. */
+  get busy(): boolean {
+    return this.phase === 'adjudicating' || this.phase === 'submitting'
+  }
 
   /** Read-only snapshot of the submit-plane state. */
   get state(): SubmitSnapshot {
@@ -78,6 +91,11 @@ export class SubmitMachine {
       case 'submit-settled': return this.onSubmitSettled(ev)
       case 'sink-settled': return this.onSinkSettled(ev)
       case 'send-committed': return this.onSendCommitted()
+      case 'restore-request': return this.onRestoreRequest(ev.token, ev.rev)
+      case 'restore-start': return this.onRestoreStart()
+      case 'restore-resolved': return this.onRestoreResolved(ev.token, ev.rev, ev.claim)
+      case 'restore-failed': return this.onRestoreFailed(ev.token, ev.rev)
+      case 'restore-cancel': return this.onRestoreCancel()
       case 'release': return this.onRelease()
       default: return unreachable(ev)
     }
@@ -217,6 +235,7 @@ export class SubmitMachine {
   }
 
   private onRelease(): readonly InputEffect[] {
+    this.cancelRestore()
     if (this.inflight !== undefined) {
       this.inflight.controller.abort()
       this.inflight = undefined
@@ -225,5 +244,50 @@ export class SubmitMachine {
     this.phase = 'plain'
     this.claim = undefined
     return []
+  }
+
+  /** Carry a restored draft's command token until the trigger pipeline can resolve it. */
+  private onRestoreRequest(token: string, rev: number): readonly InputEffect[] {
+    this.cancelRestore()
+    this.restore = { token, rev, controller: undefined }
+    return []
+  }
+
+  /** Start resolving the pending restored token; the machine owns the attempt's controller. */
+  private onRestoreStart(): readonly InputEffect[] {
+    const restore = this.restore
+    if (restore === undefined || restore.controller !== undefined) return []
+    const controller = new AbortController()
+    this.restore = { token: restore.token, rev: restore.rev, controller }
+    return [{ type: 'resolve-claim', token: restore.token, rev: restore.rev, signal: controller.signal }]
+  }
+
+  /** Apply a resolution only for the restore that asked for it. */
+  private onRestoreResolved(token: string, rev: number, claim: CommandClaim): readonly InputEffect[] {
+    if (!this.restoreMatches(token, rev)) return []
+    this.restore = undefined
+    return [{ type: 'apply-claim', claim, token, rev }]
+  }
+
+  /** A catalog warmup failure or an abort leaves the literal token, which Enter still adjudicates. */
+  private onRestoreFailed(token: string, rev: number): readonly InputEffect[] {
+    if (!this.restoreMatches(token, rev)) return []
+    this.restore = undefined
+    return []
+  }
+
+  /** Drop a pending or in-flight command chip restore. */
+  private onRestoreCancel(): readonly InputEffect[] {
+    this.cancelRestore()
+    return []
+  }
+
+  private restoreMatches(token: string, rev: number): boolean {
+    return this.restore?.token === token && this.restore.rev === rev
+  }
+
+  private cancelRestore(): void {
+    this.restore?.controller?.abort()
+    this.restore = undefined
   }
 }

@@ -27,6 +27,8 @@ import { RestartStatusItem } from './restart-status-item.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { DestinationSections } from './destinations.js'
+import { WaitingThreadsPanel } from './waiting-threads-panel.js'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
@@ -39,7 +41,9 @@ import { ThreadAsideOpenProvider, ThreadSidebar, type ThreadSidebarStandardProps
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { HeaderThreadActions } from './header-actions.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
-import { SubagentProvenanceToolRow } from './subagent-provenance/subagent-tool-row.js'
+import type { SubagentPreviewBindings } from './subagent-provenance/subagent-live-preview.js'
+import { SubagentPreviewDock } from './subagent-provenance/subagent-preview-dock.js'
+import { SubagentProvenanceToolRow, type SubagentToolViewProps } from './subagent-provenance/subagent-tool-row.js'
 import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
 import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
@@ -79,9 +83,14 @@ import {
 /** The board page's id: its `main` slot key and its row in the sidebar's panel list. */
 const BOARD_PANEL_ID = 'dshfiles-thread-board'
 
+/** Inbox › Waiting threads: the thread-shaped read of the inbox, one row per waiting thread. */
+const WAITING_THREADS_PANEL_ID = 'thread-sidebar-waiting'
+
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
     threadSidebarFollowUp: unknown
+    /** One subagent followed from its transcript row while that row is open. */
+    threadSidebarSubagentPreview: unknown
     threadSidebarPromptLink: unknown
     threadSidebarArchivedView: unknown
     threadSidebarSkillAutocomplete: unknown
@@ -162,7 +171,7 @@ export default defineClient({
         .flatMap(({ options }) => {
           const id = options.id
           if (id === undefined) return []
-          // SlotCore erases MainPanelId when exposing its heterogeneous entry ledger.
+          // SAFETY: SlotCore erases MainPanelId when exposing its heterogeneous entry ledger.
           const panelId = id as MainPanelId
           return {
             id: panelId,
@@ -284,7 +293,7 @@ export default defineClient({
           }),
         'thread-sidebar: working status item',
       )
-      // The one restart notice (plans/ade-ux §4.1 R5): Host files changed on disk plus other plugins' pending updates,
+      // The one restart notice (docs/ade-ux §4.1 R5): Host files changed on disk plus other plugins' pending updates,
       // with the restart verbs the sidebar shell guards.
       const RestartItem = (props: StatusItemProps): JSX.Element | null => (
         <RestartStatusItem
@@ -582,11 +591,15 @@ export default defineClient({
       ),
     )
 
-    // Notification sounds fire in a background tab, where no gesture can resume an audio context:
-    // unlock it on the first interaction so a later alert still rings.
+    // Notification sounds fire in a background tab. A browser with sticky user activation (`navigator.userActivation`)
+    // resumes a context created at the first sound, so only the others open the device on the first gesture: opening
+    // it blocks the main thread for 100–300 ms, which would land on the click that starts a turn.
     ctx.effect(() => {
+      if ('userActivation' in navigator) return () => undefined
       const unlockNotificationAudio = (): void => {
-        void ThreadNotificationAudioModel.unlock()
+        const unlock = (): void => void ThreadNotificationAudioModel.unlock()
+        if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(unlock, { timeout: 500 })
+        else unlock()
       }
       window.addEventListener('pointerdown', unlockNotificationAudio, { capture: true, once: true })
       window.addEventListener('keydown', unlockNotificationAudio, { capture: true, once: true })
@@ -783,21 +796,23 @@ export default defineClient({
         [registerCustomizationHost],
       )
       return (
-        <SidebarRoot
-          {...props}
-          contentOverridden={contentOverridden}
-          customizationTarget={contentOverridden ? customizationTarget : null}
-          customizationActionRef={customizationActionRef}
-          readFooterSnapshot={readFooterSnapshot}
-          subscribeFooterSnapshot={subscribeFooterSnapshot}
-          readClientRevisionKey={readClientRevisionKey}
-          readStageSession={readStageSession}
-          subscribeStageSession={subscribeStageSession}
-          subscribeClientRevisions={subscribeClientRevisions}
-          openSession={openSessionRestoringArchived}
-          runCommand={runCommand}
-          loadModelCatalog={loadModelCatalog}
-        />
+        <PluginQueryProvider>
+          <SidebarRoot
+            {...props}
+            contentOverridden={contentOverridden}
+            customizationTarget={contentOverridden ? customizationTarget : null}
+            customizationActionRef={customizationActionRef}
+            readFooterSnapshot={readFooterSnapshot}
+            subscribeFooterSnapshot={subscribeFooterSnapshot}
+            readClientRevisionKey={readClientRevisionKey}
+            readStageSession={readStageSession}
+            subscribeStageSession={subscribeStageSession}
+            subscribeClientRevisions={subscribeClientRevisions}
+            openSession={openSessionRestoringArchived}
+            runCommand={runCommand}
+            loadModelCatalog={loadModelCatalog}
+          />
+        </PluginQueryProvider>
       )
     }
 
@@ -885,18 +900,47 @@ export default defineClient({
         decorate(SubagentCatalogAction),
       ),
     )
-    ctx.slots.inject('tool.call.toolview', () =>
+    const subagentTarget = (childId: string): SubagentAddress | SessionId => ctx.sessions.subagentAddress(SessionId(childId)) ?? SessionId(childId)
+    const subagentPreview: SubagentPreviewBindings = {
+      t: translate,
+      retainChild: (childId, signal) => {
+        const reference = ctx.sessions.retain(subagentTarget(childId), { source: 'threadSidebarSubagentPreview', signal })
+        return { ready: reference.ready, release: () => reference.release() }
+      },
+      openChild: childId => ctx.uiWorkspace.openSession(subagentTarget(childId)),
+      openChildAside: childId => {
+        const address = ctx.sessions.subagentAddress(SessionId(childId))
+        if (address !== undefined) subagentCatalogActions(address.parentSessionId).openChildAside(address)
+      },
+      canOpenAside: childId => ctx.sessions.subagentAddress(SessionId(childId)) !== undefined,
+    }
+    ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
-        {
-          name: 'tool.call.toolview',
-          key: 'subagent',
-          registrant: '@dshfiles/thread-sidebar',
-          priority: -1000,
-          locale: 'conversation',
-        },
-        decorate(SubagentProvenanceToolRow),
+        { name: 'conversation.input.dock', id: 'thread-sidebar-subagents-live', order: 4, inject: sessionId => ({ sessionId }) },
+        decorate((props: PropsRuntime<'conversation.input.dock'> & { readonly sessionId: SessionSummary['id'] }) => (
+          <SubagentPreviewDock
+            useSessions={props.useSessions}
+            useSessionStatus={props.useSessionStatus}
+            sessionId={props.sessionId}
+            preview={subagentPreview}
+          />
+        )),
       ),
     )
+    const SubagentRow = decorate((props: SubagentToolViewProps) => <SubagentProvenanceToolRow {...props} preview={subagentPreview} />)
+    for (const key of ['subagent', 'subagent_fork'])
+      ctx.slots.inject('tool.call.toolview', () =>
+        ctx.slots.register(
+          {
+            name: 'tool.call.toolview',
+            key,
+            registrant: '@dshfiles/thread-sidebar',
+            priority: -1000,
+            locale: 'conversation',
+          },
+          SubagentRow,
+        ),
+      )
 
     const continueInProject = async (sessionId: SessionSummary['id'], projectId: string) => {
       const continued = await createApiClient(ctx, threadActionsApi).continueIn({ sessionId, projectId })
@@ -1070,6 +1114,8 @@ export default defineClient({
         if (project !== undefined) ctx.uiWorkspace.startSession(project.workspaceId)
       },
       continueInProject,
+      projectRegister: (input: { readonly path: string; readonly title: string }) =>
+        createApiClient(ctx, threadActionsApi).projectRegister({ path: input.path, title: input.title }),
       open: openThread,
       openLinkedSession: (sessionId: SessionSummary['id']) => {
         const activePanelId = ctx.layout.panelInfo.getSnapshot().activePanelId
@@ -1078,6 +1124,7 @@ export default defineClient({
         ctx.uiWorkspace.openSession(sessionId)
         if (activePanelId !== null) ctx.layout.selectPanel(activePanelId)
       },
+      // SAFETY: the multi-host plugin registers exactly this panel id.
       openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
       openRemoteSession: (sessionId: string) => {
         const id = SessionId(sessionId)
@@ -1134,6 +1181,36 @@ export default defineClient({
         BoardPanelGlyph,
       ),
     )
+    // The inbox lists items; this page answers the thread-shaped question next to it, in the Inbox destination.
+    ctx.slots.inject('main', () =>
+      ctx.slots.register(
+        { name: 'main', key: WAITING_THREADS_PANEL_ID, locale: THREAD_SIDEBAR_LOCALE_NAMESPACE },
+        decorate(({ t }: { readonly t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> }) => (
+          <PluginQueryProvider>
+            <WaitingThreadsPanel t={t} sessions={ctx.sessions} openThread={sessionId => openThread(SessionId(sessionId))} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register(
+        {
+          name: 'sidebar.panellist',
+          id: WAITING_THREADS_PANEL_ID,
+          order: 3,
+          label: () => translate('waitingThreadsSectionLabel'),
+          locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
+        },
+        WaitingThreadsGlyph,
+      ),
+    )
+    metadata?.plugin?.add(DestinationSections, {
+      panelId: WAITING_THREADS_PANEL_ID,
+      destination: 'inbox',
+      label: translate('waitingThreadsSectionLabel'),
+      description: translate('waitingThreadsDescription'),
+      order: 2,
+    })
     ctx.effect(
       () =>
         PaletteBridge.addActions([
@@ -1151,6 +1228,7 @@ export default defineClient({
             aliases: ['thread board', 'board', 'kanban', 'columns'],
             icon: <LayoutGridIcon className="dshx:size-4" />,
             group: 'destination',
+            // SAFETY: BOARD_PANEL_ID names the board panel this plugin registers.
             run: () => ctx.layout.selectPanel(BOARD_PANEL_ID as MainPanelId),
           },
         ]),
@@ -1272,5 +1350,22 @@ const BoardPanelGlyph = (props: { readonly size?: number }): JSX.Element => (
     <rect x="3.5" y="4" width="5" height="16" rx="1.5" />
     <rect x="10" y="4" width="5" height="11" rx="1.5" />
     <rect x="16.5" y="4" width="4" height="7" rx="1.5" />
+  </svg>
+)
+
+/** A thread with its attention mark: the Inbox › Waiting threads page. */
+const WaitingThreadsGlyph = (props: { readonly size?: number }): JSX.Element => (
+  <svg
+    aria-hidden
+    width={props.size ?? 18}
+    height={props.size ?? 18}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+  >
+    <path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v8A1.5 1.5 0 0 1 18.5 16H9l-4 3.5z" />
+    <circle cx="12" cy="10.5" r="1.2" />
   </svg>
 )
