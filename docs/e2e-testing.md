@@ -501,7 +501,10 @@ instead of replaying the unchanged ones, and 210 forced browser runs across the
 
 In CI, `check.yml` splits `pnpm check` across parallel jobs: the `boot` job runs
 `check:plugin-boot` in three shards (`scripts/ci/plugin-shard.mjs boot`, every
-bundle once and the composed web profile in shard 0), and `e2e-smoke` runs the
+bundle once and the composed web profile in shard 0; on CI a shard with a failed
+owner boots it once more, since Turbo replays the owners that passed, and an owner
+that fails twice fails the shard: `scripts/ci/boot-retry.mjs`, exercised with
+forced failures by `scripts/ci-boot-retry.test.mjs`), and `e2e-smoke` runs the
 `@smoke` journeys in two shards (`plugin-shard.mjs smoke`). `features:check`
 rides in the `dshx` job. Every pull request gets only that smoke subset: the
 whole suite takes 30-50 minutes serial, too long to gate each change.

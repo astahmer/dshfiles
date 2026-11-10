@@ -317,6 +317,17 @@ The command's payload dropped 92.8% compact (94.9% pretty). The remaining 279 KB
 (106 KB) are rendered per row in the sidebar, and jj-integration pays 483 KB for `userQuestions`. Removing those needs
 the sidebar to compute per-row facts from a narrower field, not another list algorithm.
 
+**`turnOutline` replaced by a count (2026-11-10).** Measured per projection on 2026-11-04 from the live projection
+cache (read-only, 158 Sessions), the eight columns totalled 172.5 KB: `turnOutline` 78.6 KB (45.5 %), `tokenUsage`
+36.9 KB (21.4 %), `userQuestions` 17.1 KB (9.9 %), each of the other five 2.8–5.6 %. Its only list-side reader was the
+jj-integration panel, which needs the number of prompted turns per thread (163 B for the whole corpus). jj-integration
+now registers a `promptedTurnCount` projection, counted the way `turnOutline` marks a prompted turn, and the
+session-controller fork lists it in place of `turnOutline` (about −78 KB, 45 % of the listed projection bytes on that
+corpus). An opened thread still gets `turnOutline` from its own baseline. Checked by
+`plugins/@dshfiles/jj-integration/src/prompted-turn-count.test.ts` (count equals the outline's prompted entries) and
+`plugins/@dshfiles/session-controller/tests/client/session-state-eviction.test.ts` (the list asks for the count, not the
+outline). A live list payload after deployment is not yet measured.
+
 ## First send no longer waits for its thread workspace (2026-10-22)
 
 A New thread's first Send used to sit through the whole chain before the prompt moved: the `destination` jj read, the

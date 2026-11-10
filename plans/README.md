@@ -42,7 +42,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Native-fork waste](native-fork-waste/README.md)                     | A tool catalog shared across Sessions (proposal) and one Effect copy in client bundles (blocked on namespace identity).                                                                                   |
 | [Ultra-fast DSH](ultra-fast/README.md)                               | A long-lived tab keeps ~250 subscribed Sessions resident and reopens them on reconnect.                                                                                                                   |
 | [Lint cleanup](lint-cleanup/README.md)                               | Re-measure on `main`, then remove the ratcheted baseline with real fixes and lower each cap as a rule empties.                                                                                            |
-| [Effect-native follow-ups](effect-native-follow-ups/README.md)       | Rows 1, 2, 9, 12 and 13 open in code; rows 5 and 11 need only live measurements.                                                                                                                          |
+| [Effect-native follow-ups](effect-native-follow-ups/README.md)       | Row 2 is the one code port left; rows 1, 5, 11 and 13 need Linux, a logged-in browser HAR or a restart.                                                                                                |
 
 ## Open follow-ups
 
