@@ -1048,6 +1048,37 @@ Still slow in this load and not owned by these fixes: `session/list` 1.36–3.1 
 `settings/describe` 200.8 KB ×2 (core, Host gap rows 97 and 99), `multi-host/projectOrigins` 8.96 s, and the
 attention writes (`acknowledge`, `clearUnread`, `markUnread`), which still answer the whole 177 KB snapshot.
 
+## Project origins and the Land repositories view (2026-11-10, night)
+
+Both slow reads of the evening load were in owned plugins.
+
+**`multi-host/projectOrigins` 8.96 s.** The trace of the same Host shows why: `m1-perso`, the one visible SSH host, is
+asleep, and `ssh` (`ConnectTimeout=8`) exits 255 after 8.2 s (`multi-host runtime pool connect` → `ssh command`,
+`SshUnreachable`). The origin read already batched one `ssh` per host, bounded local `git` spawns at 8 and cached
+results for 5 min, but it waited for that `ssh` before answering, so the sidebar's remote-thread grouping waited 9 s
+after every cache expiry. The read now waits at most 1.5 s for a remote host: a slower host answers `origin: null`
+with `pending: true`, its one `ssh` keeps running detached and fills the cache, and concurrent callers join it
+instead of starting another. The sidebar asks again every 3 s while `pending` is set. Local origins are cached until
+the project's `.git/config` changes (mtime and size, one `stat` per path), so `git remote set-url` shows at once
+instead of after 5 min. The span carries `dshx.multi-host.origin_requests`, `origin_local_reads` and `origin_pending`.
+
+**`jj-threads/repositories` 741 KB.** A headless load of the live GUI decoded the answer: 772 KB for 12 repositories
+and 48 thread workspaces, of which `unlanded` is 736 KB (95 %): 3,647 revisions, up to 577 in one workspace. Every
+listed consumer needs only the counts (pending, conflicted, undescribed), the tip and a short list. `repositories`
+takes an optional `revisionLimit`; with it each thread keeps its newest revisions and carries `unlandedSummary`
+(totals over all of them), and the Land page asks for 10 and shows “+N older revisions”. `threadAt` still returns one
+thread in full, the agent tool still lists everything, and an older Host ignores the field and answers in full.
+
+| Read                                       | Before                                 | After                                              | Evidence                                                                              |
+| ------------------------------------------ | -------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `projectOrigins`, unreachable host         | 8.96 s live (`ssh` 8.2 s); 3.76 s unit | ≤ 1.5 s, then `pending`; one `ssh` per host joined | `project-origins.test.ts` with a 2.5 s `ssh` stub: two calls answer in 1.5 s, one run |
+| `projectOrigins`, `remote set-url` locally | stale for up to 5 min                  | next read                                          | `caches a local Git origin until its .git/config changes`: local reads 1, 0, 1        |
+| `repositories` payload, Land page          | 772,957 B                              | 91,623 B (−88 %)                                   | `revisionLimit: 10` applied to the live answer captured headless                      |
+
+The origin change is a Host change and the sidebar's 3 s re-ask is client-side; `revisionLimit` needs both halves (a
+new page against the old Host still gets the full list). Live after-numbers need a build in the canonical checkout
+and the user's restart, then the same one-tab `har-capture.mjs --summary`.
+
 ## Session-log tool catalog bytes (2026-11-10)
 
 Every request series appends a `request/header` with the assembled tool catalog (~280 KB for the 468-tool live
