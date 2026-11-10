@@ -163,7 +163,7 @@ const textTool = (input: { readonly name: string; readonly description: string; 
   })
 
 /** Agent presets mount `bash`, `read`, … in a parent scope of each agent, outside the global catalog. */
-const runPresetToolScenario = async (config: Record<string, unknown>) => {
+const runPresetToolScenario = async (config: { readonly alwaysVisible?: readonly string[] }) => {
   const ctx = new Context()
   const commands: string[] = []
   let disposeAgent: (() => Promise<void>) | undefined

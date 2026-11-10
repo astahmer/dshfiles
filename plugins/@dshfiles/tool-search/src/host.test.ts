@@ -83,7 +83,8 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
   const scopedTools = new Map<TestAgent, Map<string, RegisteredTool>>()
   const restrictions = new Map<TestAgent, Filter[]>()
   const listeners = new Map<string, Set<(payload?: AgentEvent) => void>>()
-  const admits = (agent: TestAgent, name: string) => (restrictions.get(agent) ?? []).every(filter => (filter.allow?.has(name) ?? true) && !(filter.deny?.has(name) ?? false))
+  const admits = (agent: TestAgent, name: string) =>
+    (restrictions.get(agent) ?? []).every(filter => (filter.allow?.has(name) ?? true) && !(filter.deny?.has(name) ?? false))
   const visibleGlobals = (agent: TestAgent): ToolSchema[] => [...schemas.values()].filter(tool => admits(agent, tool.name))
   const makeAgent = (id: string, restored: readonly string[] = []): TestAgent => {
     let agent: TestAgent
