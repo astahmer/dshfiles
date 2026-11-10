@@ -47,7 +47,7 @@ Feature: Session undo
 
   @scenario:session-undo.turn-checkpoint
   Scenario: Each turn shows the jj revision its edits left, and Restore returns to it
-    Given the isolated plugin composition of "@dshfiles/session-undo,@dshfiles/jj-integration,@dshfiles/jujutsu,@dshfiles/ai-accounts,@dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/session-undo,@dshfiles/jj-integration,@dshfiles/jujutsu,@dshfiles/chat,@dshfiles/rich-composer,@dshfiles/session-controller,@dshfiles/ai-accounts,@dshfiles/workspace-folder-picker" is booted
     When a Command Code account backed by a local fake provider is added
     And a thread on the fake model is started in a scratch jj project
     And the thread asks bash to write "checkpoint-1.txt"
