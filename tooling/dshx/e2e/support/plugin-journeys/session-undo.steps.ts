@@ -10,7 +10,7 @@ const projects = new WeakMap<Page, string>()
 
 const projectFor = (page: Page): string => {
   const project = projects.get(page)
-  if (project === undefined) throw new Error('No scratch jj project was created in this scenario.')
+  if (project === undefined) throw new Error('No scratch project was created in this scenario.')
   return project
 }
 
@@ -20,16 +20,42 @@ const exists = (path: string): Promise<boolean> =>
     () => false,
   )
 
-When('a thread on the fake model is started in a scratch jj project', async ({ page }: { page: Page }) => {
+const run = (cwd: string, home: string, command: string, args: readonly string[]): void => {
+  const result = spawnSync(command, args, { cwd, env: { PATH: process.env.PATH ?? '', HOME: home }, encoding: 'utf8' })
+  if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed: ${result.stderr}`)
+}
+
+const startInScratchProject = async (page: Page, init: (project: string, home: string) => void): Promise<void> => {
   const root = await createScratchDirectory('dshx-session-undo-e2e-')
   const project = join(root, 'undo-project')
   await mkdir(project)
   await writeFile(join(project, 'README.md'), 'undo journey\n')
-  const init = spawnSync('jj', ['git', 'init'], { cwd: project, env: { PATH: process.env.PATH ?? '', HOME: root }, encoding: 'utf8' })
-  if (init.status !== 0) throw new Error(`jj git init failed: ${init.stderr}`)
+  init(project, root)
   projects.set(page, project)
   await registerWorkspaceFolder(page, project)
   await startThreadWithModel(page, { project: 'undo-project', model: 'commandcode_work/gpt-6-luna' })
+}
+
+When('a thread on the fake model is started in a scratch jj project', async ({ page }: { page: Page }) => {
+  await startInScratchProject(page, (project, home) => run(project, home, 'jj', ['git', 'init']))
+})
+
+/** A plain git repository with no `.jj`: jj-integration's git backend takes and restores the turn snapshots. */
+When('a thread on the fake model is started in a scratch git-only project', async ({ page }: { page: Page }) => {
+  await startInScratchProject(page, (project, home) => {
+    run(project, home, 'git', ['init', '-q', '-b', 'main'])
+    run(project, home, 'git', ['config', 'user.name', 'Session Undo E2E'])
+    run(project, home, 'git', ['config', 'user.email', 'session-undo-e2e@example.invalid'])
+    run(project, home, 'git', ['add', '--all'])
+    run(project, home, 'git', ['commit', '-q', '-m', 'Base fixture'])
+  })
+})
+
+Then('the project is still a git-only repository', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'session-undo-git-project-stays-git-only', async () => {
+    expect(await exists(join(projectFor(page), '.git'))).toBe(true)
+    expect(await exists(join(projectFor(page), '.jj'))).toBe(false)
+  })
 })
 
 When('the thread asks bash to write {string}', async ({ page }: { page: Page }, file: string) => {

@@ -33,6 +33,11 @@
           "featureFile": "tooling/dshx/e2e/features/session-undo.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "session-undo.undo-redo-files-git",
+          "featureFile": "tooling/dshx/e2e/features/session-undo.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "session-undo.undo-redo",
           "file": "plugins/@dshfiles/session-undo/src/undo-service.test.ts",
