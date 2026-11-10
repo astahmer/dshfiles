@@ -9,13 +9,10 @@ import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { formatMessageClock } from './message-chrome.ts'
 import { useCalendarDay } from './use-calendar-day.ts'
 import css from './MessageIconActions.module.css'
-import { QuoteMessageAction } from '../../quote-message-action.tsx'
-import type { MessageQuoteSource } from '../../quote-message.ts'
 
 export interface MessageIconActionsProps {
   /** Plain text the copy action writes. */
   text: string
-  quoteSource?: MessageQuoteSource | undefined
   /** Unix epoch ms for the clock label; omitted for transient messages. */
   time?: number | undefined
   /** Clock before icons (user) or after (assistant). */
@@ -46,7 +43,7 @@ export interface MessageIconActionsProps {
  * @returns The actions row element.
  */
 export function MessageIconActions({
-  text, quoteSource, time, clock, onBranch, branchUnavailable = false, className,
+  text, time, clock, onBranch, branchUnavailable = false, className,
   extraActions, usageAction, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
@@ -83,14 +80,13 @@ export function MessageIconActions({
     </span>
   )
   return (
-    <div className={className === undefined ? css.actions : `${css.actions} ${className}`} data-clock={clock} data-message-actions>
+    <div className={className === undefined ? css.actions : `${css.actions} ${className}`} data-clock={clock}>
       {clock === 'start' ? clockEl : null}
       <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
         <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>
           {copied ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
         </button>
       </Tooltip>
-      {quoteSource !== undefined && <QuoteMessageAction source={quoteSource} text={text} className={css.action} t={t} />}
       {extraActions}
       {onBranch !== undefined && (
         <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom">

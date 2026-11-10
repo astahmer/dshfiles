@@ -8,6 +8,8 @@ import * as React from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import type { LexicalEditor, NodeKey } from 'lexical'
+import { ChipActionsContext } from './chip-actions-context.ts'
+import { createChipActions } from './chip-actions.ts'
 
 /** Portal-loop props. */
 export interface DecoratorPortalsProps {
@@ -29,13 +31,14 @@ export function DecoratorPortals({ editor }: DecoratorPortalsProps): ReactNode {
     setDecorators(editor.getDecorators<React.JSX.Element>())
     return editor.registerDecoratorListener<React.JSX.Element>((next) => { setDecorators(next) })
   }, [editor])
+  const actions = React.useMemo(() => editor === null ? null : createChipActions(editor), [editor])
   if (editor === null) return null
   return (
-    <>
+    <ChipActionsContext.Provider value={actions}>
       {Object.entries(decorators).map(([key, jsx]) => {
         const el = editor.getElementByKey(key)
         return el === null ? null : createPortal(jsx, el, key)
       })}
-    </>
+    </ChipActionsContext.Provider>
   )
 }

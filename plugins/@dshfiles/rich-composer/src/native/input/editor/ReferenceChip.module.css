@@ -30,3 +30,67 @@
   text-decoration: line-through;
   opacity: 0.7;
 }
+
+.annotated {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  max-width: 100%;
+}
+
+.comment {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+.actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+  align-self: center;
+}
+
+.annotated:hover .actions,
+.annotated:focus-within .actions {
+  display: inline-flex;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--dsw-alias-state-business-tertiary);
+}
+
+.editor {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  width: 260px;
+  margin-top: 4px;
+  padding: 4px 6px;
+  border: 1px solid currentColor;
+  border-radius: var(--dsw-radius-sm);
+  background: Canvas;
+  color: CanvasText;
+  font: inherit;
+  font-size: 12px;
+}
