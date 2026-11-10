@@ -6,6 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
+import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
 import { ArrowLeft, Check, ChevronDown, PanelRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -122,6 +123,8 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
         : `Other folder · ${reviewPath.split('/').filter(Boolean).at(-1) ?? reviewPath}`
       : selectedProject.title
 
+  // An empty base field leaves the base to the Host: the project's main branch (chosen, declared or detected), else
+  // main, master or trunk. The placeholder names the one it used.
   const query = useQuery({
     queryKey: ['pulls-review', reviewPath, baseRef],
     enabled: reviewPath.length > 0,
@@ -209,6 +212,32 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
   const progress = result !== undefined && result.status === 'ok' && result.fileCount > 0 ? Math.round((totalReviewed / result.fileCount) * 100) : 0
 
   const markReviewed = (path: string): void => marks.set([path], !reviewedPaths.has(path))
+  const packageJson = usePackageJsonTables(result?.status === 'ok' ? result.patch : '', reviewFiles)
+  const reviewControls = (path: string): ReactNode => {
+    const isReviewed = reviewedPaths.has(path)
+    return (
+      <span className="dshx:flex dshx:items-center dshx:gap-1">
+        <input
+          type="checkbox"
+          aria-label={`Select ${path} for batch review`}
+          checked={selectedPaths.has(path)}
+          onChange={event => {
+            const click = event.nativeEvent instanceof MouseEvent ? event.nativeEvent : undefined
+            if (click?.shiftKey) {
+              setSelection(current => ListSelectionModel.extend({ state: current, orderedIds: allPaths, id: path }))
+              return
+            }
+            setSelection(current => ListSelectionModel.toggle({ state: current, id: path }))
+          }}
+          className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+        />
+        <Button variant={isReviewed ? 'secondary' : 'ghost'} size="sm" className="dshx:gap-1 dshx:text-[11px]" onClick={() => markReviewed(path)}>
+          <Check aria-hidden className="dshx:size-3" />
+          {isReviewed ? 'Reviewed' : 'Mark reviewed'}
+        </Button>
+      </span>
+    )
+  }
   const applyReviewed = (nextReviewed: boolean): void => {
     if (selection.ids.length === 0) return
     marks.set(selection.ids, nextReviewed)
@@ -316,7 +345,7 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
           ) : null}
           <Input
             aria-label="Base branch or bookmark"
-            placeholder="Base branch (default)"
+            placeholder={baseRef === '' && base !== undefined ? `Base branch (${base})` : 'Base branch (default)'}
             value={baseRef}
             onChange={event => setBaseRef(event.target.value)}
             className="dshx:w-48 dshx:max-w-full dshx:font-mono!"
@@ -380,7 +409,12 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
         ) : null}
       </Page>
 
-      {scopes.length > 0 ? (
+      {scopes.length > 0 && packageJson.files.length > 0 ? (
+        <div className="dshx:mx-5 dshx:mb-3 dshx:@max-pane-narrow:mx-3">
+          <PackageJsonTables headerActions={reviewControls} view={packageJson} />
+        </div>
+      ) : null}
+      {scopes.length > 0 && packageJson.textFiles.length > 0 ? (
         <div
           data-testid="pulls-review-diffs"
           className={cn(
@@ -389,7 +423,7 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
           )}
         >
           <PatchView
-            files={reviewFiles}
+            files={packageJson.textFiles}
             className="dshx:flex-1"
             empty={<p className={cn(HINT, 'dshx:p-3')}>No diff hunks to display.</p>}
             renderHeaderPrefix={file => {
@@ -404,37 +438,7 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
                 </span>
               )
             }}
-            renderHeaderMetadata={file => {
-              const isReviewed = reviewedPaths.has(file.name)
-              const isSelected = selectedPaths.has(file.name)
-              return (
-                <span className="dshx:flex dshx:items-center dshx:gap-1">
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${file.name} for batch review`}
-                    checked={isSelected}
-                    onChange={event => {
-                      const click = event.nativeEvent instanceof MouseEvent ? event.nativeEvent : undefined
-                      if (click?.shiftKey) {
-                        setSelection(current => ListSelectionModel.extend({ state: current, orderedIds: allPaths, id: file.name }))
-                        return
-                      }
-                      setSelection(current => ListSelectionModel.toggle({ state: current, id: file.name }))
-                    }}
-                    className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
-                  />
-                  <Button
-                    variant={isReviewed ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className="dshx:gap-1 dshx:text-[11px]"
-                    onClick={() => markReviewed(file.name)}
-                  >
-                    <Check aria-hidden className="dshx:size-3" />
-                    {isReviewed ? 'Reviewed' : 'Mark reviewed'}
-                  </Button>
-                </span>
-              )
-            }}
+            renderHeaderMetadata={file => reviewControls(file.name)}
           />
         </div>
       ) : null}

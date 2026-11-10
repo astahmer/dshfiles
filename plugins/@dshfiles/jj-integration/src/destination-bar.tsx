@@ -342,7 +342,8 @@ export const DestinationBar = (props: {
   }, [arrive, isolateByDefault, newThreadId, newThreadSessionId, ownsThreadWorkspace, resolved, workspaceId])
   useEffect(() => {
     if (newThreadId === null || workspaceId === null || destination.data === undefined) return
-    resolved(newThreadId, WorkspaceToggle.defaultDestinationMove({ destination: destination.data, workspaceId, defaultBookmark: settings?.bookmark }))
+    const defaultBookmark = destination.data.targetBookmark ?? settings?.bookmark
+    resolved(newThreadId, WorkspaceToggle.defaultDestinationMove({ destination: destination.data, workspaceId, defaultBookmark }))
   }, [destination.data, newThreadId, resolved, settings?.bookmark, workspaceId])
 
   const current = destination.data ?? (toggle.busy ? lastDestination.current : undefined)
@@ -372,7 +373,8 @@ export const DestinationBar = (props: {
   // jj and git repositories both offer isolation and a bookmark (git: branch) to start from.
   const isJj = current !== undefined && current.vcs !== 'none'
   const isolated = toggle.pending?.isolate ?? toggle.deferredIsolation ?? current?.isolated === true
-  const defaultBookmark = settings?.bookmark
+  // The project's own main branch (Settings › Projects); the global setting on a Host that does not report one.
+  const defaultBookmark = current?.targetBookmark ?? settings?.bookmark
   const bookmark = current === undefined ? null : WorkspaceToggle.startingBookmark({ destination: current, isolated, defaultBookmark })
   const [segmentOpen, setSegmentOpen] = useState(false)
   const move = (request: { readonly isolate: boolean; readonly base?: string }): void => {

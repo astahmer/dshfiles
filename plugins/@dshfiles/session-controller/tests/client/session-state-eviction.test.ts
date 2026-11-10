@@ -96,4 +96,19 @@ describe('SessionManager resident per-session state', () => {
     expect(manager.get(mountedId)).toBe(mounted)
     unsubscribe()
   })
+
+  it('never releases an instance a live scope holds before its view subscribes', () => {
+    const manager = createManager()
+    // A view retains its Session (scope bound, history opening) and subscribes only after React commits.
+    const openingId = SessionId('session-opening')
+    const opening = manager.get(openingId)
+    // SAFETY: the release pass reads only whether a scope is bound, never the context itself.
+    opening.bindScope({} as Parameters<typeof opening.bindScope>[0])
+
+    // A restore burst instantiates more unrendered Sessions than the resident limit in the same tick.
+    for (let index = 0; index < 8; index += 1) manager.get(SessionId(`session-burst-${String(index)}`))
+
+    // The held instance stays the resident one, so the view never renders a disposed Session.
+    expect(manager.get(openingId)).toBe(opening)
+  })
 })

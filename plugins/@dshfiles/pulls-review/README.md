@@ -49,6 +49,17 @@ it with the `pulls_review_revisions` tool.
 
 ![Review several selected revisions together](docs/screenshots/combined-revisions.png)
 
+**package.json as a table.** In this facet, the Revisions scope and the Review page, a changed
+`package.json` shows its dependency changes as a table instead of text lines: package and section
+(dep, dev, peer, optional), previous version, new version, and added, removed or updated. The table
+replaces the file's text diff, and **Show text diff** puts the lines back. Other changed lines in the
+file (scripts, version) are counted on the table so it hides nothing. A diff carries only a few
+lines of context; when a changed entry's section is out of view, its row has no section label and
+the text diff stays on screen, because the line may be `engines.node` or an override rather than a
+dependency. Registry data (license, downloads, release date) is not shown.
+
+![A package.json change as a table of dependencies](docs/screenshots/package-json-table.png)
+
 Ways in: the turn card (this plugin claims the native `dsh-resource://changes-review/…` address,
 so the card opens Changes on that turn instead of a second review tab), the right pane's tab
 chooser, the jujutsu composer bar ("Review workspace changes"), **Open in thread** on a Land row or

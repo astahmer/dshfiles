@@ -5,6 +5,7 @@ import type { HostCallFailed, ThreadWorkspaceError } from './errors.js'
 import { SessionReads, WorkspaceRegistry, type SessionActivityMap } from './host-edges-promise.js'
 import { IntegrationAttribution } from './integration-attribution.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { SessionActivity } from './session-activity.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
@@ -102,6 +103,7 @@ export class RepositoryViews extends Context.Service<
     RepositoryViews,
     Effect.gen(function* () {
       const threads = yield* ThreadWorkspaces
+      const projectBookmarks = yield* ProjectBookmarks
       const registry = yield* WorkspaceRegistry
       const sessions = yield* SessionReads
       const activity = yield* SessionActivity
@@ -208,6 +210,7 @@ export class RepositoryViews extends Context.Service<
                 repoRoot,
                 title: owner?.title ?? path.basename(repoRoot),
                 workspaceId: owner?.id ?? null,
+                bookmark: yield* projectBookmarks.bookmarkFor(repoRoot),
                 bookmarks: [...bookmarks.names],
                 threads: yield* Effect.forEach(threadStatuses, status =>
                   threadView({ status, workspace: byPath.get(status.path), archived, activity: currentActivity }),

@@ -339,9 +339,9 @@
         },
         {
           "key": "composerBarBase",
-          "defaultValue": "main",
-          "constraints": "Parent, trunk, or a local or remote bookmark; invalid input falls back to main.",
-          "choices": ["main", "parent", "trunk", "local bookmark", "remote bookmark"],
+          "defaultValue": "project",
+          "constraints": "The project's main branch (jj-integration Settings › Projects; main without one), parent, trunk, or a local or remote bookmark; invalid input falls back to main.",
+          "choices": ["project", "parent", "trunk", "local bookmark", "remote bookmark"],
           "coveredBy": ["jujutsu.composer-context"]
         }
       ],

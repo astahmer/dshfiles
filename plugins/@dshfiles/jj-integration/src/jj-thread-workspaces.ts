@@ -1,11 +1,11 @@
 import { JjViewReads, type JjRunError } from '@dshfiles/jj-cli'
 import { KeyedMutex } from '@dshfiles/dshx/effect/keyed-mutex'
 import { commandAttributes } from '@dshfiles/dshx/tracing'
-import { Context, Effect, FiberMap, FileSystem, Layer, Option, Path, type PlatformError, Ref, Schema } from 'effect'
+import { Context, Effect, Fiber, FiberMap, FileSystem, Layer, Option, Path, type PlatformError, Ref, Schema } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { DestinationRejected, JjFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
 import { Executables } from './executables-promise.js'
-import { JjSettings } from './jj-settings.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepoLocks } from './repo-locks.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadMetadata, type RebaseMetadataEntry } from './thread-metadata.js'
@@ -268,7 +268,7 @@ const conflictFiles = (stdout: string): readonly string[] =>
     return file !== undefined && file.length > 0 ? [file] : []
   })
 
-const destinationRecovery = 'Pick another bookmark in the destination bar, or set the bookmark in Settings › Workspaces, then retry.'
+const destinationRecovery = 'Pick another bookmark in the destination bar, or choose the project’s main branch in Settings › Projects, then retry.'
 const unknownDestination = (target: string) =>
   new DestinationRejected({ detail: `"${target}" is not a bookmark or revision in this repository, so no workspace was created. ${destinationRecovery}` })
 const ambiguousDestination = (target: string) =>
@@ -294,7 +294,7 @@ const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const locks = yield* RepoLocks
-  const settings = yield* JjSettings
+  const projectBookmarks = yield* ProjectBookmarks
   const metadata = yield* ThreadMetadata
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const executables = yield* Executables
@@ -303,7 +303,7 @@ const make = Effect.gen(function* () {
   // A spare exists in `jj workspace list` before its record is written; until then it is still not a thread.
   const sparesBeingAdded = yield* Ref.make<ReadonlySet<string>>(new Set())
 
-  const bookmark = Effect.map(settings.get, current => current.bookmark)
+  const bookmarkFor = projectBookmarks.bookmarkFor
 
   const threadsDirectory = metadata.threadsDirectory
 
@@ -603,7 +603,7 @@ const make = Effect.gen(function* () {
   })
 
   const targetRevset = Effect.fnUntraced(function* (repoRoot: string, target?: string) {
-    const name = target ?? (yield* bookmark)
+    const name = target ?? (yield* bookmarkFor(repoRoot))
     const local = yield* revisions(bookmarkRevset(name), repoRoot, { observe: true })
     if (local.length > 0) return bookmarkRevset(name)
     const remoteRevset = `remote_bookmarks(${exactBookmarkNamePattern(name)}, remote=${exactBookmarkNamePattern('origin')})`
@@ -836,10 +836,23 @@ const make = Effect.gen(function* () {
    * Make the spare for `base` in the background; outside the repo lock, since adding a workspace moves no bookmark. A
    * failure stays silent because nobody asked for this spare: the send that needs the workspace reports it from `provision`.
    */
+  const warmingKey = (repoRoot: string, target: string): string => `${repoRoot}\0${target}`
+
   const prewarm = Effect.fn('thread workspaces prewarm')(function* (repoRoot: string, base?: string) {
-    const target = base ?? (yield* bookmark)
-    yield* FiberMap.run(warming, `${repoRoot}\0${target}`, warmSpare(repoRoot, target).pipe(Effect.ignore), { onlyIfMissing: true })
+    const target = base ?? (yield* bookmarkFor(repoRoot))
+    yield* FiberMap.run(warming, warmingKey(repoRoot, target), warmSpare(repoRoot, target).pipe(Effect.ignore), { onlyIfMissing: true })
   })
+
+  /**
+   * A spare still being added for this base finishes first: its `jj workspace add` and a second one from `provision`
+   * both export refs, and in a colocated repository git refuses the later packed-refs transaction (“Could not commit
+   * packed-ref transaction”). Waiting also lets `provision` claim that spare instead of checking the tree out again.
+   * The spare takes only its own spare-record lock, never the repository lock `provision` holds.
+   */
+  const awaitWarming = (repoRoot: string, target: string) =>
+    FiberMap.get(warming, warmingKey(repoRoot, target)).pipe(
+      Effect.flatMap(fiber => (Option.isSome(fiber) ? Effect.asVoid(Fiber.await(fiber.value)) : Effect.void)),
+    )
 
   /** Neither a folder nor a jj workspace may already carry the name: reusing either would put two threads in one checkout. */
   const isFreeThreadName = Effect.fnUntraced(function* (repoRoot: string, name: string) {
@@ -896,7 +909,8 @@ const make = Effect.gen(function* () {
   const provision = Effect.fn('thread workspaces provision')(function* (repoRoot: string, base?: string, requestedName?: string) {
     return yield* locks.withRepo(repoRoot)(
       Effect.gen(function* () {
-        const target = base ?? (yield* bookmark)
+        const target = base ?? (yield* bookmarkFor(repoRoot))
+        yield* awaitWarming(repoRoot, target)
         const commitId = yield* resolveDestination(repoRoot, target)
         const spare = yield* usableSpare(repoRoot, (yield* readSpares(repoRoot))[target])
         const claimed =
@@ -964,7 +978,7 @@ const make = Effect.gen(function* () {
           .pipe(Effect.mapError(filesFailed(`Could not create ${path.dirname(workspacePath)}.`)))
         yield* gitWorktrees(repoRoot, ['prune'])
         if (workingCopy === undefined) {
-          const commitId = yield* resolveDestination(repoRoot, yield* bookmark)
+          const commitId = yield* resolveDestination(repoRoot, yield* bookmarkFor(repoRoot))
           yield* jj(['workspace', 'add', workspacePath, '--name', name, '-r', knownCommitRevset(commitId)], repoRoot)
           return
         }
@@ -1008,7 +1022,7 @@ const make = Effect.gen(function* () {
         if (!(yield* ensureAuthorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
         const repoRoot = thread.repoRoot
         const cwd = thread.workspaceRoot
-        const target = input.bookmark ?? (yield* bookmark)
+        const target = input.bookmark ?? (yield* bookmarkFor(repoRoot))
         const sourceRevision = yield* workingCopyCommitId(cwd)
         if (sourceRevision !== input.expectedSourceRevision) return stale(staleSourceMessage)
 
@@ -1288,7 +1302,7 @@ const make = Effect.gen(function* () {
           yield* progress('validating')
           if (input.validate !== undefined) yield* input.validate
           const cwd = thread.workspaceRoot
-          const target = input.bookmark ?? (yield* bookmark)
+          const target = input.bookmark ?? (yield* bookmarkFor(thread.repoRoot))
           for (let attempt = 1; ; attempt++) {
             yield* progress('rebasing')
             const baseChangeId = yield* changeIdOf(target, cwd).pipe(Effect.option, Effect.map(Option.getOrUndefined))
@@ -1365,7 +1379,7 @@ const make = Effect.gen(function* () {
   /** A bookmark counts only when it alone reaches every unlanded revision; a conflicted one could still lose them. */
   const containingBookmarks = Effect.fn('thread workspaces containing bookmarks')(function* (input: { readonly repoRoot: string; readonly name: string }) {
     const work = unlandedRevset(input.name, yield* targetRevset(input.repoRoot))
-    const target = yield* bookmark
+    const target = yield* bookmarkFor(input.repoRoot)
     const listed = yield* jj(
       ['--ignore-working-copy', 'log', '--no-graph', '-r', `heads(${work}):: & bookmarks()`, '-T', RESOLVED_BOOKMARKS_TEMPLATE],
       input.repoRoot,
@@ -1465,7 +1479,9 @@ const make = Effect.gen(function* () {
       )
         continue
       if (!(yield* exists(reportedRoot))) {
-        const unlanded = yield* revisions(`(::${record.name}@ ~ ::${bookmarkRevset(yield* bookmark)}) ~ empty()`, realRepoRoot, { observe: true })
+        const unlanded = yield* revisions(`(::${record.name}@ ~ ::${bookmarkRevset(yield* bookmarkFor(realRepoRoot))}) ~ empty()`, realRepoRoot, {
+          observe: true,
+        })
         out.push({ name: record.name, path: reportedRoot, repoRoot: realRepoRoot, missing: true, unlanded, workingCopyState: 'missing' })
         continue
       }
@@ -1654,7 +1670,7 @@ const make = Effect.gen(function* () {
       ],
       { concurrency: 'unbounded' },
     )
-    const preferred = yield* bookmark
+    const preferred = yield* bookmarkFor((yield* storeRootOf(target).pipe(Effect.orElseSucceed(() => undefined))) ?? target)
     const candidates = lines(nearest)
     return { current: candidates.includes(preferred) ? preferred : (candidates[0] ?? null), names: [...new Set(lines(listed))] }
   })
@@ -1672,7 +1688,7 @@ const make = Effect.gen(function* () {
       defaultCommitId = candidate
     }
     const defaultWorkspaceLabel = defaultCommitId === undefined ? '""' : `if(commit_id.short(64) == "${defaultCommitId}", "default@", "")`
-    const bookmarkName = yield* bookmark
+    const bookmarkName = yield* bookmarkFor(thread.repoRoot)
     const bookmarkLiteral = JSON.stringify(bookmarkName)
     const threadRevisionLimit = 16
     const threadRevisionLines = lines(

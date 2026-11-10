@@ -5,6 +5,7 @@ import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { PatchView, parsePatchFiles, type PatchLineSelection } from '@dshfiles/plugin-ui/diff'
+import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
 import { ChevronLeft, ChevronRight, RefreshCw } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -69,6 +70,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
   const current = revisions[currentIndex]
   const currentPatch = current?.patch ?? ''
   const parsed = useMemo(() => (currentPatch.length === 0 ? [] : parsePatchFiles(currentPatch).flatMap(file => file.files)), [currentPatch])
+  const packageJson = usePackageJsonTables(currentPatch, parsed)
 
   if (query.isPending)
     return (
@@ -180,7 +182,10 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
                           'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:font-mono dshx:text-xs dshx:hover:underline',
                           viewed && 'dshx:text-muted-foreground',
                         )}
-                        onClick={() => show(revision, file.path)}
+                        onClick={() => {
+                          if (revision.commitId === current?.commitId && packageJson.isTextHidden(file.path)) packageJson.showText(file.path)
+                          show(revision, file.path)
+                        }}
                         type="button"
                       >
                         {file.path}
@@ -228,35 +233,38 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
               Revision {currentIndex + 1} of {revisions.length}: <span className="dshx:font-mono">{current.shortChangeId}</span> {subject(current)}
             </p>
           </div>
-          <div
-            className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
-            data-testid="combined-diff"
-          >
-            <PatchView
-              className="dshx:flex-1"
-              empty={<p className={cn(HINT, 'dshx:p-3')}>This revision changes no file contents.</p>}
-              files={parsed}
-              focusPath={chosen?.commitId === current.commitId ? chosen.focusPath : null}
-              key={current.commitId}
-              renderHeaderMetadata={file => {
-                const target = { commitId: current.commitId, path: file.name }
-                const viewed = marks.isViewed(target)
-                return (
-                  <Button
-                    aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.name}`}
-                    className="dshx:gap-1 dshx:text-[11px]"
-                    disabled={!marks.ready}
-                    onClick={() => marks.set([target], !viewed)}
-                    size="sm"
-                    variant={viewed ? 'secondary' : 'ghost'}
-                  >
-                    {viewed ? 'Viewed' : 'Mark viewed'}
-                  </Button>
-                )
-              }}
-              {...(props.onLineSelection === undefined ? {} : { onLineSelection: (next: PatchLineSelection) => props.onLineSelection?.(next, current) })}
-            />
-          </div>
+          <PackageJsonTables onShowText={path => setChosen({ commitId: current.commitId, focusPath: path })} view={packageJson} />
+          {packageJson.textFiles.length === 0 && parsed.length > 0 ? null : (
+            <div
+              className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
+              data-testid="combined-diff"
+            >
+              <PatchView
+                className="dshx:flex-1"
+                empty={<p className={cn(HINT, 'dshx:p-3')}>This revision changes no file contents.</p>}
+                files={packageJson.textFiles}
+                focusPath={chosen?.commitId === current.commitId ? chosen.focusPath : null}
+                key={current.commitId}
+                renderHeaderMetadata={file => {
+                  const target = { commitId: current.commitId, path: file.name }
+                  const viewed = marks.isViewed(target)
+                  return (
+                    <Button
+                      aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.name}`}
+                      className="dshx:gap-1 dshx:text-[11px]"
+                      disabled={!marks.ready}
+                      onClick={() => marks.set([target], !viewed)}
+                      size="sm"
+                      variant={viewed ? 'secondary' : 'ghost'}
+                    >
+                      {viewed ? 'Viewed' : 'Mark viewed'}
+                    </Button>
+                  )
+                }}
+                {...(props.onLineSelection === undefined ? {} : { onLineSelection: (next: PatchLineSelection) => props.onLineSelection?.(next, current) })}
+              />
+            </div>
+          )}
         </>
       )}
     </div>

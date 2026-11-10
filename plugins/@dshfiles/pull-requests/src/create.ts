@@ -12,6 +12,7 @@ import {
 } from './create-model.js'
 import { GitHubCli, type GitHubRepositoryInfo } from './github-cli.js'
 import { cwdForCaller, PullRequestMonitor, sessionFor, type PullRequestMonitorError } from './monitor.js'
+import { ProjectBase } from './project-base.js'
 import type { PullRequestRecord } from './pull-request-model.js'
 import { ThreadContext } from './thread-context.js'
 
@@ -60,6 +61,7 @@ export class PullRequestCreator extends Context.Service<
       const github = yield* GitHubCli
       const thread = yield* ThreadContext
       const monitor = yield* PullRequestMonitor
+      const projectBase = yield* ProjectBase
 
       const runJj = (args: readonly string[], cwd: string, timeoutSeconds = 30): Effect.Effect<JjResult> =>
         jj.run({ args, cwd, timeout: Duration.seconds(timeoutSeconds) }).pipe(
@@ -110,7 +112,7 @@ export class PullRequestCreator extends Context.Service<
         const remote = names.includes('origin') ? 'origin' : names[0]
         if (remote === undefined) return { workspace: undefined, problems: [CreateModel.problem('no-remote', 'The workspace has no Git remote to push to.')] }
 
-        const base = repository?.defaultBranch ?? 'main'
+        const base = (yield* projectBase.chosenFor(cwd)) ?? repository?.defaultBranch ?? 'main'
         const baseRef = `${quoted(base)}@${quoted(remote)}`
         const baseFound = yield* runJj(['log', '--no-graph', '-r', `present(${baseRef})`, '-T', 'commit_id'], cwd)
         if (baseFound.kind === 'problem') return { workspace: undefined, problems: [baseFound.problem] }

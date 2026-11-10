@@ -98,6 +98,32 @@ describe('owned conversation view panel sources', () => {
     expect(f.definitions.size).toBe(0)
   })
 
+  it('treats a catalog with the same Sessions and titles as unchanged, so list updates skip the panel sync', () => {
+    const catalog = [
+      { id: a, title: 'A' },
+      { id: b, title: 'B' },
+    ]
+    expect(
+      ConversationWorkbenchSources.sameCatalog(
+        catalog,
+        catalog.map(session => ({ ...session })),
+      ),
+    ).toBe(true)
+    expect(
+      ConversationWorkbenchSources.sameCatalog(catalog, [
+        { id: a, title: 'A' },
+        { id: b, title: 'Renamed' },
+      ]),
+    ).toBe(false)
+    expect(
+      ConversationWorkbenchSources.sameCatalog(catalog, [
+        { id: b, title: 'B' },
+        { id: a, title: 'A' },
+      ]),
+    ).toBe(false)
+    expect(ConversationWorkbenchSources.sameCatalog(catalog, catalog.slice(1))).toBe(false)
+  })
+
   it('rehydrates old view panels before any main conversation mounted and binds split Sessions independently', () => {
     const f = fixture()
     const A = f.panel(a).component

@@ -1,3 +1,4 @@
+import { useProjectBookmark } from '@dshfiles/jj-integration/project-bookmark'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
@@ -517,9 +518,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     () => (debouncedSearch.length > 0 ? graphPageRevisions : [...(state?.revisions ?? []), ...graphPageRevisions]),
     [debouncedSearch, graphPageRevisions, state?.revisions],
   )
+  // The project's main branch (Settings › Projects, via jj-integration); `main` until it loads or when it is absent.
+  const projectBookmark = useProjectBookmark(path, 'main')
   const navigation = useGraphNavigation({
     repoId,
     root: path,
+    bookmark: projectBookmark,
     refreshedAt: stateQuery.dataUpdatedAt,
     onScreen: graphOnScreen,
     selected: selection ?? undefined,
@@ -617,7 +621,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const defaultBookmark = workingCopy?.localBookmarks[0] ?? localBookmarkNames[0] ?? ''
   const selectedBookmark = localBookmarkNames.includes(bookmark) ? bookmark : defaultBookmark
   const pushedRevision = remoteBookmarkRevision({ revisions: allRevisions, bookmark: selectedBookmark, remote: selectedRemote })
-  const mainRevision = state?.revisions.find(revision => revision.localBookmarks.includes('main') || revision.bookmarks.includes('main'))
+  const mainRevision = state?.revisions.find(revision => revision.localBookmarks.includes(projectBookmark) || revision.bookmarks.includes(projectBookmark))
 
   const revisionsByCommitId = useMemo(() => new Map(allRevisions.map(revision => [revision.commitId, revision])), [allRevisions])
   const graphRows = useMemo(() => {
@@ -633,7 +637,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       hidden: navigation.hidden,
       revealed: new Set(navigation.revealed.map(row => row.commitId)),
     })
-    return RevisionGraphModel.layoutRevisionGraph(graphRevisions, revisionsByCommitId, false)
+    return RevisionGraphModel.layoutRevisionGraph(graphRevisions, revisionsByCommitId, false, projectBookmark)
   }, [
     allRevisions,
     revisionsByCommitId,
@@ -647,6 +651,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     navigation.view,
     navigation.hidden,
     navigation.revealed,
+    projectBookmark,
   ])
   const visibleRevisions = useMemo(
     () =>
@@ -1253,7 +1258,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         {!revision.immutable && <ContextMenuItem onSelect={() => sendAction({ type: 'move.start', revision })}>Rebase branch onto…</ContextMenuItem>}
         {!revision.immutable && mainRevision !== undefined && mainRevision.commitId !== revision.commitId && (
           <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'rebase', sourceId: revision.commitId, destinationId: mainRevision.commitId })}>
-            Rebase onto main
+            Rebase onto {projectBookmark}
           </ContextMenuItem>
         )}
         <ContextMenuItem onSelect={() => setBookmarkDraft({ commitId: revision.commitId })}>Set bookmark…</ContextMenuItem>

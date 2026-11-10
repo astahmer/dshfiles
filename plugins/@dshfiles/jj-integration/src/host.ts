@@ -19,6 +19,7 @@ import { IntegrationRequests, IsolatedSessions } from './integration-requests.js
 import { JjSettingsLive } from './jj-settings.js'
 import { Landing } from './landing.js'
 import { MaintenanceLive } from './maintenance.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepoLocks } from './repo-locks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
@@ -52,6 +53,7 @@ const JjIntegrationLive = Layer.mergeAll(MaintenanceLive, HostHooksLive, Integra
   Layer.provideMerge(Layer.mergeAll(RepositoryViews.layer, WorkspaceSync.layer)),
   Layer.provideMerge(SessionActivity.layer),
   Layer.provideMerge(ThreadWorkspaces.layer),
+  Layer.provideMerge(ProjectBookmarks.layer),
   Layer.provideMerge(JjViewReads.layer),
   Layer.provideMerge(Jj.layerWith({ timeout: JJ_TIMEOUT, maxStdoutBytes: MAX_JJ_STDOUT_BYTES, maxStderrBytes: MAX_JJ_STDERR_BYTES })),
   // Automatic fetch runs git in a git-only repository; thread workspaces get their own Git through ThreadWorkspaces.layer.
@@ -82,6 +84,8 @@ const handlers = Api.handlers(jjIntegrationApi, {
   integrationProgress: input => IntegrationRequests.use(requests => Effect.map(requests.progress(input.path), progress => ({ progress }))),
   reviewHistory: input => ThreadLifecycle.use(lifecycle => lifecycle.reviewHistory(input)),
   threadStatus: (input, call) => ThreadLifecycle.use(lifecycle => lifecycle.threadStatus(input, call.caller)),
+  projectBookmark: input => ThreadLifecycle.use(lifecycle => lifecycle.projectBookmark(input)),
+  setProjectBookmark: input => ThreadLifecycle.use(lifecycle => lifecycle.setProjectBookmark(input)),
   landThread: (input, call) => ThreadLifecycle.use(lifecycle => lifecycle.landThread(input, call.caller)),
   workspaceSync: () => WorkspaceSync.use(sync => Effect.map(sync.current, current => ({ sync: current }))),
   workspaceSetup: input => WorkspaceSetupService.use(setup => setup.ensure(input)),

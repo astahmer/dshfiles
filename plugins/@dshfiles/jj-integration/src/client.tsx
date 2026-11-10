@@ -49,6 +49,9 @@ import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSet
 import { requestThreadSettle } from './settle-request.js'
 import { requestReplaceThreadTab } from './main-tab-replacement.js'
 import { TurnEndStatusRefreshModel, type TurnEndStatusRefresh } from './turn-end-status-refresh.js'
+import { useProjectBookmark } from './project-bookmark-query.js'
+import { ProjectMainBranchPanel } from './project-main-branch-panel.js'
+import { ProjectSettingsPanels, type ProjectSettingsPanelProps } from '@dshfiles/workspace-folder-picker/project-settings-panels'
 import { NativeAsideOwners } from '@dshfiles/workbench/registry'
 
 const PANEL_ID = 'jj-integration'
@@ -125,6 +128,16 @@ export default defineClient({
       return changes?.status === 'active' ? changes.value.review(input) : false
     }
     const changesAvailable = (): boolean => metadata?.plugin?.use(Changes).get()?.status === 'active'
+    // Settings › Projects (workspace-folder-picker) shows each project's main branch, chosen here.
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      const MainBranch = (props: ProjectSettingsPanelProps): JSX.Element => (
+        <PluginQueryProvider>
+          <ProjectMainBranchPanel {...props} />
+        </PluginQueryProvider>
+      )
+      plugin.add(ProjectSettingsPanels, { id: 'main-branch', order: 0, Panel: plugin.bind(MainBranch) })
+    }
     ctx.effect(() => {
       const sheet = document.createElement('style')
       sheet.dataset.dshfilesRemoteDestination = ''
@@ -360,7 +373,7 @@ export default defineClient({
         }
       }, [newestTurnHasEnded, props.turn.end?.time, queryClient, status.dataUpdatedAt, statusQueryKey, statusRefresh])
       const turnEndRefreshIsPending = TurnEndStatusRefreshModel.turnEndRefreshPending(statusRefresh)
-      const bookmark = useBookmark()
+      const bookmark = useProjectBookmark(path, useBookmark())
       const thread = status.data?.thread
       const [previousThread, setPreviousThread] = useState(thread)
       useEffect(() => {

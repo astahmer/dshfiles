@@ -10,6 +10,7 @@ import {
 } from './api.js'
 import { ReviewGit } from './git.js'
 import { type JjReadFailed, ReviewJj } from './jj.js'
+import { ProjectBase } from './project-base.js'
 import type { ReviewBackend } from './review-backend.js'
 import { RevisionReviewModel, type ResolvedRevision } from './revision-review.js'
 import { groupPatch } from './scopes.js'
@@ -54,6 +55,7 @@ const diffArgs = (base: string, head = HEAD_REVISION): readonly string[] => ['di
 const jjBackend = (jj: ReviewJj['Service']): ReviewBackend => ({
   vcs: 'jj',
   baseCandidates: BASE_CANDIDATES,
+  projectCandidates: branch => [branch, `${branch}@origin`],
   liveHead: HEAD_REVISION,
   savedRevision: changeIdRevset,
   // An unknown revision just means this candidate is absent; a workspace that is not a jj repository is not a missing base.
@@ -91,6 +93,8 @@ export class ReviewWorkspace extends Context.Service<
       const jjReads = yield* ReviewJj
       const jj = jjBackend(jjReads)
       const git = yield* Effect.serviceOption(ReviewGit)
+      // Without jj-integration (or in tests) a review without a base keeps trying main, master and trunk.
+      const projectBase = yield* Effect.serviceOption(ProjectBase)
       const detector = yield* VcsDetector
       const fileSystem = yield* FileSystem.FileSystem
 
@@ -110,10 +114,16 @@ export class ReviewWorkspace extends Context.Service<
         if (input.requested !== undefined && input.requested.length > 0) {
           return (yield* input.backend.resolves({ path: input.path, revision: input.requested })) ? input.requested : undefined
         }
-        for (const candidate of input.backend.baseCandidates) {
+        for (const candidate of yield* baseCandidatesFor(input.backend, input.path)) {
           if (yield* input.backend.resolves({ path: input.path, revision: candidate })) return candidate
         }
         return undefined
+      })
+
+      /** The project's main branch first (chosen, declared or detected), then the conventional names. */
+      const baseCandidatesFor = Effect.fnUntraced(function* (backend: ReviewBackend, path: string) {
+        const project = Option.isSome(projectBase) ? yield* projectBase.value.defaultFor(path) : undefined
+        return [...new Set([...(project === undefined ? [] : backend.projectCandidates(project)), ...backend.baseCandidates])]
       })
 
       const readRange = Effect.fn('review range read')(function* (input: ReviewInput & { readonly exactRange: boolean; readonly backend: ReviewBackend }) {
@@ -121,7 +131,12 @@ export class ReviewWorkspace extends Context.Service<
         const base = input.exactRange
           ? backend.savedRevision(input.fromChangeId ?? '')
           : yield* resolveBase({ backend, path: input.path, requested: input.base })
-        if (base === undefined) return failure(input.path, 'no-base', `No base bookmark found; expected one of ${backend.baseCandidates.join(', ')}.`)
+        if (base === undefined)
+          return failure(
+            input.path,
+            'no-base',
+            `No base bookmark found; expected one of ${(yield* baseCandidatesFor(backend, input.path)).join(', ')}. Choose the project's main branch in Settings › Projects, or type a base.`,
+          )
         if (input.exactRange && !(yield* backend.resolves({ path: input.path, revision: base })))
           return failure(input.path, 'no-base', 'The saved base change ID no longer resolves in this repository.')
         const headRevision = input.exactRange ? backend.savedRevision(input.toChangeId ?? '') : backend.liveHead

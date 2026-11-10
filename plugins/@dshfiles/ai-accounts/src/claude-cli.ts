@@ -610,6 +610,11 @@ export class ClaudeCliSessions {
     const open = new Map<number, { readonly kind: 'text' | 'thinking' | 'toolCall'; readonly contentIndex: number; json: string }>()
     let started = false
     let finished = false
+    // Tool uses of the current CLI message: DSH runs only the ones the CLI exposed (mcp__dsh__*). A bare name is one
+    // the CLI rejects itself ("No such tool available") without calling the bridge; running it here too executed the
+    // tool while the model saw an error, so its retry ran it a second time (duplicate threads).
+    let runnableUses = 0
+    let rejectedUses = 0
     const finish = (): void => {
       finished = true
       input.signal?.removeEventListener('abort', onAbort)
@@ -644,6 +649,8 @@ export class ClaudeCliSessions {
       switch (event.type) {
         case 'message_start':
           begin()
+          runnableUses = 0
+          rejectedUses = 0
           return
         case 'content_block_start': {
           begin()
@@ -659,7 +666,12 @@ export class ClaudeCliSessions {
             stream.push({ type: 'thinking_start', contentIndex, partial: output })
           }
           if (block.type === 'tool_use') {
-            const name = block.name.startsWith(MCP_TOOL_PREFIX) ? block.name.slice(MCP_TOOL_PREFIX.length) : block.name
+            if (!block.name.startsWith(MCP_TOOL_PREFIX)) {
+              rejectedUses += 1
+              return
+            }
+            runnableUses += 1
+            const name = block.name.slice(MCP_TOOL_PREFIX.length)
             const contentIndex = output.content.push({ type: 'toolCall', id: block.id, name, arguments: {} }) - 1
             open.set(event.index, { kind: 'toolCall', contentIndex, json: '' })
             stream.push({ type: 'toolcall_start', contentIndex, partial: output })
@@ -725,6 +737,13 @@ export class ClaudeCliSessions {
           return
         }
         case 'message_stop':
+          // Every tool use of this message was rejected by the CLI, which answers them and asks the model again: the
+          // step continues with that next message instead of ending on calls DSH must not run.
+          if (rejectedUses > 0 && runnableUses === 0) {
+            output.stopReason = 'stop'
+            delete output.rawStopReason
+            return
+          }
           finish()
           session.produced += 1
           stream.push({

@@ -6,6 +6,7 @@ import {
   jjIntegrationSettings,
   mayAutoIntegrateWorkspace,
   RepositoryAutoIntegration,
+  RepositoryBookmarks,
 } from './settings.js'
 
 const noExcludedRepositories: readonly string[] = []
@@ -68,6 +69,57 @@ describe('automatic integration scope', () => {
     expect(RepositoryAutoIntegration.isExcluded({ repositoryRoot: '/Users/dev/welii/', excludedRepositoryRoots: ['/Users/dev/welii'] })).toBe(true)
     expect(RepositoryAutoIntegration.isExcluded({ repositoryRoot: '/Users/dev/welii-two', excludedRepositoryRoots: ['/Users/dev/welii'] })).toBe(false)
     expect(RepositoryAutoIntegration.isExcluded({ repositoryRoot: '/Users/dev/welii', excludedRepositoryRoots: ['~/dev/welii'] })).toBe(false)
+  })
+})
+
+describe('project main branch', () => {
+  const fallback = 'main'
+
+  it('prefers the per-project choice, then dsh.project.json, then the detected default branch, then the global setting', () => {
+    expect(RepositoryBookmarks.resolve({ override: 'develop', declared: 'trunk', detected: 'master', fallback })).toEqual({
+      bookmark: 'develop',
+      source: 'project',
+    })
+    expect(RepositoryBookmarks.resolve({ override: null, declared: 'trunk', detected: 'master', fallback })).toEqual({ bookmark: 'trunk', source: 'file' })
+    expect(RepositoryBookmarks.resolve({ override: null, declared: undefined, detected: 'master', fallback })).toEqual({
+      bookmark: 'master',
+      source: 'detected',
+    })
+    expect(RepositoryBookmarks.resolve({ override: null, declared: null, detected: null, fallback })).toEqual({ bookmark: 'main', source: 'global' })
+  })
+
+  it('skips a layer whose name is blank or could be read as an option', () => {
+    expect(RepositoryBookmarks.resolve({ override: '  ', declared: '-r', detected: 'release/2.x', fallback })).toEqual({
+      bookmark: 'release/2.x',
+      source: 'detected',
+    })
+    expect(RepositoryBookmarks.usableName('has space')).toBeNull()
+    expect(RepositoryBookmarks.usableName(' feature/x ')).toBe('feature/x')
+    expect(RepositoryBookmarks.usableName('../../config')).toBeNull()
+  })
+
+  it('finds the override of a repository regardless of a trailing separator', () => {
+    const entries = [{ repository: '/Users/dev/shop/', bookmark: 'develop' }]
+    expect(RepositoryBookmarks.overrideFor({ repositoryRoot: '/Users/dev/shop', entries })).toBe('develop')
+    expect(RepositoryBookmarks.overrideFor({ repositoryRoot: '/Users/dev/shop-two', entries })).toBeNull()
+  })
+
+  it('replaces or clears one repository override and keeps the others', () => {
+    const entries = [
+      { repository: '/Users/dev/shop', bookmark: 'develop' },
+      { repository: '/Users/dev/blog', bookmark: 'master' },
+    ]
+    expect(RepositoryBookmarks.withOverride({ entries, repositoryRoot: '/Users/dev/shop/', bookmark: 'staging' })).toEqual([
+      { repository: '/Users/dev/blog', bookmark: 'master' },
+      { repository: '/Users/dev/shop', bookmark: 'staging' },
+    ])
+    expect(RepositoryBookmarks.withOverride({ entries, repositoryRoot: '/Users/dev/shop', bookmark: null })).toEqual([
+      { repository: '/Users/dev/blog', bookmark: 'master' },
+    ])
+  })
+
+  it('defaults to no per-project choice', () => {
+    expect(defaultJjIntegrationSettings.repositoryBookmarks).toEqual([])
   })
 })
 
