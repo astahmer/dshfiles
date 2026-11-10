@@ -113,7 +113,7 @@ const runScenario = async (progressive: boolean): Promise<ScenarioResult> => {
 
     if (progressive) {
       if (toolSearch.setup === undefined) throw new Error('Tool-search Host setup is missing')
-      await ctx.plugin({ ...toolSearch, apply: toolSearch.setup }, {})
+      await ctx.plugin({ ...toolSearch, apply: toolSearch.setup }, { mode: 'progressive' })
     }
 
     const adapter = new ScriptedToolSearchAdapter(ctx, progressive)
@@ -163,7 +163,7 @@ const textTool = (input: { readonly name: string; readonly description: string; 
   })
 
 /** Agent presets mount `bash`, `read`, … in a parent scope of each agent, outside the global catalog. */
-const runPresetToolScenario = async (config: { readonly alwaysVisible?: readonly string[] }) => {
+const runPresetToolScenario = async (config: { readonly mode: 'cache-safe' | 'progressive'; readonly alwaysVisible?: readonly string[] }) => {
   const ctx = new Context()
   const commands: string[] = []
   let disposeAgent: (() => Promise<void>) | undefined
@@ -222,16 +222,26 @@ const runPresetToolScenario = async (config: { readonly alwaysVisible?: readonly
 
 describe('tool-search with agent-plane tools', () => {
   it('keeps the agent preset tools visible and callable while deferring global tools', async () => {
-    const result = await runPresetToolScenario({ alwaysVisible: [] })
+    const result = await runPresetToolScenario({ mode: 'progressive', alwaysVisible: [] })
 
     expect(result.commands).toEqual(['pwd'])
     expect(result.requests[0]).toEqual(['bash', 'tool_search'])
   })
 
   it('shows the native core globals by default', async () => {
-    const result = await runPresetToolScenario({})
+    const result = await runPresetToolScenario({ mode: 'progressive' })
 
     expect(result.requests[0]).toEqual(['bash', 'glob', 'tool_search'])
+  })
+
+  it('keeps the agent preset tools and core globals in cache-safe mode', async () => {
+    const result = await runPresetToolScenario({ mode: 'cache-safe' })
+
+    expect(result.commands).toEqual(['pwd'])
+    expect(result.requests).toEqual([
+      ['bash', 'glob', 'tool_call', 'tool_search'],
+      ['bash', 'glob', 'tool_call', 'tool_search'],
+    ])
   })
 })
 

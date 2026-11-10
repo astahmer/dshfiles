@@ -434,7 +434,7 @@ const catalogLabel = (catalog: BenchmarkCatalog): string => (catalog.kind === 'r
 const setupBenchmarkContext = async (input: {
   readonly ctx: Context
   readonly progressive: boolean
-  readonly toolSearchConfig: { readonly maxResults?: number }
+  readonly toolSearchConfig: { readonly mode: 'cache-safe' | 'progressive'; readonly maxResults?: number }
   readonly registerTools: () => void
 }): Promise<void> => {
   const ctx = input.ctx
@@ -473,7 +473,7 @@ const runScriptedScenario = async (task: BenchmarkTask, progressive: boolean, de
     await setupBenchmarkContext({
       ctx,
       progressive,
-      toolSearchConfig: { maxResults: 1 },
+      toolSearchConfig: { mode: 'progressive', maxResults: 1 },
       registerTools: () => registerSyntheticTools(ctx, call => executedTools.push(call.name), savedNotes, decoyCount),
     })
 
@@ -759,7 +759,7 @@ const runProviderScenario = async (input: {
     await setupBenchmarkContext({
       ctx,
       progressive: input.progressive,
-      toolSearchConfig: {},
+      toolSearchConfig: { mode: 'progressive' },
       registerTools: () =>
         input.catalog.kind === 'real'
           ? registerRealTools(ctx, record, realFixtures)

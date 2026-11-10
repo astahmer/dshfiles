@@ -113,7 +113,7 @@ try {
   await startHost()
   process.stdout.write('PASS: Tool Search activated in an isolated scratch DSH Host.\n')
 
-  const integration = spawnSync('pnpm', ['--dir', pluginRoot, 'exec', 'vitest', 'run', 'src/agent-loop.integration.test.ts'], {
+  const integration = spawnSync('pnpm', ['--dir', pluginRoot, 'exec', 'vitest', 'run', 'src/agent-loop.integration.test.ts', 'src/cache-safe.integration.test.ts'], {
     cwd: repoRoot,
     encoding: 'utf8',
   })

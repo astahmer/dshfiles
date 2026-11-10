@@ -11,6 +11,12 @@
       "currentSurface": "host: tool search (not mounted)",
       "configuration": [
         {
+          "key": "mode",
+          "defaultValue": "cache-safe",
+          "constraints": "cache-safe keeps one tool list for the whole Session (core tools, tool_search, tool_call) and returns schemas as text; progressive adds the matches to the tool list.",
+          "coveredBy": ["tool-search.cache-safe-proxy", "tool-search.per-agent-disclosure-policy"]
+        },
+        {
           "key": "alwaysVisible",
           "defaultValue": "the native core tools (read, write, edit, apply_patch, bash, glob, grep, todo_write, skill, ask_user_question, job_*, subagent*, …)",
           "constraints": "Trimmed names; only * is a wildcard.",
@@ -42,6 +48,12 @@
           "id": "tool-search.ranking-limits-and-patterns",
           "file": "plugins/@dshfiles/tool-search/src/search.test.ts",
           "testName": "ranks exact names first and uses deterministic name order for ties"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.cache-safe-proxy",
+          "file": "plugins/@dshfiles/tool-search/src/cache-safe.integration.test.ts",
+          "testName": "returns schemas in the search result and keeps the declared tools identical across the Session"
         },
         {
           "kind": "unit-test",

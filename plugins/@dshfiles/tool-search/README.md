@@ -12,13 +12,20 @@ This package is not included in the web profile by default. Add `@dshfiles/tool-
 - id: dshfiles-tool-search
   name: '@dshfiles/tool-search'
   config:
+    mode: cache-safe
     alwaysVisible: [read_file, todo_*]
     maxResults: 5
     maxQueryChars: 512
     reportSchemaMetrics: false
 ```
 
-`alwaysVisible` accepts trimmed tool names with `*` as the only wildcard. `maxResults` must be an integer from 1 through 100; `maxQueryChars` must be an integer from 1 through 4096. `maxResults` and `maxQueryChars` default to `5` and `512`. `alwaysVisible` defaults to the native core tools (`read`, `write`, `edit`, `apply_patch`, `bash`, `glob`, `grep`, `todo_write`, `skill`, `ask_user_question`, `job_*`, `subagent*`, `send_message`, `list_agents`, `interrupt_agent`, `web_search`, `web_fetch`, `present`, `read_image`, the goal tools, `exit_plan_mode`, `workflow`, `working_directory`, `compaction_threshold`); setting it replaces that list, and `[]` defers every global tool. `reportSchemaMetrics` defaults to `false`; set it to `true` only for an isolated measurement profile.
+`mode` is `cache-safe` (default) or `progressive`; see [Modes](#modes). `alwaysVisible` accepts trimmed tool names with `*` as the only wildcard. `maxResults` must be an integer from 1 through 100; `maxQueryChars` must be an integer from 1 through 4096. `maxResults` and `maxQueryChars` default to `5` and `512`. `alwaysVisible` defaults to the native core tools (`read`, `write`, `edit`, `apply_patch`, `bash`, `glob`, `grep`, `todo_write`, `skill`, `ask_user_question`, `job_*`, `subagent*`, `send_message`, `list_agents`, `interrupt_agent`, `web_search`, `web_fetch`, `present`, `read_image`, the goal tools, `exit_plan_mode`, `workflow`, `working_directory`, `compaction_threshold`); setting it replaces that list, and `[]` defers every global tool. `reportSchemaMetrics` defaults to `false`; set it to `true` only for an isolated measurement profile.
+
+## Modes
+
+**`cache-safe`** (default). The tool list an agent's requests declare stays identical for the whole Session: the tools in `alwaysVisible`, the agent's own and agent-preset tools, `tool_search` and `tool_call`. Providers cache the prompt prefix in the order tools → system → messages, so an unchanged list keeps every cached token. `tool_search` returns each match's description and full parameter schema as text in its result, so a discovery only appends to the conversation. `tool_call { name, args }` decodes `args` once on the Host against the target's published JSON Schema (Effect `SchemaRepresentation.fromJsonSchemaDocument`; a schema Effect cannot import is left to the target's own validation), then runs the target through `ToolRuntime.execute` as a nested call of `tool_call`: pre-execute policies, guards, approval and post-execute policies apply as for a direct call, and the card uses the target's own presentation. A tool whose description says to run only when the user asked keeps that rule, and a destructive opt-in such as `confirm: true` is still required by the target's schema. The deferred tools stay registered and visible to the registry (only the request assembly omits them), so a call to a deferred tool by its real name also runs. `tool_call` refuses `tool_search` and itself, and nested Code Mode calls.
+
+**`progressive`**. A search adds its matches to the agent's tool list for the rest of the Session, as described below. On routes whose adapter declares a mid-conversation tool update mode (`toolUpdate`: Anthropic Messages models with `supportsMidConvoToolChanges`, Codex models with `supportsToolSearch`) DSH appends the additions as `tool-addition` developer messages and declares them deferred, so the cached prefix survives; on every other route, Claude Code CLI included, each search rewrites the tool list and loses the cache.
 
 ## Behavior and safety
 

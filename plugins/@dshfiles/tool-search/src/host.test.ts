@@ -13,6 +13,7 @@ interface ToolSearchResult {
 }
 
 interface ToolSearchConfig {
+  readonly mode?: 'cache-safe' | 'progressive'
   readonly alwaysVisible?: readonly string[]
   readonly maxResults?: number
   readonly maxQueryChars?: number
@@ -167,7 +168,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
       return () => registered.delete(listener)
     },
   }
-  const dispose = await plugin.apply(root, { maxResults: 3, ...(options.config ?? {}) })
+  const dispose = await plugin.apply(root, { mode: 'progressive', maxResults: 3, ...(options.config ?? {}) })
   const searchTool = (agent: TestAgent): RegisteredTool => {
     const tool = scopedTools.get(agent)?.get('tool_search')
     if (tool === undefined) throw new Error('tool_search was not registered')
