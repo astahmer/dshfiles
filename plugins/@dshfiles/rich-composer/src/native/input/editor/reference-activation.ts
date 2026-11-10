@@ -19,7 +19,6 @@ export function registerReferenceActivation(
 ): () => void {
   return editor.registerCommand(CLICK_COMMAND, (event) => {
     if (event.target === null || event.button !== 0 || event.detail > 1) return false
-    if (event.target instanceof Element && event.target.closest('[data-chip-action]') !== null) return false
     const node = $getNearestNodeFromDOMNode(event.target as Node)
     if ($isReferenceChipNode(node)) {
       if (node.isInvalid()) return false

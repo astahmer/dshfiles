@@ -27,6 +27,7 @@ import { SubmitMachine } from './machine.ts'
 import { DetachedSends } from './detached-sends.ts'
 import { resolveDraftInput, snapshotDraft } from '../draft.ts'
 import { DraftEditorRuntime } from './editor/runtime.ts'
+import { DraftAnnotations, type DraftAnnotation } from './draft-annotations.ts'
 import type { EditorProjection } from './editor/projection.ts'
 
 /** Popup face the shell needs (dismissal only; typed structurally to avoid a value import). */
@@ -110,6 +111,10 @@ export class SessionInputShell implements SessionInput {
   readonly state: SnapshotStore<InputState>
   /** Latest surfaced notice (null after clear); the bar renders errors as banners and information inline. */
   readonly notices: SnapshotStore<InputNotice | null> = createSnapshotStore<InputNotice | null>(null)
+  /** Conversation passages quoted into this draft; they ride the next plain message. */
+  readonly annotations = new DraftAnnotations()
+  /** Annotations taken by an in-flight send, keyed by its attempt, so a failed send gives them back. */
+  private readonly annotationFlights = new Map<number, readonly DraftAnnotation[]>()
   /** The shell-owned editor (text + chip truth); the composer binds its contenteditable to it. */
   get editor(): LexicalEditor {
     return this.draftEditor.editor
@@ -346,29 +351,36 @@ export class SessionInputShell implements SessionInput {
     if (this.disposed) return
     const timestamp = Date.now()
     let state: MessageSubmissionState | undefined
-    if (this.snapshot.phase === 'plain' && (this.snapshot.draft.trim() !== '' || this.attachmentIds.length > 0)) {
+    const annotated = this.annotations.state.getSnapshot().length > 0
+    if (this.snapshot.phase === 'plain' && (this.snapshot.draft.trim() !== '' || this.attachmentIds.length > 0 || annotated)) {
       try { state = this.deps.submissionState?.() } catch (_error) { /* Optional Session observations cannot interrupt submission. */ }
     }
     const submission: MessageSubmission = Object.freeze({
       timestamp, mode, ...source === undefined ? {} : { source }, ...state === undefined ? {} : { state },
     })
-    if (this.snapshot.draft.trim() === '' && this.attachmentIds.length > 0) {
+    if (this.snapshot.draft.trim() === '' && (this.attachmentIds.length > 0 || annotated)) {
       if (this.snapshot.phase === 'plain') {
         const attachmentIds = [...this.attachmentIds]
+        const annotations = this.annotations.take()
         const controller = new AbortController()
         this.attachmentFlightSeq += 1
         const flight = this.attachmentFlightSeq
         this.attachmentFlights.set(flight, { controller, attachmentIds })
         this.commitSend(attachmentIds)
         this.notifySubmission(submission)
-        void this.deps.defaultSink('', attachmentIds, mode, controller.signal).then((outcome) => {
+        const text = DraftAnnotations.compose({ annotations, text: '' })
+        const giveBack = (): void => {
+          this.restoreAttachments(attachmentIds)
+          this.annotations.restore(annotations)
+        }
+        void this.deps.defaultSink(text, attachmentIds, mode, controller.signal).then((outcome) => {
           if (this.disposed || !this.attachmentFlights.delete(flight)) return
           if (outcome.kind === 'success') return
-          this.restoreAttachments(attachmentIds)
+          giveBack()
           if (outcome.text !== undefined) this.notify('error', outcome.text)
         }, (error: unknown) => {
           if (this.disposed || !this.attachmentFlights.delete(flight)) return
-          this.restoreAttachments(attachmentIds)
+          giveBack()
           this.notify('error', error instanceof Error ? error.message : String(error))
         })
       }
@@ -742,12 +754,15 @@ export class SessionInputShell implements SessionInput {
     this.notifySubmission(attempt.submission)
     const attachmentIds = [...this.attachmentIds]
     this.attachmentIds = []
+    const annotations = this.annotations.take()
+    if (annotations.length > 0) this.annotationFlights.set(attempt.seq, annotations)
+    const withAnnotations = (text: string): string => DraftAnnotations.compose({ annotations, text })
     const occurrences = this.projection.occurrences
     const record = { draft, occurrences, attachmentIds }
     this.sends.capture({ seq: attempt.seq, record })
     this.sends.sent({ rev: this.rev })
     if (occurrences.length === 0) {
-      this.settleSink(attempt, this.deps.defaultSink(draft.trim(), attachmentIds, mode, attempt.signal))
+      this.settleSink(attempt, this.deps.defaultSink(withAnnotations(draft.trim()), attachmentIds, mode, attempt.signal))
       return
     }
     const inputTriggers = this.deps.inputTriggers?.()
@@ -771,7 +786,7 @@ export class SessionInputShell implements SessionInput {
           cursor = part.offset + part.length
         }
         out += draft.slice(cursor)
-        this.settleSink(attempt, this.deps.defaultSink(out.trim(), attachmentIds, mode, attempt.signal))
+        this.settleSink(attempt, this.deps.defaultSink(withAnnotations(out.trim()), attachmentIds, mode, attempt.signal))
       },
       (error: unknown) => {
         if (this.dead(attempt)) return
@@ -799,6 +814,7 @@ export class SessionInputShell implements SessionInput {
           return
         }
         this.sends.settle(attempt.seq)
+        this.annotationFlights.delete(attempt.seq)
         this.dispatchRun(({ type: 'sink-settled', attempt, ok: true, outcome }))
       },
       (error: unknown) => {
@@ -813,6 +829,8 @@ export class SessionInputShell implements SessionInput {
     const record = this.sends.settle(attempt.seq)
     if (record === undefined) return
     this.restoreAttachments(record.attachmentIds)
+    this.annotations.restore(this.annotationFlights.get(attempt.seq) ?? [])
+    this.annotationFlights.delete(attempt.seq)
     const restore = this.sends.recordFailure({ seq: attempt.seq, record, draft: this.projection.clipboardText, rev: this.rev })
     if (restore) this.restoreFailedDrafts()
     this.dispatchRun(({ type: 'sink-settled', attempt, ok: false, ...(message === undefined ? {} : { message }) }))

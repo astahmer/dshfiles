@@ -5,13 +5,13 @@ import { SelectionAnnotation, type AssistantSelection } from '../../annotate-sel
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import css from './AnnotateSelection.module.css'
 
-const OPEN_EVENT = 'dshfiles:open-composer-snippet'
-const HIGHLIGHT_MS = 1600
-const EDGE_MARGIN_PX = 80
+/** The composer's annotation pill asks for its passage with this event; the detail is `text` and `source` as URL search params. */
+const REVEAL_EVENT = 'dshfiles:reveal-annotation'
+const EDGE_MARGIN_PX = 72
 
 /**
- * Floats an Annotate action over an assistant selection, adds it to the composer as a quote chip,
- * and answers a chip's open request by scrolling to and highlighting the quoted paragraph.
+ * Floats an Annotate action over a finished assistant selection and adds it to the composer's annotation pill;
+ * answers the pill's reveal request by scrolling to the quoted paragraph and flashing it.
  * @param props - the session, the chat scroll container, and the locale seat.
  * @returns the floating action, or nothing while no assistant text is selected.
  */
@@ -24,14 +24,28 @@ export const AnnotateSelection = ({ sessionId, containerRef, t }: {
   const [selected, setSelected] = useState<AssistantSelection | undefined>(undefined)
 
   useEffect(() => {
+    let dragging = false
     const refresh = (): void => {
       const container = containerRef.current
-      setSelected(container === null ? undefined : SelectionAnnotation.selected({ container, selection: window.getSelection() }))
+      setSelected(dragging || container === null ? undefined : SelectionAnnotation.selected({ container, selection: window.getSelection() }))
     }
+    const onPointerDown = (event: PointerEvent): void => {
+      if (event.target instanceof Element && event.target.closest('[data-annotate-selection]') !== null) return
+      dragging = true
+      setSelected(undefined)
+    }
+    const onPointerUp = (): void => {
+      dragging = false
+      refresh()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('pointerup', onPointerUp, true)
     document.addEventListener('selectionchange', refresh)
     document.addEventListener('scroll', refresh, true)
     window.addEventListener('resize', refresh)
     return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('pointerup', onPointerUp, true)
       document.removeEventListener('selectionchange', refresh)
       document.removeEventListener('scroll', refresh, true)
       window.removeEventListener('resize', refresh)
@@ -39,30 +53,49 @@ export const AnnotateSelection = ({ sessionId, containerRef, t }: {
   }, [containerRef])
 
   useEffect(() => {
-    const open = (event: Event): void => {
+    const reveal = (event: Event): void => {
       const container = containerRef.current
-      const text = event instanceof CustomEvent ? String(event.detail) : ''
+      const detail = new URLSearchParams(event instanceof CustomEvent ? String(event.detail) : '')
+      const text = detail.get('text') ?? ''
       if (container === null || text === '') return
-      const target = SelectionAnnotation.targetOf({ container, text })
+      const target = SelectionAnnotation.targetOf({ container, text, source: detail.get('source') ?? '' })
       if (target === undefined) return
-      target.scrollIntoView({ block: 'center', behavior: 'smooth' })
-      target.animate(
-        [{ backgroundColor: 'var(--dsw-alias-state-business-tertiary)' }, { backgroundColor: 'transparent' }],
-        { duration: HIGHLIGHT_MS, easing: 'ease-out' },
-      )
+      const scroller = container.closest<HTMLElement>('[data-conversation-scroll]') ?? container
+      const composerHeight = scroller.querySelector<HTMLElement>('[data-composer-seat]')?.offsetHeight ?? 0
+      const box = scroller.getBoundingClientRect()
+      const rect = target.getBoundingClientRect()
+      const centered = scroller.scrollTop + rect.top - box.top - (scroller.clientHeight - composerHeight - rect.height) / 2
+      scroller.scrollTo({ top: Math.max(0, centered) })
+      target.removeAttribute('data-annotation-flash')
+      void target.getBoundingClientRect()
+      target.setAttribute('data-annotation-flash', '')
+      target.addEventListener('animationend', () => target.removeAttribute('data-annotation-flash'), { once: true })
     }
-    window.addEventListener(OPEN_EVENT, open)
-    return () => window.removeEventListener(OPEN_EVENT, open)
+    window.addEventListener(REVEAL_EVENT, reveal)
+    return () => window.removeEventListener(REVEAL_EVENT, reveal)
   }, [containerRef])
 
   if (selected === undefined || composer.status !== 'active') return null
   const left = Math.min(Math.max(selected.rect.left + selected.rect.width / 2, EDGE_MARGIN_PX), window.innerWidth - EDGE_MARGIN_PX)
   const add = (): void => {
-    if (!composer.value.attach({ sessionId, attachment: { kind: 'quote', text: selected.text } })) return
+    if (!composer.value.attach({ sessionId, attachment: { kind: 'annotation', text: selected.text, source: selected.source } })) return
     window.getSelection()?.removeAllRanges()
+    setSelected(undefined)
+    composer.value.focus({ sessionId })
   }
   return createPortal(
-    <button type="button" className={css.annotate} style={{ left, top: selected.rect.top }} onMouseDown={event => event.preventDefault()} onClick={add}>
+    <button
+      type="button"
+      data-annotate-selection
+      className={css.annotate}
+      style={{ left, top: selected.rect.top }}
+      onMouseDown={event => event.preventDefault()}
+      onClick={add}
+    >
+      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <path d="M12 7v6M9 10h6" />
+      </svg>
       {t('message.annotate')}
     </button>,
     document.body,

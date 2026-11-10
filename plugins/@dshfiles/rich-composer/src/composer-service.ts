@@ -72,6 +72,11 @@ export const createComposerService = (ctx: Context): ComposerService => {
       const target = resolve(input.sessionId)
       if (target === undefined) return false
       const attachment = input.attachment
+      if (attachment.kind === 'annotation') {
+        if (!editable(target.shell)) return false
+        target.shell.annotations.add({ text: attachment.text, source: attachment.source ?? '' })
+        return true
+      }
       if (attachment.kind !== 'file') return target.shell.addFiles([ComposerSnippets.reference(attachment)], [])
       const cwd = ctx.sessions.list.getSnapshot().byId[target.id]?.cwd
       const mention = formatFileMention({ path: relativizeToCwd(attachment.path, cwd), kind: 'file' }, false)
