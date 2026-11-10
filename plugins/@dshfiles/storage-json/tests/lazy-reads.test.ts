@@ -27,7 +27,10 @@ const descriptor = (overrides: Partial<KvUnitDescriptor> = {}): KvUnitDescriptor
 const openUnit = async (root: string, overrides: Partial<KvUnitDescriptor> = {}) => {
   const backend = new JsonStorageBackend(root)
   const unit = await backend.kv.open(descriptor(overrides))
-  return { backend, unit: unit as KvUnit & { listKeysSync(table: string): string[]; getRecordSync(table: string, key: string): unknown; getGlobalSync(): unknown } }
+  return {
+    backend,
+    unit: unit as KvUnit & { listKeysSync(table: string): string[]; getRecordSync(table: string, key: string): unknown; getGlobalSync(): unknown },
+  }
 }
 
 afterEach(async () => {

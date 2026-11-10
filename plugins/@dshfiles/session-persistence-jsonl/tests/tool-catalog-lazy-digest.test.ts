@@ -68,9 +68,10 @@ const writeLog = async (plugin: Plugin, id: string): Promise<Buffer> => {
         type: 'request/header',
         seq: SessionSeq(seq + 1),
         time: seq + 1,
-        data: turn === 1
-          ? { header: { config: { provider: 'fixture', model: 'fixture-model' }, tools }, reason: 'initial' }
-          : { header: { config: { provider: 'fixture', model: 'fixture-model' }, tools }, reason: 'series', startsSeries: true },
+        data:
+          turn === 1
+            ? { header: { config: { provider: 'fixture', model: 'fixture-model' }, tools }, reason: 'initial' }
+            : { header: { config: { provider: 'fixture', model: 'fixture-model' }, tools }, reason: 'series', startsSeries: true },
       },
       { type: 'turn/end', seq: SessionSeq(seq + 2), time: seq + 2, data: { turn, reason: { kind: 'completed' } } },
     ]
@@ -80,8 +81,7 @@ const writeLog = async (plugin: Plugin, id: string): Promise<Buffer> => {
   return readFile(logPath(root, cwd, SessionId(id), 'none'))
 }
 
-const headerTools = (events: readonly SessionEvent[]): unknown[] =>
-  events.flatMap(event => (event.type === 'request/header' ? [event.data.header.tools] : []))
+const headerTools = (events: readonly SessionEvent[]): unknown[] => events.flatMap(event => (event.type === 'request/header' ? [event.data.header.tools] : []))
 
 describe('tool catalog digests', () => {
   it('decodes full catalogs without hashing them when no row references one', async () => {

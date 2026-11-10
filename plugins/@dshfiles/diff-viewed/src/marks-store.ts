@@ -208,9 +208,9 @@ export class ViewedMarks extends Context.Service<
           if (input.viewed)
             // One durable write for the whole batch on a backend that publishes the unit as one document; a stock domain
             // (or a per-record layout) writes the same records one at a time.
-            yield* table.putMany(added.map(mark => [mark.key, mark] as const)).pipe(
-              Effect.mapError(cause => new ViewedMarksWriteFailed({ operation: 'mark', cause })),
-            )
+            yield* table
+              .putMany(added.map(mark => [mark.key, mark] as const))
+              .pipe(Effect.mapError(cause => new ViewedMarksWriteFailed({ operation: 'mark', cause })))
           else
             yield* Effect.forEach(keys, key => table.delete(key), { discard: true }).pipe(
               Effect.mapError(cause => new ViewedMarksWriteFailed({ operation: 'unmark', cause })),

@@ -8,12 +8,4 @@
 
 export { apply, Config, inject, name } from './native/index.ts'
 export { DomainError, DomainFacility, defineDomain, descriptorOf, domainTable } from './native/index.ts'
-export type {
-  DomainChanged,
-  DomainGlobalSpec,
-  DomainSpec,
-  DomainTableSpec,
-  GlobalValueOf,
-  TableKeyOf,
-  TableValueOf,
-} from './native/index.ts'
+export type { DomainChanged, DomainGlobalSpec, DomainSpec, DomainTableSpec, GlobalValueOf, TableKeyOf, TableValueOf } from './native/index.ts'

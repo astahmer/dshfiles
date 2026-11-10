@@ -352,9 +352,7 @@ export class ProcessStopper extends Context.Service<
       const stopOrphans = Effect.fn('worktree-memory stop orphans')(function* () {
         const { summary, rows } = yield* probe.scratchHosts
         const byPid = new Map(rows.map(row => [row.pid, row]))
-        const verdicts = summary.hosts
-          .filter(host => host.orphan)
-          .map(host => ({ host, verdict: guardStop({ target: host, rows, hostPid: process.pid }) }))
+        const verdicts = summary.hosts.filter(host => host.orphan).map(host => ({ host, verdict: guardStop({ target: host, rows, hostPid: process.pid }) }))
         const targets = verdicts.flatMap(({ host, verdict }): OrphanSignal[] => {
           if (verdict === 'signal-group') return [{ pid: host.pid, startedAt: host.startedAt, group: true }]
           if (verdict !== 'signal-tree') return []

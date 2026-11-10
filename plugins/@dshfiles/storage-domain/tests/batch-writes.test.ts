@@ -12,21 +12,23 @@ const itemSchema = z.object({ label: z.string(), count: z.number().int() })
 type Item = z.infer<typeof itemSchema>
 
 /** One eager table over a backend that publishes the unit as one document (the JSON `single` layout). */
-const singleSpec = (overrides: Partial<DomainSpec> = {}): DomainSpec => defineDomain({
-  name: 'demo',
-  version: 1,
-  ...overrides,
-  tables: { items: domainTable<string, Item>(itemSchema) },
-})
+const singleSpec = (overrides: Partial<DomainSpec> = {}): DomainSpec =>
+  defineDomain({
+    name: 'demo',
+    version: 1,
+    ...overrides,
+    tables: { items: domainTable<string, Item>(itemSchema) },
+  })
 
 /** A disposable per-record domain: lazy by default because its records are backed up and skipped. */
-const lazySpec = (): DomainSpec => defineDomain({
-  name: 'lazy',
-  version: 1,
-  layout: 'per-record',
-  invalidRecords: 'backup-and-skip',
-  tables: { items: domainTable<string, Item>(itemSchema) },
-})
+const lazySpec = (): DomainSpec =>
+  defineDomain({
+    name: 'lazy',
+    version: 1,
+    layout: 'per-record',
+    invalidRecords: 'backup-and-skip',
+    tables: { items: domainTable<string, Item>(itemSchema) },
+  })
 
 /** Boot a context with the storage hub, one counting backend, and a facility over it. */
 async function harness(options?: { pool?: CountingMediaPool }) {
@@ -37,7 +39,9 @@ async function harness(options?: { pool?: CountingMediaPool }) {
   const facility = new DomainFacility(ctx, { backend: 'memory', routes: {} })
   ctx.storage.mount('domain', facility)
   const changes: DomainChanged[] = []
-  ctx.on('domain/changed', (change) => { changes.push(change) })
+  ctx.on('domain/changed', change => {
+    changes.push(change)
+  })
   return { ctx, backend, facility, changes }
 }
 
@@ -57,7 +61,10 @@ describe('batch table writes', () => {
     const domain = await facility.open(singleSpec())
     const table = domain.table('items')
 
-    await table.putMany([['b', item('b', 2)], ['c', item('c', 3)]])
+    await table.putMany([
+      ['b', item('b', 2)],
+      ['c', item('c', 3)],
+    ])
 
     // Two records, one durable write: the backend published them together.
     expect(pool.counts.writes).toBe(1)
@@ -120,7 +127,12 @@ describe('batch table writes', () => {
     const table = domain.table('items')
 
     pool.failNextWrites = 1
-    const error: unknown = await table.putMany([['b', item('b', 2)], ['c', item('c', 3)]]).catch((cause: unknown) => cause)
+    const error: unknown = await table
+      .putMany([
+        ['b', item('b', 2)],
+        ['c', item('c', 3)],
+      ])
+      .catch((cause: unknown) => cause)
 
     expect(error).toBeInstanceOf(Error)
     // The batch capability propagates the backend failure unchanged: nothing of
@@ -148,7 +160,13 @@ describe('batch table writes', () => {
 
     // Fail the second record of the batch: the first one is already durable when it throws.
     pool.failWriteCall = 2
-    const error: unknown = await table.putMany([['b', item('b', 2)], ['c', item('c', 3)], ['d', item('d', 4)]]).catch((cause: unknown) => cause)
+    const error: unknown = await table
+      .putMany([
+        ['b', item('b', 2)],
+        ['c', item('c', 3)],
+        ['d', item('d', 4)],
+      ])
+      .catch((cause: unknown) => cause)
 
     // The failure is honest about durability: one record landed before it.
     expect(error).toMatchObject({ code: 'batch-partial', detail: { table: 'items', key: 'c' } })
@@ -174,7 +192,10 @@ describe('batch table writes', () => {
     const table = domain.table('items')
     const hydrations = pool.counts.getRecord
 
-    await table.putMany([['x', item('x', 1)], ['y', item('y', 2)]])
+    await table.putMany([
+      ['x', item('x', 1)],
+      ['y', item('y', 2)],
+    ])
 
     expect(pool.counts.writes).toBe(1)
     // Written values are served from the LRU: no hydrate reads the medium back.

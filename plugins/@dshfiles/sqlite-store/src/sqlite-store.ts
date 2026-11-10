@@ -205,8 +205,7 @@ const deferred = <Self, Shape extends object, E, R>(service: Context.Service<Sel
               // SAFETY: the proxy only forwards calls; a member that is not a function cannot start the build, so it
               // reports a named failure instead of resolving to a wrapper.
               const member = (instance as Record<PropertyKey, unknown>)[key]
-              if (typeof member !== 'function')
-                return Effect.die(new DeferredStoreMemberMissing({ service: service.key, member: String(key) }))
+              if (typeof member !== 'function') return Effect.die(new DeferredStoreMemberMissing({ service: service.key, member: String(key) }))
               // SAFETY: typeof proved the member is a callable method of this service.
               return (member as (...values: Array<unknown>) => Effect.Effect<unknown, E>).apply(instance, [...args])
             }),

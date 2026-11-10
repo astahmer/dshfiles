@@ -55,7 +55,12 @@ const storedEvent = (event: { readonly seq: number; readonly time: number; reado
 /** A cold Session whose projection checkpoint has no row at all, so its list metadata has to come from its stored log. */
 const recoveryFixture = async (
   readLog: () => Promise<readonly SessionEvent[]>,
-  { sizeBytes = 2_048, revision = 'r1', stored, rows = 1 }: {
+  {
+    sizeBytes = 2_048,
+    revision = 'r1',
+    stored,
+    rows = 1,
+  }: {
     readonly sizeBytes?: number
     readonly revision?: string
     readonly stored?: Map<string, unknown>
@@ -68,10 +73,11 @@ const recoveryFixture = async (
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
   const list = new ApiSessionList(ctx, 8)
-  const sessions = Array.from({ length: rows }, (_, index) => ctx.sessions.prepare(
-    SessionId(index === 0 ? 'cold-recover' : `cold-recover-${index}`),
-    { meta: { createdAt: 100 - index, cwd: resolve('cold-list-recover-fixture') } },
-  ))
+  const sessions = Array.from({ length: rows }, (_, index) =>
+    ctx.sessions.prepare(SessionId(index === 0 ? 'cold-recover' : `cold-recover-${index}`), {
+      meta: { createdAt: 100 - index, cwd: resolve('cold-list-recover-fixture') },
+    }),
+  )
   const session = sessions[0]
   if (session === undefined) throw new Error('the fixture prepares at least one Session')
   const records: SessionRecord[] = sessions.map(prepared => ({ header: prepared.header, live: false, persisted: true }))
@@ -120,7 +126,9 @@ const recoveryFixture = async (
       open: async () => ({
         table: () => ({
           get: (key: string) => stored.get(key),
-          put: async (key: string, value: Readonly<Record<string, RecoveredListMetadata>>) => { stored.set(key, structuredClone(value)) },
+          put: async (key: string, value: Readonly<Record<string, RecoveredListMetadata>>) => {
+            stored.set(key, structuredClone(value))
+          },
         }),
         close: async () => undefined,
       }),
@@ -211,10 +219,13 @@ it('folds the log again when its persistence revision moved', async () => {
   await first.list.list()
   await expect.poll(() => stored.size).toBe(1)
 
-  const next = await recoveryFixture(async () => [
-    storedEvent({ seq: 0, time: 200, type: 'user/message', data: { source: { kind: 'user' } } }),
-    storedEvent({ seq: 1, time: 210, type: 'turn/start' }),
-  ], { stored, revision: 'r2' })
+  const next = await recoveryFixture(
+    async () => [
+      storedEvent({ seq: 0, time: 200, type: 'user/message', data: { source: { kind: 'user' } } }),
+      storedEvent({ seq: 1, time: 210, type: 'turn/start' }),
+    ],
+    { stored, revision: 'r2' },
+  )
   expect((await next.list.list())[0]?.blank).toBe(true)
   await expect.poll(() => next.pushed).toMatchObject([{ blank: false, updatedAt: 200 }])
   expect(next.logReads).toEqual(['cold-recover'])

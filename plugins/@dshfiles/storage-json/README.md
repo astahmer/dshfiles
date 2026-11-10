@@ -14,10 +14,10 @@ needs: synchronous per-record reads, and one-publish batch writes on the single-
 
 ## Local delta
 
-| File | Change |
-| --- | --- |
+| File                            | Change                                                                                                                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/native/per-record-unit.ts` | synchronous per-record reads (`listKeysSync`, `getRecordSync`, `getGlobalSync`) so the domain fork can hydrate one record on first read instead of materializing the whole unit at open |
-| `src/native/single-unit.ts` | `putRecords(table, entries)`: several records in ONE document publish |
+| `src/native/single-unit.ts`     | `putRecords(table, entries)`: several records in ONE document publish                                                                                                                   |
 
 ### Batch writes (`putRecords`)
 

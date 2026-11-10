@@ -329,7 +329,10 @@ describe('request-header tool catalog dedupe', () => {
     // A crash mid-append leaves a final frame whose complete records hold a new catalog: the write path
     // truncates that frame and rewrites the records, so the rewrite must carry the catalog in full.
     const path = artifactPath(root, id, 'zstd')
-    const recovered = seriesBatch(tools, 2, 3).map(event => JSON.stringify(event)).join('\n') + '\n'
+    const recovered =
+      seriesBatch(tools, 2, 3)
+        .map(event => JSON.stringify(event))
+        .join('\n') + '\n'
     const frame = await compressZstdFrame(recovered + randomBytes(262_144).toString('base64'))
     await appendFile(path, frame.subarray(0, frame.length - 8))
 

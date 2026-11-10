@@ -8,7 +8,7 @@ import { JsonStorageBackend } from '../src/native/index.ts'
 /** Durable publishes, counted at the rename every `writeAtomic` ends with. */
 const fs = vi.hoisted(() => ({ renames: 0, failNextRename: false }))
 
-vi.mock('node:fs/promises', async (importOriginal) => {
+vi.mock('node:fs/promises', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
@@ -68,7 +68,11 @@ describe('single-layout batch writes', () => {
     // One single-record put is one document rewrite.
     expect(fs.renames).toBe(1)
 
-    await unit.putRecords('items', [['a', { label: 'a' }], ['b', { label: 'b' }], ['c', { label: 'c' }]])
+    await unit.putRecords('items', [
+      ['a', { label: 'a' }],
+      ['b', { label: 'b' }],
+      ['c', { label: 'c' }],
+    ])
     // Three records, still one rewrite.
     expect(fs.renames).toBe(2)
     expect(await storedTables(root)).toEqual({
@@ -104,7 +108,11 @@ describe('single-layout batch writes', () => {
     const root = await makeRoot()
     const { backend, unit } = await openUnit(root)
 
-    await unit.putRecords('items', [['a', { value: 1 }], ['b', { value: 2 }], ['a', { value: 3 }]])
+    await unit.putRecords('items', [
+      ['a', { value: 1 }],
+      ['b', { value: 2 }],
+      ['a', { value: 3 }],
+    ])
     expect(fs.renames).toBe(1)
     // First appearance keeps the key's position; the last entry owns its value.
     expect(await storedTables(root)).toEqual({ items: { a: { value: 3 }, b: { value: 2 } } })
@@ -118,7 +126,12 @@ describe('single-layout batch writes', () => {
     fs.renames = 0
 
     fs.failNextRename = true
-    await expect(unit.putRecords('items', [['a', { value: 2 }], ['b', { value: 3 }]])).rejects.toThrow(/injected rename failure/)
+    await expect(
+      unit.putRecords('items', [
+        ['a', { value: 2 }],
+        ['b', { value: 3 }],
+      ]),
+    ).rejects.toThrow(/injected rename failure/)
 
     expect(fs.renames).toBe(0)
     // The file still holds the pre-batch document...
@@ -136,14 +149,22 @@ describe('single-layout batch writes', () => {
   it('shows a restart every record of a committed batch and none of a rejected one', async () => {
     const root = await makeRoot()
     const first = await openUnit(root)
-    await first.unit.putRecords('items', [['a', { value: 1 }], ['b', { value: 2 }]])
+    await first.unit.putRecords('items', [
+      ['a', { value: 1 }],
+      ['b', { value: 2 }],
+    ])
     await first.backend.close()
 
     const second = await openUnit(root)
     expect((await second.unit.loadAll()).tables.items).toEqual({ a: { value: 1 }, b: { value: 2 } })
 
     fs.failNextRename = true
-    await expect(second.unit.putRecords('items', [['c', { value: 3 }], ['d', { value: 4 }]])).rejects.toThrow(/injected rename failure/)
+    await expect(
+      second.unit.putRecords('items', [
+        ['c', { value: 3 }],
+        ['d', { value: 4 }],
+      ]),
+    ).rejects.toThrow(/injected rename failure/)
     await second.backend.close()
 
     const third = await openUnit(root)

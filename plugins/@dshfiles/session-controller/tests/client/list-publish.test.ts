@@ -61,7 +61,11 @@ describe('session list publication', () => {
     const child = SessionId('session-child')
     sessions.handleSessionAdded({ sessionId: parent, agentAvailable: true, updatedAt: 1, running: true, blank: false })
     sessions.handleControlFrame({
-      type: 'projection', sessionId: parent, key: 'subagentCatalog', value: [{ id: child, createdAt: 1, mode: 'one-shot', label: 'Child' }], seq: 1,
+      type: 'projection',
+      sessionId: parent,
+      key: 'subagentCatalog',
+      value: [{ id: child, createdAt: 1, mode: 'one-shot', label: 'Child' }],
+      seq: 1,
     })
     await tick()
     const row = sessions.list.getSnapshot().byId[child]

@@ -111,7 +111,9 @@ export class StartRecovery extends Context.Service<StartRecovery, { readonly swe
           Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.logWarning('backlog: the thread start recovery loop failed', cause),
         ),
       )
-      const untilLogged = intents.untilLogged.pipe(Effect.catch(error => Effect.logWarning('backlog: the thread start recovery log could not be checked', error)))
+      const untilLogged = intents.untilLogged.pipe(
+        Effect.catch(error => Effect.logWarning('backlog: the thread start recovery log could not be checked', error)),
+      )
       const pass = tick.pipe(Effect.andThen(untilLogged), Effect.andThen(Effect.sleep(SWEEP_INTERVAL)))
       yield* DshxPlugin.worker(Effect.sleep(FIRST_SWEEP).pipe(Effect.andThen(Effect.forever(pass))))
     }),

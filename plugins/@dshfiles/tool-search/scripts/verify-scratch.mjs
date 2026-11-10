@@ -113,10 +113,14 @@ try {
   await startHost()
   process.stdout.write('PASS: Tool Search activated in an isolated scratch DSH Host.\n')
 
-  const integration = spawnSync('pnpm', ['--dir', pluginRoot, 'exec', 'vitest', 'run', 'src/agent-loop.integration.test.ts', 'src/cache-safe.integration.test.ts'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  })
+  const integration = spawnSync(
+    'pnpm',
+    ['--dir', pluginRoot, 'exec', 'vitest', 'run', 'src/agent-loop.integration.test.ts', 'src/cache-safe.integration.test.ts'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    },
+  )
   const integrationOutput = redactHostOutput(`${integration.stdout}\n${integration.stderr}`)
   assert.equal(integration.status, 0, `The AgentLoop acceptance journey failed.\n${integrationOutput}`)
   process.stdout.write('PASS: progressive tool discovery passed the real AgentLoop acceptance journey.\n')

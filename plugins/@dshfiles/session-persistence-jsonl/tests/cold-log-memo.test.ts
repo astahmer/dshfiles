@@ -38,11 +38,13 @@ const backend = async (root: string): Promise<SessionPersistence> => {
   return ctx.sessionPersistence
 }
 
-const storedSession = async (payload: string): Promise<{ root: string, path: string, id: SessionId }> => {
+const storedSession = async (payload: string): Promise<{ root: string; path: string; id: SessionId }> => {
   const root = await mkdtemp(join(tmpdir(), 'dshfiles-jsonl-memo-'))
   roots.push(root)
   const id = SessionId('session-memo')
-  const handle = await (await backend(root)).create({
+  const handle = await (
+    await backend(root)
+  ).create({
     version: SESSION_FORMAT_VERSION,
     id,
     createdAt: 1_760_000_000_000,
@@ -71,11 +73,7 @@ const storedSession = async (payload: string): Promise<{ root: string, path: str
 
 const largePayload = (): string => randomBytes(11 * 1024 * 1024).toString('base64')
 
-const observeThenResume = async (
-  persistence: SessionPersistence,
-  id: SessionId,
-  between: () => Promise<void> = async () => {},
-): Promise<void> => {
+const observeThenResume = async (persistence: SessionPersistence, id: SessionId, between: () => Promise<void> = async () => {}): Promise<void> => {
   const observer = await persistence.open(id, 'read')
   await observer.close()
   await between()

@@ -81,13 +81,14 @@ const fixture = async () => {
   agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Hello?' }], source: { kind: 'user' } }))
   await agent.whenIdle()
   const disposedWhileEvicting: boolean[] = []
-  ctx.on('session/disposed', (session) => {
+  ctx.on('session/disposed', session => {
     disposedWhileEvicting.push(owner.isEvicting(session.id))
   })
-  const sweep = (afterMs = IDLE_PAST_THRESHOLD_MS) => owner.evictIdleAgents({
-    isFollowed: sessionId => history.isFollowed(sessionId),
-    now: Date.now() + afterMs,
-  })
+  const sweep = (afterMs = IDLE_PAST_THRESHOLD_MS) =>
+    owner.evictIdleAgents({
+      isFollowed: sessionId => history.isFollowed(sessionId),
+      now: Date.now() + afterMs,
+    })
   return { ctx, model, owner, history, list, agent, sweep, disposedWhileEvicting }
 }
 

@@ -14,12 +14,12 @@ multi-record `putMany` that is one durable publish on a backend that stores the 
 
 ## Local delta
 
-| File | Change |
-| --- | --- |
-| `src/native/spec.ts` | optional `hydration: 'lazy' \| 'all'` field |
-| `src/native/index.ts` | seeds a qualifying per-record domain from document keys, with the legacy-bootstrap fallback |
-| `src/native/domain.ts` | lazy table (64-row LRU, one record hydrated per miss) and `KvTable.putMany` |
-| `src/native/error.ts` | `batch-partial` error code |
+| File                   | Change                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| `src/native/spec.ts`   | optional `hydration: 'lazy' \| 'all'` field                                                 |
+| `src/native/index.ts`  | seeds a qualifying per-record domain from document keys, with the legacy-bootstrap fallback |
+| `src/native/domain.ts` | lazy table (64-row LRU, one record hydrated per miss) and `KvTable.putMany`                 |
+| `src/native/error.ts`  | `batch-partial` error code                                                                  |
 
 ### Batch writes (`KvTable.putMany`)
 

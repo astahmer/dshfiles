@@ -50,7 +50,9 @@ interface BoundedReadInput {
  * whole log can serve the read exactly. A conversation's last messages and its last request envelope both sit near the
  * end of the log, so the window that holds its newest events holds both.
  */
-const readBoundedThread = async (input: BoundedReadInput): Promise<{ readonly cwd: string | undefined; readonly route: ThreadSnapshot['route']; readonly messages: readonly ThreadMessage[] } | undefined> => {
+const readBoundedThread = async (
+  input: BoundedReadInput,
+): Promise<{ readonly cwd: string | undefined; readonly route: ThreadSnapshot['route']; readonly messages: readonly ThreadMessage[] } | undefined> => {
   for (let keep = MAX_MESSAGES * 2; ; keep *= 2) {
     const recent = await recentLogEvents({ ctx: input.ctx, sessionId: input.sessionId, signal: input.signal, matches: isThreadEvent, keep })
     if (recent === undefined) return undefined

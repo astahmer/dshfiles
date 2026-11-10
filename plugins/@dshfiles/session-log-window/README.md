@@ -6,11 +6,11 @@ event list.
 The JSONL backend writes a header frame and then one independently decodable Zstandard frame per durable append, so a
 reader can decode a byte window of the log:
 
-| Read | Window | Used by |
-| --- | --- | --- |
-| `TailLog.open` | newest `TAIL_WINDOW_BYTES` (4 MB) | the Session Controller's cold transcript and follow pages |
-| `openLogHead` | first `HEAD_WINDOW_BYTES` (256 KB) | a title's provenance event, which the Session writes at the start |
-| `recentLogEvents` | the newest frames, extended back until enough matches | hook events, a pull-request thread's last messages |
+| Read              | Window                                                | Used by                                                           |
+| ----------------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
+| `TailLog.open`    | newest `TAIL_WINDOW_BYTES` (4 MB)                     | the Session Controller's cold transcript and follow pages         |
+| `openLogHead`     | first `HEAD_WINDOW_BYTES` (256 KB)                    | a title's provenance event, which the Session writes at the start |
+| `recentLogEvents` | the newest frames, extended back until enough matches | hook events, a pull-request thread's last messages                |
 
 Each returns `undefined` when the window cannot serve the read exactly — another backend, a non-current format, a
 migration, a torn frame, fewer matches than the caller needs and no reach back to the log's first event. Every caller

@@ -12,14 +12,15 @@ const itemSchema = z.object({ label: z.string(), count: z.number().int() })
 type Item = z.infer<typeof itemSchema>
 
 /** A disposable per-record domain: lazy by default because its records are backed up and skipped. */
-const disposableSpec = (overrides: Partial<DomainSpec> = {}): DomainSpec => defineDomain({
-  name: 'demo',
-  version: 1,
-  layout: 'per-record',
-  invalidRecords: 'backup-and-skip',
-  ...overrides,
-  tables: { items: domainTable<string, Item>(itemSchema) },
-})
+const disposableSpec = (overrides: Partial<DomainSpec> = {}): DomainSpec =>
+  defineDomain({
+    name: 'demo',
+    version: 1,
+    layout: 'per-record',
+    invalidRecords: 'backup-and-skip',
+    ...overrides,
+    tables: { items: domainTable<string, Item>(itemSchema) },
+  })
 
 const rows = (entries: ReadonlyArray<readonly [string, Item]>): Map<string, unknown> => new Map(entries)
 
@@ -32,7 +33,9 @@ async function harness(options?: { pool?: CountingMediaPool }) {
   const facility = new DomainFacility(ctx, { backend: 'memory', routes: {} })
   ctx.storage.mount('domain', facility)
   const changes: DomainChanged[] = []
-  ctx.on('domain/changed', (change) => { changes.push(change) })
+  ctx.on('domain/changed', change => {
+    changes.push(change)
+  })
   return { ctx, backend, facility, changes }
 }
 
@@ -46,7 +49,10 @@ function seed(pool: CountingMediaPool, records: ReadonlyArray<readonly [string, 
 
 describe('lazy hydration', () => {
   it('opens from document keys and reads no record', async () => {
-    const pool = seed(new CountingMediaPool(), [['a', { label: 'a', count: 1 }], ['b', { label: 'b', count: 2 }]])
+    const pool = seed(new CountingMediaPool(), [
+      ['a', { label: 'a', count: 1 }],
+      ['b', { label: 'b', count: 2 }],
+    ])
     const { facility } = await harness({ pool })
 
     const domain = await facility.open(disposableSpec())
@@ -91,7 +97,11 @@ describe('lazy hydration', () => {
   })
 
   it('serves keys, entries, and size exactly as the eager path does', async () => {
-    const entries = [['a', { label: 'a', count: 1 }], ['b', { label: 'b', count: 2 }], ['c', { label: 'c', count: 3 }]] as const
+    const entries = [
+      ['a', { label: 'a', count: 1 }],
+      ['b', { label: 'b', count: 2 }],
+      ['c', { label: 'c', count: 3 }],
+    ] as const
     const lazyPool = seed(new CountingMediaPool(), entries, { name: 'lazy' })
     const eagerPool = seed(new CountingMediaPool(), entries, { name: 'eager' })
     const lazyHarness = await harness({ pool: lazyPool })
@@ -121,10 +131,12 @@ describe('lazy hydration', () => {
     expect(pool.counts.getRecord).toBe(0)
     expect(changes.at(-1)).toMatchObject({ table: 'items', key: 'b', operation: 'put' })
 
-    await expect(table.update('b', (current) => {
-      expect(current).toEqual({ label: 'b', count: 2 })
-      return { label: 'b', count: 3 }
-    })).resolves.toEqual({ label: 'b', count: 3 })
+    await expect(
+      table.update('b', current => {
+        expect(current).toEqual({ label: 'b', count: 2 })
+        return { label: 'b', count: 3 }
+      }),
+    ).resolves.toEqual({ label: 'b', count: 3 })
     expect(table.get('b')).toEqual({ label: 'b', count: 3 })
 
     expect(await table.delete('b')).toBe(true)
@@ -161,7 +173,10 @@ describe('lazy hydration', () => {
   })
 
   it('backs up and skips a record whose document fails its schema, on first read', async () => {
-    const pool = seed(new CountingMediaPool(), [['good', { label: 'g', count: 1 }], ['bad', { label: 'missing count' }]])
+    const pool = seed(new CountingMediaPool(), [
+      ['good', { label: 'g', count: 1 }],
+      ['bad', { label: 'missing count' }],
+    ])
     const { facility, ctx } = await harness({ pool })
     const log = vi.spyOn(ctx.logger, 'error').mockImplementation(() => {})
     const domain = await facility.open(disposableSpec())
@@ -170,7 +185,9 @@ describe('lazy hydration', () => {
     expect(table.get('bad')).toBeUndefined()
     // The backup runs on the write chain, so the log and the moved document
     // land after the read that discovered the failure.
-    await vi.waitFor(() => { expect(pool.counts.backup).toBe(1) })
+    await vi.waitFor(() => {
+      expect(pool.counts.backup).toBe(1)
+    })
     expect(pool.backedUp).toEqual(['items/bad'])
     expect(log).toHaveBeenCalledWith(expect.stringContaining("moved to 'bad.json.bak.test'"))
     expect(table.size).toBe(1)
@@ -179,7 +196,10 @@ describe('lazy hydration', () => {
   })
 
   it('treats a foreign document as absent and drops it from the index', async () => {
-    const pool = seed(new CountingMediaPool(), [['a', { label: 'a', count: 1 }], ['stale', { label: 's', count: 9 }]])
+    const pool = seed(new CountingMediaPool(), [
+      ['a', { label: 'a', count: 1 }],
+      ['stale', { label: 's', count: 9 }],
+    ])
     pool.media.get('demo')?.foreign.add('items\u0000stale')
     const { facility } = await harness({ pool })
     const domain = await facility.open(disposableSpec())
@@ -207,8 +227,7 @@ describe('lazy hydration', () => {
     const pool = seed(new CountingMediaPool(), [['bad', { label: 'missing count' }]], { name: 'strict' })
     const { facility } = await harness({ pool })
 
-    await expect(facility.open(disposableSpec({ name: 'strict', invalidRecords: undefined })))
-      .rejects.toMatchObject({ code: 'invalid-record' })
+    await expect(facility.open(disposableSpec({ name: 'strict', invalidRecords: undefined }))).rejects.toMatchObject({ code: 'invalid-record' })
     expect(pool.counts.loadAll).toBe(1)
     expect(pool.counts.getRecord).toBe(0)
   })
@@ -250,21 +269,25 @@ describe('lazy hydration', () => {
   })
 
   it('rejects hydration: lazy on a single-layout domain at declaration time', () => {
-    expect(() => defineDomain({
-      name: 'single',
-      version: 1,
-      hydration: 'lazy',
-      tables: { items: domainTable<string, Item>(itemSchema) },
-    })).toThrow(/needs layout 'per-record'/)
+    expect(() =>
+      defineDomain({
+        name: 'single',
+        version: 1,
+        hydration: 'lazy',
+        tables: { items: domainTable<string, Item>(itemSchema) },
+      }),
+    ).toThrow(/needs layout 'per-record'/)
   })
 
   it('rejects an unknown hydration policy at declaration time', () => {
-    expect(() => defineDomain({
-      name: 'demo',
-      version: 1,
-      layout: 'per-record',
-      hydration: 'eventually' as 'lazy',
-      tables: { items: domainTable<string, Item>(itemSchema) },
-    })).toThrow(/hydration must be 'lazy' or 'all'/)
+    expect(() =>
+      defineDomain({
+        name: 'demo',
+        version: 1,
+        layout: 'per-record',
+        hydration: 'eventually' as 'lazy',
+        tables: { items: domainTable<string, Item>(itemSchema) },
+      }),
+    ).toThrow(/hydration must be 'lazy' or 'all'/)
   })
 })

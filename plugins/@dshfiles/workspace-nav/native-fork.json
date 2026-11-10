@@ -34,8 +34,5 @@
     "src/native/stores.ts",
     "src/native/tree.ts"
   ],
-  "added": [
-    "src/native/rows/workspace-dialogs.ts",
-    "src/native/workspace-pick-flow.ts"
-  ]
+  "added": ["src/native/rows/workspace-dialogs.ts", "src/native/workspace-pick-flow.ts"]
 }

@@ -784,10 +784,7 @@ export const BacklogPanel = (props: {
                       <Icon aria-hidden className="dshx:size-3.5" />
                       <span className="dshx:@max-pane-compact:sr-only">{viewLabels[entry]}</span>
                       {modifierHeld && (
-                        <kbd
-                          aria-hidden
-                          className="dshx:font-mono dshx:text-[10px] dshx:text-muted-foreground dshx:tabular-nums dshx:-ml-0.5"
-                        >
+                        <kbd aria-hidden className="dshx:font-mono dshx:text-[10px] dshx:text-muted-foreground dshx:tabular-nums dshx:-ml-0.5">
                           {index + 1}
                         </kbd>
                       )}

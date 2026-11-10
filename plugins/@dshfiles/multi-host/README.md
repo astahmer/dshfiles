@@ -53,7 +53,7 @@ The New thread bar (rendered by `@dshfiles/jj-integration`) starts with the
   Opening the menu pings every host once. When an SSH host's ping fails, the
   menu runs the same stepwise test as **Diagnose** and names the hop that
   broke (`SSH login failed · …`, `DSH runtime failed · …`, `multi-host
-  identity failed · …`) instead of the runtime's last error. Below the list,
+identity failed · …`) instead of the runtime's last error. Below the list,
   each failing host shows that hop's recovery and a **Diagnose** button that
   tests again; the chip's tooltip repeats the selected host's recovery.
 - On the Hosts page, **Diagnose** appears on SSH rows with a runtime error. It

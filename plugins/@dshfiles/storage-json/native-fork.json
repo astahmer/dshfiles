@@ -17,9 +17,5 @@
       "local": "locale"
     }
   ],
-  "delta": [
-    "src/native/atomic.ts",
-    "src/native/per-record-unit.ts",
-    "src/native/single-unit.ts"
-  ]
+  "delta": ["src/native/atomic.ts", "src/native/per-record-unit.ts", "src/native/single-unit.ts"]
 }

@@ -98,10 +98,7 @@ const withLock =
     Effect.flatMap(HeldWriteLocks, held => (held.has(lock) ? effect : lock.withPermit(Effect.provideService(effect, HeldWriteLocks, new Set([...held, lock])))))
 
 /** Write a batch one record at a time, for a domain that has no one-publish batch write. */
-const putEach = async <Key extends string, Value>(
-  native: KvTable<Key, Value>,
-  entries: ReadonlyArray<readonly [Key, Value]>,
-): Promise<void> => {
+const putEach = async <Key extends string, Value>(native: KvTable<Key, Value>, entries: ReadonlyArray<readonly [Key, Value]>): Promise<void> => {
   for (const [key, value] of entries) await native.put(key, value)
 }
 

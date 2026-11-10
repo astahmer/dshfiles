@@ -288,9 +288,9 @@ export const threadActionsApi = defineApi({
     status: method({
       input: Schema.Struct({ sessionIds: Schema.Array(sessionIdSchema).check(Schema.isMinLength(1)).check(Schema.isMaxLength(100)) }),
       output: Schema.Struct({
-        threads: Schema.Array(
-          Schema.Struct({ sessionId: Schema.String, exists: Schema.Boolean, archived: Schema.Boolean, settled: Schema.Boolean }),
-        ).check(Schema.isMaxLength(100)),
+        threads: Schema.Array(Schema.Struct({ sessionId: Schema.String, exists: Schema.Boolean, archived: Schema.Boolean, settled: Schema.Boolean })).check(
+          Schema.isMaxLength(100),
+        ),
       }),
       description:
         'Point lookup of named threads (DSH Sessions): whether each is still stored, archived or settled, without listing or reading any log. Read-only.',

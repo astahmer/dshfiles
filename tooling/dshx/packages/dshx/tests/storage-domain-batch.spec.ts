@@ -7,11 +7,12 @@ import { z } from 'zod'
 import { HostContext } from '../src/effect/host-context.js'
 import { StorageDomain, type StorageTable, StorageDomainWriteFailed } from '../src/effect/storage-domain.js'
 
-const specOf = (name: string) => defineDomain({
-  name,
-  version: 1,
-  tables: { items: domainTable<string, number>(z.number()) },
-})
+const specOf = (name: string) =>
+  defineDomain({
+    name,
+    version: 1,
+    tables: { items: domainTable<string, number>(z.number()) },
+  })
 
 /** Calls a test asserts against: one `putMany` batch, or one `put` per record on the fallback path. */
 interface TableCalls {
@@ -35,12 +36,16 @@ const fakeTable = (calls: TableCalls, options: { readonly batch: boolean }): Fak
     entries: () => noPairs()[Symbol.iterator](),
     keys: () => [][Symbol.iterator](),
     size: 0,
-    put: async (key) => { calls.puts.push(key) },
+    put: async key => {
+      calls.puts.push(key)
+    },
     delete: async () => true,
     update: async (_key, f) => f(0),
   }
   if (options.batch) {
-    table.putMany = async (entries) => { calls.batches.push(entries) }
+    table.putMany = async entries => {
+      calls.batches.push(entries)
+    }
   }
   return table
 }
@@ -78,9 +83,17 @@ describe('StorageDomain table batch writes', () => {
       table: fakeTable(calls, { batch: true }),
       use: items =>
         Effect.gen(function* () {
-          yield* items.putMany([['a', 1], ['b', 2]])
+          yield* items.putMany([
+            ['a', 1],
+            ['b', 2],
+          ])
           // One call for the whole batch, and no per-record write behind it.
-          expect(calls.batches).toEqual([[['a', 1], ['b', 2]]])
+          expect(calls.batches).toEqual([
+            [
+              ['a', 1],
+              ['b', 2],
+            ],
+          ])
           expect(calls.puts).toEqual([])
         }),
     })
@@ -93,7 +106,10 @@ describe('StorageDomain table batch writes', () => {
       table: fakeTable(calls, { batch: false }),
       use: items =>
         Effect.gen(function* () {
-          yield* items.putMany([['a', 1], ['b', 2]])
+          yield* items.putMany([
+            ['a', 1],
+            ['b', 2],
+          ])
           yield* items.putMany([])
           expect(calls.batches).toEqual([])
           // The batch is written in order, one record at a time; an empty batch writes nothing.
@@ -105,7 +121,9 @@ describe('StorageDomain table batch writes', () => {
   it.effect('reports the batch operation and the batch-partial code of a failed batch', () => {
     const calls: TableCalls = { puts: [], batches: [] }
     const table = fakeTable(calls, { batch: true })
-    table.putMany = async () => { throw Object.assign(new Error('two of four landed'), { code: 'batch-partial' }) }
+    table.putMany = async () => {
+      throw Object.assign(new Error('two of four landed'), { code: 'batch-partial' })
+    }
     return withTable({
       name: 'batch_partial',
       table,

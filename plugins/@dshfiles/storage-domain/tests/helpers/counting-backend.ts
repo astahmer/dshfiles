@@ -195,10 +195,7 @@ export class CountingStorageBackend implements StorageBackend {
         if (stamped === undefined) {
           this.pool.versions.set(descriptor.name, descriptor.version)
         } else if (stamped !== descriptor.version) {
-          throw new StorageError(
-            'version-mismatch',
-            `memory unit '${descriptor.name}' is stamped v${stamped}, descriptor wants v${descriptor.version}`,
-          )
+          throw new StorageError('version-mismatch', `memory unit '${descriptor.name}' is stamped v${stamped}, descriptor wants v${descriptor.version}`)
         }
         let medium = this.pool.media.get(descriptor.name)
         if (medium === undefined) {
