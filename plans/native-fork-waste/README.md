@@ -1,51 +1,51 @@
-# Native-waste fixes
+# Native-fork waste: what is left
 
-Resume here: P1 (store the tool catalog once per Session) is the only item with a measured multi-megabyte target. The
-former P0 (a 2.82 GB live heap) and P2 (an 8.7 s Session list) are closed: on 2026-11-10 the live Host held 409–579 MB
-RSS and `session list read` spans ran p50 47 ms / p95 320 ms; what fixed them is in
-[RAM usage](../../docs/ram-usage.md#the-live-host-now-2026-11-10). The browser-tab bound (former P3) is tracked in
-[ultra-fast](../ultra-fast/README.md). Fork procedure and manifest rules: [native plugin overrides](../../docs/native-plugin-overrides.md)
-and [native forks](../../docs/native-forks.md).
+The finished parts are documented where they live: the per-Session tool-catalog dedupe and its reopen seed in the
+[session-persistence-jsonl README](../../plugins/@dshfiles/session-persistence-jsonl/README.md) and
+[performance.md](../../docs/performance.md#session-log-tool-catalog-bytes-2026-11-10); the storage `listAll` and
+`putMany` wins (former P4 and P6) in
+[performance.md](../../docs/performance.md#plugin-storage-list-and-review-mark-batches-landed-2026-11-09); the Host heap
+and Session list (former P0, P2) in [RAM usage](../../docs/ram-usage.md). Fork rules:
+[native plugin overrides](../../docs/native-plugin-overrides.md), [native forks](../../docs/native-forks.md).
 
-| Item                   | State | Owner                                 | Cost                                                                     | Next step                                                                                                              |
-| ---------------------- | ----- | ------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| P1 request headers     | Open  | `agent-loop` fork writes, persistence | 8.87 MB in one Session (34 events × ~260 KB, 455-tool catalog each time) | Storage dedupe in a persistence-jsonl fork (option 1 below)                                                            |
-| P4 storage list paging | Open  | `dshx` `plugin-storage.list`          | 20 ms / 7 500 keys, 15 pages per read                                    | Index or point read, only if a real caller needs it                                                                    |
-| P5 Effect duplication  | Open  | `dshx` client build                   | +166 KB gzip for the tested supplier + 2 consumers                       | Full-profile counterfactual first; `shared-runtime` now supplies `effect` to every client, so re-measure before acting |
-| P6 mark batches        | Open  | `diff-viewed` + storage               | one file toggle ~16 ms at 7 k marks                                      | Only with a real batch workload; the confirmed-prefix failure is b:2ksz                                                |
+| Item                          | State                         | Owner                       | Measured cost                                                  |
+| ----------------------------- | ----------------------------- | --------------------------- | -------------------------------------------------------------- |
+| A. Catalog shared by Sessions | Proposed, not started         | `session-persistence-jsonl` | 22 % of decompressed log bytes, 16.6 % of on-disk bytes        |
+| B. One Effect copy in clients | Blocked on namespace identity | `dshx` client build         | 69 web-profile clients 35.1 → 28.9 MB raw, 9.95 → 8.06 MB gzip |
 
-## P1 — store the tool catalog once per Session
+## A. One tool catalog shared across Sessions
 
-Measured on the decompressed log of `session-6b9ec57a` (19.39 MB, zstd 5.43 MB): **34 `request/header` events = 9.30 MB
-= 48 % of the log**; reasons `initial` 1, `resume` 1, `change` 1, **`series` 31**; the `tools` JSON is 9.29 MB of those
-bytes; every one of the 34 catalogs is **byte-identical** (455 tools). About 8.5 MB is pure repetition.
+Every Session artifact still holds its first catalog in full. On the 75 live logs of 2026-11-10 that copy is 16.8 MB of
+75.7 MB decompressed (22 %) and about 65 KB zstd per log, 3.9 MB of 23.6 MB on disk (16.6 %). It dominates short
+subagent logs: 0.28 MB of a ~1.3 MB log. Most of those Sessions carry the same 468-tool catalog.
 
-Writer: `buildRequest` in the vendored [`agent.ts`](../../plugins/@dshfiles/agent-loop/src/native/agent.ts). It emits
-`initial`/`resume` once, `change` only when `headerEquals` fails, and `series` on every request-series start **with the
-unchanged full header** (still the case on 2026-11-10: `this.session.append('request/header', { header, reason: 'series' })`).
+Design: a content-addressed store beside the Session root (`<root>/.tool-catalogs/<sha256>.json.zstd`), written with
+temp file, fsync and directory fsync **before** the first row that names it. That row writes a distinct reference
+(`{"$dshfilesSharedToolCatalog": "<sha256>"}`) so the reader knows to look outside the artifact; the in-artifact
+reference and the reopen seed stay as they are. The read path keeps a small LRU of decoded catalogs. Readers above the
+persistence seam see no change.
 
-No reader wants a per-group catalog: `dsh-session` keeps tools per header seq for `headerSeq` lookups and resets on
-`series`; `tool-history` feeds `requestHeader()` and `dsh-llm`'s tool-update projection; the timed ask-user question and
-token-meter recompute from the latest tools. The browser receives the **full** copy (our
-[`browser-event.ts`](../../plugins/@dshfiles/session-controller/src/browser-event.ts) strips only assistant replay),
-where conversation and trajectory diff it with `JSON.stringify` and chat reads only `reason`/`startsSeries`.
+Risks to settle before building it:
 
-Ranked options:
+1. **Copies of a raw log lose the catalog.** Anything that copies `session.v4.jsonl.zstd` without the store (the
+   `.dshthread` export if it copies raw bytes, `session-repair-backups`, multi-host moves, a user's manual backup) yields
+   an unreadable artifact. The log export reads through the seam and is safe; each raw copier needs checking.
+2. **Garbage collection.** Deleting a catalog needs a mark-and-sweep over every artifact (or refcounts kept with the
+   same durability as the logs). Without it the store only grows, by one file per distinct catalog.
+3. **Raw readers.** `scripts/tool-schema-cost.ts` reads the last full catalog in the file; a log with only shared
+   references has none. Session search and usage read `config` only.
+4. **Older harnesses.** The header marker already makes a pre-fork harness refuse the artifact; keep it that way.
 
-1. **Storage dedupe, no reader change.** The `@dshfiles/session-persistence-jsonl` fork exists now: write the catalog
-   once per Session plus a per-event reference, rehydrate inline on read. Every reader and the browser stay untouched,
-   the log loses ~8.5 MB of 19.4 MB. Risk: `session-log-download` and older harnesses must not read the new artifact.
-2. **Browser-boundary strip for `series` only.** The session-controller fork can drop the repeated catalog from `series`
-   events; needs client fallbacks in the forked chat/conversation plus a new trajectory fork. Cuts traffic and client
-   RAM, log unchanged.
-3. **Format v5 catalog reference.** Writer plus a `dsh-session` fork (408 K, 30 importers, no Loader row, and the ref
-   shape forces `SESSION_FORMAT_VERSION` 5), migrations and trajectory. Biggest win, worst replay/export risk.
+Expected saving: up to 22 % of decompressed and ~16 % of on-disk log bytes, minus one store file per distinct catalog.
+`@dshfiles/tool-search` makes catalogs per Session distinct (36 tools, then 5 more per search), which this design
+neither helps nor hurts; per-tool storage would be the follow-up only if tool-search becomes the default.
 
-Plan: option 1 first, option 2 second, option 3 only if the first two leave a measured gap. Confirming metric: header
-bytes ÷ log bytes (48 % then, distinct catalog arrays = 1) on a regenerated Session, plus page-open bytes and client heap.
+## B. One Effect copy across client bundles (b:d060)
 
-## P4–P6 — only with a caller
-
-Each is measured but unproven as a user-visible cost: `pluginStorage.list` paging (P4), Effect in every client bundle
-(P5), and `diff-viewed` batch writes (P6). They stay open until a real workload shows the cost; the evidence is on
-b:r5rp, b:d060 and b:0b04.
+Every client bundle inlines `effect` because the dshx client runtime imports it. A matched counterfactual that provides
+the Effect root and eight subpaths through `@dshfiles/shared-runtime` changed the 69 web-profile client bundles from
+35,094,489 to 28,893,256 bytes raw (9,947,040 to 8,057,977 gzip-9); the supplier grew 756,133 raw / 233,094 gzip, about
+7 average consumers to break even. Composed boot passed. It fails the identity gate in Chromium: the compiler's facade
+makes the root `Option`/`Schema` namespace differ from the subpath namespace inside one consumer (true before). Next
+step: a dshx provider-only build mode, or an externalization that preserves namespace identity, then the same
+counterfactual and identity probe. Needs an idle machine: full profile builds at load 30+ are not valid numbers.

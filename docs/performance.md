@@ -1047,3 +1047,54 @@ reads the whole attention state as before. Live after-numbers for all four need 
 Still slow in this load and not owned by these fixes: `session/list` 1.36–3.1 s for 3.55 MB (core),
 `settings/describe` 200.8 KB ×2 (core, Host gap rows 97 and 99), `multi-host/projectOrigins` 8.96 s, and the
 attention writes (`acknowledge`, `clearUnread`, `markUnread`), which still answer the whole 177 KB snapshot.
+
+## Session-log tool catalog bytes (2026-11-10)
+
+Every request series appends a `request/header` with the assembled tool catalog (~280 KB for the 468-tool live
+preset). The owned [session-persistence-jsonl](../plugins/@dshfiles/session-persistence-jsonl/README.md) fork stores
+a catalog once per Session artifact and writes a 288-byte digest reference for every later repeat; readers get the
+rehydrated event. The agent loop is unchanged on purpose: `reason: "series"` resets `ToolHistoryProjection`'s declared
+baseline, so dropping or slimming that event would change the provider request, while the storage layer removes the
+same bytes with no reader change.
+
+Measured read-only on the 75 live logs written on 2026-11-10 (75.7 MB decompressed):
+
+| Catalog bytes                                    | Share of log bytes | Note                                                           |
+| ------------------------------------------------ | -----------------: | -------------------------------------------------------------- |
+| `series` headers                                 |     281–311 B each | were ~275 KB each before the fork (48 % of `session-6b9ec57a`) |
+| first full catalog per log, 16.8 MB              |               22 % | one per Session; 0.28 MB of a ~1.3 MB subagent log             |
+| full catalog rewritten on `resume`, 12 in 9 logs |      3.37 MB 4.4 % | the writer forgot its digests on Host restart; fixed below     |
+
+The writer now resumes from the catalogs the artifact's committed rows hold when a Session reopens for write (never
+from a torn final frame, whose rows the write path truncates and rewrites), and writes no reference into an unmarked
+pre-fork artifact. Replaying four resume-heavy live logs through the fork, reopening the writer at each `resume`:
+
+| Log (resumes)          | Plaintext before |              after | zstd before |             after |
+| ---------------------- | ---------------: | -----------------: | ----------: | ----------------: |
+| `532f8713` (5)         |          3.19 MB |            1.82 MB |      775 KB |            460 KB |
+| `079d97e8` (2)         |          1.43 MB |            0.87 MB |      339 KB |            210 KB |
+| `session-55691328` (2) |          8.13 MB |            7.58 MB |     1.61 MB |           1.48 MB |
+| `584b1e78` (1)         |          1.21 MB |            0.94 MB |      302 KB |            238 KB |
+| total                  |         13.96 MB | 11.21 MB (−19.7 %) |     3.02 MB | 2.39 MB (−20.9 %) |
+
+With `@dshfiles/tool-search` the catalog changes after each search (36 tools and 33 KB, then 5 more per search), so
+each search writes one new full catalog; the digest dedupe still removes every unchanged repeat. The remaining first
+copy per Session (22 %) needs a catalog shared across Sessions, a separate artifact with export and pre-fork-harness
+consequences; it is proposed, not built, in [native-fork waste](../plans/native-fork-waste/README.md).
+
+```sh
+pnpm --dir plugins/@dshfiles/session-persistence-jsonl exec vitest run tests/tool-catalog-dedup.test.ts
+```
+
+## Plugin storage list and review-mark batches (landed 2026-11-09)
+
+Two storage costs measured during the plugin sweep shipped with their callers:
+
+| Cost                                             | Before                              | After                         | Change                                                              |
+| ------------------------------------------------ | ----------------------------------- | ----------------------------- | ------------------------------------------------------------------- |
+| `pluginStorage.list` walk, 7,500 `run/` keys     | 15 pages, 19.5–20.3 ms median       | `listAll({ prefix })`, 1.8 ms | one snapshot and one sort; `list` and its cursor contract unchanged |
+| `automations.list` / `store.runs(25)`            | 24.5–25.8 / 23.8–24.8 ms            | 6.7–7.0 / 6.3–6.5 ms          | the two callers read `run/` in one pass                             |
+| `diff-viewed` 50-mark bulk on a 7,000-mark store | 709 ms median, 50 document rewrites | 13.7 ms, 1 rewrite            | `KvTable.putMany` / `StorageTable.putMany`, one publish per batch   |
+
+Both were benchmarked in scratch stores at landing (not the live GUI). They were not re-measured on 2026-11-10: the
+machine's load average was 33 on 10 cores, which makes millisecond numbers noise.

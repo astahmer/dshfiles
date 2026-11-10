@@ -30,10 +30,10 @@ events it always did.
 
 ## Delta
 
-| File                   | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/format.ts` | `TOOL_CATALOG_MARKER` / `TOOL_CATALOG_REFERENCE`, `ToolCatalogWriter` (first row writes the catalog, later rows write a reference, staged per durable batch), `rehydrateToolCatalog` in `SessionLogScanner`, and the marker-aware header line encode/parse                                                                                                                                                                                                                                                      |
-| `src/native/index.ts`  | one `ToolCatalogWriter` per session write handle, committed only after its batch is durable; the header probes and the migration-publish header line carry/strip the marker; one-Session reads (`stat`, `resolveCurrentLog`, `open` for read) never wait for the root-wide encoding walk (a root it refused keeps refusing them), an id a complete listing under a minute old did not see reads as absent without probing every project directory, and an otherwise unknown id probes the projects 16 at a time |
+| File                   | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/format.ts` | `TOOL_CATALOG_MARKER` / `TOOL_CATALOG_REFERENCE`, `ToolCatalogWriter` (first row writes the catalog, later rows write a reference, staged per durable batch), `rehydrateToolCatalog` in `SessionLogScanner` (which also keeps the committed rows' catalogs as the reopen seed), and the marker-aware header line encode/parse                                                                                                                                                                                                                                                               |
+| `src/native/index.ts`  | one `ToolCatalogWriter` per session write handle, seeded on a write open from the catalogs the scan read from committed rows, committed only after its batch is durable; the header probes and the migration-publish header line carry/strip the marker; one-Session reads (`stat`, `resolveCurrentLog`, `open` for read) never wait for the root-wide encoding walk (a root it refused keeps refusing them), an id a complete listing under a minute old did not see reads as absent without probing every project directory, and an otherwise unknown id probes the projects 16 at a time |
 
 `src/host.ts`, `scripts/build-worker.mjs` and the tests are ours: the Host entry re-exports the native plugin class
 unchanged, and the build emits the upstream migration verifier as its own `dist/worker.cjs` (upstream's second tsdown
@@ -55,9 +55,13 @@ The first `request/header` row that carries a catalog writes it in full; every l
 { "header": { "config": {…}, "tools": { "$dshfilesToolCatalog": "<sha256 of the tools JSON>" } } }
 ```
 
-The reference is resolved against catalogs already read earlier in the same artifact, in file order, so a resumed
-writer that does not know the previous process's catalogs simply writes the catalog again (one extra copy per process
-restart, never a dangling reference).
+The reference is resolved against catalogs already read earlier in the same artifact, in file order. A writer reopened
+after a Host restart resumes from the catalogs the scan read from **committed** rows, so a resumed Session writes a
+reference too; the complete rows recovered from a torn final frame are excluded, because the write path truncates that
+frame and rewrites them. An artifact whose header line lacks the marker (written before this fork) never receives a
+reference, so a harness without the fork still reads it. Before this, every `resume` rewrote the full catalog: 12
+resumes in 9 of the 75 live logs of 2026-11-10, 4.4 % of their bytes; numbers in
+[performance.md](../../../docs/performance.md#session-log-tool-catalog-bytes-2026-11-10).
 
 ### Compatibility guard
 
@@ -86,7 +90,9 @@ node scripts/native-fork-diff.mjs session-persistence-jsonl
 `tests/tool-catalog-dedup.test.ts` writes the same Session through the stock backend and this fork, asserts the
 artifact shrank and carries one catalog, asserts both reads return identical events and that
 `foldRequestHeader` still reconstructs all 455 tools, reads a pre-fork artifact with the fork, and asserts the stock
-backend refuses a deduped artifact. A compressed variant covers the zstd container and a reopened writer.
+backend refuses a deduped artifact. A compressed variant covers the zstd container and a reopened writer that
+references the catalog the previous process wrote; two more cover a resumed pre-fork artifact (no reference, the stock
+backend still reads it) and a torn final frame whose recovered rows are rewritten with their catalog in full.
 
 ## Update policy
 

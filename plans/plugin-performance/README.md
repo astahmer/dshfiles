@@ -14,7 +14,7 @@ evidence).
 | ------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | cordis-client-runner      | 8,518                         | native fork (2026-11-09) of the stock runner; boot `syncInspectManifest` dedupe already measured in performance.md       |
 | schedule                  | 7,492                         | native fork of `ui-schedule` (one source per Session, measured in performance.md); Host half unmeasured                  |
-| session-persistence-jsonl | 5,396                         | native fork; lazy catalog hashing / folder memo already measured in the ultra-fast plan; target for native-fork-waste P1 |
+| session-persistence-jsonl | 5,396                         | native fork; lazy catalog hashing / folder memo already measured in the ultra-fast plan; tool catalog dedupe (perf docs) |
 | agent-loop                | 2,503                         | native fork; replay-block trim measured in ram-usage.md                                                                  |
 | cordis-cards              | 1,739                         | native fork of `ui-cordis`; boot inventory dedupe measured in performance.md                                             |
 | storage-domain            | 1,380                         | native fork; per-record hydration measured in ram-usage.md                                                               |

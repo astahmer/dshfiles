@@ -102,7 +102,10 @@ Two owners follow:
 
 - **Host:** the per-block replay duplicate is fixed by the
   [`@dshfiles/agent-loop`](../plugins/@dshfiles/agent-loop/README.md) fork (see the table above); the `request/header`
-  tool catalog, the raw reasoning-chunk strings and the multi-copy question are separate and unattributed.
+  tool catalog is stored once per Session by the
+  [`@dshfiles/session-persistence-jsonl`](../plugins/@dshfiles/session-persistence-jsonl/README.md) fork (repeats are
+  288-byte references, numbers in [performance.md](performance.md#session-log-tool-catalog-bytes-2026-11-10)); the raw
+  reasoning-chunk strings and the multi-copy question are separate and unattributed.
 - **Browser:** one renderer held 3.3 GB for this tab, with a second at 1.7 GB. Its own copy is already block-stripped,
   so the cost is resident per-thread client state. The client store is the owned
   [session-controller fork](../plugins/@dshfiles/session-controller/README.md#local-delta): history projections stay
