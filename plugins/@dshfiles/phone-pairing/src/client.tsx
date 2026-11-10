@@ -34,7 +34,7 @@ const QrCode = (props: { readonly value: string }): JSX.Element => {
 type OfferState =
   | { readonly kind: 'idle' }
   | { readonly kind: 'loading' }
-  | { readonly kind: 'ready'; readonly offer: PairingOffer }
+  | { readonly kind: 'ready'; readonly offer: PairingOffer; readonly receivedAt: number }
   | { readonly kind: 'failed' }
 
 const minutesLeft = (expiresAt: number, now: number): number => Math.max(0, Math.ceil((expiresAt - now) / 60_000))
@@ -47,7 +47,7 @@ const PairingQrButton = (props: { readonly offer: () => Promise<PairingOffer> })
     setState({ kind: 'loading' })
     void props
       .offer()
-      .then(offer => setState({ kind: 'ready', offer }))
+      .then(offer => setState({ kind: 'ready', offer, receivedAt: Date.now() }))
       .catch(() => setState({ kind: 'failed' }))
   }
   return (
@@ -89,7 +89,7 @@ const PairingQrButton = (props: { readonly offer: () => Promise<PairingOffer> })
               {state.offer.code}
             </p>
             <p className="dshx:text-center dshx:text-xs dshx:text-muted-foreground">
-              Scan once, or open {state.offer.origin}/pair and type the code. Expires in {minutesLeft(state.offer.expiresAt, Date.now())} min.
+              Scan once, or open {state.offer.origin}/pair and type the code. Expires in {minutesLeft(state.offer.expiresAt, state.receivedAt)} min.
             </p>
           </>
         ) : null}
