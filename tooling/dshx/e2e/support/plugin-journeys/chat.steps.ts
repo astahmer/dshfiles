@@ -2,8 +2,9 @@ import { expect, type Locator, type Page } from '@playwright/test'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { When, Then } from '../bdd.js'
-import { profileFor, recordAssertion, finishJourneyAssertions } from '../steps.js'
+import { Given, When, Then } from '../bdd.js'
+import { bootComposedPluginProfile } from '../boot.js'
+import { profileFor, recordAssertion, finishJourneyAssertions, visitIsolatedPluginProfile } from '../steps.js'
 import { seedFailedFirstRequestSession, seedInterruptedSession } from '../seed-interrupted-session.mjs'
 import { seedChatImageLinkSession } from '../seed-chat-image-link-session.mjs'
 
@@ -163,6 +164,27 @@ const openTranscriptFixture = async (page: Page, rowCount: number): Promise<void
   await fixture.first().click()
 }
 
+// session-search serves the Session list from a cache that a log written behind the Host does not invalidate, so the
+// transcript is seeded before the Host starts.
+Given(
+  'the isolated plugin composition of {string} is booted with a one hundred eighty turn transcript',
+  async ({ page }: { page: Page }, packageList: string) => {
+    const packageIds = packageList.split(',').map(packageId => packageId.trim())
+    const [packageId, ...companionPackageIds] = packageIds
+    if (packageId === undefined || packageId === '') throw new Error('The plugin composition names no package.')
+    const profile = await bootComposedPluginProfile({
+      packageIds: [packageId, ...companionPackageIds],
+      profileLabel: `${packageList}-transcript`,
+      seedHome: homeRoot => seedTranscript(homeRoot, 180),
+    })
+    await visitIsolatedPluginProfile(page, profile)
+  },
+)
+
+When('the seeded transcript thread is opened', async ({ page }: { page: Page }) => {
+  await openSeededThread(page, /Untitled|Chat transcript window fixture/)
+})
+
 When('a real thread with one hundred eighty transcript turns is opened', async ({ page }: { page: Page }) => {
   await openTranscriptFixture(page, 180)
 })
@@ -223,6 +245,36 @@ Then('each upward wheel step moves the rows under the reader by the wheel distan
       jumps.push(`step ${step}: ${before.key.slice(0, 40)} moved ${Math.round(moved)}px for a ${expected}px wheel (scrollTop ${Math.round(before.scrollTop)})`)
   }
   await recordAssertion(page, 'chat-windowed-transcript-scrolls-without-jumps', () => expect(jumps).toEqual([]))
+  await finishJourneyAssertions(page)
+})
+
+Then('find in thread jumps to an unmounted turn and steps through every match', async ({ page }: { page: Page }) => {
+  await expect(page.getByText('Transcript answer 180', { exact: true })).toBeVisible()
+  await expect(page.getByText('Transcript question 42', { exact: true })).toHaveCount(0)
+  await page.keyboard.press('ControlOrMeta+f')
+  const bar = page.getByRole('search', { name: 'Find in thread', exact: true })
+  const field = bar.getByRole('textbox', { name: 'Find in thread', exact: true })
+  const count = bar.locator('[data-chat-find-count]')
+  await expect(field).toBeFocused()
+  await field.fill('question 42')
+  await recordAssertion(page, 'chat-find-in-thread-jumps-to-unmounted-turn', async () => {
+    await expect(count).toHaveText('1/1', { timeout: 20_000 })
+    await expect(page.getByText('Transcript question 42', { exact: true })).toBeVisible({ timeout: 15_000 })
+  })
+  // "4" is a prefix of turns 4 and 40-49: eleven user messages, the newest selected first.
+  await field.fill('question 4')
+  await expect(count).toHaveText('11/11', { timeout: 20_000 })
+  await field.press('Enter')
+  await recordAssertion(page, 'chat-find-in-thread-steps-through-matches', async () => {
+    await expect(count).toHaveText('1/11')
+    await expect(page.getByText('Transcript question 4', { exact: true })).toBeVisible({ timeout: 15_000 })
+  })
+  await field.press('Shift+Enter')
+  await expect(count).toHaveText('11/11')
+  await field.press('Escape')
+  await recordAssertion(page, 'chat-find-in-thread-closes', async () => {
+    await expect(bar).toHaveCount(0)
+  })
   await finishJourneyAssertions(page)
 })
 

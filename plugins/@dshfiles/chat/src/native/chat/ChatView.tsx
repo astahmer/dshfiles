@@ -22,7 +22,9 @@ import { AnnotateSelection } from './AnnotateSelection.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
 import { ConversationViewOpenerContext, useChatFocus } from '../../chat-focus-reveal.ts'
 import { InlineReferenceScope } from '../../inline-references.tsx'
-import { mergeTurnRailItems } from './turn-rail-items.ts'
+import { mergeTurnRailItems, turnStarts } from './turn-rail-items.ts'
+import { TranscriptFind } from '../../transcript-find.ts'
+import { TranscriptFindBar } from '../../transcript-find-bar.tsx'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
 import { ImagePreviewRequestModel, type ImagePreview } from '../../image-preview-request.ts'
@@ -91,6 +93,25 @@ export function ChatView({
     () => mergeTurnRailItems(turnNavigationItems, turnOutline),
     [turnNavigationItems, turnOutline],
   )
+  const findTurnStarts = useMemo(() => turnStarts(turnOutline), [turnOutline])
+  // 0 while the find bar is closed; each `Find in thread` request bumps it so the bar selects its text again.
+  const [findRequest, setFindRequest] = useState(0)
+  const frameRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { setFindRequest(0) }, [sessionId])
+  useEffect(() => {
+    const target = { frame: () => frameRef.current, open: () => setFindRequest(request => request + 1) }
+    const unregister = TranscriptFind.register(target)
+    const frame = frameRef.current
+    const touch = (): void => { TranscriptFind.touch(target) }
+    frame?.addEventListener('focusin', touch)
+    frame?.addEventListener('pointerdown', touch)
+    return () => {
+      unregister()
+      frame?.removeEventListener('focusin', touch)
+      frame?.removeEventListener('pointerdown', touch)
+    }
+  }, [])
+  const closeFind = useCallback(() => { setFindRequest(0) }, [])
   const inbox = useProjection('inbox') as InboxState | undefined
   // Workspace root off the session list row: path summaries display relative to it.
   const cwd = useSessions(s => s.byId[sessionId]?.cwd)
@@ -321,8 +342,17 @@ export function ChatView({
   const flowContext = useMemo<ChatFlowHookContext>(() => ({ motion: scroll.motion }), [scroll.motion])
 
   return (
-    <div className={css.frame}>
+    <div ref={frameRef} className={css.frame}>
       <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t} />
+      {findRequest > 0 && (
+        <TranscriptFindBar
+          sessionId={sessionId}
+          listRef={scroll.listRef}
+          turnStarts={findTurnStarts}
+          focusRequest={findRequest}
+          onClose={closeFind}
+        />
+      )}
       {scroll.initialized && (
         <TurnNavigator
           items={railItems}

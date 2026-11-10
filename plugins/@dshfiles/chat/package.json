@@ -113,6 +113,7 @@
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/session-controller": "workspace:*",
+    "@dshfiles/session-search": "workspace:*",
     "@tanstack/react-virtual": "3.14.13",
     "@testing-library/dom": "catalog:",
     "@testing-library/react": "catalog:",

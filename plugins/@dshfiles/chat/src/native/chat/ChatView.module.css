@@ -312,3 +312,9 @@
   background-color: color-mix(in srgb, var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)) 6%, transparent);
   transition: outline-color 400ms ease;
 }
+
+/* Find in thread: the words of the current match, marked through the CSS Custom Highlight API (no DOM writes). */
+::highlight(dshfiles-chat-find) {
+  background-color: color-mix(in srgb, var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)) 35%, transparent);
+  color: inherit;
+}

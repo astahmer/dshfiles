@@ -12,6 +12,12 @@ Feature: Chat browser journeys
     When a real thread with one hundred eighty transcript turns is opened
     Then each upward wheel step moves the rows under the reader by the wheel distance
 
+  @scenario:chat.find-in-thread
+  Scenario: Find in thread reaches a turn the window never mounted and steps through every match
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller, @dshfiles/session-search, @dshfiles/shortcuts" is booted with a one hundred eighty turn transcript
+    When the seeded transcript thread is opened
+    Then find in thread jumps to an unmounted turn and steps through every match
+
   @scenario:session-controller.lean-session-follow
   Scenario: A real Host follow renders history without provider replay blocks in browser frames
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted

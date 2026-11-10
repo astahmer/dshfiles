@@ -313,6 +313,49 @@
           "reason": "Client-only: swapping a fence's element while a message renders reads browser state and starts no Host work of its own."
         }
       ]
+    },
+    {
+      "id": "find-in-thread",
+      "title": "Find in thread across the whole transcript",
+      "summary": "Mod+F, or Find in thread in the command palette, opens a find bar over the thread: it asks the session-search index for every matching event of the whole Session, jumps to the Turn that holds each one (loading older history into the window first), marks the typed words there and steps through matches with Enter and Shift+Enter.",
+      "surfaces": ["client", "command"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: find bar",
+      "configuration": [],
+      "states": ["closed", "searching", "matches", "no-match", "index-missing"],
+      "failureModes": [
+        "Without @dshfiles/session-search the bar says to add it and restart DSH; when another backend owns sessionQuery it says to disable the stock row.",
+        "A match inside folded tool output lands on its Turn and shows the snippet in the bar; the words are marked only in rows on screen.",
+        "With no Chat view on screen the command returns the key to the browser's own find."
+      ],
+      "externalDependencies": [],
+      "reach": ["seed tool-call-thread", "press ControlOrMeta+f", "fill textbox \"Find in thread\" \"bash\"", "expect text \"Tool call\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.find-turn-mapping",
+          "file": "plugins/@dshfiles/chat/src/transcript-find.test.ts",
+          "testName": "maps an event seq to the Turn that holds it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-target",
+          "file": "plugins/@dshfiles/chat/src/transcript-find.test.ts",
+          "testName": "opens the find bar of the focused Chat view, else the last one used, and lets the key through when none is on screen"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.find-in-thread",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the find bar renders browser state; its Host read is the session-search findInThread API, which gets the automatic api-dispatch span there."
+        }
+      ]
     }
   ]
 }

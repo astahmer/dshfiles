@@ -317,7 +317,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
           },
         }
       },
-    }, ChatView)
+    }, decorate(ChatView))
     return disposeView
   })
 

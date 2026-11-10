@@ -87,3 +87,17 @@ export function mergeTurnRailItems(
   if (byTurn.size === 0) return EMPTY_ITEMS
   return [...byTurn.values()].sort((left, right) => left.turn - right.turn)
 }
+
+/**
+ * The first event seq of every Turn the host outline names, ascending by seq, so an event seq maps to the Turn that
+ * holds it; malformed entries are dropped as in {@link mergeTurnRailItems}.
+ * @param outline - `turnOutline` projection value, treated as wire data.
+ */
+export function turnStarts(outline: unknown): readonly { readonly turn: number; readonly seq: number }[] {
+  return outlineEntries(outline)
+    .flatMap(raw => {
+      const entry = outlineEntry(raw)
+      return entry === undefined ? [] : [{ turn: entry.turn, seq: Number(entry.seq) }]
+    })
+    .sort((left, right) => left.seq - right.seq)
+}

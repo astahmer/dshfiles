@@ -1,9 +1,10 @@
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-browser/client'
-import { Browser, defineClient, type BrowserService } from '@dshfiles/dshx/client'
+import { Browser, Command, defineClient, type BrowserService } from '@dshfiles/dshx/client'
 import { registerWebPageLauncher } from './web-page-launcher.ts'
 import { apply, inject } from './native/index.ts'
 import { PinnedToolCalls } from './pinned-tool-calls.ts'
 import { PinnedToolNames } from './pinned-tool-names.ts'
+import { TranscriptFind } from './transcript-find.ts'
 
 const BROWSER_KIND = 'browser'
 const WEB_PROTOCOLS = new Set(['http:', 'https:'])
@@ -15,6 +16,13 @@ export default defineClient({
     apply(ctx, decorate)
     const plugin = metadata?.plugin
     if (plugin === undefined) return
+    plugin.add(Command, {
+      id: TranscriptFind.commandId,
+      title: 'Find in thread',
+      keywords: ['search', 'find', 'transcript', 'messages'],
+      keys: TranscriptFind.keys,
+      run: () => (TranscriptFind.open() ? undefined : false),
+    })
     ctx.effect(() => PinnedToolNames.follow({ providers: plugin.list(PinnedToolCalls), events: ctx.uiConversation.events }))
     // The browser page type comes from another Host package, so it can appear or vanish after this plugin starts.
     const browser: BrowserService = {

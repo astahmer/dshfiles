@@ -6,6 +6,8 @@
 
 ![Choose how widely Chat image previews can browse](docs/screenshots/image-gallery-scope.png)
 
+![Find in thread across the whole transcript](docs/screenshots/find-in-thread.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.
@@ -77,6 +79,28 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/chat/use-chat-viewport.ts`, `use-chat-scroll.ts`, `ChatView.tsx` (also) | a commit's scroll work (follow the tail, restore, keep a paging anchor) runs from a ResizeObserver delivery after the next layout instead of inside the layout effect, so a streamed publication or a first open no longer forces a synchronous layout; the older-rows sentinel reads its first scroll offset in its observer callback |
 | `src/session-usage-cost.ts`, `src/native/chat/StatsPills.tsx`, `src/native/apply.ts` (also) | new: the published `@dshfiles/chat/session-usage-cost` seat; the composer usage pill declares it as a child of its dock entry and renders it after its label and beside each bucket of its dialog (below) |
 | `src/native/conversation-nodes/assistant.ts`, `turn-tail.ts`, `AssistantMarkdown.tsx` (also) | text visibility is carried per streamed block and tested with `/\S/` instead of `trim()`, so a chunk no longer copies the whole message text |
+| `src/transcript-find.ts`, `src/transcript-find-bar.tsx`, `ChatView.tsx` (also), `ChatView.module.css` (also), `turn-rail-items.ts`, `apply.ts` (also), `src/client-entry.tsx` (also) | new: the find bar (below); `ChatView` renders it and registers the view as a `Find in thread` target, `turnStarts` maps an event seq to its Turn, `apply` decorates `ChatView` so the bar reads the session-search API, and the client entry adds the command |
+
+### Find in thread
+
+The window mounts only the rows near the viewport, so the browser's own find misses older messages and folded tool
+output. **Find in thread** (`Mod+F` through the shortcuts plugin, or the command palette) opens a bar over the Chat view
+the reader is using: it asks `findInThread` of the `@dshfiles/session-search` API for every matching event of the whole
+Session ([Session search: find in one thread](../session-search/README.md#find-in-one-thread)), in transcript order.
+
+- Typing searches after 200 ms; every word must match and the last one matches as a prefix. The newest match is
+  selected first; Enter and Shift+Enter (or the arrows) step forward and back, wrapping at both ends; Escape closes.
+- Each match maps to the Turn that holds it through the host `turnOutline` (an event belongs to the last Turn that
+  started at or before it) and lands through the `chat-focus` request, which pages unloaded history in. The typed words
+  are then marked in that Turn's mounted rows with the CSS Custom Highlight API, which writes nothing into the
+  transcript's DOM, and the first one scrolls to the middle.
+- The bar shows the match's kind (message, reply, tool call, tool output) and its snippet, so a hit inside a folded
+  group or past a tool payload's index cap is still readable there; only rows on screen are marked.
+- The index skips model thinking (core's text extraction leaves it out), and one event counts once however many times
+  it matches.
+- Without session-search the bar says to add it and restart DSH; with another `sessionQuery` backend it says to disable
+  the stock row. With no Chat view on screen the command hands the key back to the browser.
+- Agents get the same read as the `thread_find` tool.
 
 ### Focus a Turn, Step or tool call from another plugin
 

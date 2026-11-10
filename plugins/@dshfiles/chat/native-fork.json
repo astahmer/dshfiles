@@ -54,6 +54,7 @@
     "src/native/chat/UserContent.tsx",
     "src/native/chat/flow-motion.ts",
     "src/native/chat/register-node-renderers.ts",
+    "src/native/chat/turn-rail-items.ts",
     "src/native/chat/use-chat-reading.ts",
     "src/native/chat/use-chat-viewport.ts",
     "src/native/chat/use-process-scroll.ts",
