@@ -91,7 +91,7 @@ export const make = <ROut, E = never, const Config extends ConfigSchema | undefi
 
     const activationSpan = (lazy: boolean) =>
       Effect.withSpan('plugin activate', {
-        attributes: { 'dshx.plugin.package': packageId, ...(lazy ? { 'dshx.plugin.lazy': true } : {}) },
+        attributes: lazy ? { 'dshx.plugin.package': packageId, 'dshx.plugin.lazy': true } : { 'dshx.plugin.package': packageId },
       })
 
     const forkMain = (services: Context.Context<PluginServices<ROut> | Scope.Scope>, runtime: PluginRuntime<PluginServices<ROut> | Scope.Scope>) => {
