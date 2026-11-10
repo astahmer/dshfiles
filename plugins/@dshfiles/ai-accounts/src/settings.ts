@@ -85,6 +85,8 @@ export const aiAccountsSettings = defineSettings({
     idleCacheMinTokens: Schema.natural().max(10_000_000).default(50_000),
     /** `provider/model` or `provider/*` → prompt-cache lifetime in minutes, e.g. 60 for a provider whose profile sets `cacheRetention: long`. */
     promptCacheMinutes: Schema.dict(Schema.natural().min(1).max(10_080)).default({}),
+    /** `provider/model` or `provider/*` → pi-ai prompt-cache retention. Unset preserves the provider default. */
+    promptCacheRetention: Schema.dict(Schema.union(['short', 'long'])).default({}),
     /** When nobody being able to run an agent matters: Quota forecast counts the gaps that fall in these hours. */
     workHours: Schema.object({
       /** `Date.getDay()` values, 0 = Sunday. */
@@ -137,6 +139,7 @@ const liveSettingsSchema = EffectSchema.Struct({
   hiddenUsageAccounts: EffectSchema.optional(EffectSchema.Unknown),
   autoRetryQuotaDefault: EffectSchema.optional(EffectSchema.Unknown),
   showQuotaRetryChoice: EffectSchema.optional(EffectSchema.Unknown),
+  promptCacheRetention: EffectSchema.optional(EffectSchema.Unknown),
 })
 
 type LiveSettings = typeof liveSettingsSchema.Type
@@ -166,6 +169,7 @@ export interface AccountSettingsSnapshot {
     readonly hiddenUsageAccounts: readonly string[]
   }
   readonly quotaRetry: { readonly autoRetryDefault: boolean; readonly showChoice: boolean }
+  readonly promptCacheRetention: Readonly<Record<string, 'short' | 'long'>>
 }
 
 /** The Host-side preferences of the namespace, each falling back on its own when absent or malformed. */
@@ -177,6 +181,7 @@ const fromLive = (live: AiAccountsSettingsValue): AccountSettingsSnapshot => {
       pricingRefreshHours: decodeSetting(EffectSchema.Finite.check(EffectSchema.isGreaterThanOrEqualTo(1)), fields.pricingRefreshHours, 24),
       pricingOverrides: decodeSetting(EffectSchema.Record(EffectSchema.String, EffectSchema.String), fields.pricingOverrides, {}),
     },
+    promptCacheRetention: decodeSetting(EffectSchema.Record(EffectSchema.String, EffectSchema.Literals(['short', 'long'])), fields.promptCacheRetention, {}),
     fastModeDefault: decodeSetting(EffectSchema.Boolean, fields.fastModeDefault, false),
     lunaReserveRouting: decodeSetting(EffectSchema.Boolean, fields.codexLunaReserve, true),
     // Preserve the Host call shape without letting an old cosmetic list override canonical route priority.

@@ -1,4 +1,5 @@
 import { CostEstimateModel, type ModelPrice, type RouteQuote } from './cost-estimate.js'
+import { cacheRetentionFor, type CacheRetention } from './cache-retention.js'
 
 /**
  * Whether the next request of an idle thread re-sends its whole prompt uncached, and what that costs.
@@ -27,7 +28,7 @@ const vendorOf = (route: { readonly provider: string; readonly model: string; re
 
 export interface CacheLifetime {
   readonly minutes: number
-  readonly source: 'override' | 'known'
+  readonly source: 'override' | 'known' | 'retention'
 }
 
 export interface IdleCacheFacts {
@@ -49,10 +50,18 @@ export class IdleCacheModel {
     readonly model: string
     readonly modelsDevId: string | null
     readonly overrides: Readonly<Record<string, number>>
+    readonly retention?: Readonly<Record<string, CacheRetention>> | undefined
+    /** The host-declared extended lifetime for this route, when its transport supports one. */
+    readonly longCacheMinutes?: number | null | undefined
   }): CacheLifetime | null => {
     const override = input.overrides[`${input.provider}/${input.model}`] ?? input.overrides[`${input.provider}/*`]
     if (override !== undefined && override > 0) return { minutes: override, source: 'override' }
     const vendor = vendorOf(input)
+    if (vendor !== null && cacheRetentionFor({ ...input, settings: input.retention ?? {} }) === 'long') {
+      const declared = input.longCacheMinutes
+      if (typeof declared === 'number') return { minutes: declared, source: 'retention' }
+      if (vendor === 'anthropic') return { minutes: 60, source: 'retention' }
+    }
     return vendor === null ? null : { minutes: KNOWN_LIFETIME_MINUTES[vendor], source: 'known' }
   }
 
@@ -86,9 +95,16 @@ export class IdleCacheModel {
     readonly route: { readonly provider: string; readonly model: string }
     readonly quote: RouteQuote | undefined
     readonly overrides: Readonly<Record<string, number>>
+    readonly retention?: Readonly<Record<string, CacheRetention>> | undefined
   }): IdleCacheFacts | null => {
     if (input.running || input.lastUsedAt === null || input.promptTokens === undefined || input.promptTokens < input.minTokens) return null
-    const lifetime = IdleCacheModel.lifetime({ ...input.route, modelsDevId: input.quote?.modelsDevId ?? null, overrides: input.overrides })
+    const lifetime = IdleCacheModel.lifetime({
+      ...input.route,
+      modelsDevId: input.quote?.modelsDevId ?? null,
+      overrides: input.overrides,
+      retention: input.retention,
+      longCacheMinutes: input.quote?.longCacheMinutes ?? null,
+    })
     const expiresAt = IdleCacheModel.expiresAt({ lastUsedAt: input.lastUsedAt, lifetime })
     if (lifetime === null || expiresAt === null || input.now < expiresAt) return null
     const price =
@@ -125,7 +141,7 @@ export class IdleCacheModel {
       : `cache expired · next send ${IdleCacheModel.formatAmount(facts.uncachedUsd)}`
 
   static readonly detail = (facts: IdleCacheFacts): string => {
-    const lifetime = `${facts.lifetime.minutes} min${facts.lifetime.source === 'override' ? ', from settings' : ''}`
+    const lifetime = `${facts.lifetime.minutes} min${facts.lifetime.source !== 'known' ? ', from settings' : ''}`
     const head = `Idle ${IdleCacheModel.formatIdle(facts.idleMinutes)}, past the prompt cache's ${lifetime}. The next message re-sends ~${IdleCacheModel.formatTokens(facts.promptTokens)} prompt tokens uncached`
     if (facts.uncachedUsd === null) return `${head}.`
     const cached = facts.cachedUsd === null ? '' : ` instead of ${IdleCacheModel.formatAmount(facts.cachedUsd)} cached`

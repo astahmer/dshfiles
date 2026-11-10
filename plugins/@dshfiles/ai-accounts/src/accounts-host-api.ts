@@ -115,16 +115,19 @@ const quoteRoutesWith = (settings: PricingSettings) =>
     const file = await store.readAccountFile()
     const kinds = new Map(file.accounts.map(account => [account.instanceId.trim() || account.kind, account.kind]))
     const cache = pricing.current()
+    const longCacheMinutes = accountRuntime(ctx)?.longCacheMinutes
     return {
       fetchedAt: cache?.fetchedAt ?? null,
-      quotes: input.routes.map(route =>
-        PricingCatalogModel.resolveRouteQuote({
+      quotes: input.routes.map(route => {
+        const quote = PricingCatalogModel.resolveRouteQuote({
           route,
           cache,
           accountKind: typeof route.provider === 'string' ? kinds.get(route.provider) : undefined,
           overrides: settings.pricingOverrides,
-        }),
-      ),
+        })
+        const extended = longCacheMinutes?.(route.provider, route.model)
+        return extended === undefined || extended === null ? quote : { ...quote, longCacheMinutes: extended }
+      }),
     }
   })
 

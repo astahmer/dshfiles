@@ -3,6 +3,7 @@ import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import type { FastModeService } from './codex-fast-mode.js'
+import { cacheRetentionFor, type CacheRetention } from './cache-retention.js'
 import type { DeclaredRetryAfter } from './provider-retry-after.js'
 import { AccountsRules } from './api.js'
 import type { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
@@ -98,6 +99,7 @@ export class ProviderProfileModel {
     readonly discoveredModels?: readonly LlmDiscoveredModel[]
     /** Sees every HTTP response this account's provider receives, e.g. to read a declared Retry-After. */
     readonly onResponse?: (response: { readonly status: number; readonly headers: Readonly<Record<string, string>> }) => void
+    readonly cacheRetention?: () => Readonly<Record<string, CacheRetention>>
   }): ResolvedPiAiProviderProfile => {
     const hidden = new Set(params.hiddenModelIds ?? [])
     const favorites = new Set(params.favoriteModelIds ?? [])
@@ -183,6 +185,7 @@ export class ProviderProfileModel {
           getModels: () => offeredModels,
         },
         params.onResponse,
+        params.cacheRetention,
       ),
     }
     profilePins.set(profile, pins)
@@ -221,19 +224,23 @@ type PiProvider = NonNullable<ResolvedPiAiProviderProfile['piProvider']>
 const observedProvider = (
   provider: PiProvider,
   onResponse: ((response: { readonly status: number; readonly headers: Readonly<Record<string, string>> }) => void) | undefined,
+  cacheRetention: (() => Readonly<Record<string, CacheRetention>>) | undefined,
 ): PiProvider => {
-  if (onResponse === undefined) return provider
+  if (onResponse === undefined && cacheRetention === undefined) return provider
   return {
     ...provider,
-    streamSimple: (model, context, options) =>
-      provider.streamSimple(model, context, {
+    streamSimple: (model, context, options) => {
+      const retention = cacheRetentionFor({ provider: provider.id, model: model.id, settings: cacheRetention?.() ?? {} })
+      const base = {
         ...options,
-        fetch: async (input, init) => {
+        fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           const response = await (options?.fetch ?? globalThis.fetch)(input, init)
-          onResponse({ status: response.status, headers: Object.fromEntries(response.headers.entries()) })
+          onResponse?.({ status: response.status, headers: Object.fromEntries(response.headers.entries()) })
           return response
         },
-      }),
+      }
+      return provider.streamSimple(model, context, retention === undefined ? base : { ...base, cacheRetention: retention })
+    },
   }
 }
 

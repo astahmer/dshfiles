@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { ReasoningEffortId, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { MessageId, ReasoningEffortId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { OAuthCredential } from '@earendil-works/pi-ai'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
+import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import { FastModeService } from './codex-fast-mode.js'
@@ -19,6 +20,37 @@ const modelsFor = (profile: ReturnType<typeof ProviderProfileModel.buildProfile>
 const disabledFastMode = new FastModeService({ isAvailable: () => false, isLiveSession: () => true, isEnabledByDefault: () => false })
 
 describe('account provider profiles', () => {
+  it('forwards live per-model retention through the real Anthropic request body', async () => {
+    const settings = (value: 'short' | 'long') => ({ 'claude-test/*': value })
+    let retention: 'short' | 'long' = 'long'
+    const upstream = anthropicProvider()
+    const model = upstream.getModels()[0]
+    if (model === undefined) throw new Error('Expected Anthropic catalog')
+    const profile = ProviderProfileModel.buildProfile({ upstream, provider: 'claude-test', displayName: 'Claude', additionalModelIds: [], cacheRetention: () => settings(retention) })
+    const adapter = new EffortPinnedAdapter({
+      profiles: () => new Map([['claude-test', profile]]),
+      resolveApiKey: async () => 'test-key',
+      auth: { credentials: { read: async () => undefined, list: async () => [], modify: async () => undefined, delete: async () => undefined }, authContext: { env: async () => undefined, fileExists: async () => false } },
+    }, { reasoningDefaults: new Map(), fastMode: disabledFastMode })
+    const originalFetch = globalThis.fetch
+    let body = ''
+    globalThis.fetch = async (_input, init) => {
+      body = String(init?.body)
+      return new Response('{"error":{"message":"stop here"}}', { status: 400 })
+    }
+    const run = async () => {
+      for await (const _chunk of adapter.stream({ provider: 'claude-test', model: model.id, messages: [{ role: 'system', id: MessageId('system'), source: { kind: 'system-prompt' }, content: [{ type: 'text', text: 'System instructions' }] }, { role: 'user', content: [{ type: 'text', text: 'hi' }] }] })) { /* drain */ }
+      return body
+    }
+    try {
+      expect(await run()).toContain('"ttl":"1h"')
+      retention = 'short'
+      expect(await run()).not.toContain('"ttl":"1h"')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
   it('retains native provenance when an account has a redundant additional ID', () => {
     const upstream = openaiCodexProvider()
     const native = upstream.getModels()[0]

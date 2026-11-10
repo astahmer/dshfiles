@@ -25,6 +25,7 @@ interface AccountRuntime {
   modelCatalogForEditing?: (instanceId: string) => Promise<readonly (LlmResolvedModelInfo & { readonly accountAdditional: boolean })[]>
   usageCache?: UsageSnapshotPromise
   pricing?: PricingCatalog
+  longCacheMinutes?: (provider: string, model: string) => number | null
   copilotLogin?: CopilotLoginService
   accountLogin?: AccountLoginService
   accountSetup?: AccountSetupService

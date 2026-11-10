@@ -32,6 +32,16 @@ const base = {
 }
 
 describe('IdleCacheModel.lifetime', () => {
+  it('uses configured long retention for supported vendor families, with explicit minutes taking precedence', () => {
+    const route = { provider: 'claude-main', model: 'claude-sonnet-4-5', modelsDevId: 'anthropic/claude-sonnet-4-5' }
+    expect(IdleCacheModel.lifetime({ ...route, overrides: {}, retention: { 'claude-main/*': 'long' } })).toEqual({ minutes: 60, source: 'retention' })
+    expect(IdleCacheModel.lifetime({ ...route, overrides: {}, retention: { 'claude-main/*': 'long' }, longCacheMinutes: 1_440 })).toEqual({
+      minutes: 1_440,
+      source: 'retention',
+    })
+    expect(IdleCacheModel.lifetime({ ...route, overrides: { 'claude-main/*': 30 }, retention: { 'claude-main/*': 'long' } })).toEqual({ minutes: 30, source: 'override' })
+  })
+
   it('uses the published default per vendor, from models.dev or the model name', () => {
     expect(IdleCacheModel.lifetime({ provider: 'x', model: 'm', modelsDevId: 'anthropic/m', overrides: {} })).toEqual({ minutes: 5, source: 'known' })
     expect(IdleCacheModel.lifetime({ provider: 'x', model: 'claude-opus-4', modelsDevId: null, overrides: {} })).toEqual({ minutes: 5, source: 'known' })

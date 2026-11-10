@@ -393,6 +393,7 @@ const startAccountsHost = (input: {
         ProviderProfileModel.buildProfile({
           upstream: upstreamFor(id, route),
           onResponse: response => declaredRetryAfter.observe(id, response, Date.now()),
+          cacheRetention: () => readSettings().promptCacheRetention,
           provider: id,
           displayName: route.displayName,
           ...settings.get(id),
@@ -407,6 +408,18 @@ const startAccountsHost = (input: {
     new Map([...profiles].map(([id, profile]) => [id, ProviderProfileModel.reasoningDefaultsForProfile(profile)]))
 
   profiles = buildProfiles(routes, initialFile)
+  runtime.longCacheMinutes = (provider, model) => {
+    const route = routes.get(provider)
+    if (route === undefined || (route.kind === CLAUDE_KIND && ClaudeAccountModel.usesCliTransport(route))) return null
+    const candidate = profiles.get(provider)?.piProvider?.getModels().find(item => item.id === model)
+    if (candidate === undefined) return null
+    const compat = candidate.compat
+    const supportsLong = compat !== undefined && 'supportsLongCacheRetention' in compat && compat.supportsLongCacheRetention === false ? false : undefined
+    if (supportsLong === false) return null
+    if (candidate.api === 'anthropic-messages') return 60
+    if (candidate.api === 'openai-responses') return compat !== undefined && 'supportsExplicitPromptCacheMode' in compat && compat.supportsExplicitPromptCacheMode === true ? 30 : 1_440
+    return null
+  }
   const reasoningDefaults = buildReasoningDefaults()
 
   runtime.accounts = { config, pool }

@@ -311,11 +311,15 @@ log write restarts it: the chip errs quiet, never early.
 Lifetimes: Anthropic models 5 min, OpenAI and Codex models 10 min (the upper
 end of OpenAI's 5–10 min), detected from the models.dev id or the model name.
 Other routes stay quiet until Settings › AI Accounts › Idle prompt cache ›
-Cache lifetimes names one (`route/model = minutes`, or `route/*`). DSH's
-native provider profile chooses what a request asks for with `cacheRetention`
-(`short`, the default; `long` asks Anthropic for 1 h and OpenAI for 24 h): give
-such a route its lifetime here. Threads under **From prompt size** (50K tokens by
-default) stay quiet; **Warn before an uncached send** turns the warning on or off.
+Cache lifetimes names one (`route/model = minutes`, or `route/*`). **Cache
+retention** sets what each account route actually asks its provider for:
+`route/model = long` or `route/* = short`, unset keeps the provider default.
+`long` asks Anthropic for a 1 h cache, OpenAI's Responses API for 24 h (or its
+declared 30 min mode), and nothing for a transport that does not support it.
+The chip's lifetime follows that choice: it reports the extended lifetime the
+Host declares for the route, so it warns at the real expiry instead of early.
+Threads under **From prompt size** (50K tokens by default) stay quiet; **Warn
+before an uncached send** turns the warning on or off.
 
 ## Editing
 

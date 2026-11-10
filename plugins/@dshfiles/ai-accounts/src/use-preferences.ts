@@ -52,6 +52,7 @@ export const usePreferences = () => {
     idleCacheWarning: value?.idleCacheWarning ?? false,
     idleCacheMinTokens: value?.idleCacheMinTokens ?? 50_000,
     promptCacheMinutes: value?.promptCacheMinutes ?? {},
+    promptCacheRetention: value?.promptCacheRetention ?? {},
     workHours: AiAccountsSchema.decode(workHoursSchema, value?.workHours),
   }
 }

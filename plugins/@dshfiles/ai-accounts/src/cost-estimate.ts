@@ -75,6 +75,8 @@ export const routeQuoteSchema = Schema.Struct({
   match: Schema.Literals(['override', 'exact', 'fuzzy', 'none']),
   free: Schema.Boolean,
   price: Schema.NullOr(modelPriceSchema),
+  /** Extended pi-ai cache lifetime when this account route's transport declares one. */
+  longCacheMinutes: Schema.optional(Schema.NullOr(Schema.Number)),
 })
 
 export type RouteQuote = typeof routeQuoteSchema.Type

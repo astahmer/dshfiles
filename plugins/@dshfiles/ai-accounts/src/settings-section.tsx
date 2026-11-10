@@ -770,6 +770,19 @@ const IdleCacheGroup = (props: { readonly readOnly: boolean; readonly write: (ta
   const savedText = minutesToText(preferences.promptCacheMinutes)
   const [draft, setDraft] = useState<string | null>(null)
   const parsed = textToMinutes(draft ?? savedText)
+  const retentionText = Object.entries(preferences.promptCacheRetention).map(([route, value]) => `${route} = ${value}`).join('\n')
+  const [retentionDraft, setRetentionDraft] = useState<string | null>(null)
+  const retentionLines = textToOverrides(retentionDraft ?? retentionText)
+  const retention: Record<string, 'short' | 'long'> = {}
+  let invalidRetention = retentionLines.skipped
+  for (const [route, value] of Object.entries(retentionLines.overrides)) {
+    if (value === 'short' || value === 'long') retention[route] = value
+    else invalidRetention += 1
+  }
+  const saveRetention = (): void => {
+    if (retentionDraft === null || retentionDraft === retentionText || invalidRetention > 0) return
+    props.write(settings.set('promptCacheRetention', retention).then(() => setRetentionDraft(null)))
+  }
   const saveLifetimes = (): void => {
     if (draft === null || draft === savedText) return
     props.write(settings.set('promptCacheMinutes', parsed.overrides).then(() => setDraft(null)))
@@ -801,6 +814,23 @@ const IdleCacheGroup = (props: { readonly readOnly: boolean; readonly write: (ta
           />
         )}
       </Row>
+      <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+        <Label className="dshx:text-sm dshx:font-normal" htmlFor="ai-accounts-prompt-cache-retention">Cache retention</Label>
+        <p className="dshx:text-xs dshx:text-muted-foreground">
+          One rule per line: <code>route/model = long</code> or <code>route/* = short</code>. Use long only where the provider and model support extended caching.
+        </p>
+        <Textarea
+          className="dshx:min-h-16 dshx:font-mono! dshx:text-xs"
+          disabled={props.readOnly}
+          id="ai-accounts-prompt-cache-retention"
+          onBlur={saveRetention}
+          onChange={event => setRetentionDraft(event.target.value)}
+          placeholder="claude_work/* = long"
+          spellCheck={false}
+          value={retentionDraft ?? retentionText}
+        />
+        {invalidRetention === 0 ? null : <p className="dshx:text-xs dshx:text-destructive">Use route/model = short or long on every line before saving.</p>}
+      </div>
       <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
         <Label className="dshx:text-sm dshx:font-normal" htmlFor="ai-accounts-prompt-cache-minutes">
           Cache lifetimes
