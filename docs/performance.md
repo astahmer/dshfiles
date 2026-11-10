@@ -1197,12 +1197,36 @@ Scratch DSH (`dshx dev up`, 14 synthetic threads created through New thread, no 
 changed live through Settings › Plugins › `@dshfiles/sidebar-right`. Fresh page per row; counts are after GC and a
 reconnect.
 
-| `residentThreads`       | instances | scopes | `sidebarView` retains | `threadSidebarAside` retains | open `session/follow` | heap  |
-| ----------------------- | --------- | ------ | --------------------- | ---------------------------- | --------------------- | ----- |
-| `4` (default)           | 9         | 9      | 5                     | 5                            | 9                     | 94 MB |
-| `0` (old, unbounded)    | 14        | 14     | 14                    | 13                           | 13                    | 94 MB |
+| `residentThreads`    | instances | scopes | `sidebarView` retains | `threadSidebarAside` retains | open `session/follow` | heap  |
+| -------------------- | --------- | ------ | --------------------- | ---------------------------- | --------------------- | ----- |
+| `4` (default)        | 9         | 9      | 5                     | 5                            | 9                     | 94 MB |
+| `0` (old, unbounded) | 14        | 14     | 14                    | 13                           | 13                    | 94 MB |
 
 `workbenchPanel` stayed at 4 and `mainView` at 1 in both runs. Heap is flat because these synthetic threads carry no
 real history; the lever here is instance and follow-stream count, not bytes: the default held 5 thread views for 14
 visited threads instead of 14. Real history makes each resident Session cost its transcript window, which is what the
 ~20-instance tab was holding. A live-tab after-number still needs the canonical build and a user restart.
+
+## Agent browser mirror cost (2026-11-11)
+
+The mirror (`preview/mirrorFrame`) polls a viewport JPEG at quality 55 every 500 ms while the Agent browser tab and the
+window are visible, and sends only a hash when the image did not change. Is that polling the cost? Probe
+`.agents/skills/live-performance-audit/scripts/mirror-probe.mjs` runs the exact frame work — `page.screenshot({ type:
+'jpeg', quality: 55 })`, SHA-1, image only when the hash changed — for four 60 s windows against a loopback fixture, and
+reports frames/s, KB/s, and the CPU of the process taking the screenshots (in DSH this is the Host) plus the Chromium
+process tree.
+
+| Window        | Content                          | Calls | Frames | Bytes/s  | Screenshot CPU | Chromium CPU |
+| ------------- | -------------------------------- | ----- | ------ | -------- | -------------- | ------------ |
+| idle          | still page, viewer not polling   | 0     | 0      | 0        | 0.4 %          | 0 %          |
+| still-poll    | still page, polling              | 115   | 1      | 0.1 kB   | 0.7 %          | 2.3 %        |
+| animated-poll | CSS spinner, every frame differs | 112   | 112    | 17.4 kB  | 0.6 %          | 6.7 %        |
+| dense-poll    | 24 text cards with animated bars | 112   | 112    | 209.7 kB | 0.9 %          | 11.1 %       |
+
+Polling is not the cost: a watched tab costs well under one core of Chromium (7–11 %) and about 1 % of the Host-side
+screenshot path, and an unchanged page costs a hash. The bytes track page entropy: ~17 kB/s for a spinner on a flat
+background, ~210 kB/s (~12.6 MB/min) for a text-dense page that changes every frame. Both stay modest for a local GUI,
+so the mirror keeps polling and does not switch to CDP `Page.startScreencast`. The measurement runs the mirror's own
+frame path in a standalone Chromium, not inside a scratch DSH Host: full-rate video or canvas pages, and DSH's own event
+loop alongside the capture, remain unmeasured. The probe prints one JSON envelope; `SECONDS`/`--seconds` and
+`ONLY=<window>` narrow a run.
