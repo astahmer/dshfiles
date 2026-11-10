@@ -5,24 +5,20 @@ SQLite op log, short aliases, providers, multi-host peers, backlinks on threads 
 item — is documented in the [plugin README](../../plugins/@dshfiles/backlog/README.md), and the reasoning behind it in
 [backlog redesign](../../plugins/@dshfiles/backlog/docs/redesign.md).
 
-Resume here: step 8 waits on the user; the rest is either open work or verification that needs a live Host restart,
-real accounts or a second machine.
+Resume here: the items below are either open work or verification that needs a live Host restart, real accounts or a
+second machine. The one-off Discord TODO import was dropped on 2026-11-10: the user does not want it.
 
 ## Open
 
-| #   | Item                                                                                                                                                    | State                    |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| 7   | Edit item bodies and replies with `@dshfiles/rich-composer` instead of the capture editor (quoting a reply into an item shipped)                        | open                     |
-| 8   | One-off import of the Discord TODO channel, also a labelled set for triage examples                                                                     | blocked: needs an export |
-| 9   | A settled thread with no linked revision moves its open items back to `todo` (needs thread-sidebar's settled state across plugins)                      | open                     |
-| 10  | Journeys for feed paging (150 entries a page, needs a seeded store) and Inbox thread rows (Acknowledge, needs thread-sidebar's settled threads)         | open                     |
-| 11  | `Closes b:<ref>` in a PR description: `@dshfiles/pull-requests` does not expose PR bodies; gate state and automation creation are unit-tested only      | open                     |
-| 12  | Cross-host calls lose error details: dshx `createDshxApiCaller` keeps only the code                                                                     | open                     |
-| 13  | Linear delegate stays unmapped (Linear's is an app user, ours an agent session)                                                                         | open                     |
-| 14  | The README peek screenshot predates the two-lane timeline; the Hosts settings section has no screenshot and does not show peers' automation-Host choice | open                     |
-
-Step 8 needs the user: the channel's export (a DiscordChatExporter JSON or HTML file) or a bot token with read access
-to that channel. None was found in `~/Downloads` on 2026-11-10 (the only `all.html` there is a saved Linear page).
+| #   | Item                                                                                                                                                    | State |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 7   | Edit item bodies and replies with `@dshfiles/rich-composer` instead of the capture editor (quoting a reply into an item shipped)                        | open  |
+| 9   | A settled thread with no linked revision moves its open items back to `todo` (needs thread-sidebar's settled state across plugins)                      | open  |
+| 10  | Journeys for feed paging (150 entries a page, needs a seeded store) and Inbox thread rows (Acknowledge, needs thread-sidebar's settled threads)         | open  |
+| 11  | `Closes b:<ref>` in a PR description: `@dshfiles/pull-requests` does not expose PR bodies; gate state and automation creation are unit-tested only      | open  |
+| 12  | Cross-host calls lose error details: dshx `createDshxApiCaller` keeps only the code                                                                     | open  |
+| 13  | Linear delegate stays unmapped (Linear's is an app user, ours an agent session)                                                                         | open  |
+| 14  | The README peek screenshot predates the two-lane timeline; the Hosts settings section has no screenshot and does not show peers' automation-Host choice | open  |
 
 ## Unverified live
 
