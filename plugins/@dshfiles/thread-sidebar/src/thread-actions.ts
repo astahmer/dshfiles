@@ -410,13 +410,12 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     const sessionId = yield* targetSessionId(input.sessionId, caller)
     const stopActivity = input.stopActivity === true
     return yield* deps.archive(sessionId, stopActivity).pipe(
-      Effect.map(archivedSessionIds => ({ status: 'archived' as const, sessionId, archivedSessionIds: [...archivedSessionIds], activity: [] as string[] })),
+      Effect.as({ status: 'archived' as const, sessionId, activity: [] as string[] }),
       Effect.catch(error =>
         errorCode(error) === 'workspace/session-active'
           ? Effect.succeed({
               status: 'refused-active' as const,
               sessionId,
-              archivedSessionIds: [...deps.archivedSessionIds()],
               activity: activityKinds(error),
             })
           : Effect.fail(failure(error, `Could not archive thread ${sessionId}.`)),
@@ -425,8 +424,8 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
   }),
 
   unarchive: Effect.fn('thread actions unarchive')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
-    const archivedSessionIds = yield* attempt(deps.unarchive(input.sessionId), `Could not restore thread ${input.sessionId}.`)
-    return { sessionId: input.sessionId, archivedSessionIds: [...archivedSessionIds] }
+    yield* attempt(deps.unarchive(input.sessionId), `Could not restore thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId }
   }),
 
   settle: Effect.fn('thread actions settle')(function* ({ input, caller }: ThreadActionContext<ThreadArchiveInput>) {

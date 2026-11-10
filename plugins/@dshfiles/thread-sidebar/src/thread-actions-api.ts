@@ -19,7 +19,6 @@ const threadRowSchema = Schema.Struct({
   updatedAt: Schema.optional(Schema.Number.check(Schema.isFinite())),
 })
 
-const archivedSessionIdsSchema = Schema.Array(Schema.String).check(Schema.isMaxLength(2000))
 const pinnedSessionIdsSchema = Schema.Array(Schema.String).check(Schema.isMaxLength(2000))
 const settledSessionIdsSchema = Schema.Array(Schema.String).check(Schema.isMaxLength(2000))
 
@@ -55,7 +54,6 @@ const renderReferences = (output: Schema.Schema.Type<typeof threadReferencesSche
 const archiveResultSchema = Schema.Struct({
   status: Schema.Literals(['archived', 'refused-active']),
   sessionId: Schema.String,
-  archivedSessionIds: Schema.Array(Schema.String).check(Schema.isMaxLength(2000)),
   activity: Schema.Array(Schema.String).check(Schema.isMaxLength(16)),
 })
 
@@ -119,7 +117,7 @@ export const threadActionsApi = defineApi({
     }),
     unarchive: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
-      output: Schema.Struct({ sessionId: Schema.String, archivedSessionIds: archivedSessionIdsSchema }),
+      output: Schema.Struct({ sessionId: Schema.String }),
       description: `Restore an archived thread to its recorded place in the sidebar. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_unarchive', render: output => `Restored thread ${output.sessionId}.` },
     }),
