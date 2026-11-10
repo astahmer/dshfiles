@@ -19,9 +19,6 @@ const threadRowSchema = Schema.Struct({
   updatedAt: Schema.optional(Schema.Number.check(Schema.isFinite())),
 })
 
-const pinnedSessionIdsSchema = Schema.Array(Schema.String).check(Schema.isMaxLength(2000))
-const settledSessionIdsSchema = Schema.Array(Schema.String).check(Schema.isMaxLength(2000))
-
 const projectRowSchema = Schema.Struct({
   projectId: Schema.String,
   title: Schema.String,
@@ -123,25 +120,25 @@ export const threadActionsApi = defineApi({
     }),
     settle: method({
       input: Schema.Struct({ sessionId: Schema.optional(sessionIdSchema) }),
-      output: Schema.Struct({ sessionId: Schema.String, settledSessionIds: settledSessionIdsSchema }),
+      output: Schema.Struct({ sessionId: Schema.String }),
       description: `Settle one thread: it stays listed and openable, but no model step starts — not from a message, a subagent settlement, a reminder or a queued follow-up — until thread_unsettle. Refuse while its own turn runs; stop it first. Defaults to the calling thread when sessionId is omitted. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_settle', render: output => `Settled thread ${output.sessionId}.` },
     }),
     unsettle: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
-      output: Schema.Struct({ sessionId: Schema.String, settledSessionIds: settledSessionIdsSchema }),
+      output: Schema.Struct({ sessionId: Schema.String }),
       description: `Unsettle a settled thread so it can run model steps again. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_unsettle', render: output => `Unsettled thread ${output.sessionId}.` },
     }),
     pin: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
-      output: Schema.Struct({ sessionId: Schema.String, pinnedSessionIds: pinnedSessionIdsSchema }),
+      output: Schema.Struct({ sessionId: Schema.String }),
       description: `Pin one thread ahead of the unpinned threads of its project. Refused while the thread is archived. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_pin', render: output => `Pinned thread ${output.sessionId}.` },
     }),
     unpin: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
-      output: Schema.Struct({ sessionId: Schema.String, pinnedSessionIds: pinnedSessionIdsSchema }),
+      output: Schema.Struct({ sessionId: Schema.String }),
       description: `Remove one thread's pin. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_unpin', render: output => `Unpinned thread ${output.sessionId}.` },
     }),
