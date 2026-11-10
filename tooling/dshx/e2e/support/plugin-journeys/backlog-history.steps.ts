@@ -1,9 +1,12 @@
 import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
+import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
+import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { createScratchDirectory, sendMessage, startThreadWithModel } from '../threads.js'
 import { backlogRef } from './backlog-refs.js'
 
@@ -78,10 +81,55 @@ Then('the export file holds the item {string}', async ({ page }: { page: Page },
   await finishJourneyAssertions(page)
 })
 
-Then('the Hosts section says no other Host shares the backlog yet', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'backlog-hosts-empty', async () => {
-    const hosts = page.getByRole('region', { name: 'Hosts', exact: true }).filter({ hasText: 'No other Host yet' })
-    await expect(hosts).toContainText('No other Host yet. Add one in the Hosts panel, then turn it on here.')
+/** Two multi-host runtimes this Host cannot reach, as a Hosts panel adds them: enough for the backlog to list them. */
+When('two multi-host Hosts are seeded', async ({ page }: { page: Page }) => {
+  const createdAt = '2026-11-11T00:00:00.000Z'
+  const launchUrl = 'http://127.0.0.1:1/?token=dshx-e2e-backlog-peer'
+  const host = (id: string, name: string, position: number) => ({
+    schemaVersion: 2,
+    id,
+    name,
+    connector: { kind: 'local' },
+    hidden: false,
+    position,
+    createdAt,
+  })
+  const runtime = (id: string, hostId: string, name: string, originPort: number) => ({
+    schemaVersion: 2,
+    id,
+    hostId,
+    name,
+    locator: { kind: 'local', launchUrl },
+    identity: null,
+    originPort,
+    createdAt,
+  })
+  const directory = {
+    schemaVersion: 2,
+    hosts: [host('studio', 'Studio', 0), host('build-box', 'Build box', 1)],
+    runtimes: [
+      runtime('10000000-0000-4000-8000-00000000bacc', 'studio', 'Studio', 43_011),
+      runtime('10000000-0000-4000-8000-00000000bacd', 'build-box', 'Build box', 43_012),
+    ],
+    retiredPorts: [],
+  }
+  const dataDirectory = join(profileFor(page).homeRoot, 'plugins', 'multi-host')
+  await mkdir(dataDirectory, { recursive: true, mode: 0o700 })
+  await writeFile(join(dataDirectory, 'directory.json'), `${JSON.stringify(directory, null, 2)}\n`, { mode: 0o600 })
+  await page.reload()
+  await StartupDialogs.registerProviderSetupDismissal(page)
+  await openGlobalPanel(page, 'Backlog')
+  await page.getByRole('button', { name: 'Backlog settings', exact: true }).click()
+})
+
+Then('the Hosts section lists both Hosts and where each runs automation', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-hosts-peers', async () => {
+    const hosts = page.getByRole('region', { name: 'Hosts', exact: true })
+    const buildBox = hosts.getByRole('listitem', { name: 'Host Build box' })
+    await expect(buildBox).toBeVisible()
+    await expect(buildBox).toContainText('Automation Host not reported yet')
+    await expect(hosts.getByRole('listitem', { name: 'Host Studio' })).toBeVisible()
+    await expect(hosts).not.toContainText('No other Host yet')
   })
   await finishJourneyAssertions(page)
 })

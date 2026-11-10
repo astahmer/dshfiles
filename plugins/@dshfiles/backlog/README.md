@@ -863,9 +863,10 @@ The calls go through `@dshfiles/multi-host`'s `runtimePeerRead`, which passes ex
 `backlog/peerOpsSince` and `backlog/peerFiles` (the backlog depends on its published contract, never the reverse); a
 failed read is retried once. Without multi-host the section says the backlog stays on this Host and nothing runs. Each
 pull is one `backlog peer pull` span with counts only (ops, lag, outcome). The section lists each runtime with its
-switch, last pull, ops still to pull, last error and **Sync now**, and the automation Host picker; the item work log
-names the other Host that wrote an event. Agents read `backlog_peer_status` and, when the user asked, call
-`backlog_peer_sync` and `backlog_peers_configure`.
+switch, last pull, ops still to pull, last error and **Sync now**, where that Host runs automation (once it has been
+pulled), and the automation Host picker; a Host that picked a different automation Host is named, with the recovery
+of setting the same Host on every Host. The item work log names the other Host that wrote an event. Agents read
+`backlog_peer_status` and, when the user asked, call `backlog_peer_sync` and `backlog_peers_configure`.
 
 ### Import from the JSON storage domains
 

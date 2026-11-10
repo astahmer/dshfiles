@@ -37,7 +37,8 @@ Feature: Backlog item references and history
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/multi-host" is booted
     When the Backlog panel is opened
     And the Backlog settings are opened
-    Then the Hosts section says no other Host shares the backlog yet
+    And two multi-host Hosts are seeded
+    Then the Hosts section lists both Hosts and where each runs automation
 
   @scenario:backlog.item-timeline-lanes
   Scenario: Agent progress folds into a work log beside the conversation, and agent items stay out of project counts

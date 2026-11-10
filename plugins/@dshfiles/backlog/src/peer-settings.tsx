@@ -9,6 +9,7 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 
 import { backlogApi, type BacklogPeerStatusView } from './api.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { PeerAutomation, type PeerAutomationView } from './peer-automation.js'
 
 const PEER_STATUS_KEY = ['dshfiles-backlog', 'peer-status'] as const
 const THIS_HOST = ''
@@ -25,6 +26,18 @@ const pulledAgo = (at: number | null): string => {
 
 type PeerView = BacklogPeerStatusView['peers'][number]
 
+/** Where one peer runs automation, in this section's words: on itself, on this Host, or on a Host it names. */
+const automationSentence = (entry: { readonly peerName: string; readonly peerHostId: string | null; readonly automation: PeerAutomationView }): string =>
+  entry.automation.hostId === entry.peerHostId ? `${entry.peerName} runs automation itself` : `${entry.peerName} runs automation on ${entry.automation.label}`
+
+/** What the section says when Hosts picked different automation Hosts: two of them would run the same gate checks. */
+const automationDisagreement = (status: BacklogPeerStatusView): string | null => {
+  const disagreements = PeerAutomation.disagreements(status)
+  if (disagreements.length === 0) return null
+  const where = disagreements.map(automationSentence).join('; ')
+  return `Hosts disagree on where automation runs: ${where}. Pick the same Host here and in each Host's Backlog settings › Hosts, or gate checks and main polling run twice.`
+}
+
 /** What the section says instead of a Host list when there is nothing to list. */
 const emptyNote = (status: BacklogPeerStatusView): string | null => {
   if (!status.available)
@@ -33,7 +46,13 @@ const emptyNote = (status: BacklogPeerStatusView): string | null => {
   return null
 }
 
-const PeerRow = (props: { readonly peer: PeerView; readonly busy: boolean; readonly onToggle: (enabled: boolean) => void; readonly onSync: () => void }) => {
+const PeerRow = (props: {
+  readonly peer: PeerView
+  readonly automation: PeerAutomationView | null
+  readonly busy: boolean
+  readonly onToggle: (enabled: boolean) => void
+  readonly onSync: () => void
+}) => {
   const { peer } = props
   return (
     <li className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3" aria-label={`Host ${peer.name}`}>
@@ -54,6 +73,9 @@ const PeerRow = (props: { readonly peer: PeerView; readonly busy: boolean; reado
           <Switch size="sm" checked={peer.enabled} aria-label={`Share the backlog with ${peer.name}`} onCheckedChange={props.onToggle} />
         </span>
       </div>
+      <p className="dshx:text-xs dshx:text-muted-foreground">
+        {props.automation === null ? 'Automation Host not reported yet' : `Automation on ${props.automation.label}`}
+      </p>
       {peer.error === null ? null : (
         <p role="alert" className="dshx:text-xs dshx:text-destructive">
           {peer.error.message}
@@ -72,6 +94,7 @@ export const BacklogHostsSettings = (): JSX.Element => {
   const sync = useMutation({ mutationFn: (runtimeId?: string) => api.peerSync(runtimeId === undefined ? {} : { runtimeId }), onSuccess: store })
   const configure = useMutation({ mutationFn: (input: Parameters<typeof api.configurePeers>[0]) => api.configurePeers(input), onSuccess: store })
   const data = status.data
+  const disagreement = data === undefined ? null : automationDisagreement(data)
   const enabledCount = data?.peers.filter(peer => peer.enabled).length ?? 0
   const automationOptions: ComboboxOption[] = [
     { value: THIS_HOST, label: 'This Host' },
@@ -108,6 +131,7 @@ export const BacklogHostsSettings = (): JSX.Element => {
               <PeerRow
                 key={peer.runtimeId}
                 peer={peer}
+                automation={PeerAutomation.of(data, peer)}
                 busy={sync.isPending && (sync.variables === undefined || sync.variables === peer.runtimeId)}
                 onToggle={enabled => configure.mutate({ peers: [{ runtimeId: peer.runtimeId, enabled }] })}
                 onSync={() => sync.mutate(peer.runtimeId)}
@@ -128,6 +152,11 @@ export const BacklogHostsSettings = (): JSX.Element => {
                 />
               </div>
               {data.automationNote === null ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{data.automationNote}</p>}
+              {disagreement === null ? null : (
+                <p role="status" className="dshx:text-xs dshx:text-warning">
+                  {disagreement}
+                </p>
+              )}
             </div>
           ) : null}
         </div>
