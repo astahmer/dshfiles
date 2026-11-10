@@ -26,20 +26,46 @@ export interface SettingsOpenRequest {
   readonly query?: string
 }
 
+interface SettingsHubRegistration {
+  readonly visible: () => boolean
+  readonly open: (request: SettingsOpenRequest) => void
+}
+
+/**
+ * One Settings page, several presentations. A request goes to the visible hub; when every hub is hidden, the request
+ * waits for the occurrence the shell is about to reveal, so reopening a background Settings tab shows what was asked
+ * for instead of the section it happened to hold.
+ */
 export const createSettingsHubRouter = () => {
-  const hubs = new Set<{ readonly visible: () => boolean; readonly open: (request: SettingsOpenRequest) => void }>()
+  const hubs = new Set<SettingsHubRegistration>()
+  let pending: SettingsOpenRequest | undefined
+  const deliver = (hub: SettingsHubRegistration): void => {
+    const request = pending
+    if (request === undefined) return
+    pending = undefined
+    hub.open(request)
+  }
   return {
-    register: (hub: { readonly visible: () => boolean; readonly open: (request: SettingsOpenRequest) => void }) => {
+    register: (hub: SettingsHubRegistration) => {
       hubs.add(hub)
       return () => {
         hubs.delete(hub)
       }
     },
+    /** True when a visible hub took it; false leaves it pending for the hub that becomes visible next. */
     open: (request: SettingsOpenRequest): boolean => {
       const hub = [...hubs].find(candidate => candidate.visible())
-      if (hub === undefined) return false
+      if (hub === undefined) {
+        pending = request
+        return false
+      }
+      pending = undefined
       hub.open(request)
       return true
+    },
+    /** The hub just became the Settings surface: hand it the request that could not be delivered earlier. */
+    activate: (hub: SettingsHubRegistration): void => {
+      if (hubs.has(hub)) deliver(hub)
     },
   }
 }
@@ -71,20 +97,21 @@ export const createSettingsWorkbenchHub = (sources: {
       setTarget(undefined)
       setQuery('')
     }
-    useEffect(
-      () =>
-        sources.router.register({
-          visible: () => visible.current,
-          open: request => {
-            if (request.field !== undefined) setActiveId(request.field.sectionId)
-            else if (request.sectionId !== undefined) setActiveId(request.sectionId)
-            setField(request.field)
-            setTarget(request.field === undefined ? request.target : undefined)
-            setQuery(previous => request.query ?? (request.field === undefined && request.sectionId === undefined ? previous : ''))
-          },
-        }),
-      [],
-    )
+    const [hub] = useState<SettingsHubRegistration>(() => ({
+      visible: () => visible.current,
+      open: request => {
+        if (request.field !== undefined) setActiveId(request.field.sectionId)
+        else if (request.sectionId !== undefined) setActiveId(request.sectionId)
+        setField(request.field)
+        setTarget(request.field === undefined ? request.target : undefined)
+        setQuery(previous => request.query ?? (request.field === undefined && request.sectionId === undefined ? previous : ''))
+      },
+    }))
+    useEffect(() => sources.router.register(hub), [hub])
+    const shown = props.visible !== false
+    useEffect(() => {
+      if (shown) sources.router.activate(hub)
+    }, [shown, hub])
     const close = props.onClose ?? sources.closeSettings
     const view = sources.view({ groups, activeId, field, query })
     const owner: SettingsSectionOwnerProps & {
