@@ -43,6 +43,11 @@ describe('rankTools', () => {
     expect(ToolSearchModel.rank('book flight', broadCatalog)).toEqual([])
   })
 
+  it('labels only the tool families a catalog holds, in a fixed order', () => {
+    expect(ToolSearchModel.familyLabels(['thread_rename', 'backlog_list', 'backlog_get', 'read_file'])).toEqual(['backlog tasks', 'threads'])
+    expect(ToolSearchModel.familyLabels(['read_file'])).toEqual([])
+  })
+
   it('rejects blank and overlong queries and limits outside the configured ceiling', () => {
     const limits = { maxResults: 2, maxQueryChars: 8 }
     expect(() => ToolSearchModel.validate('  ', undefined, limits)).toThrow('must not be blank')

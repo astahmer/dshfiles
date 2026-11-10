@@ -271,10 +271,17 @@ class ToolSearch extends Context.Service<
           }
         })
 
+        /** Fixed when the agent attaches, so the declared list never changes; later MCP tools are still searchable. */
+        const schemaSearchDescription = (state: AgentState): string => {
+          const families = ToolSearchModel.familyLabels(deferredNames(state))
+          const covers = families.length === 0 ? '' : ` Unlisted tools include ${families.join(', ')}; search before saying you cannot do something.`
+          return `Find tools that are not listed: describe the capability you need or name a tool exactly. Returns each match's description and parameter schema; call it with ${TOOL_CALL_NAME}.${covers}`
+        }
+
         const schemaSearchTool = (state: AgentState) =>
           Tool.make({
             name: TOOL_SEARCH_NAME,
-            description: `Find tools that are not listed: describe the capability you need or name a tool exactly. Returns each match's description and parameter schema; call it with ${TOOL_CALL_NAME}.`,
+            description: schemaSearchDescription(state),
             input: Schema.Struct({
               query: Schema.String.annotate({ description: `Capability or exact tool name to find (maximum ${config.maxQueryChars} characters).` }),
               limit: Schema.optionalKey(Schema.Int.annotate({ description: `Maximum matches to return, from 1 to ${config.maxResults}.` })),

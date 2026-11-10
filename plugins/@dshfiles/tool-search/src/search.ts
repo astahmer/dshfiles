@@ -123,23 +123,23 @@ const synonymWeight = 0.6
  * Family aliases: words that name what a whole tool family is for, appended once to every member's text, so a query
  * phrased in everyday words reaches the family and BM25 picks the member.
  */
-const familyAliases: readonly (readonly [prefix: string, words: string])[] = [
-  ['backlog_', 'task todo item tracker ticket issue bug idea'],
-  ['schedule_', 'reminder remind later timer recurring'],
-  ['jj_thread_', 'land rebase main unlanded'],
-  ['jj_', 'revision commit bookmark'],
-  ['thread_', 'conversation chat'],
-  ['memory_', 'remember earlier recall'],
-  ['secret_', 'key credential password'],
-  ['usage_', 'cost spend token'],
-  ['ai_accounts_', 'subscription quota allowance account codex claude'],
-  ['multi_host_', 'remote machine host server ssh'],
-  ['traces_', 'error failure latency slow span'],
-  ['whiteboard_', 'diagram drawing sketch'],
-  ['pull_request', 'pr pull request github'],
-  ['preview_', 'browser page web localhost'],
-  ['background_jobs_', 'job running background'],
-  ['settings_', 'setting preference configuration'],
+const familyAliases: readonly (readonly [prefix: string, words: string, label: string])[] = [
+  ['backlog_', 'task todo item tracker ticket issue bug idea', 'backlog tasks'],
+  ['schedule_', 'reminder remind later timer recurring', 'reminders'],
+  ['jj_thread_', 'land rebase main unlanded', 'thread workspaces and landing'],
+  ['jj_', 'revision commit bookmark', 'jj revisions'],
+  ['thread_', 'conversation chat', 'threads'],
+  ['memory_', 'remember earlier recall', 'memory of earlier threads'],
+  ['secret_', 'key credential password', 'secrets'],
+  ['usage_', 'cost spend token', 'usage and cost'],
+  ['ai_accounts_', 'subscription quota allowance account codex claude', 'AI accounts, subscriptions and quota'],
+  ['multi_host_', 'remote machine host server ssh', 'remote hosts'],
+  ['traces_', 'error failure latency slow span', 'traces and errors'],
+  ['whiteboard_', 'diagram drawing sketch', 'whiteboards'],
+  ['pull_request', 'pr pull request github', 'pull requests'],
+  ['preview_', 'browser page web localhost', 'preview browser'],
+  ['background_jobs_', 'job running background', 'background jobs'],
+  ['settings_', 'setting preference configuration', 'DSH settings'],
 ]
 
 const familyText = (name: string): string =>
@@ -147,6 +147,12 @@ const familyText = (name: string): string =>
     .filter(([prefix]) => name.startsWith(prefix))
     .map(([, words]) => words)
     .join(' ')
+
+/** Labels of the families with at least one of `names`, in table order, so a model knows what a search can find. */
+const familyLabels = (names: Iterable<string>): string[] => {
+  const present = [...names]
+  return familyAliases.filter(([prefix]) => present.some(name => name.startsWith(prefix))).map(([, , label]) => label)
+}
 
 const compareToolNames = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0)
 
@@ -260,4 +266,5 @@ export class ToolSearchModel {
   static readonly validate = validateSearch
   static readonly compileAlwaysVisible = compileAlwaysVisible
   static readonly rank = rankTools
+  static readonly familyLabels = familyLabels
 }
