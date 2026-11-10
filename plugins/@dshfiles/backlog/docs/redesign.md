@@ -62,3 +62,43 @@ local storage; Enter sends instantly (optimistic), failure restores the draft wi
 | Activity not shared                | Item log stays the source of truth (timeline is bounded and observation-only); backlog events published to the timeline (setting `publishActivity`); live thread state from the session list |
 | Lists not virtualized              | Items virtualized, Feed paged, Board columns capped, revision-gated polling, Host-side project counts; measured on 2,017 items                                                               |
 | Jev and model triage untested live | Jev checked live with the `jev-api-key-optmem` secret; its work question now counts bug reports as work. The model path is still unchecked: the free models refuse calls outside OpenCode    |
+
+## Why it exists, and the rules it keeps
+
+TODOs used to live in one Discord channel. It worked because capture cost nothing and old notes sank below the fold on
+their own; it failed at everything a tracker does: no status, owner or links, no backlinks, nothing an agent could read
+or move. The backlog keeps the channel's properties and adds the tracker's:
+
+- **One input.** The capture box (and `backlog_capture`) takes free text; kind, refs and project are derived, never
+  required.
+- **Sorting is activity, not filing.** The default view is ordered by last activity; search and facets find the rest.
+- **Decay, not an "outdated" status.** Freshness is computed on read from last activity, kind and status, so nothing
+  sweeps and any touch revives an item.
+- **A capability the user has, the Agent gets.** Every panel verb is an agent tool on the same Host method.
+- **The human wins.** A field the user set is not moved by an automatic rule; every change is an event with its actor.
+- **Links are data.** `jj:<rev>`, `b:<ref>`, thread ids, branches and URLs in the text become typed links with
+  backlinks.
+
+## Decisions
+
+- **Standalone, not part of memory.** Memory holds facts, the backlog holds intent.
+- **One SQLite op log instead of the JSON storage domain.** The JSON document was rewritten whole on every write, kept
+  attachments as base64 and reused ids after a delete and restart. Ops are append-only with ULIDs and a hybrid logical
+  clock; items are a fold of them, attachments are content-addressed files, and revert writes a new op.
+- **Short random aliases.** New items get `b:` plus four Crockford base32 characters; legacy numbers stay valid
+  forever. The two never collide because a legacy reference is digits only.
+- **Agent noise is activity, not items.** Agent-created items are hidden by default per view, and the item timeline
+  splits a Conversation lane from a collapsed Work log, because agent comments and moves outnumber the user's by far.
+- **Many sources behind one provider port.** Linear, GitHub, markdown files, Notion and Jira are providers serving
+  the `backlog-provider` Host API, each with several accounts and bindings; polling is the baseline because webhooks
+  need public HTTPS.
+- **Hosts replicate as peers, without a leader.** Ops are a grow-only set, so any topology converges and an offline
+  Host keeps writing. A leader Host (no offline writes) and JSONL in git as the source of truth were rejected.
+- **No embedding index.** A trigram FTS index narrows candidates; the token scorer ranks them.
+- **Taken from other trackers:** a ready queue and atomic claims with a lease (Beads), owner versus agent delegate and
+  per-project agent guidance (Linear), priority, sub-issues, acceptance criteria, plan and summary sections
+  (Backlog.md), duplicate merge with reference rewriting, gates, templates, due dates, revert from history, and a
+  shipped digest. Scheduled rules and recurring items compose `@dshfiles/project-automations`; PR state composes
+  `@dshfiles/pull-requests`.
+- **Left out on purpose:** SLAs, estimates and velocity, sprints, roadmaps, triage rotation, workload, a custom-field
+  builder, watchers, permissions, dashboards and releases. They are noise for one user and their agents.
