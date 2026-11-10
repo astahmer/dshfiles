@@ -24,7 +24,7 @@ import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ArrowLeftIcon, RefreshCwIcon, ScrollTextIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FiringAlertsBanner, FiringAlertsCount } from './alerts/alert-badges.js'
 import type { TracesAlertsTranslate } from './alerts/alerts-locale.js'
 import { AlertsView, useFiringCount } from './alerts/alerts-view.js'
@@ -43,7 +43,8 @@ import { createThreadOpener } from './open-thread.js'
 import { ServiceMapView } from './service-map.js'
 import { TraceList } from './trace-list.js'
 import { Schema, type Types } from 'effect'
-import { storedTracesView, tracesTabSchema, WINDOW_OPTIONS, type TracesView } from './view-state.js'
+import { tracesTabSchema, WINDOW_OPTIONS, type TracesView } from './view-state.js'
+import { panelStores } from './panel-stores.js'
 
 const ALL = '__all__'
 
@@ -67,6 +68,7 @@ export const RecoveryAlert = (props: { readonly message: string; readonly action
 )
 
 export const TracesPanel = (props: {
+  readonly panelId?: string
   readonly sessions: ISessions
   readonly workspaces: IWorkspaces
   readonly uiWorkspace: UiWorkspace
@@ -77,7 +79,8 @@ export const TracesPanel = (props: {
   const client = useApi(tracesApi)
   const firing = useFiringCount()
   const queryClient = useQueryClient()
-  const view = storedTracesView.useValue()
+  const stores = useMemo(() => panelStores(props.panelId), [props.panelId])
+  const view = stores.traces.useValue()
   const [traceId, setTraceId] = useState<string | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
   const [logCorrelation, setLogCorrelation] = useState<LogCorrelation | null>(null)
@@ -88,7 +91,7 @@ export const TracesPanel = (props: {
   const update = (patch: Partial<TracesView> & { readonly traceId?: string | null }): void => {
     const { traceId: nextTraceId, ...stored } = patch
     if (nextTraceId !== undefined) setTraceId(nextTraceId)
-    if (Object.keys(stored).length > 0) storedTracesView.set({ ...view, ...stored })
+    if (Object.keys(stored).length > 0) stores.traces.set({ ...view, ...stored })
   }
   const search = useDebouncedValue({ value: view.search.trim(), delayMs: 250 })
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
@@ -204,7 +207,7 @@ export const TracesPanel = (props: {
               </TabsTrigger>
             </TabsList>
             <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-              <SavedViewsMenu t={props.tAlerts} />
+              <SavedViewsMenu t={props.tAlerts} stores={stores} />
               {view.tab === 'traces' || view.tab === 'logs' || view.tab === 'alerts' ? null : (
                 <Select value={String(view.windowMinutes)} onValueChange={value => update({ windowMinutes: Number(value) })}>
                   <SelectTrigger size="sm" aria-label={t('window')} className="dshx:w-32">
@@ -338,6 +341,7 @@ export const TracesPanel = (props: {
           <TabsContent value="logs">
             {view.tab === 'logs' ? (
               <LogsView
+                store={stores.logs}
                 client={client}
                 services={services}
                 correlation={logCorrelation}
@@ -380,6 +384,7 @@ export const TracesPanel = (props: {
           <TabsContent value="boards">
             {view.tab === 'boards' ? (
               <BoardsView
+                store={stores.board}
                 windowMinutes={view.windowMinutes}
                 onDrillDown={drillDown =>
                   update({

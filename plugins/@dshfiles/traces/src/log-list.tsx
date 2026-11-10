@@ -10,17 +10,16 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ChevronDownIcon, ChevronRightIcon, WaypointsIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useInfiniteQuery } from '@dshfiles/plugin-ui/query'
-import * as Schema from 'effect/Schema'
 import { useState } from 'react'
 import type { LogsInput } from './api.js'
 import type { Types } from 'effect'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { TraceFormat } from './format.js'
 import type { TracesTranslate } from './locales.js'
 import { tracesQueries, type TracesClient } from './queries.js'
 import { AttributeTable } from './trace-detail.js'
 import { ServiceDot } from './trace-list.js'
 import type { LogRecord } from './types.js'
+import { storedLogsView, type LogsView as LogsViewState } from './panel-stores.js'
 
 const ALL = '__all__'
 
@@ -31,21 +30,6 @@ const SEVERITY_FLOORS = [
   { value: 13, key: 'severityWarn' },
   { value: 17, key: 'severityError' },
 ] as const
-
-export const logsViewSchema = Schema.Struct({
-  search: Schema.String.check(Schema.isMaxLength(200)),
-  service: Schema.NullOr(Schema.String.check(Schema.isMaxLength(256))),
-  minSeverity: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(24)),
-  attribute: Schema.String.check(Schema.isMaxLength(640)),
-})
-
-export type LogsView = Schema.Schema.Type<typeof logsViewSchema>
-
-export const storedLogsView = createStoredValue({
-  key: 'dshfiles.traces.logs-view.v1',
-  schema: logsViewSchema,
-  fallback: { search: '', service: null, minSeverity: 0, attribute: '' },
-})
 
 /** `key=value` from the attribute box; anything else filters nothing. */
 const parseAttributeFilter = (text: string): { readonly key: string; readonly value: string } | null => {
@@ -127,6 +111,7 @@ export const LogRow = (props: { readonly log: LogRecord; readonly onOpenTrace: (
 
 export const LogsView = (props: {
   readonly client: TracesClient
+  readonly store?: typeof storedLogsView
   readonly services: readonly string[]
   readonly correlation: LogCorrelation | null
   readonly onClearCorrelation: () => void
@@ -134,9 +119,10 @@ export const LogsView = (props: {
   readonly t: TracesTranslate
 }): JSX.Element => {
   const t = props.t
-  const view = storedLogsView.useValue()
-  const update = (patch: Partial<LogsView>): void => {
-    storedLogsView.set({ ...view, ...patch })
+  const store = props.store ?? storedLogsView
+  const view = store.useValue()
+  const update = (patch: Partial<LogsViewState>): void => {
+    store.set({ ...view, ...patch })
   }
   const search = useDebouncedValue({ value: view.search.trim(), delayMs: 250 })
   const attribute = parseAttributeFilter(useDebouncedValue({ value: view.attribute, delayMs: 250 }))

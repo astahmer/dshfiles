@@ -30,4 +30,10 @@ const defaultTracesView: TracesView = {
 }
 
 /** The panel's tab, filters and window survive a reload and are shared by every browser tab, like a URL would be. */
-export const storedTracesView = createStoredValue({ key: 'dshfiles.traces.view.v1', schema: tracesViewSchema, fallback: defaultTracesView })
+export const tracesViewFor = (panelId?: string) =>
+  createStoredValue({
+    key: panelId === undefined ? 'dshfiles.traces.view.v1' : `dshfiles.traces.view.v1/panel/${encodeURIComponent(panelId)}`,
+    schema: tracesViewSchema,
+    fallback: defaultTracesView,
+  })
+export const storedTracesView = tracesViewFor()
