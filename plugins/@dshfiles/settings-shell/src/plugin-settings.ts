@@ -9,6 +9,8 @@ interface NamespaceDescription {
   readonly secrets?: readonly { readonly path: readonly string[] }[]
   /** False for a namespace whose plugin draws its own Settings page; its fields still show under "More settings". */
   readonly autoGenerate: boolean
+  /** The raw user layer: a field present here is modified. */
+  readonly user?: JsonValue
 }
 
 /** Display text a bundle's manifest gives one of its rows; the row id is the settings namespace. */
@@ -25,6 +27,8 @@ export interface PluginSettingsPage {
   readonly description: string
   readonly group: 'plugins' | 'more'
   readonly fields: readonly SettingField[]
+  /** Dotted paths of the fields the user layer sets, for the `@modified` search filter. */
+  readonly modifiedPaths: readonly string[]
 }
 
 const PAGE_PREFIX = 'plugin:'
@@ -57,6 +61,7 @@ export class SettingsPluginPages {
             description: label?.description || own.description,
             group: namespace.autoGenerate ? ('plugins' as const) : ('more' as const),
             fields,
+            modifiedPaths: fields.filter(field => SettingsSchemaModel.hasValueAt(namespace.user, field.path)).map(field => field.path.join('.')),
           },
         ]
       })

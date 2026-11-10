@@ -20,6 +20,7 @@ const pages = SettingsPluginPages.pluginSettingsPages({
           maxChildren: Schema.natural().description('Child threads listed under a parent.'),
         }),
       ),
+      user: { maxChildren: 4, autoArchiveSessionIds: ['s1'] },
     },
     { ns: 'dshfiles-main-tabs', autoGenerate: true, schema: wire(Schema.object({ maxTabs: Schema.natural().description('Préférences des onglets.') })) },
   ],
@@ -49,6 +50,19 @@ const entries = SettingsSearch.entryRows({
 })
 
 describe('searchSettings', () => {
+  it('narrows to settings the user layer sets with @modified, alone or with words, and toggles the filter', () => {
+    expect(pages.find(page => page.ns === 'thread-sidebar')?.modifiedPaths).toEqual(['maxChildren'])
+    const modified = SettingsSearch.search({ query: '@modified', sections, pages, entries })
+    expect(modified.pages.map(hit => [hit.page.ns, hit.fields.map(field => field.key)])).toEqual([['thread-sidebar', ['maxChildren']]])
+    expect(modified.total).toBe(1)
+    expect(SettingsSearch.search({ query: '@Modified archive', sections, pages, entries }).total).toBe(0)
+    expect(SettingsSearch.search({ query: '@modified child', sections, pages, entries }).total).toBe(1)
+    expect(SettingsSearch.toggleModified('thread  child')).toBe('@modified thread child')
+    expect(SettingsSearch.toggleModified('@modified thread')).toBe('thread')
+    expect(SettingsSearch.hasModifiedFilter('x @MODIFIED')).toBe(true)
+    expect(SettingsSearch.highlightText('@modified child')).toBe('child')
+  })
+
   it('finds settings by title, description and key, never hidden ones, and counts them per page', () => {
     const result = SettingsSearch.search({ query: 'archive', sections, pages, entries: [] })
     expect(result.pages.map(hit => [hit.page.ns, hit.fields.map(field => field.key)])).toEqual([

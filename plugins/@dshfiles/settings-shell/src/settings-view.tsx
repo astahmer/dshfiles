@@ -3,6 +3,7 @@ import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
 import { IconCloseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
+import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { ArrowUpRightIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -210,7 +211,7 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
             </h3>
             <span className="dshx:text-xs dshx:text-muted-foreground">{t('search.matches', { count: hit.fields.length })}</span>
           </button>
-          {props.renderMatches(hit.page, hit.fields, props.query)}
+          {props.renderMatches(hit.page, hit.fields, SettingsSearch.highlightText(props.query))}
         </section>
       ))}
     </div>
@@ -342,6 +343,17 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             </InputGroupAddon>
           )}
         </InputGroup>
+        <Toggle
+          aria-label={t('search.modified')}
+          className="dshx:shrink-0"
+          data-settings-modified-filter=""
+          onPressedChange={() => props.onSearch(SettingsSearch.toggleModified(props.query))}
+          pressed={SettingsSearch.hasModifiedFilter(props.query)}
+          size="sm"
+          variant="outline"
+        >
+          {t('search.modified')}
+        </Toggle>
         {searching && (
           <span aria-live="polite" className="dshx:shrink-0 dshx:text-[12px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" role="status">
             {foundText}

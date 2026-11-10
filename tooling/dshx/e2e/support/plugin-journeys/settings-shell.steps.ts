@@ -235,6 +235,65 @@ Then('Max tabs is back to {int} and no longer marked modified', async ({ page }:
   await finishJourneyAssertions(page)
 })
 
+const mainTabsPage = (page: Page) => page.getByRole('region', { name: 'Main tabs', exact: true })
+const jsonEditor = (page: Page) => mainTabsPage(page).locator('[data-settings-json] textarea')
+const jsonDocumentSchema = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json))
+
+Then('the Max tabs row says it is an override that inherits {int}', async ({ page }: { page: Page }, value: number) => {
+  await recordAssertion(page, 'settings-shell-row-source', async () => {
+    await expect(settingRow(page, 'maxTabs').locator('[data-setting-source="user"]')).toHaveText(`Override · inherits ${String(value)}`)
+    await expect(settingRow(page, 'enabled').locator('[data-setting-source]')).toHaveText('Default')
+  })
+})
+
+When('the Main tabs page is shown as JSON', async ({ page }: { page: Page }) => {
+  await mainTabsPage(page).getByRole('radio', { name: 'JSON', exact: true }).click()
+  await expect(jsonEditor(page)).toBeVisible()
+})
+
+Then('the JSON overrides hold Max tabs {int} and the defaults view holds {int}', async ({ page }: { page: Page }, override: number, inherited: number) => {
+  await recordAssertion(page, 'settings-shell-json-overrides-and-defaults', async () => {
+    await expect.poll(async () => Schema.decodeUnknownSync(jsonDocumentSchema)(await jsonEditor(page).inputValue()).maxTabs).toBe(override)
+    await mainTabsPage(page).getByRole('tab', { name: 'Defaults', exact: true }).click()
+    await expect(mainTabsPage(page).locator('pre[aria-label="Defaults"]')).toContainText(`"maxTabs": ${String(inherited)}`)
+    await mainTabsPage(page).getByRole('tab', { name: 'Overrides', exact: true }).click()
+  })
+})
+
+When('the JSON overrides add an unknown key', async ({ page }: { page: Page }) => {
+  await jsonEditor(page).fill('{ "maxTabs": 8, "maxTabz": 3 }')
+})
+
+Then('the JSON editor names the unknown key and cannot save', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-json-diagnostics', async () => {
+    await expect(mainTabsPage(page).locator('[data-diagnostic="unknown-key"]')).toContainText('maxTabz is not a setting of this plugin')
+    await expect(mainTabsPage(page).getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  })
+})
+
+When('the JSON overrides set Max tabs to {int} and are saved', async ({ page }: { page: Page }, value: number) => {
+  await jsonEditor(page).fill(`{ "maxTabs": ${String(value)} }`)
+  await mainTabsPage(page).getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(mainTabsPage(page).getByText('Unsaved changes', { exact: true })).toHaveCount(0)
+})
+
+Then('the form shows Max tabs {int} marked modified', async ({ page }: { page: Page }, value: number) => {
+  await recordAssertion(page, 'settings-shell-json-save-reaches-the-form', async () => {
+    await mainTabsPage(page).getByRole('radio', { name: 'Form', exact: true }).click()
+    await expect(settingRow(page, 'maxTabs').getByRole('spinbutton', { name: 'Max tabs', exact: true })).toHaveValue(String(value))
+    await expect(settingRow(page, 'maxTabs')).toHaveAttribute('data-modified', '')
+  })
+})
+
+Then('only the Max tabs setting is listed', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-modified-filter', async () => {
+    await expect(settingsView(page).getByText('1 Setting Found', { exact: true })).toBeVisible()
+    await expect(settingRow(page, 'maxTabs')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Modified', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  })
+  await finishJourneyAssertions(page)
+})
+
 const SETTINGS_MUTATE = /settings[./]mutate/
 const isSettingsWrite = (request: Request): boolean => request.method() === 'POST' && SETTINGS_MUTATE.test(`${request.url()} ${request.postData() ?? ''}`)
 const heldSettingsWrites = new Map<Page, Route[]>()

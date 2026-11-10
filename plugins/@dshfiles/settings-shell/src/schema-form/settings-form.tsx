@@ -23,6 +23,26 @@ import {
   type SettingField,
 } from './schema-model.js'
 import { savingOutcome, settleSave, type SaveOutcome, type SaveOutcomes } from './save-outcome.js'
+import { SettingProvenanceModel, type SettingProvenance } from './setting-provenance.js'
+
+const MAX_PREVIEW = 40
+
+/** A short JSON preview of a value, for the source line. */
+const valuePreview = (value: JsonValue): string => {
+  const text = JSON.stringify(value) ?? ''
+  return text.length > MAX_PREVIEW ? `${text.slice(0, MAX_PREVIEW - 1)}…` : text
+}
+
+/** Where the row's value comes from, in words: no colour carries the meaning. */
+const sourceText = (provenance: SettingProvenance, t: ShellTranslate): string => {
+  if (provenance.source === 'user') {
+    const label = provenance.equalsInherited ? t('source.userEqual') : t('source.user')
+    return provenance.inherited === undefined || provenance.equalsInherited
+      ? label
+      : `${label} · ${t('source.inherits', { value: valuePreview(provenance.inherited) })}`
+  }
+  return t(`source.${provenance.source}`)
+}
 
 const numberSchema = Schema.Union([Schema.Number, Schema.NumberFromString]).check(Schema.isFinite())
 
@@ -457,6 +477,7 @@ const SettingRow = (props: {
   readonly value: JsonValue | undefined
   /** The user layer sets this field: the row shows the modified bar and offers a reset. */
   readonly modified: boolean
+  readonly provenance: SettingProvenance
   readonly reset: (field: SettingField) => Promise<boolean>
   readonly disabled: boolean
   readonly highlight: string | undefined
@@ -527,9 +548,12 @@ const SettingRow = (props: {
               <Highlight query={props.highlight} text={field.description} />
             </span>
           )}
-          <code className="dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground/80">
-            <Highlight query={props.highlight} text={field.path.join('.')} />
-          </code>
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2 dshx:text-[11px] dshx:text-muted-foreground/80">
+            <code className="dshx:font-mono">
+              <Highlight query={props.highlight} text={field.path.join('.')} />
+            </code>
+            <span data-setting-source={props.provenance.source}>{sourceText(props.provenance, props.t)}</span>
+          </span>
         </div>
         {!block && <div className="dshx:shrink-0">{control}</div>}
       </div>
@@ -608,6 +632,7 @@ export const SettingsForm = (props: {
               focused={focusKey === field.path.join('.')}
               highlight={props.highlight}
               modified={edit === undefined ? user !== undefined && SettingsSchemaModel.hasValueAt(user, field.path) : edit.kind === 'set'}
+              provenance={SettingProvenanceModel.of({ field, value: values, base, user })}
               refused={outcome?.status === 'refused'}
               reset={reset}
               t={props.t}

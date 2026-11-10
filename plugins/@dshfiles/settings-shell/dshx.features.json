@@ -6,13 +6,28 @@
       "id": "settings-shell-port",
       "title": "Native Settings shell, ported",
       "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
-      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"General\""],
-      "surfaces": ["client", "settings", "integration"],
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "expect button \"General\""
+      ],
+      "surfaces": [
+        "client",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "sidebar: Account menu › Settings",
       "configuration": [],
-      "states": ["closed", "open", "compact-navigation", "onboarding", "disconnected", "update-available"],
+      "states": [
+        "closed",
+        "open",
+        "compact-navigation",
+        "onboarding",
+        "disconnected",
+        "update-available"
+      ],
       "failureModes": [
         "When the running DSH ships another version of the native Settings package, the Host warns at boot and General shows the running version, so the port is refreshed instead of drifting silently.",
         "The native welcome notice stores its acknowledgement in the switched-off row's namespace, so the shell ports that step and keeps the acknowledgement in its own namespace; someone who acknowledged the native notice sees it once more."
@@ -47,13 +62,27 @@
       "id": "settings-workbench-panels",
       "title": "One dockable Settings hub with real navigation and forms",
       "summary": "The New tab chooser offers one Settings hub with actual section navigation, search and native/plugin forms. Leaf sections remain registered for saved layouts and explicit links but are hidden from primary suggestions. The authorized shell renderer and ConfigForm remain the owners. Workbench pane chrome is mandatory; hidden right-pane tabs retain their state. It is the same grouped page as the stage page, for free-docking layouts.",
-      "reach": ["click button \"Collapse sidebar\"", "click button \"New tab\"", "click button \"Settings\"", "expect button \"General\""],
-      "surfaces": ["client", "integration"],
+      "reach": [
+        "click button \"Collapse sidebar\"",
+        "click button \"New tab\"",
+        "click button \"Settings\"",
+        "expect button \"General\""
+      ],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "main-tabs: New tab › Settings",
       "configuration": [],
-      "states": ["registered", "open", "label-updated", "source-removed", "disposed"],
+      "states": [
+        "registered",
+        "open",
+        "label-updated",
+        "source-removed",
+        "disposed"
+      ],
       "failureModes": [
         "Without a mounted workbench the sources remain registered but no docked panel is shown.",
         "A removed settings section or namespace unregisters; an existing panel never falls through to another section.",
@@ -90,13 +119,31 @@
       "id": "dsh-release-notice",
       "title": "DSH release notice and TL;DR",
       "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
-      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"Check for DSH updates\""],
-      "surfaces": ["client", "host", "api", "tool", "storage"],
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings*\"",
+        "expect button \"Check for DSH updates\""
+      ],
+      "surfaces": [
+        "client",
+        "host",
+        "api",
+        "tool",
+        "storage"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "sidebar: Settings trigger release mark › General",
       "configuration": [],
-      "states": ["checking", "up-to-date", "update-available", "summary-expanded", "dismissed", "comparison-unknown", "unavailable"],
+      "states": [
+        "checking",
+        "up-to-date",
+        "update-available",
+        "summary-expanded",
+        "dismissed",
+        "comparison-unknown",
+        "unavailable"
+      ],
       "failureModes": [
         "GitHub is unavailable or returns an invalid payload; Settings stays usable and offers a manual retry.",
         "The installed version is absent from the bounded release history; the plugin reports that comparison is unknown instead of guessing.",
@@ -149,12 +196,21 @@
         "click option \"Settings: General*\"",
         "expect tab \"Settings\""
       ],
-      "surfaces": ["client", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: the Settings page in the stage",
       "configuration": [],
-      "states": ["closed", "open", "panel-hidden", "restored-on-reload"],
+      "states": [
+        "closed",
+        "open",
+        "panel-hidden",
+        "restored-on-reload"
+      ],
       "failureModes": [
         "With no other tab left, main-tabs keeps showing Settings: it cannot show an empty main view.",
         "A plugin that still dispatches dshfiles:open-settings with surface modal gets the page; there is no dialog to open."
@@ -190,12 +246,21 @@
         "click option \"Settings: General*\"",
         "expect group \"Models & accounts\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: task groups in the Settings navigation",
       "configuration": [],
-      "states": ["grouped", "linked-page-loaded", "linked-page-missing", "jev-gathered", "other-group"],
+      "states": [
+        "grouped",
+        "linked-page-loaded",
+        "linked-page-missing",
+        "jev-gathered",
+        "other-group"
+      ],
       "failureModes": [
         "A section or namespace nobody placed shows under Other with its own label until the group map in src/settings-groups.ts places it.",
         "A linked page whose plugin is not loaded is left out rather than offered as a dead link.",
@@ -263,12 +328,19 @@
         "fill searchbox \"Search settings\" \"max tabs\"",
         "expect text \"1 Setting Found\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Search settings",
       "configuration": [],
-      "states": ["empty-query", "results", "no-results"],
+      "states": [
+        "empty-query",
+        "results",
+        "no-results"
+      ],
       "failureModes": [
         "Native sections draw their own rows: a match on a section's name offers to open it, and the settings they draw stay searchable and open that section."
       ],
@@ -312,12 +384,20 @@
         "click button \"Show coding view*\"",
         "expect switch \"Show coding view\""
       ],
-      "surfaces": ["client", "settings", "tool"],
+      "surfaces": [
+        "client",
+        "settings",
+        "tool"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Search settings › section controls",
       "configuration": [],
-      "states": ["entry-results", "section-opened-at-target", "invalid-entries-skipped"],
+      "states": [
+        "entry-results",
+        "section-opened-at-target",
+        "invalid-entries-skipped"
+      ],
       "failureModes": [
         "A section whose published entries do not decode is skipped with one console warning.",
         "A section registered imperatively must publish its own entries with publishSettingsSearchEntries."
@@ -376,13 +456,24 @@
         "click button \"Main tabs\"",
         "expect spinbutton \"Max tabs\""
       ],
-      "surfaces": ["client", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: plugin pages",
       "configuration": [],
-      "states": ["ready", "read-only", "unavailable", "refused"],
-      "failureModes": ["A namespace whose plugin is not loaded shows its fields disabled with an explanation."],
+      "states": [
+        "ready",
+        "read-only",
+        "unavailable",
+        "refused"
+      ],
+      "failureModes": [
+        "A namespace whose plugin is not loaded shows its fields disabled with an explanation."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -407,7 +498,7 @@
     {
       "id": "modified-settings",
       "title": "Modified settings and reset to default",
-      "summary": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override, also while the change that set it is still saving.",
+      "summary": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override, also while the change that set it is still saving. Every row names where its value comes from (Override, Profile composition, Default or Source unknown) and what an override would re-inherit, and the Modified toggle beside search (the @modified filter) lists only overridden settings.",
       "reach": [
         "click button \"Open command palette\"",
         "fill combobox \"Search the command palette\" \"Settings: General\"",
@@ -417,13 +508,25 @@
         "press Enter",
         "expect button \"Reset to default\""
       ],
-      "surfaces": ["client", "settings"],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Reset to default",
       "configuration": [],
-      "states": ["default", "modified", "pending"],
-      "failureModes": ["A refused value shows under its row and the row returns to the stored value."],
+      "states": [
+        "default",
+        "modified",
+        "pending",
+        "composition",
+        "unknown-source",
+        "modified-filter"
+      ],
+      "failureModes": [
+        "A refused value shows under its row and the row returns to the stored value."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -435,12 +538,203 @@
           "kind": "gherkin",
           "id": "settings-shell.reset-while-saving",
           "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.provenance",
+          "file": "plugins/@dshfiles/settings-shell/src/schema-form/setting-provenance.test.ts",
+          "testName": "marks an override equal to what it inherits as explicit, and a reset target as the composition value"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.modified-filter",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-search.test.ts",
+          "testName": "narrows to settings the user layer sets with @modified, alone or with words, and toggles the filter"
         }
       ],
       "telemetry": [
         {
           "kind": "not-applicable",
           "reason": "Client-only: Modified settings and reset to default renders browser state and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "settings-json-editor",
+      "title": "Edit plugin settings as JSON",
+      "summary": "Each plugin settings page switches between the form and its overrides as JSON: Insert setting completes keys from the schema with their descriptions, every unknown key or wrong value is listed with its line and blocks Save, Save sends only the fields the draft changed fenced by the revision it started from, and read-only Defaults and Effective tabs show what each field inherits and resolves to. A concurrent change or a refusal keeps the draft with a recovery.",
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Settings: General\"",
+        "click option \"Settings: General*\"",
+        "click button \"Main tabs\"",
+        "click radio \"JSON\"",
+        "expect tab \"Overrides\""
+      ],
+      "surfaces": [
+        "client",
+        "settings"
+      ],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: plugin page › JSON",
+      "configuration": [],
+      "states": [
+        "following",
+        "editing",
+        "saving",
+        "refused",
+        "stale",
+        "diagnostics"
+      ],
+      "failureModes": [
+        "Settings changed elsewhere since the draft started: the draft stays, Save is blocked, and the warning offers Load latest or Save my changes over them (only the draft's changed fields).",
+        "The Host refuses the write: the draft stays and the alert points to the Form view and the configuration file.",
+        "A key the schema does not show (a typo, a secret or hidden field) or a value of the wrong type is listed with its line and blocks Save."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.json-editor",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.json-editor-save",
+          "file": "plugins/@dshfiles/settings-shell/src/schema-form/settings-json-editor.test.tsx",
+          "testName": "saves only the changed fields, fenced by the revision the draft started from, then follows the store"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.json-editor-conflict",
+          "file": "plugins/@dshfiles/settings-shell/src/schema-form/settings-json-editor.test.tsx",
+          "testName": "keeps the draft when the settings changed elsewhere and saves only its own fields over them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.json-document",
+          "file": "plugins/@dshfiles/settings-shell/src/schema-form/settings-document.test.ts",
+          "testName": "accepts fields and the objects that hold them, and flags unknown keys, secrets and wrong types with their line"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the JSON view writes through the shared ConfigForm, the same settings mutate the form uses; it starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "settings-inspect-tool",
+      "title": "Inspect a setting's default, override and source",
+      "summary": "The read-only settings_inspect Agent tool reports each visible field of a namespace with its schema default, user override (also when it equals the default), inherited value, effective value and source, the same model the Settings rows draw.",
+      "reach": [
+        "click tab \"Agents\"",
+        "click button \"Capabilities\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "expect text \"settings_inspect\""
+      ],
+      "surfaces": [
+        "tool",
+        "host"
+      ],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: settings_inspect",
+      "configuration": [],
+      "states": [
+        "user",
+        "composition",
+        "default",
+        "unknown"
+      ],
+      "failureModes": [
+        "An unknown namespace is refused with the known ones named; secret fields are never listed."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.inspect",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-tools.test.ts",
+          "testName": "reports each visible field with its source, override, inherited value and schema default"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "settings-shell.inspect-browser",
+          "reason": "Agent tool with no UI of its own; the Settings rows draw the same provenance model, walked by settings-shell.json-editor."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "plugin-enablement-tools",
+      "title": "List and switch plugin entries for an Agent",
+      "summary": "plugin_inventory lists the profile's Loader entries with enablement, runtime phase and why an entry cannot be changed; plugin_set_enabled enables or disables one through the plugin manager and relays its verdict: applied live, waiting for a user restart (with the reason), or overridden by a higher-priority layer. It never restarts DSH; the opposite value reverses it.",
+      "reach": [
+        "click tab \"Agents\"",
+        "click button \"Capabilities\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "expect text \"plugin_set_enabled\""
+      ],
+      "surfaces": [
+        "tool",
+        "host"
+      ],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tools: plugin_inventory, plugin_set_enabled",
+      "configuration": [],
+      "states": [
+        "applied",
+        "restart-required",
+        "overridden",
+        "failed"
+      ],
+      "failureModes": [
+        "No plugin manager on the Host: the tool says to edit cordis.patch.yml by hand and restart.",
+        "An unknown entry id is refused and points to plugin_inventory; a manager failure points to Settings › Plugins and the profile file."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.plugin-enablement",
+          "file": "plugins/@dshfiles/settings-shell/src/plugin-controls.test.ts",
+          "testName": "lists entries and relays the manager verdict for a change, restart included"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.plugin-enablement-failures",
+          "file": "plugins/@dshfiles/settings-shell/src/plugin-controls.test.ts",
+          "testName": "refuses an unknown entry, a missing manager and a manager failure with a recovery"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "settings-shell.plugin-enablement-browser",
+          "reason": "Agent tools with no UI of their own; the native Plugins page is the user's control for the same plugin-manager verb, and a scratch run would toggle real Loader rows."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },
@@ -455,12 +749,21 @@
         "click button \"More ways to open the configuration file\"",
         "expect menuitem \"Copy path\""
       ],
-      "surfaces": ["client", "settings", "integration"],
+      "surfaces": [
+        "client",
+        "settings",
+        "integration"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Open configuration file",
       "configuration": [],
-      "states": ["no-document", "document", "copied", "failed"],
+      "states": [
+        "no-document",
+        "document",
+        "copied",
+        "failed"
+      ],
       "failureModes": [
         "If the document is absent or desktop path opening is unavailable, the native action creates/opens it in the Host's text editor.",
         "Remote (non-loopback) browsers get neither the action nor the path."
@@ -484,8 +787,15 @@
       "id": "shared-jev-key",
       "title": "Set the Jev key once",
       "summary": "Settings › Tools & MCP › Jev leads with one Key: a secret:ALIAS reference (Secret Catalog picker) that Backlog triage and Memory's signal gates both resolve on the Host. Each plugin's earlier key stays stored but hidden as the fallback while the shared key is empty, and is copied into an empty shared key once, never over a set one. Backlog's Jev section and Memory's review link here.",
-      "reach": ["click button \"Settings\"", "fill searchbox \"Search settings\" \"Jev\"", "expect text \"Key\""],
-      "surfaces": ["client", "host"],
+      "reach": [
+        "click button \"Settings\"",
+        "fill searchbox \"Search settings\" \"Jev\"",
+        "expect text \"Key\""
+      ],
+      "surfaces": [
+        "client",
+        "host"
+      ],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Tools & MCP › Jev › Key",
@@ -494,10 +804,19 @@
           "key": "dshfiles-settings-shell.jevSecret",
           "defaultValue": "",
           "constraints": "Secret Catalog reference only (secret:ALIAS or secret:ALIAS@env); resolves on the Host. Empty falls back to each plugin's earlier key, then TYPESAFE_API_KEY.",
-          "coveredBy": ["settings-shell.jev-key-adopt", "settings-shell.jev-key-first"]
+          "coveredBy": [
+            "settings-shell.jev-key-adopt",
+            "settings-shell.jev-key-first"
+          ]
         }
       ],
-      "states": ["shared-set", "shared-empty-legacy-fallback", "adopted-once", "adoption-deferred", "environment-fallback"],
+      "states": [
+        "shared-set",
+        "shared-empty-legacy-fallback",
+        "adopted-once",
+        "adoption-deferred",
+        "environment-fallback"
+      ],
       "failureModes": [
         "A Host without settings-shell's namespace keeps each plugin reading its own earlier key and the environment.",
         "When Backlog and Memory held different earlier keys, the first adopted one becomes shared; the other stays stored in its plugin and is used again if the shared key is cleared."

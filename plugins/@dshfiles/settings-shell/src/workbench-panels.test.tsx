@@ -23,7 +23,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', async importOriginal => ({
   IconSettingsOutlineMedium: () => <svg aria-hidden />,
 }))
 
-const page: PluginSettingsPage = { pageId: 'plugin:example', ns: 'example', title: 'Example', description: '', group: 'plugins', fields: [] }
+const page: PluginSettingsPage = { pageId: 'plugin:example', ns: 'example', title: 'Example', description: '', group: 'plugins', fields: [], modifiedPaths: [] }
 
 /** Real identity-aware registry contract, bounded to the bridge's one dependency. */
 const registryFixture = () => {

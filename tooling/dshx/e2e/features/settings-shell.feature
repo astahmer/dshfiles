@@ -77,6 +77,21 @@ Feature: Settings shell
     When Max tabs is reset to its default
     Then Max tabs is back to 10 and no longer marked modified
 
+  @scenario:settings-shell.json-editor
+  Scenario: The JSON view edits overrides with diagnostics, shows the defaults and the form shows each source
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When the Main tabs page is opened in Settings
+    And Max tabs is set to 8
+    Then the Max tabs row says it is an override that inherits 10
+    When the Main tabs page is shown as JSON
+    Then the JSON overrides hold Max tabs 8 and the defaults view holds 10
+    When the JSON overrides add an unknown key
+    Then the JSON editor names the unknown key and cannot save
+    When the JSON overrides set Max tabs to 12 and are saved
+    Then the form shows Max tabs 12 marked modified
+    When Settings are searched for "@modified"
+    Then only the Max tabs setting is listed
+
   @scenario:settings-shell.reset-while-saving
   Scenario: Reset to default right after a change resets once the change is saved
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted

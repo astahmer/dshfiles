@@ -47,6 +47,9 @@ const terms = (query: string): readonly string[] =>
     .split(/\s+/u)
     .filter(term => term.length > 0)
 
+/** VS Code's `@modified` filter: only settings the user layer sets. */
+const MODIFIED_TOKEN = '@modified'
+
 const matchesAll = (haystack: string, needles: readonly string[]): boolean => needles.every(needle => haystack.includes(needle))
 
 /** Entries whose title, description, keywords, id or section name hold every word of the query. */
@@ -69,23 +72,28 @@ const searchSettings = (input: {
   readonly entries: readonly SectionEntryRow[]
   readonly shortcuts?: readonly ShortcutRow[]
 }): SettingsSearchResult => {
-  const needles = terms(input.query)
+  const all = terms(input.query)
+  const modifiedOnly = all.includes(MODIFIED_TOKEN)
+  const needles = all.filter(term => term !== MODIFIED_TOKEN)
   const counts = new Map<string, number>()
-  if (needles.length === 0) return { sections: [], pages: [], entries: [], shortcuts: [], total: 0, counts }
-  const sections = input.sections.filter(section => matchesAll(fold(`${section.label} ${section.keywords ?? ''}`), needles))
+  if (all.length === 0) return { sections: [], pages: [], entries: [], shortcuts: [], total: 0, counts }
+  // Sections, published entries and shortcuts carry no user layer, so the modified filter leaves only plugin fields.
+  const sections = modifiedOnly ? [] : input.sections.filter(section => matchesAll(fold(`${section.label} ${section.keywords ?? ''}`), needles))
   for (const section of sections) counts.set(section.id, 1)
-  const entries = matchSectionEntries({ query: input.query, entries: input.entries })
+  const entries = modifiedOnly ? [] : matchSectionEntries({ query: input.query, entries: input.entries })
   for (const entry of entries) counts.set(entry.sectionId, (counts.get(entry.sectionId) ?? 0) + 1)
   const pages = input.pages.flatMap(page => {
     const context = fold(`${page.title} ${page.ns}`)
-    const fields = page.fields.filter(field =>
-      matchesAll(`${context} ${fold(`${field.groups.join(' ')} ${field.title} ${field.description} ${field.path.join('.')} ${field.key}`)}`, needles),
+    const fields = page.fields.filter(
+      field =>
+        (!modifiedOnly || page.modifiedPaths.includes(field.path.join('.'))) &&
+        matchesAll(`${context} ${fold(`${field.groups.join(' ')} ${field.title} ${field.description} ${field.path.join('.')} ${field.key}`)}`, needles),
     )
     if (fields.length === 0) return []
     counts.set(page.pageId, fields.length)
     return [{ page, fields }]
   })
-  const shortcuts = (input.shortcuts ?? []).filter(shortcut =>
+  const shortcuts = (modifiedOnly ? [] : (input.shortcuts ?? [])).filter(shortcut =>
     matchesAll(fold(`${shortcut.label} ${shortcut.aliases.join(' ')} ${shortcut.keys.join(' ')} ${shortcut.keys.join('')} ${shortcut.id}`), needles),
   )
   return {
@@ -122,8 +130,27 @@ const sectionEntryRows = (input: {
     }
   })
 
+/** The query with the `@modified` filter added, or removed when it is there. */
+const toggleModified = (query: string): string => {
+  const words = query.split(/\s+/u).filter(word => word.length > 0)
+  const has = words.some(word => word.toLowerCase() === MODIFIED_TOKEN)
+  return (has ? words.filter(word => word.toLowerCase() !== MODIFIED_TOKEN) : [MODIFIED_TOKEN, ...words]).join(' ')
+}
+
+const hasModifiedFilter = (query: string): boolean => terms(query).includes(MODIFIED_TOKEN)
+
+/** The words a result highlights: the query without its filter. */
+const highlightText = (query: string): string =>
+  query
+    .split(/\s+/u)
+    .filter(word => word.length > 0 && word.toLowerCase() !== MODIFIED_TOKEN)
+    .join(' ')
+
 export class SettingsSearch {
   static readonly search = searchSettings
+  static readonly toggleModified = toggleModified
+  static readonly hasModifiedFilter = hasModifiedFilter
+  static readonly highlightText = highlightText
   static readonly matchEntries = matchSectionEntries
   static readonly entryRows = sectionEntryRows
 }

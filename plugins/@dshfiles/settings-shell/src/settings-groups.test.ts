@@ -14,6 +14,7 @@ const page = (ns: string, title: string, keys: readonly string[], group: 'plugin
   description: '',
   group,
   fields: keys.map(field),
+  modifiedPaths: [],
 })
 
 // The mounted web profile's sections and a cross-section of its namespaces (scratch DSH, 2026-11-04).
