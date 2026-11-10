@@ -49,13 +49,13 @@ redirect to an IP literal is refused even when a proxy is configured.
 Host settings in the `dshfiles-web-fetch-readable` namespace (no client form yet;
 write them with `settings_set`). Every value is read per fetch, so a change applies to the next call.
 
-| Field              | Default   | Meaning                                                    |
-| ------------------ | --------- | ---------------------------------------------------------- |
-| `readable`         | on        | Reduce HTML to its article; off returns the whole page     |
-| `maxRedirects`     | `8`       | Hops to follow, 0–20                                       |
-| `timeoutMs`        | `30000`   | Whole-fetch timeout, redirects included                    |
-| `maxResponseBytes` | `5000000` | Bytes read; a larger declared length is refused            |
-| `maxBodyChars`     | `100000`  | Characters returned after extraction; the tool caps on top |
+| Field              | Default   | Meaning                                                      |
+| ------------------ | --------- | ------------------------------------------------------------ |
+| `readable`         | on        | Reduce HTML to its article; off returns the whole page       |
+| `maxRedirects`     | `8`       | Hops to follow, 0–20                                         |
+| `timeoutMs`        | `30000`   | Whole-fetch timeout, redirects included                      |
+| `maxResponseBytes` | `5000000` | Bytes read; a larger declared length is refused              |
+| `maxBodyChars`     | `100000`  | Characters returned after extraction; the tool caps on top   |
 | `citations`        | on        | Show source chips under `web_search` and `web_fetch` results |
 
 ## Source chips

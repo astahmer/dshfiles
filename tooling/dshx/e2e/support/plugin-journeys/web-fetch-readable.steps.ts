@@ -63,7 +63,10 @@ When('a source chip is clicked', async ({ page }: { page: Page }) => {
   const chip = page.locator('[data-web-citation="github.com"]').first()
   await expect(chip).toHaveAttribute('href', 'https://github.com/jj-vcs/jj')
   await expect(chip).toHaveAttribute('target', '_blank')
-  const popup = page.context().waitForEvent('page', { timeout: 10_000 }).catch(() => undefined)
+  const popup = page
+    .context()
+    .waitForEvent('page', { timeout: 10_000 })
+    .catch(() => undefined)
   await chip.click()
   const opened = await popup
   await recordAssertion(page, 'web-fetch-readable-citation-opens', async () => {

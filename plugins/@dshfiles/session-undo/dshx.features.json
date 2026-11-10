@@ -6,22 +6,12 @@
       "id": "turn-undo-redo",
       "title": "Undo and redo a turn: conversation and files together",
       "summary": "Each turn start snapshots the thread's workspace through the VCS provider (a jj operation in a jj workspace, a snapshot commit in git) before any of its tool calls run. Undo restores that snapshot, continues in a fork of the conversation cut before the turn and archives the original; redo restores the files the undo replaced and brings the original back.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Undo last turn",
       "configuration": [],
-      "states": [
-        "no-checkpoint",
-        "undoable",
-        "undone",
-        "redone",
-        "running"
-      ],
+      "states": ["no-checkpoint", "undoable", "undone", "redone", "running"],
       "failureModes": [
         "Undo and redo are refused while the thread runs.",
         "A fork that fails after the files were restored puts the files back before reporting the error.",
@@ -89,23 +79,12 @@
       "id": "turn-rewind",
       "title": "Rewind to before any recorded turn, files included",
       "summary": "The composer's Rewind menu lists every recorded turn. Rewind to here confirms which turns leave the conversation, restores the workspace files to the snapshot taken when that turn started, continues in a fork cut before it and archives the original; redo brings every rewound turn and its files back. A file restore is refused while another live thread works in the same folder (it would overwrite that thread's edits), with an explicit Rewind anyway override.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: Rewind to an earlier turn",
       "configuration": [],
-      "states": [
-        "single-turn",
-        "rewindable",
-        "confirming",
-        "shared-directory-refused",
-        "rewound",
-        "redone"
-      ],
+      "states": ["single-turn", "rewindable", "confirming", "shared-directory-refused", "rewound", "redone"],
       "failureModes": [
         "Rewind is refused while the thread runs.",
         "A turn with no checkpoint is refused with the list of recorded turns.",
@@ -162,11 +141,7 @@
       "id": "turn-checkpoint",
       "title": "Each turn names the jj revision its edits left, with Restore to here",
       "summary": "When a turn ends in a jj workspace, session-undo snapshots the files again and records the revision holding them (@, or its parent past an empty undescribed change) when it differs from the turn's start. The turn's action row shows it as a jj: reference the Jujutsu panel opens, and Restore to here rewinds to the start of the next recorded turn, so files and conversation return to how this turn left them. A git workspace takes no turn-end snapshot and shows nothing.",
-      "surfaces": [
-        "client",
-        "host",
-        "integration"
-      ],
+      "surfaces": ["client", "host", "integration"],
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: turn action row",
@@ -175,22 +150,11 @@
           "key": "turnRevisions",
           "defaultValue": "true",
           "constraints": "Boolean; off skips the turn-end snapshot and hides the revision and Restore in the turn's action row.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "session-undo.turn-revision"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["session-undo.turn-revision"]
         }
       ],
-      "states": [
-        "no-revision",
-        "revision",
-        "restorable",
-        "confirming",
-        "restored"
-      ],
+      "states": ["no-revision", "revision", "restorable", "confirming", "restored"],
       "failureModes": [
         "A turn that changed no file names no revision.",
         "A failed turn-end snapshot leaves the turn without a revision; undo and rewind are unchanged.",

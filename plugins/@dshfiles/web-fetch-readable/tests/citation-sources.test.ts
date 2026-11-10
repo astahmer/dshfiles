@@ -41,9 +41,9 @@ describe('CitationSources', () => {
     expect(CitationSources.citationSourcesOf({ toolName: 'web_search', phase: 'result', isError: false, meta: search, text: undefined })).toEqual([
       { url: 'https://example.com/a', host: 'example.com', title: 'A' },
     ])
-    expect(
-      CitationSources.citationSourcesOf({ toolName: 'web_fetch', phase: 'result', isError: false, meta: fetch, text: '\n# The page\n' }),
-    ).toEqual([{ url: 'https://example.com/post', host: 'example.com', title: 'The page' }])
+    expect(CitationSources.citationSourcesOf({ toolName: 'web_fetch', phase: 'result', isError: false, meta: fetch, text: '\n# The page\n' })).toEqual([
+      { url: 'https://example.com/post', host: 'example.com', title: 'The page' },
+    ])
     expect(CitationSources.citationSourcesOf({ toolName: 'web_search', phase: 'start', isError: false, meta: search, text: undefined })).toEqual([])
     expect(CitationSources.citationSourcesOf({ toolName: 'web_search', phase: 'result', isError: true, meta: search, text: undefined })).toEqual([])
     expect(CitationSources.citationSourcesOf({ toolName: 'bash', phase: 'result', isError: false, meta: search, text: undefined })).toEqual([])

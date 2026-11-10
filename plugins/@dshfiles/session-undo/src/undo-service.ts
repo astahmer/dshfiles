@@ -328,7 +328,10 @@ export class SessionUndo extends Context.Service<
                   snapshot: Option.getOrNull(Option.map(taken, snapshot => snapshot.snapshot)),
                   prompt: prompt?.turn === input.turn ? prompt.text : '',
                   at,
-                  ...Option.match(Option.flatMapNullishOr(taken, snapshot => snapshot.revision), { onNone: () => ({}), onSome: before => ({ before }) }),
+                  ...Option.match(
+                    Option.flatMapNullishOr(taken, snapshot => snapshot.revision),
+                    { onNone: () => ({}), onSome: before => ({ before }) },
+                  ),
                 }),
               ),
             ),

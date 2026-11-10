@@ -8,12 +8,12 @@ Built with dshx (no port: nothing upstream does this). Its own small plugin rath
 
 ## Settings (`dshfiles-tool-meta`)
 
-| Key          | Default    | Meaning                                                                                   |
-| ------------ | ---------- | ----------------------------------------------------------------------------------------- |
-| `enabled`    | `true`     | Show the timing line on tool cards.                                                       |
-| `timeFormat` | `absolute` | `absolute`: clock time, with the day when not today. `relative`: `12 s ago`, `5 min ago`. |
-| `fileCards`  | `true`     | Show file reads as a code card and file mutations as collapsible diffs.                   |
-| `approvalCard` | `true`   | Show tool approval requests as a risk card instead of the native panel.                  |
+| Key            | Default    | Meaning                                                                                   |
+| -------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| `enabled`      | `true`     | Show the timing line on tool cards.                                                       |
+| `timeFormat`   | `absolute` | `absolute`: clock time, with the day when not today. `relative`: `12 s ago`, `5 min ago`. |
+| `fileCards`    | `true`     | Show file reads as a code card and file mutations as collapsible diffs.                   |
+| `approvalCard` | `true`     | Show tool approval requests as a risk card instead of the native panel.                   |
 
 ## File tool cards
 

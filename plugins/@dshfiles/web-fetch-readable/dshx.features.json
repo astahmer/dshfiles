@@ -6,24 +6,12 @@
       "id": "readable-web-fetch",
       "title": "Answer ctx.web fetches across redirects with the readable article",
       "summary": "A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.",
-      "surfaces": [
-        "host",
-        "settings",
-        "integration"
-      ],
+      "surfaces": ["host", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: dshfiles-web-fetch-readable",
       "configuration": [],
-      "states": [
-        "fetching",
-        "redirecting",
-        "extracted",
-        "full-page",
-        "blocked",
-        "unsupported",
-        "aborted"
-      ],
+      "states": ["fetching", "redirecting", "extracted", "full-page", "blocked", "unsupported", "aborted"],
       "failureModes": [
         "A redirect to a non-public, non-HTTP or credentialed URL fails with WEB_BLOCKED_URL or WEB_INVALID_URL before it is requested.",
         "More redirects than maxRedirects fail with WEB_REDIRECT_BLOCKED and name the setting.",
@@ -105,10 +93,7 @@
       "id": "web-citations",
       "title": "Source chips under web_search and web_fetch results",
       "summary": "Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tooltip. A click opens the page in the browser pane beside the thread when one takes it, otherwise in a new tab; a modified or middle click always opens a new tab.",
-      "surfaces": [
-        "client",
-        "settings"
-      ],
+      "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: web_search / web_fetch rows",
@@ -117,21 +102,11 @@
           "key": "citations",
           "defaultValue": "true",
           "constraints": "Boolean; off renders no chips and the native web rows unchanged.",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "coveredBy": [
-            "web-fetch-readable.citation-sources"
-          ]
+          "choices": ["true", "false"],
+          "coveredBy": ["web-fetch-readable.citation-sources"]
         }
       ],
-      "states": [
-        "no-sources",
-        "sources",
-        "opened-in-pane",
-        "opened-in-tab"
-      ],
+      "states": ["no-sources", "sources", "opened-in-pane", "opened-in-tab"],
       "failureModes": [
         "A failed result, a call that has not settled, or meta without sources shows no chips.",
         "A non-HTTP(S) or malformed URL never becomes a chip; a repeated URL shows once.",
