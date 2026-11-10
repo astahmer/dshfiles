@@ -5,7 +5,7 @@
     {
       "id": "one-shared-stylesheet",
       "title": "One shared plugin stylesheet",
-      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner. It also carries the touch platform baseline: no tap highlight or landscape text inflation, touch-action manipulation on controls, no long-press selection on control labels, and a 16px floor on fields under a coarse pointer so iOS never zooms into the composer.",
+      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
@@ -28,6 +28,36 @@
         {
           "kind": "not-applicable",
           "reason": "Client-only: One shared plugin stylesheet renders browser state and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "touch-platform-baseline",
+      "title": "Touch platform baseline",
+      "summary": "Page-global element rules in the shared sheet's base layer: no tap highlight or landscape text inflation, touch-action manipulation on native controls, no long-press selection on control labels under a coarse pointer, and a field floor of max(16px, inherited size) under a coarse pointer so iOS never zooms into a field.",
+      "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "client: shared stylesheet",
+      "configuration": [],
+      "states": ["baseline-applied", "baseline-missing"],
+      "failureModes": [
+        "The baseline is unlayered, so it beats dshx: utilities: a dshx:touch-none control gets touch-action manipulation and a touch drag pans the page instead of dragging the control.",
+        "A coarse-pointer field floor reaches a field whose size is not inherited, so the field still renders under 16px and iOS zooms into it on focus.",
+        "A long-press selection rule reaches a control whose label is content, so text the user meant to copy cannot be selected."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ui-styles.touch-baseline",
+          "featureFile": "tooling/dshx/e2e/features/ui-styles.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the touch baseline styles browser state and starts no Host work of its own."
         }
       ]
     }
