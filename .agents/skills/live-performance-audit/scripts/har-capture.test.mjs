@@ -53,14 +53,22 @@ test('a batch POST keeps each call endpoint, payload digest and answer size, nev
   const body = id =>
     JSON.stringify({
       entries: [
-        { id, endpoint: 'dshx-abc123/state', payload: { version: 1, input: { note: 'private text' }, traceparent: `00-${'1'.repeat(31)}${id}-${'2'.repeat(16)}-01` } },
+        {
+          id,
+          endpoint: 'dshx-abc123/state',
+          payload: { version: 1, input: { note: 'private text' }, traceparent: `00-${'1'.repeat(31)}${id}-${'2'.repeat(16)}-01` },
+        },
         { id: id + 1, endpoint: 'dshx-def456/list', payload: { version: 1, input: {} } },
       ],
     })
   const first = body(1)
   const second = body(3)
   const answered = entry(first, 'http://127.0.0.1:3080/api/dshx-batch')
-  answered.response.content = { size: 120, mimeType: 'application/x-ndjson', text: `{"id":2,"result":{"ok":true,"value":"private text"}}\n{"id":1,"status":503}\n` }
+  answered.response.content = {
+    size: 120,
+    mimeType: 'application/x-ndjson',
+    text: `{"id":2,"result":{"ok":true,"value":"private text"}}\n{"id":1,"status":503}\n`,
+  }
   const redacted = redactHar({ log: { entries: [answered, entry(second, 'http://127.0.0.1:3080/api/dshx-batch')] } })
   assert.equal(JSON.stringify(redacted).includes('private text'), false)
   const [one, two] = redacted.log.entries.map(item => item.request.postData._batch)

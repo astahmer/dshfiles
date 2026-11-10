@@ -111,9 +111,19 @@ test('expands an annotated dshx-batch POST into its calls, with owner, size and 
   assert.deepEqual(summary.batches, { posts: 3, calls: 6 })
   const devServers = summary.topMethods.find(row => row.method === 'POST preview/devServers')
   assert.deepEqual(
-    { owner: devServers?.owner, calls: devServers?.calls, viaBatch: devServers?.viaBatch, distinct: devServers?.distinct, every: devServers?.intervalP50S, maxKB: devServers?.maxResponseKB },
+    {
+      owner: devServers?.owner,
+      calls: devServers?.calls,
+      viaBatch: devServers?.viaBatch,
+      distinct: devServers?.distinct,
+      every: devServers?.intervalP50S,
+      maxKB: devServers?.maxResponseKB,
+    },
     { owner: '@dshfiles/preview', calls: 3, viaBatch: 3, distinct: 1, every: 15, maxKB: 1.8 },
   )
   assert.deepEqual(summary.unmappedChannels, ['unmapped dshx-00000000'])
-  assert.equal(summary.topMethods.some(row => row.method.includes('dshx-batch')), false)
+  assert.equal(
+    summary.topMethods.some(row => row.method.includes('dshx-batch')),
+    false,
+  )
 })

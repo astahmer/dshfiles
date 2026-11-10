@@ -108,31 +108,30 @@ export const summarizeHar = ({ har, channelOwners, top = 15 }) => {
   const allEntries = har.log?.entries ?? []
   const apiEntries = allEntries.filter(entry => new URL(entry.request.url).pathname.startsWith('/api/'))
   const entriesByRequest = new Map()
-  const requests = apiEntries
-    .map(entry => {
-      const start = Date.parse(entry.startedDateTime)
-      const { label, owner } = describeRequest(entry, channelOwners)
-      const status = entry.response?.status ?? 0
-      const wait = Math.max(0, entry.timings?.wait ?? 0)
-      return {
-        label,
-        owner,
-        httpMethod: entry.request.method,
-        start,
-        time: entry.time,
-        blocked: Math.max(0, entry.timings?.blocked ?? 0),
-        wait,
-        status,
-        sent: status !== 0,
-        abortedInQueue: status === 0 && wait === 0,
-        requestBytes: entry.request.postData?._bodyBytes ?? Buffer.byteLength(entry.request.postData?.text ?? ''),
-        responseBytes: responseBytes(entry),
-        digest: crypto
-          .createHash('sha1')
-          .update(`${entry.request.method} ${label} ${bodyKey(entry)}`)
-          .digest('hex'),
-      }
-    })
+  const requests = apiEntries.map(entry => {
+    const start = Date.parse(entry.startedDateTime)
+    const { label, owner } = describeRequest(entry, channelOwners)
+    const status = entry.response?.status ?? 0
+    const wait = Math.max(0, entry.timings?.wait ?? 0)
+    return {
+      label,
+      owner,
+      httpMethod: entry.request.method,
+      start,
+      time: entry.time,
+      blocked: Math.max(0, entry.timings?.blocked ?? 0),
+      wait,
+      status,
+      sent: status !== 0,
+      abortedInQueue: status === 0 && wait === 0,
+      requestBytes: entry.request.postData?._bodyBytes ?? Buffer.byteLength(entry.request.postData?.text ?? ''),
+      responseBytes: responseBytes(entry),
+      digest: crypto
+        .createHash('sha1')
+        .update(`${entry.request.method} ${label} ${bodyKey(entry)}`)
+        .digest('hex'),
+    }
+  })
   apiEntries.forEach((entry, index) => entriesByRequest.set(requests[index], entry))
   requests.sort((left, right) => left.start - right.start)
   if (requests.length === 0) return { requests: 0, otherRequests: allEntries.length }

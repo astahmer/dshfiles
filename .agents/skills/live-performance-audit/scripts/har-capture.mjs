@@ -49,7 +49,14 @@ export const batchCalls = text => {
     if (!Array.isArray(entries)) return undefined
     return entries.flatMap(entry =>
       typeof entry?.endpoint === 'string' && Number.isInteger(entry.id)
-        ? [{ id: entry.id, endpoint: entry.endpoint, digest: digest(stablePayload(entry.payload)), requestBytes: Buffer.byteLength(JSON.stringify(entry.payload ?? null)) }]
+        ? [
+            {
+              id: entry.id,
+              endpoint: entry.endpoint,
+              digest: digest(stablePayload(entry.payload)),
+              requestBytes: Buffer.byteLength(JSON.stringify(entry.payload ?? null)),
+            },
+          ]
         : [],
     )
   } catch {
@@ -110,9 +117,7 @@ export const redactHar = har => {
                 mimeType: entry.request.postData.mimeType,
                 text: digest(stableBody(text)),
                 _bodyBytes: Buffer.byteLength(text),
-                ...(calls === undefined
-                  ? {}
-                  : { _batch: calls.map(({ id, ...call }) => ({ ...call, responseBytes: answers?.[id] ?? null })) }),
+                ...(calls === undefined ? {} : { _batch: calls.map(({ id, ...call }) => ({ ...call, responseBytes: answers?.[id] ?? null })) }),
               },
             }),
       },
