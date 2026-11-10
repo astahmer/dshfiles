@@ -86,41 +86,63 @@ same script; the live Host keeps serving the old copy until the user restarts it
 
 ## tool-search in a scratch profile, 2026-11-10
 
-[tool-search](../plugins/@dshfiles/tool-search/README.md) restricts each agent to its `alwaysVisible` tools plus one
-`tool_search` tool; a search adds its top `maxResults` (5) BM25 matches to that agent's allow list for the rest of the
-Session. Measured in a scratch DSH (`dshx dev up --name toolsearch`, isolated home and port) with every owned bundle
-`profiles/web` depends on, once without and once with `--plugin @dshfiles/tool-search`, driven by the loopback fake
-provider (`[[call TOOL {json}]]` directives) and read with `node scripts/tool-schema-cost.ts` on the scratch Session
-logs. The baseline request carries the same 468 tools as the live `web` request above.
+[tool-search](../plugins/@dshfiles/tool-search/README.md) defers each agent's global tools behind one `tool_search`
+tool; a search adds its top `maxResults` (5) BM25 matches for the rest of the Session. The tools an agent gets from its
+own or its agent preset's scope (`bash`, `read`, `write`, `schedule_*`, …) are not global and stay visible, and
+`alwaysVisible` defaults to the native core globals (`apply_patch`, `glob`, `grep`, `subagent*`, the goal tools,
+`working_directory`, `compaction_threshold`, …). Measured in a scratch DSH (`dshx dev up --name toolsearch2`, isolated
+home and port) with every owned bundle `profiles/web` depends on, once without and once with
+`--plugin @dshfiles/tool-search`, driven by the loopback fake provider (`[[call TOOL {json}]]` directives) and read
+with `node scripts/tool-schema-cost.ts` on the scratch Session logs.
 
-| Configuration (same 97 owned bundles)                                      | Tools in first request | Tool chars | Tool tokens |
-| -------------------------------------------------------------------------- | ---------------------: | ---------: | ----------: |
-| Without tool-search                                                        |                    468 |    274,965 |      68,742 |
-| tool-search, defaults (`alwaysVisible: []`)                                |                      4 |      3,085 |         772 |
-| tool-search, `alwaysVisible` = the 31 native core tools                    |                     12 |      8,650 |       2,163 |
-| Projected: the 31 native core tools + `tool_search`, once the bug is fixed |                     32 |     26,930 |       6,733 |
+| Configuration (same 98 owned bundles)                                    | Tools in first request | Tool chars | Tool tokens |
+| ------------------------------------------------------------------------ | ---------------------: | ---------: | ----------: |
+| Without tool-search                                                      |                    469 |    275,609 |      68,902 |
+| tool-search before the fix, `alwaysVisible: []` (core tools lost)        |                      4 |      3,085 |         772 |
+| tool-search before the fix, `alwaysVisible` = 31 core names (core lost)  |                     12 |      8,650 |       2,163 |
+| tool-search, defaults (agent-plane tools + core globals + `tool_search`) |                     36 |     32,912 |       8,228 |
 
-The projection sums the baseline schemas of `read`, `write`, `edit`, `apply_patch`, `bash`, `glob`, `grep`,
-`todo_write`, `skill`, `ask_user_question`, `job_*`, `subagent*`, `send_message`, `list_agents`, `interrupt_agent`,
-`web_search`, `web_fetch`, `present`, `read_image`, the goal tools, `exit_plan_mode`, `workflow`, `working_directory`
-and `compaction_threshold`, plus the 519-char `tool_search` schema.
+The 36 tools are `bash`, `read`, `write`, `edit`, `todo_write`, `skill`, `ask_user_question`, `job_*`, `send_message`,
+`subagent*`, `list_agents`, `interrupt_agent`, `web_search`, `web_fetch`, `present`, `read_image`, `exit_plan_mode`,
+`workflow` and `schedule_*` from the agent plane, the core globals above, and `tool_search`. The two "before the fix"
+rows are from the first scratch run, when the plugin's allow list hid every agent-plane tool.
 
 ### Round trips
 
-Three scripted tasks in one thread, each one discovery then one call (`tool_search "list backlog items"` →
-`backlog_list`, `"jj thread workspace status"` → `jj_thread_status`, `"open a page in the preview browser"` →
-`preview_open`):
+One thread: the `tool-call-thread` seed's opening `bash` call, then three tasks of one discovery and one call each
+(`tool_search "list backlog items"` → `backlog_list`, `"jj thread workspace status"` → `jj_thread_status`,
+`"open a page in the preview browser"` → `preview_open`), then `read` and a second `bash`:
 
 | Task               | Requests without | Requests with | Loaded by the search                                                           | Tool tokens after |
 | ------------------ | ---------------: | ------------: | ------------------------------------------------------------------------------ | ----------------: |
-| `backlog_list`     |                2 |             3 | `backlog_list`, `_projects`, `_get`, `_sync_binding_remove`, `_referencing`    |             1,847 |
-| `jj_thread_status` |                2 |             3 | `jj_thread_status`, `_workspace_sync`, `_discard`, `_destination`, `_refresh…` |             2,327 |
-| `preview_open`     |                2 |             3 | `preview_open`, `_reveal`, `_screenshot`, `_close`, `_navigate`                |             3,042 |
+| opening `bash`     |                2 |             2 | (agent-plane, always visible)                                                  |             8,228 |
+| `backlog_list`     |                2 |             3 | `backlog_list`, `_projects`, `_get`, `_sync_binding_remove`, `_referencing`    |             9,304 |
+| `jj_thread_status` |                2 |             3 | `jj_thread_status`, `_workspace_sync`, `_discard`, `_destination`, `_refresh…` |             9,784 |
+| `preview_open`     |                2 |             3 | `preview_open`, `_reveal`, `_screenshot`, `_close`, `_navigate`                |            10,499 |
+| `read`, `bash`     |                4 |             4 | —                                                                              |            10,499 |
 
-Each discovery costs one extra model request and grows the tool list by 5 schemas (about 500 to 1,200 tokens) for the
-rest of the Session; nothing is ever unloaded. Ten searches in one thread reached 43 tools and 8,932 tokens. Every
-target ranked first and was then called successfully; calling a deferred tool before searching fails with
-`ToolNotFoundError` (`unknown tool "backlog_list"`), which the model must recover from with another request.
+All 9 calls succeeded with tool-search, both `bash` calls included. The whole thread sent 18 requests carrying
+174,529 tool tokens in total; without tool-search the 12 requests that skip the three searches carried 826,824
+(−79 %). Each discovery costs one extra model request and grows the tool list by 5 schemas (about 500 to 1,100
+tokens) for the rest of the Session; nothing is ever unloaded. Every target ranked first; calling a deferred tool
+before searching fails with `ToolNotFoundError` (`unknown tool "backlog_list"`), which the model must recover from with
+another request.
+
+### Real model
+
+The plugin's opt-in Codex benchmark (`src/provider-benchmark.test.ts`, `codex-alex2`, `gpt-6-luna`, high effort,
+existing ai-accounts login, request budget 15) on the `real-335` catalog, tasks phrased by intent:
+
+| Task                | Direct: success, requests | Progressive: success, requests | Progressive searches |
+| ------------------- | ------------------------: | -----------------------------: | -------------------: |
+| `running-jobs`      |                      ✓, 2 |                           ✓, 3 |                    1 |
+| `capture-bug`       |                      ✓, 2 |                           ✓, 5 |                    3 |
+| `subscription-left` |                      ✓, 2 |               (budget reached) |                    — |
+
+3/3 direct, 2/2 progressive. Direct sent 62.4k estimated tool tokens per request, but the provider served the
+second request's 40.2k prompt tokens from cache; progressive sent 476 to 3,061 per request and nothing was cached. The
+catalog has no agent-plane tools, so this measures discovery, not the fix. A failed paraphrase (`capture-bug` needed
+three queries) costs a request each.
 
 Retrieval on the real catalog: the plugin's own ranker (`ToolSearchModel.rank`) over the 468 live schemas puts the
 target in the top 5 for 14 of 20 natural-language queries. It misses paraphrases that share no words with the
@@ -132,15 +154,10 @@ model: 9/12 tasks against 12/12 direct.
 
 ### Failure modes
 
-1. **The core tools disappear and cannot be found.** With either configuration the agent loses `bash`, `read`,
-   `write`, `edit`, `todo_write`, `skill`, `ask_user_question`, `job_*`, `send_message`, `subagent_fork`,
-   `list_agents`, `interrupt_agent`, `web_search`, `web_fetch`, `present`, `read_image`, `exit_plan_mode` and
-   `workflow`: they are agent-scoped registrations, absent from the global catalog `tool_search` ranks
-   (`tool_search "bash"` returns `thread_dev_servers`, `"read"` returns `backlog_read_file`…), and the plugin's
-   `tools.restrict({ allow })` list is built from global names only, so `alwaysVisible` cannot admit them either. The
-   seeded `bash` call failed with `unknown tool "bash"` in every tool-search run. Only `glob`, `grep` and `subagent`
-   survived. Fixing this means building the allow list from `ctx.tools.schemas(agent)` names that are not global, in
-   `refreshRestriction` (`plugins/@dshfiles/tool-search/src/host.ts`).
+1. **Fixed: the core tools disappeared.** Agent presets mount `bash`, `read`, `write` and the other agent-plane tools
+   in a parent scope of each agent, and `tools.restrict()` filters everything an agent inherits, so the plugin's
+   `allow` list of global names hid them (`unknown tool "bash"`). The plugin now denies only the deferred global
+   names; `agent-loop.integration.test.ts` runs a preset-scoped `bash` through the real tool registry.
 2. **Prompt-cache churn.** The tool list changes after every search, so the cached prefix the provider keeps for an
    unchanged header is lost each time; the Codex benchmark recorded almost no cached input in progressive mode
    against 72 % cached direct.
@@ -149,17 +166,17 @@ model: 9/12 tasks against 12/12 direct.
 
 ### Recommendation
 
-Do not adopt in `web` yet. The default configuration removes the file and shell tools outright, so an agent cannot
-work. After the allow-list fix, adopt only with an always-visible core set: the projected 6.7k tokens per request is
-about a tenth of today's 68.7k, at one extra request per tool family a task needs and a cache miss after each
-discovery. Before switching, re-run this measurement with a real model on long multi-turn Sessions, where the direct
-mode's cached schema prefix amortizes best.
+Usable now; adopting it in `web` is a restart and the user's call. With the defaults an agent keeps every core tool
+and starts at 8.2k tool tokens instead of 68.9k (−88 %), at one extra request per tool family a task needs and a
+prompt-cache miss after each discovery. Try it in `web` as a reversible trial (remove the row to undo) rather than a
+default: the cache churn and paraphrase misses only show their real cost on long multi-turn Sessions with the Claude
+route, which neither run above covers.
 
 ## Next levers, by size
 
-1. **Fewer schemas per request.** tool-search, measured above: about 90 % fewer tool tokens with a core set, but it
-   currently hides the agent-scoped core tools and needs that fix first. Not in `web`: adding it changes every
-   agent's first step and needs a restart, so it is the user's call.
+1. **Fewer schemas per request.** tool-search, measured above: 88 % fewer tool tokens on the first request with the
+   default core set. Not in `web`: adding it changes every agent's first step and needs a restart, so it is the
+   user's call.
 2. **Gate rarely used families behind a setting.** No owned plugin has such a pattern, and dshx's `ApiToolExposure`
    (`tooling/dshx/packages/dshx/src/api/types.ts`) has no condition, so this needs a dshx feature (a settings
    predicate on `tool:`) first. The
