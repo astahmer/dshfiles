@@ -36,14 +36,15 @@ function sessionSeqCursor(value: number): SessionSeqCursor {
 /**
  * Projection columns the list surface itself consumes: `title` and
  * `sessionListMetadata` build each row, while the sidebar's lineage and the jj
- * panel read turn outlines, questions, subagent facts and token totals from
- * `projectionValues`. Everything else (cost estimates, image limits, model
- * selection, todos, goal, inbox) is read from the opened Session's baseline.
+ * panel read prompted-turn counts, questions, subagent facts and token totals
+ * from `projectionValues`. Everything else (turn outlines, cost estimates, image
+ * limits, model selection, todos, goal, inbox) is read from the opened Session's
+ * baseline: `turnOutline` alone was 45 % of the listed bytes, for a count.
  */
 const LIST_PROJECTIONS = [
   'title',
   'sessionListMetadata',
-  'turnOutline',
+  'promptedTurnCount',
   'userQuestions',
   'subagentTiming',
   'threadSidebarModelRoute',
@@ -60,7 +61,7 @@ const LIST_PROJECTIONS = [
 const RESIDENT_SESSION_STATE_LIMIT = 3
 
 /** Values a list row still reads after its Session's history state is released. */
-const LIST_ROW_STATE_KEYS = ['title', 'sessionListMetadata'] as const
+const LIST_ROW_STATE_KEYS = ['title', 'sessionListMetadata', 'promptedTurnCount'] as const
 
 /**
  * Session instances nobody renders that stay instantiated. The sidebar restores and revisits threads freely, and a

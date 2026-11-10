@@ -215,9 +215,12 @@ behind the bookmark, its status chip and the primary blocker. A blank New-thread
 slot the app left in the workspace is not a conversation: it never names the
 row, dates it, or counts as its history, and it does not keep an archived thread
 from reading as archived. A registration with no conversation and nothing
-pending is not a row at all. The message count rides the Host's `turnOutline`
-projection, which the client asks for per thread session, so it costs no log
-read and no conversation opening. Clicking anywhere in the row expands it (or
+pending is not a row at all. The message count is this plugin's
+`promptedTurnCount` projection (turns a human prompt opened, counted as
+`turnOutline` marks them), listed by the Session list in place of the whole
+outline, so it costs no log read, no conversation opening and one number per
+thread instead of every turn's previews. A thread whose checkpoint predates the
+projection shows no count until its Session is opened or runs again. Clicking anywhere in the row expands it (or
 use the chevron); the details list every blocker, the pending revisions, the
 thread's sessions, the workspace path with a copy
 action, and **Preview**, which loads the latest three user/assistant text

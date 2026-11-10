@@ -111,4 +111,37 @@ describe('SessionManager resident per-session state', () => {
     // The held instance stays the resident one, so the view never renders a disposed Session.
     expect(manager.get(openingId)).toBe(opening)
   })
+
+  it('keeps the prompted-turn count a list row reads after its history state is released', async () => {
+    const manager = createManager()
+    const viewed = ['a', 'b', 'c', 'd', 'e'].map(id => SessionId(`session-count-${id}`))
+    for (const sessionId of viewed) {
+      const session = manager.get(sessionId)
+      seedSession(manager, sessionId)
+      manager.handleControlFrame({ type: 'projection', sessionId, key: 'promptedTurnCount', value: 1, seq: 3 })
+      await manager.drop(sessionId, session)
+    }
+
+    expect(projectedKeys(manager, viewed[0]!)).toEqual(['promptedTurnCount', 'title'])
+    expect(manager.projectionValues(viewed[0]!)).toEqual(expect.objectContaining({ promptedTurnCount: 1 }))
+  })
+})
+
+describe('SessionManager list request', () => {
+  it('asks for the prompted-turn count instead of the whole turn outline', async () => {
+    const requests: unknown[] = []
+    const session = {
+      list: async (request: unknown): Promise<RemoteResult<{ items: readonly SessionSummary[] }>> => {
+        requests.push(request)
+        return { ok: true, value: { items: [] } }
+      },
+    }
+    // SAFETY: refreshList reads only session.list.
+    const manager = new SessionManager({ session } as unknown as SessionRemotes)
+    await manager.refreshList()
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]).toEqual({ projections: expect.arrayContaining(['title', 'sessionListMetadata', 'promptedTurnCount']) })
+    expect(requests[0]).not.toEqual({ projections: expect.arrayContaining(['turnOutline']) })
+  })
 })

@@ -1,7 +1,7 @@
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { Git } from '@dshfiles/git-cli'
 import { Jj, JjViewReads } from '@dshfiles/jj-cli'
-import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
@@ -20,6 +20,7 @@ import { JjSettingsLive } from './jj-settings.js'
 import { Landing } from './landing.js'
 import { MaintenanceLive } from './maintenance.js'
 import { ProjectBookmarks } from './project-bookmarks.js'
+import { promptedTurnCountProjection } from './prompted-turn-count.js'
 import { RepoLocks } from './repo-locks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
@@ -38,7 +39,19 @@ const MAX_JJ_STDERR_BYTES = 64 * 1024
 
 const PlatformLive = Layer.mergeAll(DshChildProcessSpawner.layer, NodeFileSystem.layer, NodePath.layer)
 
+/** The panel's per-thread message count, listed in place of the whole `turnOutline`. */
+const PromptedTurnCountLive = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const { ctx } = yield* HostContext
+    yield* Effect.acquireRelease(
+      Effect.sync(() => ctx.sessionProjections.register(promptedTurnCountProjection)),
+      unregister => Effect.sync(() => unregister()),
+    )
+  }),
+)
+
 const BaseLive = Layer.mergeAll(
+  PromptedTurnCountLive,
   RepoLocks.layer,
   Executables.layer,
   JjSettingsLive,
@@ -138,14 +151,22 @@ const vcsProviderHandlers = Api.handlers(VcsProviders.contract('@dshfiles/jj-int
     ThreadLifecycle.use(lifecycle =>
       Effect.map(lifecycle.provision(input), provisioned => ({ workspaceId: provisioned.workspaceId, isolated: provisioned.isolated })),
     ),
-  snapshot: input => ThreadWorkspaces.use(threads => Effect.map(threads.snapshotFiles(input.path), snapshot => ({ snapshot }))),
+  snapshot: input =>
+    ThreadWorkspaces.use(threads =>
+      Effect.gen(function* () {
+        const snapshot = yield* threads.snapshotFiles(input.path)
+        // The revision is a label for the snapshot: failing to name it never fails the snapshot.
+        const revision = yield* threads.snapshotRevision(input.path, snapshot).pipe(Effect.orElseSucceed(() => null))
+        return revision === null ? { snapshot } : { snapshot, revision }
+      }),
+    ),
   restore: input => ThreadWorkspaces.use(threads => Effect.map(threads.restoreFiles(input.path, input.snapshot), previous => ({ previous }))),
 })
 
 export default {
   ...DshxPlugin.make({
     name: 'jj-integration',
-    inject: ['subprocess', 'sessionController'],
+    inject: ['subprocess', 'sessionController', 'sessionProjections'],
     settings: [jjIntegrationSettings],
     layer: JjIntegrationLive,
     apis: [Api.bind(jjIntegrationApi, handlers), Api.bind(VcsProviders.contract('@dshfiles/jj-integration'), vcsProviderHandlers)],

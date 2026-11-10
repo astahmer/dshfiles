@@ -308,6 +308,13 @@ const start = async (
     update: async () => undefined,
     replace: async () => undefined,
   })
+  const registeredProjections = new Set<string>()
+  host.ctx.provide('sessionProjections', {
+    register: (projection: { readonly key: string }) => {
+      registeredProjections.add(projection.key)
+      return () => registeredProjections.delete(projection.key)
+    },
+  })
   host.ctx.on('dshfiles/activity/event', payload => {
     events.push(payload.value)
   })
@@ -351,6 +358,7 @@ const start = async (
     host,
     events,
     prompts,
+    registeredProjections,
     checkoutSyncs,
     api,
     wire,

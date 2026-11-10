@@ -1,9 +1,9 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
-import type {} from '@deepseek-ai/dsh-session-turn-outline/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PaletteActions, type PaletteActionContext } from '@dshfiles/command-palette/palette-contract'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import type {} from './prompted-turn-count-types.js'
 import { EntityList } from '@dshfiles/plugin-ui/components/entity-row'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
@@ -767,11 +767,11 @@ const useMinuteTick = (): number => {
 
 interface SessionDirectory {
   readonly byId: ReadonlyMap<string, SessionSummary>
-  /** Turns that carried a human prompt, per session: the Host's `turnOutline` projection. */
+  /** Turns that carried a human prompt, per session: the Host's `promptedTurnCount` projection. */
   readonly userMessagesBySession: ReadonlyMap<string, number>
 }
 
-/** Session rows plus the whole-log turn outline, which the Host serves without opening a conversation. */
+/** Session rows plus each one's prompted-turn count, which the Host serves without opening a conversation. */
 const useSessionDirectory = (sessions: ISessions): SessionDirectory => {
   const subscribe = useCallback((listener: () => void) => sessions.list.subscribe(listener), [sessions])
   const readSnapshot = useCallback(() => sessions.list.getSnapshot(), [sessions])
@@ -780,9 +780,8 @@ const useSessionDirectory = (sessions: ISessions): SessionDirectory => {
   const userMessagesBySession = useMemo(() => {
     const counts = new Map<string, number>()
     for (const [sessionId, projection] of Object.entries(snapshot.projectionsBySession)) {
-      const outline = projection.values.turnOutline
-      if (outline === undefined) continue
-      counts.set(sessionId, outline.filter(entry => entry.prompt.trim().length > 0).length)
+      const count = projection.values.promptedTurnCount
+      if (count !== undefined) counts.set(sessionId, count)
     }
     return counts
   }, [snapshot.projectionsBySession])

@@ -56,6 +56,10 @@ describe.skipIf(!jjAvailable)('jj-integration wire error codes', () => {
     rmSync(root, { recursive: true, force: true })
   })
 
+  it('registers the prompted-turn count the Session list carries for the panel', () => {
+    expect([...harness.registeredProjections]).toEqual(['promptedTurnCount'])
+  })
+
   it('answers every API failure path with a stable code', async () => {
     const table: Record<string, WireOutcome | string | boolean> = {}
     const record = async (name: string, method: Parameters<JjIntegrationTestHarness['wire']>[0], input: WireInput) => {
