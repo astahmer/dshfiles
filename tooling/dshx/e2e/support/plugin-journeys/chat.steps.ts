@@ -72,11 +72,14 @@ const seedTranscript = async (homeRoot: string, rowCount: number): Promise<void>
 
 const openSeededThread = async (page: Page, title: RegExp): Promise<void> => {
   const fixture = page.getByRole('treeitem', { name: title })
+  const ungrouped = page.getByText('Ungrouped', { exact: true }).first()
   await expect
     .poll(
       async () => {
         await page.reload()
-        if ((await fixture.count()) === 0) await page.getByText('Ungrouped', { exact: true }).first().click()
+        // A thread seeded before boot lists under its workspace; one seeded after it may sit in a collapsed Ungrouped.
+        await fixture.or(ungrouped).first().waitFor({ state: 'attached', timeout: 3_000 }).catch(() => undefined)
+        if ((await fixture.count()) === 0) await ungrouped.click({ timeout: 3_000 }).catch(() => undefined)
         await fixture
           .first()
           .waitFor({ state: 'attached', timeout: 3_000 })
@@ -148,22 +151,7 @@ Then('the stopped notices remain but Resume disappears', async ({ page }: { page
 const openTranscriptFixture = async (page: Page, rowCount: number): Promise<void> => {
   const profile = profileFor(page)
   await seedTranscript(profile.homeRoot, rowCount)
-  const fixture = page.getByRole('treeitem', { name: /Untitled|Chat transcript window fixture/ })
-  await expect
-    .poll(
-      async () => {
-        await page.reload()
-        if ((await fixture.count()) === 0) await page.getByText('Ungrouped', { exact: true }).first().click()
-        await fixture
-          .first()
-          .waitFor({ state: 'attached', timeout: 3_000 })
-          .catch(() => undefined)
-        return fixture.count()
-      },
-      { timeout: 30_000 },
-    )
-    .toBeGreaterThan(0)
-  await fixture.first().click()
+  await openSeededThread(page, /Untitled|Chat transcript window fixture/)
 }
 
 // session-search serves the Session list from a cache that a log written behind the Host does not invalidate, so the

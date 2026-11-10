@@ -12,9 +12,7 @@ Feature: Chat browser journeys
     When a real thread with one hundred eighty transcript turns is opened
     Then each upward wheel step moves the rows under the reader by the wheel distance
 
-  # Blocked: a persisted Session seeded before boot is never listed (chat.windowed-transcript fails the same way since
-  # 2026-11-10); drop @fixme once that seed/listing regression is fixed.
-  @scenario:chat.find-in-thread @fixme
+  @scenario:chat.find-in-thread
   Scenario: Find in thread reaches a turn the window never mounted and steps through every match
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller, @dshfiles/session-search, @dshfiles/shortcuts" is booted with a one hundred eighty turn transcript
     When the seeded transcript thread is opened
