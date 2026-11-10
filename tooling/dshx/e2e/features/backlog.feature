@@ -497,6 +497,13 @@ Feature: Backlog
     And the thread the item links is opened
     Then the thread header lists backlog item b:1 titled "Follow up on the deployment"
 
+  @scenario:backlog.quote-reply
+  Scenario: Quote a finished reply into a new backlog item
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts, @dshfiles/chat" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread on the fake model writes "Plan the release notes"
+    And the reply is added to the backlog
+    Then the capture quotes the reply "Answered by ALPHA1" and links the thread
 
   @scenario:backlog.backlog-mentions
   Scenario: Complete a backlog item mention in a comment

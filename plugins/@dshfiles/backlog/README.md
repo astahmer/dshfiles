@@ -311,6 +311,13 @@ The thread count fills the native `conversation.session.header.utilities` slot. 
 `RevisionSections`, a registry `@dshfiles/jj-integration/revision-sections` declares and the jj panel
 (`@dshfiles/jujutsu`) renders, so neither jj plugin depends on this one.
 
+## Quote a reply into an item
+
+A finished reply's action row has **Add to backlog**: it opens the Backlog capture with the reply's first line as the
+title, the whole reply as a Markdown quote and `From session-…`, which capture turns into a link to the thread. Edit it
+and press Enter as with any capture. The Chat fork hands the reply text to `conversation.chat.assistant-actions`
+entries (`ChatTurnActionExtras.text`); without it (the stock Chat row) the action does not render.
+
 ## Retrieve tweet context
 
 When a new item, an edited title or description, or an explicit URL link adds a public X/Twitter status, Backlog automatically retrieves its first unimported post through Tweet Context. For an older item—or after a failed or interrupted lookup—right-click its row and choose **Retrieve tweet content**. Retrieval sends the post ID to FxEmbed. Post and thread text is appended as a clearly marked, quoted section; existing descriptions and files are preserved. Available photos and sampled video frames become item attachments within the remaining slots and an eight-image, 16 MiB import budget.

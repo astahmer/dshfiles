@@ -1029,6 +1029,38 @@
       ]
     },
     {
+      "id": "quote-reply",
+      "title": "Quote a finished reply into a new backlog item",
+      "summary": "A finished reply's action row offers Add to backlog: the Backlog capture opens with the reply's first line as the title, the reply as a Markdown quote and the thread's session id, which capture turns into a thread link. The user edits it and presses Enter as with any capture.",
+      "surfaces": ["client", "integration"],
+      "surface": "rowAction",
+      "destination": "work",
+      "currentSurface": "conversation.chat.assistant-actions: Add to backlog",
+      "configuration": [],
+      "states": ["hidden", "offered", "captured"],
+      "failureModes": ["A reply without text, or a Chat row that does not pass the reply text, shows no action."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.quote-reply",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.quote-reply-text",
+          "file": "plugins/@dshfiles/backlog/src/message-quote.test.ts",
+          "testName": "titles the capture with the first line, quotes the reply and links the thread"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the action fills the capture box; the capture itself is the existing API call."
+        }
+      ]
+    },
+    {
       "id": "reference-preview",
       "title": "Preview a referenced item from a conversation",
       "summary": "An Agent writing `b:<id>` in its markdown gets a link: clicking it opens an inline card with the item's title, kind, status, project and body. A mention the user sent renders as the composer's chip, hiding the serialized title and tool hint. Image attachments appear as thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. Open in Backlog selects that item in the Backlog panel. Prose and inline code are linked; fenced code examples, existing links and text that only contains the token stay as written.",

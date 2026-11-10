@@ -1834,3 +1834,18 @@ Then('the thread header lists backlog item b:{int} titled {string}', async ({ pa
   })
   await finishJourneyAssertions(page)
 })
+
+When('the reply is added to the backlog', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Quote this reply in a new backlog item', exact: true }).last().click()
+})
+
+Then('the capture quotes the reply {string} and links the thread', async ({ page }: { page: Page }, reply: string) => {
+  await recordAssertion(page, 'backlog-quote-reply', async () => {
+    const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+    await expect(capture).toBeVisible()
+    // The capture editor may draw the Markdown quote as a block, so read the words rather than the `>` marker.
+    await expect(capture).toContainText(reply)
+    await expect(capture).toContainText(/From\s+session-[0-9a-f]/)
+  })
+  await finishJourneyAssertions(page)
+})
