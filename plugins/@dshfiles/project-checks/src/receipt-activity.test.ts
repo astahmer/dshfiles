@@ -76,12 +76,8 @@ describe('Project Checks activity summary', () => {
     expect(ProjectChecksActivityModel.event({ ...remote, executor: { kind: 'local' } }).value.executor).toEqual({ kind: 'local' })
 
     const decode = Schema.decodeUnknownResult(projectChecksActivityEventSchema, { onExcessProperty: 'error' })
-    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: sentinels[0] } } })._tag).toBe(
-      'Failure',
-    )
-    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', workspace: sentinels[1] } } })._tag).toBe(
-      'Failure',
-    )
+    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', sshTarget: sentinels[0] } } })._tag).toBe('Failure')
+    expect(decode({ ...event, value: { ...event.value, executor: { kind: 'remote', remoteId: 'm1', workspace: sentinels[1] } } })._tag).toBe('Failure')
     expect(decode({ ...event, value: { ...event.value, remoteFailure: { remoteId: 'm1', code: 'peer-unreachable', message: sentinels[2] } } })._tag).toBe(
       'Failure',
     )

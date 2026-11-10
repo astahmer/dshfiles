@@ -227,8 +227,7 @@ const verificationStageLabels = {
 
 export const verificationReceiptActivity = (receipt: VerificationReceiptSummary): ActivityIngest => {
   const statusLabel = receipt.status === 'timed-out' ? 'timed out' : receipt.status
-  const executorLabel =
-    receipt.executor === null ? 'executor unknown' : receipt.executor.kind === 'local' ? 'local' : `remote ${receipt.executor.remoteId}`
+  const executorLabel = receipt.executor === null ? 'executor unknown' : receipt.executor.kind === 'local' ? 'local' : `remote ${receipt.executor.remoteId}`
   const modeLabel = `${verificationStageLabels[receipt.verificationStage]} · ${receipt.automatic ? `automatic · attempt ${receipt.attempt} · verification turn ${receipt.verificationTurn ?? 'unknown'}` : 'manual'} · ${executorLabel}`
   const revisionLabel = (revision: string | null): string => (revision === null ? 'unavailable' : revision)
   const level: ActivityLevel =

@@ -52,13 +52,9 @@ export type ProjectChecksActivityEvent = typeof projectChecksActivityEventSchema
 const activityEventInput = (receipt: StoredReceipt) => {
   const summaryExtras: { -readonly [Key in keyof ProjectChecksActivityEvent['value']]?: ProjectChecksActivityEvent['value'][Key] } = {}
   if (receipt.executor !== undefined)
-    summaryExtras.executor =
-      receipt.executor.kind === 'local' ? { kind: 'local' } : { kind: 'remote', remoteId: receipt.executor.remoteId }
+    summaryExtras.executor = receipt.executor.kind === 'local' ? { kind: 'local' } : { kind: 'remote', remoteId: receipt.executor.remoteId }
   if (receipt.remoteFailure !== undefined)
-    summaryExtras.remoteFailure =
-      receipt.remoteFailure === null
-        ? null
-        : { remoteId: receipt.remoteFailure.remoteId, code: receipt.remoteFailure.code }
+    summaryExtras.remoteFailure = receipt.remoteFailure === null ? null : { remoteId: receipt.remoteFailure.remoteId, code: receipt.remoteFailure.code }
   if (receipt.verificationStage !== undefined) summaryExtras.verificationStage = receipt.verificationStage
   return {
     kind: 'verification-receipt',
