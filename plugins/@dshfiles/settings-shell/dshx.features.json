@@ -95,7 +95,14 @@
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "sidebar: Settings trigger release mark › General",
-      "configuration": [],
+      "configuration": [
+        {
+          "key": "dshfiles-settings-shell.releaseCheck",
+          "defaultValue": "true",
+          "constraints": "Live. Off: the browser never asks on its own and the badge stays hidden; Check for DSH updates still asks once when pressed.",
+          "coveredBy": ["settings-shell.release-check-switch"]
+        }
+      ],
       "states": ["checking", "up-to-date", "update-available", "summary-expanded", "dismissed", "comparison-unknown", "unavailable"],
       "failureModes": [
         "GitHub is unavailable or returns an invalid payload; Settings stays usable and offers a manual retry.",
@@ -120,6 +127,12 @@
           "id": "settings-shell.release-status",
           "file": "plugins/@dshfiles/settings-shell/src/release-status.test.ts",
           "testName": "lists releases after the installed version and keeps their links on GitHub"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.release-check-switch",
+          "file": "plugins/@dshfiles/settings-shell/src/release-status.test.ts",
+          "testName": "asks on its own only while releaseCheck is on, and keeps the default on an older Host"
         }
       ],
       "telemetry": [
@@ -459,7 +472,7 @@
     {
       "id": "settings-json-editor",
       "title": "Edit plugin settings as JSON",
-      "summary": "Each plugin settings page switches between the form and its overrides as JSON: Insert setting completes keys from the schema with their descriptions, every unknown key or wrong value is listed with its line and blocks Save, Save sends only the fields the draft changed fenced by the revision it started from, and read-only Defaults and Effective tabs show what each field inherits and resolves to. A concurrent change or a refusal keeps the draft with a recovery.",
+      "summary": "Each plugin settings page switches between the form and its overrides as JSON: Insert setting completes keys from the schema with their descriptions, every unknown key or wrong value is listed with its line and blocks Save, Save sends only the fields the draft changed fenced by the revision it started from, and read-only Defaults and Effective tabs show what each field inherits and resolves to. A concurrent change or a refusal keeps the draft with a recovery. A field opened from search or a link while JSON shows stays in JSON with its key selected, and type diagnostics name the expected type in the active language.",
       "reach": [
         "click text \"More\"",
         "click menuitem \"Settings*\"",
@@ -505,6 +518,34 @@
           "id": "settings-shell.json-document",
           "file": "plugins/@dshfiles/settings-shell/src/schema-form/settings-document.test.ts",
           "testName": "accepts fields and the objects that hold them, and flags unknown keys, secrets and wrong types with their line"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.json-stays-on-focus",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.json-phone-keyboard",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.json-page-keeps-view",
+          "file": "plugins/@dshfiles/settings-shell/src/plugin-settings-page.test.tsx",
+          "testName": "reopens a field from search in the JSON view it left, with the key selected"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.json-editor-focus",
+          "file": "plugins/@dshfiles/settings-shell/src/schema-form/settings-json-editor.test.tsx",
+          "testName": "selects the key of a focused field, and says when the overrides leave it out"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.json-editor-localized-types",
+          "file": "plugins/@dshfiles/settings-shell/src/schema-form/settings-json-editor.test.tsx",
+          "testName": "words the expected type through the translation, so every locale names it"
         }
       ],
       "telemetry": [
@@ -559,24 +600,19 @@
     },
     {
       "id": "plugin-enablement-tools",
-      "title": "List and switch plugin entries for an Agent",
-      "summary": "plugin_inventory lists the profile's Loader entries with enablement, runtime phase and why an entry cannot be changed; plugin_set_enabled enables or disables one through the plugin manager and relays its verdict: applied live, waiting for a user restart (with the reason), or overridden by a higher-priority layer. It never restarts DSH; the opposite value reverses it.",
-      "reach": [
-        "click tab \"Agents\"",
-        "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
-        "expect region \"Tools (*\"",
-        "expect text \"plugin_set_enabled\""
-      ],
-      "surfaces": ["tool", "host"],
-      "surface": "agentToolOnly",
-      "destination": "none",
-      "currentSurface": "agent tools: plugin_inventory, plugin_set_enabled",
+      "title": "List and switch plugin entries, from Settings or an Agent",
+      "summary": "Each plugin settings page shows its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the seed. plugin_inventory lists the same for every entry; plugin_set_enabled enables or disables one through the plugin manager and relays its verdict: applied live, waiting for a user restart (with the reason), or overridden by a higher-priority layer. It never restarts DSH; the opposite value reverses it.",
+      "reach": ["click text \"More\"", "click menuitem \"Settings*\"", "click button \"Main tabs\"", "expect switch \"Plugin enabled\""],
+      "surfaces": ["client", "settings", "tool", "host"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: plugin page › entry card; agent tools: plugin_inventory, plugin_set_enabled",
       "configuration": [],
       "states": ["applied", "restart-required", "overridden", "failed"],
       "failureModes": [
         "No plugin manager on the Host: the tool says to edit cordis.patch.yml by hand and restart.",
-        "An unknown entry id is refused and points to plugin_inventory; a manager failure points to Settings › Plugins and the profile file."
+        "An unknown entry id is refused and points to plugin_inventory; a manager failure points to Settings › Plugins and the profile file.",
+        "An older Host or one without a plugin manager answers no entry: the page shows no card and the Plugins page stays the control."
       ],
       "externalDependencies": [],
       "verification": [
@@ -593,9 +629,21 @@
           "testName": "refuses an unknown entry, a missing manager and a manager failure with a recovery"
         },
         {
-          "kind": "not-applicable",
-          "id": "settings-shell.plugin-enablement-browser",
-          "reason": "Agent tools with no UI of their own; the native Plugins page is the user's control for the same plugin-manager verb, and a scratch run would toggle real Loader rows."
+          "kind": "unit-test",
+          "id": "settings-shell.plugin-entry-records",
+          "file": "plugins/@dshfiles/settings-shell/src/plugin-controls.test.ts",
+          "testName": "names each entry's bundle, the bundles that reconfigure it, the seed region and what waits for a restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.plugin-entry-seed-region",
+          "file": "plugins/@dshfiles/settings-shell/src/plugin-controls.test.ts",
+          "testName": "names the rows whose last override sits in the seed region, which profile:sync restores"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.plugin-entry-card",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
         }
       ],
       "telemetry": [

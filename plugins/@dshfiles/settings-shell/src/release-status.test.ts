@@ -6,7 +6,7 @@ import { FetchHttpClient } from 'effect/http'
 import { TestClock } from 'effect/testing'
 import { InstalledVersions } from './installed-versions.js'
 import { ReleaseCheck } from './release-check.js'
-import { githubReleasesJson, releaseStatusFromGitHub } from './release-status.js'
+import { githubReleasesJson, releaseCheckSchedule, releaseStatusFromGitHub } from './release-status.js'
 
 const githubRelease = (input: { readonly tag: string; readonly body?: string; readonly draft?: boolean }) => ({
   tag_name: input.tag,
@@ -139,4 +139,13 @@ describe('ReleaseCheck', () => {
       }),
     ),
   )
+})
+
+describe('release check switch', () => {
+  it('asks on its own only while releaseCheck is on, and keeps the default on an older Host', () => {
+    expect(releaseCheckSchedule({ releaseCheck: true })).toEqual({ automatic: true, off: false })
+    expect(releaseCheckSchedule({ releaseCheck: false })).toEqual({ automatic: false, off: true })
+    expect(releaseCheckSchedule({})).toEqual({ automatic: true, off: false })
+    expect(releaseCheckSchedule(undefined)).toEqual({ automatic: false, off: false })
+  })
 })

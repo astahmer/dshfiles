@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
+import { PageViewMemoryProvider } from './plugin-settings-page.js'
 import { Highlight } from './schema-form/settings-form.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { JEV_ENTRY_ID, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
@@ -302,111 +303,113 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   }
   const foundText = result.total === 1 ? t('search.foundOne') : t('search.found', { count: result.total })
   return (
-    <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-      <div className="dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4 dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3">
-        <div
-          className="dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-[16px] dshx:leading-6 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)] dshx:@max-pane-compact:sr-only"
-          id={props.titleId}
-        >
-          {props.renderSlot('settings.header', {})}
-        </div>
-        <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[560px] dshx:flex-1">
-          <InputGroupAddon>
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupInput
-            aria-label={t('search.placeholder')}
-            autoComplete="off"
-            autoFocus
-            data-modal-autofocus=""
-            onChange={event => props.onSearch(event.currentTarget.value)}
-            onKeyDown={event => {
-              // Escape clears a query first, as in VS Code.
-              if (event.key === 'Escape' && props.query !== '') {
-                event.preventDefault()
-                event.stopPropagation()
-                event.nativeEvent.stopImmediatePropagation()
-                props.onSearch('')
-              }
-            }}
-            placeholder={t('search.placeholder')}
-            role="searchbox"
-            spellCheck={false}
-            type="text"
-            value={props.query}
-          />
-          {props.query !== '' && (
-            <InputGroupAddon align="inline-end">
-              <InputGroupButton aria-label={t('search.clear')} onClick={() => props.onSearch('')} size="icon-xs">
-                <XIcon />
-              </InputGroupButton>
+    <PageViewMemoryProvider>
+      <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+        <div className="dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4 dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3">
+          <div
+            className="dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-[16px] dshx:leading-6 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)] dshx:@max-pane-compact:sr-only"
+            id={props.titleId}
+          >
+            {props.renderSlot('settings.header', {})}
+          </div>
+          <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[560px] dshx:flex-1">
+            <InputGroupAddon>
+              <SearchIcon />
             </InputGroupAddon>
+            <InputGroupInput
+              aria-label={t('search.placeholder')}
+              autoComplete="off"
+              autoFocus
+              data-modal-autofocus=""
+              onChange={event => props.onSearch(event.currentTarget.value)}
+              onKeyDown={event => {
+                // Escape clears a query first, as in VS Code.
+                if (event.key === 'Escape' && props.query !== '') {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  event.nativeEvent.stopImmediatePropagation()
+                  props.onSearch('')
+                }
+              }}
+              placeholder={t('search.placeholder')}
+              role="searchbox"
+              spellCheck={false}
+              type="text"
+              value={props.query}
+            />
+            {props.query !== '' && (
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton aria-label={t('search.clear')} onClick={() => props.onSearch('')} size="icon-xs">
+                  <XIcon />
+                </InputGroupButton>
+              </InputGroupAddon>
+            )}
+          </InputGroup>
+          <Toggle
+            aria-label={t('search.modified')}
+            className="dshx:shrink-0"
+            data-settings-modified-filter=""
+            onPressedChange={() => props.onSearch(SettingsSearch.toggleModified(props.query))}
+            pressed={SettingsSearch.hasModifiedFilter(props.query)}
+            size="sm"
+            variant="outline"
+          >
+            {t('search.modified')}
+          </Toggle>
+          {searching && (
+            <span aria-live="polite" className="dshx:shrink-0 dshx:text-[12px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" role="status">
+              {foundText}
+            </span>
           )}
-        </InputGroup>
-        <Toggle
-          aria-label={t('search.modified')}
-          className="dshx:shrink-0"
-          data-settings-modified-filter=""
-          onPressedChange={() => props.onSearch(SettingsSearch.toggleModified(props.query))}
-          pressed={SettingsSearch.hasModifiedFilter(props.query)}
-          size="sm"
-          variant="outline"
-        >
-          {t('search.modified')}
-        </Toggle>
-        {searching && (
-          <span aria-live="polite" className="dshx:shrink-0 dshx:text-[12px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" role="status">
-            {foundText}
-          </span>
-        )}
-        <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-end dshx:gap-1.5">
-          {props.renderSlot('settings.action', {})}
-          {props.onClose !== undefined && (
-            <button className={headerButton} onClick={props.onClose} type="button">
-              <IconCloseOutlineRegular size={14} />
-              <span className="dshx:sr-only">{props.renderSlot('settings.close', {})}</span>
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="dshx:hidden dshx:shrink-0 dshx:border-b dshx:border-border dshx:px-3 dshx:py-2 dshx:@max-pane-compact:block">
-        <Combobox
-          label={t('search.sections')}
-          value={active?.id ?? ''}
-          options={props.groups.flatMap(({ group, entries }) =>
-            entries.map(entry => ({ value: entry.id, label: entry.label, keywords: [entry.keywords], group: group.label })),
-          )}
-          onValueChange={select}
-          matchTriggerWidth
-        />
-      </div>
-      <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
-        <nav
-          aria-label={t('title')}
-          className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4 dshx:@max-pane-compact:hidden"
-        >
-          {props.groups.map(({ group, entries }) => (
-            <div aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-0.5" data-settings-group={group.id} key={group.id} role="group">
-              <span className={navGroup}>{group.label}</span>
-              {entries.map(entry => (
-                <NavCell active={!searching && entry.id === active?.id} count={countOf(entry)} entry={entry} key={entry.id} onSelect={select} />
-              ))}
-            </div>
-          ))}
-        </nav>
-        <div
-          className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
-          ref={content}
-        >
-          <div className="dshx:max-w-[880px]">
-            {searching && <SearchResults {...props} result={result} />}
-            {!searching && active !== undefined && (
-              <EntryView {...props} entry={active} groupLabel={activeGroup?.label ?? ''} jevNamespaces={jevNamespaces} key={active.id} />
+          <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-end dshx:gap-1.5">
+            {props.renderSlot('settings.action', {})}
+            {props.onClose !== undefined && (
+              <button className={headerButton} onClick={props.onClose} type="button">
+                <IconCloseOutlineRegular size={14} />
+                <span className="dshx:sr-only">{props.renderSlot('settings.close', {})}</span>
+              </button>
             )}
           </div>
         </div>
+        <div className="dshx:hidden dshx:shrink-0 dshx:border-b dshx:border-border dshx:px-3 dshx:py-2 dshx:@max-pane-compact:block">
+          <Combobox
+            label={t('search.sections')}
+            value={active?.id ?? ''}
+            options={props.groups.flatMap(({ group, entries }) =>
+              entries.map(entry => ({ value: entry.id, label: entry.label, keywords: [entry.keywords], group: group.label })),
+            )}
+            onValueChange={select}
+            matchTriggerWidth
+          />
+        </div>
+        <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
+          <nav
+            aria-label={t('title')}
+            className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4 dshx:@max-pane-compact:hidden"
+          >
+            {props.groups.map(({ group, entries }) => (
+              <div aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-0.5" data-settings-group={group.id} key={group.id} role="group">
+                <span className={navGroup}>{group.label}</span>
+                {entries.map(entry => (
+                  <NavCell active={!searching && entry.id === active?.id} count={countOf(entry)} entry={entry} key={entry.id} onSelect={select} />
+                ))}
+              </div>
+            ))}
+          </nav>
+          <div
+            className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
+            ref={content}
+          >
+            <div className="dshx:max-w-[880px]">
+              {searching && <SearchResults {...props} result={result} />}
+              {!searching && active !== undefined && (
+                <EntryView {...props} entry={active} groupLabel={activeGroup?.label ?? ''} jevNamespaces={jevNamespaces} key={active.id} />
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </PageViewMemoryProvider>
   )
 }
 

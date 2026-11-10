@@ -31,11 +31,19 @@ describe('settings document', () => {
     const parsed = SettingsDocument.parse({ text: draft, fields })
     expect(parsed.ok).toBe(true)
     expect(parsed.diagnostics).toEqual([
-      { code: 'type', path: ['maxTabs'], line: 2, expected: 'a number ≥ 2 and ≤ 50' },
-      { code: 'type', path: ['layout', 'dense'], line: 3, expected: 'true or false' },
+      { code: 'type', path: ['maxTabs'], line: 2, expected: { shape: 'scalar', control: field('maxTabs').control } },
+      { code: 'type', path: ['layout', 'dense'], line: 3, expected: { shape: 'scalar', control: { kind: 'boolean' } } },
       { code: 'unknown-key', path: ['token'], line: 4 },
       { code: 'unknown-key', path: ['typo'], line: 5 },
     ])
+  })
+
+  it('finds the key of a set field, nested ones included, and nothing for a field the document leaves out', () => {
+    const draft = ['{', '  "maxTabs": 3,', '  "layout": {', '    "dense": true', '  }', '}'].join('\n')
+    const nested = SettingsDocument.keyRange({ text: draft, path: ['layout', 'dense'] })
+    expect(nested === undefined ? undefined : draft.slice(nested.start, nested.end)).toBe('"dense"')
+    expect(draft.slice(0, nested?.start).split('\n')).toHaveLength(4)
+    expect(SettingsDocument.keyRange({ text: draft, path: ['enabled'] })).toBeUndefined()
   })
 
   it('reports a parse error with its line and refuses a document that is not an object', () => {

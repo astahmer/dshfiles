@@ -34,7 +34,7 @@ const PortDriftWarning = Layer.effectDiscard(
 )
 
 const settingsShellLayer = Layer.mergeAll(SettingsTools.layer, ReleaseCheck.layer, BundleLabels.layer, PortDriftWarning).pipe(
-  Layer.provideMerge(Layer.mergeAll(InstalledVersions.layer, NativeSettings.layer, PluginControls.layer)),
+  Layer.provideMerge(Layer.mergeAll(InstalledVersions.layer, NativeSettings.layer, PluginControls.layer.pipe(Layer.provide(NativeSettings.layer)))),
   Layer.provideMerge(Layer.merge(nodeFileSystemLayer, FetchHttpClient.layer)),
 )
 

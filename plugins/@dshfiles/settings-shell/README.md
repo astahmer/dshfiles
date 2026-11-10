@@ -30,7 +30,9 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
   its plugin settings and the link to the accounts page share one entry. Every Jev setting (enable, key, thresholds) of
   every plugin sits under **Tools & MCP › Jev**; the plugin's own page says so and links there.
 - **Scope**: plugin pages say they apply to every project and thread. No setting stores a per-project or per-thread
-  value today, so the page shows that as information instead of a scope control it could not honour.
+  value today, so the page shows that as information instead of a scope control it could not honour. Project or
+  thread scopes, VS Code's precedence rules, a JSON view of the YAML profile patch, migrating existing YAML or
+  credentials, and bulk reset are not built; each needs its own design.
 - **Narrow windows and phones**: the group list becomes a searchable entry picker above the page.
 - The former dialog, expanded dialog and side-panel presentations are gone. A `dshfiles:open-settings` request that
   still names `surface: 'modal'` opens the page.
@@ -50,7 +52,7 @@ These are presentation-only panel registrations; setting reads/writes retain the
 
 ### DSH release notices
 
-The Settings trigger shows a small badge when GitHub has a release newer than the DSH version running on the Host. **General** lists releases between the installed version and latest, offers a concise English TL;DR, and links to the official release notes. Dismissal is browser-local and lasts until another release appears. Release checks run on the Host against the fixed public GitHub Releases API, are cached for one hour, and can be retried from General; an unavailable or unmatched history never guesses that an update exists. The read-only `dsh_release_status` Agent tool uses the same checked result.
+The Settings trigger shows a small badge when GitHub has a release newer than the DSH version running on the Host. **Settings › General › Settings › Release check** (`releaseCheck`) turns the automatic check off: nothing asks GitHub on its own, the badge stays hidden, and **Check for DSH updates** still asks once when pressed. **General** lists releases between the installed version and latest, offers a concise English TL;DR, and links to the official release notes. Dismissal is browser-local and lasts until another release appears. Release checks run on the Host against the fixed public GitHub Releases API, are cached for one hour, and can be retried from General; an unavailable or unmatched history never guesses that an update exists. The read-only `dsh_release_status` Agent tool uses the same checked result.
 
 ### Search
 
@@ -106,10 +108,24 @@ native rows and `useSettings` read, so every surface stays in step. A Host write
 and reloads the entry), so a row shows the requested value until the write settles; a refused value shows under its
 row.
 
+**Plugin entries.** Under its scope line a page shows the Loader entry behind it (a dshx plugin's settings namespace is
+its entry id; a page whose namespace no entry carries shows none), read from the plugin manager through the same
+`plugins` API `plugin_inventory` uses: the entry id, the bundle whose patch declares the row (or the module, for a row
+DSH or the profile declares), the bundles that change the row without declaring it, and a **Plugin enabled** switch. The switch
+is the manager's `setPluginEnabled`; a change the running Host did not apply shows **Starts after a restart** or **Stops
+after a restart** until the user restarts DSH, as does a disabled entry still running. An `overridden` or failed verdict
+says which layer or file to edit. A row whose override sits in the seed's marked Cordis region carries a note: the
+manager edits that override in place and `pnpm profile:sync` restores the region, so the change lasts only until the
+next sync and belongs in `profiles/web`; a row with no override there gets an appended one, which the sync keeps.
+Cordis `inject` dependencies are not in the manager's records, so the card does not list them. Which owned features
+have a switch at all, and the ones still missing, is audited in [feature controls](../../../docs/feature-controls.md).
+
 **Modified settings** carry a thin bar on their left, as in VS Code: the field is set in the user layer (an override
 equal to the default still counts, as natively). Hovering or focusing the row shows **Reset to default**, which unsets
 the override so the field re-inherits the composition default. A deep link to a field scrolls it into view and
-highlights it for two seconds.
+highlights it for two seconds. A field opened from search or a link while the page shows JSON stays in JSON: the
+editor selects the field's key, or says the overrides leave it out and that **Insert setting** adds it. Each Settings
+instance (the stage page, a docked hub) remembers each page's view while it is open.
 
 **Where a value comes from.** Under its key path each row names its source in words, never only by colour:
 
@@ -152,8 +168,12 @@ The editor is the kit's `Textarea`, `Tabs` and `Command`, not `@dshfiles/editor`
 completion, but using it here would need a new cross-plugin contract (Settings may not import the editor), a
 schemastery-to-JSON-Schema converter and a multi-megabyte bundle in Settings, and Monaco is poor with a soft keyboard.
 The kit version needs none of that and works on a phone; schema-aware completion is the Insert setting picker and the
-diagnostics come from the same field model the form draws (`src/schema-form/settings-document.ts`). Type expectations
-in diagnostics ("true or false", "a number ≥ 2") are English in every locale.
+diagnostics come from the same field model the form draws (`src/schema-form/settings-document.ts`). A type diagnostic
+carries the expected type as data and the editor words it in the active language ("true or false", "≥ 2 的数字").
+
+At 390 px the whole path works from the keyboard alone: the Settings shortcut focuses search, Tab reaches the page
+result, the arrow keys move between **Form** and **JSON**, and the editor and **Save** are Tab stops; nothing
+scrolls sideways. The `settings-shell.json-phone-keyboard` journey walks it (`pnpm check:e2e settings-shell`).
 
 ### Agent tools
 
@@ -163,7 +183,7 @@ in diagnostics ("true or false", "a number ≥ 2") are English in every locale.
 | `settings_inspect`   | One namespace field by field: schema default, override, inherited, effective value, source. Read-only.      |
 | `settings_set`       | Merge a patch into one namespace (user asked).                                                              |
 | `settings_unset`     | Reset one field path (user asked).                                                                          |
-| `plugin_inventory`   | The profile's Loader entries: module, enabled, runtime phase, and why one cannot be changed. Read-only.     |
+| `plugin_inventory`   | The profile's Loader entries: module, owning bundle, enabled, phase, pending restart, seed row. Read-only.  |
 | `plugin_set_enabled` | Enable or disable one entry through the plugin manager (user asked); reversed with the opposite value.      |
 | `dsh_release_status` | The DSH release check below. Read-only.                                                                     |
 
@@ -244,10 +264,11 @@ Deliberate differences from upstream:
 
 ## Settings (`dshfiles-settings-shell`)
 
-| Key         | Default | Meaning                                                                                             |
-| ----------- | ------- | --------------------------------------------------------------------------------------------------- |
-| `openIn`    | `auto`  | Retired and hidden: Settings always opens as the page in the stage; a saved value still validates.  |
-| `jevSecret` | `''`    | The one TypeSafe Jev key (`secret:ALIAS[@env]`, Secret Catalog picker), read by Backlog and Memory. |
+| Key            | Default | Meaning                                                                                                |
+| -------------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| `openIn`       | `auto`  | Retired and hidden: Settings always opens as the page in the stage; a saved value still validates.     |
+| `releaseCheck` | `true`  | Check GitHub for newer DSH releases every few hours and badge the trigger. Live; off keeps the button. |
+| `jevSecret`    | `''`    | The one TypeSafe Jev key (`secret:ALIAS[@env]`, Secret Catalog picker), read by Backlog and Memory.    |
 
 ### One Jev key
 

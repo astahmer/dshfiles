@@ -1,13 +1,14 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { ChevronDownIcon, ChevronUpIcon, ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
 import { settingsShellApi } from './shell-api.js'
-import type { DshReleaseStatus } from './release-status.js'
+import { settingsShellSettings } from './settings.js'
+import { releaseCheckSchedule, type DshReleaseStatus } from './release-status.js'
 import type { ShellTranslate } from './native/locales.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
@@ -21,29 +22,34 @@ const dismissedRelease = createStoredValue({
 
 const useReleaseStatus = () => {
   const api = useApi(settingsShellApi)
-  return useQuery({
+  const schedule = releaseCheckSchedule(useSettings(settingsShellSettings).value)
+  const query = useQuery({
     queryKey: RELEASE_STATUS_QUERY_KEY,
     queryFn: ({ signal }) => api.releaseStatus(undefined, { signal }),
     staleTime: 60 * 60 * 1000,
-    refetchInterval: RELEASE_STATUS_REFRESH_MS,
+    refetchInterval: schedule.automatic ? RELEASE_STATUS_REFRESH_MS : false,
+    enabled: schedule.automatic,
   })
+  return { query, off: schedule.off }
 }
 
 const noticeMessage = (props: {
   readonly t: ShellTranslate
   readonly updateAvailable: boolean
   readonly isError: boolean
+  readonly off: boolean
   readonly status: DshReleaseStatus | undefined
 }): string => {
   if (props.updateAvailable) return props.t('releaseNotice.available', { version: props.status?.latestVersion ?? '' })
   if (props.isError) return props.t('releaseNotice.failed')
   if (props.status?.comparisonKnown === false) return props.t('releaseNotice.unknown', { version: props.status.currentVersion ?? '' })
   if (props.status?.comparisonKnown === true) return props.t('releaseNotice.current', { version: props.status.currentVersion ?? '' })
+  if (props.off) return props.t('releaseNotice.off')
   return props.t('releaseNotice.checking')
 }
 
 export const DshReleaseIndicator = (props: { readonly t: ShellTranslate }): JSX.Element | null => {
-  const status = useReleaseStatus()
+  const status = useReleaseStatus().query
   const dismissed = dismissedRelease.useValue()
   const version = status.data?.available === true && status.data.latestVersion !== dismissed ? status.data.latestVersion : null
   if (version === null) return null
@@ -56,7 +62,7 @@ export const DshReleaseIndicator = (props: { readonly t: ShellTranslate }): JSX.
 }
 
 export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Element => {
-  const status = useReleaseStatus()
+  const { query: status, off } = useReleaseStatus()
   const dismissed = dismissedRelease.useValue()
   const [expanded, setExpanded] = useState(false)
   const releaseStatus = status.data
@@ -68,7 +74,7 @@ export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Ele
       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-4">
         <div className="dshx:min-w-0 dshx:flex-1">
           <div className="dshx:text-[14px] dshx:leading-5 dshx:font-medium">
-            {noticeMessage({ t: props.t, updateAvailable, isError: status.isError, status: releaseStatus })}
+            {noticeMessage({ t: props.t, updateAvailable, isError: status.isError, off, status: releaseStatus })}
           </div>
           {updateAvailable && (
             <div className="dshx:mt-1 dshx:text-[12px] dshx:leading-[18px] dshx:text-muted-foreground">

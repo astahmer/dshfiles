@@ -1,7 +1,8 @@
 import type {} from '@deepseek-ai/dsh-plugin-manager'
 import { HostContext } from '@dshfiles/dshx/effect'
-import { Context, Effect, Layer, Schema } from 'effect'
-import type { PluginChange, PluginEntry } from './shell-api.js'
+import { Context, Effect, FileSystem, Layer, Option, Ref, Schema } from 'effect'
+import { NativeSettings } from './native-settings-promise.js'
+import { rowIdOf, type PluginChange, type PluginEntry } from './shell-api.js'
 
 /**
  * The profile's Loader entries and their enablement, through the plugin manager that owns the profile patch. It persists
@@ -46,6 +47,15 @@ const MAX_REASON = 300
 export interface PluginManagerSurface<Id extends string> {
   listPlugins(): Promise<readonly PluginInfoLike<Id>[]>
   setPluginEnabled(id: Id, enabled: boolean): Promise<PluginChangeResult>
+  /** Absent on a manager that predates bundle records; the entries then name no owner. */
+  listBundles?(): Promise<readonly BundleInfoLike[]>
+}
+
+/** What these controls read of a bundle record; `BundleInfo` satisfies it. */
+export interface BundleInfoLike {
+  readonly name: string
+  readonly rows: readonly { readonly rowId: string; readonly entryId?: string }[]
+  readonly overrides: readonly string[]
 }
 
 /** What these controls read of the manager's change result; `ChangeResult` satisfies it. */
@@ -68,6 +78,30 @@ export interface PluginInfoLike<Id extends string> {
 
 const reasonOf = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause)).slice(0, MAX_REASON)
 
+const SEED_START = '# BEGIN NIX-MANAGED DSH PLUGINS'
+const SEED_END = '# END NIX-MANAGED DSH PLUGINS'
+const TOP_LEVEL_ID = /^- id:\s*['"]?([^'"\s#]+)/u
+
+/**
+ * Entry ids whose last top-level override in the profile patch sits inside the seed's marked region. The plugin manager
+ * edits that last override in place, and `pnpm profile:sync` restores the region from the seed, so a change to one of
+ * these rows does not survive the next sync. Rows overridden after the region, or not at all, get an appended override
+ * outside it, which the sync keeps.
+ */
+export const seedRegionEntries = (patch: string): ReadonlySet<string> => {
+  const last = new Map<string, boolean>()
+  let inside = false
+  for (const line of patch.split('\n')) {
+    if (line.startsWith(SEED_START)) inside = true
+    else if (line.startsWith(SEED_END)) inside = false
+    const id = TOP_LEVEL_ID.exec(line)?.[1]
+    if (id !== undefined) last.set(id, inside)
+  }
+  return new Set([...last].filter(([, seeded]) => seeded).map(([id]) => id))
+}
+
+const RUNNING_PHASES: ReadonlySet<string | null> = new Set(['pending', 'loading', 'active'])
+
 export class PluginControls extends Context.Service<
   PluginControls,
   {
@@ -78,10 +112,18 @@ export class PluginControls extends Context.Service<
     }) => Effect.Effect<PluginChange, PluginManagerMissing | PluginManagerFailed | PluginEntryUnknown>
   }
 >()('@dshfiles/settings-shell/PluginControls') {
-  static readonly layerFrom = <Id extends string>(manager: () => PluginManagerSurface<Id> | undefined) =>
-    Layer.succeed(
+  static readonly layerFrom = <Id extends string>(
+    manager: () => PluginManagerSurface<Id> | undefined,
+    profilePatch: Effect.Effect<Option.Option<string>> = Effect.succeedNone,
+  ) =>
+    Layer.effect(
       PluginControls,
-      (() => {
+      Effect.gen(function* () {
+        // What a change this Host relayed waits for: the next start enables or disables the entry. A restart clears it.
+        const awaitingRestart = yield* Ref.make(new Map<string, boolean>())
+        // Bundle records only name owners: when the manager cannot read them, the entries still list, without one.
+        const bundles = (found: PluginManagerSurface<Id>): Effect.Effect<readonly BundleInfoLike[]> =>
+          Effect.tryPromise(() => found.listBundles?.() ?? Promise.resolve([])).pipe(Effect.orElseSucceed(() => []))
         const current = Effect.suspend(() => {
           const found = manager()
           return found === undefined ? Effect.fail(new PluginManagerMissing({})) : Effect.succeed(found)
@@ -89,15 +131,29 @@ export class PluginControls extends Context.Service<
         const entries = Effect.flatMap(current, found =>
           Effect.tryPromise({ try: () => found.listPlugins(), catch: cause => new PluginManagerFailed({ reason: reasonOf(cause), cause }) }),
         )
-        const list = Effect.map(entries, rows =>
-          rows.map(row => ({
-            entryId: row.entryId,
-            moduleName: row.moduleName,
-            enabled: row.enabled,
-            phase: row.fiberPhase,
-            readOnlyReason: row.readOnlyReason ?? null,
-          })),
-        ).pipe(Effect.withSpan('settings-shell plugin inventory read'))
+        const list = Effect.gen(function* () {
+          const found = yield* current
+          const rows = yield* entries
+          const bundleRows = yield* bundles(found)
+          const seeded = Option.match(yield* profilePatch, { onNone: () => new Set<string>(), onSome: seedRegionEntries })
+          const awaiting = yield* Ref.get(awaitingRestart)
+          return rows.map((row): PluginEntry => {
+            const running = RUNNING_PHASES.has(row.fiberPhase)
+            const target = awaiting.get(row.entryId) ?? (!row.enabled && running ? false : undefined)
+            const rowId = rowIdOf(row.entryId)
+            return {
+              entryId: row.entryId,
+              moduleName: row.moduleName,
+              enabled: row.enabled,
+              phase: row.fiberPhase,
+              readOnlyReason: row.readOnlyReason ?? null,
+              bundle: bundleRows.find(bundle => bundle.rows.some(declared => (declared.entryId ?? declared.rowId) === row.entryId))?.name ?? null,
+              configuredBy: bundleRows.filter(bundle => bundle.overrides.includes(rowId)).map(bundle => bundle.name),
+              pendingRestart: target === undefined || target === running ? null : target ? 'enable' : 'disable',
+              seedRegion: seeded.has(rowId),
+            }
+          })
+        }).pipe(Effect.withSpan('settings-shell plugin inventory read'))
         const setEnabled = Effect.fn('settings-shell plugin enablement write')(function* (input: { readonly entryId: string; readonly enabled: boolean }) {
           const found = yield* current
           const rows = yield* entries
@@ -122,16 +178,23 @@ export class PluginControls extends Context.Service<
                     .slice(0, MAX_REASON),
             warnings: (result.warnings ?? []).slice(0, 50),
           }
+          if (result.application === 'restart-required') yield* Ref.update(awaitingRestart, map => new Map(map).set(input.entryId, input.enabled))
+          if (result.application === 'applied') yield* Ref.update(awaitingRestart, map => new Map([...map].filter(([id]) => id !== input.entryId)))
           return change
         })
         return PluginControls.of({ list, setEnabled })
-      })(),
+      }),
     )
 
   static readonly layer = Layer.unwrap(
     Effect.gen(function* () {
       const host = yield* HostContext
-      return PluginControls.layerFrom(() => host.ctx.get('pluginManager'))
+      const native = yield* NativeSettings
+      const fs = yield* FileSystem.FileSystem
+      const profilePatch = Effect.flatMap(native.documentPath, path =>
+        Option.match(path, { onNone: () => Effect.succeedNone, onSome: file => Effect.option(fs.readFileString(file)) }),
+      )
+      return PluginControls.layerFrom(() => host.ctx.get('pluginManager'), profilePatch)
     }),
   )
 }

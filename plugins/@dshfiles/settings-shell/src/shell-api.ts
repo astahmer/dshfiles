@@ -24,8 +24,19 @@ const pluginEntrySchema = Schema.Struct({
   phase: Schema.NullOr(Schema.String),
   /** Why the profile patch cannot change this entry; null when it can. */
   readOnlyReason: Schema.NullOr(Schema.String),
+  /** The bundle whose patch declares the row; null for a row the installation or the profile declares. */
+  bundle: Schema.NullOr(Schema.String),
+  /** Bundles whose patch changes the row without declaring it (switch it off, configure it). */
+  configuredBy: Schema.Array(Schema.String).check(Schema.isMaxLength(200)),
+  /** What the next start does to this entry after a change the running Host did not apply; null when nothing waits. */
+  pendingRestart: Schema.NullOr(Schema.Literals(['enable', 'disable'])),
+  /** The row's override sits in the seed's marked region, which `pnpm profile:sync` restores: a change does not survive it. */
+  seedRegion: Schema.Boolean,
 })
 export type PluginEntry = typeof pluginEntrySchema.Type
+
+/** A Loader entry id is its path in the Loader tree (`include:dshfiles-main-tabs`); the patch row id is its last segment. */
+export const rowIdOf = (entryId: string): string => entryId.slice(entryId.lastIndexOf(':') + 1)
 
 const pluginChangeSchema = Schema.Struct({
   entryId: Schema.String,
@@ -224,7 +235,7 @@ export const settingsShellApi = defineApi({
       input: Schema.Struct({ query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(128))) }),
       output: Schema.Struct({ entries: Schema.Array(pluginEntrySchema).check(Schema.isMaxLength(2000)) }),
       description:
-        'List the plugin entries of the active profile with their module, whether each is enabled, its runtime phase, and why it cannot be changed when the profile patch cannot address it. A query filters by entry id or module. Read-only.',
+        'List the plugin entries of the active profile with their module, the bundle that declares each row and the bundles that reconfigure it, whether each is enabled, its runtime phase, a change waiting for a restart, whether pnpm profile:sync restores the row from the seed, and why it cannot be changed when the profile patch cannot address it. A query filters by entry id or module. Read-only.',
       tool: {
         name: 'plugin_inventory',
         readOnly: true,
@@ -235,8 +246,12 @@ export const settingsShellApi = defineApi({
                 .map(entry =>
                   [
                     `${entry.entryId} · ${entry.moduleName}`,
+                    entry.bundle === null ? undefined : `from ${entry.bundle}`,
+                    entry.configuredBy.length === 0 ? undefined : `changed by ${entry.configuredBy.join(', ')}`,
                     entry.enabled ? 'enabled' : 'disabled',
                     entry.phase ?? 'not running',
+                    entry.pendingRestart === null ? undefined : `${entry.pendingRestart === 'enable' ? 'starts' : 'stops'} after the user restarts DSH`,
+                    entry.seedRegion ? 'seed row: pnpm profile:sync restores it' : undefined,
                     entry.readOnlyReason === null ? undefined : `read-only (${entry.readOnlyReason})`,
                   ]
                     .filter(part => part !== undefined)

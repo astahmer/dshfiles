@@ -9,10 +9,10 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { PlusIcon } from '@dshfiles/plugin-ui/icons'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { useReducer, useState, useSyncExternalStore } from 'react'
+import { useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react'
 import type { ShellTranslate } from '../native/locales.js'
-import { jsonValueSchema, SettingsSchemaModel, type JsonValue, type SettingField } from './schema-model.js'
-import { SettingsDocument, type DocumentDiagnostic } from './settings-document.js'
+import { jsonValueSchema, SettingsSchemaModel, type JsonValue, type ScalarControl, type SettingField } from './schema-model.js'
+import { SettingsDocument, type DocumentDiagnostic, type Expectation } from './settings-document.js'
 
 /**
  * One namespace's overrides as JSON text, beside the form. Clean, the text follows the stored overrides; the first
@@ -56,6 +56,29 @@ const useSnapshot = (form: ConfigForm<unknown>): ConfigFormSnapshot<unknown> =>
 
 const decodeJsonValue = Schema.decodeUnknownOption(jsonValueSchema)
 
+const scalarText = (control: ScalarControl, t: ShellTranslate): string => {
+  switch (control.kind) {
+    case 'boolean':
+      return t('json.expect.boolean')
+    case 'choice':
+      return t('json.expect.choice', { options: control.options.map(option => JSON.stringify(option.value)).join(', ') })
+    case 'number':
+      if (control.min !== undefined && control.max !== undefined) return t('json.expect.numberBetween', { min: control.min, max: control.max })
+      if (control.min !== undefined) return t('json.expect.numberMin', { min: control.min })
+      if (control.max !== undefined) return t('json.expect.numberMax', { max: control.max })
+      return t('json.expect.number')
+    case 'text':
+      return t('json.expect.text')
+  }
+}
+
+const expectationText = (expected: Expectation, t: ShellTranslate): string => {
+  const item = scalarText(expected.control, t)
+  if (expected.shape === 'list') return t('json.expect.list', { item })
+  if (expected.shape === 'record') return t('json.expect.record', { item })
+  return item
+}
+
 const diagnosticText = (diagnostic: DocumentDiagnostic, t: ShellTranslate): string => {
   const message = ((): string => {
     switch (diagnostic.code) {
@@ -66,7 +89,10 @@ const diagnosticText = (diagnostic: DocumentDiagnostic, t: ShellTranslate): stri
       case 'unknown-key':
         return t('json.diag.unknownKey', { path: diagnostic.path.join('.') })
       case 'type':
-        return t('json.diag.type', { path: diagnostic.path.join('.'), expected: diagnostic.expected ?? '' })
+        return t('json.diag.type', {
+          path: diagnostic.path.join('.'),
+          expected: diagnostic.expected === undefined ? '' : expectationText(diagnostic.expected, t),
+        })
     }
   })()
   return diagnostic.line === undefined ? message : `${t('json.line', { line: diagnostic.line })} ${message}`
@@ -134,10 +160,14 @@ export const SettingsJsonEditor = (props: {
   readonly form: ConfigForm<unknown>
   readonly fields: readonly SettingField[]
   readonly t: ShellTranslate
+  readonly focusPath?: readonly string[]
 }): JSX.Element => {
   const { t } = props
   const snapshot = useSnapshot(props.form)
   const [state, send] = useReducer(reduce, { kind: 'following' })
+  const [tab, setTab] = useState('overrides')
+  const [unsetFocus, setUnsetFocus] = useState<string | undefined>(undefined)
+  const textarea = useRef<HTMLTextAreaElement>(null)
   const [nextToken, setNextToken] = useState(0)
   const user = Option.getOrUndefined(decodeJsonValue(snapshot.user))
   const base = Option.getOrUndefined(decodeJsonValue(snapshot.base))
@@ -147,7 +177,46 @@ export const SettingsJsonEditor = (props: {
   const writable = snapshot.status === 'ready' && snapshot.writable
   const stale = draft !== undefined && state.kind !== 'saving' && draft.revision !== snapshot.revision
   const blocking = parsed.diagnostics.length > 0
-  const edit = (next: string): void => send({ type: 'edit', text: next, revision: snapshot.revision, before: user })
+  const focusKey = props.focusPath?.join('.')
+  const loaded = snapshot.status === 'ready'
+  const following = state.kind === 'following'
+  // The key a focus request already served: a request is served once, and once the person types the caret is theirs.
+  const selectedFocus = useRef<string | undefined>(undefined)
+  const edit = (next: string): void => {
+    selectedFocus.current = focusKey
+    setUnsetFocus(undefined)
+    send({ type: 'edit', text: next, revision: snapshot.revision, before: user })
+  }
+
+  // A link can open the page before its overrides arrive: until the key is selected, each new text looks it up again.
+  useEffect(() => {
+    if (props.focusPath === undefined || focusKey === undefined) {
+      selectedFocus.current = undefined
+      return
+    }
+    if (!loaded || selectedFocus.current === focusKey || !following) return
+    setTab('overrides')
+    const range = SettingsDocument.keyRange({ text, path: props.focusPath })
+    setUnsetFocus(range === undefined ? focusKey : undefined)
+    const element = textarea.current
+    if (element === null) return
+    element.focus()
+    element.scrollIntoView({ block: 'nearest' })
+    if (range === undefined) return
+    selectedFocus.current = focusKey
+    element.setSelectionRange(range.start, range.end)
+    const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight)
+    const line = text.slice(0, range.start).split('\n').length - 1
+    if (Number.isFinite(lineHeight)) element.scrollTop = Math.max(0, line * lineHeight - element.clientHeight / 3)
+  }, [focusKey, following, loaded, props.focusPath, text])
+
+  const settle = async (input: { readonly token: number; readonly write: Promise<boolean> }): Promise<void> => {
+    try {
+      send({ type: 'settled', token: input.token, accepted: await input.write })
+    } catch {
+      send({ type: 'settled', token: input.token, accepted: false })
+    }
+  }
 
   const save = (fence: number | undefined): void => {
     if (draft === undefined || !parsed.ok || blocking) return
@@ -159,15 +228,12 @@ export const SettingsJsonEditor = (props: {
       return
     }
     send({ type: 'save', token })
-    void props.form.mutate(ops, fence).then(
-      accepted => send({ type: 'settled', token, accepted }),
-      () => send({ type: 'settled', token, accepted: false }),
-    )
+    void settle({ token, write: props.form.mutate(ops, fence) })
   }
 
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3" data-settings-json={props.namespace}>
-      <Tabs defaultValue="overrides">
+      <Tabs onValueChange={setTab} value={tab}>
         <TabsList>
           <TabsTrigger value="overrides">{t('json.overrides')}</TabsTrigger>
           <TabsTrigger value="defaults">{t('json.defaults')}</TabsTrigger>
@@ -194,12 +260,18 @@ export const SettingsJsonEditor = (props: {
             aria-label={t('json.editorLabel', { namespace: props.namespace })}
             autoCapitalize="off"
             autoCorrect="off"
-            className="dshx:min-h-64 dshx:w-full dshx:resize-y dshx:font-mono! dshx:text-xs"
+            className="dshx:min-h-64 dshx:max-h-[60vh] dshx:w-full dshx:resize-y dshx:font-mono! dshx:text-xs"
             disabled={!writable || state.kind === 'saving'}
             onChange={event => edit(event.currentTarget.value)}
+            ref={textarea}
             spellCheck={false}
             value={text}
           />
+          {unsetFocus !== undefined && (
+            <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground" role="status">
+              {t('json.notOverridden', { path: unsetFocus })}
+            </p>
+          )}
           <ul
             aria-live="polite"
             className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:gap-1 dshx:p-0"

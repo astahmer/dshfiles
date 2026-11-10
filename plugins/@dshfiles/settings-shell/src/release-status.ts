@@ -118,3 +118,12 @@ export const releaseStatusFromGitHub = (input: { readonly currentVersion: string
     releases: currentIndex > 0 ? releases.slice(0, currentIndex) : [],
   }
 }
+
+/**
+ * Whether the browser asks for the release status on its own. Off, only Check for DSH updates asks; before the settings
+ * load nothing asks, and an older Host that serves the namespace without `releaseCheck` keeps the default (on).
+ */
+export const releaseCheckSchedule = (settings: { readonly releaseCheck?: boolean } | undefined) => ({
+  automatic: settings !== undefined && settings.releaseCheck !== false,
+  off: settings?.releaseCheck === false,
+})

@@ -10,6 +10,11 @@ export const settingsShellSettings = defineSettings({
       .hidden()
       .description('Retired: the gear, the palette and Mod+, always open the Settings page in the stage.'),
     welcomeNoticeVersion: Schema.string().default('').hidden().description('The welcome notice version last acknowledged.'),
+    releaseCheck: Schema.boolean()
+      .default(true)
+      .description(
+        'Ask GitHub every few hours whether a newer DSH release exists, and badge the Settings trigger when one does. Off: no automatic request; Settings › General still checks when you press Check for DSH updates.',
+      ),
     // The one TypeSafe Jev key (docs/ade-ux §4.6): backlog and memory read it; their own older keys are the fallback.
     jevSecret: Schema.string()
       .role('secret-ref')

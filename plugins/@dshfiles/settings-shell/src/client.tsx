@@ -48,6 +48,7 @@ import { settingsShellApi } from './shell-api.js'
 import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseNotice } from './release-notice.js'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
+import { PluginEntryCard } from './plugin-entry-card.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
@@ -485,6 +486,7 @@ export default defineClient({
       pluginPages: SettingsGroups.searchablePages(input.groups),
       renderPluginPage: (page: PluginSettingsPage, nested: boolean) => (
         <PluginSettingsPageView
+          entry={<PluginEntryCard namespace={page.ns} t={input.t} />}
           form={formFor(page.ns)}
           key={page.pageId}
           nested={nested}
@@ -601,6 +603,7 @@ export default defineClient({
       return (
         <PluginQueryProvider>
           <PluginSettingsPageView
+            entry={<PluginEntryCard namespace={props.page.ns} t={t} />}
             form={formFor(props.page.ns)}
             page={props.page}
             t={t}

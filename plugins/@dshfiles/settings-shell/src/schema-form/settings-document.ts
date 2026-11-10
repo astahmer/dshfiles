@@ -20,11 +20,17 @@ export interface DocumentDiagnostic {
   readonly path: readonly string[]
   /** One-based line the diagnostic points at, when the text locates it. */
   readonly line: number | undefined
-  /** What the value should be, for a type diagnostic ("true or false", "one of …"). */
-  readonly expected?: string
+  /** What the value should be, for a type diagnostic; the editor words it in the active language. */
+  readonly expected?: Expectation
   /** The parser's message, for a parse diagnostic. */
   readonly detail?: string
 }
+
+/** The type a field's value must have: one scalar, or a list or object of them. */
+export type Expectation =
+  | { readonly shape: 'scalar'; readonly control: ScalarControl }
+  | { readonly shape: 'list'; readonly control: ScalarControl }
+  | { readonly shape: 'record'; readonly control: ScalarControl }
 
 export type ParsedDocument =
   | { readonly ok: true; readonly value: { readonly [key: string]: JsonValue }; readonly diagnostics: readonly DocumentDiagnostic[] }
@@ -39,22 +45,6 @@ const mutable = (value: JsonValue): MutableJson => {
   if (Array.isArray(value)) return value.map(item => mutable(item))
   if (typeof value === 'object' && value !== null) return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, mutable(item)]))
   return value
-}
-
-const expectedOf = (control: ScalarControl): string => {
-  switch (control.kind) {
-    case 'boolean':
-      return 'true or false'
-    case 'choice':
-      return `one of ${control.options.map(option => JSON.stringify(option.value)).join(', ')}`
-    case 'number': {
-      const bounds = [control.min === undefined ? undefined : `≥ ${String(control.min)}`, control.max === undefined ? undefined : `≤ ${String(control.max)}`]
-      const range = bounds.filter(bound => bound !== undefined).join(' and ')
-      return range === '' ? 'a number' : `a number ${range}`
-    }
-    case 'text':
-      return 'a string'
-  }
 }
 
 const scalarFits = (control: ScalarControl, value: JsonValue): boolean => {
@@ -76,18 +66,18 @@ const scalarFits = (control: ScalarControl, value: JsonValue): boolean => {
 }
 
 /** Undefined when the value fits the field's control, else what it should be. */
-const mismatch = (control: SettingControl, value: JsonValue): string | undefined => {
+const mismatch = (control: SettingControl, value: JsonValue): Expectation | undefined => {
   if (control.kind === 'json') return undefined
   if (control.kind === 'list') {
-    if (!Array.isArray(value)) return `a list of ${expectedOf(control.item)} values`
-    return value.every(item => scalarFits(control.item, item)) ? undefined : `a list of ${expectedOf(control.item)} values`
+    const fits = Array.isArray(value) && value.every(item => scalarFits(control.item, item))
+    return fits ? undefined : { shape: 'list', control: control.item }
   }
   if (control.kind === 'record') {
     const record = asRecord(value)
-    if (record === undefined || Array.isArray(value)) return `an object of ${expectedOf(control.value)} values`
-    return Object.values(record).every(item => scalarFits(control.value, item)) ? undefined : `an object of ${expectedOf(control.value)} values`
+    const fits = record !== undefined && !Array.isArray(value) && Object.values(record).every(item => scalarFits(control.value, item))
+    return fits ? undefined : { shape: 'record', control: control.value }
   }
-  return scalarFits(control, value) ? undefined : expectedOf(control)
+  return scalarFits(control, value) ? undefined : { shape: 'scalar', control }
 }
 
 /** The line holding `"key":` at the given nesting, searched after the line of its parent. */
@@ -235,6 +225,20 @@ const placeholderFor = (field: SettingField): JsonValue => {
 
 const format = (value: JsonValue | undefined): string => `${JSON.stringify(value ?? {}, null, 2)}\n`
 
+/** The text range of a field's key in the document, so the editor can select it; undefined when the document does not set it. */
+const keyRange = (input: { readonly text: string; readonly path: readonly string[] }): { readonly start: number; readonly end: number } | undefined => {
+  const last = input.path.at(-1)
+  if (last === undefined) return undefined
+  const lines = input.text.split('\n')
+  const line = lineOfPath(lines, input.path)
+  if (line === undefined) return undefined
+  const lineStart = lines.slice(0, line - 1).reduce((offset, text) => offset + text.length + 1, 0)
+  const key = JSON.stringify(last)
+  const column = lines[line - 1]?.indexOf(key) ?? -1
+  if (column === -1) return undefined
+  return { start: lineStart + column, end: lineStart + column + key.length }
+}
+
 export class SettingsDocument {
   static readonly parse = parseDocument
   static readonly operations = operations
@@ -242,4 +246,5 @@ export class SettingsDocument {
   static readonly withField = withField
   static readonly format = format
   static readonly placeholderFor = placeholderFor
+  static readonly keyRange = keyRange
 }

@@ -16,7 +16,7 @@ const schema = Schema.decodeUnknownSync(jsonValueSchema)(
   Schemastery.object({ maxTabs: Schemastery.natural().default(12), dense: Schemastery.boolean().default(false) }).toJSON(),
 )
 const fields = SettingsSchemaModel.settingFields({ schema, secrets: [], text })
-const t: ShellTranslate = key => key
+const t: ShellTranslate = (key, params) => (params === undefined ? key : `${key}${JSON.stringify(params)}`)
 
 /** One namespace's user layer as the fake store keeps it. */
 interface Overrides {
@@ -100,8 +100,10 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-const render = async (form: ConfigForm<unknown>): Promise<void> => {
-  await act(async () => root.render(<SettingsJsonEditor fields={fields} form={form} namespace="example" t={t} />))
+const render = async (form: ConfigForm<unknown>, focusPath?: readonly string[]): Promise<void> => {
+  await act(async () =>
+    root.render(<SettingsJsonEditor fields={fields} form={form} namespace="example" t={t} {...(focusPath === undefined ? {} : { focusPath })} />),
+  )
 }
 
 const editor = (): HTMLTextAreaElement => {
@@ -179,5 +181,28 @@ describe('SettingsJsonEditor', () => {
     expect(button('json.save').disabled).toBe(true)
     await click('json.discard')
     expect(decodeJson(jsonValueSchema, editor().value)).toEqual({})
+  })
+
+  it('words the expected type through the translation, so every locale names it', async () => {
+    await render(createForm({ user: {}, revision: 1 }).form)
+    await type('{ "dense": "yes", "maxTabs": [1] }')
+    const messages = [...container.querySelectorAll('[data-diagnostic="type"]')].map(item => item.textContent)
+    expect(messages).toEqual([
+      expect.stringContaining('"expected":"json.expect.boolean"'),
+      expect.stringContaining('"expected":"json.expect.numberMin{\\"min\\":0}"'),
+    ])
+  })
+
+  it('selects the key of a focused field, and says when the overrides leave it out', async () => {
+    // jsdom lays nothing out, so it has no scrollIntoView.
+    HTMLElement.prototype.scrollIntoView = () => undefined
+    const store = createForm({ user: { maxTabs: 20, dense: true }, revision: 1 })
+    await render(store.form, ['dense'])
+    expect(document.activeElement).toBe(editor())
+    expect(editor().value.slice(editor().selectionStart, editor().selectionEnd)).toBe('"dense"')
+    await act(async () => store.changeElsewhere({ maxTabs: 20 }))
+    await render(store.form, ['maxTabs'])
+    await render(store.form, ['dense'])
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('json.notOverridden{"path":"dense"}')
   })
 })
