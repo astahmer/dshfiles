@@ -610,9 +610,13 @@ of text) and the **summary**: it lists them in its descriptor's `capabilities.ex
 those rows only for such a provider (the Jira provider maps the due date, and the other two to custom fields the binding
 names). Bindings saved before keep them off until you turn them on.
 
-Delegate is not mapped: Linear's delegate is an app user, the backlog's an agent session. Bindings migrated from the
-earlier settings rows keep the four fields that sync owned then (title, description, status, labels); turn priority,
-parent and relations on in the binding when you want them.
+Delegate is deliberately not synced in either direction: Linear's delegate is an installed app user, while a backlog
+delegate identifies an agent session. One app can represent many sessions, so the app identity cannot identify the
+session; syncing it would conflate ownership. The provider neither reads nor changes Linear's delegate, and does not
+replace the backlog delegate from Linear. A mapping needs an explicit cross-system identity and lifecycle contract.
+
+Bindings migrated from the earlier settings rows keep the four fields that sync owned then (title, description, status,
+labels); turn priority, parent and relations on in the binding when you want them.
 
 How a pass works: one binding at a time, each behind its own permit, and only on its **owner Host** (the Host that saved
 it; others show “Runs on another Host”). It pulls the pages changed since the binding's cursor, then compares each

@@ -15,7 +15,6 @@ second machine. The one-off Discord TODO import was dropped on 2026-11-10: the u
 | 7   | Edit item bodies and replies with `@dshfiles/rich-composer` instead of the capture editor (quoting a reply into an item shipped)                   | open  |
 | 11  | `Closes b:<ref>` in a PR description: `@dshfiles/pull-requests` does not expose PR bodies; gate state and automation creation are unit-tested only | open  |
 | 12  | multi-host's gateway maps a remote plugin failure to `RemoteApiFailed { code, detail }`, so the JSON details dshx now keeps stop at that boundary  | open  |
-| 13  | Linear delegate stays unmapped (Linear's is an app user, ours an agent session)                                                                    | open  |
 | 14  | The Hosts settings section does not show peers' automation-Host choice (its screenshot shows a Host with no peers)                                 | open  |
 
 ## Unverified live
