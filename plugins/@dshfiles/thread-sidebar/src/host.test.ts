@@ -43,7 +43,8 @@ const withWiring = <A, E>(
       Layer.provideMerge(Layer.mergeAll(SessionEvents.layerTest(pubsub), fakeSidebarHost(fake), SidebarSettings.layer.pipe(Layer.provide(settings)))),
       Layer.provide(Layer.succeed(StateFiles, files)),
     )
-    const publish = (event: SessionEvent['event']) => PubSub.publish(pubsub, { sessionId: 'session-1', event }).pipe(Effect.asVoid)
+    const publish = (event: SessionEvent['event']) =>
+      PubSub.publish(pubsub, { sessionId: 'session-1', origin: undefined, parentSessionId: undefined, event }).pipe(Effect.asVoid)
     return yield* body({ publish, fake }).pipe(Effect.provide(layer))
   }).pipe(Effect.provide(temporaryStateFiles))
 

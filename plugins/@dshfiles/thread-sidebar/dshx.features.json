@@ -2,6 +2,54 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "notification-history",
+      "title": "Review retained thread notifications",
+      "summary": "Review the last 500 thread events in Host-owned storage, independently of toast delivery and thread attention. Mark entries read or unread, dismiss or restore them, clear captured entries with confirmation, and open an existing thread.",
+      "surface": "destinationSection",
+      "destination": "observe",
+      "currentSurface": "Observe › Notifications",
+      "reach": ["seed tool-call-thread", "click tab \"Observe\"", "click button \"Notifications\"", "expect heading \"Notifications\""],
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["loading", "empty", "unread", "read", "dismissed", "confirm-clear", "unavailable-thread", "host-unavailable"],
+      "failureModes": [
+        "Storage errors leave the previous history unchanged and offer retry guidance.",
+        "Clearing the captured entry IDs preserves concurrent arrivals.",
+        "Missing threads leave readable notification entries without a navigation action.",
+        "No prompt, response, question, approval detail or raw error text is retained."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.notification-history",
+          "featureFile": "tooling/dshx/e2e/features/notification-history.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notification-history-contract",
+          "file": "plugins/@dshfiles/thread-sidebar/src/notification-history-api.test.ts",
+          "testName": "exposes one shared operation per UI verb, with explicit clear confirmation"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "notification history record",
+          "file": "plugins/@dshfiles/thread-sidebar/src/notification-history-host.test.ts",
+          "testName": "records a tracing span for each history write"
+        }
+      ]
+    },
+    {
       "id": "no-folder-promotion",
       "title": "Turn a No folder thread into a project",
       "summary": "A thread started in No folder runs in its own dated scratch folder. Its row menu offers Turn into project, which registers that folder as a project with a title no other project holds and moves the thread under its own project group; the folder and its revisions stay where they were. A thread that is already a project is never offered the row action.",
@@ -58,9 +106,9 @@
       "title": "Send one prompt to several models",
       "surface": "command",
       "destination": "none",
-      "currentSurface": "palette: Send to several models\u2026",
+      "currentSurface": "palette: Send to several models…",
       "summary": "Create two to six independent threads for selected models, selecting each model before sending the same prompt and reporting per-model success or failure.",
-      "reach": ["click button \"Open command palette\"", "click text \"Send to several models\u2026\"", "expect dialog \"Send to several models\""],
+      "reach": ["click button \"Open command palette\"", "click text \"Send to several models…\"", "expect dialog \"Send to several models\""],
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
       "states": ["model-selection", "creating", "partial-success", "complete"],
@@ -115,7 +163,7 @@
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "main-tabs: New tab \u203a Thread Sidebar views",
+      "currentSurface": "main-tabs: New tab › Thread Sidebar views",
       "configuration": [],
       "states": ["sidebar-present", "panel-open", "navigation-current", "declarer-unloaded"],
       "failureModes": [
@@ -398,7 +446,7 @@
     {
       "id": "status-grouped-thread-list",
       "title": "See every thread grouped by what it needs from you",
-      "summary": "All threads is grouped by the ADE status vocabulary: Pinned on top, then Needs you, Working, Ready, Idle and Done (Done folded; a thread idle for 72 hours folds into Done unless pinned). Within a group the newest return comes first. Needs you and Failed are a projection of the inbox (open items about the thread) plus the questions, approvals, usage limits and interrupted turns the sidebar already sees, and a parent rolls up its subagents so it never looks finished while a child waits or failed. Each row shows a status glyph, the title, the agent preset, muted project and host chips, the elapsed time and one inline verb when it needs you (Answer and Approve open the thread; Retry, Resume and Land run the inbox item's verb); the hover action strip opens to the left of that verb, so neither covers the other. A Needs you group header offers Resume all for every row whose verb is Resume, so quota stops and interrupted turns leave together. Group \u203a Arrange manually brings back the drag-to-arrange sections; saved views keep their own grouping.",
+      "summary": "All threads is grouped by the ADE status vocabulary: Pinned on top, then Needs you, Working, Ready, Idle and Done (Done folded; a thread idle for 72 hours folds into Done unless pinned). Within a group the newest return comes first. Needs you and Failed are a projection of the inbox (open items about the thread) plus the questions, approvals, usage limits and interrupted turns the sidebar already sees, and a parent rolls up its subagents so it never looks finished while a child waits or failed. Each row shows a status glyph, the title, the agent preset, muted project and host chips, the elapsed time and one inline verb when it needs you (Answer and Approve open the thread; Retry, Resume and Land run the inbox item's verb); the hover action strip opens to the left of that verb, so neither covers the other. A Needs you group header offers Resume all for every row whose verb is Resume, so quota stops and interrupted turns leave together. Group › Arrange manually brings back the drag-to-arrange sections; saved views keep their own grouping.",
       "reach": [
         "expect region \"Threads\"",
         "click button \"Group: Status\"",
@@ -409,7 +457,7 @@
       "surfaces": ["client", "integration"],
       "surface": "destinationSection",
       "destination": "threads",
-      "currentSurface": "thread-list: All threads \u203a Group: Status",
+      "currentSurface": "thread-list: All threads › Group: Status",
       "configuration": [
         {
           "key": "threadViews.views[all-threads].groupBy",
@@ -542,7 +590,7 @@
       "surfaces": ["client", "integration"],
       "surface": "rowAction",
       "destination": "threads",
-      "currentSurface": "thread-list: project header \u203a New chat",
+      "currentSurface": "thread-list: project header › New chat",
       "configuration": [],
       "states": ["expanded-project", "collapsed-project", "blank-chat", "project-draft", "fresh-after-send"],
       "failureModes": [
@@ -602,7 +650,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "rowAction",
       "destination": "threads",
-      "currentSurface": "thread-list: Archive \u203a Undo",
+      "currentSurface": "thread-list: Archive › Undo",
       "configuration": [
         {
           "key": "archiveUndoEnabled",
@@ -680,7 +728,7 @@
       "surfaces": ["client", "storage"],
       "surface": "destinationSection",
       "destination": "threads",
-      "currentSurface": "thread-list: Thread list settings \u203a Manage views",
+      "currentSurface": "thread-list: Thread list settings › Manage views",
       "configuration": [
         {
           "key": "groupBy",
@@ -705,7 +753,7 @@
         {
           "key": "views",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
-          "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, source filters, and optional showCount (default true). The browser copy an older version wrote is handed to the Host on the next load.",
+          "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, source filters, and optional showCount (default true). The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
@@ -731,7 +779,7 @@
         {
           "key": "viewPresets",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"done\",\"name\":null,\"groupBy\":\"date\",\"statusFilters\":[\"not-running\",\"attention\"],\"sourceFilter\":\"main\",\"enabled\":true}]",
-          "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, source filters, and optional showCount (default true). The browser copy an older version wrote is handed to the Host on the next load.",
+          "constraints": "Host-synced saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, source filters, and optional showCount (default true). The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         }
       ],
@@ -765,7 +813,7 @@
       "failureModes": [
         "Each attention status filter matches the row label the user already sees (approval needed, input needed, turn finished, needs resume, interrupted), alone or combined; Inactive is selectable in the same filter group and matches the existing idle-section classifier. The shipped Working view selects only Working, so an interrupted or usage-limited thread that is not running stays off it, and a parent counts as working while its own turn or one of its subagents runs; the shipped Done view selects Not running OR Needs attention and groups main threads by date, admitting recent, pinned and parked idle rows. Not running excludes effectively running, muted, settled and archived rows without changing Inactive.",
         "Attention dots appear only on matching non-All-threads views, use one highest-priority selected attention color, and do not borrow an unrelated color from Inactive alone; Not running uses the same classifier for rows and badges; storage selectors exclude running rows unless Working is also selected.",
-        "Saved view IDs and names must be unique; at least one of 1\u201312 presets must remain enabled; defaults ship only All threads, Working and Done with Done active; legacy not-working migrates to not-running without resetting the supplied three-view custom document or restoring Inbox/Gone; earlier built-in shipped filters upgrade while edited, renamed and custom views survive unchanged.",
+        "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled; defaults ship only All threads, Working and Done with Done active; legacy not-working migrates to not-running without resetting the supplied three-view custom document or restoring Inbox/Gone; earlier built-in shipped filters upgrade while edited, renamed and custom views survive unchanged.",
         "When the view tab row is narrower than the full tabs measure (an invisible copy of the row with every full name), built-in views show their icon and custom views their initial, with the count kept and the full name as tooltip and accessible name, so every tab fits without horizontal scroll; a row wide enough keeps the full names unchanged."
       ],
       "externalDependencies": [],
@@ -924,7 +972,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.view-controls-unit-preference-defaults",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
-          "testName": "ships three defaults with All threads active and grouped by status (plan \u00a74.3)"
+          "testName": "ships three defaults with All threads active and grouped by status (plan §4.3)"
         },
         {
           "kind": "unit-test",
@@ -1015,7 +1063,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: Thread sidebar \u203a idle policy",
+      "currentSurface": "settings: Thread sidebar › idle policy",
       "configuration": [
         {
           "key": "autoSettleEnabled",
@@ -1193,7 +1241,7 @@
     {
       "id": "section-order",
       "title": "Group remote threads with each view",
-      "summary": "Remote threads started from this DSH join the current view\u2019s status, date, or project groups by default. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
+      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
       "reach": [
         "click button \"All threads\"",
         "expect button \"All threads\"",
@@ -1205,7 +1253,7 @@
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
-      "currentSurface": "thread-list: Thread list settings \u203a Remote group",
+      "currentSurface": "thread-list: Thread list settings › Remote group",
       "configuration": [],
       "states": ["integrated-by-default", "separate-remote", "reordered", "empty-sections-folded", "remote-row-own-verbs"],
       "failureModes": [
@@ -1283,7 +1331,7 @@
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: Thread sidebar \u203a settled archive delay",
+      "currentSurface": "settings: Thread sidebar › settled archive delay",
       "configuration": [
         {
           "key": "settledArchiveDelay",
@@ -1351,12 +1399,12 @@
       "surfaces": ["client", "settings", "storage"],
       "surface": "rowAction",
       "destination": "threads",
-      "currentSurface": "thread-list: row menu \u203a Mute",
+      "currentSurface": "thread-list: row menu › Mute",
       "configuration": [
         {
           "key": "mutedThreads",
           "defaultValue": "{}",
-          "constraints": "Hidden; session id \u2192 { until: epoch ms or null for until unmuted, activityAt: the activity time the row keeps while muted }. Expired entries are dropped when they wake.",
+          "constraints": "Hidden; session id → { until: epoch ms or null for until unmuted, activityAt: the activity time the row keeps while muted }. Expired entries are dropped when they wake.",
           "coveredBy": ["thread-sidebar.thread-mute"]
         }
       ],
@@ -1426,12 +1474,12 @@
       "surfaces": ["client", "host", "storage"],
       "surface": "rowAction",
       "destination": "threads",
-      "currentSurface": "thread-list: row menu \u203a Mark unread",
+      "currentSurface": "thread-list: row menu › Mark unread",
       "configuration": [],
       "states": ["read", "manual-unread"],
       "failureModes": [
         "The Host stores the mark for the whole user, so every open tab, plugin and CLI reads the same unread state.",
-        "Opening a thread drops its whole attention record without touching another thread\u2019s record.",
+        "Opening a thread drops its whole attention record without touching another thread’s record.",
         "The Host still holds the record after a DSH restart, while a failed migration keeps the browser copy for a retry."
       ],
       "externalDependencies": [],
@@ -1537,7 +1585,7 @@
       "surfaces": ["client", "host", "settings", "storage"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: Notifications \u203a Thread notifications",
+      "currentSurface": "settings: Notifications › Thread notifications",
       "configuration": [
         {
           "key": "notificationCategories",
@@ -1646,7 +1694,7 @@
       "surfaces": ["client", "settings", "storage"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "thread-list: Sidebar settings \u203a Customize sidebar",
+      "currentSurface": "thread-list: Sidebar settings › Customize sidebar",
       "configuration": [
         {
           "key": "headerMode",
@@ -1986,12 +2034,8 @@
     {
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
-      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a \u201cparent thread unavailable\u201d header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
-      "reach": [
-        "click button \"Thread list settings\"",
-        "click button \"Finished subagents: Fold into \u201cN finished\u201d\"",
-        "expect menuitemradio \"Hide them\""
-      ],
+      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a “parent thread unavailable” header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
+      "reach": ["click button \"Thread list settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -2018,7 +2062,7 @@
       "states": ["collapsed", "expanded", "nested", "copied", "finished-folded", "parent-unavailable"],
       "failureModes": [
         "Child chains preserve inherited workspace identity.",
-        "A branch whose nearest listed ancestor is missing from the corpus groups under one \u201cparent thread unavailable\u201d header and never renders as a top-level thread row.",
+        "A branch whose nearest listed ancestor is missing from the corpus groups under one “parent thread unavailable” header and never renders as a top-level thread row.",
         "The unavailable branch header archives every thread in it, and archived threads of that branch stay hidden until the view filters for archived, where the same header restores them.",
         "Copied links omit credentials and unsupported path-based routes."
       ],
@@ -2445,7 +2489,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
-      "currentSurface": "thread-list: row menu \u203a Mention",
+      "currentSurface": "thread-list: row menu › Mention",
       "configuration": [],
       "states": ["idle", "dragging", "captured", "resolving", "inserted", "unavailable", "failed"],
       "failureModes": [
@@ -2652,7 +2696,7 @@
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "threads",
-      "currentSurface": "thread-list: row menu \u203a Open in side panel",
+      "currentSurface": "thread-list: row menu › Open in side panel",
       "configuration": [
         {
           "key": "hiddenRowActions",
@@ -2739,7 +2783,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
-      "currentSurface": "thread-list: row menu \u203a Referenced by",
+      "currentSurface": "thread-list: row menu › Referenced by",
       "configuration": [],
       "states": ["loading", "empty", "listed", "degraded"],
       "failureModes": [
@@ -2902,7 +2946,7 @@
       "surfaces": ["client", "integration"],
       "surface": "rowAction",
       "destination": "threads",
-      "currentSurface": "thread-list: row menu \u203a Edit title",
+      "currentSurface": "thread-list: row menu › Edit title",
       "configuration": [],
       "states": ["title-idle", "title-editing", "title-committed", "title-cancelled"],
       "failureModes": [
@@ -2938,7 +2982,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "rowAction",
       "destination": "threads",
-      "currentSurface": "thread-list: row menu \u203a Continue in project",
+      "currentSurface": "thread-list: row menu › Continue in project",
       "configuration": [],
       "states": ["idle", "listing-projects", "continuing", "continued", "continued-unsettled", "failed"],
       "failureModes": [
@@ -3108,7 +3152,7 @@
       ],
       "surface": "attentionProvider",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox \u203a Turn finished",
+      "currentSurface": "left-nav: Inbox › Turn finished",
       "surfaces": ["host", "integration"],
       "configuration": [],
       "states": ["ready", "failed", "manually-unread", "acknowledged", "inbox-absent", "done-in-inbox"],
@@ -3152,7 +3196,7 @@
     {
       "id": "destination-rail",
       "title": "Switch destinations from the rail",
-      "summary": "In the fixed layout the left column is a labelled rail of eight destinations (Threads, Inbox, Land, Work, Agents, Observe, Knowledge, Settings) beside one list. Threads shows the thread list; every other destination lists its sections, and choosing one opens that page in the stage. The former left-nav pages are sections now, labelled without their plugin name; a page nobody mapped is listed under Settings \u203a Other pages, and plugins add pages through the DestinationSections registry instead of rail entries. The Inbox entry shows the Inbox's own Needs you badge when the Inbox is installed. Collapsed, only the rail stays and its labels move into tooltips.",
+      "summary": "In the fixed layout the left column is a labelled rail of eight destinations (Threads, Inbox, Land, Work, Agents, Observe, Knowledge, Settings) beside one list. Threads shows the thread list; every other destination lists its sections, and choosing one opens that page in the stage. The former left-nav pages are sections now, labelled without their plugin name; a page nobody mapped is listed under Settings › Other pages, and plugins add pages through the DestinationSections registry instead of rail entries. The Inbox entry shows the Inbox's own Needs you badge when the Inbox is installed. Collapsed, only the rail stays and its labels move into tooltips.",
       "reach": [
         "click tab \"Observe\"",
         "expect navigation \"Observe pages\"",
@@ -3168,7 +3212,7 @@
       "configuration": [],
       "states": ["expanded", "collapsed"],
       "failureModes": [
-        "A page another plugin registers without a section entry is still listed, under Settings \u203a Other pages.",
+        "A page another plugin registers without a section entry is still listed, under Settings › Other pages.",
         "Without the Inbox plugin the Inbox destination shows an empty state and no badge."
       ],
       "externalDependencies": [],
@@ -3248,7 +3292,7 @@
     {
       "id": "touch-row-menu",
       "title": "Open a thread's actions by touch",
-      "summary": "On a coarse pointer each thread row shows a \u22ef button that opens the row's own actions menu (the right-click menu, which holds every hover action: pin, mute, move, settle, open in side panel\u2026), anchored under the button. Touch has no hover and iOS WebKit fires no contextmenu on a long press, so the hover strip is hidden there and the inline status verb (Answer, Land, Retry) moves left of the \u22ef button. A fine pointer keeps the hover strip and no extra button.",
+      "summary": "On a coarse pointer each thread row shows a ⋯ button that opens the row's own actions menu (the right-click menu, which holds every hover action: pin, mute, move, settle, open in side panel…), anchored under the button. Touch has no hover and iOS WebKit fires no contextmenu on a long press, so the hover strip is hidden there and the inline status verb (Answer, Land, Retry) moves left of the ⋯ button. A fine pointer keeps the hover strip and no extra button.",
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "threads",
@@ -3274,12 +3318,12 @@
     {
       "id": "layout-mode",
       "title": "Choose a fixed or free-docking left column",
-      "summary": "Settings \u203a Layout (and the palette's Layout commands) switch the left column between the fixed rail-and-list layout, the default, and free docking, which mounts the movable Workbench panes again. The Workbench's saved left layout and named layouts are not touched while fixed is on, so switching back to free docking restores them; Move tab to stops offering the left region while it is absent.",
+      "summary": "Settings › Layout (and the palette's Layout commands) switch the left column between the fixed rail-and-list layout, the default, and free docking, which mounts the movable Workbench panes again. The Workbench's saved left layout and named layouts are not touched while fixed is on, so switching back to free docking restores them; Move tab to stops offering the left region while it is absent.",
       "reach": ["click tab \"Settings\"", "click radio \"Free docking\"", "expect tab \"Thread Sidebar: Threads\""],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: Thread sidebar \u203a Layout",
+      "currentSurface": "settings: Thread sidebar › Layout",
       "configuration": [
         {
           "key": "layoutMode",
@@ -3320,7 +3364,7 @@
         "click tab \"Land\"",
         "click button \"Where did a page go?\"",
         "expect heading \"Where did a page go?\"",
-        "click button \"Open Observe \u203a Usage\"",
+        "click button \"Open Observe › Usage\"",
         "expect tab \"Observe\""
       ],
       "surfaces": ["client", "command"],
@@ -3438,12 +3482,12 @@
     {
       "id": "waiting-threads-page",
       "title": "See the threads waiting on you in one page",
-      "summary": "Inbox \u203a Waiting threads lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
+      "summary": "Inbox › Waiting threads lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
       "reach": ["click tab \"Inbox\"", "click button \"Waiting threads\"", "expect heading \"Waiting threads\""],
       "surfaces": ["client", "integration"],
       "surface": "destinationSection",
       "destination": "inbox",
-      "currentSurface": "left-nav: Inbox \u203a Waiting threads",
+      "currentSurface": "left-nav: Inbox › Waiting threads",
       "configuration": [],
       "states": ["needs-you", "ready", "empty", "busy", "provider-absent"],
       "failureModes": [

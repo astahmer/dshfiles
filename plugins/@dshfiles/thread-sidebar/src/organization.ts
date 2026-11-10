@@ -240,8 +240,10 @@ export interface OrderedSidebarEntry {
 
 export type SessionActivity = Pick<SessionSummary, 'id' | 'running' | 'updatedAt' | 'blank'>
 
-const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
-  includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
+const isAttentionSessionIncluded = (
+  session: { readonly origin?: SessionSummary['origin'] | undefined; readonly parentId?: SessionSummary['parentId'] | undefined },
+  includeSubagentAttention: boolean,
+): boolean => includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
 
 /** The settings the idle settle policy reads; the browser and the Host scan pass the same values. */
 export type AutoSettlePolicy = Pick<

@@ -8224,6 +8224,12 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(270d4dc1290c940a1694f1ca388defa2)
+      '@deepseek-ai/dsh-agent':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.2.1-rc.2)(@deepseek-ai/dsh-scope@0.2.1-rc.2)(@deepseek-ai/dsh-session-projection@0.2.1-rc.2)(@deepseek-ai/dsh-session@0.2.1-rc.2)(@deepseek-ai/dsh-system-prompt@0.2.1-rc.2)(@deepseek-ai/dsh-typert-protocol@0.2.1-rc.2)(@deepseek-ai/dsh-util-values@0.2.1-rc.2)(@deepseek-ai/dsh-workspace@0.2.1-rc.2)
+      '@deepseek-ai/dsh-agent-loop':
+        specifier: 0.2.1-rc.2
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.1-rc.2)(@deepseek-ai/dsh-llm@0.2.1-rc.2)(@deepseek-ai/dsh-scope@0.2.1-rc.2)(@deepseek-ai/dsh-session-persistence@0.2.1-rc.2)(@deepseek-ai/dsh-session-projection@0.2.1-rc.2)(@deepseek-ai/dsh-session@0.2.1-rc.2)(@deepseek-ai/dsh-system-prompt@0.2.1-rc.2)(@deepseek-ai/dsh-tools@0.2.1-rc.2)
       '@deepseek-ai/dsh-api-gateway':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
@@ -8326,6 +8332,9 @@ importers:
       '@deepseek-ai/dsh-token-meter':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-compaction-image-offload@0.2.1-rc.2)(@deepseek-ai/dsh-compaction@0.2.1-rc.2)(@deepseek-ai/dsh-llm-retry@0.2.1-rc.2)(@deepseek-ai/dsh-llm@0.2.1-rc.2)(@deepseek-ai/dsh-session-projection@0.2.1-rc.2)(@deepseek-ai/dsh-session@0.2.1-rc.2)
+      '@deepseek-ai/dsh-user-approval':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.1-rc.2)(@deepseek-ai/dsh-brand@0.2.1-rc.2)(@deepseek-ai/dsh-llm@0.2.1-rc.2)(@deepseek-ai/dsh-scope@0.2.1-rc.2)(@deepseek-ai/dsh-session@0.2.1-rc.2)(@deepseek-ai/dsh-system-prompt@0.2.1-rc.2)
       '@deepseek-ai/dsh-user-questions':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.1-rc.2)(@deepseek-ai/dsh-llm@0.2.1-rc.2)(@deepseek-ai/dsh-scope@0.2.1-rc.2)(@deepseek-ai/dsh-session-projection@0.2.1-rc.2)(@deepseek-ai/dsh-session@0.2.1-rc.2)(@deepseek-ai/dsh-typert-protocol@0.2.1-rc.2)

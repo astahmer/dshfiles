@@ -79,6 +79,13 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     formerLabels: ['Inbox'],
   },
   {
+    panelId: 'dshfiles-notification-history',
+    destination: 'observe',
+    label: 'Notifications',
+    description: 'Retained thread events, including missed alerts.',
+    order: 0,
+  },
+  {
     panelId: 'jj-integration',
     destination: 'land',
     label: 'Workspaces',

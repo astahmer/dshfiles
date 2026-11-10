@@ -15,7 +15,7 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
-import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
+import { BellIcon, LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
 import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -63,6 +63,8 @@ import { PaletteBridge } from './palette-bridge.js'
 import './client.css'
 import { NotificationSettingsTab, SettingsTab } from './settings-tab.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
+import { NotificationHistoryPanel } from './notification-history-panel.js'
+import { notificationHistoryLocale } from './notification-history-locales.js'
 import { createSkillMentionSource } from './skill-mention.js'
 import { followUpPrompt } from './follow-up.js'
 import {
@@ -132,7 +134,7 @@ const hasWorkspaceShortcuts = (hooks: unknown): hooks is { readonly workspaceSho
 
 export default defineClient({
   name: '@dshfiles/thread-sidebar',
-  locales: [threadSidebarLocale],
+  locales: [threadSidebarLocale, notificationHistoryLocale],
   // rootProps and the workspaces entry read these at render time, not from setup,
   // so the compiler cannot infer them. Declaring only slots lets the plugin
   // activate and then throw inside the slot, which blanks the sidebar instead of
@@ -692,16 +694,45 @@ export default defineClient({
      * Navigation history can point at a thread archived since the visit. Restore it before opening:
      * native navigation clears an archived main Session right after it opens, releasing the reference.
      */
-    const openSessionRestoringArchived = (sessionId: SessionSummary['id']): void => {
-      if (!ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) {
-        openThread(sessionId)
-        return
+    const openSessionRestoringArchived = async (sessionId: SessionSummary['id']): Promise<boolean> => {
+      if (ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) {
+        try {
+          await ctx.workspaces.unarchiveSession(sessionId)
+        } catch {
+          return false
+        }
       }
-      void ctx.workspaces.unarchiveSession(sessionId).then(
-        () => openThread(sessionId),
-        () => undefined,
-      )
+      openThread(sessionId)
+      return true
     }
+
+    const notificationHistoryTranslate = ctx.locale.bind('dshfiles.notificationHistory')
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register(
+        { name: 'sidebar.panellist', id: 'dshfiles-notification-history', order: 2, label: () => notificationHistoryTranslate('title') },
+        props => <BellIcon size={props.size} aria-hidden />,
+      ),
+    )
+    ctx.slots.inject('main', () =>
+      ctx.slots.register(
+        { name: 'main', key: 'dshfiles-notification-history', locale: 'dshfiles.notificationHistory' },
+        decorate(props => (
+          <PluginQueryProvider>
+            <NotificationHistoryPanel
+              sessions={ctx.sessions}
+              workspaces={ctx.workspaces}
+              t={props.t}
+              openThread={async sessionId => {
+                const snapshot = ctx.sessions.list.getSnapshot()
+                const existingId = snapshot.ids.find(id => id === sessionId)
+                if (existingId === undefined || snapshot.byId[existingId] === undefined) return false
+                return openSessionRestoringArchived(existingId)
+              }}
+            />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
 
     const subscribeLeftContent = (listener: () => void): (() => void) => ctx.slots.subscribe('shell.left', listener)
     const leftContentOverridden = (): boolean => ctx.slots.entriesOfSlot('shell.left').length > 0
@@ -1100,7 +1131,7 @@ export default defineClient({
         const openIfListed = (): void => {
           const session = ctx.sessions.list.getSnapshot().byId[id]
           if (session === undefined || session.blank) return
-          openSessionRestoringArchived(id)
+          void openSessionRestoringArchived(id)
         }
         if (ctx.sessions.list.getSnapshot().byId[id] !== undefined) {
           openIfListed()

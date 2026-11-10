@@ -2180,7 +2180,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "DestinationSections",
       "importFrom": "@dshfiles/thread-sidebar/destinations",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:254",
+      "source": "plugins/@dshfiles/thread-sidebar/src/destinations.ts:261",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/thread-sidebar.destination-section",
@@ -2761,7 +2761,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-communication › agent-directory"
       ],
       "details": [
-        "Used by 77 catalog feature(s)",
+        "Used by 78 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
