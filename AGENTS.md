@@ -308,6 +308,11 @@ The runbook is
 
 ## Writing plugins
 
+Make significant or opinionated features configurable or independently
+switchable, so others can reuse and combine dshfiles to fit their workflows.
+Choose sensible, compatible defaults; document the controls, effects and any
+restart requirement. Do not add a toggle for every minor implementation detail.
+
 New plugins use our dshx hard fork at `tooling/dshx` (`@dshfiles/dshx`;
 provenance in [`FORK.md`](tooling/dshx/FORK.md)). It has no upstream remote and
 must not install `@becomeopc/dshx` from a registry. Build it, then scaffold:
