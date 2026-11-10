@@ -38,6 +38,24 @@ export const threadAttentionSnapshotSchema = SchemaHelpers.strictStruct(
   }),
 )
 
+/**
+ * What changed after a revision the caller holds: records written since (`put`) and threads whose record was dropped
+ * since (`removed`). `complete: false` means the Host no longer knows every removal since then (it restarted or trimmed
+ * its log); read `state` instead.
+ */
+export const threadAttentionChangesSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    revision: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThan(0)),
+    complete: Schema.Boolean,
+    put: Schema.Array(threadAttentionViewSchema).check(Schema.isMaxLength(MAX_ATTENTION_SESSIONS)),
+    removed: Schema.Array(sessionIdSchema).check(Schema.isMaxLength(MAX_ATTENTION_SESSIONS)),
+  }),
+)
+
+/** Newest finish first, then oldest write: the order every snapshot lists its sessions in. */
+export const compareAttentionViews = (left: ThreadAttentionView, right: ThreadAttentionView): number =>
+  (right.finishedAt ?? 0) - (left.finishedAt ?? 0) || left.version - right.version
+
 /** Browser state carried over once, when this plugin starts owning the record on the Host. */
 export const threadAttentionMigrationEntrySchema = SchemaHelpers.strictStruct(
   Schema.Struct({
@@ -58,6 +76,13 @@ export const threadSidebarAttentionApi = defineApi({
       output: threadAttentionSnapshotSchema,
       description: 'Threads whose finished turn (or manual unread mark) the user has not acknowledged yet. Read-only.',
       tool: { name: 'thread_attention_state', readOnly: true },
+    }),
+    changesSince: method({
+      input: SchemaHelpers.strictStruct(
+        Schema.Struct({ revision: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)) }),
+      ),
+      output: threadAttentionChangesSchema,
+      description: 'The attention records written or dropped after a revision the caller holds, so a page follows changes without re-reading every record.',
     }),
     acknowledge: method({
       input: SchemaHelpers.strictStruct(
@@ -118,3 +143,4 @@ export const threadSidebarAttentionApi = defineApi({
 export type ThreadAttentionView = Schema.Schema.Type<typeof threadAttentionViewSchema>
 export type ThreadAttentionSnapshot = Schema.Schema.Type<typeof threadAttentionSnapshotSchema>
 export type ThreadAttentionMigrationEntry = Schema.Schema.Type<typeof threadAttentionMigrationEntrySchema>
+export type ThreadAttentionChanges = Schema.Schema.Type<typeof threadAttentionChangesSchema>

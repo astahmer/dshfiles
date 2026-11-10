@@ -553,7 +553,12 @@ from any tab; the acknowledgement carries the record version the browser
 rendered, so a turn that finishes in between stays unacknowledged, and it never
 clears a manual unread mark on the same thread. A browser that still holds markers
 from the older browser-local version hands them to the Host once and then drops
-its copy.
+its copy. A page reads the whole state once, then follows each `changed` event
+and its 30 s poll with `changesSince`, which returns only the records written
+or dropped after the revision the page holds (a drop takes a revision too).
+When the Host cannot name every drop since then (it restarted, or more than
+2000 drops passed) it answers `complete: false` and the page reads the whole
+state; a Host without the method makes the page read the whole state as before.
 Auto-settle can inherit the global auto-settle setting, explicitly enable it
 for one thread, or exclude that thread; the global idle threshold and safety
 exclusions still apply. A thread with a still-running descendant is never

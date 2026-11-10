@@ -192,6 +192,7 @@ export default DshxPlugin.make({
     }),
     Api.bind(threadSidebarAttentionApi, {
       state: () => ThreadAttention.use(attention => attention.snapshot),
+      changesSince: input => ThreadAttention.use(attention => attention.changesSince(input.revision)),
       acknowledge: input => ThreadAttention.use(attention => attention.acknowledge(input)),
       clearUnread: input => ThreadAttention.use(attention => attention.clearUnread(input)),
       clearUnreadMany: input => ThreadAttention.use(attention => attention.clearUnreadMany(input.entries)),

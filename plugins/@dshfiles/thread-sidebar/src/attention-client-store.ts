@@ -1,9 +1,17 @@
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import type { ThreadAttentionMigrationEntry, ThreadAttentionSnapshot, ThreadAttentionView } from './attention-api.js'
+import {
+  compareAttentionViews,
+  type ThreadAttentionChanges,
+  type ThreadAttentionMigrationEntry,
+  type ThreadAttentionSnapshot,
+  type ThreadAttentionView,
+} from './attention-api.js'
 
 /** The slice of the client this store uses, so a test can serve it without casting. */
 export interface AttentionApi {
   readonly state: (input: undefined, options?: { readonly signal?: AbortSignal }) => Promise<ThreadAttentionSnapshot>
+  /** Absent on a Host that predates it; the store then reads `state` every time. */
+  readonly changesSince?: (input: { readonly revision: number }, options?: { readonly signal?: AbortSignal }) => Promise<ThreadAttentionChanges>
   readonly acknowledge: (
     input: { readonly sessionId: string; readonly version: number },
     options?: { readonly signal?: AbortSignal },
@@ -82,8 +90,35 @@ const createStore = (): ThreadAttentionStore => {
 
   const adopt = (snapshot: ThreadAttentionSnapshot): void => {
     if (snapshot.revision < revision) return
+    if (snapshot.revision === revision && snapshot.sessions === state.snapshot?.sessions && state.error === null) return
     revision = snapshot.revision
     setState({ snapshot, error: null, ownerMissing: false })
+  }
+
+  /** A Host without `changesSince` fails it (an unknown method); this page then reads the whole state every time. */
+  let changesUnsupported = false
+
+  /**
+   * The records changed since the snapshot this page holds, merged into it; the whole state when there is no snapshot
+   * yet, the Host does not know every change since (`complete: false`), or the call fails.
+   */
+  const fetchState = async (client: AttentionApi): Promise<ThreadAttentionSnapshot> => {
+    const held = state.snapshot
+    if (held === null || client.changesSince === undefined || changesUnsupported) return client.state(undefined, {})
+    let changes: ThreadAttentionChanges
+    try {
+      changes = await client.changesSince({ revision: held.revision }, {})
+    } catch (error) {
+      if (error instanceof Error && isApiOwnerMissing(error)) throw error
+      changesUnsupported = true
+      return client.state(undefined, {})
+    }
+    if (!changes.complete) return client.state(undefined, {})
+    if (changes.put.length === 0 && changes.removed.length === 0) return { revision: changes.revision, sessions: held.sessions }
+    const merged = new Map(held.sessions.map(view => [view.sessionId, view]))
+    for (const sessionId of changes.removed) merged.delete(sessionId)
+    for (const view of changes.put) merged.set(view.sessionId, view)
+    return { revision: changes.revision, sessions: [...merged.values()].sort(compareAttentionViews) }
   }
 
   const read = (): Promise<void> => {
@@ -92,8 +127,7 @@ const createStore = (): ThreadAttentionStore => {
     const now = Date.now()
     if (now - lastAttemptAt < MIN_REFRESH_GAP_MS) return Promise.resolve()
     lastAttemptAt = now
-    const pending = api
-      .state(undefined, {})
+    const pending = fetchState(api)
       .then(snapshot => {
         adopt(snapshot)
       })
@@ -202,6 +236,7 @@ const createStore = (): ThreadAttentionStore => {
       rereadQueued = false
       lastAttemptAt = 0
       stopped = false
+      changesUnsupported = false
       stopPolling()
     },
   }

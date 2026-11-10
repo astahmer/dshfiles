@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it, vi } from 'vitest'
-import type { ThreadAttentionSnapshot } from './attention-api.js'
+import type { ThreadAttentionChanges, ThreadAttentionSnapshot } from './attention-api.js'
 import { sharedThreadAttentionStore, type AttentionApi } from './attention-client-store.js'
 
 const snapshot = (revision: number, sessionIds: readonly string[] = []): ThreadAttentionSnapshot => ({
@@ -138,5 +138,59 @@ describe('shared thread attention store', () => {
     await vi.advanceTimersByTimeAsync(30_000)
     assert.equal(failedReads, 1)
     assert.equal(store().getSnapshot().snapshot?.revision, 1)
+  })
+
+  it('follows a change with the records changed since its revision instead of the whole state', async () => {
+    const { api, calls } = fakeApi()
+    const asked: number[] = []
+    let answer: ThreadAttentionChanges = { revision: 5, complete: true, put: snapshot(5, ['thread-b']).sessions, removed: ['thread-a'] }
+    const delta: AttentionApi = {
+      ...api,
+      changesSince: async input => {
+        asked.push(input.revision)
+        return answer
+      },
+    }
+    store().attach(delta)
+    await vi.advanceTimersByTimeAsync(0)
+    assert.equal(calls.state, 1)
+
+    store().changed?.(5)
+    await vi.advanceTimersByTimeAsync(0)
+    assert.deepEqual(asked, [1])
+    assert.equal(calls.state, 1)
+    assert.equal(store().getSnapshot().snapshot?.revision, 5)
+    assert.deepEqual(
+      store()
+        .getSnapshot()
+        .snapshot?.sessions.map(view => view.sessionId),
+      ['thread-b'],
+    )
+
+    answer = { revision: 9, complete: false, put: [], removed: [] }
+    store().changed?.(9)
+    await vi.advanceTimersByTimeAsync(0)
+    assert.deepEqual(asked, [1, 5])
+    assert.equal(calls.state, 2)
+  })
+
+  it('reads the whole state from a Host that predates changesSince, and stops asking it', async () => {
+    const { api, calls } = fakeApi()
+    let asked = 0
+    const older: AttentionApi = {
+      ...api,
+      changesSince: async () => {
+        asked += 1
+        return Promise.reject(new Error('Unknown API method changesSince.'))
+      },
+    }
+    store().attach(older)
+    await vi.advanceTimersByTimeAsync(0)
+    store().changed?.(2)
+    await vi.advanceTimersByTimeAsync(0)
+    store().changed?.(3)
+    await vi.advanceTimersByTimeAsync(0)
+    assert.equal(asked, 1)
+    assert.equal(calls.state, 3)
   })
 })

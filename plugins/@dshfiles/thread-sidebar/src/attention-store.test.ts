@@ -131,7 +131,7 @@ describe('thread attention', () => {
         const marked = yield* attention.markUnreadMany(['stale', 'new'])
         expect(marked.sessions.find(record => record.sessionId === 'stale')).toEqual({
           sessionId: 'stale',
-          version: 11_001,
+          version: 11_002,
           finishedAt: 3_000,
           finishedSeq: 3,
           finishedReason: 'completed',
@@ -181,6 +181,49 @@ describe('thread attention', () => {
       }),
     ),
   )
+
+  it.effect('changesSince names the records written and dropped after a revision, and refuses one older than its log', () =>
+    withAttention(20_000, () =>
+      Effect.gen(function* () {
+        const attention = yield* ThreadAttention
+        const before = yield* attention.snapshot
+        expect(yield* attention.changesSince(before.revision - 1)).toEqual({ revision: before.revision, complete: false, put: [], removed: [] })
+
+        yield* attention.recordFinish({ sessionId: 'kept', seq: 1, time: 1_000, reason: 'completed' })
+        yield* attention.recordFinish({ sessionId: 'opened', seq: 2, time: 2_000, reason: 'completed' })
+        const seen = yield* attention.snapshot
+        const opened = seen.sessions.find(record => record.sessionId === 'opened')
+        yield* attention.clearUnread({ sessionId: 'opened', version: opened?.version ?? 0 })
+        yield* attention.recordFinish({ sessionId: 'later', seq: 3, time: 3_000, reason: 'error' })
+
+        const changes = yield* attention.changesSince(seen.revision)
+        const after = yield* attention.snapshot
+        expect(changes.complete).toBe(true)
+        expect(changes.revision).toBe(after.revision)
+        expect(changes.revision).toBeGreaterThan(seen.revision)
+        expect(changes.put.map(record => record.sessionId)).toEqual(['later'])
+        expect(changes.removed).toEqual(['opened'])
+
+        const merged = new Map(seen.sessions.map(record => [record.sessionId, record]))
+        for (const sessionId of changes.removed) merged.delete(sessionId)
+        for (const record of changes.put) merged.set(record.sessionId, record)
+        expect([...merged.keys()].sort()).toEqual(after.sessions.map(record => record.sessionId).sort())
+
+        expect(yield* attention.changesSince(after.revision)).toEqual({ revision: after.revision, complete: true, put: [], removed: [] })
+      }),
+    ),
+  )
+
+  it('keeps the newest removals and raises the floor past the ones it drops', () => {
+    const removedAt = new Map([
+      ['a', 10],
+      ['b', 30],
+      ['c', 20],
+    ])
+    expect(ThreadAttentionStoreModel.boundRemovals({ removedAt, floor: 5, limit: 2 })).toBe(10)
+    expect([...removedAt.keys()].sort()).toEqual(['b', 'c'])
+    expect(ThreadAttentionStoreModel.boundRemovals({ removedAt, floor: 10, limit: 2 })).toBe(10)
+  })
 
   it('the least recently written records are trimmed past the bound', () => {
     const record = (sessionId: string, version: number): ThreadAttentionView => ({

@@ -3,9 +3,11 @@ import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { Clock, Context, Effect, Layer, Option, PubSub, Schema, Stream, SynchronizedRef } from 'effect'
 import {
+  compareAttentionViews,
   MAX_ATTENTION_SESSIONS,
   threadAttentionViewSchema,
   type AttentionFinishReason,
+  type ThreadAttentionChanges,
   type ThreadAttentionMigrationEntry,
   type ThreadAttentionSnapshot,
   type ThreadAttentionView,
@@ -79,6 +81,8 @@ const legacyAttentionRecord = (entry: ThreadAttentionMigrationEntry, version: nu
       }
 
 export class ThreadAttentionStoreModel {
+  static readonly boundRemovals = (input: { readonly removedAt: Map<string, number>; readonly floor: number; readonly limit: number }): number =>
+    boundRemovals(input.removedAt, input.floor, input.limit)
   static readonly finishReasonFromEvent = finishReasonFromEvent
   static readonly nextVersion = nextAttentionVersion
   static readonly keysToTrim = attentionKeysToTrim
@@ -88,6 +92,29 @@ export class ThreadAttentionStoreModel {
 interface AttentionState {
   readonly records: ReadonlyMap<string, ThreadAttentionView>
   readonly revision: number
+  /** The revision each dropped record was dropped at, since `floor`; a later write of the thread forgets it. */
+  readonly removedAt: ReadonlyMap<string, number>
+  /** Removals at or before this revision are unknown (before this Host started, or trimmed from `removedAt`). */
+  readonly floor: number
+}
+
+/** Records written and dropped after `since`, or `complete: false` when a removal since then may be unknown. */
+const changesOf = (state: AttentionState, since: number): ThreadAttentionChanges => {
+  if (since < state.floor) return { revision: state.revision, complete: false, put: [], removed: [] }
+  return {
+    revision: state.revision,
+    complete: true,
+    put: [...state.records.values()].filter(record => record.version > since).sort(compareAttentionViews),
+    removed: [...state.removedAt].flatMap(([sessionId, at]) => (at > since ? [sessionId] : [])),
+  }
+}
+
+/** Keep at most `limit` removals, the newest; the floor rises to the newest one dropped. */
+const boundRemovals = (removedAt: Map<string, number>, floor: number, limit = MAX_ATTENTION_SESSIONS): number => {
+  if (removedAt.size <= limit) return floor
+  const oldest = [...removedAt].sort((left, right) => left[1] - right[1]).slice(0, removedAt.size - limit)
+  for (const [sessionId] of oldest) removedAt.delete(sessionId)
+  return Math.max(floor, ...oldest.map(([, at]) => at))
 }
 
 /** What one change does: rows to put and keys to delete, applied durably before the mirror moves. */
@@ -100,7 +127,7 @@ type Operation = AttentionStorageFailed['operation']
 
 const snapshotOf = (state: AttentionState): ThreadAttentionSnapshot => ({
   revision: state.revision,
-  sessions: [...state.records.values()].sort((left, right) => (right.finishedAt ?? 0) - (left.finishedAt ?? 0) || byVersionAscending(left, right)),
+  sessions: [...state.records.values()].sort(compareAttentionViews),
 })
 
 /**
@@ -112,6 +139,7 @@ export class ThreadAttention extends Context.Service<
   ThreadAttention,
   {
     readonly snapshot: Effect.Effect<ThreadAttentionSnapshot>
+    readonly changesSince: (revision: number) => Effect.Effect<ThreadAttentionChanges>
     /** Every committed change, after the mirror moved; read `snapshot` for the state. */
     readonly changes: Stream.Stream<void>
     readonly recordFinish: (input: {
@@ -140,9 +168,12 @@ export class ThreadAttention extends Context.Service<
       const stored = yield* table.entries.pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation: 'open', cause })))
       const now = yield* Clock.currentTimeMillis
       const changed = yield* PubSub.sliding<void>(16)
+      const initialRevision = Math.max(now, ...stored.map(([, record]) => record.version))
       const state = yield* SynchronizedRef.make<AttentionState>({
         records: new Map(stored),
-        revision: Math.max(now, ...stored.map(([, record]) => record.version)),
+        revision: initialRevision,
+        removedAt: new Map(),
+        floor: initialRevision,
       })
 
       /** Run one change under the mirror's lock: plan it against the current records, write it, then publish it. */
@@ -164,7 +195,16 @@ export class ThreadAttention extends Context.Service<
             const puts = change.put.filter(record => records.has(record.sessionId))
             yield* Effect.forEach(puts, record => table.put(record.sessionId, record), { discard: true })
             yield* Effect.forEach([...change.remove, ...trimmed], sessionId => table.delete(sessionId), { discard: true })
-            const next = { records, revision }
+            // A drop takes a revision too, so a page holding the record before it can learn it from `changesSince`.
+            const dropped = [...change.remove, ...trimmed].filter(sessionId => current.records.has(sessionId) && !records.has(sessionId))
+            const removedAt = new Map(current.removedAt)
+            for (const record of puts) removedAt.delete(record.sessionId)
+            if (dropped.length > 0) {
+              const droppedAt = takeVersion()
+              for (const sessionId of dropped) removedAt.set(sessionId, droppedAt)
+            }
+            const floor = boundRemovals(removedAt, current.floor)
+            const next = { records, revision, removedAt, floor }
             return [snapshotOf(next), next] as const
           }).pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation, cause }))),
         ).pipe(Effect.tap(() => PubSub.publish(changed, undefined)))
@@ -173,6 +213,7 @@ export class ThreadAttention extends Context.Service<
 
       return ThreadAttention.of({
         snapshot: Effect.map(SynchronizedRef.get(state), snapshotOf),
+        changesSince: revision => Effect.map(SynchronizedRef.get(state), current => changesOf(current, revision)),
         changes: Stream.fromPubSub(changed),
         recordFinish: Effect.fn('thread attention record')(function* (input) {
           yield* apply('record', (records, takeVersion) => ({
