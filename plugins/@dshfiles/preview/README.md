@@ -11,7 +11,9 @@ Three things a thread needs while it builds a web app:
 - **Thread dev servers.** The thread header lists the TCP ports the thread's processes listen on, with **Open** and
   **Stop**. Open loads the URL in the right-Sidebar Browser tab beside the thread on screen (the native
   `ui-sidebar-browser` row, which the `web` seed enables), or in a new browser tab when no pane takes it. A page link
-  in the chat and `preview_reveal` open the same tab; a link to an image opens the image viewer instead.
+  in the chat and `preview_reveal` open the same tab; a link to an image opens the image viewer instead. A server this
+  browser has not opened yet gets a **Preview** button beside the chip (× dismisses it); `autoOpenDevServers` opens it
+  in the tab beside the thread on screen without the click.
 - **Agent browser.** **Watch** on a preview page opens the thread panel's **Agent browser** tab: the agent's own
   headless page, mirrored about twice a second while the tab and window are visible (an unchanged frame sends only its
   hash). Clicks, scrolls, typed text and named keys replay on that page, so you can see and take over what the agent
@@ -48,14 +50,15 @@ serves Host plugin callers only (`createHostApiClient`); `@dshfiles/html-render`
 
 ## Settings (`dshfiles-preview`)
 
-| Setting             | Default                                        |                                                                       |
-| ------------------- | ---------------------------------------------- | --------------------------------------------------------------------- |
-| `allowedHosts`      | `localhost`, `127.0.0.1`, `::1`, `*.localhost` | Hosts a top-level navigation may reach.                               |
-| `allowAnyHost`      | off                                            | Any http(s) host.                                                     |
-| `allowEvaluate`     | off                                            | Offer `preview_evaluate`.                                             |
-| `chromiumPath`      | empty                                          | Chrome/Chromium executable; empty uses the Playwright headless shell. |
-| `idleMinutes`       | 15                                             | Close a thread's pages after this long without a preview call.        |
-| `maxPagesPerThread` | 4                                              |                                                                       |
+| Setting              | Default                                        |                                                                                                             |
+| -------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `allowedHosts`       | `localhost`, `127.0.0.1`, `::1`, `*.localhost` | Hosts a top-level navigation may reach.                                                                     |
+| `allowAnyHost`       | off                                            | Any http(s) host.                                                                                           |
+| `allowEvaluate`      | off                                            | Offer `preview_evaluate`.                                                                                   |
+| `chromiumPath`       | empty                                          | Chrome/Chromium executable; empty uses the Playwright headless shell.                                       |
+| `idleMinutes`        | 15                                             | Close a thread's pages after this long without a preview call.                                              |
+| `maxPagesPerThread`  | 4                                              |                                                                                                             |
+| `autoOpenDevServers` | off                                            | Open a new dev server beside the thread on screen instead of offering **Preview**. Read live by the Client. |
 
 ## How it works
 
@@ -83,9 +86,17 @@ thread header chip ─► previewApi.devServers ─► lsof/ss + ps + cwd probe 
   same process is still alive.
 - **Cleanup.** A thread's browser context closes when the thread is disposed or idles for `idleMinutes`; unloading the
   plugin closes Chromium.
-- **Reveal.** `preview_open` with `reveal` or `preview_reveal` publishes a `pagesChanged` event; the header chip of
-  that thread opens the URL through the `Browser` contract (`@dshfiles/chat`). A reveal never falls back to a new tab:
-  without a click the browser would block it as a popup.
+- **Reveal.** `preview_open` with `reveal` or `preview_reveal` stamps the page's `revealRequestedAt` and publishes a
+  `pagesChanged` event. The header chip of that thread treats the newest request, from the event or the page list, as
+  pending state: it opens the URL through the `Browser` contract (`@dshfiles/chat`) once its thread is on screen and
+  the pane accepts it, retrying every second for 20 s while the pane refuses (a fresh GUI has no minted surface yet),
+  and records it in `localStorage` (`dshfiles-preview:handled`, with the previewed and dismissed servers) so a reload
+  does not repeat it. Events missed before the stream went live are caught up by the page list. A reveal never falls
+  back to a new tab: without a click the browser would block it as a popup.
+- **Remote GUI.** When the GUI's own hostname is not loopback, a loopback URL in the pane or a new tab would load the
+  viewer's machine. Open and **Preview** on such a server have the Host load it in a preview page and show it in the
+  **Agent browser**; a page row keeps only **Watch**; a reveal opens the Agent browser on its page; auto-open falls back
+  to the **Preview** button.
 - **Mirror.** `mirrorFrame` returns a JPEG viewport (quality 55) and its SHA-1; the view sends the hash it shows and
   gets `image: null` while the page is still. `mirrorInput` replays one click, wheel, key or text gesture in page
   viewport pixels. Both are Client methods; agents keep `preview_screenshot`, `preview_click` and `preview_type`.

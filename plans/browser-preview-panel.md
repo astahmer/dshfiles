@@ -3,21 +3,17 @@
 Goal: a thread's dev server and the page its agent drives show beside the thread, like t3code, Codex and Claude Code.
 
 Shipped and documented in the [preview README](../plugins/@dshfiles/preview/README.md): the native right-Sidebar Browser
-tab (checked live on the `web` Host after its 2026-11-10 restart: the dev-server chip's **Open**, a chat link and
-`preview_reveal` each load the URL there), Open falling back to a new browser tab, and **Watch** opening the **Agent
-browser** mirror.
+tab for Open, chat links and reveals (a reveal now waits until the pane beside its thread takes it), the **Preview**
+offer and `autoOpenDevServers`, the **Agent browser** mirror, and the remote-GUI fallback to the mirror.
 
-Resume here: P3.
+Resume here: P4c.
 
 ## Open
 
-| Phase | What                                                                                                                                                                                                                        | Owner                | Status |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ------ |
-| P1b   | One of two live `preview_reveal` calls made while the thread was on screen in a fresh browser did not open the pane (the other opened it within 1.4 s). Reproduce before changing the chip's reveal handling.               | preview              | todo   |
-| P3    | Auto-reveal: when a thread's dev server first appears, offer one **Preview** action that opens it in the pane; a setting turns auto-open on. No pane steals focus without a click by default.                               | preview              | todo   |
-| P4b   | Remote GUI: when the GUI origin is not loopback, Open on a loopback URL loads the viewer's own machine. Prefer Watch there (or open the mirror for a dev-server row through a short-lived preview page).                    | preview              | todo   |
-| P4c   | Measure the mirror with `live-performance-audit` (bytes/s and Host CPU while watching an animated page); switch to CDP `Page.startScreencast` only if polling is the measured cost.                                         | preview              | todo   |
-| P5    | Agent ↔ user hand-off: the agent points at an element (`preview_snapshot` ref → highlight overlay in the Agent browser), and the user annotates a region and sends it to the thread (reuse `@dshfiles/annotations` intake). | preview, annotations | idea   |
+| Phase | What                                                                                                                                                                                                                                                                                                                                             | Owner                | Status |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- | ------ |
+| P4c   | Measure the mirror with `live-performance-audit`: bytes/s and Host CPU while one Agent browser tab watches an animated page (a CSS spinner on a loopback server) for 60 s, against an idle tab. Switch `mirrorFrame` polling to CDP `Page.startScreencast` only if those numbers name polling as the cost; record them in `docs/performance.md`. | preview              | todo   |
+| P5    | Agent ↔ user hand-off: the agent points at an element (`preview_snapshot` ref → highlight overlay in the Agent browser), and the user annotates a region and sends it to the thread (reuse `@dshfiles/annotations` intake). Next step: a design note on the overlay channel (a `mirrorFrame` field vs a new event) before code.                  | preview, annotations | idea   |
 
 ## Decisions to keep
 
