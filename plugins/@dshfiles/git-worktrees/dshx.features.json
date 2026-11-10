@@ -86,7 +86,7 @@
         {
           "kind": "not-applicable",
           "id": "git-worktrees.git-file-snapshots-browser",
-          "reason": "Host-only: snapshot and restore are vcs-provider API methods with no UI of their own; the browser path that drives them is session-undo's Undo/Redo, covered by session-undo.undo-redo-files, and the git behaviour by the integration test against a temporary repository."
+          "reason": "Host-only: snapshot and restore are vcs-provider API methods with no UI of their own; the browser path that drives them is session-undo's Undo/Redo, covered in a git-only repository by session-undo.undo-redo-files-git, and the git behaviour by the integration test against a temporary repository."
         },
         {
           "kind": "host-test",

@@ -10,8 +10,7 @@ its results into `features:report`.
 
 - [ ] **Fresh green baseline on stock rc.2.** The nightly `journeys` job is the baseline run; it has not run yet. Triage
       each red owner from its `plugin-journeys-<run>-<shard>` artifact as drift, harness gap or regression
-      (`maintain-verify-dsh`). Known red locally on 2026-11-10: `session-undo.undo-redo-files` fails in a scratch DSH
-      from a dirty shared workspace (the `bash` tool call its turn depends on), so check it there first.
+      (`maintain-verify-dsh`).
 - [ ] **Feed run results into `features:report`**, so it separates failing, unrun and browser-verified features instead
       of counting a linked tag as covered.
 - [ ] **Measure the artifact size** of a red nightly shard before raising its seven-day retention.

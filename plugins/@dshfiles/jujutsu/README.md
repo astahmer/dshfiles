@@ -312,6 +312,14 @@ outside that scan, and unavailable or truncated operation history cannot be
 identified from this query; the UI reports when the scan is incomplete and
 when no marker was found in its window.
 
+## Git-only repositories
+
+Both panels stay jj-only. Thread workspaces, automatic fetch, review scopes and turn undo already run through the git
+backend ([jj-integration › Git repositories](../jj-integration/README.md#git-repositories)), but this package is about
+13.5k lines of jj-native UI and Host: revsets, the operation log, workspaces and the describe, split, squash and rebase
+actions. A git adapter would need `git log --graph` parsing and a reduced action set, so it waits for a design that
+names which actions a git graph keeps; it is not started.
+
 ## Runtime compatibility and composition
 
 The package peer ranges target `@deepseek-ai/* >=0.2.0-rc.1 <0.3.0-0`, which

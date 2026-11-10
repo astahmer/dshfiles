@@ -634,9 +634,8 @@ use **Rebase**.
 
 ## Limits
 
-- Git-only repositories cover the thread-workspace flows above, automatic fetch and pulls-review. The revision graph
-  panel ([`@dshfiles/jujutsu`](../jujutsu/README.md)) stays jj-only; remaining work is tracked in
-  [plans/vcs-adapters](../../../plans/vcs-adapters/README.md).
+- Git-only repositories cover the thread-workspace flows above, automatic fetch, pulls-review and session undo. The
+  revision graph panel stays jj-only ([`@dshfiles/jujutsu` › Git-only repositories](../jujutsu/README.md#git-only-repositories)).
 - A thread workspace starts without `node_modules`; run project-specific
   preparation only after the thread starts and only when its memory-note
   conditions match.

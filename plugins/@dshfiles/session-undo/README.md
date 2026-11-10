@@ -42,6 +42,7 @@ turns recorded before it can still be undone.
 
 ```sh
 pnpm --dir plugins/@dshfiles/session-undo test     # undo/redo, rewind N, shared folders, refusals, fork failure, the snapshot gate
-pnpm --dir plugins/@dshfiles/session-undo test:e2e # scratch DSH: three turns write files, rewind past two, redo
+pnpm --dir plugins/@dshfiles/session-undo test:e2e # scratch DSH: undo and redo a turn's file in a jj project and in a git-only
+                                                   # repository; three turns write files, rewind past two, redo
 dshx dev open session-undo/turn-undo-redo          # scratch DSH: undo a seeded turn, the Redo button appears
 ```
