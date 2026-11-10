@@ -2,7 +2,9 @@ Feature: pulls.review thread review scopes
 
   A thread owns a jj workspace, so the plugin reads `jj diff --from <base> --to @`
   through the Host and groups it with pulls.review's rule-based scopes. The
-  `/pulls` command reports the same grouping as text in the thread.
+  `/pulls` command reports the same grouping as text in the thread. One journey
+  runs in a git-only repository, where the thread is a git worktree read from
+  its merge base with the base branch.
 
   @scenario:pulls-review.thread-scopes
   Scenario: Read the thread workspace's changes as review scopes
@@ -22,6 +24,17 @@ Feature: pulls.review thread review scopes
     And the thread workspace holds changed files in different scopes
     And the pulls.review panel is opened from the sidebar
     Then the pulls.review panel reads the thread workspace against "main"
+    Then every scope's file diffs appear in the same scrollable review
+
+  @scenario:pulls-review.git-thread-scopes
+  Scenario: Review a git-only thread worktree's changes by scope
+    Given the isolated plugin composition of "@dshfiles/pulls-review, @dshfiles/diff-viewed, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable git-only repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And the thread workspace holds changed files in different scopes
+    And the pulls.review panel is opened from the sidebar
+    Then the pulls.review panel reads the git thread worktree against "main"
     Then every scope's file diffs appear in the same scrollable review
 
   @scenario:pulls-review.batch-reviewed

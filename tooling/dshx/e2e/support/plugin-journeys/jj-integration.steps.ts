@@ -185,10 +185,13 @@ const repositoryFor = (page: Page): ThreadRepository => {
 
 /**
  * The checkout the journey's thread actually runs in, ready for another journey to seed working-copy changes there.
- * An isolated thread workspace wins; a thread that stayed in the project checkout returns that checkout instead.
+ * An isolated thread workspace wins; a thread that stayed in the project checkout returns that checkout instead. A
+ * git-only repository has no jj workspaces, so its thread is the git worktree beside the checkout.
  */
 export const threadWorkspacePathFor = (page: Page): string => {
   const repository = repositoryFor(page)
+  if (!existsSync(join(repository.repositoryPath, '.jj')))
+    return gitWorktreePaths(repository).find(path => path !== repository.repositoryPath) ?? repository.repositoryPath
   const threadName = workspaceNames(repository).find(name => name !== 'default')
   return threadName === undefined ? repository.repositoryPath : join(repository.threadsPath, threadName)
 }
