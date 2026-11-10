@@ -21,6 +21,7 @@ import { FacetSessionStateModel, type FacetSessionPatch } from './changes-facet-
 import { ChangesScopeModel, changesScopeSchema, type ChangesRequest, type ChangesScope } from './changes-scope.js'
 import { CombinedReview } from './combined-review.js'
 import { LandCard } from './land-card.js'
+import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
 import { TurnChangesModel, TurnChangesReadError, type TurnChangesEvent } from './turn-changes.js'
 import { useRangeViewedMarks, useTurnViewedMarks, type ViewedMarksView } from './viewed-marks.js'
 import { Schema } from 'effect'
@@ -206,6 +207,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
     }
   }, [activeScope, rangeResult, turnData])
   const parsedFiles = useMemo(() => (diff === undefined || diff.patch.length === 0 ? [] : parsePatchFiles(diff.patch).flatMap(file => file.files)), [diff])
+  const packageJson = usePackageJsonTables(diff?.patch ?? '', parsedFiles)
   const paths = useMemo(() => (diff?.files ?? []).map(file => file.path), [diff])
   const viewedCount = paths.filter(path => marks.viewed.has(path)).length
   const additions = (diff?.files ?? []).reduce((total, file) => total + file.added, 0)
@@ -436,7 +438,10 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
                       'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:font-mono dshx:text-xs dshx:hover:underline',
                       viewed && 'dshx:text-muted-foreground',
                     )}
-                    onClick={() => patchFacet({ focusPath: file.path })}
+                    onClick={() => {
+                      if (packageJson.isTextHidden(file.path)) packageJson.showText(file.path)
+                      patchFacet({ focusPath: file.path })
+                    }}
                     type="button"
                   >
                     {file.display}
@@ -447,37 +452,40 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
               )
             })}
           </ul>
+          <PackageJsonTables onShowText={path => patchFacet({ focusPath: path })} view={packageJson} />
           {commentBox}
           {commentStatus}
-          <div
-            className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
-            data-testid="changes-diffs"
-          >
-            <PatchView
-              className="dshx:flex-1"
-              empty={<p className={cn(HINT, 'dshx:p-3')}>No diff lines to display (binary or oversized files).</p>}
-              files={parsedFiles}
-              focusPath={focusPath}
-              onLineSelection={next => {
-                patchFacet({ selection: next, commentNotice: null })
-              }}
-              renderHeaderMetadata={file => {
-                const viewed = marks.viewed.has(file.name)
-                return (
-                  <Button
-                    aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.name}`}
-                    className="dshx:gap-1 dshx:text-[11px]"
-                    disabled={!marks.ready}
-                    onClick={() => marks.set([file.name], !viewed)}
-                    size="sm"
-                    variant={viewed ? 'secondary' : 'ghost'}
-                  >
-                    {viewed ? 'Viewed' : 'Mark viewed'}
-                  </Button>
-                )
-              }}
-            />
-          </div>
+          {packageJson.textFiles.length === 0 && parsedFiles.length > 0 ? null : (
+            <div
+              className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
+              data-testid="changes-diffs"
+            >
+              <PatchView
+                className="dshx:flex-1"
+                empty={<p className={cn(HINT, 'dshx:p-3')}>No diff lines to display (binary or oversized files).</p>}
+                files={packageJson.textFiles}
+                focusPath={focusPath}
+                onLineSelection={next => {
+                  patchFacet({ selection: next, commentNotice: null })
+                }}
+                renderHeaderMetadata={file => {
+                  const viewed = marks.viewed.has(file.name)
+                  return (
+                    <Button
+                      aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.name}`}
+                      className="dshx:gap-1 dshx:text-[11px]"
+                      disabled={!marks.ready}
+                      onClick={() => marks.set([file.name], !viewed)}
+                      size="sm"
+                      variant={viewed ? 'secondary' : 'ghost'}
+                    >
+                      {viewed ? 'Viewed' : 'Mark viewed'}
+                    </Button>
+                  )
+                }}
+              />
+            </div>
+          )}
         </>
       ) : null}
     </div>
