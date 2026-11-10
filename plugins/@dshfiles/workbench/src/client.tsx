@@ -26,6 +26,7 @@ import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
 import {
   workbenchPanels,
   NativeAsideOwners,
+  WorkbenchMainNavigation,
   panelTabTitle,
   type WORKBENCH_MAIN_PANEL_ID,
   type ThreadFacetObservable,
@@ -33,12 +34,14 @@ import {
 } from './registry.js'
 import { PanelTitles } from './panel-titles.js'
 import { createDockPaneActions, migrateDockVisibility, rightPaneVisibility } from './right-panel-mode.js'
+import { createRightPaneContents } from './right-pane-contents.js'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { createMainPanelSources } from './panel-sources.js'
 import { panelMainTarget } from './panel-main-target.js'
 import { createTabPanelAdapter } from './tab-panels.js'
 import { KeptThreadViews } from './kept-thread-views.js'
 import { createSemanticPanelOpener } from './semantic-panel-opener.js'
+import { createMainNavigation } from './main-navigation.js'
 import { createResettableAsidePlacement, WorkbenchReset } from './reset-layout.js'
 import { ConversationPanels } from './conversation-panels.js'
 import { semanticLayouts } from './semantic-layouts.js'
@@ -151,7 +154,7 @@ export default defineClient({
     let syncMainTabs: (() => void) | undefined
     let resettingLayout = false
     // On a phone the same controls open the thread panel sheet instead of the remembered desktop right pane.
-    const dockActions = phoneAwareDockActions(createDockPaneActions())
+    const dockActions = phoneAwareDockActions(createDockPaneActions(rightPaneVisibility, createRightPaneContents(registry)))
     ctx.effect(() => {
       // Legacy settings are decode-only compatibility data, never renderer choices.
       ctx.get('mainSurface')?.setMode('workbench')
@@ -314,11 +317,11 @@ export default defineClient({
                 const contributor = registry.list().find(panel => panel.mainPanelId === panelId && !panel.hiddenFromAdd)
                 if (scope !== undefined && contributor?.scopedComponent !== undefined) {
                   const Panel = contributor.scopedComponent
-                  return panelProps => <Panel {...panelProps} panelId={contributor.id} scope={scope} />
+                  return panelProps => <Panel {...panelProps} scope={scope} />
                 }
                 if (scope === undefined && contributor !== undefined) {
                   const Panel = contributor.component
-                  return panelProps => <Panel {...panelProps} panelId={contributor.id} />
+                  return panelProps => <Panel {...panelProps} />
                 }
                 if (scope !== undefined)
                   return () => (
@@ -674,6 +677,25 @@ export default defineClient({
         openInRegion,
       })
     let semanticPanelOpener = newSemanticPanelOpener()
+    ctx.effect(() => {
+      const navigation = createMainNavigation({
+        isWorkbench: () => ctx.get('mainSurface')?.mode() === 'workbench',
+        definition: id => registry.list().find(panel => panel.mainPanelId === id && !panel.hiddenFromAdd),
+        definitionForTab: id => registry.list().find(panel => panel.tabId === id),
+        tabs: workbenchTabs,
+        subscribeRegistry: registry.subscribe,
+        requestSemantic: (id, title) => semanticPanelOpener.request('main', id, title),
+        reveal: id => {
+          const owner = regions.entries().find(([, api]) => api.getPanel(id) !== undefined)
+          openInRegion(owner?.[0] ?? 'main', id)
+        },
+      })
+      const unregister = WorkbenchMainNavigation.register(navigation.open)
+      return () => {
+        unregister()
+        navigation.dispose()
+      }
+    }, 'workbench: targeted main navigation')
 
     let revealLeftPanel: (() => void) | undefined
     const movePanelTo = (from: WorkbenchRegionId, api: DockviewApi, to: WorkbenchRegionId, panelId: string): void => {

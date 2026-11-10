@@ -7,6 +7,7 @@ export default defineConfig({
     'phone-thread-menu': 'src/phone-thread-menu.tsx',
   },
   client: {
+    dshxRuntime: 'shared',
     shared: '@dshfiles/shared-runtime',
     entry: 'src/client-entry.tsx',
     // Not browser-roster packages (no `dsh.client` row and no static seed name), so the

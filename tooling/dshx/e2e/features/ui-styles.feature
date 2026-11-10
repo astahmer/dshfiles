@@ -8,3 +8,8 @@ Feature: One shared plugin stylesheet
   Scenario: An isolated plugin boot injects the shared stylesheet
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
     Then exactly one shared plugin stylesheet is injected
+
+  @scenario:ui-styles.touch-baseline
+  Scenario: The touch baseline leaves dshx utilities in charge of touch-action
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
+    Then a dshx touch-none control keeps touch-action none and a plain button keeps touch-action manipulation

@@ -10,6 +10,7 @@ import { UsageNavigation, type UsageQuotaTarget } from '@dshfiles/ai-accounts/qu
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { WorkbenchMainNavigation, workbenchPanels } from '@dshfiles/workbench/registry'
 import { AccountUsageDashboard } from './account-usage-dashboard.js'
 import type { OpenThread } from './format.js'
 import { UsagePanel, UsageTabs } from './panel.js'
@@ -41,6 +42,14 @@ export default defineClient({
   inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'sidebarRightTabs'],
   setup(ctx, decorate, metadata) {
     const plugin = metadata?.plugin
+    const navigate = (apply: (panelId?: string) => void): void => {
+      void WorkbenchMainNavigation.open(PANEL_ID)
+        .then(result => {
+          apply(result.kind === 'native' ? undefined : result.panelId)
+          if (result.kind === 'native') ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+        })
+        .catch((error: unknown) => console.error('Could not open Usage; try opening it from the sidebar.', error))
+    }
     if (plugin !== undefined) {
       const Dashboard = (props: AccountUsageViewProps): JSX.Element => (
         <PluginQueryProvider>
@@ -51,10 +60,10 @@ export default defineClient({
       // Observe › Usage › Quota is where ai-accounts' quota views live now (docs/ade-ux §6); its old entry points and
       // saved tabs open it through this contract.
       const openQuota = (target?: UsageQuotaTarget): void => {
-        UsageQuota.go(target)
-        UsageTabs.show('quota')
-        // SAFETY: PANEL_ID is registered as a main-panel slot below.
-        ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+        navigate(panelId => {
+          UsageQuota.go(target, panelId)
+          UsageTabs.show('quota', panelId)
+        })
       }
       plugin.provide(UsageNavigation, { openQuota })
       // The former pages keep their names in the palette and land on their view.
@@ -99,6 +108,14 @@ export default defineClient({
       // SAFETY: Only ids registered as main panels reach this (the Usage page here, Traces by @dshfiles/traces).
       if (ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)) ctx.layout.selectPanel(id as MainPanelId)
     }
+    /** Show a main panel where it actually lives: a Workbench occurrence first, the native panel otherwise. */
+    const reveal = (id: string): void => {
+      void WorkbenchMainNavigation.open(id)
+        .then(result => {
+          if (result.kind === 'native') openPanel(id)
+        })
+        .catch((error: unknown) => console.error(`Could not open ${id}; open it from the sidebar.`, error))
+    }
     const threadTitle = (sessionId: string): string => {
       const summary = Object.values(ctx.sessions.list.getSnapshot().byId).find(entry => entry?.id === sessionId)
       return summary?.displayTitle ?? 'This thread'
@@ -129,14 +146,14 @@ export default defineClient({
             <ThreadCostFacet
               sessionId={props.sessionId}
               onShowRequests={sessionId => {
-                UsageTabs.showRequestsFor({ sessionId, label: threadTitle(sessionId) })
-                openPanel(PANEL_ID)
+                navigate(panelId => UsageTabs.showRequestsFor({ sessionId, label: threadTitle(sessionId) }, panelId))
               }}
-              onOpenTraces={() => openPanel(TRACES_PANEL_ID)}
+              onOpenTraces={() => reveal(TRACES_PANEL_ID)}
               onOpenAccount={accountId => {
-                UsageQuota.go({ view: 'accounts', accountId })
-                UsageTabs.show('quota')
-                openPanel(PANEL_ID)
+                navigate(panelId => {
+                  UsageQuota.go({ view: 'accounts', accountId }, panelId)
+                  UsageTabs.show('quota', panelId)
+                })
               }}
             />
           </PluginQueryProvider>
@@ -144,6 +161,20 @@ export default defineClient({
       ),
     )
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: 'Usage' }, PanelGlyph))
+    ctx.effect(
+      () =>
+        workbenchPanels().register({
+          id: `main/${PANEL_ID}`,
+          mainPanelId: PANEL_ID,
+          title: 'Usage',
+          component: decorate(props => (
+            <PluginQueryProvider>
+              <UsagePanel panelId={props.panelId} openThread={openThread} />
+            </PluginQueryProvider>
+          )),
+        }),
+      'usage: workbench panel',
+    )
     ctx.slots.inject('main', () =>
       ctx.slots.register(
         { name: 'main', key: PANEL_ID },

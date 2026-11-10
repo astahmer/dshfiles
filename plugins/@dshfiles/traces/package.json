@@ -29,6 +29,7 @@
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/sqlite-store": "workspace:*",
     "@dshfiles/usage": "workspace:*",
+    "@dshfiles/workbench": "workspace:*",
     "@effect/platform-node": "catalog:",
     "@effect/sql-sqlite-node": "catalog:",
     "effect": "catalog:"

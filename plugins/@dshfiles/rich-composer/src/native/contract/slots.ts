@@ -314,6 +314,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
         'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe' }
         'conversation.hero.options': { kind: 'list'; scope: 'session' }
+        'conversation.composer.location': { kind: 'list'; scope: 'session' }
       }
       inject: ConversationInjected
       locale: 'conversation'

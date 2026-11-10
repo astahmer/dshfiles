@@ -219,6 +219,24 @@ declare global {
   var dshfilesWorkbenchPanelsV1: WorkbenchPanelRegistry | undefined
   /** Native-aside capabilities remain available even before Workbench itself activates. */
   var dshfilesWorkbenchNativeAsideOwnersV1: Map<string, () => boolean> | undefined
+  var dshfilesWorkbenchMainNavigationV1: { open: (mainPanelId: string) => Promise<MainNavigationResult> } | undefined
+}
+
+export type MainNavigationResult = { readonly kind: 'native' } | { readonly kind: 'workbench'; readonly panelId: string }
+
+/** The frame owns the occurrence chosen for cross-plugin navigation. */
+export class WorkbenchMainNavigation {
+  static register(open: (mainPanelId: string) => Promise<MainNavigationResult>): () => void {
+    const owner = { open }
+    globalThis.dshfilesWorkbenchMainNavigationV1 = owner
+    return () => {
+      if (globalThis.dshfilesWorkbenchMainNavigationV1 === owner) globalThis.dshfilesWorkbenchMainNavigationV1 = undefined
+    }
+  }
+
+  static open(mainPanelId: string): Promise<MainNavigationResult> {
+    return globalThis.dshfilesWorkbenchMainNavigationV1?.open(mainPanelId) ?? Promise.resolve({ kind: 'native' })
+  }
 }
 
 const nativeAsideOwners = (): Map<string, () => boolean> => (globalThis.dshfilesWorkbenchNativeAsideOwnersV1 ??= new Map())

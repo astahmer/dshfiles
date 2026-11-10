@@ -16,7 +16,6 @@ import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import {
   KeyRoundIcon,
   ArrowDownWideNarrowIcon,
@@ -42,7 +41,6 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useAutosave } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, keepPreviousData, useIsMutating, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { Effect, Schema } from 'effect'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
 import { backlogApi, BacklogViews, type BacklogBackfillResult, type BacklogSummaryView } from './api.js'
@@ -61,9 +59,9 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogPeek } from './item-peek.js'
 import { ItemsView } from './items-view.js'
 import { panelDraftKey } from './panel-draft.js'
+import { panelPreferences, views } from './panel-preferences.js'
 import { BacklogProjectPaths } from './project-paths.js'
 import { ProjectsView } from './projects-view.js'
-import { BacklogShipped } from './shipped.js'
 import { AgentRunStates } from './agent-run-state.js'
 import { WorkGlyphs } from './work-glyphs.js'
 import { ShippedView } from './shipped-view.js'
@@ -86,8 +84,6 @@ type OpenThread = (sessionId: string) => void
 type View = BacklogView
 
 const MAX_ANIMATED_ITEMS = 150
-// Ready came last so the number keys of the older views stay as they were.
-const views = ['feed', 'inbox', 'items', 'board', 'projects', 'shipped', 'ready'] as const
 const viewLabels = {
   feed: 'Feed',
   inbox: 'Inbox',
@@ -107,14 +103,8 @@ const viewIcons = {
   shipped: RocketIcon,
 } as const
 
-const sortOrderSchema = Schema.Literals(['updated', 'created', 'priority', 'due'])
-const defaultSort = { feed: 'updated', inbox: 'updated', items: 'updated' } as const
-
 /** Each view, and the full search results, keeps its own "Hide agent items" choice; hiding is the default. */
 type AgentItemsScope = View | 'search'
-const hideAgentItemsDefaults = { feed: true, inbox: true, ready: true, items: true, board: true, projects: true, shipped: true, search: true } as const
-const hiddenByDefault = Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true)))
-
 const sortOrders = ['updated', 'created', 'priority', 'due'] as const
 const sortLabels = { updated: 'Last update', created: 'Created', priority: 'Priority', due: 'Due date' } satisfies Record<BacklogSort, string>
 const sortNames = {
@@ -123,47 +113,6 @@ const sortNames = {
   priority: 'priority, then oldest',
   due: 'due date, soonest first',
 } satisfies Record<BacklogSort, string>
-
-const preferencesSchema = Schema.Struct({
-  view: Schema.Literals(views),
-  groupBy: Schema.Literals(['status', 'kind', 'project', 'attention', 'priority', 'parent', 'due']),
-  showDormant: Schema.Boolean,
-  statuses: Schema.Array(Schema.Literals(BacklogItems.statuses)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
-  project: Schema.NullOr(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null))),
-  projects: Schema.Array(Schema.NullOr(Schema.String)).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
-  sort: Schema.Struct({
-    feed: sortOrderSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('updated'))),
-    inbox: sortOrderSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('updated'))),
-    items: sortOrderSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('updated'))),
-  }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaultSort))),
-  hideAgentItems: Schema.Struct({
-    feed: hiddenByDefault,
-    inbox: hiddenByDefault,
-    ready: hiddenByDefault,
-    items: hiddenByDefault,
-    board: hiddenByDefault,
-    projects: hiddenByDefault,
-    shipped: hiddenByDefault,
-    search: hiddenByDefault,
-  }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(hideAgentItemsDefaults))),
-  shippedPeriod: Schema.Literals(BacklogShipped.unitPeriods).pipe(Schema.withDecodingDefaultKey(Effect.succeed('week'))),
-})
-
-const preferences = createStoredValue({
-  key: 'dshfiles.backlog.view.v2',
-  schema: preferencesSchema,
-  fallback: {
-    view: 'feed' as const,
-    groupBy: 'status' as const,
-    showDormant: false,
-    statuses: [],
-    project: null,
-    projects: [],
-    sort: { feed: 'updated' as const, inbox: 'updated' as const, items: 'updated' as const },
-    hideAgentItems: hideAgentItemsDefaults,
-    shippedPeriod: 'week' as const,
-  },
-})
 
 /** The panel's tooltip timing and the run-state lookup its rows, cards and inspector read. */
 const PanelProviders = (props: { readonly runStateOf: Parameters<typeof WorkGlyphs.RunStateProvider>[0]['value']; readonly children: ReactNode }) => (
@@ -504,6 +453,7 @@ export const BacklogPanel = (props: {
     backfillStartError ??
     (backfill.error === null ? null : errorMessage(backfill.error, 'Could not read backfill progress.')) ??
     (backfillJobId !== null && backfill.isSuccess && backfill.data === null ? 'This backfill is no longer available in this Host process.' : null)
+  const preferences = useMemo(() => panelPreferences(props.panelId), [props.panelId])
   const stored = preferences.useValue()
   const view = stored.view
   const setPreference = (change: Partial<typeof stored>): void => {
@@ -1115,6 +1065,7 @@ export const BacklogPanel = (props: {
                   )}
                   {view === 'board' && (
                     <BoardView
+                      panelId={props.panelId}
                       triageOff={triageOff}
                       items={items}
                       openId={openId}

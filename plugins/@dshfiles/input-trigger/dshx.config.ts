@@ -6,6 +6,7 @@ export default defineConfig({
   profile: 'vanilla',
   client: {
     entry: 'src/client-entry.ts',
+    dshxRuntime: 'shared',
     shared: '@dshfiles/shared-runtime',
     bundleDependencies: ['@deepseek-ai/dsh-util-values'],
     vite: { plugins: [pluginUiVite()] },

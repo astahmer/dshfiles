@@ -13,6 +13,7 @@ import type {
 } from 'lexical'
 import { DecoratorNode } from 'lexical'
 import type { ReferenceInsert } from '../../contract/draft-editor.ts'
+import { ComposerSnippets } from '../../../composer-snippets.ts'
 import { ReferenceChip } from './ReferenceChip.tsx'
 
 /** JSON form of one chip (Lexical node serialization contract). */
@@ -158,6 +159,12 @@ export class ReferenceChipNode extends DecoratorNode<JSX.Element> {
     writable.__invalid = invalid
   }
 
+  /** Replaces the owner-scoped reference id, keeping the chip's identity. */
+  setReference(ref: string): void {
+    const writable = this.getWritable()
+    writable.__ref = ref
+  }
+
   /** Owner-resolution failure bit. */
   isInvalid(): boolean {
     return this.getLatest().__invalid
@@ -190,6 +197,8 @@ export class ReferenceChipNode extends DecoratorNode<JSX.Element> {
         label={this.__label}
         appearance={this.__appearance}
         invalid={this.__invalid}
+        nodeKey={this.__key}
+        annotation={ComposerSnippets.annotationOf({ source: this.__source, ref: this.__ref })}
       />
     )
   }

@@ -13,6 +13,7 @@ export default defineConfig({
     entry: 'src/client.ts',
     vite: { plugins: [pluginUiVite()] },
     sharedRuntime: {
+      dshxRuntime: true,
       provide: [
         '@deepseek-ai/schemastery',
         '@radix-ui/primitive',

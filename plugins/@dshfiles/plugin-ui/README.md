@@ -263,6 +263,10 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
   semantic-component allowlist.
 - `@dshfiles/ui-styles` is the only bundle that compiles the shared sheet;
   after **any** class change, rebuild it and the plugin you changed.
+- The touch baseline in `@dshfiles/ui-styles/src/client.css` is the one deliberate page-global element rule set: it
+  sets `touch-action` on every native button, link, tab and menu item, and a 16px floor on every native field under a
+  coarse pointer. Keep it inside `@layer base`; an unlayered rule there beats `dshx:touch-none` and every other
+  `dshx:` utility. Add a new page-global rule to that file only with the same reason, and list it here.
 - Avoid native JSX `<select>` controls; use `Combobox` from
   `@dshfiles/plugin-ui/components/ui/combobox` instead, matching the New Thread
   picker for consistent, searchable selection. The `no-native-select` lint rule

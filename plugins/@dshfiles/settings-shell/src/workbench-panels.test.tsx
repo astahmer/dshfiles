@@ -9,10 +9,10 @@ import type { PluginSettingsPage } from './plugin-settings.js'
 import type { SectionRow } from './settings-view.js'
 import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import {
+  createSettingsHubRouter,
   createSettingsWorkbenchHub,
   registerSettingsWorkbenchPanels,
   SETTINGS_WORKBENCH_HUB_ID,
-  type SettingsOpenRequest,
   settingsWorkbenchPanelId,
 } from './workbench-panels.js'
 import type { ShellTranslate } from './native/locales.js'
@@ -64,6 +64,26 @@ const definition = (definitions: ReadonlyMap<string, WorkbenchPanelDefinition>, 
 }
 
 describe('Settings workbench sources', () => {
+  it('routes to one visible hub and stops after disposal', () => {
+    const router = createSettingsHubRouter()
+    const hidden = vi.fn()
+    const visible = vi.fn()
+    const second = vi.fn()
+    const stopHidden = router.register({ visible: () => false, open: hidden })
+    const stopVisible = router.register({ visible: () => true, open: visible })
+    const stopSecond = router.register({ visible: () => true, open: second })
+    expect(router.open({ sectionId: 'models', query: 'test' })).toBe(true)
+    expect(hidden).not.toHaveBeenCalled()
+    expect(visible).toHaveBeenCalledWith({ sectionId: 'models', query: 'test' })
+    expect(second).not.toHaveBeenCalled()
+    stopVisible()
+    expect(router.open({ sectionId: 'general' })).toBe(true)
+    expect(second).toHaveBeenCalledOnce()
+    stopSecond()
+    stopHidden()
+    expect(router.open({})).toBe(false)
+  })
+
   it('keeps navigation inside each hub and renders the original section and plugin-page controls', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     const groups = createSnapshotStore<readonly GroupedEntries[]>(
@@ -73,10 +93,10 @@ describe('Settings workbench sources', () => {
     const close = vi.fn()
     const fields: unknown[] = []
     const t: ShellTranslate = key => key
-    const openRequests = createSnapshotStore<SettingsOpenRequest | undefined>(undefined)
+    const router = createSettingsHubRouter()
     const Hub = createSettingsWorkbenchHub({
       groups,
-      openRequests,
+      router,
       closeSettings: close,
       view: input => {
         fields.push(input.field)
@@ -130,9 +150,56 @@ describe('Settings workbench sources', () => {
       expect(host.querySelectorAll('[data-settings-view="tab"]')).toHaveLength(2)
       expect(fields.every(field => field === undefined)).toBe(true)
 
-      await act(async () => openRequests.set({ sectionId: 'plugin:example' }))
+      await act(async () => {
+        router.open({ sectionId: 'plugin:example' })
+      })
       expect(first.querySelector('input[aria-label="Original plugin control"]')).not.toBeNull()
-      expect(second.querySelector('input[aria-label="Original plugin control"]')).not.toBeNull()
+      expect(second.querySelector('input[aria-label="Original General control"]')).not.toBeNull()
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('delivers a request to the hub that becomes visible after it was asked', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    const groups = createSnapshotStore<readonly GroupedEntries[]>(
+      SettingsGroups.group({ sections: [{ id: 'general', label: 'General', order: 0 }], pages: [page], panels: new Set() }),
+    )
+    const router = createSettingsHubRouter()
+    const Hub = createSettingsWorkbenchHub({
+      groups,
+      router,
+      closeSettings: vi.fn(),
+      view: input => ({
+        ...input,
+        rows: [],
+        pluginPages: SettingsGroups.searchablePages(input.groups),
+        shortcuts: [],
+        openPanel: vi.fn(),
+        sectionEntries: [],
+        sectionTarget: undefined,
+        onReveal: vi.fn(),
+        renderSlot: () => <input aria-label="Original General control" defaultValue="original value" />,
+        renderPluginPage: current => <input aria-label="Original plugin control" defaultValue={current.title} />,
+        renderMatches: () => null,
+        sectionOwner: { close: vi.fn() },
+        t: key => key,
+        onSelect: vi.fn(),
+        onSearch: vi.fn(),
+      }),
+    })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    const hub = (visible: boolean) => <Hub panelId="settings-hidden" visible={visible} />
+    try {
+      await act(async () => root.render(hub(false)))
+      await act(async () => expect(router.open({ sectionId: 'plugin:example' })).toBe(false))
+      expect(host.querySelector('input[aria-label="Original General control"]')).not.toBeNull()
+      await act(async () => root.render(hub(true)))
+      expect(host.querySelector('input[aria-label="Original plugin control"]')).not.toBeNull()
     } finally {
       await act(async () => root.unmount())
       host.remove()

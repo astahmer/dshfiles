@@ -1,16 +1,18 @@
 import type {
   SessionCancelValue,
   SessionFollowFrame,
+  SessionForkValue,
   SessionPage,
   SessionProjectionsValue,
   SessionPromptValue,
+  SessionRenameValue,
   SessionSelectModelValue,
   SessionSummary,
   SessionUpdateQueueValue,
 } from '@deepseek-ai/dsh-api-session-controller/types'
 import { Effect, Result, Schema } from 'effect'
 
-const payloadKinds = ['summaries', 'follow-frame', 'page', 'projections', 'prompt', 'cancel', 'selected-model', 'queue'] as const
+const payloadKinds = ['summaries', 'follow-frame', 'page', 'projections', 'prompt', 'cancel', 'selected-model', 'forked', 'renamed', 'queue'] as const
 
 /** A remote runtime answered with a payload this Host cannot read; `cause` holds the schema issue. */
 export class SessionPayloadError extends Schema.TaggedError<SessionPayloadError>()('SessionPayloadError', {
@@ -49,6 +51,8 @@ export const sessionPageSchema = passthrough(
 const acceptedSchema = passthrough(Schema.Struct({ accepted: Schema.Literal(true) }))
 const modelSelectionSchema = passthrough(Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optionalKey(Schema.String) }))
 export const sessionSelectModelSchema = passthrough(Schema.Struct({ selected: modelSelectionSchema }))
+export const sessionForkSchema = passthrough(Schema.Struct({ sessionId: Schema.String }))
+export const sessionRenameSchema = passthrough(Schema.Struct({ title: Schema.String, seq: Schema.Number }))
 export const sessionProjectionsSchema = Schema.Union([
   Schema.Null,
   passthrough(Schema.Struct({ kind: Schema.Literal('sequenced'), asOfSeq: Schema.Number })),
@@ -88,6 +92,10 @@ export const projections = decoder<SessionProjectionsValue, typeof sessionProjec
 export const prompt = decoder<SessionPromptValue, typeof acceptedSchema>('prompt', acceptedSchema)
 /** An admitted cancellation receipt. */
 export const cancel = decoder<SessionCancelValue, typeof acceptedSchema>('cancel', acceptedSchema)
+/** The Session a remote fork created. */
+export const forked = decoder<SessionForkValue, typeof sessionForkSchema>('forked', sessionForkSchema)
+/** The title a remote rename committed. */
+export const renamed = decoder<SessionRenameValue, typeof sessionRenameSchema>('renamed', sessionRenameSchema)
 /** The model a remote Session's runtime selected. */
 export const selectedModel = decoder<SessionSelectModelValue, typeof sessionSelectModelSchema>('selected-model', sessionSelectModelSchema)
 /** An applied queue mutation receipt. */
