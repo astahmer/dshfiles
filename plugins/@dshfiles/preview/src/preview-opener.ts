@@ -17,6 +17,19 @@ const open = (input: { readonly pane: BrowserService | undefined; readonly url: 
   return 'tab'
 }
 
+const LOOPBACK = /^(?:localhost|127(?:\.\d{1,3}){3}|::1|\[::1\]|.+\.localhost)$/i
+
+/**
+ * Whether a URL names the DSH Host's own loopback while the GUI runs on another machine: the pane and a new tab load
+ * in the viewer's browser, so they would reach the viewer's machine instead of the Host.
+ * @param input - the GUI page's hostname and the URL to open.
+ * @returns true when only the Host can load it.
+ */
+const hostOnly = (input: { readonly guiHostname: string; readonly url: string }): boolean => {
+  if (LOOPBACK.test(input.guiHostname) || !URL.canParse(input.url)) return false
+  return LOOPBACK.test(new URL(input.url).hostname)
+}
+
 const newBrowserTab = (url: string): void => {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
@@ -27,10 +40,14 @@ const usePreviewOpener = () => {
   const pane = browser.status === 'active' ? browser.value : undefined
   const available = pane?.available ?? NO_PANE
   const paneAvailable = useSyncExternalStore(available.subscribe, available.get, available.get)
-  return { paneAvailable, open: (url: string): PreviewTarget => open({ pane, url, newTab: newBrowserTab }) }
+  return {
+    paneAvailable,
+    open: (url: string): PreviewTarget => open({ pane, url, newTab: newBrowserTab }),
+  }
 }
 
 export class PreviewOpener {
   static readonly open = open
+  static readonly hostOnly = hostOnly
   static readonly use = usePreviewOpener
 }

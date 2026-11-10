@@ -31,7 +31,7 @@ const attempt = (input: {
   readonly pages: readonly PreviewPageView[]
   readonly shown: ReadonlySet<string>
   readonly onScreen: boolean
-  readonly open: (url: string) => boolean
+  readonly open: (request: RevealRequest) => boolean
 }): RevealAttempt => {
   const listed = input.pages.flatMap(page =>
     page.revealRequestedAt === null ? [] : [{ pageId: page.pageId, url: page.url, requestedAt: page.revealRequestedAt }],
@@ -43,7 +43,7 @@ const attempt = (input: {
   if (newest === undefined || !input.onScreen) return { shown: undefined, retry: false }
   const key = revealKey({ sessionId: input.sessionId, request: newest })
   if (input.shown.has(key)) return { shown: undefined, retry: false }
-  return input.open(newest.url) ? { shown: key, retry: false } : { shown: undefined, retry: true }
+  return input.open(newest) ? { shown: key, retry: false } : { shown: undefined, retry: true }
 }
 
 const serverKey = (input: { readonly sessionId: string; readonly server: DevServerView }): string =>

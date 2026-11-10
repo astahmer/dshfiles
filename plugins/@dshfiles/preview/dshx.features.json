@@ -129,7 +129,8 @@
         "A pid recycled between the list and the stop is refused because the stop re-reads the process table and matches pid and start time.",
         "Several threads sharing one checkout all list a server no job attributes; the job owner wins when a job matches.",
         "Listening sockets no thread accounts for (other apps, system services) are not listed.",
-        "Open is disabled when no browser tab is available beside the thread on screen."
+        "Open is disabled when no browser tab is available beside the thread on screen.",
+        "From a GUI on another machine a loopback URL would load the viewer's own machine, so Open and Preview load it in a Host preview page and show it in the Agent browser, a page row drops Open for Watch, a reveal opens the Agent browser, and autoOpenDevServers falls back to the Preview button."
       ],
       "externalDependencies": [
         {
@@ -172,6 +173,12 @@
           "id": "preview.dev-server-offer",
           "file": "plugins/@dshfiles/preview/src/preview-reveal.test.ts",
           "testName": "offers the first dev server with a port that was not handled yet"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.remote-gui-open",
+          "file": "plugins/@dshfiles/preview/src/preview-opener.test.ts",
+          "testName": "marks a Host loopback URL host-only when the GUI runs on another machine"
         }
       ],
       "telemetry": [

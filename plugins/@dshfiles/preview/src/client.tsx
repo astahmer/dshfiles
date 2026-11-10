@@ -65,8 +65,13 @@ export default defineClient({
         }),
       'preview registers the Agent browser tab type',
     )
-    const openMirror = (input: { readonly sessionId: string; readonly pageId: string }): void => {
-      ctx.sidebarRight.openTab(MIRROR_TAB_KIND, { params: input })
+    const openMirror = (input: { readonly sessionId: string; readonly pageId: string }): boolean => {
+      try {
+        ctx.sidebarRight.openTab(MIRROR_TAB_KIND, { params: input })
+        return true
+      } catch {
+        return false
+      }
     }
     const MirrorBody = decorate((props: { readonly useTabInfo: UseSidebarRightTabInfo }) => {
       const info = props.useTabInfo()

@@ -14,6 +14,21 @@ const pane = (accepts: boolean): BrowserService & { readonly opened: string[] } 
   }
 }
 
+describe('PreviewOpener.hostOnly', () => {
+  it('marks a Host loopback URL host-only when the GUI runs on another machine', () => {
+    expect(PreviewOpener.hostOnly({ guiHostname: 'mac.tailnet.ts.net', url: 'http://127.0.0.1:5173/' })).toBe(true)
+    expect(PreviewOpener.hostOnly({ guiHostname: '192.168.1.20', url: 'http://localhost:3000/' })).toBe(true)
+    expect(PreviewOpener.hostOnly({ guiHostname: '192.168.1.20', url: 'http://app.localhost:3000/' })).toBe(true)
+  })
+
+  it('opens directly from a loopback GUI or for a non-loopback URL', () => {
+    expect(PreviewOpener.hostOnly({ guiHostname: '127.0.0.1', url: 'http://localhost:5173/' })).toBe(false)
+    expect(PreviewOpener.hostOnly({ guiHostname: 'localhost', url: 'http://127.0.0.1:5173/' })).toBe(false)
+    expect(PreviewOpener.hostOnly({ guiHostname: 'mac.tailnet.ts.net', url: 'http://mac.tailnet.ts.net:5173/' })).toBe(false)
+    expect(PreviewOpener.hostOnly({ guiHostname: 'mac.tailnet.ts.net', url: 'not a url' })).toBe(false)
+  })
+})
+
 describe('PreviewOpener.open', () => {
   it('opens in the pane when it accepts the URL', () => {
     const tabs: string[] = []

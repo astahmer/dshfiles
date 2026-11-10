@@ -21,6 +21,14 @@ const REVEAL_RETRIES = 20
 /** Reveals shown and dev servers previewed or dismissed in this browser, so a reload does not repeat them. */
 const storedHandled = createStoredValue({ key: 'dshfiles-preview:handled', schema: Schema.Array(Schema.String), fallback: [] })
 
+/** Whether only the Host can load this URL, as read from the GUI page this bundle runs in. */
+const hostOnly = (url: string): boolean => PreviewOpener.hostOnly({ guiHostname: window.location.hostname, url })
+
+const OpenGlyph = (props: { readonly url: string; readonly paneAvailable: boolean }): JSX.Element => {
+  if (hostOnly(props.url)) return <MonitorIcon className="dshx:size-3" />
+  return props.paneAvailable ? <PanelRightIcon className="dshx:size-3" /> : <ExternalLinkIcon className="dshx:size-3" />
+}
+
 const recordHandled = (key: string): void => {
   storedHandled.set([...storedHandled.get().filter(entry => entry !== key), key].slice(-HANDLED_LIMIT))
 }
@@ -36,8 +44,8 @@ export const DevServersChip = (props: {
   readonly sessionId: string
   /** Whether this thread is the one on screen, the only one whose pane a reveal may open. */
   readonly onScreen: boolean
-  /** Show the agent's own page, live, in the thread panel. */
-  readonly onWatch: (input: { readonly sessionId: string; readonly pageId: string }) => void
+  /** Show the agent's own page, live, in the thread panel; false when no panel is on screen to take it. */
+  readonly onWatch: (input: { readonly sessionId: string; readonly pageId: string }) => boolean
 }) => {
   const api = useApi(previewApi)
   const browser = useContract(Browser)
@@ -53,7 +61,6 @@ export const DevServersChip = (props: {
   const key = useMemo(() => DevServerPoll.serversKey(props.sessionId), [props.sessionId])
   const pagesKey = useMemo(() => DevServerPoll.pagesKey(props.sessionId), [props.sessionId])
   const opener = PreviewOpener.use()
-  const OpenIcon = opener.paneAvailable ? PanelRightIcon : ExternalLinkIcon
 
   const events = useApiEvent(previewApi, 'pagesChanged', payload => {
     if (payload.sessionId !== props.sessionId) return
@@ -85,6 +92,7 @@ export const DevServersChip = (props: {
   })
 
   const pagesData = pagesQuery.data
+  const onWatch = props.onWatch
   const pane = browser.status === 'active' ? browser.value : undefined
   useEffect(() => {
     const result = PreviewReveal.attempt({
@@ -93,20 +101,21 @@ export const DevServersChip = (props: {
       pages: pagesData?.pages ?? [],
       shown: handled,
       onScreen: props.onScreen,
-      // An agent's reveal is not a click, so a new tab would be blocked: it only goes to the pane.
-      open: url => pane?.open(url) === true,
+      // An agent's reveal is not a click, so a new tab would be blocked: it only goes to the pane, or to the mirror of
+      // its page when the pane would load the viewer's machine.
+      open: request => (hostOnly(request.url) ? onWatch({ sessionId: props.sessionId, pageId: request.pageId }) : pane?.open(request.url) === true),
     })
     if (result.shown !== undefined) recordHandled(result.shown)
     if (!result.retry || retry >= REVEAL_RETRIES) return
     const timer = setTimeout(() => setRetry(count => count + 1), REVEAL_RETRY_MS)
     return () => clearTimeout(timer)
-  }, [props.sessionId, props.onScreen, pushed, pagesData, handled, retry, pane, opener.paneAvailable])
+  }, [props.sessionId, props.onScreen, onWatch, pushed, pagesData, handled, retry, pane, opener.paneAvailable])
 
   const offer = PreviewReveal.offer({ sessionId: props.sessionId, servers: serversQuery.data?.servers ?? [], handled })
   const offerKey = offer?.key
   const offerUrl = offer?.url
   useEffect(() => {
-    if (offerKey === undefined || offerUrl === undefined || !autoOpen || !props.onScreen) return
+    if (offerKey === undefined || offerUrl === undefined || !autoOpen || !props.onScreen || hostOnly(offerUrl)) return
     if (pane?.open(offerUrl) === true) recordHandled(offerKey)
   }, [offerKey, offerUrl, autoOpen, props.onScreen, pane, opener.paneAvailable])
 
@@ -117,6 +126,20 @@ export const DevServersChip = (props: {
       void queryClient.invalidateQueries({ queryKey: key })
     },
   })
+
+  // A GUI on another machine cannot load the Host's loopback, so the Host loads it in a preview page and the mirror shows it.
+  const watchUrl = useMutation({
+    mutationFn: (url: string) => api.open({ sessionId: props.sessionId, url }),
+    onSuccess: page => {
+      setOpen(false)
+      props.onWatch({ sessionId: props.sessionId, pageId: page.pageId })
+    },
+    onError: () => setOpen(true),
+  })
+  const openUrl = (url: string): void => {
+    if (hostOnly(url)) watchUrl.mutate(url)
+    else opener.open(url)
+  }
 
   const servers = serversQuery.data?.servers ?? []
   const pages = pagesQuery.data?.pages ?? []
@@ -155,20 +178,24 @@ export const DevServersChip = (props: {
                 </span>
                 <span className="dshx:truncate dshx:text-muted-foreground dshx:text-xs">{server.command}</span>
               </div>
-              {server.ports[0] === undefined ? null : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="dshx:h-6 dshx:px-2 dshx:text-xs"
-                  onClick={() => {
-                    recordHandled(PreviewReveal.serverKey({ sessionId: props.sessionId, server }))
-                    opener.open(server.ports[0]?.url ?? '')
-                  }}
-                >
-                  <OpenIcon className="dshx:size-3" />
-                  Open
-                </Button>
-              )}
+              {server.ports.slice(0, 1).map(port => {
+                return (
+                  <Button
+                    key={port.url}
+                    variant="outline"
+                    size="sm"
+                    className="dshx:h-6 dshx:px-2 dshx:text-xs"
+                    disabled={watchUrl.isPending}
+                    onClick={() => {
+                      recordHandled(PreviewReveal.serverKey({ sessionId: props.sessionId, server }))
+                      openUrl(port.url)
+                    }}
+                  >
+                    <OpenGlyph url={port.url} paneAvailable={opener.paneAvailable} />
+                    Open
+                  </Button>
+                )
+              })}
               <Button
                 variant={armed === server.pid ? 'destructive' : 'outline'}
                 size="sm"
@@ -201,32 +228,41 @@ export const DevServersChip = (props: {
                 <MonitorIcon className="dshx:size-3" />
                 Watch
               </Button>
-              <Button variant="outline" size="sm" className="dshx:h-6 dshx:px-2 dshx:text-xs" onClick={() => opener.open(page.url)}>
-                <OpenIcon className="dshx:size-3" />
-                Open
-              </Button>
+              {hostOnly(page.url) ? null : (
+                <Button variant="outline" size="sm" className="dshx:h-6 dshx:px-2 dshx:text-xs" onClick={() => opener.open(page.url)}>
+                  <OpenGlyph url={page.url} paneAvailable={opener.paneAvailable} />
+                  Open
+                </Button>
+              )}
             </div>
           ))}
           {stop.isError ? (
             <p className="dshx:px-1 dshx:text-destructive dshx:text-xs">{errorMessage(stop.error, 'Stopping failed.')} Refresh the list and try again.</p>
           ) : null}
+          {watchUrl.isError ? (
+            <p className="dshx:px-1 dshx:text-destructive dshx:text-xs">
+              {errorMessage(watchUrl.error, 'The preview browser could not open this server.')} Check Settings › dshfiles-preview, or open it on the DSH
+              machine.
+            </p>
+          ) : null}
         </section>
       </PopoverContent>
     </Popover>
   )
-  if (offer === undefined || autoOpen) return popover
+  if (offer === undefined || (autoOpen && !hostOnly(offer.url))) return popover
   return (
     <div className="dshx-root dshx:flex dshx:items-center dshx:gap-0.5">
       <Button
         variant="outline"
         size="sm"
         className="dshx:h-6 dshx:gap-1 dshx:px-1.5 dshx:text-xs"
+        disabled={watchUrl.isPending}
         onClick={() => {
           recordHandled(offer.key)
-          opener.open(offer.url)
+          openUrl(offer.url)
         }}
       >
-        <OpenIcon className="dshx:size-3" />
+        <OpenGlyph url={offer.url} paneAvailable={opener.paneAvailable} />
         Preview
       </Button>
       <Button variant="ghost" size="icon" className="dshx:size-6" aria-label="Dismiss preview" onClick={() => recordHandled(offer.key)}>

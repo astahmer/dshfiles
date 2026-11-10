@@ -15,9 +15,9 @@ const pane = (accepts: readonly boolean[]) => {
   let call = 0
   return {
     opened,
-    open: (url: string): boolean => {
+    open: (request: { readonly url: string }): boolean => {
       const accepted = accepts[call++] ?? false
-      if (accepted) opened.push(url)
+      if (accepted) opened.push(request.url)
       return accepted
     },
   }
