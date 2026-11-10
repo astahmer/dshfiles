@@ -9,8 +9,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { SearchIndex } from '../src/index-db.js'
 import { runIngestPass } from '../src/ingest.js'
+import { runWithIndex } from './index-harness.js'
 import { writeSessionLog } from './session-log-fixture.js'
 
 const sessions = Number(process.env.IDLE_BENCH_SESSIONS ?? '2800')
@@ -30,27 +30,32 @@ describe.skipIf(process.env.IDLE_BENCH !== '1')('idle ingest pass', () => {
       const writeBytes = (): number => Number(/^write_bytes: (\d+)$/m.exec(readFileSync('/proc/self/io', 'utf8'))?.[1] ?? 0)
       const writtenBefore = writeBytes()
       const buildStartedAt = performance.now()
-      const index = new SearchIndex(join(root, 'index.sqlite'))
-      // The worker interleaves the backfills with ingest; a first build runs them until they report done.
-      for (;;) {
-        const backfilled = index.backfillConversation(2_000) && index.backfillRowMap(2_000)
-        const result = await runIngestPass({ index, root: corpus, budgetMs: 60_000, windowBytes: 2 * 1024 * 1024, now: Date.now })
-        if (backfilled && result.complete && result.behindSessions === 0) break
-      }
-      const firstBuildMs = Math.round(performance.now() - buildStartedAt)
+      const measured = await runWithIndex(join(root, 'index.sqlite'), function* (index) {
+        // The worker interleaves the backfills with ingest; a first build runs them until they report done.
+        for (;;) {
+          const backfilled = (yield* index.backfillConversation(2_000)) && (yield* index.backfillRowMap(2_000))
+          const result = yield* runIngestPass({ index, root: corpus, budgetMs: 60_000, windowBytes: 2 * 1024 * 1024, now: Date.now })
+          if (backfilled && result.complete && result.behindSessions === 0) break
+        }
+        const firstBuildMs = Math.round(performance.now() - buildStartedAt)
+        const wall: number[] = []
+        const cpu: number[] = []
+        for (let pass = 0; pass < passes; pass += 1) {
+          const startedAt = performance.now()
+          const usage = process.cpuUsage()
+          const result = yield* runIngestPass({ index, root: corpus, budgetMs: 1_000, windowBytes: 2 * 1024 * 1024, now: Date.now })
+          const spent = process.cpuUsage(usage)
+          wall.push(performance.now() - startedAt)
+          cpu.push((spent.user + spent.system) / 1_000)
+          expect(result.ingested).toBe(0)
+        }
+        return { wall, cpu, firstBuildMs }
+      })
+      const wall = measured.wall
+      const cpu = measured.cpu
+      const firstBuildMs = measured.firstBuildMs
       const firstBuildWrittenMb = Number(((writeBytes() - writtenBefore) / 1024 / 1024).toFixed(1))
       const indexMb = Number((statSync(join(root, 'index.sqlite')).size / 1024 / 1024).toFixed(1))
-      const wall: number[] = []
-      const cpu: number[] = []
-      for (let pass = 0; pass < passes; pass += 1) {
-        const startedAt = performance.now()
-        const usage = process.cpuUsage()
-        const result = await runIngestPass({ index, root: corpus, budgetMs: 1_000, windowBytes: 2 * 1024 * 1024, now: Date.now })
-        const spent = process.cpuUsage(usage)
-        wall.push(performance.now() - startedAt)
-        cpu.push((spent.user + spent.system) / 1_000)
-        expect(result.ingested).toBe(0)
-      }
       const median = (values: readonly number[]): number => [...values].sort((left, right) => left - right)[Math.floor(values.length / 2)] ?? 0
       console.log(
         JSON.stringify({
@@ -62,7 +67,6 @@ describe.skipIf(process.env.IDLE_BENCH !== '1')('idle ingest pass', () => {
           cpuMsMedian: Number(median(cpu).toFixed(1)),
         }),
       )
-      index.close()
     } finally {
       await rm(root, { recursive: true, force: true })
     }

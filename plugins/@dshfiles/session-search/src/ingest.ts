@@ -4,16 +4,16 @@
  * responsive to searches between passes, and every session commits on its own, so an interrupted pass resumes instead
  * of restarting the corpus.
  */
-import { open } from 'node:fs/promises'
-import { setImmediate } from 'node:timers/promises'
+import { closeSync, openSync, readSync } from 'node:fs'
 import { buildSessionEventSearchDocuments, extractSessionEventText } from '@deepseek-ai/dsh-session-query'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import * as Duration from 'effect/Duration'
+import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { FrameLog, type SessionLogFile } from './frame-log.js'
-import type { DocumentRow, SearchIndex, SessionCursor } from './index-db.js'
+import type { BatchInput, DocumentRow, SearchIndex, SessionCursor } from './index-db.js'
 import { withoutUndefined } from './optional-fields.js'
 import { sessionHeaderSchema, type SessionHeaderRow } from './protocol.js'
 import { DocumentText } from './text.js'
@@ -38,6 +38,7 @@ export interface IngestPassOptions {
   readonly now: () => number
   /** Sessions the user archived: cold history, dropped from the index and indexed again only when asked for by id. */
   readonly archived?: ReadonlySet<string>
+  readonly isArchived?: (sessionId: string) => Effect.Effect<boolean>
 }
 
 const GROUP_SESSIONS = 64
@@ -86,30 +87,30 @@ const toHeader = (raw: unknown, sessionId: string): SessionHeaderRow => {
  * sized to what the file still holds, not to the window: zero-filling a 2 MiB buffer per small log was 13 % of a first
  * build's CPU.
  */
-const readWindow = async (path: string, from: number, windowBytes: number, fileSize: number): Promise<Buffer> => {
+const readWindow = (path: string, from: number, windowBytes: number, fileSize: number): Buffer => {
   const length = Math.max(0, Math.min(windowBytes, fileSize - from))
   if (length === 0) return Buffer.alloc(0)
-  const handle = await open(path, 'r')
+  const handle = openSync(path, 'r')
   try {
     const buffer = Buffer.allocUnsafe(length)
-    const { bytesRead } = await handle.read(buffer, 0, length, from)
+    const bytesRead = readSync(handle, buffer, 0, length, from)
     return buffer.subarray(0, bytesRead)
   } finally {
-    await handle.close()
+    closeSync(handle)
   }
 }
 
-const ingestSession = async (options: IngestPassOptions & { readonly log: SessionLogFile; readonly cursor: SessionCursor | undefined }): Promise<number> => {
-  const { index, log, cursor, windowBytes, now } = options
+const stageSession = (options: IngestPassOptions & { readonly log: SessionLogFile; readonly cursor: SessionCursor | undefined }): BatchInput => {
+  const { log, cursor, windowBytes, now } = options
   const replace = cursor === undefined || cursor.dev !== log.dev || cursor.ino !== log.ino || log.size < cursor.offset
   const from = replace ? 0 : cursor.offset
   // A frame larger than the window decodes nothing; widen until one fits or the rest of the log is read.
   let size = windowBytes
-  let window = await readWindow(log.path, from, size, log.size)
+  let window = readWindow(log.path, from, size, log.size)
   let decoded = FrameLog.decodeFrom(window, 0)
   while (decoded.offset === 0 && from + size < log.size) {
     size *= 2
-    window = await readWindow(log.path, from, size, log.size)
+    window = readWindow(log.path, from, size, log.size)
     decoded = FrameLog.decodeFrom(window, 0)
   }
   const events = parseEvents(decoded.text, replace)
@@ -138,91 +139,131 @@ const ingestSession = async (options: IngestPassOptions & { readonly log: Sessio
       })
     }
   }
-  const header = await FrameLog.readHeader(log.path)
-  index.commitBatch({
+  const header = FrameLog.readHeader(log.path)
+  return {
     header: toHeader(header, log.sessionId),
     cursor: { logPath: log.path, dev: log.dev, ino: log.ino, offset: from + decoded.offset, size: log.size, mtimeNs: log.mtimeNs },
     documents: rows,
     replace,
     now: now(),
-  })
-  return rows.length
+  }
 }
 
-export const runIngestPass = async (options: IngestPassOptions): Promise<IngestPassResult> => {
+const sameCursor = (left: SessionCursor | undefined, right: SessionCursor | undefined): boolean =>
+  left === undefined
+    ? right === undefined
+    : right !== undefined &&
+      left.id === right.id &&
+      left.logPath === right.logPath &&
+      left.dev === right.dev &&
+      left.ino === right.ino &&
+      left.offset === right.offset &&
+      left.size === right.size &&
+      left.mtimeNs === right.mtimeNs
+
+export const runIngestPass = Effect.fn('session-search ingest pass')(function* (options: IngestPassOptions) {
   const startedAt = options.now()
-  const logs = await FrameLog.list(options.root)
-  const cursors = options.index.cursors()
+  const logs = FrameLog.list(options.root)
+  const cursors = yield* options.index.cursors()
   let ingested = 0
   let documents = 0
   let behindSessions = 0
   let behindBytes = 0
   let pruned = 0
   let complete = true
-  // Sessions commit in groups of up to GROUP_SESSIONS or GROUP_MS; searches still run between sessions inside a group.
-  let grouped = 0
+  let grouped: { readonly batch: BatchInput; readonly cursor: SessionCursor | undefined }[] = []
   let groupStartedAt = 0
-  try {
-    for (const log of logs) {
-      if (options.archived?.has(log.sessionId) === true) {
-        // Cold by the user's own decision: keep no documents for it, and index it again only for a targeted search.
-        if (cursors.has(log.sessionId)) {
-          options.index.forget(log.sessionId)
-          pruned += 1
+  let stagedBytes = 0
+  const commitGroup = () =>
+    options.index.sql.withTransaction(
+      Effect.gen(function* () {
+        let count = 0
+        let written = 0
+        let skipped = false
+        for (const item of grouped) {
+          const current = yield* options.index.cursor(item.batch.header.id)
+          const archived =
+            options.isArchived === undefined ? options.archived?.has(item.batch.header.id) === true : yield* options.isArchived(item.batch.header.id)
+          if (archived || !sameCursor(current, item.cursor)) {
+            skipped = true
+            continue
+          }
+          yield* options.index.commitBatch(item.batch)
+          count += 1
+          written += item.batch.documents.length
         }
-        continue
+        return { count, written, skipped }
+      }),
+    )
+  for (const log of logs) {
+    if (options.archived?.has(log.sessionId) === true) {
+      if (cursors.has(log.sessionId)) {
+        yield* options.index.forget(log.sessionId)
+        pruned += 1
       }
-      const cursor = cursors.get(log.sessionId)
-      const unchanged =
-        cursor !== undefined &&
-        cursor.dev === log.dev &&
-        cursor.ino === log.ino &&
-        cursor.size === log.size &&
-        cursor.mtimeNs === log.mtimeNs &&
-        cursor.offset >= log.size
-      if (unchanged) continue
-      behindSessions += 1
-      behindBytes += Math.max(0, log.size - (cursor?.offset ?? 0))
-      if (!complete) continue
-      if (options.now() - startedAt >= options.budgetMs && ingested > 0) {
-        complete = false
-        continue
-      }
-      if (grouped === 0) {
-        options.index.beginGroup()
-        groupStartedAt = options.now()
-      }
-      documents += await ingestSession({ ...options, log, cursor })
-      ingested += 1
-      grouped += 1
-      if (grouped >= GROUP_SESSIONS || options.now() - groupStartedAt >= GROUP_MS) {
-        options.index.commitGroup()
-        grouped = 0
-      }
-      // Searches queue on this thread's message port; let them run between sessions.
-      await setImmediate()
+      continue
     }
-    options.index.commitGroup()
-  } catch (error) {
-    options.index.rollbackGroup()
-    throw error
+    const cursor = cursors.get(log.sessionId)
+    const unchanged =
+      cursor !== undefined &&
+      cursor.dev === log.dev &&
+      cursor.ino === log.ino &&
+      cursor.size === log.size &&
+      cursor.mtimeNs === log.mtimeNs &&
+      cursor.offset >= log.size
+    if (unchanged) continue
+    behindSessions += 1
+    behindBytes += Math.max(0, log.size - (cursor?.offset ?? 0))
+    if (!complete) continue
+    if (options.now() - startedAt >= options.budgetMs && ingested + grouped.length > 0) {
+      complete = false
+      continue
+    }
+    if (grouped.length === 0) groupStartedAt = options.now()
+    const batch = stageSession({ ...options, log, cursor })
+    grouped.push({ batch, cursor })
+    stagedBytes += batch.documents.reduce((sum, document) => sum + Buffer.byteLength(document.text), 0)
+    if (grouped.length >= GROUP_SESSIONS || options.now() - groupStartedAt >= GROUP_MS || stagedBytes >= 8 * 1024 * 1024) {
+      const committed = yield* commitGroup()
+      ingested += committed.count
+      documents += committed.written
+      if (committed.skipped) complete = false
+      grouped = []
+      stagedBytes = 0
+    }
+    yield* Effect.yieldNow
+  }
+  if (grouped.length > 0) {
+    const committed = yield* commitGroup()
+    ingested += committed.count
+    documents += committed.written
+    if (committed.skipped) complete = false
   }
   return { scanned: logs.length, ingested, documents, behindSessions, behindBytes, pruned, complete }
-}
+})
 
 /**
  * Index exactly the Sessions a caller asked about, even archived ones. A targeted search is the slow path back into cold
  * history, so it pays for the read instead of the whole corpus staying indexed.
  */
-export const indexSessions = async (options: IngestPassOptions, sessionIds: readonly string[]): Promise<number> => {
-  const wanted = new Set(sessionIds.filter(sessionId => options.index.cursor(sessionId) === undefined))
+export const indexSessions = Effect.fn('session-search index sessions')(function* (options: IngestPassOptions, sessionIds: readonly string[]) {
+  const cursors = yield* options.index.cursors()
+  const wanted = new Set(sessionIds.filter(sessionId => !cursors.has(sessionId)))
   if (wanted.size === 0) return 0
-  const logs = await FrameLog.list(options.root)
+  const logs = FrameLog.list(options.root)
   let documents = 0
   for (const log of logs) {
     if (!wanted.delete(log.sessionId)) continue
-    documents += await ingestSession({ ...options, log, cursor: undefined })
+    const batch = stageSession({ ...options, log, cursor: undefined })
+    const written = yield* options.index.sql.withTransaction(
+      Effect.gen(function* () {
+        if ((yield* options.index.cursor(log.sessionId)) !== undefined) return false
+        yield* options.index.commitBatch(batch)
+        return true
+      }),
+    )
+    if (written) documents += batch.documents.length
     if (wanted.size === 0) break
   }
   return documents
-}
+})

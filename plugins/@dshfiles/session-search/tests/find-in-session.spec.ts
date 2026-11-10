@@ -3,17 +3,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { findExpression } from '../src/find-query.js'
-import { SearchIndex } from '../src/index-db.js'
+import type { SearchIndex } from '../src/index-db.js'
+import { runWithIndex } from './index-harness.js'
 
 const roots: string[] = []
 afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
-const openIndex = async (): Promise<SearchIndex> => {
+const openIndex = async (): Promise<string> => {
   const root = await mkdtemp(join(tmpdir(), 'session-search-find-'))
   roots.push(root)
-  return new SearchIndex(join(root, 'index.sqlite'))
+  return join(root, 'index.sqlite')
 }
 
 const commit = (index: SearchIndex, sessionId: string, documents: readonly { readonly type: string; readonly surface: string; readonly text: string }[]) =>
@@ -40,19 +41,19 @@ describe('findExpression', () => {
 
 describe('SearchIndex.findInSession', () => {
   it('returns every matching current event of one Session in seq order, with a snippet', async () => {
-    const index = await openIndex()
-    commit(index, 'session-a', [
-      { type: 'user/message', surface: 'current', text: 'Please investigate the quartz rollout.' },
-      { type: 'assistant/thinking', surface: 'current', text: 'The quartz job retries forever.' },
-      { type: 'tool/result', surface: 'current', text: 'nothing relevant here' },
-      { type: 'tool/result', surface: 'shadowed', text: 'quartz in a rewound branch' },
-      { type: 'assistant/message', surface: 'current', text: 'Fixed the quartzite retry loop.' },
-    ])
-    commit(index, 'session-b', [{ type: 'user/message', surface: 'current', text: 'quartz elsewhere' }])
+    const path = await openIndex()
+    const found = await runWithIndex(path, function* (index) {
+      yield* commit(index, 'session-a', [
+        { type: 'user/message', surface: 'current', text: 'Please investigate the quartz rollout.' },
+        { type: 'assistant/thinking', surface: 'current', text: 'The quartz job retries forever.' },
+        { type: 'tool/result', surface: 'current', text: 'nothing relevant here' },
+        { type: 'tool/result', surface: 'shadowed', text: 'quartz in a rewound branch' },
+        { type: 'assistant/message', surface: 'current', text: 'Fixed the quartzite retry loop.' },
+      ])
+      yield* commit(index, 'session-b', [{ type: 'user/message', surface: 'current', text: 'quartz elsewhere' }])
+      return yield* index.findInSession({ sessionId: 'session-a', query: findExpression('quartz') ?? '', limit: 10 })
+    })
 
-    const query = findExpression('quartz')
-    expect(query).not.toBeNull()
-    const found = index.findInSession({ sessionId: 'session-a', query: query ?? '', limit: 10 })
     expect(found.hasMore).toBe(false)
     expect(found.matches.map(match => [match.seq, match.type])).toEqual([
       [0, 'user/message'],
@@ -60,21 +61,23 @@ describe('SearchIndex.findInSession', () => {
       [4, 'assistant/message'],
     ])
     expect(found.matches[1]?.snippet).toBe('The quartz job retries forever.')
-    index.close()
   })
 
   it('needs every word and reports more matches than the limit', async () => {
-    const index = await openIndex()
-    commit(
-      index,
-      'session-a',
-      Array.from({ length: 5 }, (_, seq) => ({ type: 'assistant/message', surface: 'current', text: `step ${String(seq)} retry storm` })),
-    )
-    const query = findExpression('retry sto') ?? ''
-    const page = index.findInSession({ sessionId: 'session-a', query, limit: 3 })
-    expect(page.matches.map(match => match.seq)).toEqual([0, 1, 2])
-    expect(page.hasMore).toBe(true)
-    expect(index.findInSession({ sessionId: 'session-a', query: findExpression('retry calm') ?? '', limit: 3 }).matches).toEqual([])
-    index.close()
+    const path = await openIndex()
+    const outcome = await runWithIndex(path, function* (index) {
+      yield* commit(
+        index,
+        'session-a',
+        Array.from({ length: 5 }, (_, seq) => ({ type: 'assistant/message', surface: 'current', text: `step ${String(seq)} retry storm` })),
+      )
+      const page = yield* index.findInSession({ sessionId: 'session-a', query: findExpression('retry sto') ?? '', limit: 3 })
+      const unrelated = yield* index.findInSession({ sessionId: 'session-a', query: findExpression('retry calm') ?? '', limit: 3 })
+      return { page, unrelated }
+    })
+
+    expect(outcome.page.matches.map(match => match.seq)).toEqual([0, 1, 2])
+    expect(outcome.page.hasMore).toBe(true)
+    expect(outcome.unrelated.matches).toEqual([])
   })
 })

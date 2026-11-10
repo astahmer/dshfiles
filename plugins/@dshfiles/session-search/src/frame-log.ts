@@ -4,8 +4,7 @@
  * what the log gained. That resume property is what makes incremental ingest possible; a one-shot decoder stops at the
  * first frame (measured: 208 bytes for a 26 MB log) and must not be used here.
  */
-import { readdirSync, statSync, type Dirent } from 'node:fs'
-import { open, readdir } from 'node:fs/promises'
+import { closeSync, openSync, readdirSync, readSync, statSync, type Dirent } from 'node:fs'
 import { basename } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
 import { decodeJson } from '@dshfiles/dshx/json'
@@ -122,17 +121,17 @@ export class FrameLog {
   }
 
   /** The header is the first line the writer emits, so it lives inside the log's first frame. */
-  static async readHeader(path: string): Promise<SessionHeaderRow> {
-    const handle = await open(path, 'r')
+  static readHeader(path: string): SessionHeaderRow {
+    const handle = openSync(path, 'r')
     try {
-      const { size } = await handle.stat()
+      const { size } = statSync(path)
       // A frame is not bounded by HEADER_BYTES: the writer batches a session's first events with its header, so the first
       // frame is routinely larger than 64 KiB (2026-11-06: a 454 KiB frame stopped ingest on that log every pass, and
       // one unreadable session aborted the whole pass, leaving the index 1125 sessions behind). Grow the window until a
       // complete frame is in it instead of declaring the log corrupt.
       for (let window = HEADER_BYTES; ; window *= 2) {
         const buffer = Buffer.alloc(window)
-        const { bytesRead } = await handle.read(buffer, 0, window, 0)
+        const bytesRead = readSync(handle, buffer, 0, window, 0)
         const view = buffer.subarray(0, bytesRead)
         const first = FrameLog.scan(view)[0]
         if (first !== undefined) {
@@ -143,13 +142,13 @@ export class FrameLog {
         if (window >= size) throw new Error(`no complete Zstandard frame in the ${String(size)}-byte log ${path}`)
       }
     } finally {
-      await handle.close()
+      closeSync(handle)
     }
   }
 
   /** The log generation the persistence backend reads for a session directory: the highest `session[.vN].jsonl[.zstd]`. */
-  static async currentLog(sessionDirectory: string): Promise<string | undefined> {
-    return FrameLog.#bestLog(sessionDirectory, await readdir(sessionDirectory).catch(() => []))
+  static currentLog(sessionDirectory: string): string | undefined {
+    return FrameLog.#currentLogSync(sessionDirectory)
   }
 
   /**
@@ -160,7 +159,7 @@ export class FrameLog {
    * round trips; the same walk with sync calls costs 50 ms CPU and 24 ms wall, which is also the longest a search
    * waits behind it.
    */
-  static async list(root: string): Promise<readonly SessionLogFile[]> {
+  static list(root: string): readonly SessionLogFile[] {
     const logs: SessionLogFile[] = []
     for (const project of FrameLog.#directories(root)) {
       for (const sessionDirectory of FrameLog.#directories(project)) {

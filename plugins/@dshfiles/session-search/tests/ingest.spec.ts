@@ -2,12 +2,12 @@ import { appendFile, mkdtemp, rm } from 'node:fs/promises'
 import { constants, zstdCompressSync } from 'node:zlib'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { afterEach, expect, it } from 'vitest'
-import { SearchIndex } from '../src/index-db.js'
+import { Effect } from 'effect'
 import * as Duration from 'effect/Duration'
 import { IdleBackoff, indexSessions, runIngestPass } from '../src/ingest.js'
 import { writeSessionLog } from './session-log-fixture.js'
+import { runWithIndex } from './index-harness.js'
 
 const roots: string[] = []
 
@@ -20,18 +20,20 @@ it('ingests a log whose frames are larger than the read window', async () => {
   roots.push(root)
   const sessionId = 'session-dddddddd-0000-4000-8000-000000000000'
   await writeSessionLog({ directory: join(root, 'sessions', 'project', sessionId), exchanges: 4, sessionId })
-  const index = new SearchIndex(join(root, 'index.sqlite'))
 
-  let documents = 0
-  for (let pass = 0; pass < 50; pass += 1) {
-    const result = await runIngestPass({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 16, now: Date.now })
-    documents += result.documents
-    if (result.behindSessions === 0) break
-  }
+  const outcome = await runWithIndex(join(root, 'index.sqlite'), function* (index) {
+    let documents = 0
+    for (let pass = 0; pass < 50; pass += 1) {
+      const result = yield* runIngestPass({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 16, now: Date.now })
+      documents += result.documents
+      if (result.behindSessions === 0) break
+    }
+    const search = yield* index.searchSessions({ query: 'retry storm', limit: 5 })
+    return { documents, search }
+  })
 
-  expect(documents).toBeGreaterThan(0)
-  expect(index.searchSessions({ query: 'retry storm', limit: 5 }).matches.map(match => match.header.id)).toContain(sessionId)
-  index.close()
+  expect(outcome.documents).toBeGreaterThan(0)
+  expect(outcome.search.matches.map(match => match.header.id)).toContain(sessionId)
 })
 
 it('indexes an event the writer split across frames and catches the log up', async () => {
@@ -48,15 +50,17 @@ it('indexes an event the writer split across frames and catches the log up', asy
   })}\n`
   const frame = (text: string): Buffer => zstdCompressSync(Buffer.from(text, 'utf8'), { params: { [constants.ZSTD_c_checksumFlag]: 1 } })
   await appendFile(path, Buffer.concat([frame(line.slice(0, 40)), frame(line.slice(40))]))
-  const index = new SearchIndex(join(root, 'index.sqlite'))
 
-  let behind = 1
-  for (let pass = 0; pass < 10 && behind > 0; pass += 1)
-    behind = (await runIngestPass({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1024 * 1024, now: Date.now })).behindSessions
+  const outcome = await runWithIndex(join(root, 'index.sqlite'), function* (index) {
+    let behind = 1
+    for (let pass = 0; pass < 10 && behind > 0; pass += 1)
+      behind = (yield* runIngestPass({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1024 * 1024, now: Date.now })).behindSessions
+    const search = yield* index.searchSessions({ query: 'zanzibar', limit: 5 })
+    return { behind, search }
+  })
 
-  expect(behind).toBe(0)
-  expect(index.searchSessions({ query: 'zanzibar', limit: 5 }).matches.map(match => match.header.id)).toEqual([sessionId])
-  index.close()
+  expect(outcome.behind).toBe(0)
+  expect(outcome.search.matches.map(match => match.header.id)).toEqual([sessionId])
 })
 
 it('drops an archived Session’s documents and indexes it again only for a targeted search', async () => {
@@ -64,36 +68,38 @@ it('drops an archived Session’s documents and indexes it again only for a targ
   roots.push(root)
   const sessionId = 'session-ffffffff-0000-4000-8000-000000000000'
   await writeSessionLog({ directory: join(root, 'sessions', 'project', sessionId), exchanges: 2, sessionId })
-  const index = new SearchIndex(join(root, 'index.sqlite'))
-  const ingest = (archived?: ReadonlySet<string>) => {
-    const options = { index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1024 * 1024, now: Date.now }
-    return runIngestPass(archived === undefined ? options : { ...options, archived })
-  }
 
-  expect((await ingest()).ingested).toBe(1)
-  expect(index.searchSessions({ query: 'retry storm', limit: 5 }).matches).toHaveLength(1)
+  const outcome = await runWithIndex(join(root, 'index.sqlite'), function* (index) {
+    const ingest = (archived?: ReadonlySet<string>) => {
+      const options = { index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1024 * 1024, now: Date.now }
+      return runIngestPass(archived === undefined ? options : { ...options, archived })
+    }
 
-  const cold = await ingest(new Set([sessionId]))
-  expect(cold.pruned).toBe(1)
-  expect(index.searchSessions({ query: 'retry storm', limit: 5 }).matches).toHaveLength(0)
+    const first = yield* ingest()
+    const firstSearch = yield* index.searchSessions({ query: 'retry storm', limit: 5 })
+    const cold = yield* ingest(new Set([sessionId]))
+    const coldSearch = yield* index.searchSessions({ query: 'retry storm', limit: 5 })
+    // Cold stays out of a broad pass, and the targeted path is what reads it back.
+    const second = yield* ingest(new Set([sessionId]))
+    yield* indexSessions({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1024 * 1024, now: Date.now, archived: new Set([sessionId]) }, [
+      sessionId,
+    ])
+    const targeted = yield* index.searchSessions({ query: 'retry storm', limit: 5 })
+    return { first, firstSearch, cold, coldSearch, second, targeted }
+  })
 
-  // Cold stays out of a broad pass, and the targeted path is what reads it back.
-  expect((await ingest(new Set([sessionId]))).ingested).toBe(0)
-  await indexSessions({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1024 * 1024, now: Date.now, archived: new Set([sessionId]) }, [
-    sessionId,
-  ])
-  expect(index.searchSessions({ query: 'retry storm', limit: 5 }).matches.map(match => match.header.id)).toEqual([sessionId])
-  index.close()
+  expect(outcome.first.ingested).toBe(1)
+  expect(outcome.firstSearch.matches).toHaveLength(1)
+  expect(outcome.cold.pruned).toBe(1)
+  expect(outcome.coldSearch.matches).toHaveLength(0)
+  expect(outcome.second.ingested).toBe(0)
+  expect(outcome.targeted.matches.map(match => match.header.id)).toEqual([sessionId])
 })
 
 it('rolls back every session and FTS row when a grouped write fails', async () => {
   const root = await mkdtemp(join(tmpdir(), 'session-search-rollback-'))
   roots.push(root)
   const path = join(root, 'index.sqlite')
-  const index = new SearchIndex(path)
-  const raw = new DatabaseSync(path)
-  raw.exec("CREATE TRIGGER fail_second BEFORE INSERT ON sessions WHEN NEW.id = 'second' BEGIN SELECT RAISE(ABORT, 'forced failure'); END")
-  raw.close()
   const batch = (id: string) => ({
     header: { id, version: 4, createdAt: 0, isSeeded: false },
     cursor: { logPath: id, dev: '1', ino: '1', offset: 1, size: 1, mtimeNs: '1' },
@@ -101,14 +107,27 @@ it('rolls back every session and FTS row when a grouped write fails', async () =
     replace: true,
     now: 1,
   })
-  index.beginGroup()
-  index.commitBatch(batch('first'))
-  expect(() => index.commitBatch(batch('second'))).toThrow('forced failure')
-  index.rollbackGroup()
-  expect(index.cursor('first')).toBeUndefined()
-  expect(index.cursor('second')).toBeUndefined()
-  expect(index.searchSessions({ query: 'rollbackterm', limit: 5 }).matches).toEqual([])
-  index.close()
+
+  const outcome = await runWithIndex(path, function* (index) {
+    yield* index.sql.unsafe("CREATE TRIGGER fail_second BEFORE INSERT ON sessions WHEN NEW.id = 'second' BEGIN SELECT RAISE(ABORT, 'forced failure'); END")
+    const failure = yield* index.sql
+      .withTransaction(
+        Effect.gen(function* () {
+          yield* index.commitBatch(batch('first'))
+          yield* index.commitBatch(batch('second'))
+        }),
+      )
+      .pipe(Effect.flip)
+    const first = yield* index.cursor('first')
+    const second = yield* index.cursor('second')
+    const search = yield* index.searchSessions({ query: 'rollbackterm', limit: 5 })
+    return { failure, first, second, search }
+  })
+
+  expect(outcome.failure).toMatchObject({ _tag: 'SqlError', reason: { _tag: 'ConstraintError' } })
+  expect(outcome.first).toBeUndefined()
+  expect(outcome.second).toBeUndefined()
+  expect(outcome.search.matches).toEqual([])
 })
 
 it('backs the idle poll off from 5 s to a minute', () => {
@@ -121,12 +140,17 @@ it('reads every cursor at once, as the per-session lookups do', async () => {
   roots.push(root)
   const ids = ['session-aaaaaaa1-0000-4000-8000-000000000000', 'session-aaaaaaa2-0000-4000-8000-000000000000']
   for (const sessionId of ids) await writeSessionLog({ directory: join(root, 'sessions', 'project', sessionId), exchanges: 2, sessionId })
-  const index = new SearchIndex(join(root, 'index.sqlite'))
-  await runIngestPass({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1 << 20, now: Date.now })
-  const cursors = index.cursors()
-  expect([...cursors.keys()].sort()).toEqual(ids)
-  for (const sessionId of ids) expect(cursors.get(sessionId)).toEqual(index.cursor(sessionId))
-  const idle = await runIngestPass({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1 << 20, now: Date.now })
-  expect(idle).toMatchObject({ scanned: 2, ingested: 0, behindSessions: 0 })
-  index.close()
+
+  const outcome = await runWithIndex(join(root, 'index.sqlite'), function* (index) {
+    yield* runIngestPass({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1 << 20, now: Date.now })
+    const cursors = yield* index.cursors()
+    const perSession: (unknown | undefined)[] = []
+    for (const sessionId of ids) perSession.push(yield* index.cursor(sessionId))
+    const idle = yield* runIngestPass({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 1 << 20, now: Date.now })
+    return { cursors, perSession, idle }
+  })
+
+  expect([...outcome.cursors.keys()].sort()).toEqual(ids)
+  for (const [position, sessionId] of ids.entries()) expect(outcome.cursors.get(sessionId)).toEqual(outcome.perSession[position])
+  expect(outcome.idle).toMatchObject({ scanned: 2, ingested: 0, behindSessions: 0 })
 })

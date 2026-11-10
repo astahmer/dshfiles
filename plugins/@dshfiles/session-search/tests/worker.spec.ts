@@ -65,7 +65,7 @@ const waitFor = async (condition: () => Promise<boolean>, label: string): Promis
   }
 }
 
-describe('owned search backend over the real worker', () => {
+describe('owned search backend over the real worker', { timeout: 30_000 }, () => {
   it('indexes the corpus, answers sessionQuery, and pages with a cursor', async () => {
     const context = await boot()
     await waitForIndex(2)

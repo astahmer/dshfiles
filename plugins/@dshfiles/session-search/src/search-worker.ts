@@ -7,12 +7,16 @@
  */
 import { workerData } from 'node:worker_threads'
 
+import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import * as NodeRuntime from '@effect/platform-node/NodeRuntime'
 import * as NodeWorkerRunner from '@effect/platform-node/NodeWorkerRunner'
+import { SqliteStore } from '@dshfiles/sqlite-store'
 import { Clock, Duration, Effect, FiberHandle, Layer, Queue, Ref, Schema } from 'effect'
 import { RpcServer } from 'effect/rpc'
+import { SqlClient } from 'effect/sql'
+import type { SqlError } from 'effect/sql/SqlError'
 
-import { SearchIndex } from './index-db.js'
+import { indexMigrations, SearchIndex } from './index-db.js'
 import { IdleBackoff, indexSessions, runIngestPass } from './ingest.js'
 
 const IDLE_SLEEP = IdleBackoff.first
@@ -21,6 +25,9 @@ import { SearchWorkerFailed, SearchWorkerRpcs, workerConfigSchema } from './prot
 
 const BUSY_SLEEP = Duration.millis(50)
 const BACKFILL_ROWIDS = 2_000
+
+const config = Schema.decodeUnknownSync(workerConfigSchema)(workerData)
+const windowBytes = config.windowBytes ?? 2 * 1024 * 1024
 
 type Progress = {
   readonly root: string | undefined
@@ -40,12 +47,8 @@ const indexFailure = (cause: unknown) => new SearchWorkerFailed({ code: 'session
 
 const Handlers = SearchWorkerRpcs.toLayer(
   Effect.gen(function* () {
-    const config = yield* Schema.decodeUnknownEffect(workerConfigSchema)(workerData)
-    const windowBytes = config.windowBytes ?? 2 * 1024 * 1024
-    const index = yield* Effect.acquireRelease(
-      Effect.sync(() => new SearchIndex(config.indexPath)),
-      opened => Effect.sync(() => opened.close()),
-    )
+    const sql = yield* SqlClient.SqlClient
+    const index = new SearchIndex(sql, config.indexPath)
     const progress = yield* Ref.make<Progress>({
       root: undefined,
       ingesting: false,
@@ -59,7 +62,7 @@ const Handlers = SearchWorkerRpcs.toLayer(
     })
     // A committed session event cuts the loop's sleep short, so fresh content is searchable without waiting out the idle delay.
     const wake = yield* Queue.dropping<void>(1)
-    const loop = yield* FiberHandle.make<never, never>()
+    const loop = yield* FiberHandle.make<never, SqlError>()
     // The user's archived Sessions: cold history, dropped from the index and only read back for a targeted search.
     const archived = yield* Ref.make<ReadonlySet<string>>(new Set())
     // A large prune is reclaimed once per process; a second VACUUM would only rewrite an already-compact file.
@@ -69,20 +72,18 @@ const Handlers = SearchWorkerRpcs.toLayer(
     let lastCompactionAt = 0
 
     const health = Effect.flatMap(Ref.get(progress), (current): Effect.Effect<IndexHealth, SearchWorkerFailed> =>
-      Effect.try({
-        try: () =>
-          index.health({
-            behindSessions: current.behindSessions,
-            behindBytes: current.behindBytes,
-            ingesting: current.ingesting,
-            lastIngestMs: current.lastIngestMs,
-            slowestIngestMs: current.slowestIngestMs,
-            lastSearchMs: current.lastSearchMs,
-            slowestSearchMs: current.slowestSearchMs,
-            lastError: current.lastError,
-          }),
-        catch: indexFailure,
-      }),
+      index
+        .health({
+          behindSessions: current.behindSessions,
+          behindBytes: current.behindBytes,
+          ingesting: current.ingesting,
+          lastIngestMs: current.lastIngestMs,
+          slowestIngestMs: current.slowestIngestMs,
+          lastSearchMs: current.lastSearchMs,
+          slowestSearchMs: current.slowestSearchMs,
+          lastError: current.lastError,
+        })
+        .pipe(Effect.mapError(indexFailure)),
     )
 
     // True when a wake ended the pause, false when the time ran out.
@@ -94,15 +95,24 @@ const Handlers = SearchWorkerRpcs.toLayer(
         const startedAt = yield* Clock.currentTimeMillis
         const cold = yield* Ref.get(archived)
         yield* Ref.update(progress, current => ({ ...current, ingesting: true }))
-        const outcome = yield* Effect.tryPromise(async () => {
-          // One bounded step per loop, so searches still run between steps while an older index gains its conversation table.
-          const backfilled = index.backfillConversation(BACKFILL_ROWIDS) && index.backfillRowMap(BACKFILL_ROWIDS)
-          const result = await runIngestPass({ index, root, budgetMs: 1_000, windowBytes, now: Date.now, archived: cold })
-          return { backfilled, result }
+        // One bounded step per loop, so searches still run between steps while an older index gains its conversation table.
+        const outcome = yield* Effect.gen(function* () {
+          const conversationReady = yield* index.backfillConversation(BACKFILL_ROWIDS)
+          const rowMapReady = yield* index.backfillRowMap(BACKFILL_ROWIDS)
+          const result = yield* runIngestPass({
+            index,
+            root,
+            budgetMs: 1_000,
+            windowBytes,
+            now: Date.now,
+            archived: cold,
+            isArchived: sessionId => Effect.map(Ref.get(archived), current => current.has(sessionId)),
+          })
+          return { backfilled: conversationReady && rowMapReady, result }
         }).pipe(Effect.result)
         const elapsed = (yield* Clock.currentTimeMillis) - startedAt
         if (outcome._tag === 'Failure') {
-          yield* Ref.update(progress, current => ({ ...current, ingesting: false, lastIngestMs: elapsed, lastError: describeError(outcome.failure.cause) }))
+          yield* Ref.update(progress, current => ({ ...current, ingesting: false, lastIngestMs: elapsed, lastError: describeError(outcome.failure) }))
           return IDLE_SLEEP
         }
         const result = outcome.success.result
@@ -110,10 +120,17 @@ const Handlers = SearchWorkerRpcs.toLayer(
         // failure is reported instead of swallowed by the pass.
         // Un-merged FTS5 segments are the real garbage after a prune (measured 1.82 GB of a 2.01 GB index), and the page
         // freelist stays small, so the trigger is bytes per document as well as free pages.
-        if (Date.now() - lastCompactionAt > COMPACTION_INTERVAL_MS && (index.freePageRatio() > 0.25 || index.bytesPerDocument() > 2_048)) {
-          const reclaimed = yield* Effect.try({ try: () => (index.compact(), true), catch: error => describeError(error) }).pipe(Effect.result)
-          if (reclaimed._tag === 'Success') lastCompactionAt = Date.now()
-          else yield* Effect.logWarning('session-search: the index could not be compacted yet', reclaimed.failure)
+        if (Date.now() - lastCompactionAt > COMPACTION_INTERVAL_MS) {
+          const freePageRatio = yield* index.freePageRatio()
+          const bytesPerDocument = yield* index.bytesPerDocument()
+          if (freePageRatio > 0.25 || bytesPerDocument > 2_048) {
+            const reclaimed = yield* index.compact().pipe(
+              Effect.as(true),
+              Effect.catch(error => Effect.succeed(describeError(error))),
+            )
+            if (reclaimed === true) lastCompactionAt = Date.now()
+            else yield* Effect.logWarning('session-search: the index could not be compacted yet', reclaimed)
+          }
         }
         yield* Ref.update(progress, current => ({
           ...current,
@@ -137,10 +154,10 @@ const Handlers = SearchWorkerRpcs.toLayer(
       }),
     )
 
-    const timedSearch = <A>(search: () => A) =>
+    const timedSearch = <A>(search: Effect.Effect<A, unknown>) =>
       Effect.gen(function* () {
         const startedAt = performance.now()
-        const result = yield* Effect.try({ try: search, catch: indexFailure })
+        const result = yield* search.pipe(Effect.mapError(indexFailure))
         const elapsed = Math.round(performance.now() - startedAt)
         yield* Ref.update(progress, current => ({ ...current, lastSearchMs: elapsed, slowestSearchMs: Math.max(current.slowestSearchMs, elapsed) }))
         return result
@@ -153,26 +170,20 @@ const Handlers = SearchWorkerRpcs.toLayer(
           if (request.sessionIds !== undefined && request.sessionIds.length > 0) {
             const root = (yield* Ref.get(progress)).root
             if (root !== undefined) {
-              yield* Effect.tryPromise({
-                try: () => indexSessions({ index, root, budgetMs: 1_000, windowBytes, now: Date.now }, request.sessionIds ?? []),
-                catch: indexFailure,
-              })
+              yield* indexSessions({ index, root, budgetMs: 1_000, windowBytes, now: Date.now }, request.sessionIds ?? []).pipe(Effect.mapError(indexFailure))
             }
           }
-          return yield* timedSearch(() => index.searchSessions(request))
+          return yield* timedSearch(index.searchSessions(request))
         }),
-      SearchEvents: request => timedSearch(() => ({ sessionId: request.sessionId, ...index.searchEvents(request) })),
+      SearchEvents: request => timedSearch(Effect.map(index.searchEvents(request), rows => ({ sessionId: request.sessionId, ...rows }))),
       // A find names its Session, so an archived (cold) one is read back for this request, as a targeted search is.
       FindInSession: request =>
         Effect.gen(function* () {
           const root = (yield* Ref.get(progress)).root
           if (root !== undefined) {
-            yield* Effect.tryPromise({
-              try: () => indexSessions({ index, root, budgetMs: 1_000, windowBytes, now: Date.now }, [request.sessionId]),
-              catch: indexFailure,
-            })
+            yield* indexSessions({ index, root, budgetMs: 1_000, windowBytes, now: Date.now }, [request.sessionId]).pipe(Effect.mapError(indexFailure))
           }
-          return yield* timedSearch(() => index.findInSession(request))
+          return yield* timedSearch(index.findInSession(request))
         }),
       Health: () => health,
       Nudge: () => Effect.andThen(Queue.offer(wake, undefined), health),
@@ -193,10 +204,15 @@ const Handlers = SearchWorkerRpcs.toLayer(
   }),
 )
 
+const indexLayer = SqliteStore.layer({ filename: config.indexPath, migrations: indexMigrations }).pipe(
+  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+)
+
 const WorkerServer = RpcServer.layer(SearchWorkerRpcs).pipe(
   Layer.provide(Handlers),
   Layer.provide(RpcServer.layerProtocolWorkerRunner),
   Layer.provide(NodeWorkerRunner.layer),
+  Layer.provide(indexLayer),
 )
 
 NodeRuntime.runMain(Layer.launch(WorkerServer))

@@ -3,24 +3,14 @@
  * a pass can resume where it stopped and a search is a single read-only query. Every row that crosses out of SQLite is
  * decoded once with a schema, so no dictionary-typed value reaches the rest of the plugin.
  */
-import { mkdirSync, statSync } from 'node:fs'
-import { dirname } from 'node:path'
-import { DatabaseSync, type StatementSync } from 'node:sqlite'
+import { statSync } from 'node:fs'
 import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { SqlClient } from 'effect/sql'
 import * as SchemaGetter from 'effect/SchemaGetter'
 import type { IndexHealth } from './api-schemas.js'
 import { withoutUndefined } from './optional-fields.js'
-import type {
-  EventFilters,
-  FindInSessionRequest,
-  FindInSessionResult,
-  SearchMatch,
-  SessionEventSearchRequest,
-  SessionHeaderRow,
-  SessionSearchRequest,
-} from './protocol.js'
+import type { EventFilters, FindInSessionRequest, SearchMatch, SessionEventSearchRequest, SessionHeaderRow, SessionSearchRequest } from './protocol.js'
 import { sessionHeaderSchema } from './protocol.js'
 import { DocumentText } from './text.js'
 
@@ -143,6 +133,8 @@ const pageCountRowSchema = Schema.Struct({ page_count: numberLike })
 const freelistRowSchema = Schema.Struct({ freelist_count: numberLike })
 
 const documentRowidSchema = Schema.Struct({ document_rowid: numberLike })
+const insertedRowSchema = Schema.Struct({ lastInsertRowid: numberLike })
+const DOCUMENT_INSERT_CHUNK = 100
 
 export interface SessionCursor {
   readonly id: string
@@ -157,6 +149,7 @@ export interface SessionCursor {
 const CURSOR_SELECT = 'SELECT id, log_path, log_dev, log_ino, log_offset, log_size, log_mtime_ns FROM sessions'
 const CURSOR_BY_ID = `${CURSOR_SELECT} WHERE id = ?`
 
+// oxlint-disable-next-line antislop/no-unknown-parameters -- the row is parsed with cursorRowSchema immediately.
 const cursorOf = (row: unknown): SessionCursor | undefined => {
   const parsed = Schema.decodeUnknownResult(cursorRowSchema)(row)
   if (parsed._tag === 'Failure') return undefined
@@ -289,7 +282,7 @@ const backfillRowSchema = Schema.Struct({
   truncated: numberLike,
 })
 
-export class EffectSearchIndex {
+export class SearchIndex {
   constructor(
     readonly sql: SqlClient.SqlClient,
     readonly path = ':memory:',
@@ -318,10 +311,13 @@ export class EffectSearchIndex {
         yield* this.sql.unsafe('DELETE FROM conversation_documents WHERE session_id = ?', [sessionId])
         return
       }
-      for (const row of mapped) {
-        const rowid = Schema.decodeUnknownSync(documentRowidSchema)(row).document_rowid
-        yield* this.sql.unsafe('DELETE FROM session_documents WHERE rowid = ?', [rowid])
-        yield* this.sql.unsafe('DELETE FROM conversation_documents WHERE rowid = ?', [rowid])
+      const rowids = mapped.map(row => Schema.decodeUnknownSync(documentRowidSchema)(row).document_rowid)
+      // One statement per chunk: a per-row delete cost a statement per document, the dominant cost of a full reindex.
+      for (let start = 0; start < rowids.length; start += DOCUMENT_INSERT_CHUNK) {
+        const chunk = rowids.slice(start, start + DOCUMENT_INSERT_CHUNK)
+        const placeholders = chunk.map(() => '?').join(', ')
+        yield* this.sql.unsafe(`DELETE FROM session_documents WHERE rowid IN (${placeholders})`, chunk)
+        yield* this.sql.unsafe(`DELETE FROM conversation_documents WHERE rowid IN (${placeholders})`, chunk)
       }
       yield* this.sql.unsafe('DELETE FROM session_document_rows WHERE session_id = ?', [sessionId])
     })
@@ -342,16 +338,42 @@ export class EffectSearchIndex {
           yield* this.deleteSessionRows(header.id)
           yield* this.sql.unsafe('DELETE FROM sessions WHERE id = ?', [header.id])
         }
-        for (const document of documents) {
-          const values = [document.text, document.sessionId, document.seq, document.type, document.time, document.surface, document.truncated ? 1 : 0]
-          yield* this.sql.unsafe('INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?)', values)
-          const ids = yield* this.sql.unsafe('SELECT last_insert_rowid() AS document_rowid')
-          const rowid = Schema.decodeUnknownSync(documentRowidSchema)(ids[0]).document_rowid
-          yield* this.sql.unsafe('INSERT INTO session_document_rows (session_id, document_rowid) VALUES (?, ?)', [header.id, rowid])
-          if (isConversation(document))
+        const rowids: number[] = []
+        // One statement per chunk: FTS5 assigns rowids from the current maximum upward, so a contiguous chunk yields
+        // contiguous rowids and no document needs a read back to learn its rowid.
+        for (let start = 0; start < documents.length; start += DOCUMENT_INSERT_CHUNK) {
+          const chunk = documents.slice(start, start + DOCUMENT_INSERT_CHUNK)
+          const values: (string | number)[] = []
+          for (const document of chunk)
+            values.push(document.text, document.sessionId, document.seq, document.type, document.time, document.surface, document.truncated ? 1 : 0)
+          const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')
+          const inserted = yield* this.sql
+            .unsafe(`INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES ${placeholders}`, values)
+            .raw
+          const chunkLast = Schema.decodeUnknownSync(insertedRowSchema)(inserted).lastInsertRowid
+          const chunkFirst = chunkLast - chunk.length + 1
+          for (let index = 0; index < chunk.length; index += 1) rowids.push(chunkFirst + index)
+        }
+        for (let start = 0; start < documents.length; start += DOCUMENT_INSERT_CHUNK) {
+          const chunk = documents.slice(start, start + DOCUMENT_INSERT_CHUNK)
+          const chunkRowids = rowids.slice(start, start + DOCUMENT_INSERT_CHUNK)
+          const mappingValues: (string | number)[] = []
+          for (const rowid of chunkRowids) mappingValues.push(header.id, rowid)
+          yield* this.sql.unsafe(
+            `INSERT INTO session_document_rows (session_id, document_rowid) VALUES ${chunkRowids.map(() => '(?, ?)').join(', ')}`,
+            mappingValues,
+          )
+          const conversation: (string | number)[] = []
+          const conversationPlaceholders: string[] = []
+          for (const [index, document] of chunk.entries()) {
+            if (!isConversation(document)) continue
+            conversationPlaceholders.push('(?, ?, ?, ?, ?, ?, ?, ?)')
+            conversation.push(chunkRowids[index] ?? 0, document.text, document.sessionId, document.seq, document.type, document.time, document.surface, document.truncated ? 1 : 0)
+          }
+          if (conversationPlaceholders.length > 0)
             yield* this.sql.unsafe(
-              'INSERT INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-              [rowid, ...values],
+              `INSERT INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES ${conversationPlaceholders.join(', ')}`,
+              conversation,
             )
         }
         const truncated = documents.reduce((total, document) => total + (document.truncated ? 1 : 0), 0)
@@ -396,6 +418,8 @@ export class EffectSearchIndex {
 
   readonly setMeta = (key: string, value: string) =>
     this.sql.unsafe('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value', [key, value])
+
+  readonly conversationReady = () => Effect.map(this.meta('conversation_ready'), value => value === '1')
 
   readonly backfillConversation = (rowids: number) =>
     this.sql.withTransaction(
@@ -619,7 +643,7 @@ export class EffectSearchIndex {
       return bytes / documents
     })
 
-  readonly health = (input: Parameters<SearchIndex['health']>[0]) =>
+  readonly health = (input: Omit<IndexHealth, 'sessions' | 'documents' | 'indexBytes'>) =>
     Effect.gen({ self: this }, function* () {
       const sessionRows = yield* this.sql.unsafe('SELECT count(*) AS count FROM sessions')
       const documentRows = yield* this.sql.unsafe('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions')
@@ -651,517 +675,6 @@ export class EffectSearchIndex {
         return to >= until
       }),
     )
-}
-
-export class SearchIndex {
-  readonly #database: DatabaseSync
-  readonly #path: string
-  // Constant SQL only: node:sqlite compiles on every prepare, and the write path prepared per document.
-  readonly #statements = new Map<string, StatementSync>()
-
-  constructor(path: string) {
-    this.#path = path
-    mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
-    this.#database = new DatabaseSync(path)
-    this.#database.exec('PRAGMA journal_mode = wal')
-    this.#database.exec('PRAGMA synchronous = normal')
-    // The index is the biggest store here and its worker writes in bursts; without a limit the log grew to 225 MB
-    // beside a 291 MB index. Keep it at 32 MB and checkpoint as it fills.
-    this.#database.exec('PRAGMA journal_size_limit = 33554432')
-    this.#database.exec('PRAGMA wal_autocheckpoint = 1000')
-    this.#database.exec(SCHEMA)
-  }
-
-  #prepare(sql: string): StatementSync {
-    let statement = this.#statements.get(sql)
-    if (statement === undefined) {
-      statement = this.#database.prepare(sql)
-      this.#statements.set(sql, statement)
-    }
-    return statement
-  }
-
-  cursor(sessionId: string): SessionCursor | undefined {
-    return cursorOf(this.#prepare(CURSOR_BY_ID).get(sessionId))
-  }
-
-  /** Every stored cursor in one read: an ingest pass compares each log with its cursor, and one query per log cost 85 ms on 2,800 Sessions. */
-  cursors(): ReadonlyMap<string, SessionCursor> {
-    const cursors = new Map<string, SessionCursor>()
-    for (const row of this.#prepare(CURSOR_SELECT).all()) {
-      const cursor = cursorOf(row)
-      if (cursor !== undefined) cursors.set(cursor.id, cursor)
-    }
-    return cursors
-  }
-
-  /** Store the session header plus the newest cursor after a committed batch. */
-  commitBatch(input: BatchInput): void {
-    const { header, cursor, documents, replace, now } = input
-    this.#write(() => {
-      if (replace) {
-        this.#deleteSessionRows(header.id)
-        this.#prepare('DELETE FROM sessions WHERE id = ?').run(header.id)
-      }
-      if (documents.length > 0) {
-        const insert = this.#prepare('INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        const remember = this.#prepare('INSERT INTO session_document_rows (session_id, document_rowid) VALUES (?, ?)')
-        for (const document of documents) {
-          const inserted = insert.run(
-            document.text,
-            document.sessionId,
-            document.seq,
-            document.type,
-            document.time,
-            document.surface,
-            document.truncated ? 1 : 0,
-          )
-          remember.run(header.id, Number(inserted.lastInsertRowid))
-          if (isConversation(document))
-            this.#prepare(
-              'INSERT INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            ).run(
-              inserted.lastInsertRowid,
-              document.text,
-              document.sessionId,
-              document.seq,
-              document.type,
-              document.time,
-              document.surface,
-              document.truncated ? 1 : 0,
-            )
-        }
-      }
-      const truncated = documents.reduce((total, document) => total + (document.truncated ? 1 : 0), 0)
-      this.#prepare(
-        `INSERT INTO sessions (id, version, created_at, cwd, parent_session, seed_length, delegation_depth, agent_preset,
-             log_path, log_dev, log_ino, log_offset, log_size, log_mtime_ns, indexed_at, documents_count, truncated_documents)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (id) DO UPDATE SET
-             version = excluded.version, created_at = excluded.created_at, cwd = excluded.cwd, parent_session = excluded.parent_session,
-             seed_length = excluded.seed_length, delegation_depth = excluded.delegation_depth, agent_preset = excluded.agent_preset,
-             log_path = excluded.log_path, log_dev = excluded.log_dev, log_ino = excluded.log_ino, log_offset = excluded.log_offset,
-             log_size = excluded.log_size, log_mtime_ns = excluded.log_mtime_ns, indexed_at = excluded.indexed_at,
-             documents_count = sessions.documents_count + excluded.documents_count, truncated_documents = sessions.truncated_documents + excluded.truncated_documents`,
-      ).run(
-        header.id,
-        header.version,
-        header.createdAt,
-        header.cwd ?? null,
-        header.parentSession ?? null,
-        header.isSeeded ? 0 : null,
-        header.delegationDepth ?? null,
-        header.agentPreset ?? null,
-        cursor.logPath,
-        cursor.dev,
-        cursor.ino,
-        cursor.offset,
-        cursor.size,
-        cursor.mtimeNs,
-        now,
-        documents.length,
-        truncated,
-      )
-    })
-  }
-
-  /**
-   * Run one session's write: its own transaction, or a savepoint inside an open group so a failure undoes only that
-   * session. Grouping is what bounds write amplification: FTS5 flushes a new segment per transaction and merges them
-   * again, so committing 2,800 Sessions one by one wrote 285 MB for an 8.6 MB index.
-   */
-  #write(write: () => void): void {
-    if (this.#database.isTransaction) {
-      this.#database.exec('SAVEPOINT session_write')
-      try {
-        write()
-        this.#database.exec('RELEASE session_write')
-      } catch (error) {
-        this.#database.exec('ROLLBACK TO session_write')
-        this.#database.exec('RELEASE session_write')
-        throw error
-      }
-      return
-    }
-    this.#database.exec('BEGIN IMMEDIATE')
-    try {
-      write()
-      this.#database.exec('COMMIT')
-    } catch (error) {
-      this.#database.exec('ROLLBACK')
-      throw error
-    }
-  }
-
-  /** Open a group that later session writes join; `commitGroup` makes them durable together. */
-  beginGroup(): void {
-    if (!this.#database.isTransaction) this.#database.exec('BEGIN IMMEDIATE')
-  }
-
-  commitGroup(): void {
-    if (this.#database.isTransaction) this.#database.exec('COMMIT')
-  }
-
-  rollbackGroup(): void {
-    if (this.#database.isTransaction) this.#database.exec('ROLLBACK')
-  }
-
-  /** Forget a session whose log was rewritten, so the next pass indexes it from the start. */
-  forget(sessionId: string): void {
-    this.#write(() => {
-      this.#deleteSessionRows(sessionId)
-      this.#prepare('DELETE FROM sessions WHERE id = ?').run(sessionId)
-    })
-  }
-
-  /**
-   * Delete one session's documents through the rowid mapping, because a predicate on `session_id` inside
-   * the FTS5 table scans every document in the index (measured 532 ms on a 982 MB index) while an FTS5
-   * delete by rowid is a direct write. A Session indexed before this mapping existed has no rows here:
-   * it takes the one scanning delete, and everything indexed afterwards stays on the rowid path.
-   */
-  #deleteSessionRows(sessionId: string): void {
-    const mapped = this.#prepare('SELECT document_rowid FROM session_document_rows WHERE session_id = ?').all(sessionId)
-    if (mapped.length === 0) {
-      // Nothing indexed means nothing to delete; only a Session indexed before the rowid map (see `backfillRowMap`)
-      // still takes the scanning delete, ~15 s on this index while the worker serves no search.
-      const counted = Schema.decodeUnknownResult(countRowSchema)(this.#prepare('SELECT documents_count AS count FROM sessions WHERE id = ?').get(sessionId))
-      if (counted._tag === 'Failure' || counted.success.count === 0) return
-      this.#prepare('DELETE FROM session_documents WHERE session_id = ?').run(sessionId)
-      this.#prepare('DELETE FROM conversation_documents WHERE session_id = ?').run(sessionId)
-      return
-    }
-    const remove = this.#prepare('DELETE FROM session_documents WHERE rowid = ?')
-    const removeConversation = this.#prepare('DELETE FROM conversation_documents WHERE rowid = ?')
-    for (const row of mapped) {
-      const rowid = Schema.decodeUnknownSync(documentRowidSchema)(row).document_rowid
-      remove.run(rowid)
-      removeConversation.run(rowid)
-    }
-    this.#prepare('DELETE FROM session_document_rows WHERE session_id = ?').run(sessionId)
-  }
-
-  #meta(key: string): string | undefined {
-    const parsed = Schema.decodeUnknownResult(metaValueSchema)(this.#prepare('SELECT value FROM meta WHERE key = ?').get(key))
-    return parsed._tag === 'Success' ? parsed.success.value : undefined
-  }
-
-  #setMeta(key: string, value: string): void {
-    this.#prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, value)
-  }
-
-  /** Whether `conversation_documents` holds every conversation document, so searches may use it. */
-  get conversationReady(): boolean {
-    return this.#meta('conversation_ready') === '1'
-  }
-
-  /**
-   * Copy the next `rowids` rowids of conversation documents indexed before `conversation_documents` existed. Documents
-   * committed since are written to both tables, so the copy stops at the highest rowid it saw first.
-   * @returns whether the copy is complete.
-   */
-  backfillConversation(rowids: number): boolean {
-    if (this.conversationReady) return true
-    this.#database.exec('BEGIN IMMEDIATE')
-    try {
-      let until = Number(this.#meta('conversation_backfill_until') ?? Number.NaN)
-      if (Number.isNaN(until)) {
-        until = Schema.decodeUnknownSync(numberLike)(this.#prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0)
-        this.#setMeta('conversation_backfill_until', String(until))
-      }
-      const from = Number(this.#meta('conversation_backfill_from') ?? '0')
-      const to = Math.min(until, from + rowids)
-      const copy = this.#prepare(
-        'INSERT OR REPLACE INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      )
-      for (const raw of this.#prepare(
-        'SELECT rowid, text, session_id, seq, type, time, surface, truncated FROM session_documents WHERE rowid > ? AND rowid <= ?',
-      ).all(from, to)) {
-        const row = Schema.decodeUnknownSync(backfillRowSchema)(raw)
-        if (isConversation(row)) copy.run(row.rowid, row.text, row.session_id, row.seq, row.type, row.time, row.surface, row.truncated)
-      }
-      this.#setMeta('conversation_backfill_from', String(to))
-      if (to >= until) this.#setMeta('conversation_ready', '1')
-      this.#database.exec('COMMIT')
-      return to >= until
-    } catch (error) {
-      this.#database.exec('ROLLBACK')
-      throw error
-    }
-  }
-
-  /**
-   * Record the rowids of the next `rowids` documents indexed before `session_document_rows` existed, so replacing or
-   * forgetting their Session deletes by rowid instead of scanning every document. Stops at the highest rowid it saw
-   * first; later documents are mapped as they are committed.
-   * @returns whether every document is mapped.
-   */
-  backfillRowMap(rowids: number): boolean {
-    if (this.#meta('row_map_ready') === '1') return true
-    this.#database.exec('BEGIN IMMEDIATE')
-    try {
-      let until = Number(this.#meta('row_map_backfill_until') ?? Number.NaN)
-      if (Number.isNaN(until)) {
-        until = Schema.decodeUnknownSync(numberLike)(this.#prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0)
-        this.#setMeta('row_map_backfill_until', String(until))
-      }
-      const from = Number(this.#meta('row_map_backfill_from') ?? '0')
-      const to = Math.min(until, from + rowids)
-      this.#prepare(
-        'INSERT OR IGNORE INTO session_document_rows (session_id, document_rowid) SELECT session_id, rowid FROM session_documents WHERE rowid > ? AND rowid <= ?',
-      ).run(from, to)
-      this.#setMeta('row_map_backfill_from', String(to))
-      if (to >= until) this.#setMeta('row_map_ready', '1')
-      this.#database.exec('COMMIT')
-      return to >= until
-    } catch (error) {
-      this.#database.exec('ROLLBACK')
-      throw error
-    }
-  }
-
-  /**
-   * The table a filtered search reads: the conversation subset when the filters ask for exactly it (the user and/or
-   * assistant messages of the current surface), with the clauses that subset already satisfies dropped.
-   */
-  #route(filters: EventFilters | undefined): SearchRoute {
-    if (filters === undefined || !this.conversationReady) return { table: 'session_documents', filters } satisfies SearchRoute
-    const types = filters.filter(filter => filter.kind === 'type')
-    const surfaces = filters.filter(filter => filter.kind === 'surface')
-    const [type] = types
-    const [surface] = surfaces
-    if (types.length !== 1 || surfaces.length !== 1 || type === undefined || surface === undefined)
-      return { table: 'session_documents', filters } satisfies SearchRoute
-    if (surface.values.length !== 1 || surface.values[0] !== CONVERSATION_SURFACE) return { table: 'session_documents', filters } satisfies SearchRoute
-    if (type.values.length === 0 || !type.values.every(value => CONVERSATION_TYPES.has(value)))
-      return { table: 'session_documents', filters } satisfies SearchRoute
-    const coversEveryType = [...CONVERSATION_TYPES].every(value => type.values.includes(value))
-    return {
-      table: 'conversation_documents',
-      filters: filters.filter(filter => filter.kind !== 'surface' && (filter.kind !== 'type' || !coversEveryType)),
-    }
-  }
-
-  searchSessions(request: SessionSearchRequest): SearchRows {
-    const filters: string[] = []
-    const bindings: (string | number)[] = []
-    if (request.sessionIds !== undefined && request.sessionIds.length > 0) {
-      filters.push(`d.session_id IN (${request.sessionIds.map(() => '?').join(', ')})`)
-      bindings.push(...request.sessionIds)
-    }
-    if (request.cwd !== undefined) {
-      filters.push('s.cwd = ?')
-      bindings.push(request.cwd)
-    }
-    const route = this.#route(request.filters)
-    const events = eventFilterClauses(route.filters)
-    filters.push(...events.clauses)
-    bindings.push(...events.bindings)
-    const rows = this.#rankedRows({
-      table: route.table,
-      filters,
-      bindings,
-      limit: request.limit + 1,
-      offset: request.cursor ?? 0,
-      sessionId: undefined,
-      query: request.query,
-    })
-    return { matches: rows.slice(0, request.limit).map(row => this.#match(row)), hasMore: rows.length > request.limit }
-  }
-
-  searchEvents(request: SessionEventSearchRequest): EventSearchRows {
-    const route = this.#route(request.filters)
-    const events = eventFilterClauses(route.filters)
-    const rows = this.#rankedRows({
-      table: route.table,
-      filters: events.clauses,
-      bindings: events.bindings,
-      limit: request.limit + 1,
-      offset: request.cursor ?? 0,
-      sessionId: request.sessionId,
-      query: request.query,
-    })
-    const first = rows[0]
-    return {
-      header: first === undefined ? this.sessionHeader(request.sessionId) : this.#match(first).header,
-      matches: rows.slice(0, request.limit).map(row => this.#match(row)),
-      hasMore: rows.length > request.limit,
-    }
-  }
-
-  /**
-   * Every matching document of one Session's current surface in transcript order, for a find bar that steps through
-   * them; ranking would reorder what the reader expects to walk top to bottom.
-   */
-  findInSession(request: FindInSessionRequest): FindInSessionResult {
-    const rows = this.#prepare(
-      `SELECT d.seq AS seq, d.type AS type, d.time AS time, snippet(session_documents, 0, ?, ?, '…', 24) AS marked_text
-       FROM session_documents AS d
-       WHERE session_documents MATCH ? AND d.session_id = ? AND d.surface = 'current'
-       ORDER BY d.seq ASC, d.rowid ASC LIMIT ?`,
-    )
-      .all(MARKER_START, MARKER_END, request.query, request.sessionId, request.limit + 1)
-      .map(value => Schema.decodeUnknownSync(findRowSchema)(value))
-    return {
-      matches: rows.slice(0, request.limit).map(row => ({
-        seq: row.seq,
-        type: row.type,
-        time: row.time,
-        snippet: DocumentText.snippet(row.marked_text, FIND_SNIPPET_CHARS),
-      })),
-      hasMore: rows.length > request.limit,
-    }
-  }
-
-  sessionHeader(sessionId: string): SessionHeaderRow | null {
-    const value = this.#prepare(
-      'SELECT id, version, created_at, cwd, parent_session, seed_length, delegation_depth, agent_preset FROM sessions WHERE id = ?',
-    ).get(sessionId)
-    const parsed = Schema.decodeUnknownResult(sessionRowSchema)(value)
-    return parsed._tag === 'Success' ? headerOf(parsed.success) : null
-  }
-
-  /**
-   * The best-ranked document of each matching session, best sessions first. A common term matches ~100 000 documents
-   * here, so this ranks first and builds snippets for the returned rows only (snippet() re-tokenizes a whole document),
-   * and scores only the best `rankCap` documents through FTS5's ordered `rank` scan. Walking documents in rank order
-   * keeps the first one of each session, so the cap only loses sessions past it; a capped answer shorter than asked is
-   * recomputed over every match.
-   */
-  #rankedRows(input: {
-    readonly table: DocumentTable
-    readonly query: string
-    readonly filters: readonly string[]
-    readonly bindings: readonly (string | number)[]
-    readonly limit: number
-    readonly offset: number
-    readonly sessionId: string | undefined
-  }): readonly RankedRow[] {
-    const rankCap = Math.max(RANK_CAP, (input.offset + input.limit) * 50)
-    const capped = this.#rankedRowsWithin({ ...input, rankCap })
-    return capped.length >= input.limit ? capped : this.#rankedRowsWithin({ ...input, rankCap: undefined })
-  }
-
-  #rankedRowsWithin(input: {
-    readonly table: DocumentTable
-    readonly query: string
-    readonly filters: readonly string[]
-    readonly bindings: readonly (string | number)[]
-    readonly limit: number
-    readonly offset: number
-    readonly sessionId: string | undefined
-    readonly rankCap: number | undefined
-  }): readonly RankedRow[] {
-    const table = input.table
-    const where = [`${table} MATCH ?`, ...(input.sessionId === undefined ? [] : ['d.session_id = ?']), ...input.filters].join(' AND ')
-    const bindings: (string | number)[] = [
-      input.query,
-      ...(input.sessionId === undefined ? [] : [input.sessionId]),
-      ...input.bindings,
-      ...(input.rankCap === undefined ? [] : [input.rankCap]),
-      input.limit,
-      input.offset,
-      input.query,
-    ]
-    const sql = `
-      WITH matched AS (
-        SELECT d.rowid AS document_rowid, d.session_id AS session_id, d.seq AS seq, d.time AS time,
-               ${input.rankCap === undefined ? `bm25(${table})` : 'rank'} AS score, length(d.text) AS document_length
-        FROM ${table} AS d JOIN sessions AS s ON s.id = d.session_id
-        WHERE ${where}${input.rankCap === undefined ? '' : ' ORDER BY rank LIMIT ?'}
-      ),
-      ranked AS (
-        SELECT document_rowid, session_id, seq, time, score, document_length,
-               row_number() OVER (PARTITION BY session_id ORDER BY score ASC, document_length ASC, time DESC, seq DESC) AS event_rank
-        FROM matched
-      ),
-      page AS (
-        SELECT document_rowid, score, document_length, time, session_id, seq FROM ranked WHERE event_rank = 1
-        ORDER BY score ASC, document_length ASC, time DESC, session_id ASC, seq DESC
-        LIMIT ? OFFSET ?
-      )
-      SELECT d.session_id AS session_id, d.seq AS seq, d.type AS type, d.time AS time, d.surface AS surface,
-             s.id AS id, s.version AS version, s.created_at AS created_at, s.cwd AS cwd, s.parent_session AS parent_session,
-             s.seed_length AS seed_length, s.delegation_depth AS delegation_depth, s.agent_preset AS agent_preset,
-             snippet(${table}, 0, ?, ?, '…', 32) AS marked_text
-      FROM page JOIN ${table} AS d ON d.rowid = page.document_rowid JOIN sessions AS s ON s.id = page.session_id
-      WHERE ${table} MATCH ?
-      ORDER BY page.score ASC, page.document_length ASC, page.time DESC, page.session_id ASC, page.seq DESC
-    `
-    const values = this.#database.prepare(sql).all(...bindings.slice(0, -1), MARKER_START, MARKER_END, input.query)
-    return values.map(value => Schema.decodeUnknownSync(rankedRowSchema)(value))
-  }
-
-  #match(row: RankedRow): SearchMatch {
-    return {
-      sessionId: row.session_id,
-      seq: row.seq,
-      type: row.type,
-      time: row.time,
-      surface: row.surface,
-      snippet: DocumentText.snippet(row.marked_text, 240),
-      header: headerOf(row),
-    }
-  }
-
-  /**
-   * Reclaim the space a large prune left behind. Deleting the documents of archived Sessions empties most of the file,
-   * and SQLite reuses those pages only for new rows; a one-shot VACUUM gives the bytes back. The caller runs it off the
-   * Host thread and only when the free share says it is worth minutes of the worker's time.
-   */
-  vacuum(): void {
-    this.#database.exec('VACUUM')
-  }
-
-  /** Bytes the file holds per indexed document; an FTS5 index that keeps pruned postings rises after deletes. */
-  bytesPerDocument(): number {
-    const documents = Schema.decodeUnknownSync(countRowSchema)(this.#prepare('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions').get()).count
-    if (documents === 0) return 0
-    let bytes = 0
-    for (const suffix of ['', '-wal', '-shm']) bytes += statSize(`${this.#path}${suffix}`)
-    return bytes / documents
-  }
-
-  /**
-   * Merge every FTS5 segment and give the file back. Deleting the documents of archived Sessions leaves their postings
-   * in un-merged segments — measured 1.82 GB of a 2.01 GB index for 80 MB of text — and only `optimize` reclaims them;
-   * `VACUUM` alone frees just the page freelist.
-   */
-  compact(): void {
-    this.#database.exec("INSERT INTO session_documents(session_documents) VALUES('optimize')")
-    this.#database.exec("INSERT INTO conversation_documents(conversation_documents) VALUES('optimize')")
-    this.#database.exec('VACUUM')
-  }
-
-  /** Share of the index file that is free pages after deletes, 0 when the file holds nothing yet. */
-  freePageRatio(): number {
-    const pages = Schema.decodeUnknownSync(pageCountRowSchema)(this.#prepare('PRAGMA page_count').get()).page_count
-    if (pages === 0) return 0
-    return Schema.decodeUnknownSync(freelistRowSchema)(this.#prepare('PRAGMA freelist_count').get()).freelist_count / pages
-  }
-
-  health(input: {
-    readonly behindSessions: number
-    readonly behindBytes: number
-    readonly ingesting: boolean
-    readonly lastIngestMs: number
-    readonly slowestIngestMs: number
-    readonly lastSearchMs: number
-    readonly slowestSearchMs: number
-    readonly lastError: string | null
-  }): IndexHealth {
-    const sessions = Schema.decodeUnknownSync(countRowSchema)(this.#prepare('SELECT count(*) AS count FROM sessions').get()).count
-    // `commitBatch` maintains `documents_count` on every append, replace and forget, so the sum is the
-    // FTS5 row count without scanning the virtual table (measured 572 ms per `count(*)` at 982 MB).
-    const documents = Schema.decodeUnknownSync(countRowSchema)(this.#prepare('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions').get()).count
-    let indexBytes = 0
-    for (const suffix of ['', '-wal', '-shm']) indexBytes += statSize(`${this.#path}${suffix}`)
-    return { sessions, documents, indexBytes, ...input }
-  }
-
-  close(): void {
-    this.#database.close()
-  }
 }
 
 const statSize = (path: string): number => {
