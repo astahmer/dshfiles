@@ -18,6 +18,8 @@ export interface PullRequestView {
   readonly checks: PullRequestChecks
   /** A thread watches it, so its state stays current. */
   readonly watched: boolean
+  /** The pull request's description, as last polled; null when it predates the field. */
+  readonly body: string | null
 }
 
 const failing = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'])
@@ -74,6 +76,7 @@ export class PullRequestState extends Context.Service<
             state: stateOf(link.lastKnownState?.state),
             checks: checksOf(link.lastKnownState?.checks ?? []),
             watched: link.watching || (previous?.watched ?? false),
+            body: link.lastKnownState?.body ?? previous?.body ?? null,
           }
           if (previous === undefined || (previous.state === 'unknown' && view.state !== 'unknown')) views.set(pull.url, view)
         }
@@ -94,7 +97,7 @@ export class PullRequestState extends Context.Service<
           available: served,
           pullRequests: pulls.map(
             (pull): PullRequestView =>
-              views.get(pull.url) ?? { url: pull.url, repo: pull.repo, number: pull.number, state: 'unknown', checks: 'none', watched: false },
+              views.get(pull.url) ?? { url: pull.url, repo: pull.repo, number: pull.number, state: 'unknown', checks: 'none', watched: false, body: null },
           ),
         }
       })

@@ -25,6 +25,7 @@ const view: GitHubPullRequestView = {
   statusCheckRollup: [{ __typename: 'CheckRun', name: 'unit', status: 'COMPLETED', conclusion: 'SUCCESS' }],
   comments: [],
   reviews: [],
+  body: '',
 }
 
 /** Every poll of this pull request fails, and it sorts before `acme/third#9` so a skipped tail would show. */

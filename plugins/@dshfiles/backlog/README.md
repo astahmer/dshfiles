@@ -252,9 +252,11 @@ changes and can be reverted), never parsed out of its description.
 - **Pull requests**: GitHub pull and GitLab merge-request URLs are PR links. **Link PR…** in the inspector or
   `backlog_link_pr` links one as `fixes` (or `implements` with `closes: false`) and asks `@dshfiles/pull-requests` to
   watch it through the item's newest thread; the inspector and `backlog_pull_requests` show open, merged or closed and
-  the checks. A fixing PR that merges moves its item to done unless you set its status by hand. Without the
-  pull-requests plugin a PR link is a plain link. That plugin exposes no PR description, so `Closes b:k3f9` written in a
-  PR body is not read; commits saying it still close the item once they land on `main`.
+  the checks. A fixing PR that merges moves its item to done unless you set its status by hand, and so do the items
+  its description names with `Closes b:k3f9` (also `Fixes`, `Resolves`): pull-requests keeps the description’s first
+  16,384 characters with each polled state, and the gate watch reads it only once the pull request merged. Without the
+  pull-requests plugin a PR link is a plain link and a description closes nothing; commits saying `Closes b:k3f9` still
+  close the item once they land on `main`.
 - **Duplicate merge**: **Merge into…** on the item menu (one item or a selection) and **Merge into b:…** on a triage
   duplicate suggestion, or `backlog_merge` (an agent passes `confirm: true`), move each duplicate's comments (quoted,
   keeping who wrote them), links, tags, files and sub-issues into the survivor, rewrite links other items held to the

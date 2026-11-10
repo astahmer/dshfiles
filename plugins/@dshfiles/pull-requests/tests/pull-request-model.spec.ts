@@ -46,6 +46,7 @@ describe('GitHub pull-request decoding', () => {
           { author: null, state: 'PENDING', submittedAt: null, url: 'https://github.com/acme/widget/pull/42#pullrequestreview-2' },
         ],
         title: 'Not retained',
+        body: 'Closes b:k3f9',
       }),
     )
 
@@ -65,6 +66,7 @@ describe('GitHub pull-request decoding', () => {
         at: '2026-11-01T11:00:00Z',
         author: 'reviewer',
       },
+      body: 'Closes b:k3f9',
     })
   })
 

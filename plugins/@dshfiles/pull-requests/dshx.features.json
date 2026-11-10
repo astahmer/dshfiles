@@ -20,7 +20,7 @@
       "externalDependencies": [
         {
           "id": "github-cli",
-          "boundary": "Runs gh repo view for number-plus-cwd links and gh pr view with state, mergeable, mergeStateStatus, reviewDecision, statusCheckRollup, comments and reviews; uses the CLI's configured login without reading or storing credentials. GitHub.com only.",
+          "boundary": "Runs gh repo view for number-plus-cwd links and gh pr view with state, mergeable, mergeStateStatus, reviewDecision, statusCheckRollup, comments, reviews and the description (first 16,384 characters); uses the CLI's configured login without reading or storing credentials. GitHub.com only.",
           "deterministicFake": "tests/pull-request-model.spec.ts supplies fixed CLI-shaped JSON to the production Effect Schema decoder; tests/host.spec.ts uses a real test Host without invoking GitHub."
         }
       ],

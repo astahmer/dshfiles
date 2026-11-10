@@ -33,7 +33,10 @@ Create re-checks everything and refuses when the workspace head is no longer the
 
 - Uses the installed `gh` executable and its existing login. It never reads, prints, or stores an authentication token. Only GitHub.com PR URLs are accepted; GitHub Enterprise hosts are not supported.
 - Watching polls immediately, then every two minutes. Multiple linked threads watching the same repository and PR share one `gh pr view` per poll. Links, last-known state, and rate-limit backoff persist in the Host `StorageDomain`.
-- Polling requests `state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,comments,reviews`. New comment/review messages contain only author and timestamp, not user-authored text.
+- Polling requests `state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,comments,reviews,body`. New
+  comment/review messages contain only author and timestamp, not user-authored text. The first 16,384 characters of
+  the description are kept with the last known state, so another plugin can read the closing references it names
+  (`Closes b:k3f9`); a stored record written before that field simply has no description.
 - The `gh pr view` status rollup does not separately identify required versus optional checks. The “checks passed” transition is therefore conservative: GitHub must report `mergeStateStatus: CLEAN`, at least one status entry must be present, and every returned entry must be successful. It does not claim a separately enumerated branch-protection check set.
 - Rate limiting applies persisted exponential backoff starting at two minutes and capped at one hour. Other CLI or schema failures retain the last known state and retry on a later cycle.
 - On merge or close, watching stops and the plugin asks `thread-sidebar` to settle the linked thread. Auto-settle can skip running, waiting, blank, archived, pinned, opted-out, or descendant-active threads. If `thread-sidebar` is absent, pull-request state continues updating and the Host logs that message/settle integration was unavailable.

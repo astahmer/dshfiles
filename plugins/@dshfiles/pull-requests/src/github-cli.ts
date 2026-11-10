@@ -2,9 +2,9 @@ import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { Context, Duration, Effect, Layer, Schema, Stream } from 'effect'
 import { githubPullRequestViewSchema, type GitHubPullRequestView } from './pull-request-model.js'
 
-const POLL_FIELDS = 'state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,comments,reviews'
+const POLL_FIELDS = 'state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,comments,reviews,body'
 const PULL_REQUEST_PROJECTION =
-  '. | {state, mergeable, mergeStateStatus, reviewDecision, statusCheckRollup: (.statusCheckRollup // [] | map(if has("context") then {context, state} else {name, status, conclusion} end)), comments: (.comments | map({author, createdAt})), reviews: (.reviews | map({author, state, submittedAt}))}'
+  '. | {state, mergeable, mergeStateStatus, reviewDecision, statusCheckRollup: (.statusCheckRollup // [] | map(if has("context") then {context, state} else {name, status, conclusion} end)), comments: (.comments | map({author, createdAt})), reviews: (.reviews | map({author, state, submittedAt})), body}'
 const collectText = <E>(stream: Stream.Stream<Uint8Array, E>) =>
   stream.pipe(
     Stream.decodeText(),

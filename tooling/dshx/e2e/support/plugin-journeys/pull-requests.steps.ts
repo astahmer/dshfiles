@@ -19,7 +19,7 @@ case "$1 $2" in
   "repo view") echo '{"nameWithOwner":"acme/widget","defaultBranchRef":{"name":"main"}}' ;;
   "pr list") echo '[]' ;;
   "pr create") echo '${PULL_REQUEST_URL}' ;;
-  "pr view") echo '{"state":"OPEN","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","reviewDecision":null,"statusCheckRollup":[{"name":"unit","status":"COMPLETED","conclusion":"SUCCESS"}],"comments":[],"reviews":[]}' ;;
+  "pr view") echo '{"state":"OPEN","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","reviewDecision":null,"statusCheckRollup":[{"name":"unit","status":"COMPLETED","conclusion":"SUCCESS"}],"comments":[],"reviews":[],"body":""}' ;;
   *) echo "stub gh: unexpected $*" >&2; exit 2 ;;
 esac
 `

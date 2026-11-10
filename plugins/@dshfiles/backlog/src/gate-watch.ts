@@ -8,7 +8,8 @@ import { BacklogMainBranch } from './main-branch.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
 import { BacklogGates } from './gates.js'
 import { AutomationHost } from './peer-replication.js'
-import { PullRequestState } from './pull-request-state.js'
+import { PullRequestState, type PullRequestView } from './pull-request-state.js'
+import { BacklogSignals } from './signals.js'
 import { BacklogStore } from './store.js'
 
 const MAX_REPOSITORIES = 10
@@ -25,10 +26,21 @@ const openStatuses = ['inbox', 'todo', 'doing'] as const
 const revisionPattern = /^[0-9a-z]{4,64}$/
 
 /**
+ * The item refs each merged pull request closes through its description (`Closes b:k3f9`), so the gate watch can close
+ * items the PR names and not only the one it is linked to. A pull request still open closes nothing.
+ */
+export const mergedPullRequestClosers = (pullRequests: readonly PullRequestView[]): readonly { readonly url: string; readonly refs: readonly string[] }[] =>
+  pullRequests.flatMap(pull => {
+    if (pull.state !== 'merged' || pull.body === null) return []
+    const refs = BacklogSignals.closedBy(pull.body)
+    return refs.length === 0 ? [] : [{ url: pull.url, refs }]
+  })
+
+/**
  * Resolves gates from what the Host already watches: pull requests through `@dshfiles/pull-requests`, revisions on
  * the project's main branch with one jj read per repository, project-check receipts of the threads linked to the item, and the calendar
  * for date gates (derived on read, nothing to resolve). A linked pull request with relation `fixes` that merges moves
- * its item to done, unless you set the status by hand.
+ * its item to done, and so do the items its description names (`Closes b:k3f9`), unless you set the status by hand.
  */
 export const GateWatch = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -56,13 +68,35 @@ export const GateWatch = Layer.effectDiscard(
       if (!known.available) return
       const merged = new Set(known.pullRequests.filter(pull => pull.state === 'merged').map(pull => pull.url))
       const isMerged = (url: string) => merged.has(BacklogGates.pullRequestOf(url)?.url ?? url)
+      const closed = new Set<number>()
+      // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each item resolves its own gates and links in order; the set dedupes them.
       for (const item of items) {
         const resolved: Resolution[] = item.gates
           .filter(gate => gate.open && gate.kind === 'pr' && isMerged(gate.target))
           .map(gate => ({ gateId: gate.id, detail: 'merged' }))
         if (resolved.length > 0) yield* store.resolveGates({ id: item.id, resolved })
-        for (const link of item.links.filter(candidate => candidate.type === 'url' && candidate.relation === 'fixes' && isMerged(candidate.target)))
+        for (const link of item.links.filter(candidate => candidate.type === 'url' && candidate.relation === 'fixes' && isMerged(candidate.target))) {
           yield* store.applySignal({ id: item.id, status: 'done', link, reason: `fixed by ${BacklogGates.label({ kind: 'pr', target: link.target })}` })
+          closed.add(item.id)
+        }
+      }
+      // A merged pull request closes the items its own description names, not only the one it is linked to.
+      // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- resolvers are cheap local reads, run in ref order until a first miss.
+      for (const closer of mergedPullRequestClosers(known.pullRequests)) {
+        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- one ref resolves at a time, skipping refs that already closed.
+        for (const ref of closer.refs) {
+          const id = yield* store.resolve(ref)
+          if (id === undefined || closed.has(id)) continue
+          const found = yield* store.get(id)
+          if (!found.ok || found.value.item.status === 'done' || found.value.item.status === 'dropped') continue
+          yield* store.applySignal({
+            id,
+            status: 'done',
+            link: { type: 'url', target: closer.url, relation: 'fixes' },
+            reason: `closed by ${BacklogGates.label({ kind: 'pr', target: closer.url })}`,
+          })
+          closed.add(id)
+        }
       }
     })
 

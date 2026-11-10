@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { PullRequestWatcher, type PullRequestRecord, type PullRequestSnapshot } from './pull-request-model.js'
+import { Schema } from 'effect'
+import {
+  MAX_SNAPSHOT_BODY_CHARS,
+  PullRequestWatcher,
+  pullRequestSnapshotSchema,
+  summarizePullRequest,
+  type GitHubPullRequestView,
+  type PullRequestRecord,
+  type PullRequestSnapshot,
+} from './pull-request-model.js'
 
 const snapshot = (state: PullRequestSnapshot['state'] = 'OPEN'): PullRequestSnapshot => ({
   state,
@@ -27,6 +36,37 @@ const record = (fields: Partial<PullRequestRecord> = {}): PullRequestRecord => (
   consecutiveRateLimits: 0,
   lastError: null,
   ...fields,
+})
+
+describe('pull request description', () => {
+  it('keeps a bounded description, and decodes a stored record that predates it', () => {
+    const view: GitHubPullRequestView = {
+      state: 'MERGED',
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+      reviewDecision: null,
+      statusCheckRollup: [],
+      comments: [],
+      reviews: [],
+      body: `Closes b:k3f9\n${'x'.repeat(MAX_SNAPSHOT_BODY_CHARS)}`,
+    }
+    const snapshot = summarizePullRequest(view)
+    expect(snapshot.body?.startsWith('Closes b:k3f9')).toBe(true)
+    expect(snapshot.body?.length).toBe(MAX_SNAPSHOT_BODY_CHARS)
+
+    const legacy = {
+      state: 'MERGED',
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+      reviewDecision: null,
+      checks: [],
+      commentsCount: 0,
+      latestComment: null,
+      reviewsCount: 0,
+      latestReview: null,
+    }
+    expect(Schema.decodeUnknownSync(pullRequestSnapshotSchema)(legacy)).not.toHaveProperty('body')
+  })
 })
 
 describe('watcher status', () => {

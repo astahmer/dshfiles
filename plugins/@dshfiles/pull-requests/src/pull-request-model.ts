@@ -44,6 +44,7 @@ export const githubPullRequestViewSchema = Schema.Struct({
   statusCheckRollup: Schema.NullOr(Schema.Array(checkRollupSchema)),
   comments: Schema.Array(commentSchema),
   reviews: Schema.Array(reviewSchema),
+  body: Schema.String,
 })
 
 export type GitHubPullRequestView = Schema.Schema.Type<typeof githubPullRequestViewSchema>
@@ -71,6 +72,9 @@ export const pullRequestCheckSchema = Schema.Struct({ status: Schema.Literals(su
 
 export const pullRequestEventSchema = Schema.Struct({ at: githubTimestampSchema, author: Schema.NullOr(Schema.String) })
 
+/** How much of a pull request's description a stored snapshot keeps: closing references sit at its top. */
+export const MAX_SNAPSHOT_BODY_CHARS = 16_384
+
 export const pullRequestSnapshotSchema = Schema.Struct({
   state: Schema.Literals(['OPEN', 'CLOSED', 'MERGED']),
   mergeable: Schema.Literals(['MERGEABLE', 'CONFLICTING', 'UNKNOWN']),
@@ -81,6 +85,8 @@ export const pullRequestSnapshotSchema = Schema.Struct({
   latestComment: Schema.NullOr(pullRequestEventSchema),
   reviewsCount: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   latestReview: Schema.NullOr(pullRequestEventSchema),
+  /** The description as polled, bounded; absent in records written before it was kept. */
+  body: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_SNAPSHOT_BODY_CHARS))),
 })
 
 export type PullRequestSnapshot = Schema.Schema.Type<typeof pullRequestSnapshotSchema>
@@ -245,6 +251,7 @@ export const summarizePullRequest = (view: GitHubPullRequestView): PullRequestSn
     latestComment: newest(comments),
     reviewsCount: view.reviews.length,
     latestReview: newest(reviews),
+    body: view.body.slice(0, MAX_SNAPSHOT_BODY_CHARS),
   }
 }
 
