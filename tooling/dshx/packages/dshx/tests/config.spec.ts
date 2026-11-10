@@ -154,6 +154,14 @@ describe('resolveDshxConfig', () => {
     })
   })
 
+  it('keeps the inline DSHX runtime unless a Host opts into the snapshot', async () => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/host.ts')
+    await expect(resolveDshxConfig({ cwd: root })).resolves.not.toHaveProperty('hostDshxRuntime')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { host: { dshxRuntime: 'snapshot' } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ hostDshxRuntime: 'snapshot' })
+  })
+
   it('rejects Host bundle subpaths, duplicates, and Cordis identity', async () => {
     for (const dependencies of ["['@test/local-core/subpath']", "['@test/local-core', '@test/local-core']", "['@deepseek-ai/cordis']"]) {
       const { root } = await temporaryProject()
@@ -182,6 +190,13 @@ describe('resolveDshxConfig', () => {
     await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientShared: '@test/runtime' })
     await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { sharedRuntime: { provide: ['zod', 'radix-ui'] } } }\n")
     await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientSharedRuntime: ['zod', 'radix-ui'] })
+    await expect(resolveDshxConfig({ cwd: root })).resolves.not.toHaveProperty('clientSharedDshxRuntime')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { sharedRuntime: { provide: ['zod'], dshxRuntime: true } } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientSharedRuntime: ['zod'], clientSharedDshxRuntime: true })
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { shared: '@test/runtime' } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.not.toHaveProperty('clientDshxRuntime')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { client: { shared: '@test/runtime', dshxRuntime: 'shared' } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({ clientShared: '@test/runtime', clientDshxRuntime: 'shared' })
     for (const client of [
       "{ shared: 'Not A Package' }",
       "{ shared: '@test/runtime', sharedRuntime: { provide: ['zod'] } }",
@@ -291,6 +306,10 @@ describe('resolveDshxConfig', () => {
     ["export default { build: { minify: 'yes' } }\n", 'minify'],
     ["export default { compatibility: { allowUnsupported: 'yes' } }\n", 'allowUnsupported'],
     ['export default { host: { bundleDependencies: [7] } }\n', 'unique bare package roots'],
+    ["export default { host: { dshxRuntime: 'shared' } }\n", 'dshxRuntime'],
+    ["export default { client: { dshxRuntime: 'snapshot' } }\n", 'client.dshxRuntime'],
+    ["export default { client: { dshxRuntime: 'shared' } }\n", 'requires client.shared'],
+    ["export default { client: { sharedRuntime: { provide: ['zod'], dshxRuntime: 'yes' } } }\n", 'client.sharedRuntime.dshxRuntime'],
     ["export default { client: { sharedRuntime: { provide: ['zod', 7] } } }\n", 'unique bare module specifiers'],
   ])('rejects invalid config: %s', async (config, message) => {
     const { root } = await temporaryProject()

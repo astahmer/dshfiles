@@ -12,8 +12,8 @@ const CONFIG_FILENAME = 'dshx.config.ts'
 const PACKAGE_FILENAME = 'package.json'
 const TOP_LEVEL_KEYS = new Set(['name', 'host', 'client', 'modules', 'profile', 'dev', 'build', 'compatibility'])
 const FACE_KEYS = new Set(['entry', 'vite'])
-const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies'])
-const CLIENT_FACE_KEYS = new Set([...HOST_FACE_KEYS, 'shared', 'sharedRuntime'])
+const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies', 'dshxRuntime'])
+const CLIENT_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies', 'shared', 'sharedRuntime', 'dshxRuntime'])
 const VITE_KEYS = new Set(['plugins'])
 
 const decode = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): S['Type'] | undefined =>
@@ -141,6 +141,18 @@ function validateSharedRuntime(client: JsonObject, file: string): void {
       hint: 'Use client: { shared: "@scope/shared-runtime" }.',
     })
   }
+  if (client.dshxRuntime !== undefined && client.dshxRuntime !== 'inline' && client.dshxRuntime !== 'shared') {
+    throw new DshxError('DSHX4004', 'client.dshxRuntime must be "inline" or "shared".', {
+      file,
+      hint: 'Use client: { shared: "@scope/shared-runtime", dshxRuntime: "shared" } to read the DSHX runtime from the supplier.',
+    })
+  }
+  if (client.dshxRuntime === 'shared' && client.shared === undefined) {
+    throw new DshxError('DSHX4004', 'client.dshxRuntime "shared" requires client.shared.', {
+      file,
+      hint: 'Name the shared-runtime supplier that serves the DSHX Client runtime: client: { shared: "@scope/shared-runtime" }.',
+    })
+  }
   if (client.sharedRuntime === undefined) return
   if (client.shared !== undefined) {
     throw new DshxError('DSHX4004', 'client.shared and client.sharedRuntime cannot be combined.', {
@@ -155,7 +167,13 @@ function validateSharedRuntime(client: JsonObject, file: string): void {
       hint: 'Use client: { sharedRuntime: { provide: ["zod", "@tanstack/react-query"] } }.',
     })
   }
-  rejectUnknownKeys(client.sharedRuntime, new Set(['provide']), 'client.sharedRuntime', file)
+  rejectUnknownKeys(client.sharedRuntime, new Set(['provide', 'dshxRuntime']), 'client.sharedRuntime', file)
+  if (client.sharedRuntime.dshxRuntime !== undefined && typeof client.sharedRuntime.dshxRuntime !== 'boolean') {
+    throw new DshxError('DSHX4004', 'client.sharedRuntime.dshxRuntime must be a boolean.', {
+      file,
+      hint: 'Use client: { sharedRuntime: { provide: [...], dshxRuntime: true } } to serve the stored DSHX Client runtimes.',
+    })
+  }
 }
 
 function checkConfig(value: unknown, file: string): DshxConfig {
@@ -181,6 +199,12 @@ function checkConfig(value: unknown, file: string): DshxConfig {
     rejectUnknownKeys(candidate, field === 'client' ? CLIENT_FACE_KEYS : HOST_FACE_KEYS, field, file)
     optionalNonEmptyString(candidate.entry, `${field}.entry`, file)
     optionalPackageNames(candidate.bundleDependencies, `${field}.bundleDependencies`, file)
+    if (field === 'host' && candidate.dshxRuntime !== undefined && candidate.dshxRuntime !== 'inline' && candidate.dshxRuntime !== 'snapshot') {
+      throw new DshxError('DSHX4004', 'host.dshxRuntime must be "inline" or "snapshot".', {
+        file,
+        hint: 'Use host: { dshxRuntime: "snapshot" } to share one immutable DSHX runtime between Host bundles.',
+      })
+    }
     if (candidate.vite !== undefined) {
       if (!isObject(candidate.vite)) {
         throw new DshxError('DSHX4004', `${field}.vite must be an object.`, {
@@ -428,12 +452,15 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     ...(hostEntry !== undefined && { hostEntry }),
     ...(clientEntry !== undefined && { clientEntry }),
     hostBundleDependencies,
+    ...(loaded.config.host !== false && loaded.config.host?.dshxRuntime !== undefined && { hostDshxRuntime: loaded.config.host.dshxRuntime }),
     ...(modules.length !== 0 && { modules }),
     clientBundleDependencies: loaded.config.client === false ? [] : (loaded.config.client?.bundleDependencies ?? []),
     ...(!(loaded.config.client === false || loaded.config.client?.shared === undefined) && { clientShared: loaded.config.client.shared }),
     ...(!(loaded.config.client === false || loaded.config.client?.sharedRuntime === undefined) && {
       clientSharedRuntime: loaded.config.client.sharedRuntime.provide,
+      ...(loaded.config.client.sharedRuntime.dshxRuntime === true && { clientSharedDshxRuntime: true }),
     }),
+    ...(loaded.config.client !== false && loaded.config.client?.dshxRuntime !== undefined && { clientDshxRuntime: loaded.config.client.dshxRuntime }),
     ...(hostVitePlugins.length !== 0 && { hostVitePlugins }),
     ...(clientVitePlugins.length !== 0 && { clientVitePlugins }),
     outDir: resolve(root, 'dist'),

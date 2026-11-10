@@ -106,6 +106,11 @@ export interface WorkbenchPanelRegistry {
   readonly hasOpenRequests: () => boolean
   readonly takeOpenRequests: () => readonly string[]
   readonly subscribe: (listener: () => void) => () => void
+  /**
+   * Run several registrations and disposals; subscribers hear them once, at the end. Optional: a registry created by
+   * an older bundle on this page lacks it.
+   */
+  readonly batch?: (change: () => void) => void
 }
 
 export const createWorkbenchPanelRegistry = (): WorkbenchPanelRegistry => {
@@ -113,8 +118,14 @@ export const createWorkbenchPanelRegistry = (): WorkbenchPanelRegistry => {
   const listeners = new Set<() => void>()
   const openRequests: string[] = []
   let snapshot: readonly WorkbenchPanelDefinition[] = []
+  let batchDepth = 0
+  let batchChanged = false
 
   const notify = (): void => {
+    if (batchDepth > 0) {
+      batchChanged = true
+      return
+    }
     snapshot = [...definitions.values()]
     for (const listener of listeners) listener()
   }
@@ -141,6 +152,18 @@ export const createWorkbenchPanelRegistry = (): WorkbenchPanelRegistry => {
         if (definitions.get(definition.id) !== definition) return
         definitions.delete(definition.id)
         notify()
+      }
+    },
+    batch: change => {
+      batchDepth += 1
+      try {
+        change()
+      } finally {
+        batchDepth -= 1
+        if (batchDepth === 0 && batchChanged) {
+          batchChanged = false
+          notify()
+        }
       }
     },
     get: id => definitions.get(id),

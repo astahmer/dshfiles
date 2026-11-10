@@ -37,17 +37,20 @@ const pinned = Effect.fnUntraced(function* (run: JjRun) {
   return { operationId, revisions, ids, count }
 })
 
-const landmarkDefinitions = [
-  { kind: 'current', label: 'Current', revset: '@' },
-  { kind: 'main-origin', label: 'main@origin', revset: 'remote_bookmarks(exact:main, exact:origin)' },
-  { kind: 'main', label: 'main', revset: 'bookmarks(exact:main)' },
-  { kind: 'default', label: 'Default', revset: 'present(default@)' },
-] satisfies { kind: GraphNavigation['landmarks'][number]['kind']; label: string; revset: string }[]
+/** The `main` landmarks name the project's main branch (`main` unless jj-integration says otherwise). */
+const landmarkDefinitions = (bookmark: string) =>
+  [
+    { kind: 'current', label: 'Current', revset: '@' },
+    { kind: 'main-origin', label: `${bookmark}@origin`, revset: `remote_bookmarks(exact:${JSON.stringify(bookmark)}, exact:"origin")` },
+    { kind: 'main', label: bookmark, revset: `bookmarks(exact:${JSON.stringify(bookmark)})` },
+    { kind: 'default', label: 'Default', revset: 'present(default@)' },
+  ] satisfies { kind: GraphNavigation['landmarks'][number]['kind']; label: string; revset: string }[]
 
-const readGraphNavigation = Effect.fnUntraced(function* (run: JjRun) {
+const readGraphNavigation = Effect.fnUntraced(function* (run: JjRun, bookmark = 'main') {
   const snapshot = yield* pinned(run)
+  const definitions = landmarkDefinitions(bookmark)
   const landmarks = yield* Effect.forEach(
-    landmarkDefinitions,
+    definitions,
     definition =>
       Effect.gen(function* () {
         const result = yield* snapshot.revisions(definition.revset)
@@ -61,7 +64,7 @@ const readGraphNavigation = Effect.fnUntraced(function* (run: JjRun) {
         return landmark
       }),
     // Each landmark is one jj process over its own revset and none depends on another's output.
-    { concurrency: landmarkDefinitions.length },
+    { concurrency: definitions.length },
   )
   const navigation: GraphNavigation = { operationId: snapshot.operationId, landmarks }
   return navigation

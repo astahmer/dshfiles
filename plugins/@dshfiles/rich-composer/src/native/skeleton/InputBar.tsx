@@ -44,6 +44,9 @@ import { observeControlRow } from './control-row-layout.ts'
 import { observeRunRowPlacement } from './run-row-placement.ts'
 import css from './InputBar.module.css'
 
+/** `@dshfiles/workbench`'s `KeptThreadViews.shownEvent`: a kept thread view was shown again without remounting. */
+const THREAD_VIEW_SHOWN_EVENT = 'dshfiles:thread-view-shown'
+
 export type InputBarProps = ComposerBarProps
 
 export const InputBar = memo(function InputBar({
@@ -189,6 +192,18 @@ export const InputBar = memo(function InputBar({
     if (locked || editor === null) return
     focusDraftEditor(editor, revealSelection)
   }, [locked, sessionId, editor])
+
+  // A thread view the workbench kept mounted is shown again without remounting, so the unlock effect above does not
+  // run; take focus the same way. The draft's scroll offset survived with the view, so nothing needs revealing.
+  useEffect(() => {
+    if (locked || editor === null) return
+    const onShown = (event: Event): void => {
+      const root = editor.getRootElement()
+      if (root !== null && event.target instanceof Node && event.target.contains(root)) focusDraftEditor(editor, () => undefined)
+    }
+    document.addEventListener(THREAD_VIEW_SHOWN_EVENT, onShown)
+    return () => document.removeEventListener(THREAD_VIEW_SHOWN_EVENT, onShown)
+  }, [locked, editor])
 
   // A persisted draft arrives AFTER the unlock effect: DefaultConversationViews
   // adopts it in its own mount effect, and a parent's mount effect runs after

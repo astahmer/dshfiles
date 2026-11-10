@@ -17,6 +17,18 @@ export class TranscriptWindow {
   static readonly growthRows = 24
   /** Steps an open may take on its own while its rows do not fill the view; scrolling up takes the rest. */
   static readonly openingFillSteps = 3
+  /**
+   * Rows a reader back at the newest row keeps mounted. Reading up mounts older rows; without this bound they stayed
+   * mounted after the reader came back, so a long session's DOM only grew. It stays above what the opening fill steps
+   * mount, so trimming never undoes a fill that a short view still needs.
+   */
+  static readonly followingRows = 120
+
+  /** Index of the first row to keep once the reader follows the newest row again, or null when the window is within bounds. */
+  static trimmedStart(input: { readonly count: number; readonly start: number }): number | null {
+    const keep = Math.max(0, input.count - TranscriptWindow.followingRows)
+    return input.start < keep ? keep : null
+  }
 
   /** Index of the first mounted row when a thread opens, keeping a restored reading position mounted. */
   static openingStart(input: { readonly count: number; readonly anchorIndex: number | null }): number {
@@ -129,9 +141,18 @@ export const useTranscriptWindow = (input: WindowInput) => {
     [entries, seqOf, start, widenTo, loadThrough],
   )
 
+  /** Drop rows read up the transcript past the bound; the scroll owner calls it while the reader follows the newest row. */
+  const keepTail = useCallback(() => {
+    if (startKey === undefined || !ready) return
+    const trimmed = TranscriptWindow.trimmedStart({ count: entries.length, start })
+    const row = trimmed === null ? undefined : entries[trimmed]
+    if (row !== undefined) setStartKey(chatRenderKey(row))
+  }, [startKey, ready, entries, start])
+
   return {
     entries: mounted,
     hidden: start,
+    keepTail,
     hasMore: hasMore || start > 0,
     firstSeq,
     loadOlder: loadOlderRows,

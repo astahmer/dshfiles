@@ -178,6 +178,9 @@ takes an explicit `apply` (false previews) and never forces a discard.
 `jj_thread_cleanup_jobs` reads the background trail the dialog's confirmation
 now starts (state, phase, counts, the workspace in flight, the newest result),
 so the agent can follow the same asynchronous pass the user watches.
+Settings › Projects › **Main branch** pairs `jj_project_bookmark` (read-only:
+the branch and the layer that chose it) with `jj_set_project_bookmark` (write;
+`bookmark: null` reverses it to Automatic).
 
 Deliberately not bound, because an existing tool already covers the decision or
 there is no model decision to make: `land` and `threadAt` (both accept an

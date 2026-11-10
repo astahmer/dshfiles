@@ -38,6 +38,7 @@ const hostVerb =
 const effectDeps = (deps: FixtureDeps): ThreadActionDeps => ({
   ...deps,
   listSessions: hostVerb(deps.listSessions),
+  sessionExists: hostVerb(deps.sessionExists),
   readTitles: hostVerb(deps.readTitles),
   listThreadRelations: hostVerb(deps.listThreadRelations),
   searchThreadContent: hostVerb(deps.searchThreadContent),
@@ -71,6 +72,7 @@ const createThreadActions = (deps: FixtureDeps) => {
       Effect.runPromise(action({ input: context.input, caller: context.caller }), { signal: context.signal })
   return {
     list: call(actions.list),
+    status: call(actions.status),
     references: call(actions.references),
     archive: call(actions.archive),
     unarchive: call(actions.unarchive),
@@ -97,6 +99,7 @@ const createThreadActions = (deps: FixtureDeps) => {
 
 const createDeps = (overrides: Partial<FixtureDeps> = {}): FixtureDeps => ({
   listSessions: async () => [summary('session-a'), summary('session-b')],
+  sessionExists: async () => true,
   readTitles: async ids => new Map(ids.map(id => [id, `title ${id}`])),
   listThreadRelations: async () => [],
   searchThreadContent: async () => [],
@@ -178,6 +181,38 @@ describe('thread actions: fan out', () => {
     expect(calls.indexOf('select:session-1:alpha')).toBeLessThan(calls.indexOf('prompt:session-1'))
     expect(calls.indexOf('select:session-2:beta')).toBeLessThan(calls.indexOf('prompt:session-2'))
     expect(calls).toContain('rename:session-1:Compare these answers · alpha')
+  })
+})
+
+describe('thread actions: status', () => {
+  test('reports each named thread as stored, archived and settled without listing or reading titles', async () => {
+    const stored = new Set(['session-live', 'session-archived', 'session-settled'])
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => {
+          throw new Error('status must not list threads')
+        },
+        readTitles: async () => {
+          throw new Error('status must not read titles')
+        },
+        sessionExists: async sessionId => stored.has(sessionId),
+        archivedSessionIds: () => ['session-archived'],
+        settledSessionIds: () => ['session-settled'],
+      }),
+    )
+
+    const result = await actions.status({
+      input: { sessionIds: ['session-live', 'session-archived', 'session-settled', 'session-missing'] },
+      caller: agent('caller'),
+      signal,
+    })
+
+    expect(result.threads).toEqual([
+      { sessionId: 'session-live', exists: true, archived: false, settled: false },
+      { sessionId: 'session-archived', exists: true, archived: true, settled: false },
+      { sessionId: 'session-settled', exists: true, archived: false, settled: true },
+      { sessionId: 'session-missing', exists: false, archived: false, settled: false },
+    ])
   })
 })
 
@@ -941,6 +976,7 @@ describe('thread actions: tool exposure', () => {
       'thread_prompt',
       'thread_stop',
       'thread_select_model',
+      'thread_status',
       'thread_references',
       'project_list',
       'project_register',
@@ -960,6 +996,6 @@ describe('thread actions: tool exposure', () => {
     const readOnly = Object.values(threadActionsApi.methods)
       .filter(method => method.tool?.readOnly === true)
       .map(method => method.tool?.name)
-    expect(readOnly).toEqual(['thread_list', 'thread_references', 'project_list'])
+    expect(readOnly).toEqual(['thread_list', 'thread_status', 'thread_references', 'project_list'])
   })
 })

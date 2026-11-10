@@ -86,7 +86,7 @@ export class Pricing extends Context.Service<
           if (Option.isNone(current)) return
           const cache = current.value
           const replace = catalogChanged || (yield* repo.getMeta('pricingFetchedAt')) !== String(cache.fetchedAt)
-          const routes = replace ? yield* repo.routeBands : yield* repo.unratedRouteBands
+          const routes = replace ? yield* repo.routeBands() : yield* repo.unratedRouteBands()
           if (routes.length === 0 && !replace) return
           yield* repo.writeRates({ rates: ratesFor({ cache, routes, kinds: yield* accountKinds.read }), replace })
           yield* repo.setMeta({ key: 'pricingFetchedAt', value: String(cache.fetchedAt) })

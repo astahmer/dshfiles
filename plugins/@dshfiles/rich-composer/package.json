@@ -40,7 +40,7 @@
     "@dshfiles/session-controller": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
-    "zod": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
@@ -88,7 +88,6 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "clsx": "catalog:",
-    "effect": "catalog:",
     "jsdom": "catalog:",
     "lexical": "catalog:",
     "react": "catalog:",

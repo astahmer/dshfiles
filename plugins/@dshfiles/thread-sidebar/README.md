@@ -831,11 +831,11 @@ Saved views use the `thread-sidebar-views` API over the same `thread-sidebar.thr
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in
 `src/thread-actions-api.ts`) exposes the sidebar's thread and project actions to
-the Agent as twenty-one native tools: `thread_list`, `thread_archive`,
+the Agent as twenty-three native tools: `thread_list`, `thread_archive`,
 `thread_unarchive`, `thread_settle`, `thread_unsettle`, `thread_pin`,
 `thread_unpin`, `thread_rename`,
-`thread_fork`, `thread_continue_in`, `thread_create`, `thread_prompt`, `thread_stop`,
-`thread_select_model`, `thread_references`, `project_list`,
+`thread_fork`, `thread_continue_in`, `thread_fan_out`, `thread_create`, `thread_prompt`, `thread_stop`,
+`thread_select_model`, `thread_status`, `thread_references`, `project_list`,
 `project_register`, `project_rename`, `project_delete`, `project_reorder`, and
 `thread_move` (a reorder within the project that already holds the thread;
 `thread_continue_in` is the cross-project move). `src/thread-actions.ts`

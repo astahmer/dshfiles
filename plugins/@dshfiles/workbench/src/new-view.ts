@@ -4,6 +4,7 @@ import { WORKBENCH_COMPONENT } from './layout-store.js'
 
 const NEW_VIEW_PREFIX = 'dshfiles-workbench.new-view/'
 const sourceParams = Schema.Struct({ sourceId: Schema.String.check(Schema.isMinLength(1)) })
+const isSourceParams = Schema.is(sourceParams)
 
 export interface NewViewSelection {
   readonly group?: DockviewGroupPanel
@@ -17,10 +18,10 @@ export class NewViewTabs {
   }
 
   /** Validate source parameters where Dockview restores untrusted browser layout data. */
-  // oxlint-disable-next-line antislop/no-unknown-parameters -- Dockview persistence is the input boundary; safeParse validates it immediately below.
+  // oxlint-disable-next-line antislop/no-unknown-parameters -- Dockview persistence is the input boundary; the guard validates it immediately below.
   static sourceId(params: unknown, fallback: string): string {
-    const parsed = Schema.decodeUnknownResult(sourceParams)(params)
-    return parsed._tag === 'Success' ? parsed.success.sourceId : fallback
+    // Most panels carry no source parameters: a guard answers without building a decode error per panel.
+    return isSourceParams(params) ? params.sourceId : fallback
   }
 
   static open(api: DockviewApi, group?: DockviewGroupPanel, direction: 'within' | 'right' | 'below' = 'within'): IDockviewPanel {

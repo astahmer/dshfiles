@@ -92,6 +92,12 @@
           "id": "usage.cost-catalog",
           "file": "plugins/@dshfiles/usage/src/cost.test.ts",
           "testName": "prices routes from the AI Accounts catalog file and re-prices when the catalog changes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.store-opens-on-first-read",
+          "file": "plugins/@dshfiles/usage/src/store-lazy.test.ts",
+          "testName": "opens the SQLite file on the first read, not when the plugin activates"
         }
       ],
       "telemetry": [

@@ -315,8 +315,8 @@ const THREADS_DIRECTORY_SUFFIX = '-threads'
  * from, so the workspace path is folded to its repository and never listed as a project of its own.
  */
 const projectPath = (path: string): string => {
-  const normalized = path.replace(/\/+$/u, '')
-  const separator = normalized.lastIndexOf('/')
+  const normalized = path.replace(/[\\/]+$/u, '')
+  const separator = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'))
   if (separator < 0) return normalized
   const parent = normalized.slice(0, separator)
   if (parent.length <= THREADS_DIRECTORY_SUFFIX.length || !parent.endsWith(THREADS_DIRECTORY_SUFFIX)) return normalized

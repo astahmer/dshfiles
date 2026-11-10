@@ -243,8 +243,8 @@ export default defineClient({
         const view = readHostView({
           activePanelId: ctx.layout.panelInfo.getSnapshot().activePanelId,
           currentSessionId: ctx.uiSession.adapter.current.getSnapshot().key,
-          sessions: sessions.ids.flatMap(id => sessions.byId[id] ?? []),
-          workspaces: ctx.workspaces.list.getSnapshot().items,
+          byId: sessions.byId,
+          workspaces: HostSnapshotsModel.selectStableWorkspaceItems(ctx.workspaces.list.getSnapshot().items),
         })
         // The Host cannot name a scope, so a scoped tab on screen reports itself; otherwise the panel is bare.
         const snapshot = actor.getSnapshot()
@@ -257,10 +257,9 @@ export default defineClient({
           reported = key
           actor.send({ type: 'host.navigated', target, projectId: view.projectId })
         }
-        const known = new Set(Object.keys(sessions.byId))
         const missing = Object.values(actor.getSnapshot().context.sets)
           .flatMap(set => set.tabs)
-          .flatMap(tab => (tab.target.kind === 'thread' && !known.has(tab.target.sessionId) ? [tab.target.sessionId] : []))
+          .flatMap(tab => (tab.target.kind === 'thread' && !Object.hasOwn(sessions.byId, tab.target.sessionId) ? [tab.target.sessionId] : []))
         if (missing.length > 0) actor.send({ type: 'threads.missing', sessionIds: [...new Set(missing)] })
       }
       const disposers = [
@@ -391,12 +390,11 @@ export default defineClient({
             }),
           )
           const byId = props.useSessions(HostSnapshotsModel.selectStableSessionListState).byId
-          const sessions = useMemo(() => new Map<string, SessionSummary>(Object.values(byId).map(session => [session.id, session])), [byId])
-          const workspaceItems = props.useWorkspaces(state => state.items)
-          const workspaceForThread = useMemo(
-            () => createThreadWorkspaceResolver({ sessions: Object.values(byId), workspaces: workspaceItems }),
-            [byId, workspaceItems],
-          )
+          // oxlint-disable-next-line antislop/no-passthrough-variable -- widens the SessionId-keyed record so a tab's plain string id can look a row up.
+          const rowsById: Readonly<Record<string, SessionSummary | undefined>> = byId
+          const sessionOf = (sessionId: string): SessionSummary | undefined => (Object.hasOwn(rowsById, sessionId) ? rowsById[sessionId] : undefined)
+          const workspaceItems = props.useWorkspaces(state => HostSnapshotsModel.selectStableWorkspaceItems(state.items))
+          const workspaceForThread = useMemo(() => createThreadWorkspaceResolver({ byId, workspaces: workspaceItems }), [byId, workspaceItems])
           const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
           // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges,
           // and both read the one page-wide poll instead of each holding their own interval.
@@ -433,7 +431,7 @@ export default defineClient({
               }
             }
             const sessionId = tab.target.sessionId
-            const session = sessions.get(sessionId)
+            const session = sessionOf(sessionId)
             const status = session === undefined ? undefined : statuses.get(session.id)
             const tabStatus = threadTabStatus({
               needsYou: status?.pendingInteraction !== undefined,
@@ -467,7 +465,7 @@ export default defineClient({
           const pick = (target: HostTarget | null): void => actor.send({ type: 'start.pick', target })
           const startSections = (): readonly StartSection[] => {
             const threads = recentThreads(
-              ctx.sessions.list.getSnapshot().ids.flatMap(id => sessions.get(id) ?? []),
+              ctx.sessions.list.getSnapshot().ids.flatMap(id => sessionOf(id) ?? []),
               session => statuses.get(session.id)?.running ?? session.running,
             )
             const panels = ctx.slots

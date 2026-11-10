@@ -9,6 +9,7 @@ import { NumberedSection } from './panel-primitives.js'
 import { AccountDraftModel } from './account-draft.js'
 import { shouldOfferCredentialSetup } from './credential-setup-model.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
+import { ShellCommand } from './shell-command.js'
 
 const PathField = (props: {
   readonly label: string
@@ -58,20 +59,21 @@ const KEY_FIELD = {
   },
 } satisfies Record<AccountDraft['kind'], { readonly label: string; readonly hint: string; readonly placeholder: string } | null>
 
-const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
-
 const launchCommandFor = (draft: AccountDraft): string | null => {
-  if (draft.kind === 'codex' && draft.shadowHomePath.trim() !== '') return `CODEX_HOME=${shellQuote(draft.shadowHomePath)} codex`
+  if (draft.kind === 'codex' && draft.shadowHomePath.trim() !== '') return ShellCommand.withEnvironment('CODEX_HOME', draft.shadowHomePath, 'codex')
   if (draft.kind === 'claude') return claudeLaunchCommand(draft.homePath.trim())
   return null
 }
 
-/** Claude Code reads its default login only with CLAUDE_CONFIG_DIR unset; a quoted `~` would not expand. */
+/**
+ * Claude Code reads its default login only with CLAUDE_CONFIG_DIR unset; a quoted `~` would not expand. A `~/` path
+ * names no platform, so it keeps the POSIX form; a Windows Host shows its homes drive-absolute, which get PowerShell.
+ */
 const claudeLaunchCommand = (homePath: string): string | null => {
   if (homePath === '') return null
   if (/^~\/\.claude\/?$/u.test(homePath)) return 'claude'
-  if (homePath.startsWith('~/')) return `CLAUDE_CONFIG_DIR="$HOME"/${shellQuote(homePath.slice(2))} claude`
-  return `CLAUDE_CONFIG_DIR=${shellQuote(homePath)} claude`
+  if (homePath.startsWith('~/')) return `CLAUDE_CONFIG_DIR="$HOME"/${ShellCommand.posixQuote(homePath.slice(2))} claude`
+  return ShellCommand.withEnvironment('CLAUDE_CONFIG_DIR', homePath, 'claude')
 }
 
 export const RuntimePathsSection = (props: {

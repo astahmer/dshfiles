@@ -1060,6 +1060,30 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await reloaded.list(repo))[0]?.rebasedTipChangeId).toBe(tipChangeId)
   })
 
+  it("starts and lands a thread on the project's own main branch instead of main", async () => {
+    jj(repo, 'new', 'main')
+    writeFileSync(join(repo, 'develop.txt'), 'develop only\n')
+    jj(repo, 'commit', '-m', 'develop base')
+    jj(repo, 'bookmark', 'create', 'develop', '-r', '@-')
+    const mainBefore = jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'commit_id')
+    const projectThreads = ThreadWorkspacesTestSupport.promiseThreads({
+      executor,
+      settings: { repositoryBookmarks: [{ repository: repo, bookmark: 'develop' }] },
+    })
+    try {
+      const thread = await projectThreads.provision(repo)
+      expect(readFileSync(join(thread.path, 'develop.txt'), 'utf8')).toBe('develop only\n')
+      writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
+      jj(thread.path, 'describe', '-m', 'feat: on develop')
+      const landed = await projectThreads.land(thread.path)
+      expect(landed).toMatchObject({ status: 'landed' })
+      expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'develop', '-T', 'description.first_line()')).toBe('feat: on develop')
+      expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'commit_id')).toBe(mainBefore)
+    } finally {
+      await projectThreads.dispose()
+    }
+  })
+
   it('lands work onto an explicitly selected bookmark without moving main', async () => {
     const thread = await threads.provision(repo)
     const mainBefore = jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'commit_id')

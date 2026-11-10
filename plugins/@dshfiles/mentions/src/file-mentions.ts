@@ -69,20 +69,21 @@ export class FileMentions {
       const path = quoted[1]
       if (path === undefined || path === '') continue
       const start = quoted.index ?? 0
-      matches.push({ start, end: start + quoted[0].length, mention: quoted[0], path, kind: path.endsWith('/') ? 'directory' : 'file' })
+      matches.push({ start, end: start + quoted[0].length, mention: quoted[0], path, kind: /[\\/]$/u.test(path) ? 'directory' : 'file' })
     }
     // A quoted directory keeps its quote open until the writer types the closing one or moves on.
     const open = /@"([^"\n]*)$/u.exec(text)
     const openPath = open?.[1]
-    if (open !== null && openPath !== undefined && openPath !== '' && openPath.endsWith('/')) {
+    if (open !== null && openPath !== undefined && openPath !== '' && /[\\/]$/u.test(openPath)) {
       const start = open.index
       matches.push({ start, end: start + open[0].length, mention: open[0], path: openPath, kind: 'directory' })
     }
-    for (const bare of text.matchAll(/(?<![\w@/"])(@[^\s"',;:()]+)/gu)) {
+    // A Windows Host writes absolute mentions as `@C:\repo\a.ts`: the drive's colon is part of the path there.
+    for (const bare of text.matchAll(/(?<![\w@/"])(@(?:[A-Za-z]:[\\/])?[^\s"',;:()]+)/gu)) {
       const raw = bare[1]?.slice(1)
       if (raw === undefined) continue
       const path = raw.replace(/[.,;:!?]+$/u, '')
-      if (path === '' || path.startsWith('{') || !(path.includes('/') || /\.[\w-]+$/u.test(path))) continue
+      if (path === '' || path.startsWith('{') || !(/[\\/]/u.test(path) || /\.[\w-]+$/u.test(path))) continue
       const start = bare.index ?? 0
       const mention = `@${path}`
       matches.push({ start, end: start + mention.length, mention, path, kind: 'file' })

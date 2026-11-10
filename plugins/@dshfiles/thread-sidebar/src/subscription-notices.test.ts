@@ -1,5 +1,8 @@
+import { NodeFileSystem } from '@effect/platform-node'
 import { describe, expect, it } from '@effect/vitest'
-import { Effect, Ref, SubscriptionRef } from 'effect'
+import { Effect, FileSystem, Layer, Ref, SubscriptionRef } from 'effect'
+import { jsonStorageDomain } from './storage.test-support.js'
+import { ThreadSubscriptions } from './subscriptions-store.js'
 import type { ThreadSubscription } from './subscriptions-api.js'
 import {
   SubscriptionNoticeModel,
@@ -67,6 +70,13 @@ const state = (overrides: Partial<SubscriptionTargetState> = {}): SubscriptionTa
   title: 'Fix the parser',
   ...overrides,
 })
+
+/** The real subscription store on a temporary storage root, so an unsubscribe is the store's own. */
+const withSubscriptions = <A, E>(body: (root: string) => Effect.Effect<A, E, ThreadSubscriptions>) =>
+  Effect.gen(function* () {
+    const root = yield* (yield* FileSystem.FileSystem).makeTempDirectoryScoped({ prefix: 'thread-subscription-notices-' })
+    return yield* body(root).pipe(Effect.provide(ThreadSubscriptions.layer.pipe(Layer.provide(jsonStorageDomain(root)))))
+  }).pipe(Effect.provide(NodeFileSystem.layer))
 
 describe('thread subscription notices', () => {
   it('only a real completion is reported', () => {
@@ -175,6 +185,29 @@ describe('thread subscription notices', () => {
       yield* notifySubscribers({ notices: unused.notices, subscriptions: noEdges.store, targetSessionId: 'target', finish: 'completed' })
       expect(yield* Ref.get(unused.delivered)).toEqual([])
     }),
+  )
+
+  it.effect('one subscription delivers exactly one notice per finish, and none once unsubscribed', () =>
+    withSubscriptions(() =>
+      Effect.gen(function* () {
+        const subscriptions = yield* ThreadSubscriptions
+        const { notices, delivered } = yield* fakeNotices({
+          states: new Map([
+            ['target', state()],
+            ['watcher', state()],
+          ]),
+          entries: [{ role: 'assistant', text: 'Landed the fix.' }],
+        })
+
+        yield* subscriptions.subscribe({ subscriberSessionId: 'watcher', targetSessionId: 'target' })
+        yield* notifySubscribers({ notices, subscriptions, targetSessionId: 'target', finish: 'completed' })
+        expect(yield* Ref.get(delivered)).toHaveLength(1)
+
+        yield* subscriptions.unsubscribe({ subscriberSessionId: 'watcher', targetSessionId: 'target' })
+        yield* notifySubscribers({ notices, subscriptions, targetSessionId: 'target', finish: 'completed' })
+        expect(yield* Ref.get(delivered)).toHaveLength(1)
+      }),
+    ),
   )
 
   it.effect('a subscriber the Host no longer resolves loses its edge instead of retrying forever', () =>

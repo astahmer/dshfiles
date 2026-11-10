@@ -2,7 +2,7 @@ import type { DomainChanged, DomainSpec, KvTable, TableKeyOf, TableValueOf } fro
 import { Context, Effect, Layer, Option, Queue, Schedule, Schema, Scope, Semaphore, Stream } from 'effect'
 import { HostContext, hostService } from './host-context.js'
 
-const domainErrorCode = Schema.Literals(['already-open', 'facet-unsupported', 'invalid-record', 'missing-key', 'closed'])
+const domainErrorCode = Schema.Literals(['already-open', 'batch-partial', 'facet-unsupported', 'invalid-record', 'missing-key', 'closed'])
 
 const DomainErrorCause = Schema.Struct({ code: domainErrorCode })
 
@@ -97,6 +97,14 @@ const withLock =
   <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
     Effect.flatMap(HeldWriteLocks, held => (held.has(lock) ? effect : lock.withPermit(Effect.provideService(effect, HeldWriteLocks, new Set([...held, lock])))))
 
+/** Write a batch one record at a time, for a domain that has no one-publish batch write. */
+const putEach = async <Key extends string, Value>(
+  native: KvTable<Key, Value>,
+  entries: ReadonlyArray<readonly [Key, Value]>,
+): Promise<void> => {
+  for (const [key, value] of entries) await native.put(key, value)
+}
+
 /** The Host storage facility could not open a domain (wrong spec, a second open of the same name, a backend failure). */
 export class StorageDomainOpenFailed extends Schema.TaggedError<StorageDomainOpenFailed>()('StorageDomainOpenFailed', {
   domain: Schema.String,
@@ -124,7 +132,7 @@ export class StorageDomainReadFailed extends Schema.TaggedError<StorageDomainRea
 export class StorageDomainWriteFailed extends Schema.TaggedError<StorageDomainWriteFailed>()('StorageDomainWriteFailed', {
   domain: Schema.String,
   table: Schema.String,
-  operation: Schema.Literals(['put', 'delete', 'update']),
+  operation: Schema.Literals(['put', 'put-many', 'delete', 'update']),
   code: Schema.optional(domainErrorCode),
   cause: Schema.optional(Schema.Defect()),
 }) {
@@ -139,9 +147,20 @@ export interface StorageTable<Key extends string, Value> {
   readonly entries: Effect.Effect<ReadonlyArray<readonly [Key, Value]>, StorageDomainReadFailed>
   readonly size: Effect.Effect<number, StorageDomainReadFailed>
   readonly put: (key: Key, value: Value) => Effect.Effect<void, StorageDomainWriteFailed>
+  /**
+   * Insert or overwrite several records in one durable write. The owned storage-domain fork publishes a whole
+   * `single`-layout unit once for the batch; the stock form (or a per-record layout) writes one record at a time, so a
+   * mid-batch failure there leaves the earlier records durable and fails with code `batch-partial`.
+   */
+  readonly putMany: (entries: ReadonlyArray<readonly [Key, Value]>) => Effect.Effect<void, StorageDomainWriteFailed>
   readonly delete: (key: Key) => Effect.Effect<boolean, StorageDomainWriteFailed>
   /** Replace an existing record with `f(current)`; fails with `missing-key` when the record is absent. */
   readonly update: (key: Key, f: (current: Value) => Value) => Effect.Effect<Value, StorageDomainWriteFailed>
+}
+
+/** Multi-record write the owned storage-domain fork adds to a table; the stock form has no such method. */
+interface BatchKvTable<Key extends string, Value> {
+  putMany(entries: ReadonlyArray<readonly [Key, Value]>): Promise<void>
 }
 
 /** A domain open for the lifetime of the Scope that opened it. */
@@ -168,6 +187,10 @@ export class StorageDomain extends Context.Service<
       const facility = yield* hostService('storageDomain')
 
       const tableOf = <Key extends string, Value>(domain: string, name: string, native: KvTable<Key, Value>, writeLock: Semaphore.Semaphore) => {
+        // The owned storage-domain fork exposes a one-publish batch write; the stock form has none, and its fallback
+        // writes each record on its own (the same order and durability the per-record `put` loop had).
+        // oxlint-disable-next-line antislop/no-passthrough-variable -- the alias narrows `native` to its optional batch capability.
+        const batchTable: KvTable<Key, Value> & Partial<BatchKvTable<Key, Value>> = native
         const read = <A>(evaluate: () => A) =>
           Effect.try({ try: evaluate, catch: cause => new StorageDomainReadFailed({ domain, table: name, code: codeOf(cause), cause }) })
         const write = <A>(operation: StorageDomainWriteFailed['operation'], run: () => Promise<A>) =>
@@ -182,6 +205,7 @@ export class StorageDomain extends Context.Service<
           entries: read(() => [...native.entries()]),
           size: read(() => native.size),
           put: (key, value) => write('put', () => native.put(key, value)),
+          putMany: entries => write('put-many', () => batchTable.putMany?.call(native, entries) ?? putEach(native, entries)),
           delete: key => write('delete', () => native.delete(key)),
           update: (key, f) => write('update', () => native.update(key, f)),
         }

@@ -24,7 +24,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** Native MainPanel layout policy, without a second Session/editor state owner. */
 class HeroPolicy {
-  static content(session: SessionSnapshot, conversation: ConversationSnapshot, summaryBlank: boolean | undefined): ConversationContentInputProps {
+  static content(
+    session: SessionSnapshot,
+    conversation: Pick<ConversationSnapshot, 'activeTargets'>,
+    summaryBlank: boolean | undefined,
+  ): ConversationContentInputProps {
     // Native ui-conversation's value module is disabled by RichComposer. Use
     // its exact phase facts through public snapshot selectors, not a runtime
     // import of that disabled owner or a second state/projection implementation.
@@ -47,14 +51,16 @@ export const WorkbenchThreadConversation = (props: ConversationSources & PropsRe
   const presentation = useContract(ConversationScope)
   const Scope = presentation.status === 'active' ? presentation.value.Scope : Fragment
   const session = props.useSession(snapshot => snapshot)
-  const conversation = props.useConversation(snapshot => snapshot)
+  // Only the active-target set: the whole snapshot changes on every streamed view publication, and re-rendering
+  // here re-renders the header and every Session slot entry under it.
+  const activeTargets = props.useConversation(snapshot => snapshot.activeTargets)
   const summaryBlank = props.useSessions(snapshot => snapshot.byId[session.sessionId]?.blank)
   // Both producer-owned Factories inherit this panel's fixed Session. Native
   // Content keeps its resident editor and per-Session child-view selection.
   return (
     <Scope>
       {props.renderFactorySlot('dshfiles.workbench.conversation-header', { reserveHostCorner: true })}
-      {props.renderFactorySlot('conversation.content', HeroPolicy.content(session, conversation, summaryBlank))}
+      {props.renderFactorySlot('conversation.content', HeroPolicy.content(session, { activeTargets }, summaryBlank))}
     </Scope>
   )
 }
@@ -70,10 +76,10 @@ export interface WorkbenchThreadPanelProps {
 /** Call once at the client composition root. Every mounted panel owns and releases its own reference. */
 export const createWorkbenchThreadPanel = (sessions: Pick<ISessions, 'list' | 'retain'>) => {
   const subscribe = (listener: () => void) => sessions.list.subscribe(listener)
-  const getSnapshot = () => sessions.list.getSnapshot()
   return function WorkbenchThreadPanel(props: WorkbenchThreadPanelProps): ReactNode {
-    const list = useSyncExternalStore(subscribe, getSnapshot)
-    const listedId = list.ids.find(id => id === props.sessionId)
+    // Only listing membership matters here; a whole-list subscription re-rendered every mounted conversation on each
+    // retention or title change.
+    const listedId = useSyncExternalStore(subscribe, () => sessions.list.getSnapshot().ids.find(id => id === props.sessionId))
     const [reference, setReference] = useState<SessionReference>()
     useEffect(() => {
       if (listedId === undefined) {

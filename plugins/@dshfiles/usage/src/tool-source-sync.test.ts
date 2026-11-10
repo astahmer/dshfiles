@@ -4,7 +4,7 @@ import { Effect, Schema } from 'effect'
 import { SqlClient } from 'effect/sql'
 import type { ToolExecutionRow } from './fold.js'
 import { UsageRepo } from './store.js'
-import { usageRepoTest } from './test-layers.js'
+import { usageRepoTestWithSql } from './test-layers.js'
 
 const decodeCount = Schema.decodeUnknownEffect(Schema.Tuple([Schema.Struct({ count: Schema.Number })]))
 
@@ -93,5 +93,5 @@ it.effect('skips unchanged tool-source updates while reclassifying changed non-s
         expect.objectContaining({ name: 'task.run', category: 'mcp', owner: null }),
       ]),
     )
-  }).pipe(Effect.provide(usageRepoTest())),
+  }).pipe(Effect.provide(usageRepoTestWithSql())),
 )

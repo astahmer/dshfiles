@@ -1,27 +1,31 @@
 /** Semantic draft snapshots shared by storage, programmatic input, and editor restoration. */
-import { z } from 'zod'
+import { Option } from 'effect'
+import * as Schema from 'effect/Schema'
 import type { DraftInput, DraftReference, DraftSnapshot, Occurrence } from './contract/draft-editor.ts'
 
-const referenceSchema = z.object({
-  source: z.string(),
-  ref: z.string(),
-  offset: z.number().int().nonnegative(),
-  length: z.number().int().positive(),
-  label: z.string(),
-  appearance: z.enum(['session', 'file', 'folder']).optional(),
-  clipboardText: z.string(),
-  invalid: z.boolean().optional(),
+const referenceSchema = Schema.Struct({
+  source: Schema.String,
+  ref: Schema.String,
+  offset: Schema.Natural,
+  length: Schema.Int.check(Schema.isGreaterThan(0)),
+  label: Schema.String,
+  appearance: Schema.optional(Schema.Literals(['session', 'file', 'folder'])),
+  clipboardText: Schema.String,
+  invalid: Schema.optional(Schema.Boolean),
 })
 
-const commandSchema = z.object({
-  token: z.string(),
+const commandSchema = Schema.Struct({
+  token: Schema.String,
 })
 
-const snapshotSchema = z.object({
-  text: z.string(),
-  references: z.array(referenceSchema),
-  command: commandSchema.optional(),
-}).refine((draft) => {
+const draftSchema = Schema.Struct({
+  text: Schema.String,
+  references: Schema.Array(referenceSchema),
+  command: Schema.optional(commandSchema),
+})
+
+/** Whether every reference names a span after the leading command token, in order, and matches the draft text. */
+const hasOrderedReferenceSpans = (draft: typeof draftSchema.Type): boolean => {
   const spelling = draft.command?.token.trimEnd()
   if (spelling !== undefined && (!/^\/\S/u.test(spelling) || !draft.text.startsWith(spelling))) return false
   let end = spelling?.length ?? 0
@@ -31,7 +35,12 @@ const snapshotSchema = z.object({
     if (end > draft.text.length || draft.text.slice(reference.offset, end) !== reference.clipboardText) return false
   }
   return true
-}, 'Draft references must identify ordered, non-overlapping text spans after the leading command token')
+}
+
+const snapshotSchema = draftSchema.check(
+  Schema.makeFilter(draft =>
+    (hasOrderedReferenceSpans(draft) ? true : 'Draft references must identify ordered, non-overlapping text spans after the leading command token')),
+)
 
 /**
  * Copy input into the semantic draft representation without editor runtime identities.
@@ -54,16 +63,16 @@ export function resolveDraftInput(input: DraftInput): DraftSnapshot {
  */
 export function parseStoredDraft(value: unknown): DraftSnapshot | undefined {
   if (typeof value === 'string') return resolveDraftInput(value)
-  const parsed = snapshotSchema.safeParse(value)
-  if (!parsed.success) return undefined
+  const parsed = Schema.decodeUnknownOption(snapshotSchema)(value)
+  if (Option.isNone(parsed)) return undefined
   return {
-    text: parsed.data.text,
-    references: parsed.data.references.map(({ appearance, invalid, ...reference }) => ({
+    text: parsed.value.text,
+    references: parsed.value.references.map(({ appearance, invalid, ...reference }) => ({
       ...reference,
       ...(appearance === undefined ? {} : { appearance }),
       ...(invalid === undefined ? {} : { invalid }),
     })),
-    ...(parsed.data.command === undefined ? {} : { command: { token: parsed.data.command.token } }),
+    ...(parsed.value.command === undefined ? {} : { command: { token: parsed.value.command.token } }),
   }
 }
 

@@ -12,6 +12,7 @@ const unused = () => Effect.die('not used by the slash commands')
 const actionsLayer = (input: { readonly settled: Ref.Ref<ReadonlyArray<string>>; readonly archiveRefusal: boolean }) => {
   const deps: ThreadActionDeps = {
     listSessions: unused,
+    sessionExists: unused,
     readTitles: unused,
     listThreadRelations: unused,
     searchThreadContent: unused,

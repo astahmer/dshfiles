@@ -44,6 +44,9 @@ When('the composer model picker is searched for an unavailable model', async ({ 
   const search = page.getByRole('textbox', { name: 'Search models and accounts', exact: true })
   await expect(modelList).toBeVisible()
   await expect(search).toBeFocused()
+  await page.keyboard.press('Escape')
+  await trigger.click()
+  await expect(search).toBeFocused()
 
   const popoverBounds = await page.getByRole('dialog').boundingBox()
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')

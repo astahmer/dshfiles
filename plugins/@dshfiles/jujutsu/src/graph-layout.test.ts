@@ -123,6 +123,19 @@ describe('branch layout', () => {
     expect(rowOf(rows, 'snooze0').outgoing.map(link => [link.fromLane, link.toLane])).toEqual([[1, 0]])
   })
 
+  test('the project main branch claims the trunk lane even when it is not named main', () => {
+    const develop = chain('develop', 3, undefined, index => ({ bookmarks: index === 0 ? ['develop'] : [] }))
+    const topic = chain('topic', 2, 'develop1', index => ({ bookmarks: index === 0 ? ['topic'] : [] }))
+    const rows = RevisionGraphModel.layoutRevisionGraph(
+      [...topic, ...develop],
+      new Map([...topic, ...develop].map(row => [row.commitId, row])),
+      false,
+      'develop',
+    )
+    expect(new Set(develop.map(row => rowOf(rows, row.commitId).color))).toEqual(new Set([0]))
+    expect(rowOf(rows, 'topic0').color).not.toBe(0)
+  })
+
   test('a merge opens its second parent to the right and that branch rejoins the trunk at its own fork', () => {
     expect(rowOf(rows, 'merge').outgoing.map(link => link.toLane)).toEqual([0, 2])
     expect(rowOf(rows, 'side0').commitLane).toBe(2)

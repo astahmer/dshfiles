@@ -213,7 +213,9 @@ const transcriptOf = async (runtime: typeof SessionControllerHostRuntime.Service
   const query = runtime.sessionQuery
   if (query === undefined) throw notFound()
   try {
-    return recentTranscript({ events: (await query.readSession(id)).events, limit })
+    // `readSession` lists the whole persisted corpus before it reads one log; an observation reads only this one.
+    using observation = await query.observeSession(id, { signal, projectionMode: 'none' })
+    return recentTranscript({ events: observation.events, limit })
   } catch (error) {
     if (isSessionQueryNotFound(error)) throw notFound()
     throw error

@@ -10,12 +10,28 @@ const gramsOf = (text: string): Set<string> => {
   return grams
 }
 
-/** Every gram of every text the scorer reads for this item, lowercased the way the scorer compares them. */
-const itemGrams = (item: BacklogItem): Set<string> => {
-  const grams = new Set<string>()
-  for (const [, texts] of BacklogSearch.sourcesOf(item)) for (const text of texts) for (const gram of gramsOf(text.toLowerCase())) grams.add(gram)
-  return grams
+/** Calls `visit` with every gram of every text the scorer reads for this item, lowercased the way the scorer compares them. */
+const forEachItemGram = (item: BacklogItem, visit: (gram: string) => void): void => {
+  for (const [, texts] of BacklogSearch.sourcesOf(item))
+    for (const text of texts) {
+      const lower = text.toLowerCase()
+      for (let index = 0; index + GRAM <= lower.length; index += 1) visit(lower.slice(index, index + GRAM))
+    }
 }
+
+/** Where `id` sits in an ascending posting, or where it would be inserted. */
+const positionOf = (posting: readonly number[], id: number): number => {
+  let low = 0
+  let high = posting.length
+  while (low < high) {
+    const middle = (low + high) >>> 1
+    if ((posting[middle] ?? 0) < id) low = middle + 1
+    else high = middle
+  }
+  return low
+}
+
+const holds = (posting: readonly number[], id: number): boolean => posting[positionOf(posting, id)] === id
 
 /**
  * A trigram full-text index in front of the token scorer. It only narrows: the scorer still decides whether and how
@@ -23,19 +39,25 @@ const itemGrams = (item: BacklogItem): Set<string> => {
  * its trigrams is in that item's gram set; intersecting the posting lists of every trigram of every term therefore
  * keeps every item the scorer could match and drops most that it could not.
  *
- * Items are immutable records replaced on each write, so `sync` re-indexes only the items whose object changed.
+ * Items are immutable records replaced on each write, so `sync` re-indexes only the items whose object changed. A posting
+ * is an ascending array of item ids and no per-item gram set is kept: removal recomputes the grams of the indexed item.
  */
 export class BacklogSearchIndex {
-  readonly #postings = new Map<string, Set<number>>()
-  readonly #indexed = new Map<number, { readonly item: BacklogItem; readonly grams: ReadonlySet<string> }>()
+  readonly #postings = new Map<string, number[]>()
+  readonly #indexed = new Map<number, BacklogItem>()
   #syncedRecords: ReadonlyMap<number, BacklogItem> | null = null
 
   /** Brings the index level with one snapshot of the store; a snapshot already synced costs nothing. */
   sync(records: ReadonlyMap<number, BacklogItem>): void {
     if (records === this.#syncedRecords) return
-    for (const [id, entry] of this.#indexed) if (records.get(id) !== entry.item) this.#remove(id)
+    for (const [id, item] of this.#indexed) if (records.get(id) !== item) this.#remove(id, item)
     for (const [id, item] of records) if (!this.#indexed.has(id)) this.#add(id, item)
     this.#syncedRecords = records
+  }
+
+  /** Whether any term is long enough to narrow; until a search has one, the index is never built. */
+  static narrows(terms: readonly string[]): boolean {
+    return terms.some(term => term.length >= GRAM)
   }
 
   /**
@@ -50,7 +72,7 @@ export class BacklogSearchIndex {
         const posting = this.#postings.get(gram)
         if (posting === undefined) return new Set()
         if (result === null) result = new Set(posting)
-        else for (const id of result) if (!posting.has(id)) result.delete(id)
+        else for (const id of result) if (!holds(posting, id)) result.delete(id)
         if (result.size === 0) return result
       }
     }
@@ -62,23 +84,27 @@ export class BacklogSearchIndex {
   }
 
   #add(id: number, item: BacklogItem): void {
-    const grams = itemGrams(item)
-    for (const gram of grams) {
+    forEachItemGram(item, gram => {
       const posting = this.#postings.get(gram)
-      if (posting === undefined) this.#postings.set(gram, new Set([id]))
-      else posting.add(id)
-    }
-    this.#indexed.set(id, { item, grams })
+      if (posting === undefined) return void this.#postings.set(gram, [id])
+      const last = posting.at(-1) ?? 0
+      if (last === id) return
+      if (last < id) return void posting.push(id)
+      const position = positionOf(posting, id)
+      if (posting[position] !== id) posting.splice(position, 0, id)
+    })
+    this.#indexed.set(id, item)
   }
 
-  #remove(id: number): void {
-    const entry = this.#indexed.get(id)
-    if (entry === undefined) return
-    for (const gram of entry.grams) {
+  #remove(id: number, item: BacklogItem): void {
+    forEachItemGram(item, gram => {
       const posting = this.#postings.get(gram)
-      posting?.delete(id)
-      if (posting?.size === 0) this.#postings.delete(gram)
-    }
+      if (posting === undefined) return
+      const position = positionOf(posting, id)
+      if (posting[position] !== id) return
+      if (posting.length === 1) this.#postings.delete(gram)
+      else posting.splice(position, 1)
+    })
     this.#indexed.delete(id)
   }
 }

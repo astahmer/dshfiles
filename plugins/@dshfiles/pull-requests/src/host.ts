@@ -11,6 +11,7 @@ import { pullRequestApi } from './api.js'
 import { PullRequestCreator } from './create.js'
 import { GitHubCli } from './github-cli.js'
 import { PullRequestMonitor } from './monitor.js'
+import { ProjectBase } from './project-base.js'
 import { PullRequestStore } from './store.js'
 import { ThreadContext } from './thread-context.js'
 import type { PullRequestLinkView, PullRequestRecord } from './pull-request-model.js'
@@ -32,7 +33,7 @@ const monitor = PullRequestMonitor.layer.pipe(Layer.provideMerge(storeAndGitHub)
 const jjAndThread = Layer.mergeAll(Jj.layer, ThreadContext.layer).pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, DshChildProcessSpawner.layer)),
 )
-const creator = PullRequestCreator.layer.pipe(Layer.provideMerge(Layer.mergeAll(monitor, jjAndThread)))
+const creator = PullRequestCreator.layer.pipe(Layer.provideMerge(Layer.mergeAll(monitor, jjAndThread, ProjectBase.layer.pipe(Layer.provide(HostApis.layer)))))
 
 const pollWorker = Layer.effectDiscard(
   Effect.gen(function* () {

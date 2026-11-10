@@ -11,6 +11,16 @@ Feature: jj thread workspaces
     When a disposable jj repository is chosen as the New thread project
     Then the destination bar offers the main bookmark in the shared checkout
 
+  @scenario:jj-integration.project-main-branch-browser-journey
+  Scenario: A project's main branch chosen in Settings › Projects is where its New thread workspaces start
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/settings-shell" is booted
+    When a disposable jj repository with a "develop" bookmark is chosen as the New thread project
+    And "develop" is chosen as the project's main branch in Settings › Projects
+    Then Settings › Projects shows the project using "develop", chosen here
+    When Settings › Projects is closed
+    And the New thread workspace toggle is turned on
+    Then the New thread workspace starts from the project's main branch "develop"
+
   @scenario:jj-integration.project-icon-browser-journey
   Scenario: A project shows the icon its repository ships
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/multi-host, @dshfiles/settings-shell" is booted

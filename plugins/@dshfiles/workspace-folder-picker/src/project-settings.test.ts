@@ -36,10 +36,16 @@ describe('project setting tiers', () => {
     expect(projectSettingRows(null).map(row => row.fallback)).toEqual([
       'Auto-detected icon, else a monogram',
       'The profile setting',
-      'The profile setting',
+      'Origin’s default branch, else the global Bookmark setting',
       'No checks offered',
       'No scripts suggested',
     ])
+  })
+
+  it('says that a per-project main branch in the profile wins over the declared bookmark, and nothing else', () => {
+    const overridden = projectSettingRows(declared).filter(row => row.overriddenBy !== null)
+    expect(overridden.map(row => row.key)).toEqual(['bookmark'])
+    expect(overridden[0]?.overriddenBy).toContain('wins over this file')
   })
 
   it('does not count an empty checks or scripts list as a declaration', () => {

@@ -447,3 +447,13 @@
     }
   }
 }
+
+/*
+ * The workbench renders the Host conversation inside its own `.dshx-root` region, so the scoped reset above reaches
+ * assistant and user Markdown too. Markdown declares its own marker styling but never `list-style`, so the reset is the
+ * only rule competing for the marker type and every list loses its numbers and bullets. An unlayered rule outranks the
+ * layered reset; `revert` hands the property back to the user agent rather than pinning one marker style.
+ */
+:where([data-slot^='conversation.']) :is(ol, ul) {
+  list-style: revert;
+}
