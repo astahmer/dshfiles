@@ -17,7 +17,8 @@
         "Chromium missing or failing to launch reports how to install the headless shell or set chromiumPath instead of a stack trace.",
         "A snapshot ref from an older snapshot that no longer resolves fails the action with a timeout that asks for a fresh preview_snapshot.",
         "An agent cannot act on another thread's pages; a Client must name the thread.",
-        "preview_evaluate stays refused until the user turns on allowEvaluate."
+        "preview_evaluate stays refused until the user turns on allowEvaluate.",
+        "A reveal made while the pane cannot take it (the GUI still booting, the event stream reconnecting, another thread on screen) waits: the page list carries the request, and it opens once its thread is on screen and the pane accepts it."
       ],
       "externalDependencies": [
         {
@@ -54,13 +55,25 @@
           "kind": "unit-test",
           "id": "preview.thread-isolation",
           "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
-          "testName": "isolates threads and closes a thread\u2019s pages when it ends"
+          "testName": "isolates threads and closes a thread’s pages when it ends"
         },
         {
           "kind": "unit-test",
           "id": "preview.url-policy",
           "file": "plugins/@dshfiles/preview/src/url-policy.test.ts",
           "testName": "refuses remote hosts, look-alike hosts and non-web schemes by default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.reveal-retry",
+          "file": "plugins/@dshfiles/preview/src/preview-reveal.test.ts",
+          "testName": "keeps a reveal the pane refused and shows it on the next attempt"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.reveal-missed-event",
+          "file": "plugins/@dshfiles/preview/src/preview-reveal.test.ts",
+          "testName": "shows a reveal whose event was missed once the page list carries it"
         }
       ],
       "telemetry": [
@@ -95,7 +108,7 @@
     {
       "id": "thread-dev-servers",
       "title": "Thread dev servers",
-      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on \u2014 processes from its jobs or bash calls, and processes running inside its workspace \u2014 plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop. The same list is the Dev servers tab of Observe \u203a Processes (every thread that runs a job) and part of the thread panel's Jobs facet.",
+      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on — processes from its jobs or bash calls, and processes running inside its workspace — plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop. The same list is the Dev servers tab of Observe › Processes (every thread that runs a job) and part of the thread panel's Jobs facet.",
       "reach": ["click button \"Dev servers and previews\"", "expect region \"Dev servers\""],
       "surfaces": ["host", "tool", "client"],
       "surface": "threadFacet",
@@ -132,7 +145,7 @@
           "kind": "unit-test",
           "id": "preview.dev-server-attribution",
           "file": "plugins/@dshfiles/preview/src/dev-servers.test.ts",
-          "testName": "attributes a Host job\u2019s descendant to the job owner and an orphan to the thread whose workspace holds it"
+          "testName": "attributes a Host job’s descendant to the job owner and an orphan to the thread whose workspace holds it"
         },
         {
           "kind": "unit-test",

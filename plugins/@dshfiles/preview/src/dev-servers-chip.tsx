@@ -2,15 +2,27 @@ import { useEffect, useMemo, useState } from 'react'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { Browser, useApi, useApiEvent, useContract } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ExternalLinkIcon, GlobeIcon, MonitorIcon, PanelRightIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import * as Schema from 'effect/Schema'
 import { previewApi, type DevServerView, type PreviewPageView } from './api.js'
 import { DevServerPoll } from './dev-server-poll.js'
 import { PreviewOpener } from './preview-opener.js'
+import { PreviewReveal, type RevealRequest } from './preview-reveal.js'
 
-const revealed = new Set<string>()
+const SHOWN_LIMIT = 100
+const REVEAL_RETRY_MS = 1_000
+const REVEAL_RETRIES = 20
+
+/** Reveals shown in this browser, so a reload does not repeat them. */
+const storedShown = createStoredValue({ key: 'dshfiles-preview:handled', schema: Schema.Array(Schema.String), fallback: [] })
+
+const recordShown = (key: string): void => {
+  storedShown.set([...storedShown.get().filter(entry => entry !== key), key].slice(-SHOWN_LIMIT))
+}
 
 const portLabel = (servers: readonly DevServerView[], pages: readonly PreviewPageView[]): string => {
   const ports = servers.flatMap(server => server.ports.map(port => port.port))
@@ -21,6 +33,8 @@ const portLabel = (servers: readonly DevServerView[], pages: readonly PreviewPag
 
 export const DevServersChip = (props: {
   readonly sessionId: string
+  /** Whether this thread is the one on screen, the only one whose pane a reveal may open. */
+  readonly onScreen: boolean
   /** Show the agent's own page, live, in the thread panel. */
   readonly onWatch: (input: { readonly sessionId: string; readonly pageId: string }) => void
 }) => {
@@ -29,24 +43,22 @@ export const DevServersChip = (props: {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [armed, setArmed] = useState<number | null>(null)
+  const [pushed, setPushed] = useState<RevealRequest | null>(null)
+  const [retry, setRetry] = useState(0)
+  const shownList = storedShown.useValue()
+  const shown = useMemo(() => new Set(shownList), [shownList])
   const key = useMemo(() => DevServerPoll.serversKey(props.sessionId), [props.sessionId])
   const pagesKey = useMemo(() => DevServerPoll.pagesKey(props.sessionId), [props.sessionId])
   const opener = PreviewOpener.use()
   const OpenIcon = opener.paneAvailable ? PanelRightIcon : ExternalLinkIcon
   // An agent's reveal is not a click, so a new tab would be blocked: it only goes to the pane.
-  const revealInPane = (url: string): void => {
-    if (browser.status === 'active') browser.value.open(url)
-  }
 
   const events = useApiEvent(previewApi, 'pagesChanged', payload => {
     if (payload.sessionId !== props.sessionId) return
     void queryClient.invalidateQueries({ queryKey: pagesKey })
-    const reveal = payload.reveal
-    if (reveal === null) return
-    const id = `${props.sessionId}:${reveal.pageId}:${String(reveal.requestedAt)}`
-    if (revealed.has(id)) return
-    revealed.add(id)
-    revealInPane(reveal.url)
+    if (payload.reveal === null) return
+    setPushed(payload.reveal)
+    setRetry(0)
   })
   useEffect(() => {
     if (events === 'live') {
@@ -69,6 +81,23 @@ export const DevServersChip = (props: {
     refetchInterval: DevServerPoll.pagesIntervalMs,
     retry: false,
   })
+
+  const pagesData = pagesQuery.data
+  const pane = browser.status === 'active' ? browser.value : undefined
+  useEffect(() => {
+    const result = PreviewReveal.attempt({
+      sessionId: props.sessionId,
+      pushed,
+      pages: pagesData?.pages ?? [],
+      shown,
+      onScreen: props.onScreen,
+      open: url => pane?.open(url) === true,
+    })
+    if (result.shown !== undefined) recordShown(result.shown)
+    if (!result.retry || retry >= REVEAL_RETRIES) return
+    const timer = setTimeout(() => setRetry(count => count + 1), REVEAL_RETRY_MS)
+    return () => clearTimeout(timer)
+  }, [props.sessionId, props.onScreen, pushed, pagesData, shown, retry, pane, opener.paneAvailable])
 
   const stop = useMutation({
     mutationFn: (server: DevServerView) => api.stopDevServer({ sessionId: props.sessionId, pid: server.pid, startedAt: server.startedAt, confirm: true }),

@@ -83,15 +83,16 @@ export default defineClient({
     })
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: MIRROR_TAB_ID }, MirrorBody))
 
+    const HeaderChip = decorate((props: { readonly sessionId: string }) => {
+      const mounted = useSyncExternalStore(ctx.sidebarRight.mounted.subscribe, ctx.sidebarRight.mounted.getSnapshot)
+      return (
+        <PluginQueryProvider>
+          <DevServersChip sessionId={props.sessionId} onScreen={mounted !== undefined && String(mounted) === props.sessionId} onWatch={openMirror} />
+        </PluginQueryProvider>
+      )
+    })
     ctx.slots.inject('conversation.session.header.actions', () =>
-      ctx.slots.register(
-        { name: 'conversation.session.header.actions', id: 'dshfiles-preview-dev-servers', order: 20 },
-        decorate(props => (
-          <PluginQueryProvider>
-            <DevServersChip sessionId={props.sessionId} onWatch={openMirror} />
-          </PluginQueryProvider>
-        )),
-      ),
+      ctx.slots.register({ name: 'conversation.session.header.actions', id: 'dshfiles-preview-dev-servers', order: 20 }, HeaderChip),
     )
   },
 })
