@@ -35,6 +35,10 @@ first:
   **Hide this host**.
 - A host that answered in the last 10 s reads as **Reconnecting…** instead of
   turning red on a short network blip.
+- A host running another DSH core version than this machine says so on its
+  Hosts row and in a remote thread's header. Neither offers an Update button:
+  **Update hosts** syncs the dshfiles checkout, not the core, which stays the
+  job of whoever manages that machine. Hosts are never restarted from here.
 
 The dedicated reusable hosts page is **Hosts** in navigation and the Workbench chooser.
 
