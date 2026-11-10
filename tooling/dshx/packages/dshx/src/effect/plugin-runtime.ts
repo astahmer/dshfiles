@@ -42,20 +42,21 @@ export interface ActivationSlot<R> {
   readonly stop: () => void
 }
 
-/** Refused because the plugin is not running: not activated yet, unloaded, or failed to activate. */
-export class PluginInactive extends Error {
-  override readonly name = 'PluginInactive'
-}
-
 /** The wire code a Client sees when this plugin was not running; `ApiProtocolModel.error` would report it as internal. */
 export const PLUGIN_INACTIVE_CODE = 'plugin-inactive'
 
-/**
- * A call to a plugin that is not running. The Host API dispatch serializes an ApiError by its `remoteCode` and calls an
- * uncoded one `internal`, so name it: a Client can stop polling instead of reporting a handler failure.
- */
-export const inactiveError = (input: { readonly cause: PluginInactive; readonly apiId: string; readonly method: string }) =>
-  ApiProtocolModel.error('unavailable', input.cause.message, input.apiId, input.method, false, input.cause, PLUGIN_INACTIVE_CODE)
+/** Refused because the plugin is not running: not activated yet, unloaded, or failed to activate. */
+export class PluginInactive extends Error {
+  override readonly name = 'PluginInactive'
+
+  /**
+   * This refusal as the error of one API call. The Host API dispatch serializes an ApiError by its `remoteCode` and calls
+   * an uncoded one `internal`, so name it: a Client can stop polling instead of reporting a handler failure.
+   */
+  apiError(input: { readonly apiId: string; readonly method: string }) {
+    return ApiProtocolModel.error('unavailable', this.message, input.apiId, input.method, false, this, PLUGIN_INACTIVE_CODE)
+  }
+}
 
 export const makeActivationSlot = <R>(plugin: string): ActivationSlot<R> => {
   let state: SlotState<R> = { status: 'waiting', ready: Promise.withResolvers() }
@@ -80,9 +81,8 @@ export const makeActivationSlot = <R>(plugin: string): ActivationSlot<R> => {
   /** The first call starts the deferred activation once; a start that throws instead of failing the slot still releases it. */
   const startOnce = () => {
     if (started !== undefined || deferred === undefined) return
-    const start = deferred
     started = Promise.resolve()
-      .then(start)
+      .then(deferred)
       .then(
         () => undefined,
         (error: unknown) => fail(error instanceof Error ? error : new Error(String(error))),
