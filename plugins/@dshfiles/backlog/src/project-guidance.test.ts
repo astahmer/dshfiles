@@ -3,7 +3,7 @@ import { Context, Effect, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
 import { ProjectGuidance } from './project-guidance.js'
 import { BacklogStore } from './store.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 const user = { kind: 'user' } as const
 
@@ -20,7 +20,7 @@ describe('project guidance', () => {
     Effect.gen(function* () {
       yield* TestClock.setTime(1_000)
       const store = yield* Effect.map(
-        Layer.build(backlogStoreLayer({ rows: backlogRows(), settings: { projectGuidance: [{ project: '/work/dshfiles', guidance: 'Never push.' }] } })),
+        Layer.build(BacklogTestStore.layer({ rows: BacklogTestStore.rows(), settings: { projectGuidance: [{ project: '/work/dshfiles', guidance: 'Never push.' }] } })),
         context => Context.get(context, BacklogStore),
       )
       const guided = (yield* store.capture({ text: 'guided', project: '/work/dshfiles', actor: user })).item.id

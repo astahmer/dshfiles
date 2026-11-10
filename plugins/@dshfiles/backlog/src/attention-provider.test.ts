@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import type { BacklogSummaryView } from './api.js'
 import { BACKLOG_ATTENTION_SOURCE, BacklogAttention } from './attention-provider.js'
 import { BacklogStore } from './store.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 const user = { kind: 'user' } as const
 
@@ -84,7 +84,7 @@ describe('backlog inbox provider', () => {
     }
     const runtime = ManagedRuntime.make(
       BacklogAttention.layer.pipe(
-        Layer.provideMerge(backlogStoreLayer()),
+        Layer.provideMerge(BacklogTestStore.layer()),
         Layer.provideMerge(HostApis.layer),
         Layer.provideMerge(Layer.succeed(HostContext, HostContext.of({ ctx: host.ctx, packageId: '@dshfiles/backlog' }))),
       ),

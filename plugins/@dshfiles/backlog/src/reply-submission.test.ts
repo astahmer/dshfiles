@@ -6,7 +6,7 @@ import type { AgentDispatchOutcome } from './agent-dispatch.js'
 import { fileInput, type ComposerFile } from './composer-files.js'
 import { submitReply } from './reply-submission.js'
 import { BacklogStore, type BacklogActor } from './store.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 import { commentMutation } from './use-backlog-actions.js'
 
 const deferred = <Value>() => {
@@ -34,7 +34,7 @@ const user: BacklogActor = { kind: 'user' }
 
 const setup = async () => {
   // The panel talks to the store through a Promise API client, so this test drives the real store from that edge.
-  const runtime = ManagedRuntime.make(backlogStoreLayer())
+  const runtime = ManagedRuntime.make(BacklogTestStore.layer())
   const store = await runtime.runPromise(BacklogStore)
   const created = await runtime.runPromise(store.capture({ text: 'Fix the flaky test', actor: user }))
   const id = created.item.id

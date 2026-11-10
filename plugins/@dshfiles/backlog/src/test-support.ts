@@ -20,12 +20,6 @@ export interface BacklogTestRows {
 
 const scratchDirectory = (): string => mkdtempSync(join(tmpdir(), 'dshfiles-backlog-test-'))
 
-/** A store file on disk, so a second open sees what the first wrote. */
-export const backlogRows = (input: { readonly legacy?: Partial<LegacySnapshot> | undefined } = {}): BacklogTestRows => {
-  const directory = scratchDirectory()
-  return { database: join(directory, 'backlog.db'), files: join(directory, 'files'), legacy: input.legacy ?? {} }
-}
-
 const memoryRows = (): BacklogTestRows => ({ database: ':memory:', files: join(scratchDirectory(), 'files'), legacy: {} })
 
 /** The real SQLite repo over the rows' file (`:memory:` by default) and a scratch attachment folder. */
@@ -36,12 +30,21 @@ const backlogRepoLayer = (rows: BacklogTestRows = memoryRows()) =>
     Layer.provideMerge(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
   )
 
-/** A real BacklogStore over an in-memory SQLite file, or the given rows, and default settings. */
-export const backlogStoreLayer = (input: { readonly rows?: BacklogTestRows | undefined; readonly settings?: Partial<BacklogSettings> | undefined } = {}) =>
-  BacklogStore.layer.pipe(Layer.provideMerge(backlogRepoLayer(input.rows)), Layer.provideMerge(backlogSettingsTestLayer(input.settings)))
+/** A real backlog store for tests: its rows on disk or in memory, and the layers over them. */
+export class BacklogTestStore {
+  /** A store file on disk, so a second open sees what the first wrote. */
+  static readonly rows = (input: { readonly legacy?: Partial<LegacySnapshot> | undefined } = {}): BacklogTestRows => {
+    const directory = scratchDirectory()
+    return { database: join(directory, 'backlog.db'), files: join(directory, 'files'), legacy: input.legacy ?? {} }
+  }
 
-/** The backlog's SQLite file alone, for services that keep their own table and need no item fold. */
-export const backlogDbLayer = (rows: BacklogTestRows = memoryRows()) =>
-  BacklogDb.layer.pipe(
-    Layer.provideMerge(Layer.mergeAll(BacklogStorePaths.layer({ database: rows.database, files: rows.files }), NodeFileSystem.layer, NodePath.layer)),
-  )
+  /** A real BacklogStore over an in-memory SQLite file, or the given rows, and default settings. */
+  static readonly layer = (input: { readonly rows?: BacklogTestRows | undefined; readonly settings?: Partial<BacklogSettings> | undefined } = {}) =>
+    BacklogStore.layer.pipe(Layer.provideMerge(backlogRepoLayer(input.rows)), Layer.provideMerge(backlogSettingsTestLayer(input.settings)))
+
+  /** The backlog's SQLite file alone, for services that keep their own table and need no item fold. */
+  static readonly dbLayer = (rows: BacklogTestRows = memoryRows()) =>
+    BacklogDb.layer.pipe(
+      Layer.provideMerge(Layer.mergeAll(BacklogStorePaths.layer({ database: rows.database, files: rows.files }), NodeFileSystem.layer, NodePath.layer)),
+    )
+}

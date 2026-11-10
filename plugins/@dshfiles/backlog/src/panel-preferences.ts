@@ -33,7 +33,7 @@ const preferencesSchema = Schema.Struct({
   }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(hideAgentItemsDefaults))),
   shippedPeriod: Schema.Literals(BacklogShipped.unitPeriods).pipe(Schema.withDecodingDefaultKey(Effect.succeed('week'))),
 })
-export const panelStorageKey = (base: string, panelId: string | undefined): string =>
+const panelStorageKey = (base: string, panelId: string | undefined): string =>
   panelId === undefined || panelId === BACKLOG_PANEL_ID ? base : `${base}/panel/${encodeURIComponent(panelId)}`
 
 export const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']

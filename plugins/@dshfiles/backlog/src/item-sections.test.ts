@@ -4,9 +4,9 @@ import { TestClock } from 'effect/testing'
 import { BacklogRepo } from './backlog-repo.js'
 import { BacklogItems } from './item.js'
 import { BacklogStore } from './store.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
-const open = Effect.map(Layer.build(backlogStoreLayer({ rows: backlogRows() })), context => ({
+const open = Effect.map(Layer.build(BacklogTestStore.layer({ rows: BacklogTestStore.rows() })), context => ({
   store: Context.get(context, BacklogStore),
   repo: Context.get(context, BacklogRepo),
 }))

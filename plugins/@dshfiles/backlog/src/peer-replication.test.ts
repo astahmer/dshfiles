@@ -11,7 +11,7 @@ import { AutomationHost, BacklogPeers } from './peer-replication.js'
 import { PeerCallFailed, PeerTransport, type PeerRead } from './peer-transport.js'
 import type { BacklogSettings } from './settings.js'
 import { BacklogStore } from './store.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 const user = { kind: 'user' } as const
 
@@ -25,7 +25,7 @@ const openHost = (input: { readonly network: Network; readonly settings?: Partia
       BacklogPeers.layer.pipe(
         Layer.provideMerge(AutomationHost.layer),
         Layer.provideMerge(PeerTransport.layerTest(input.network)),
-        Layer.provideMerge(backlogStoreLayer({ settings: input.settings ?? {} })),
+        Layer.provideMerge(BacklogTestStore.layer({ settings: input.settings ?? {} })),
       ),
     ),
     context => ({ store: Context.get(context, BacklogStore), repo: Context.get(context, BacklogRepo), peers: Context.get(context, BacklogPeers) }),

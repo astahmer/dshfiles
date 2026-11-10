@@ -4,9 +4,9 @@ import { TestClock } from 'effect/testing'
 import { sortBacklogItems } from './backlog-sort.js'
 import { DueDates } from './due-date.js'
 import { BacklogStore } from './store.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
-const openStore = Effect.map(Layer.build(backlogStoreLayer({ rows: backlogRows() })), context => Context.get(context, BacklogStore))
+const openStore = Effect.map(Layer.build(BacklogTestStore.layer({ rows: BacklogTestStore.rows() })), context => Context.get(context, BacklogStore))
 const user = { kind: 'user' } as const
 const DAY_MS = 86_400_000
 

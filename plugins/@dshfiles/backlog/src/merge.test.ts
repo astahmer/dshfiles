@@ -3,7 +3,7 @@ import { Context, Effect, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogStore } from './store.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 const user = { kind: 'user' } as const
 const agent = { kind: 'agent', sessionId: 'session-merge01', cwd: '/work/dshfiles' } as const
@@ -12,8 +12,8 @@ describe('duplicate merge', () => {
   it.effect('moves comments, links, tags and sub-issues to the survivor, drops the duplicate and redirects its reference', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(1_000)
-      const rows = backlogRows()
-      const store = yield* Effect.map(Layer.build(backlogStoreLayer({ rows })), context => Context.get(context, BacklogStore))
+      const rows = BacklogTestStore.rows()
+      const store = yield* Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => Context.get(context, BacklogStore))
       const survivor = (yield* store.capture({ text: 'composer drops chips #composer', actor: user })).item
       const duplicate = (yield* store.capture({ text: 'chips vanish on paste #paste https://example.com/report', actor: user })).item
       const duplicateRef = BacklogReference.refOf(duplicate)
@@ -48,12 +48,12 @@ describe('duplicate merge', () => {
   it.effect('keeps the redirect across a restart of the store', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(1_000)
-      const rows = backlogRows()
-      const first = yield* Effect.map(Layer.build(backlogStoreLayer({ rows })), context => Context.get(context, BacklogStore))
+      const rows = BacklogTestStore.rows()
+      const first = yield* Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => Context.get(context, BacklogStore))
       const survivor = (yield* first.capture({ text: 'keep me', actor: user })).item
       const duplicate = (yield* first.capture({ text: 'merge me', actor: user })).item
       yield* first.merge({ survivorId: survivor.id, duplicateIds: [duplicate.id], actor: user })
-      const reopened = yield* Effect.map(Layer.build(backlogStoreLayer({ rows })), context => Context.get(context, BacklogStore))
+      const reopened = yield* Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => Context.get(context, BacklogStore))
       expect(yield* reopened.resolve(BacklogReference.refOf(duplicate))).toBe(survivor.id)
     }).pipe(Effect.scoped),
   )

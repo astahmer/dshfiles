@@ -4,7 +4,7 @@ import { TestClock } from 'effect/testing'
 import { BacklogBackfill, type BackfillProgress, type TriageOutcome } from './backfill.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
 import { BacklogStore } from './store.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 const triaged: BacklogEvent = { at: 1, actor: 'system', kind: 'triaged', detail: 'suggested kind bug' }
 
@@ -109,6 +109,6 @@ describe('backfill store', () => {
       expect(reopened.ok && reopened.value.item.events.at(-1)?.detail).toBe('found nothing to change')
       // The marker is history, not activity: the item does not read as freshly touched in the feed.
       expect((yield* store.list({})).items[0]?.activity).toEqual({ count: 0, agents: 0, comments: 0, last: null })
-    }).pipe(Effect.provide(backlogStoreLayer())),
+    }).pipe(Effect.provide(BacklogTestStore.layer())),
   )
 })

@@ -10,7 +10,7 @@ import { Context, Effect, Layer, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
 import { BacklogExport } from './backlog-export.js'
 import { BacklogStore } from './store.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 const user = { kind: 'user' } as const
 
@@ -18,7 +18,7 @@ const open = () =>
   Effect.map(
     Layer.build(
       BacklogExport.layer.pipe(
-        Layer.provideMerge(backlogStoreLayer({ rows: backlogRows() })),
+        Layer.provideMerge(BacklogTestStore.layer({ rows: BacklogTestStore.rows() })),
         Layer.provideMerge(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
       ),
     ),

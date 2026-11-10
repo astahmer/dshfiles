@@ -11,14 +11,14 @@ import type { BacklogItem } from './item.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogStore } from './store.js'
 import type { SyncMapping } from './sync-legacy-mapping.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 import { ulidPattern } from './ulid.js'
 
 const user = { kind: 'user' } as const
 const agent = { kind: 'agent', sessionId: 'session-abc123', cwd: '/work/dshfiles' } as const
 
-const open = (rows = backlogRows()) =>
-  Effect.map(Layer.build(backlogStoreLayer({ rows })), context => ({ store: Context.get(context, BacklogStore), repo: Context.get(context, BacklogRepo) }))
+const open = (rows = BacklogTestStore.rows()) =>
+  Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => ({ store: Context.get(context, BacklogStore), repo: Context.get(context, BacklogRepo) }))
 
 const storedItems = (store: BacklogStore['Service'], ids: readonly number[]) =>
   Effect.map(store.getMany(ids), result => result.items.map(detail => withoutFreshness(detail.item)))
@@ -95,7 +95,7 @@ describe('the op log', () => {
   it.effect('folds back to exactly the items the store serves, after every kind of write and a restart', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(1_000)
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       const { store, repo } = yield* open(rows)
       const first = yield* store.capture({
         text: 'bug: composer drops chips #composer see b:2',
@@ -145,7 +145,7 @@ describe('the op log', () => {
 
   it.effect('keeps every event instead of trimming the history at 200', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       const { store } = yield* open(rows)
       const created = yield* store.capture({ text: 'chatty item', actor: agent })
       for (let index = 0; index < 205; index++) yield* store.comment({ id: created.item.id, text: `progress ${String(index)}`, actor: agent })
@@ -159,7 +159,7 @@ describe('the op log', () => {
 
   it.effect('stores identical bytes once and drops them only when no attachment uses them', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       const { store } = yield* open(rows)
       const file = (id: string) => ({ id, kind: 'file' as const, name: `${id}.txt`, mediaType: 'text/plain', bytes: 2, data: 'aGk=' })
       const one = yield* store.capture({ text: 'one', files: [file('same-bytes-1')], actor: user })
@@ -209,7 +209,7 @@ describe('the legacy import', () => {
         }),
         legacyItem({ id: 7, events: [{ at: 120, actor: 'user', kind: 'commented', detail: 'history that lost its created event' }] }),
       ]
-      const rows = backlogRows({
+      const rows = BacklogTestStore.rows({
         legacy: {
           items: legacy,
           files: [
@@ -244,7 +244,7 @@ describe('the legacy import', () => {
 
   it.effect('starts empty and never imports later when the JSON domains held nothing', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       const { repo } = yield* open(rows)
       expect(Option.getOrThrow(yield* repo.importReport)).toMatchObject({ items: 0, ops: 0 })
 
@@ -257,7 +257,7 @@ describe('the legacy import', () => {
 describe('the sync mappings table', () => {
   it.effect('writes several mappings in one batch and treats an empty batch as a no-op', () =>
     Effect.gen(function* () {
-      const { repo } = yield* open(backlogRows())
+      const { repo } = yield* open(BacklogTestStore.rows())
       yield* repo.mappings.putMany([
         ['1', mapping(1)],
         ['2', { ...mapping(2), remoteKey: 'ENG-2' }],
@@ -275,7 +275,7 @@ describe('short aliases', () => {
   it.effect('gives a new item a fixed short alias while legacy numbers keep resolving, across a restart', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(1_000)
-      const rows = backlogRows({ legacy: { items: [legacyItem({ id: 3 })], files: [], mappings: [], nextId: 9 } })
+      const rows = BacklogTestStore.rows({ legacy: { items: [legacyItem({ id: 3 })], files: [], mappings: [], nextId: 9 } })
       const { store } = yield* open(rows)
       const created = yield* store.capture({ text: 'fresh work, see b:3', actor: user })
       const ref = created.item.ref ?? ''

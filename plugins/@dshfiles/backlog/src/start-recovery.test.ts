@@ -5,7 +5,7 @@ import { SessionsUnavailable } from './errors.js'
 import { StartRecovery } from './start-recovery.js'
 import { StartIntentClaims, StartIntents, type StartIntent, type StartIntentDraft } from './start-intents.js'
 import { BacklogStore } from './store.js'
-import { backlogDbLayer, backlogRows, backlogStoreLayer, type BacklogTestRows } from './test-support.js'
+import { BacklogTestStore, type BacklogTestRows } from './test-support.js'
 import { ThreadStart, type StartThreadResult } from './thread-start.js'
 
 type Resume = (intent: StartIntent) => Effect.Effect<StartThreadResult, SessionsUnavailable>
@@ -22,12 +22,12 @@ const fakeThreads = (resume: Resume) =>
   )
 
 const openRecovery = (input: { readonly resume: Resume; readonly rows?: BacklogTestRows | undefined }) => {
-  const rows = input.rows ?? backlogRows()
+  const rows = input.rows ?? BacklogTestStore.rows()
   return Layer.build(
     StartRecovery.layer.pipe(
       Layer.provideMerge(fakeThreads(input.resume)),
-      Layer.provideMerge(Layer.mergeAll(StartIntentClaims.layer, StartIntents.layer.pipe(Layer.provideMerge(backlogDbLayer(rows))))),
-      Layer.provideMerge(backlogStoreLayer({ rows })),
+      Layer.provideMerge(Layer.mergeAll(StartIntentClaims.layer, StartIntents.layer.pipe(Layer.provideMerge(BacklogTestStore.dbLayer(rows))))),
+      Layer.provideMerge(BacklogTestStore.layer({ rows })),
     ),
   ).pipe(
     Effect.map(context => ({
@@ -40,7 +40,7 @@ const openRecovery = (input: { readonly resume: Resume; readonly rows?: BacklogT
 
 /** The plugin loop over a log whose `stale` reads are counted: one read per recovery pass. */
 const openLoop = (input: { readonly resume: Resume }) => {
-  const rows = backlogRows()
+  const rows = BacklogTestStore.rows()
   const passes = { count: 0 }
   const countedIntents = Layer.effect(
     StartIntents,
@@ -48,13 +48,13 @@ const openLoop = (input: { readonly resume: Resume }) => {
       const intents = yield* StartIntents
       return StartIntents.of({ ...intents, stale: query => Effect.andThen(Effect.sync(() => (passes.count += 1)), intents.stale(query)) })
     }),
-  ).pipe(Layer.provide(StartIntents.layer), Layer.provideMerge(backlogDbLayer(rows)))
+  ).pipe(Layer.provide(StartIntents.layer), Layer.provideMerge(BacklogTestStore.dbLayer(rows)))
   return Layer.build(
     StartRecovery.loop.pipe(
       Layer.provideMerge(StartRecovery.layer),
       Layer.provideMerge(fakeThreads(input.resume)),
       Layer.provideMerge(Layer.mergeAll(StartIntentClaims.layer, countedIntents)),
-      Layer.provideMerge(backlogStoreLayer({ rows })),
+      Layer.provideMerge(BacklogTestStore.layer({ rows })),
     ),
   ).pipe(Effect.map(context => ({ passes, intents: Context.get(context, StartIntents), store: Context.get(context, BacklogStore) })))
 }

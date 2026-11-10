@@ -7,7 +7,7 @@ import { Effect, Layer } from 'effect'
 import { AiActivity } from './ai-activity.js'
 import { HostAttachments } from './host-edge-promise.js'
 import { BacklogStore } from './store.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 import { TweetImport } from './tweet-import.js'
 
 const tweetImportLayer = Layer.unwrap(
@@ -18,7 +18,7 @@ const tweetImportLayer = Layer.unwrap(
     ),
     host =>
       TweetImport.layer.pipe(
-        Layer.provideMerge(Layer.mergeAll(backlogStoreLayer(), AiActivity.layer, HostApis.layer, HostAttachments.layer)),
+        Layer.provideMerge(Layer.mergeAll(BacklogTestStore.layer(), AiActivity.layer, HostApis.layer, HostAttachments.layer)),
         Layer.provideMerge(HostContext.layer({ ctx: host.ctx, packageId: '@dshfiles/backlog' })),
       ),
   ),

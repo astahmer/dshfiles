@@ -3,7 +3,7 @@ import { Context, Effect, Layer, Result } from 'effect'
 import type { BacklogBackfillResult } from './api.js'
 import type { TriageOutcome } from './backfill.js'
 import { BackfillAlreadyRunning, TriageUnconfigured } from './errors.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 import { TriageBackfill } from './triage-backfill.js'
 import { Triage } from './triage-service.js'
 
@@ -30,7 +30,7 @@ const stalled = Triage.of({
 })
 
 const jobsOn = (triage: Triage['Service']) =>
-  Effect.map(Layer.build(TriageBackfill.layer.pipe(Layer.provideMerge(backlogStoreLayer()), Layer.provideMerge(Layer.succeed(Triage, triage)))), context =>
+  Effect.map(Layer.build(TriageBackfill.layer.pipe(Layer.provideMerge(BacklogTestStore.layer()), Layer.provideMerge(Layer.succeed(Triage, triage)))), context =>
     Context.get(context, TriageBackfill),
   )
 

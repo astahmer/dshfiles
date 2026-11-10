@@ -9,7 +9,7 @@ import { BacklogOrigins } from './event-origin.js'
 import { BacklogOps } from './op-log.js'
 import { BacklogStore } from './store.js'
 import { LegacySyncMappings } from './sync-legacy-mapping.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 /**
  * Rehearses the one-time import against a copy of a live store: set BACKLOG_REHEARSAL_DIR to a folder holding copies
@@ -98,7 +98,7 @@ describe.skipIf(directory === undefined)('legacy import rehearsal', () => {
           files: join(sqliteDirectory, 'files'),
           legacy: { items, files, mappings, nextId: Option.match(counter, { onNone: () => null, onSome: value => value.nextId }) },
         }
-        const openBacklog = Effect.map(Layer.build(backlogStoreLayer({ rows })), context => ({
+        const openBacklog = Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => ({
           store: Context.get(context, BacklogStore),
           repo: Context.get(context, BacklogRepo),
         }))
@@ -159,7 +159,7 @@ describe.skipIf(directory === undefined)('legacy import rehearsal', () => {
         const freshRef = fresh.item.ref ?? ''
 
         // A fresh peer Host pulls the whole log page by page and folds every item the same, under the refs it shows.
-        const peer = yield* Effect.map(Layer.build(backlogStoreLayer()), context => ({
+        const peer = yield* Effect.map(Layer.build(BacklogTestStore.layer()), context => ({
           store: Context.get(context, BacklogStore),
           repo: Context.get(context, BacklogRepo),
         }))

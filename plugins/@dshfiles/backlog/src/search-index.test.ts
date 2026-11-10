@@ -10,7 +10,7 @@ import type { BacklogItem } from './item.js'
 import { BacklogSearch } from './search.js'
 import { BacklogSearchIndex } from './search-index.js'
 import { BacklogStore } from './store.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 const DAY_MS = 86_400_000
 
@@ -165,7 +165,7 @@ plainDescribe('search index heap', () => {
   })
 })
 
-const openStore = () => Effect.map(Layer.build(backlogStoreLayer()), context => Context.get(context, BacklogStore))
+const openStore = () => Effect.map(Layer.build(BacklogTestStore.layer()), context => Context.get(context, BacklogStore))
 const user = { kind: 'user' } as const
 
 describe('store search index', () => {

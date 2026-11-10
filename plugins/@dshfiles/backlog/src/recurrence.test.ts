@@ -4,9 +4,9 @@ import { TestClock } from 'effect/testing'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
 import { BacklogStore } from './store.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
-const openStore = Effect.map(Layer.build(backlogStoreLayer({ rows: backlogRows() })), context => Context.get(context, BacklogStore))
+const openStore = Effect.map(Layer.build(BacklogTestStore.layer({ rows: BacklogTestStore.rows() })), context => Context.get(context, BacklogStore))
 const user = { kind: 'user' } as const
 
 describe('recurrence', () => {

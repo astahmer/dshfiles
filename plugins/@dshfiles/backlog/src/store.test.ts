@@ -5,12 +5,12 @@ import { BacklogRepo } from './backlog-repo.js'
 import type { BacklogItem, BacklogLink } from './item.js'
 import { BacklogItems } from './item.js'
 import { BacklogStore } from './store.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore, type BacklogTestRows } from './test-support.js'
 
 const DAY_MS = 86_400_000
 
-const openStore = (rows = backlogRows()) => Effect.map(Layer.build(backlogStoreLayer({ rows })), context => Context.get(context, BacklogStore))
-const openRepo = (rows: ReturnType<typeof backlogRows>) => Effect.map(Layer.build(backlogStoreLayer({ rows })), context => Context.get(context, BacklogRepo))
+const openStore = (rows = BacklogTestStore.rows()) => Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => Context.get(context, BacklogStore))
+const openRepo = (rows: BacklogTestRows) => Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => Context.get(context, BacklogRepo))
 
 /** An item the JSON storage domain held before the SQLite store. */
 const legacyItem = (fields: Partial<BacklogItem> & Pick<BacklogItem, 'id'>): BacklogItem => ({
@@ -158,7 +158,7 @@ describe('store', () => {
   it.effect('links an agent capture to its thread and project, and lists newest activity first', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(1_000)
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       const store = yield* openStore(rows)
 
       const first = yield* store.capture({ text: 'idea: a kanban for agents', actor: user })
@@ -262,7 +262,7 @@ describe('store', () => {
 
   it.effect('continues ids after a Host restart', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       yield* TestClock.setTime(1)
       const first = yield* openStore(rows)
       yield* first.capture({ text: 'one', actor: user })
@@ -277,7 +277,7 @@ describe('store', () => {
 
   it.effect('never reuses the id of a deleted newest item after a Host restart', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       const first = yield* openStore(rows)
       yield* first.capture({ text: 'one', actor: user })
       const newest = yield* first.capture({ text: 'two', actor: user })
@@ -290,7 +290,7 @@ describe('store', () => {
 
   it.effect('continues after the largest stored id when the counter lags behind it', () =>
     Effect.gen(function* () {
-      const rows = backlogRows({ legacy: { items: [legacyItem({ id: 1 }), legacyItem({ id: 2 })], nextId: 2 } })
+      const rows = BacklogTestStore.rows({ legacy: { items: [legacyItem({ id: 1 }), legacyItem({ id: 2 })], nextId: 2 } })
 
       const reopened = yield* openStore(rows)
       expect((yield* reopened.capture({ text: 'three', actor: user })).item.id).toBe(3)
@@ -706,7 +706,7 @@ describe('attention and inbox', () => {
 
   it.effect('keeps legacy closed items out of the Inbox despite stale flags', () =>
     Effect.gen(function* () {
-      const rows = backlogRows({
+      const rows = BacklogTestStore.rows({
         legacy: { items: [legacyItem({ id: 1, title: 'already closed', status: 'done', humanFields: ['status'], attention: 'blocked' })] },
       })
       yield* TestClock.setTime(9)
@@ -752,7 +752,7 @@ describe('attention and inbox', () => {
   it.effect('records each event origin once, keeps it across a restart, and derives it for events written before it', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(3)
-      const rows = backlogRows({
+      const rows = BacklogTestStore.rows({
         legacy: {
           items: [
             legacyItem({
@@ -791,7 +791,7 @@ describe('attention and inbox', () => {
   it.effect('keeps images and files with an item, reads them back, and removes them', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(1_000)
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       const store = yield* openStore(rows)
       const detail = yield* store.capture({
         text: 'bug: composer loses pasted screenshots',
@@ -822,7 +822,7 @@ describe('attention and inbox', () => {
 
   it.effect('imports tweet text and images once without replacing the existing description', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       yield* TestClock.setTime(1_000)
       const store = yield* openStore(rows)
       const created = yield* store.capture({ text: 'Read this post https://x.com/someone/status/123\nKeep this note', actor: user })
@@ -860,7 +860,7 @@ describe('attention and inbox', () => {
 
   it.effect('permanently deletes an item and all its attachments only with explicit confirmation', () =>
     Effect.gen(function* () {
-      const rows = backlogRows()
+      const rows = BacklogTestStore.rows()
       yield* TestClock.setTime(1_000)
       const store = yield* openStore(rows)
       const created = yield* store.capture({
@@ -955,7 +955,7 @@ describe('attention and inbox', () => {
 
   it.effect('keeps older user replies editable without stored comment ids', () =>
     Effect.gen(function* () {
-      const rows = backlogRows({
+      const rows = BacklogTestStore.rows({
         legacy: {
           items: [
             legacyItem({

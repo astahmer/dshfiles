@@ -6,12 +6,12 @@ import { TestClock } from 'effect/testing'
 import { BacklogItems } from './item.js'
 import { LeaseEndings } from './lease-sweep.js'
 import { BacklogStore } from './store.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 
 const MINUTE_MS = 60_000
 
-const openStore = (rows = backlogRows()) => Effect.map(Layer.build(backlogStoreLayer({ rows })), context => Context.get(context, BacklogStore))
+const openStore = (rows = BacklogTestStore.rows()) => Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => Context.get(context, BacklogStore))
 
 const user = { kind: 'user' } as const
 const agentA = { kind: 'agent', sessionId: 'session-aaaaaa', cwd: '/work/repo' } as const
@@ -156,7 +156,7 @@ describe('claims', () => {
     Effect.scoped(
       Effect.gen(function* () {
         yield* TestClock.setTime(1_000)
-        const rows = backlogRows()
+        const rows = BacklogTestStore.rows()
         const store = yield* openStore(rows)
         const item = yield* store.capture({ text: 'long work', status: 'todo', actor: user })
         yield* store.claim({ id: item.item.id, actor: agentA })

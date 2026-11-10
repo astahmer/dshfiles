@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer } from 'effect'
 import { StartIntentClaims, StartIntents, type StartIntentDraft } from './start-intents.js'
-import { backlogDbLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
-const openIntents = Effect.map(Layer.build(StartIntents.layer.pipe(Layer.provideMerge(backlogDbLayer()))), context => Context.get(context, StartIntents))
+const openIntents = Effect.map(Layer.build(StartIntents.layer.pipe(Layer.provideMerge(BacklogTestStore.dbLayer()))), context => Context.get(context, StartIntents))
 
 /** The stale window the recovery pass uses: a start nobody refreshed for this long is taken. */
 const window = 45_000

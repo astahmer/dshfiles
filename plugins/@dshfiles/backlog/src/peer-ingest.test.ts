@@ -6,12 +6,12 @@ import { BacklogRepo, type PeerOpWire } from './backlog-repo.js'
 import type { BacklogItem } from './item.js'
 import { BacklogOps, type BacklogOpRecord } from './op-log.js'
 import { BacklogStore } from './store.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 const user = { kind: 'user' } as const
 
-const open = (rows = backlogRows()) =>
-  Effect.map(Layer.build(backlogStoreLayer({ rows })), context => ({ store: Context.get(context, BacklogStore), repo: Context.get(context, BacklogRepo) }))
+const open = (rows = BacklogTestStore.rows()) =>
+  Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => ({ store: Context.get(context, BacklogStore), repo: Context.get(context, BacklogRepo) }))
 type Host = Effect.Success<ReturnType<typeof open>>
 
 const decodeOp = Schema.decodeUnknownEffect(BacklogOps.json)
@@ -224,7 +224,7 @@ describe('peer replication of the op log', () => {
         lastActivityAt: 100,
         events: [{ at: 100, actor: 'user', kind: 'created', detail: 'legacy twelve' }],
       }
-      const a = yield* open(backlogRows({ legacy: { items: [legacy] } }))
+      const a = yield* open(BacklogTestStore.rows({ legacy: { items: [legacy] } }))
       const b = yield* open()
       yield* settle([a, b], new Map())
       const onB = (yield* b.store.list({ freshness: 'all', limit: 10 })).items

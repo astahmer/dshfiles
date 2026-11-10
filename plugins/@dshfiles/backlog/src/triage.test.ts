@@ -10,7 +10,7 @@ import { AiActivity } from './ai-activity.js'
 import type { BacklogItem } from './item.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { BacklogStore } from './store.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 import { BacklogTriage, type TriageServices } from './triage.js'
 import { Triage } from './triage-service.js'
 
@@ -36,7 +36,7 @@ const item = (id: number, title: string, fields: Partial<BacklogItem> = {}): Bac
 /** The triage service over a real store, with only Jev, the model and the Secret Catalog replaced at their edges. */
 const triageLayer = (settings: Partial<BacklogSettings>) =>
   Triage.layer.pipe(
-    Layer.provideMerge(backlogStoreLayer({ settings })),
+    Layer.provideMerge(BacklogTestStore.layer({ settings })),
     Layer.provideMerge(AiActivity.layer),
     Layer.provideMerge(Layer.succeed(Jev, Jev.of({ ask: () => Effect.die('unused') }))),
     Layer.provideMerge(Layer.succeed(Llm, Llm.of({ complete: () => Effect.die('unused') } as never))),

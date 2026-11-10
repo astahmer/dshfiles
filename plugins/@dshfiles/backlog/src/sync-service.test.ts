@@ -11,7 +11,7 @@ import { BacklogSync } from './sync-service.js'
 import { BacklogSyncModel } from './sync-model.js'
 import { SyncSources } from './sync-sources.js'
 import { legacyGithubRow, legacyLinearRow, syncTestLayer } from './sync-test-support.js'
-import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 
 const user = { kind: 'user' } as const
 
@@ -353,7 +353,7 @@ describe('BacklogSync with Linear', () => {
 
   it.effect('keeps items, connections and links across a Host restart', () => {
     const linear = fakeLinear()
-    const storage = backlogRows()
+    const storage = BacklogTestStore.rows()
     return Effect.gen(function* () {
       const id = yield* Effect.gen(function* () {
         const created = yield* (yield* BacklogStore).capture({ text: 'Survives restarts', actor: user })
@@ -374,7 +374,7 @@ describe('Remote sync setup', () => {
   it.effect('migrates settings rows and per-item mappings to connections, bindings and refs once, keeping every link', () => {
     const linear = fakeLinear()
     const github = fakeGithub()
-    const storage = backlogRows()
+    const storage = BacklogTestStore.rows()
     const rows = [
       legacyLinearRow,
       { ...legacyGithubRow, project: '/work/app', autoSyncMinutes: 15, pushAgentComments: true },
@@ -416,7 +416,7 @@ describe('Remote sync setup', () => {
           url: 'https://linear.app/acme/issue/ENG-9',
         })
         return { app: onApp.item.id, linear: onLinear.item.id }
-      }).pipe(Effect.provide(backlogStoreLayer({ rows: storage })))
+      }).pipe(Effect.provide(BacklogTestStore.layer({ rows: storage })))
 
       const migrated = yield* Effect.gen(function* () {
         const sync = yield* BacklogSync

@@ -11,7 +11,7 @@ import { ShippedSummaryUnconfigured } from './errors.js'
 import type { BacklogSettings } from './settings.js'
 import { ShippedSummaries } from './shipped-summaries.js'
 import { BacklogStore } from './store.js'
-import { backlogStoreLayer } from './test-support.js'
+import { BacklogTestStore } from './test-support.js'
 import { Triage } from './triage-service.js'
 
 const user = { kind: 'user' } as const
@@ -21,7 +21,7 @@ const DAY = 86_400_000
 const summariesLayer = (input: { readonly settings: Partial<BacklogSettings>; readonly calls: string[] }) =>
   ShippedSummaries.layer.pipe(
     Layer.provideMerge(Triage.layer),
-    Layer.provideMerge(backlogStoreLayer({ settings: input.settings })),
+    Layer.provideMerge(BacklogTestStore.layer({ settings: input.settings })),
     Layer.provideMerge(AiActivity.layer),
     Layer.provideMerge(Layer.succeed(Jev, Jev.of({ ask: () => Effect.die('unused') }))),
     Layer.provideMerge(
