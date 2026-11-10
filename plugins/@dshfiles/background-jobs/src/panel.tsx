@@ -372,6 +372,7 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
 
   return (
     <Page
+      scroll
       heading={props.heading ?? t('title')}
       description={props.description ?? t('subtitle')}
       {...(props.tabs === undefined ? {} : { tabs: props.tabs })}
