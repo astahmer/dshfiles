@@ -56,7 +56,8 @@ export const undoSessionsLayer = Layer.effect(
       archive: sessionId => Effect.flatMap(registry, found => Effect.tryPromise(() => found.archiveSession(SessionId(sessionId)))).pipe(bestEffort('archive')),
       unarchive: sessionId =>
         Effect.flatMap(registry, found => Effect.tryPromise(() => found.unarchiveSession(SessionId(sessionId)))).pipe(bestEffort('unarchive')),
-      // A thread that has started a turn may hold edits; blank and archived ones hold none. Only attached Sessions
+      // A thread with a message may hold edits; blank and archived ones hold none. A New thread draft already logs its
+      // permission, sandbox and model choices, so only its message surface tells it apart. Only attached Sessions
       // count: `sessionController.list` folds every Session log stored on the Host (seconds at a few thousand), and
       // every Session it returns that is not attached is discarded here anyway. The plugin does not inject `sessions`,
       // so its context refuses `ctx.sessions`; `hostService` reads the store without that guard.
@@ -65,7 +66,7 @@ export const undoSessionsLayer = Layer.effect(
         return (yield* attached).list().flatMap((session): LiveThread[] => {
           const cwd = session.header.cwd
           const sessionId = String(session.id)
-          if (cwd === undefined || session.seq === 0 || archived.has(sessionId)) return []
+          if (cwd === undefined || session.surface.nodes.length === 0 || archived.has(sessionId)) return []
           const parent = session.header.parentSession
           return [{ sessionId, cwd, parentSessionId: parent === undefined ? null : String(parent) }]
         })

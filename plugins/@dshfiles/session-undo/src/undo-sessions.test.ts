@@ -1,5 +1,6 @@
 import { Context as CordisContext } from '@deepseek-ai/cordis'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import SessionStore, { SessionId, type Session } from '@deepseek-ai/dsh-session'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
@@ -10,6 +11,12 @@ const hostWith = (ctx: CordisContext, archived: readonly string[], plugin: Cordi
   // SAFETY: liveThreads reads only archivedSessionIds from the workspace registry.
   ctx.provide('workspaceRegistry', { archivedSessionIds: archived } as never)
   return Layer.succeed(HostContext, HostContext.of({ ctx: plugin, packageId: '@dshfiles/session-undo' }))
+}
+
+const prompted = (session: Session): Session => {
+  session.append('turn/start', { turn: 1 })
+  session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'write a file' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+  return session
 }
 
 const liveThreadsOf = (ctx: CordisContext, archived: readonly string[], plugin: CordisContext = ctx) =>
@@ -27,20 +34,16 @@ describe('undo sessions', () => {
           context => Effect.promise(() => context.fiber.dispose()),
         )
         yield* Effect.promise(() => ctx.plugin(SessionStore))
-        const started = (id: string, cwd: string, parent?: string) => {
-          const session = ctx.sessions.create(SessionId(id), {
-            meta: parent === undefined ? { cwd } : { cwd, parentSession: SessionId(parent) },
-          })
-          session.append('turn/start', { turn: 1 })
-          return session
-        }
+        const started = (id: string, cwd: string, parent?: string) =>
+          prompted(ctx.sessions.create(SessionId(id), { meta: parent === undefined ? { cwd } : { cwd, parentSession: SessionId(parent) } }))
         started('session-shared', '/workspace/shared')
         ctx.sessions.create(SessionId('session-blank'), { meta: { cwd: '/workspace/shared' } })
+        // A New thread draft logs its settings before any message, and a turn can end before one enters it.
+        ctx.sessions.create(SessionId('session-no-message'), { meta: { cwd: '/workspace/shared' } }).append('turn/start', { turn: 1 })
         started('session-archived', '/workspace/shared')
         started('session-child', '/workspace/shared', 'session-shared')
         started('session-elsewhere', '/workspace/elsewhere')
-        const noFolder = ctx.sessions.create(SessionId('session-no-folder'))
-        noFolder.append('turn/start', { turn: 1 })
+        prompted(ctx.sessions.create(SessionId('session-no-folder')))
 
         expect(yield* liveThreadsOf(ctx, ['session-archived'])).toEqual([
           { sessionId: 'session-shared', cwd: '/workspace/shared', parentSessionId: null },
@@ -59,8 +62,7 @@ describe('undo sessions', () => {
           context => Effect.promise(() => context.fiber.dispose()),
         )
         yield* Effect.promise(() => ctx.plugin(SessionStore))
-        const session = ctx.sessions.create(SessionId('session-live'), { meta: { cwd: '/workspace/shared' } })
-        session.append('turn/start', { turn: 1 })
+        prompted(ctx.sessions.create(SessionId('session-live'), { meta: { cwd: '/workspace/shared' } }))
         expect(yield* liveThreadsOf(ctx, [])).toEqual([{ sessionId: 'session-live', cwd: '/workspace/shared', parentSessionId: null }])
       }),
     ),
@@ -74,8 +76,7 @@ describe('undo sessions', () => {
           context => Effect.promise(() => context.fiber.dispose()),
         )
         yield* Effect.promise(() => root.plugin(SessionStore))
-        const session = root.sessions.create(SessionId('session-live'), { meta: { cwd: '/workspace/shared' } })
-        session.append('turn/start', { turn: 1 })
+        prompted(root.sessions.create(SessionId('session-live'), { meta: { cwd: '/workspace/shared' } }))
         const plugin = yield* Effect.promise(
           () => new Promise<CordisContext>(resolve => void root.plugin({ name: 'session-undo-probe', apply: resolve })),
         )
