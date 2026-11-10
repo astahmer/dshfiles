@@ -47,3 +47,13 @@ Feature: Workspace editor
     When a disposable workspace with source, dependency and version-control files has a thread
     And "README.md" is opened twice from the Workspace files page
     Then the editor shows "README.md" in one tab with its disk content
+
+  @scenario:editor.thread-artifacts
+  Scenario: An agent artifact can be edited, reopened and deleted in the workbench
+    Given the isolated plugin composition of "@dshfiles/editor, @dshfiles/ai-accounts, @dshfiles/storage-json, @dshfiles/storage-domain, @dshfiles/workspace-folder-picker, @dshfiles/workbench, @dshfiles/frame-layout" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model creates a thread artifact
+    Then the artifact can be opened and edited in the workbench
+    And the saved artifact can be reopened after a Host restart
+    And the artifact can be deleted from the thread
+    And a new Markdown artifact can be created and saved in the workbench
