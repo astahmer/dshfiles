@@ -2,6 +2,7 @@ import { appendFile, mkdtemp, rm } from 'node:fs/promises'
 import { constants, zstdCompressSync } from 'node:zlib'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { afterEach, expect, it } from 'vitest'
 import { SearchIndex } from '../src/index-db.js'
 import * as Duration from 'effect/Duration'
@@ -82,6 +83,31 @@ it('drops an archived Session’s documents and indexes it again only for a targ
     sessionId,
   ])
   expect(index.searchSessions({ query: 'retry storm', limit: 5 }).matches.map(match => match.header.id)).toEqual([sessionId])
+  index.close()
+})
+
+it('rolls back every session and FTS row when a grouped write fails', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'session-search-rollback-'))
+  roots.push(root)
+  const path = join(root, 'index.sqlite')
+  const index = new SearchIndex(path)
+  const raw = new DatabaseSync(path)
+  raw.exec("CREATE TRIGGER fail_second BEFORE INSERT ON sessions WHEN NEW.id = 'second' BEGIN SELECT RAISE(ABORT, 'forced failure'); END")
+  raw.close()
+  const batch = (id: string) => ({
+    header: { id, version: 4, createdAt: 0, isSeeded: false },
+    cursor: { logPath: id, dev: '1', ino: '1', offset: 1, size: 1, mtimeNs: '1' },
+    documents: [{ sessionId: id, seq: 1, type: 'user/message', time: 1, surface: 'current', text: 'rollbackterm', truncated: false }],
+    replace: true,
+    now: 1,
+  })
+  index.beginGroup()
+  index.commitBatch(batch('first'))
+  expect(() => index.commitBatch(batch('second'))).toThrow('forced failure')
+  index.rollbackGroup()
+  expect(index.cursor('first')).toBeUndefined()
+  expect(index.cursor('second')).toBeUndefined()
+  expect(index.searchSessions({ query: 'rollbackterm', limit: 5 }).matches).toEqual([])
   index.close()
 })
 
