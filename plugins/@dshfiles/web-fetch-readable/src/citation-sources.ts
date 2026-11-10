@@ -33,6 +33,7 @@ const unique = (sources: readonly CitationSource[]): readonly CitationSource[] =
 }
 
 /** The sources a `web_search` result carries in its replayable meta, in result order, each URL once. */
+// oxlint-disable-next-line antislop/no-unknown-parameters -- persisted Session metadata is decoded below.
 const fromSearch = (meta: unknown): readonly CitationSource[] =>
   Option.match(Schema.decodeUnknownOption(searchMetaSchema)(meta), {
     onNone: () => [],
