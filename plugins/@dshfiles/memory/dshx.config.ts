@@ -15,7 +15,7 @@ export default defineConfig({
       '@dshfiles/sqlite-store',
     ],
   },
-  client: { entry: 'src/client-entry.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
+  client: { entry: 'src/client-entry.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   modules: { api: 'src/api.ts', 'workspace-scripts-api': 'src/workspace-scripts-api.ts' },
   build: { sourcemap: true, declarations: false, minify: true },
 })

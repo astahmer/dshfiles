@@ -4,6 +4,7 @@ export default defineConfig({
   name: '@dshfiles/schedule',
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   client: {
+    dshxRuntime: 'shared',
     shared: '@dshfiles/shared-runtime',
     entry: 'src/client-entry.tsx',
     // Not browser-roster packages, so the native plugin's build inlines them too.

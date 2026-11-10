@@ -615,6 +615,22 @@ Then('exactly one shared plugin stylesheet is injected', async ({ page }: { page
   completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
 })
 
+Then('a dshx touch-none control keeps touch-action none and a plain button keeps touch-action manipulation', async ({ page }: { page: Page }) => {
+  await page.locator('[data-plugin-css="@dshfiles/ui-styles/client.css"]').waitFor({ state: 'attached', timeout: OUTCOME_TIMEOUT_MS })
+  const touchActions = await page.evaluate(() => {
+    const control = document.createElement('button')
+    control.className = 'dshx:touch-none'
+    const plain = document.createElement('button')
+    document.body.append(control, plain)
+    const computed = { control: getComputedStyle(control).touchAction, plain: getComputedStyle(plain).touchAction }
+    control.remove()
+    plain.remove()
+    return computed
+  })
+  await recordAssertion(page, 'touch-baseline-keeps-utilities-in-charge', () => expect(touchActions).toEqual({ control: 'none', plain: 'manipulation' }))
+  completeEvidenceStep(evidenceRunFor(page), 'assertion-complete')
+})
+
 Then(
   'the command palette opens within {int} ms and filters each keystroke within {int} ms',
   async ({ page }: { page: Page }, openBudgetMs: number, keystrokeBudgetMs: number) => {

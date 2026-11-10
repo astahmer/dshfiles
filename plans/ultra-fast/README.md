@@ -1,6 +1,6 @@
 # Ultra-fast DSH
 
-Resume here: live heap fixed (2,354 → 346–459 MB after GC; open follows no longer pin decoded logs or frames). Open: a long-lived browser tab keeps ~250 Session instances resident with open follows and reopens them all on every reconnect (session-controller client resident cap only bounds viewed Sessions) — agent working; then sidebar/main-tabs/session-controller list churn (GC while streaming), dshx client runtime rollout (flag exists, off), Host gap: native gateway `cancellableStream`/mux `pump` keep the last frame per stream.
+Resume here: live heap fixed (2,354 → 346–459 MB after GC; open follows no longer pin decoded logs or frames). Open: a long-lived browser tab keeps ~250 Session instances resident with open follows and reopens them all on every reconnect (session-controller client resident cap only bounds viewed Sessions) — agent working; then sidebar/main-tabs/session-controller list churn (GC while streaming), Host gap: native gateway `cancellableStream`/mux `pump` keep the last frame per stream.
 before/after row in this file and its evidence in `docs/performance.md` or `docs/ram-usage.md`.
 
 ## Goal
@@ -91,7 +91,7 @@ Not yet measured: cold switch after a Host start, reload to interactive, streami
 - Cold (first-visit) switch still pays scroll restore, caret and width-measure layouts; the open-thread event path costs ~60 ms more than a row click.
 - Sidebar virtualization (C02); transcript windowing is one-directional (reading far up still grows the DOM until back at the tail).
 - Boot duplicates left (2026-11-09, see `docs/performance.md`): stock `ui-settings` `settings/describe` (its row id is the `ui-settings` settings namespace, so it cannot be forked under a new row); per warm switch `session-undo` `history`, `preview` `devServers`.
-- dshx client runtime still inlined (~83 KB × ~70 plugins) and dshx Host runtime inlined (17 MB): needs immutable content-addressed runtime snapshots (U2).
+- dshx client runtime shared by content hash from `@dshfiles/shared-runtime` in all 74 consumers: client bundles 28.8 → 22.6 MB; Host runtime shared through snapshots (U2).
 - Core: Vite `/assets/*` shell served without cache-control.
 
 ## Done on 2026-11-09 (jj line above `main`, not yet on main)

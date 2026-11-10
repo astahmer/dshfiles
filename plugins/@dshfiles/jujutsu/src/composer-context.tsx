@@ -1,8 +1,6 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
-import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { useProjectBookmark } from '@dshfiles/jj-integration/project-bookmark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
@@ -15,15 +13,14 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, FileCodeIcon, FileDiffIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, FileCodeIcon, FileDiffIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import * as Schema from 'effect/Schema'
 import { useAutoRefresh } from './auto-refresh.js'
 import { useOpenInEditor } from './open-in-editor.js'
-import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
+import { type ComposerBase, type ComposerRepository } from './composer-context-api.js'
 import type { FileStatus } from './api.js'
 import { ComposerContextModel, composerBaseSetting, PROJECT_BASE_SETTING } from './composer-context-core.js'
 import { composerSessionCwd } from './composer-context-session.js'
@@ -31,6 +28,7 @@ import { ChatReferenceLinks } from './chat-reference-links.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { decodePreferences } from './preferences.js'
 import { jujutsuSettings } from './settings.js'
+import { useComposerContextApi } from './use-jujutsu-api.js'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 
 export interface ComposerJujutsuServices {
@@ -109,7 +107,7 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   const base: ComposerBase = ComposerContextModel.composerBaseForProject(setting, projectBookmark)
   const choice = ComposerContextModel.composerBaseChoice(setting)
   const baseKey = composerBaseSetting(base)
-  const api = useApi(composerContextApi)
+  const api = useComposerContextApi(props.sessionId)
   // Chat reference links read the repository's bookmarks to decide which inline code is a link, so the
   // shared context query stays on for them even when this surface's own toggle is off.
   const loaded = (preferences[surface] || preferences.chatReferenceLinks) && cwd !== null
@@ -239,7 +237,7 @@ const ComposerChangesBarContent = (props: ComposerSlotProps): JSX.Element | null
   const context = useComposerContext(props, 'composerBar')
   const [expanded, setExpanded] = useState(false)
   const [fullDiffPath, setFullDiffPath] = useState<string | null | undefined>(undefined)
-  const api = useApi(composerContextApi)
+  const api = useComposerContextApi(props.sessionId)
   const openInEditor = useOpenInEditor()
   const repository = context.repository
   const diffQuery = useQuery({
@@ -407,37 +405,20 @@ const Chip = (props: { readonly tooltip: string; readonly onClick: () => void; r
   </Tooltip>
 )
 
-/** One contextual chip below the composer; it opens the Jujutsu panel for this repository. */
-export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
+/** The jj workspace and bookmark inside the composer's run summary chip; it opens the Jujutsu panel for this repository. */
+export const ComposerLocation = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerChips')
   const repository = context.repository
   const workspaces = useWorkspaceItems(props.jujutsu.workspaces)
   const currentWorkspace = workspaces.find(workspace => workspace.sessionIds.includes(props.sessionId))
-  const workspaceId = currentWorkspace?.workspaceId
-  const api = useApi(jjIntegrationApi)
-  const destination = useQuery({
-    queryKey: ['jujutsu', 'composer-project', workspaceId ?? ''],
-    enabled: repository !== null && workspaceId !== undefined,
-    retry: false,
-    queryFn: ({ signal }) =>
-      runHostRequest({
-        signal,
-        timeoutMs: 15_000,
-        request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }),
-      }).catch(error => {
-        if (isApiOwnerMissing(error)) return null
-        throw error
-      }),
-  })
   if (repository === null) return null
   const toggle = (): void => props.jujutsu.toggleJujutsu(repository.root)
 
   const ownBookmark = repository.bookmarks[0]
   const nearestBookmark = repository.nearestBookmarks[0]
   const bookmark = ownBookmark ?? nearestBookmark
-  const project =
-    workspaces.find(workspace => workspace.workspaceId === destination.data?.projectWorkspaceId)?.title ?? currentWorkspace?.title ?? basename(repository.root)
-  const workspace = repository.workspace === project ? undefined : repository.workspace
+  // The run summary chip already shows this thread workspace's title ("project · name"), so its name is not repeated.
+  const workspace = repository.workspace === null || currentWorkspace?.title.split(' · ').includes(repository.workspace) ? undefined : repository.workspace
   const location = [workspace, bookmark === undefined ? undefined : bookmark + (ownBookmark === undefined ? '+' : '')]
     .filter((value): value is string => value !== undefined)
     .join(' / ')
@@ -451,19 +432,20 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   ]
     .filter((value): value is string => value !== undefined)
     .join('\n')
+  // Rich Composer's run summary chip already names the project and host: this continues it with the location.
   return (
     <TooltipProvider delayDuration={500}>
-      <div
-        className="dshx-root dshx:flex dshx:w-80 dshx:max-w-full dshx:min-w-0 dshx:shrink dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground"
+      <span
+        className="dshx-root dshx:flex dshx:min-w-0 dshx:shrink dshx:items-center dshx:gap-1 dshx:overflow-hidden"
         ref={context.ref}
+        data-jujutsu-location=""
       >
-        <Chip className="dshx:max-w-full dshx:shrink" onClick={toggle} tooltip={title}>
-          <FolderIcon />
-          <span className="dshx:min-w-0 dshx:truncate">{project}</span>
-          <span className="dshx:min-w-0 dshx:truncate dshx:text-foreground">({label})</span>
+        <span aria-hidden="true">·</span>
+        <Chip className="dshx:max-w-full dshx:shrink dshx:px-1 dshx:py-0" onClick={toggle} tooltip={title}>
+          <span className="dshx:min-w-0 dshx:truncate">{label}</span>
           {repository.conflict && <span className="dshx:shrink-0 dshx:text-destructive">conflict</span>}
         </Chip>
-      </div>
+      </span>
     </TooltipProvider>
   )
 }

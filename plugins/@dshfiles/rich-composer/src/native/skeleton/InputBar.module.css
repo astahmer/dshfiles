@@ -256,6 +256,13 @@
   user-select: none;
 }
 
+/* Same floor as the editor's touch baseline in ui-styles: a 14px placeholder would grow on the first keystroke. */
+@media (pointer: coarse) {
+  .placeholder {
+    font-size: max(16px, 1em);
+  }
+}
+
 .inputDisabled {
   color: var(--dsw-alias-label-tertiary);
   cursor: not-allowed;

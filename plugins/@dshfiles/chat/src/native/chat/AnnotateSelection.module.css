@@ -1,0 +1,15 @@
+.annotate {
+  position: fixed;
+  z-index: 60;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: Canvas;
+  color: CanvasText;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+  cursor: pointer;
+}

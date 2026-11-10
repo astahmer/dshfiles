@@ -32,6 +32,7 @@ function AddressableTab({ props, tab }: { readonly props: ResourceSeatProps; rea
   const shared = {
     renderSlot: props.renderSlot,
     occurrence: props.occurrence,
+    sessionId: props.sessionId,
     useTabTypes: props.useTabTypes,
     useTabNavigation: props.useTabNavigation,
     useStore: props.useStore,

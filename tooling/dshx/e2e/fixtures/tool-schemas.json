@@ -1,8 +1,9 @@
 {
-  "hostBundles": 68,
+  "hostBundles": 79,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
+    "@dshfiles/agent-loop",
     "@dshfiles/agent-plan",
     "@dshfiles/agent-questions",
     "@dshfiles/agent-telemetry",
@@ -20,6 +21,8 @@
     "@dshfiles/capabilities-hub",
     "@dshfiles/command-palette",
     "@dshfiles/context-compaction",
+    "@dshfiles/cordis-cards",
+    "@dshfiles/cordis-client-runner",
     "@dshfiles/diff-viewed",
     "@dshfiles/editor",
     "@dshfiles/fff-search",
@@ -32,8 +35,11 @@
     "@dshfiles/mcp-endpoint",
     "@dshfiles/mcp-servers",
     "@dshfiles/memory",
+    "@dshfiles/mermaid-diagrams",
     "@dshfiles/model-effort-picker",
     "@dshfiles/multi-host",
+    "@dshfiles/phone-access",
+    "@dshfiles/phone-pairing",
     "@dshfiles/plugin-guide",
     "@dshfiles/policies",
     "@dshfiles/preview",
@@ -45,13 +51,18 @@
     "@dshfiles/queue-reorder",
     "@dshfiles/references",
     "@dshfiles/resource-packs",
+    "@dshfiles/schedule",
     "@dshfiles/secret-catalog",
+    "@dshfiles/session-persistence-jsonl",
     "@dshfiles/session-search",
     "@dshfiles/session-undo",
     "@dshfiles/settings-models",
     "@dshfiles/settings-shell",
+    "@dshfiles/settings-subagent",
     "@dshfiles/settings-web-search",
     "@dshfiles/shared-streams",
+    "@dshfiles/storage-domain",
+    "@dshfiles/storage-json",
     "@dshfiles/test-runs",
     "@dshfiles/thread-share",
     "@dshfiles/thread-sidebar",
@@ -70,12 +81,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 591,
-  "apiToolBindings": 408,
-  "apiToolNameCount": 408,
-  "apiToolSchemas": 407,
+  "apiMethods": 599,
+  "apiToolBindings": 414,
+  "apiToolNameCount": 414,
+  "apiToolSchemas": 413,
   "definedTools": 24,
-  "tools": 431,
+  "tools": 437,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -5593,10 +5604,15 @@
     },
     {
       "name": "jj_thread_cleanup_jobs",
-      "description": "Progress and recent trail of background workspace cleanup jobs, newest first: state, phase, counts, the item in flight, the failure, and the newest job’s full result. Read-only.",
+      "description": "Progress and recent trail of background workspace cleanup jobs, newest first: state, phase, owning repository, counts, the item in flight, the failure with its safe recovery, and the full result of the newest job of each repository. Pass path to see one project’s jobs, including those asked from its thread workspaces. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "path": {
+            "description": "A project or one of its thread workspaces: only the cleanup jobs of the repository that owns it, plus runs over every repository.",
+            "type": "string"
+          }
+        },
         "additionalProperties": false
       }
     },
@@ -6574,6 +6590,63 @@
       }
     },
     {
+      "name": "multi_host_answer_question",
+      "description": "Answer one question on a remote thread with one answer per question, on the runtime that owns the thread. Call only when the user asked you to give that answer; never choose one yourself.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "interactionId": {
+            "type": "string"
+          },
+          "callId": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "object",
+            "properties": {
+              "answers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "selected": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "custom": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "selected"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "answers"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "sessionId",
+          "answer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "multi_host_browse",
       "description": "List folders on a remote runtime at one path (default: the runtime home), for choosing where a remote thread runs. Read-only.",
       "parameters": {
@@ -6842,6 +6915,15 @@
       "parameters": {
         "type": "object",
         "properties": {}
+      }
+    },
+    {
+      "name": "multi_host_land_repositories",
+      "description": "The thread workspaces of every visible remote host, limited to threads recorded on this DSH, plus the hosts that did not answer. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
       }
     },
     {
@@ -7227,6 +7309,49 @@
       }
     },
     {
+      "name": "multi_host_session_interactions",
+      "description": "Questions and approvals remote threads are waiting on right now, read from the runtimes this Host is following. A thread that is not open here may hold more on its own host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "multi_host_session_jj",
+      "description": "Run one JJ thread action in a remote thread's own folder, on the runtime that owns the thread: threadAt and integrationProgress read it; land, queueLand, cancelQueuedLand and discard change it (discard needs an explicit force, and force: true abandons unlanded work). Call only when the user asked for that action.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "threadAt",
+              "integrationProgress",
+              "land",
+              "queueLand",
+              "cancelQueuedLand",
+              "discard"
+            ]
+          },
+          "input": {}
+        },
+        "required": [
+          "sessionId",
+          "method",
+          "input"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "multi_host_session_jj_repositories",
       "description": "Read JJ repository and thread-workspace status from the runtime that owns this mirrored Session. Read-only.",
       "parameters": {
@@ -7238,6 +7363,56 @@
         },
         "required": [
           "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "multi_host_session_repository",
+      "description": "Read or change a remote thread's own repository on the runtime that owns it: revision graph, details, diffs and composer context, or a prepared jujutsu action. The call must name the thread's folder or the repository id it resolves to. Reads are safe. confirm and openRepository change the repository: Call only when the user asked for that action.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "api": {
+            "type": "string",
+            "enum": [
+              "jujutsu",
+              "jujutsu-composer"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "registerRepository",
+              "load",
+              "graphPage",
+              "workspaces",
+              "graphNavigation",
+              "revisionRelationship",
+              "graphSlice",
+              "referenceGraph",
+              "referenceTitles",
+              "details",
+              "revisionFiles",
+              "editTimes",
+              "workingDiff",
+              "prepare",
+              "context",
+              "diff",
+              "openRepository",
+              "confirm"
+            ]
+          },
+          "input": {}
+        },
+        "required": [
+          "sessionId",
+          "api",
+          "method",
+          "input"
         ],
         "additionalProperties": false
       }
@@ -10250,6 +10425,25 @@
       }
     },
     {
+      "name": "thread_status",
+      "description": "Point lookup of named threads (DSH Sessions): whether each is still stored, archived or settled, without listing or reading any log. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "sessionIds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "thread_stop",
       "description": "Stop one thread's running work through the same cancel path as the sidebar's stop: its current turn ends and the thread stays available. Call only when the user asked for this.",
       "parameters": {
@@ -10270,7 +10464,18 @@
       "description": "Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) is queued into the subscriber and wakes it when it is idle. Defaults the subscriber to the calling thread. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "subscriberSessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -10278,7 +10483,15 @@
       "description": "List thread subscriptions: which thread is notified when which other thread finishes a turn. Filter by subscriber or target; omit both for every edge. Nothing is delivered without a subscription. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "subscriberSessionId": {
+            "type": "string"
+          },
+          "targetSessionId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
@@ -10334,7 +10547,18 @@
       "description": "Stop the notices for one pair: no further completion of the target reaches the subscriber. Defaults the subscriber to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "subscriberSessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
       }
     },
     {

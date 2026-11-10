@@ -21,6 +21,20 @@ afterEach(() => {
 })
 
 describe('panel scopes', () => {
+  it('keeps repeated dock occurrences independent across restoration', () => {
+    const first = PanelScopes.dock('view/first')
+    const second = PanelScopes.dock('view/second')
+    expect(first).not.toBe(second)
+    PanelScopes.remember(first, { path: '/first', view: 'graph' })
+    PanelScopes.remember(second, { path: '/second', view: 'source' })
+    PanelScopes.writeMemory(first, 'textFilter', 'one')
+    PanelScopes.writeMemory(second, 'textFilter', 'two')
+    expect(PanelScopes.persisted(first).path).toBe('/first')
+    expect(PanelScopes.persisted(second).path).toBe('/second')
+    expect(PanelScopes.rememberedState(first, 'textFilter', () => '')).toBe('one')
+    expect(PanelScopes.rememberedState(second, 'textFilter', () => '')).toBe('two')
+  })
+
   it('reads only its own panel scope, and falls back to the panel default for an unscoped tab', () => {
     const own = (scope: string | null) => new CustomEvent(PANEL_SCOPE_EVENT, { detail: { panelId: JUJUTSU_PANEL_ID, scope } })
 

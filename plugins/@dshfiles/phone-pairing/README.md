@@ -1,5 +1,7 @@
 # Phone pairing
 
+![Pair a phone over a self-provisioned HTTPS tunnel](docs/screenshots/phone-pairing.png)
+
 Public, password-less phone access to DSH: at startup the Host provisions an HTTPS
 tunnel, prints one QR (or a 6-digit code), and the phone keeps a persistent cookie.
 Devices live in `$DSH_HOME/plugins/phone-pairing/devices.json` as SHA-256 hashes.
@@ -17,7 +19,9 @@ Devices live in `$DSH_HOME/plugins/phone-pairing/devices.json` as SHA-256 hashes
 3. It provisions a tunnel for that provider: a signed-in Tailscale gets `tailscale funnel --bg --https=443`
    (public `https://<machine>.<tailnet>.ts.net`); otherwise an installed `cloudflared`
    quick tunnel. With neither, it prints install hints and does nothing.
-4. The terminal shows a QR (`https://<origin>/pair#id=…&secret=…`) and a 6-digit code.
+4. The terminal shows a QR (`https://<origin>/pair#id=…&secret=…`) and a 6-digit code. The DSH sidebar footer has the
+   same QR behind **Show pairing QR code**, so a code can be minted without the terminal; the popover mints one fresh
+   single-use offer each time it opens and shows how to turn phone access on while it is off.
 5. The phone scans, or opens `/pair` and types the code. Redemption is single use,
    expires after `offerTtlSeconds`, and is rate limited per minute.
 6. The response sets `__Host-dsh_phone` (HttpOnly, SameSite=Strict, Secure on HTTPS).

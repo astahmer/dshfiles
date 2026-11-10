@@ -28,6 +28,9 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
   `styles.css` maps them to the Host `--dsw-*` tokens. `dark:` matches `body[data-ds-dark-theme]`.
 - The Host ships unlayered `button,input,select,textarea{font-family:inherit}`, which beats layered utilities: use
   `dshx:font-mono!` on controls.
+- The touch baseline in `ui-styles/src/client.css` is the one deliberate page-global element rule set (`touch-action`
+  on native controls, coarse-pointer selection and a 16px field floor). Keep it inside `@layer base`, so `dshx:` utilities
+  still override it, and record any new page-global rule there the same way.
 - Stacking: Host modals are `z-index: 1000`; kit dialogs/sheets 1050; floating layers (select, popover, menu,
   tooltip, hover card) 1100. Keep new overlays in those bands.
 - Scoped Preflight never targets bare `[data-slot]` — DSH tags its own outlets with `data-slot`.

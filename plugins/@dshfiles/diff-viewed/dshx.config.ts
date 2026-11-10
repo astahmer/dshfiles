@@ -5,6 +5,6 @@ export default defineConfig({
   name: '@dshfiles/diff-viewed',
   modules: { 'marks-api': 'src/marks-api.ts' },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
-  client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
+  client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

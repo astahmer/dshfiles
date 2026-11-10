@@ -10,9 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { Schema } from 'effect'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
@@ -30,16 +28,8 @@ import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { BacklogReference } from './backlog-reference.js'
+import { boardColumnsFor, boardStatuses } from './panel-preferences.js'
 
-const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
-const boardStatusSchema = Schema.Literals(['inbox', 'todo', 'doing', 'done', 'dropped'])
-const noHiddenColumns: readonly BacklogStatus[] = []
-/** The board's own column order and hidden columns, kept in this browser and apart from every other view's settings. */
-const boardColumns = createStoredValue({
-  key: 'dshfiles.backlog.board-columns.v1',
-  schema: Schema.Struct({ order: Schema.Array(boardStatusSchema), hidden: Schema.Array(boardStatusSchema) }),
-  fallback: { order: [...boardStatuses], hidden: noHiddenColumns },
-})
 const rankIn = (order: readonly BacklogStatus[], status: BacklogStatus): number => {
   const index = order.indexOf(status)
   return index === -1 ? order.length : index
@@ -220,6 +210,7 @@ const BoardCard = (props: {
  * lets it glide into the new column. Every column is a drop target.
  */
 export const BoardView = (props: {
+  readonly panelId?: string | undefined
   readonly items: readonly BacklogSummaryView[]
   readonly openId: number | null
   readonly cursorId: number | null
@@ -230,6 +221,7 @@ export const BoardView = (props: {
   readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
+  const boardColumns = useMemo(() => boardColumnsFor(props.panelId), [props.panelId])
   const columnPreferences = boardColumns.useValue()
   const orderedStatuses = useMemo(
     // A status missing from a stored order (an older value) sorts last instead of first.

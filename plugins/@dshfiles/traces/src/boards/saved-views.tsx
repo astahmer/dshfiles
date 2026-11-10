@@ -18,11 +18,11 @@ import { useState } from 'react'
 import * as Schema from 'effect/Schema'
 import { trimmedString } from '../alerts/alert-types.js'
 import type { TracesAlertsTranslate } from '../alerts/alerts-locale.js'
-import { logsViewSchema, storedLogsView } from '../log-list.js'
-import { storedTracesView, tracesViewSchema } from '../view-state.js'
+import { logsViewSchema, type PanelStores } from '../panel-stores.js'
+import { tracesViewSchema } from '../view-state.js'
 import { BUILTIN_BOARDS } from './board-definitions.js'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { boardCopyOf, storedBoardId } from './boards-view.js'
+import { boardCopyOf } from './boards-view.js'
 
 const MAX_SAVED_VIEWS = 30
 
@@ -47,27 +47,27 @@ const storedSavedViews = createStoredValue({
   fallback: [],
 })
 
-const applyView = (view: SavedView): void => {
-  storedTracesView.set(view.traces)
-  storedLogsView.set(view.logs)
-  if (view.board !== null) storedBoardId.set(view.board)
+const applyView = (view: SavedView, stores: PanelStores): void => {
+  stores.traces.set(view.traces)
+  stores.logs.set(view.logs)
+  if (view.board !== null) stores.board.set(view.board)
 }
 
-const saveCurrentView = (name: string): void => {
-  const traces = storedTracesView.get()
+const saveCurrentView = (name: string, stores: PanelStores): void => {
+  const traces = stores.traces.get()
   const view: SavedView = {
     id: `view-${Date.now().toString(36)}`,
     name: name.trim(),
     savedAt: Date.now(),
     traces,
-    logs: storedLogsView.get(),
-    board: traces.tab === 'boards' ? storedBoardId.get() : null,
+    logs: stores.logs.get(),
+    board: traces.tab === 'boards' ? stores.board.get() : null,
   }
   storedSavedViews.set([view, ...storedSavedViews.get().filter(existing => existing.name !== view.name)].slice(0, MAX_SAVED_VIEWS))
 }
 
 /** The panel header's Views menu: built-in boards one click away, the user's saved views, and saving the current one. */
-export const SavedViewsMenu = (props: { readonly t: TracesAlertsTranslate }): JSX.Element => {
+export const SavedViewsMenu = (props: { readonly t: TracesAlertsTranslate; readonly stores: PanelStores }): JSX.Element => {
   const t = props.t
   const saved = storedSavedViews.useValue()
   const [naming, setNaming] = useState(false)
@@ -87,8 +87,8 @@ export const SavedViewsMenu = (props: { readonly t: TracesAlertsTranslate }): JS
             <DropdownMenuItem
               key={board.id}
               onSelect={() => {
-                storedBoardId.set(board.id)
-                storedTracesView.set({ ...storedTracesView.get(), tab: 'boards' })
+                props.stores.board.set(board.id)
+                props.stores.traces.set({ ...props.stores.traces.get(), tab: 'boards' })
               }}
             >
               {t(boardCopyOf(board.id).title)}
@@ -100,7 +100,7 @@ export const SavedViewsMenu = (props: { readonly t: TracesAlertsTranslate }): JS
             <DropdownMenuItem disabled>{t('noSavedViews')}</DropdownMenuItem>
           ) : (
             saved.map(view => (
-              <DropdownMenuItem key={view.id} onSelect={() => applyView(view)}>
+              <DropdownMenuItem key={view.id} onSelect={() => applyView(view, props.stores)}>
                 <span className="dshx:min-w-0 dshx:truncate">{view.name}</span>
               </DropdownMenuItem>
             ))
@@ -143,7 +143,7 @@ export const SavedViewsMenu = (props: { readonly t: TracesAlertsTranslate }): JS
             onSubmit={event => {
               event.preventDefault()
               if (name.trim() === '') return
-              saveCurrentView(name)
+              saveCurrentView(name, props.stores)
               setNaming(false)
             }}
           >
