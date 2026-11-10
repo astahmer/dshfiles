@@ -162,7 +162,9 @@ const FileRow = (props: {
   const groups = new Map<string, TestCase[]>()
   for (const test of tests) {
     const suite = suitesNamed ? test.suites.join(' > ') : ''
-    groups.set(suite, [...(groups.get(suite) ?? []), test])
+    const suiteTests = groups.get(suite)
+    if (suiteTests === undefined) groups.set(suite, [test])
+    else suiteTests.push(test)
   }
   const meta = [
     props.file.failedCount > 0 ? `${props.file.failedCount} failed` : undefined,
