@@ -374,6 +374,8 @@ const note = await notes.get({ id: 'a' })
 
 `connectDshxApiClient(contract, { url?, origin?, cookie?, fetch? })` is the Node-side SDK client for one dshx API: the same methods, `.safe` results and `ApiError` kinds as a Client's `useApi` client, so `isApiOwnerMissing` and `Api.client` from `@dshfiles/dshx/effect` work unchanged. It exchanges the tokenized launch URL for a session cookie (`url`, else `DSHX_URL`, else `~/.dsh/runtime/web-url`), then posts to the API's Connection routes; with `origin` it skips that exchange and calls an already-authenticated session. The contract must declare `owner`. Schemas run on the Host as for any caller; the handler sees `caller: { kind: 'client' }`. It needs Node's `fetch` and is not for the browser, which uses `useApi`.
 
+A `remote` failure keeps what the handler sent: `remoteCode`, the message (cut at 1000 characters) and `remoteDetails`. The underlying `createDshxApiCaller`, which multi-host's gateway calls across Hosts, throws a `DshPlatformError` with the same `code`, `message` and `details`. Details are kept only as a JSON object of at most 8 KB; keys that name a token, cookie, secret, password, credential or API key read `[redacted]`, and `?token=` or `cookie=`/`authorization=` values inside strings are redacted too.
+
 Against the in-process Host from `@dshfiles/dshx/testing`, pass its Connection's fetch:
 
 ```ts
