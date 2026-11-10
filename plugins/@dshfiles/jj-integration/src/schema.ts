@@ -4,7 +4,7 @@ import * as Schema from 'effect/Schema'
 
 type JsonSchemaOptions = { readonly target: 'draft-07' | 'draft-2020-12' | 'openapi-3.0' }
 
-const emptyObject = (document: Record<string, unknown>) =>
+const emptyObject = (document: JsonSchema.JsonSchema) =>
   (document['type'] === undefined && document['not'] !== undefined) ||
   (document['type'] === 'object' && document['properties'] === undefined && document['additionalProperties'] === false)
 
@@ -13,23 +13,20 @@ const closedDocument = (schema: SchemaTypes.ConstraintDecoder<unknown>) => Schem
 
 const current = (document: ReturnType<typeof closedDocument>, options: JsonSchemaOptions) => {
   const built = options.target === 'draft-07' ? JsonSchema.toDocumentDraft07(document) : document
-  const schema: Record<string, unknown> = { ...built.schema }
+  const schema: JsonSchema.JsonSchema = { ...built.schema }
   if (Object.keys(built.definitions).length > 0) {
     schema[options.target === 'draft-07' ? 'definitions' : '$defs'] = built.definitions
   }
   return schema
 }
 
-type JsonObject = Record<string, unknown>
-type JsonSchemaValue = JsonObject | readonly JsonSchemaValue[] | string | number | boolean | null
-
-const isJsonObject = (value: unknown): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
+const isJsonObject = (value: Schema.Json): value is Schema.JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
+const decodeJsonSchema = Schema.decodeUnknownSync(Schema.Json)
 
 /** dshx drops `additionalProperties: true` before publishing, so the wrapper publishes the same document zod did. */
-const omitDefaultAdditionalProperties = (value: unknown): JsonSchemaValue => {
+const omitDefaultAdditionalProperties = (value: Schema.Json): Schema.Json => {
   if (Array.isArray(value)) return value.map(entry => omitDefaultAdditionalProperties(entry))
-  if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') return value
-  if (!isJsonObject(value)) throw new TypeError('Expected a JSON Schema value.')
+  if (!isJsonObject(value)) return value
   return Object.fromEntries(
     Object.entries(value)
       .filter(([key, child]) => !(key === 'additionalProperties' && child === true))
@@ -40,10 +37,9 @@ const omitDefaultAdditionalProperties = (value: unknown): JsonSchemaValue => {
 const ARRAY_KEY_ORDER = ['$schema', 'description', 'title', 'minItems', 'maxItems', 'type', 'items']
 
 /** zod published an array's description and bounds before `type`; Effect publishes them after `items`. */
-const reorderArrayKeywords = (value: unknown): JsonSchemaValue => {
+const reorderArrayKeywords = (value: Schema.Json): Schema.Json => {
   if (Array.isArray(value)) return value.map(entry => reorderArrayKeywords(entry))
-  if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') return value
-  if (!isJsonObject(value)) throw new TypeError('Expected a JSON Schema value.')
+  if (!isJsonObject(value)) return value
   const node = Object.fromEntries(Object.entries(value).map(([key, child]) => [key, reorderArrayKeywords(child)]))
   if (node['type'] !== 'array' && node['items'] === undefined) return node
   const ordered = ARRAY_KEY_ORDER.filter(key => key in node).map(key => [key, node[key]])
@@ -51,17 +47,17 @@ const reorderArrayKeywords = (value: unknown): JsonSchemaValue => {
   return Object.fromEntries([...ordered, ...rest])
 }
 
-const publishedDocument = (document: unknown): JsonObject => (isJsonObject(document) ? document : {})
+const publishedDocument = (document: Schema.Json): JsonSchema.JsonSchema => (isJsonObject(document) ? document : {})
 
 /** `Schema.Struct({})` publishes `{ not: { type: 'null' } }` where `z.object({})` published an empty object. */
-const closeEmptyObject = (document: Record<string, unknown>): Record<string, unknown> => {
+const closeEmptyObject = (document: JsonSchema.JsonSchema): JsonSchema.JsonSchema => {
   if (!emptyObject(document)) return document
   const { not: _not, $schema, ...rest } = document
   const replaced = { ...rest, type: 'object', properties: {}, additionalProperties: false }
   return $schema === undefined ? replaced : { $schema, ...replaced }
 }
 
-const merge = (standardDocument: Record<string, unknown>, document: ReturnType<typeof closedDocument>, options: JsonSchemaOptions) => {
+const merge = (standardDocument: JsonSchema.JsonSchema, document: ReturnType<typeof closedDocument>, options: JsonSchemaOptions) => {
   const closed = current(document, options)
   if (!emptyObject(closed)) return { ...standardDocument, ...closed }
   return closeEmptyObject({ ...standardDocument, ...closed })
@@ -83,9 +79,9 @@ export const strictStandardSchema = <S extends SchemaTypes.ConstraintDecoder<unk
       jsonSchema: {
         ...standardJsonSchema,
         input: (options: JsonSchemaOptions) =>
-          publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(merge(standardJsonSchema.input(options), document, options)))),
+          publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(decodeJsonSchema(merge(standardJsonSchema.input(options), document, options))))),
         output: (options: JsonSchemaOptions) =>
-          publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(merge(standardJsonSchema.output(options), document, options)))),
+          publishedDocument(reorderArrayKeywords(omitDefaultAdditionalProperties(decodeJsonSchema(merge(standardJsonSchema.output(options), document, options))))),
       },
     },
   }
