@@ -1,6 +1,7 @@
 import { chmod, copyFile, lstat, mkdir, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { userInfo } from 'node:os'
 import { join, resolve, sep } from 'node:path'
+import { decodeJson, jsonObjectSchema, type JsonObject, type JsonValue } from '@dshfiles/dshx/json'
 import { AccountCredentialHomeWork } from './account-credential-home-work.js'
 import { ShellCommand } from './shell-command.js'
 
@@ -173,15 +174,19 @@ export interface CodexAuthView {
   readonly error: string | undefined
 }
 
-const decodeJwtPayload = (token: string): Record<string, unknown> | undefined => {
+const decodeJwtPayload = (token: string): JsonObject | undefined => {
   const segment = token.split('.')[1]
   if (segment === undefined) return undefined
   try {
-    return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8')) as Record<string, unknown>
+    return decodeJson(jsonObjectSchema, Buffer.from(segment, 'base64url').toString('utf8'))
   } catch {
     return undefined
   }
 }
+
+/** A nested object of a Codex auth document or token claim, or an empty one when the field is missing or not an object. */
+const isJsonObject = (value: JsonValue | undefined): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
+const objectField = (value: JsonValue | undefined): JsonObject => (isJsonObject(value) ? value : {})
 
 export class CodexHomeModel {
   static readonly accountHome = codexAccountHome
@@ -189,6 +194,7 @@ export class CodexHomeModel {
   static readonly loginHint = codexLoginHint
   static readonly authJsonPath = authJsonPath
   static readonly decodeJwtPayload = decodeJwtPayload
+  static readonly objectField = objectField
 }
 
 const readString = (value: unknown): string | undefined => (typeof value === 'string' && value.length > 0 ? value : undefined)
@@ -211,22 +217,22 @@ export const describeCodexAuth = async (layout: CodexHomeLayout): Promise<CodexA
   } catch {
     return { path, signedIn: false, identity: undefined, plan: undefined, error: undefined }
   }
-  let parsed: Record<string, unknown>
+  let parsed: JsonObject
   try {
-    parsed = JSON.parse(raw) as Record<string, unknown>
+    parsed = decodeJson(jsonObjectSchema, raw)
   } catch {
     return {
       path,
       signedIn: false,
       identity: undefined,
       plan: undefined,
-      error: 'auth.json is not valid JSON',
+      error: 'auth.json is not a JSON object',
     }
   }
-  const tokens = (parsed.tokens ?? {}) as Record<string, unknown>
+  const tokens = objectField(parsed.tokens)
   const claims = typeof tokens.id_token === 'string' ? decodeJwtPayload(tokens.id_token) : undefined
-  const profile = (claims?.['https://api.openai.com/profile'] ?? {}) as Record<string, unknown>
-  const auth = (claims?.['https://api.openai.com/auth'] ?? {}) as Record<string, unknown>
+  const profile = objectField(claims?.['https://api.openai.com/profile'])
+  const auth = objectField(claims?.['https://api.openai.com/auth'])
   const plan = readString(parsed.chatgpt_plan_type) ?? readString(auth.chatgpt_plan_type)
   const userId = readString(auth.user_id) ?? readString(auth.chatgpt_user_id)
   return {

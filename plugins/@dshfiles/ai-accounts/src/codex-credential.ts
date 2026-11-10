@@ -1,19 +1,10 @@
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { LlmError } from '@deepseek-ai/dsh-llm'
+import { decodeJson, jsonObjectSchema, type JsonObject } from '@dshfiles/dshx/json'
 import type { Credential, OAuthCredential } from '@earendil-works/pi-ai'
 import { AccountCredentialHomeWork } from './account-credential-home-work.js'
 import { CodexHomeModel, materializeCodexShadowHome, type CodexHomeInput, type CodexHomeLayout } from './codex-home.js'
-
-const decodeJwtPayload = (token: string): Record<string, unknown> | undefined => {
-  const segment = token.split('.')[1]
-  if (segment === undefined) return undefined
-  try {
-    return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8')) as Record<string, unknown>
-  } catch {
-    return undefined
-  }
-}
 
 /**
  * pi-ai credential plumbing for one Codex account.
@@ -38,20 +29,20 @@ export const readCodexOAuthCredential = async (codexHome: string): Promise<OAuth
   } catch {
     throw new LlmError(`No readable Codex login at ${path}. Sign in with \`CODEX_HOME="${codexHome}" codex login\`.`, 'MISSING_CREDENTIAL')
   }
-  let parsed: Record<string, unknown>
+  let parsed: JsonObject
   try {
-    parsed = JSON.parse(raw) as Record<string, unknown>
+    parsed = decodeJson(jsonObjectSchema, raw)
   } catch {
-    throw new LlmError(`Codex login at ${path} is not valid JSON.`, 'INVALID_CREDENTIAL')
+    throw new LlmError(`Codex login at ${path} is not a JSON object.`, 'INVALID_CREDENTIAL')
   }
-  const tokens = (parsed.tokens ?? {}) as Record<string, unknown>
+  const tokens = CodexHomeModel.objectField(parsed.tokens)
   const access = readString(tokens.access_token)
   const refresh = readString(tokens.refresh_token)
   if (access === undefined || refresh === undefined) {
     throw new LlmError(`Codex login at ${path} has no ChatGPT token pair. Sign in with ChatGPT, not an API key.`, 'MISSING_CREDENTIAL')
   }
-  const claims = decodeJwtPayload(access) ?? {}
-  const auth = (claims[AUTH_CLAIM] ?? {}) as Record<string, unknown>
+  const claims = CodexHomeModel.decodeJwtPayload(access) ?? {}
+  const auth = CodexHomeModel.objectField(claims[AUTH_CLAIM])
   const accountId = readString(auth.chatgpt_account_id)
   const expiresClaim = typeof claims.exp === 'number' ? claims.exp : undefined
   return {
@@ -70,19 +61,20 @@ export const persistCodexOAuthCredential = async (codexHome: string, credential:
   const path = join(codexHome, 'auth.json')
   const raw = await readFile(path, 'utf8').catch(() => undefined)
   if (raw === undefined) return
-  let parsed: Record<string, unknown>
+  let parsed: JsonObject
   try {
-    parsed = JSON.parse(raw) as Record<string, unknown>
+    parsed = decodeJson(jsonObjectSchema, raw)
   } catch {
     return
   }
-  const tokens = (parsed.tokens ?? {}) as Record<string, unknown>
-  tokens.access_token = credential.access
-  tokens.refresh_token = credential.refresh
-  parsed.tokens = tokens
-  parsed.last_refresh = new Date().toISOString()
+  // Keep every field Codex CLI wrote; only the token pair and the refresh time change.
+  const next = {
+    ...parsed,
+    tokens: { ...CodexHomeModel.objectField(parsed.tokens), access_token: credential.access, refresh_token: credential.refresh },
+    last_refresh: new Date().toISOString(),
+  }
   const tmp = `${path}.ai-accounts-tmp-${process.pid}-${Date.now()}`
-  await writeFile(tmp, `${JSON.stringify(parsed, null, 2)}\n`, { mode: 0o600 })
+  await writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
   await rename(tmp, path)
 }
 
