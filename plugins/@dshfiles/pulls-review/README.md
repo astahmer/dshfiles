@@ -120,6 +120,10 @@ same review port (`src/review-backend.ts`), over [`@dshfiles/git-cli`](../git-cl
   `fromChangeId`/`toChangeId` take them as is (`git diff <from> <to>`).
 - Failure reasons keep their names (`jj-missing` means the VCS executable is missing); the messages say git.
 
+Real temporary repositories in `tests/git-output.spec.ts` cover the git CLI output, and the
+`pulls-review.git-thread-scopes` journey (`tooling/dshx/e2e/features/pulls-review.feature`) starts a thread in its own
+git worktree of a git-only repository and checks the Review panel reads its files in two scopes as `main..HEAD`.
+
 The panel shows the range and totals, then every changed-file diff in one
 scrollable view. Each diff header carries its scope and summary, and a per-file
 action marks that file reviewed. The review-wide selector can batch-mark files
