@@ -598,7 +598,7 @@ and returns `null` when it has nothing for that revision; the panel renders noth
 
 ## Agent tools
 
-- `jj_thread_isolate`: before the first code edit, create a dedicated jj workspace when the current Session is not isolated. It starts from the configured bookmark. The Session cwd stays unchanged, so use the returned absolute path for all file operations and as shell `workdir`; status and rebase tools follow the isolated workspace automatically.
+- `jj_thread_isolate`: before the first code edit, create a dedicated jj workspace for the calling Session from the configured bookmark, even when its cwd is another Session's thread workspace. A repeated call by the same Session returns its own existing workspace. The Session cwd stays unchanged, so use the returned absolute path for all file operations and as shell `workdir`; status and rebase tools follow the isolated workspace automatically.
 
 ### Workspaces subagents work in
 

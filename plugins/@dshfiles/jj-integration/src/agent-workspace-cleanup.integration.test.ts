@@ -42,6 +42,18 @@ describe.skipIf(!jjAvailable)('workspaces agents isolate for themselves', () => 
 
   const cleanup = (apply: boolean) => harness.api.cleanupWorkspaces({ path: repo, olderThanHours: 0, kinds: ['empty', 'integrated'], apply })
 
+  it('isolates a child Session from its parent workspace and reuses only the child workspace', async () => {
+    const parent = isolatedWorkspace(await harness.runTool('jj_thread_isolate', {}, { sessionId: 'session-parent', cwd: repo }))
+    const child = { sessionId: 'session-child', cwd: parent.path }
+
+    const childWorkspace = isolatedWorkspace(await harness.runTool('jj_thread_isolate', {}, child))
+    const repeated = isolatedWorkspace(await harness.runTool('jj_thread_isolate', {}, child))
+
+    expect(childWorkspace.path).not.toBe(parent.path)
+    expect(repeated.path).toBe(childWorkspace.path)
+    expect(repeated.name).toBe(childWorkspace.name)
+  })
+
   it('keeps the workspace while its work is unlanded or its Session works, then removes it once it landed', async () => {
     const subagent = { sessionId: 'session-subagent', cwd: repo }
     harness.setSession(subagent.sessionId, { running: true, questions: 0 })
