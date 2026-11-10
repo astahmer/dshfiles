@@ -23,6 +23,14 @@ const en = {
   waitingForAnyJobs: 'Waiting for any of {count} background jobs to finish',
   waitRemaining: '{duration} until wait timeout',
   waitProgress: 'Wait timeout countdown: {remaining} remaining of {timeout}',
+  riskHigh: 'Destructive',
+  riskReview: 'Review',
+  riskLow: 'Read-only',
+  approvalDetails: 'Approval details: Enter allows once, Escape rejects',
+  approvalReject: 'Reject',
+  approvalAllowOnce: 'Allow once',
+  approvalFailed: 'The decision did not reach the agent. Try again, or reject and ask the agent to retry.',
+  approvalReason: '{tool} asks to run with more access',
 }
 
 const zh = {
@@ -45,6 +53,14 @@ const zh = {
   waitingForAnyJobs: '正在等待任意一个后台任务结束（共 {count} 个）',
   waitRemaining: '等待超时还有 {duration}',
   waitProgress: '等待超时倒计时：还剩 {remaining}，共 {timeout}',
+  riskHigh: '破坏性',
+  riskReview: '需审查',
+  riskLow: '只读',
+  approvalDetails: '审批详情：Enter 允许一次，Escape 拒绝',
+  approvalReject: '拒绝',
+  approvalAllowOnce: '允许一次',
+  approvalFailed: '决定未送达智能体。请重试，或拒绝后让智能体重新尝试。',
+  approvalReason: '{tool} 请求以更高权限运行',
 } satisfies Record<keyof typeof en, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

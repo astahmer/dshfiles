@@ -185,6 +185,51 @@
           "reason": "Client-only: the diff card parses persisted tool metadata in the browser and starts no Host work."
         }
       ]
+    },
+    {
+      "id": "approval-card",
+      "title": "The native approval request as a risk card",
+      "summary": "A native approval request renders in the composer as one card: a risk badge (Destructive for a command that deletes, overwrites or publishes, Read-only for a tool that only reads, Review otherwise), the tool name, the request's reason, the command the call runs, and Reject / Allow once with the Esc and Enter keys. The decision still goes through the native approval package's answer, so its waterfall, withdrawal and one-answer lock are unchanged; turning the card off shows the native panel.",
+      "surfaces": ["client", "settings"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: pending approval request",
+      "configuration": [
+        {
+          "key": "approvalCard",
+          "defaultValue": "true",
+          "constraints": "Boolean; off hands the next request back to the native approval panel.",
+          "choices": ["true", "false"],
+          "coveredBy": ["tool-meta.approval-risk"]
+        }
+      ],
+      "states": ["no-request", "card", "answered", "failed"],
+      "failureModes": [
+        "A request that is no longer answerable (withdrawn) leaves both decisions disabled until the next request replaces the card.",
+        "A decision that does not reach the agent shows the failure under the details and unlocks the card to retry.",
+        "A remote thread's approval (multi-host) is not a native waterfall request and keeps its own panel."
+      ],
+      "externalDependencies": [
+        {
+          "id": "dsh-client-ui-approval",
+          "boundary": "The decision, its waterfall and the request's one-answer lock belong to the native approval package; the card renders the request and calls answer().",
+          "deterministicFake": "src/approval-risk.test.ts rates the commands; the card renders in the composer chain the native approval package also registers."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.approval-risk",
+          "file": "plugins/@dshfiles/tool-meta/src/approval-risk.test.ts",
+          "testName": "rates destroying or publishing commands high"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the card renders a request the Host already recorded and answers through the native approval waterfall."
+        }
+      ]
     }
   ]
 }

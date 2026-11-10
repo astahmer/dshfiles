@@ -11,6 +11,14 @@ export const toolMetaSettings = defineSettings({
     ])
       .default('absolute')
       .description('How the start time of a tool call reads.'),
+    approvalCard: Schema.boolean()
+      .default(true)
+      .description('Show tool approval requests as a card with a risk badge, the command and the Enter / Escape keys. Off shows the native approval panel.'),
+    fileCards: Schema.boolean()
+      .default(true)
+      .description(
+        'Show `read` results as a syntax-highlighted code card, and `edit` / `write` / `apply_patch` as collapsible diffs. Off keeps the native rows; `apply_patch` has no native card and keeps its diff.',
+      ),
   }),
   applies: 'live',
 })
