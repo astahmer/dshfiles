@@ -103,6 +103,7 @@ import { DESTINATIONS, DestinationSections, Destinations } from './destinations.
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
 import { threadSidebarNavigationApi, type NavigationRecord } from './navigation-api.js'
 import { SidebarCustomizationFallback, SidebarCustomizationSeat } from './sidebar-customization.js'
+import { decodeClientRevisions } from './client-revisions.js'
 
 const NO_PENDING_PLUGINS: readonly string[] = []
 
@@ -400,11 +401,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const pluginUpdatesSupported = pluginUpdates.status !== 'error'
   const refetchPluginUpdates = pluginUpdates.refetch
   const clientRevisionKey = useSyncExternalStore(props.subscribeClientRevisions, props.readClientRevisionKey, props.readClientRevisionKey)
-  const clientRevisions = useMemo(
-    // SAFETY: clientRevisionKey is the JSON.stringify of this same [id, rev] pair list, built in this component.
-    () => (JSON.parse(clientRevisionKey) as ReadonlyArray<readonly [string, string]>).map(([id, rev]) => ({ id, rev })),
-    [clientRevisionKey],
-  )
+  const clientRevisions = useMemo(() => decodeClientRevisions(clientRevisionKey), [clientRevisionKey])
   const clientUpdates = useApiQuery(threadSidebarPluginUpdatesApi, 'clientUpdates', {
     enabled: pluginUpdatesSupported && clientRevisions.length > 0,
     input: { revisions: clientRevisions },
