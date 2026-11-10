@@ -1,5 +1,9 @@
+import { NodeServices } from '@effect/platform-node'
+import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { resolveProvider } from '../src/providers.ts'
+import { resolveProvider as resolveProviderEffect, type Provider } from '../src/providers.ts'
+
+const resolveProvider = (preferred?: Provider) => Effect.runPromise(resolveProviderEffect(preferred).pipe(Effect.provide(NodeServices.layer)))
 
 describe('provider resolution', () => {
   it('prefers Tailscale, then the public tunnel, and honours an explicit choice', async () => {

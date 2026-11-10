@@ -1,8 +1,12 @@
-import { execFile } from 'node:child_process'
+import type { Context } from '@deepseek-ai/cordis'
+import { HostContext, tracerLayer } from '@dshfiles/dshx/effect'
+import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
-import { withSpan } from '@dshfiles/dshx/tracing'
+import { Effect, Layer, ManagedRuntime, Schema, Stream } from 'effect'
+import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 
-const TAILSCALE_TIMEOUT_MS = 3_000
+/** `tailscale` exited with a non-zero code. */
+class TailscaleFailed extends Schema.TaggedError<TailscaleFailed>()('TailscaleFailed', { exitCode: Schema.Number }) {}
 
 /** Tailnet status parsing and the two Tailscale actions this plugin needs. */
 export class Tailnet {
@@ -19,31 +23,42 @@ export class Tailnet {
   }
 }
 
-const runTailscale = (args: readonly string[]): Promise<string> =>
-  new Promise((resolve, reject) => {
-    execFile('tailscale', [...args], { timeout: TAILSCALE_TIMEOUT_MS }, (error, stdout) => {
-      if (error) reject(error)
-      else resolve(stdout)
-    })
-  })
+const runTailscale = (args: readonly string[]) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const handle = yield* spawner.spawn(ChildProcess.make('tailscale', [...args], { stdin: 'ignore' }))
+      const [stdout, exitCode] = yield* Effect.all([Stream.mkString(Stream.decodeText(Stream.drainFork(handle.stdout, handle.stderr))), handle.exitCode], {
+        concurrency: 'unbounded',
+      })
+      if (exitCode !== 0) return yield* new TailscaleFailed({ exitCode })
+      return stdout
+    }),
+  ).pipe(Effect.timeout('3 seconds'))
 
-export const detectTailnet = (): Promise<string | undefined> =>
-  withSpan('phone access tailnet', async () => {
-    try {
-      return Tailnet.parseName(await runTailscale(['status', '--json']))
-    } catch {
-      return undefined
-    }
-  })
+export const detectTailnet = runTailscale(['status', '--json']).pipe(
+  Effect.flatMap(raw => Effect.try(() => Tailnet.parseName(raw))),
+  Effect.orElseSucceed(() => undefined),
+  Effect.withSpan('phone access tailnet'),
+)
 
 /** Point Tailscale Serve at the loopback proxy; the caller prints the undo command. */
-export const serveTailnet = (port: number): Promise<boolean> =>
-  withSpan('phone access serve', async () => {
-    if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return false
-    try {
-      await runTailscale(['serve', '--bg', '--https=443', `http://127.0.0.1:${port}`])
-      return true
-    } catch {
-      return false
-    }
-  })
+export const serveTailnet = Effect.fn('phone access serve')(function* (port: number) {
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) return false
+  return yield* runTailscale(['serve', '--bg', '--https=443', `http://127.0.0.1:${port}`]).pipe(
+    Effect.as(true),
+    Effect.orElseSucceed(() => false),
+  )
+})
+
+/** The Promise edge `apply` calls: one runtime per activation, spawning through the Host's `subprocess` service. */
+export const tailnetCommands = (ctx: Context) => {
+  const runtime = ManagedRuntime.make(
+    Layer.mergeAll(DshChildProcessSpawner.layer, tracerLayer).pipe(Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/phone-access' }))),
+  )
+  return {
+    detect: () => runtime.runPromise(detectTailnet),
+    serve: (port: number) => runtime.runPromise(serveTailnet(port)),
+    dispose: () => runtime.dispose(),
+  }
+}

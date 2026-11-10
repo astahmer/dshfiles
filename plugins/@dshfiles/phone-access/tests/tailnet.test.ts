@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { tracerLayer } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { NodeServices } from '@effect/platform-node'
+import { Effect, Layer } from 'effect'
+import type { ChildProcessSpawner } from 'effect/process'
 import { detectTailnet, serveTailnet, Tailnet } from '../src/tailnet.ts'
+
+const run = <A>(effect: Effect.Effect<A, never, ChildProcessSpawner.ChildProcessSpawner>) =>
+  Effect.runPromise(effect.pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, tracerLayer))))
 
 describe('Tailnet.parseName', () => {
   it('accepts a tailnet DNS name and strips the trailing dot', () => {
@@ -18,7 +25,7 @@ describe('Tailnet.parseName', () => {
 describe('detectTailnet', () => {
   it('records one bounded span even when Tailscale is absent', async () => {
     using recorder = recordSpans()
-    await detectTailnet()
+    await run(detectTailnet)
     expect(recorder.named('phone access tailnet')).toHaveLength(1)
     const metadata = JSON.stringify(recorder.spans.map(span => ({ attributes: span.attributes, status: span.status })))
     expect(metadata).not.toContain('ts.net')
@@ -28,7 +35,7 @@ describe('detectTailnet', () => {
 describe('serveTailnet', () => {
   it('records one bounded span and refuses an invalid port without running Tailscale', async () => {
     using recorder = recordSpans()
-    await expect(serveTailnet(0)).resolves.toBe(false)
+    await expect(run(serveTailnet(0))).resolves.toBe(false)
     expect(recorder.named('phone access serve')).toHaveLength(1)
   })
 })

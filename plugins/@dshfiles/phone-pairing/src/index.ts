@@ -10,7 +10,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import z from '@deepseek-ai/schemastery'
+import { HostContext, tracerLayer } from '@dshfiles/dshx/effect'
+import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { definePlugin } from '@dshfiles/dshx/host'
+import { Layer, ManagedRuntime, type Effect } from 'effect'
 import { phonePairingApi, type PairingOffer } from './api.ts'
 import { createPairingGateway, mintNativeCookie, type NativeCookie } from './gateway.ts'
 import { resolveProvider } from './providers.ts'
@@ -41,7 +44,7 @@ interface NativeConnection {
 
 export default definePlugin({
   id: 'dshfiles-phone-pairing',
-  inject: ['connection', 'webServer'],
+  inject: ['connection', 'webServer', 'subprocess'],
   uses: ['tools', 'rpc'],
   Config: pluginConfig,
   setup(api) {
@@ -53,13 +56,19 @@ export default definePlugin({
     let settingStore: PhoneAccessSettings | undefined
     let gateway: ReturnType<typeof createPairingGateway> | undefined
     let pairing: Awaited<ReturnType<typeof createPairingStore>> | undefined
-    let stopTunnel: (() => Promise<void>) | undefined
+    let stopTunnel: Effect.Effect<void> | undefined
     let publicOrigin: string | undefined
+    const runtime = ManagedRuntime.make(
+      Layer.mergeAll(DshChildProcessSpawner.layer, tracerLayer).pipe(Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/phone-pairing' }))),
+    )
 
     ctx.effect(() => () => {
       gateway?.closeAll()
       gateway?.server.close()
-      void stopTunnel?.()
+      void (async () => {
+        if (stopTunnel !== undefined) await runtime.runPromise(stopTunnel)
+        await runtime.dispose()
+      })()
     })
 
     const nativeCookie = async (): Promise<NativeCookie | undefined> => {
@@ -114,8 +123,8 @@ export default definePlugin({
         deviceTtlMs: (config.deviceTtlDays ?? 365) * 24 * 3_600_000,
         offerTtlMs: (config.offerTtlSeconds ?? 300) * 1_000,
       })
-      const { provider } = await resolveProvider(settings?.provider)
-      const tunnel = settings?.origin === undefined ? await startTunnel(gatewayPort, provider) : undefined
+      const { provider } = await runtime.runPromise(resolveProvider(settings?.provider))
+      const tunnel = settings?.origin === undefined ? await runtime.runPromise(startTunnel(gatewayPort, provider)) : undefined
       const origin = settings?.origin ?? tunnel?.origin
       const upstream = serverPort()
       if (origin === undefined) throw new Error(`no tunnel for provider ${provider}; set "origin" in ${directory}/settings.json`)
@@ -137,7 +146,7 @@ export default definePlugin({
       gateway?.closeAll()
       gateway?.server.close()
       gateway = undefined
-      await stopTunnel?.()
+      if (stopTunnel !== undefined) await runtime.runPromise(stopTunnel)
       stopTunnel = undefined
       publicOrigin = undefined
       await settingStore?.save({ enabled: false })
@@ -150,7 +159,7 @@ export default definePlugin({
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
         execute: async () => {
-          const { provider, availability } = await resolveProvider(settingStore?.current.provider)
+          const { provider, availability } = await runtime.runPromise(resolveProvider(settingStore?.current.provider))
           const devices = (pairing?.listDevices() ?? []).map(device => `${device.id} last used ${new Date(device.lastUsedAt).toISOString()}`)
           return JSON.stringify({ enabled: settingStore?.current.enabled ?? false, provider, available: availability, devices })
         },
@@ -208,7 +217,7 @@ export default definePlugin({
       const loaded = await PhoneAccessSettings.load(`${directory}/settings.json`)
       settingStore = loaded.store
       if (!loaded.settings.enabled) {
-        const { provider, availability } = await resolveProvider(loaded.settings.provider)
+        const { provider, availability } = await runtime.runPromise(resolveProvider(loaded.settings.provider))
         console.log(
           `phone-pairing: phone access is off. Ask the agent to enable it, or write {"enabled":true} to ${directory}/settings.json. Would use ${provider}; providers: ${availability
             .map(option => `${option.provider}${option.available ? '' : ` (install: ${option.install ?? 'manual'})`}`)

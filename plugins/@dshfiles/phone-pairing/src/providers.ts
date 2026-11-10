@@ -1,4 +1,6 @@
-import { execFile } from 'node:child_process'
+import { Effect } from 'effect'
+import type { ChildProcessSpawner } from 'effect/process'
+import { commandExists } from './commands.ts'
 
 export type Provider = 'tailscale-funnel' | 'tailscale-serve' | 'cloudflared' | 'manual'
 
@@ -10,9 +12,6 @@ export interface Availability {
   /** What the user still has to do once the binary exists. */
   readonly setup?: string
 }
-
-const which = (command: string): Promise<boolean> =>
-  new Promise(resolve => execFile('sh', ['-c', `command -v ${command}`], { timeout: 5_000 }, error => resolve(error === null)))
 
 const platform = process.platform
 
@@ -31,23 +30,25 @@ const entry = (input: { provider: Provider; available: boolean; setup?: string }
   return availability
 }
 
-export const detectProviders = async (): Promise<Availability[]> => {
-  const [tailscale, cloudflared] = await Promise.all([which('tailscale'), which('cloudflared')])
+const detectProviders = Effect.gen(function* () {
+  const [tailscale, cloudflared] = yield* Effect.all([commandExists('tailscale'), commandExists('cloudflared')], { concurrency: 'unbounded' })
   return [
     entry({ provider: 'tailscale-funnel', available: tailscale, setup: 'tailscale up, then enable HTTPS certificates in the Tailscale admin console' }),
     entry({ provider: 'tailscale-serve', available: tailscale, setup: 'tailscale up (tailnet only, no public URL)' }),
     entry({ provider: 'cloudflared', available: cloudflared }),
     entry({ provider: 'manual', available: true, setup: 'point your own HTTPS reverse proxy at the gateway port' }),
   ]
-}
+})
 
 /** Tailscale when it is installed, otherwise the public OTP tunnel; the user's choice wins. */
-export const resolveProvider = async (preferred?: Provider): Promise<{ provider: Provider; availability: Availability[] }> => {
-  const availability = await detectProviders()
+export const resolveProvider = Effect.fnUntraced(function* (
+  preferred?: Provider,
+): Effect.fn.Return<{ provider: Provider; availability: Availability[] }, never, ChildProcessSpawner.ChildProcessSpawner> {
+  const availability = yield* detectProviders
   if (preferred !== undefined) return { provider: preferred, availability }
   const tailscale = availability.find(option => option.provider === 'tailscale-serve' && option.available)
   if (tailscale !== undefined) return { provider: 'tailscale-serve', availability }
   const cloudflared = availability.find(option => option.provider === 'cloudflared' && option.available)
   if (cloudflared !== undefined) return { provider: 'cloudflared', availability }
   return { provider: 'manual', availability }
-}
+})

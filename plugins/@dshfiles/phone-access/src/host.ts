@@ -12,11 +12,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { renderTerminalQr } from './qr.ts'
 import { createRewriteProxy } from './rewrite-proxy.ts'
-import { detectTailnet, serveTailnet } from './tailnet.ts'
+import { tailnetCommands } from './tailnet.ts'
 
 export const name = 'phone-access'
 
-export const inject = ['connection']
+export const inject = ['connection', 'subprocess']
 
 export interface Config {
   /** Absolute HTTPS origins the phone reaches; empty means detect the Tailscale hostname. */
@@ -56,9 +56,11 @@ export const apply = (ctx: Context, config: Config): void => {
   const proxyPort = config.proxyPort ?? 3443
   const configured = configuredOrigins(config)
 
+  const tailnet = tailnetCommands(ctx)
   let active = true
   ctx.effect(() => () => {
     active = false
+    void tailnet.dispose()
   })
 
   const print = (origins: readonly string[]): void => {
@@ -73,10 +75,10 @@ export const apply = (ctx: Context, config: Config): void => {
   }
 
   const detectOrigins = async (): Promise<string[]> => {
-    const host = await detectTailnet()
+    const host = await tailnet.detect()
     if (host === undefined) return []
     if (config.autoServe !== false) {
-      if (!(await serveTailnet(proxyPort))) return []
+      if (!(await tailnet.serve(proxyPort))) return []
       console.log(`phone-access: Tailscale Serve now targets http://127.0.0.1:${proxyPort} (undo: tailscale serve --https=443 off)`)
     }
     const origin = secureOrigin(`https://${host}`)
