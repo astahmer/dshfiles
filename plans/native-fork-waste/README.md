@@ -47,5 +47,5 @@ bytes ÷ log bytes (48 % then, distinct catalog arrays = 1) on a regenerated Ses
 ## P4–P6 — only with a caller
 
 Each is measured but unproven as a user-visible cost: `pluginStorage.list` paging (P4), Effect in every client bundle
-(P5), and `diff-viewed` batch writes (P6). They stay open until a real workload shows the cost; the decision rule and
-evidence are in [backlog-improvement-sweep](../backlog-improvement-sweep/README.md).
+(P5), and `diff-viewed` batch writes (P6). They stay open until a real workload shows the cost; the evidence is on
+b:r5rp, b:d060 and b:0b04.
