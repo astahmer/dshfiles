@@ -92,9 +92,14 @@ not replace the native question service. The `web` profile switches DSH's own
 (`profiles/web/cordis.patch.yml`). After that wait the tool returns
 `{ pending: true, callId }` and the root Agent keeps working; the question stays
 answerable, and a late answer is steered in as a `user-question-reply` message.
-`timeout: -1` still blocks until answered. The browser behavior of that mode
-(card, pending result, late answer, cancel, restart) has not been accepted in a
-browser yet; see [plans/async-agent-questions.md](../../../plans/async-agent-questions.md).
+`timeout: -1` still blocks until answered. The browser journey
+[agent-questions-timed.feature](../../../tooling/dshx/e2e/features/agent-questions-timed.feature)
+boots the web seed's own timed row and proves the ticking countdown and
+Recommended badge, the pending result while the Agent continues, a late Submit
+arriving as a user message tagged `answer_to_pending_question` with the call id,
+Stop withdrawing the form, and the pending card shown again after a Host
+restart. An answer submitted after that restart does not reach the Agent: the
+root Session is stopped then ([Host gap 16](../../../plans/dsh-host-gaps.md)).
 
 The Client half only restyles that native card (`src/client.ts`): a tabular,
 fixed-width countdown so it stops jittering, a header that stacks below 480 px
