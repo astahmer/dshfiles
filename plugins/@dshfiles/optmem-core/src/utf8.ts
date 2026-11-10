@@ -1,3 +1,8 @@
+interface BoundedText {
+  readonly text: string
+  readonly truncatedBytes: number
+}
+
 const isHighSurrogate = (code: number): boolean => code >= 0xd800 && code <= 0xdbff
 const isLowSurrogate = (code: number): boolean => code >= 0xdc00 && code <= 0xdfff
 const encodedSize = (code: number, pair: boolean): number => {
@@ -62,7 +67,7 @@ export class Utf8 {
   }
 
   /** Keeps head and tail around an explicit marker so the result stays within `maxBytes`. */
-  static boundHeadTail(text: string, maxBytes: number): { readonly text: string; readonly truncatedBytes: number } {
+  static boundHeadTail(text: string, maxBytes: number): BoundedText {
     const total = Utf8.byteLength(text)
     if (total <= maxBytes) return { text, truncatedBytes: 0 }
     const markerBudget = 48
