@@ -1,4 +1,5 @@
 import { Schema, SchemaAST } from 'effect'
+import { jsonValueSchema } from './api.js'
 
 export class SshTargetInvalid extends Schema.TaggedError<SshTargetInvalid>()('SshTargetInvalid', {}, { dshxWireCode: 'invalid-ssh-target' }) {
   override get message(): string {
@@ -397,7 +398,12 @@ export class ApiUnreachable extends Schema.TaggedError<ApiUnreachable>()(
 /** A plugin API on the remote runtime failed; `code` is that API's own code. */
 export class RemoteApiFailed extends Schema.TaggedError<RemoteApiFailed>()(
   'RemoteApiFailed',
-  { code: Schema.String.check(Schema.isMaxLength(128)), detail: Schema.optional(Schema.String), cause: Schema.optional(Schema.Defect()) },
+  {
+    code: Schema.String.check(Schema.isMaxLength(128)),
+    detail: Schema.optional(Schema.String),
+    details: Schema.optional(Schema.Record(Schema.String, jsonValueSchema)),
+    cause: Schema.optional(Schema.Defect()),
+  },
   { dshxWireCode: 'remote-api-failed' },
 ) {
   override get message(): string {

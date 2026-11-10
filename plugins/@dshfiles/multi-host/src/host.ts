@@ -179,9 +179,11 @@ declare module '@deepseek-ai/dsh-llm' {
 const peerReadTargets = new Map([['backlog', { packageId: '@dshfiles/backlog', apiId: 'backlog', version: 1 }]])
 
 const failed = (error: unknown) =>
-  isTaggedFailure(error)
-    ? { code: failureCodeOf(error), message: error.message }
-    : { code: 'runtime-unavailable', message: 'The runtime request failed. Check the host status and reconnect if needed.' }
+  error instanceof RemoteApiFailed && error.details !== undefined
+    ? { code: failureCodeOf(error), message: error.message, details: error.details }
+    : isTaggedFailure(error)
+      ? { code: failureCodeOf(error), message: error.message }
+      : { code: 'runtime-unavailable', message: 'The runtime request failed. Check the host status and reconnect if needed.' }
 
 /** The failure a Host service reports, as a value a client shows: its wire code and message. */
 const unavailable = (): { readonly ok: false; readonly code: string; readonly message: string } => ({

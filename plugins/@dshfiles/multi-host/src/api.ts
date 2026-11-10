@@ -54,7 +54,11 @@ const hostSummarySchema = Schema.Struct({
   fetchBeforeThread: Schema.optional(Schema.Boolean),
 })
 
-const failureSchema = Schema.Struct({ code: Schema.String.check(Schema.isMaxLength(128)), message: Schema.String.check(Schema.isMaxLength(2048)) })
+const failureSchema = Schema.Struct({
+  code: Schema.String.check(Schema.isMaxLength(128)),
+  message: Schema.String.check(Schema.isMaxLength(2048)),
+  details: Schema.optional(Schema.Record(Schema.String, jsonValueSchema)),
+})
 
 const runtimeSummarySchema = Schema.Struct({
   id: idSchema,

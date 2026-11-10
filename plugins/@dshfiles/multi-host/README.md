@@ -267,8 +267,10 @@ title}` for threads started here, so the sidebar and view can list them.
   methods. `runtimePeerRead` lets another plugin of this Host read a remote
   runtime through a closed list of read-only calls (`remotePeerReadCalls`:
   the backlog's `peerInfo`, `peerOpsSince` and `peerFiles`, for its peer
-  replication); the remote failure code comes back as the result code. Add a
-  call there only when it reads and never writes on the remote runtime.
+  replication); the remote failure code comes back as the result code. Remote
+  plugin failures may also include JSON object details, redacted by the dshx
+  caller and omitted when they exceed its 8,192-character bound. Add a call
+  there only when it reads and never writes on the remote runtime.
 
 ## Compared with bb and t3code
 

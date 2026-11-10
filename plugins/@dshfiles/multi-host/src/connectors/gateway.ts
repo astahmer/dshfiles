@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
-import { createDshxApiCaller, loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'
+import { createDshxApiCaller, DshPlatformError, loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'
 import type { JsonValue } from '@dshfiles/dshx/platform'
 import { Cause, Duration, Effect, Option, Queue, Schema, type Scope, Stream } from 'effect'
 import { Cookies, FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
@@ -216,7 +216,8 @@ const pluginApiError = (cause: unknown): PluginApiError => {
   if (code === 'authentication-expired') return new AuthenticationExpired()
   // The owner wrote this for the person asking; a generic failure would hide why it refused.
   const detail = cause instanceof Error && cause.message !== '' ? sanitizeRemoteMessage(cause.message) : undefined
-  return new RemoteApiFailed({ code: code.slice(0, 128), cause, ...(detail !== undefined && { detail }) })
+  const details = cause instanceof DshPlatformError ? cause.details : undefined
+  return new RemoteApiFailed({ code: code.slice(0, 128), cause, ...(detail !== undefined && { detail }), ...(details !== undefined && { details }) })
 }
 
 /**
