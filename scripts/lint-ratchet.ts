@@ -101,6 +101,7 @@ const astGrepVendored = [
   'plugins/@dshfiles/cordis-cards/src/host.ts',
   'plugins/@dshfiles/cordis-cards/src/css-modules.d.ts',
   'plugins/@dshfiles/agent-loop/src/native/**',
+  'plugins/@dshfiles/sidebar-right/src/native/**',
 ]
 
 // A native fork's entry is its vendored index.ts, which the fork cannot rename; these files load it to host or test the fork's delta.
