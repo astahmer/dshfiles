@@ -21,6 +21,10 @@
       "types": "./src/lib/utils.ts",
       "default": "./src/lib/utils.ts"
     },
+    "./lib/stack-frames": {
+      "types": "./src/lib/stack-frames.ts",
+      "default": "./src/lib/stack-frames.ts"
+    },
     "./lib/host-request": {
       "types": "./src/lib/host-request.ts",
       "default": "./src/lib/host-request.ts"

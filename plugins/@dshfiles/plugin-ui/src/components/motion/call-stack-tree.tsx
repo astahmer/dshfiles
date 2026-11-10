@@ -15,7 +15,12 @@ export interface CallFrame {
   /** Argument text inside the parentheses; truncated when long. */
   readonly args?: string
   readonly file?: string
+  /** The frame's full path or URL as the runtime printed it, for opening the file. */
+  readonly path?: string
   readonly line?: number
+  readonly column?: number
+  /** Render the name without call parentheses: a source location with no function name. */
+  readonly bare?: boolean
   readonly status?: CallFrameStatus
   readonly children?: readonly CallFrame[]
 }
@@ -295,7 +300,8 @@ function FrameRow({
           className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:font-mono! dshx:text-muted-foreground dshx:outline-none dshx:disabled:cursor-default dshx:focus-visible:underline"
         >
           {frame.receiver ? `${frame.receiver}.` : ''}
-          <span className="dshx:font-semibold dshx:text-foreground">{frame.name}</span>({frame.args ?? ''})
+          <span className="dshx:font-semibold dshx:text-foreground">{frame.name}</span>
+          {frame.bare === true ? null : `(${frame.args ?? ''})`}
           {!expanded && hasChildren ? <span className="dshx:ml-2 dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-[11px]">+{frame.children?.length}</span> : null}
         </button>
         {frame.line !== undefined ? (

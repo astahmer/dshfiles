@@ -149,3 +149,8 @@ export const CodeBlock = (props: { code: string; lang?: string | undefined; copy
     {props.code}
   </pre>
 )
+
+export const languageForPath = (path: string): string | undefined => path.split('.').at(-1)
+
+/** Highlights nothing, as the Host does while a grammar loads: callers render plain text. */
+export const useCodeHighlighter = (_language: string | undefined) => (_code: string) => undefined

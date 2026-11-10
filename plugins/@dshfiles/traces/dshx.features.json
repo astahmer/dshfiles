@@ -261,13 +261,13 @@
         {
           "kind": "unit-test",
           "id": "traces.stack-frames-v8",
-          "file": "plugins/@dshfiles/traces/src/stack-frames.test.ts",
+          "file": "plugins/@dshfiles/plugin-ui/tests/stack-frames.test.ts",
           "testName": "reads a V8 stack innermost first and marks library frames"
         },
         {
           "kind": "unit-test",
           "id": "traces.stack-frames-unknown",
-          "file": "plugins/@dshfiles/traces/src/stack-frames.test.ts",
+          "file": "plugins/@dshfiles/plugin-ui/tests/stack-frames.test.ts",
           "testName": "gives no frames for text it cannot read"
         }
       ],

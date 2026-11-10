@@ -1,8 +1,7 @@
-import { languageForPath, useCodeHighlighter, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useState } from 'react'
-import { ChevronDownIcon, ChevronRightIcon, CopyIcon } from '../icons.js'
 import { cn } from '../lib/utils.js'
-import { Button } from './ui/button.js'
+import { CodeBlock, FilePath } from './code-block.js'
+import { CallStackTree, type CallFrame } from './motion/call-stack-tree.js'
 
 export interface SourceLocation {
   readonly file: string
@@ -17,17 +16,6 @@ export interface CodeFrameLine {
 }
 
 type OpenFile = (path: string, options?: { readonly line?: number }) => void
-
-/** A path with its folder muted and its file name emphasised. */
-export const FilePath = (props: { readonly path: string }): JSX.Element => {
-  const slash = props.path.lastIndexOf('/')
-  return (
-    <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">
-      <span className="dshx:text-muted-foreground">{props.path.slice(0, slash + 1)}</span>
-      <span className="dshx:font-medium dshx:text-foreground">{props.path.slice(slash + 1)}</span>
-    </span>
-  )
-}
 
 const LocationLink = (props: { readonly location: SourceLocation; readonly openFile: OpenFile | undefined }): JSX.Element => {
   const label = (
@@ -50,77 +38,88 @@ const LocationLink = (props: { readonly location: SourceLocation; readonly openF
   )
 }
 
-/**
- * A few source lines around a failure, highlighted with the Host's grammar for `path` and numbered with the file's own
- * line numbers; the Host `CodeBlock` always counts from 1, which is wrong for a frame cut from the middle of a file.
- */
+/** A few source lines around a failure, numbered with the file's own line numbers and the failing line marked. */
 export const CodeFrame = (props: {
   readonly path: string
   readonly lines: readonly CodeFrameLine[]
   readonly highlightLine?: number | undefined
-}): JSX.Element => {
-  const highlight = useCodeHighlighter(languageForPath(props.path))
-  const source = props.lines.map(line => line.text).join('\n')
-  const spans = highlight(source)
-  return (
-    <div className="dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border">
-      <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-3 dshx:py-1">
-        <FilePath path={props.path} />
-        <Button
-          aria-label="Copy code"
-          className="dshx:ml-auto dshx:size-6"
-          onClick={() => void writeClipboard(source)}
-          size="icon"
-          type="button"
-          variant="ghost"
-        >
-          <CopyIcon />
-        </Button>
-      </div>
-      <div className="dshx:overflow-x-auto dshx:py-1.5 dshx:font-mono dshx:text-xs">
-        {props.lines.map((line, index) => (
-          <div className={cn('dshx:flex dshx:gap-4 dshx:px-3 dshx:whitespace-pre', line.number === props.highlightLine && 'dshx:bg-muted')} key={line.number}>
-            <span className="dshx:w-6 dshx:shrink-0 dshx:text-right dshx:text-muted-foreground dshx:select-none">{line.number}</span>
-            <span>
-              {spans?.[index]?.map((span, spanIndex) => (
-                <span key={spanIndex} style={span.style}>
-                  {span.text}
-                </span>
-              )) ?? line.text}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+}): JSX.Element => (
+  <CodeBlock
+    code={props.lines.map(line => line.text).join('\n')}
+    downloadable={false}
+    highlightLines={props.highlightLine === undefined ? [] : [props.highlightLine]}
+    path={props.path}
+    startLine={props.lines[0]?.number ?? 1}
+  />
+)
 
-/** Where an error happened: the location (opens the file when `openFile` is given), its code frame, and the rest of the stack folded away. */
+/** A vitest-style `file:line:column` location as a call frame with no function name. */
+export const locationFrame = (location: SourceLocation, index: number): CallFrame => ({
+  id: `location-${String(index)}`,
+  name: `${location.file}:${String(location.line)}:${String(location.column)}`,
+  path: location.file,
+  line: location.line,
+  column: location.column,
+  bare: true,
+  status: /node_modules|^node:/.test(location.file) ? 'existing' : 'changed',
+})
+
+/**
+ * Where an error happened: the location (opens the file when `openFile` is given), its code frame, and the call stack
+ * as a `CallStackTree`, innermost first. Library and runtime frames (`status: 'existing'`) hide behind a toggle;
+ * selecting a frame opens its file at its line.
+ */
 export const StackTrace = (props: {
-  readonly location: SourceLocation | undefined
-  readonly codeFrame: readonly CodeFrameLine[]
-  readonly frames: readonly SourceLocation[]
+  /** The error as one line (`TypeError: price is not a number`); defaults to the frame count. */
+  readonly heading?: string | undefined
+  readonly location?: SourceLocation | undefined
+  readonly codeFrame?: readonly CodeFrameLine[]
+  readonly frames: readonly CallFrame[]
   readonly openFile?: OpenFile | undefined
+  readonly className?: string | undefined
 }): JSX.Element => {
-  const [framesOpen, setFramesOpen] = useState(false)
+  const [showLibrary, setShowLibrary] = useState(false)
+  const libraryCount = props.frames.filter(frame => frame.status === 'existing').length
+  const ownCount = props.frames.length - libraryCount
+  const visible = showLibrary || ownCount === 0 ? props.frames : props.frames.filter(frame => frame.status !== 'existing')
+  const codeFrame = props.codeFrame ?? []
+  const openFrame = (id: string) => {
+    const frame = props.frames.find(candidate => candidate.id === id)
+    const path = frame?.path ?? frame?.file
+    if (path === undefined) return
+    props.openFile?.(path, frame?.line === undefined ? {} : { line: frame.line })
+  }
   return (
-    <div className="dshx:flex dshx:flex-col dshx:gap-2">
+    <div className={cn('dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2', props.className)} data-stack-trace="">
       {props.location !== undefined && <LocationLink location={props.location} openFile={props.openFile} />}
-      {props.codeFrame.length > 0 && <CodeFrame highlightLine={props.location?.line} lines={props.codeFrame} path={props.location?.file ?? ''} />}
+      {codeFrame.length > 0 && <CodeFrame highlightLine={props.location?.line} lines={codeFrame} path={props.location?.file ?? ''} />}
       {props.frames.length > 0 && (
-        <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
-          <button className="dshx:flex dshx:items-center dshx:gap-1 dshx:self-start" onClick={() => setFramesOpen(open => !open)} type="button">
-            {framesOpen ? <ChevronDownIcon className="dshx:size-3.5" /> : <ChevronRightIcon className="dshx:size-3.5" />}
-            {props.frames.length} more {props.frames.length === 1 ? 'frame' : 'frames'}
-          </button>
-          {framesOpen && (
-            <div className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:pl-5">
-              {props.frames.map((frame, index) => (
-                <LocationLink key={index} location={frame} openFile={props.openFile} />
-              ))}
-            </div>
-          )}
-        </div>
+        <CallStackTree
+          className="dshx:gap-2 dshx:rounded-lg dshx:p-3 dshx:@max-pane-narrow:p-2"
+          heading={props.heading ?? `${String(props.frames.length)} ${props.frames.length === 1 ? 'frame' : 'frames'}`}
+          listLabel="Stack frames"
+          roots={visible}
+          spacedRoots={false}
+          summary={
+            <span className="dshx:flex dshx:items-center dshx:gap-3 dshx:text-xs">
+              <span>
+                {ownCount} in your code
+                {libraryCount > 0 && ` · ${String(libraryCount)} in libraries`}
+              </span>
+              {libraryCount > 0 && ownCount > 0 && (
+                <button
+                  aria-pressed={showLibrary}
+                  className="dshx:text-foreground dshx:underline-offset-2 dshx:hover:underline"
+                  onClick={() => setShowLibrary(value => !value)}
+                  type="button"
+                >
+                  {showLibrary ? 'Hide library frames' : 'Show library frames'}
+                </button>
+              )}
+            </span>
+          }
+          {...(props.openFile === undefined ? {} : { onSelectFrame: openFrame })}
+        />
       )}
     </div>
   )

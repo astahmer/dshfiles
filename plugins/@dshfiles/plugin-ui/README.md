@@ -42,7 +42,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 - `SearchInput` (`components/ui/search-input`) is the search field: the input group with a leading search glyph. `className` sizes the group; `aria-label`, `value`, `ref` and every other prop reach the input.
 - `StatusDot` (`components/ui/status-dot`) is the round status marker: `tone` (`current`, `success`, `destructive`, `warning`, `info`, `muted`) or a computed color class, `size` `sm` (6px) or default (8px). It is `aria-hidden` unless given an `aria-label`, which makes it `role="img"`; it forwards its ref so a `TooltipTrigger asChild` can wrap it.
 - `components/image-lightbox` (`ImageLightbox`) is the one full-window image viewer: arrow keys and side controls move, the thumbnail strip jumps, Escape closes and focus returns to the opener, and an image without `src` shows as loading. The thread composer and the backlog composer both render it, so a gallery change lands in one place. Labels default to English and accept a translated `ImageLightboxLabels`.
-- Agent cards: `components/tool-card` (`ToolCard` on the Host `DisclosureRow`, `StatusIcon`) and `components/stack-trace` (`StackTrace`, `CodeFrame` highlighted by the Host grammar with the file's own line numbers, `FilePath`). Prefer the Host `CodeBlock` and `TerminalBlock` for whole files and command output.
+- Agent cards: `components/tool-card` (`ToolCard` on the Host `DisclosureRow`, `StatusIcon`), `components/code-block` and `components/stack-trace` (see [Code and stack traces](#code-and-stack-traces)). The Host `TerminalBlock` stays the view for command output.
 - `Markdown` (`components/markdown`) renders text through the Host `MarkdownText` with English chrome and the `compact` variant by default; `[label](scheme:target)` links open through the dshx `LinkHandler` registry. `Code` (`components/code`) is the Host `CodeBlock` with English copy labels. Pass translated `labels`/`copyLabel` when the plugin has a locale.
 - Icons: `import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'` (lucide-react re-exported, so plugins need no extra dependency); Host `Icon*` from `@deepseek-ai/dsh-client-ui-primitives` where a DSH-native glyph matters.
 - Readable names: `EntityLabels` (`@dshfiles/plugin-ui/hooks/entity-labels`) turns Session ids into thread titles (`useSessionLabel`) and workspace ids or folders into project names (`useWorkspaceLabel`); `isThreadWorkspace` and `groupByRepository` fold jj thread workspaces under their repository. Pass it the injected `ctx.sessions` / `ctx.workspaces`.
@@ -144,6 +144,7 @@ the screen named; when a screen needs a prop the component lacks, add it here ra
 | Component                                          | Used by                                                                         |
 | -------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `TraceWaterfall`, `AgentTimeline`, `CallStackTree` | traces: span tree, session traces, span exception frames                        |
+| `StackTrace`, `CodeBlock`                          | test-runs: failing test frames and code frames, Stack trace card under bash     |
 | `MergeChecks`                                      | pulls-review Land card                                                          |
 | `MergeConflictGraph`                               | jj-integration workspace menu conflict notice                                   |
 | `FallbackChain`                                    | model-effort-picker fallbacks, with a "Serving now" rung                        |
@@ -252,6 +253,47 @@ Only for tangled flows with three or more states (select → prepare → confirm
 ## Chart
 
 `@dshfiles/plugin-ui/chart` re-exports TanStack Charts 1.0.0 and `ChartFrame`, which maps `--ts-chart-*` onto DSH tokens.
+
+## Code and stack traces
+
+```tsx
+import { CodeBlock, FilePath } from '@dshfiles/plugin-ui/components/code-block'
+import { CodeFrame, StackTrace, locationFrame } from '@dshfiles/plugin-ui/components/stack-trace'
+import { StackFrames } from '@dshfiles/plugin-ui/lib/stack-frames'
+
+;<CodeBlock code={source} path="src/cart/pricing.ts" startLine={27} highlightLines={[29]} />
+const report = StackFrames.extract(output) // first error + frames in command output, or undefined
+;<StackTrace heading={`${report.errorName}: ${report.message}`} frames={report.frames} openFile={openFile} />
+```
+
+- `CodeBlock` highlights with the Host's lazy Shiki grammars (`useCodeHighlighter`, grammar from `path` or `lang`) and
+  draws a header with the path or language, a wrap toggle, copy and download (`downloadable={false}` hides it). The
+  gutter counts from `startLine` (`false` hides it), so a fragment cut from line 27 reads 27; the Host `CodeBlock`
+  always counts from 1 and has no wrap or download. `Code` (`components/code`) stays the Host block for Markdown-style
+  fences.
+- `StackFrames.parse(stacktrace)` reads V8, JVM, Gecko and Python stacks into `CallFrame`s, innermost first, with
+  `file`, full `path`, `line` and `column`; application frames are `changed`, library and runtime frames
+  (`node_modules`, `node:`, `site-packages`, `java.`) `existing`. `StackFrames.extract(output)` finds the first error in
+  command output with its header (`TypeError: …`, a JVM `Exception in thread`, a Python traceback's last line) and its
+  frames; one frame-like line with no header above it is not a trace, and a `Caused by` chain ends it.
+- `StackTrace` shows the location, the `CodeFrame` (a `CodeBlock` numbered from the frame's first line, failing line
+  marked) and the frames in a `CallStackTree`, library frames behind a toggle. Selecting a frame calls
+  `openFile(path, { line })`. `locationFrame` turns a Vitest `file:line:column` location into a frame with no function
+  name (`bare`).
+
+Adopters: test-runs (failing tests, and the Stack trace card under any bash call that crashed) and traces (span
+exception frames). The gallery's Code tab demos all three.
+
+### Design references
+
+The Code Block, Stack Trace and Diff Review rows of [HextaUI](https://hextaui.com/blocks) were design references.
+HextaUI's repository ([preetsuthar17/hextaui](https://github.com/preetsuthar17/hextaui), `LICENSE`: MIT, © 2026 Preet
+Suthar) covers its free components, hooks and utilities: those may be ported here with that notice kept in the ported
+file. Its blocks are HextaUI Pro under the [Pro License](https://hextaui.com/legal/license), which allows Pro and free
+blocks (Prompt Input included) inside an open-source end product but forbids redistributing them as part of a UI kit or
+component library, which this package is. So blocks are only ever rebuilt here from their visible behaviour, and no
+HextaUI code is vendored in this package. HextaUI builds on Base UI and Tabler icons; ports land on the Radix parts and
+lucide icons this package already has rather than adding Base UI.
 
 ## Diff
 
