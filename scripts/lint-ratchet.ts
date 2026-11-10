@@ -100,6 +100,15 @@ const astGrepVendored = [
   'plugins/@dshfiles/cordis-cards/src/native/**',
   'plugins/@dshfiles/cordis-cards/src/host.ts',
   'plugins/@dshfiles/cordis-cards/src/css-modules.d.ts',
+  'plugins/@dshfiles/agent-loop/src/native/**',
+]
+
+// A native fork's entry is its vendored index.ts, which the fork cannot rename; these files load it to host or test the fork's delta.
+const astGrepNativeEntryImporters = [
+  'plugins/@dshfiles/agent-loop/src/host.ts',
+  'plugins/@dshfiles/agent-loop/tests/agent-loop.integration.test.ts',
+  'plugins/@dshfiles/cordis-client-runner/tests/inspect-manifest.test.ts',
+  'plugins/@dshfiles/cordis-cards/tests/inventory-read.test.ts',
 ]
 
 const ruleCapsSchema = Schema.Record(Schema.String, Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)))
@@ -147,7 +156,7 @@ const readFindings = (): ReadonlyArray<Finding> => {
       }
     })
   }
-  const output = run(['ast-grep', 'scan', ...lintRoots, '--json=stream', ...[...astGrepBoundaries, ...astGrepVendored].map(path => `--globs=!${path}`)])
+  const output = run(['ast-grep', 'scan', ...lintRoots, '--json=stream', ...[...astGrepBoundaries, ...astGrepVendored, ...astGrepNativeEntryImporters].map(path => `--globs=!${path}`)])
   return output
     .split('\n')
     .filter(Boolean)
