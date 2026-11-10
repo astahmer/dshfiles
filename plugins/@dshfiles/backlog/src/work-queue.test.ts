@@ -7,6 +7,7 @@ import { BacklogItems } from './item.js'
 import { LeaseEndings } from './lease-sweep.js'
 import { BacklogStore } from './store.js'
 import { backlogRows, backlogStoreLayer } from './test-support.js'
+import { ThreadLifecycle } from './thread-lifecycle.js'
 
 const MINUTE_MS = 60_000
 
@@ -279,4 +280,68 @@ describe('claims', () => {
       expect(statusCalls).toBe(0)
     }),
   )
+})
+
+describe('settled threads', () => {
+  const startIn = (store: BacklogStore['Service'], text: string, threadIds: readonly string[]) =>
+    Effect.gen(function* () {
+      const captured = yield* store.capture({ text, actor: user })
+      for (const threadId of threadIds)
+        yield* store.applySignal({ id: captured.item.id, status: 'doing', link: { type: 'thread', target: threadId }, reason: 'mentioned in a thread' })
+      return captured.item.id
+    })
+
+  const statusOf = (store: BacklogStore['Service'], id: number) => Effect.map(store.get(id), detail => (detail.ok ? detail.value.item.status : undefined))
+
+  it.effect('returns an item to todo once every linked thread settled with no revision linked, and only then', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const recorder = yield* Effect.acquireRelease(
+          Effect.sync(() => recordSpans()),
+          spans => Effect.sync(() => spans[Symbol.dispose]()),
+        )
+        yield* TestClock.setTime(1_000)
+        const store = yield* openStore()
+        const abandoned = yield* startIn(store, 'abandoned work', ['session-aaaaaa'])
+        const landed = yield* startIn(store, 'landed work', ['session-aaaaaa'])
+        yield* store.link({ id: landed, link: { type: 'revision', target: 'kxyzabcd' }, actor: user })
+        const shared = yield* startIn(store, 'still worked on elsewhere', ['session-aaaaaa', 'session-bbbbbb'])
+        const byHand = yield* startIn(store, 'moved by hand', [])
+        yield* store.update({ id: byHand, status: 'doing', actor: user })
+        yield* store.applySignal({ id: byHand, status: 'doing', link: { type: 'thread', target: 'session-aaaaaa' }, reason: 'mentioned in a thread' })
+        const lookup = (sessionId: string) => Effect.succeed([sessionId, sessionId === 'session-aaaaaa' ? 'settled' : 'live'] as const)
+
+        expect(yield* LeaseEndings.sweepOnce({ store, lookup: Option.some(lookup) })).toBe(0)
+        expect(yield* statusOf(store, abandoned)).toBe('doing')
+
+        expect(yield* LeaseEndings.sweepOnce({ store, lookup: Option.some(lookup), settledThreads: true })).toBe(1)
+        const after = yield* store.get(abandoned)
+        expect(after.ok && after.value.item.status).toBe('todo')
+        expect(after.ok && after.value.item.events.at(-1)).toMatchObject({
+          actor: 'system',
+          threadId: 'session-aaaaaa',
+          detail: 'doing → todo (its thread session-aaaaaa settled before a revision was linked)',
+        })
+        expect(yield* statusOf(store, landed)).toBe('doing')
+        expect(yield* statusOf(store, shared)).toBe('doing')
+        expect(yield* statusOf(store, byHand)).toBe('doing')
+        expect((yield* store.list({ ready: true })).items.map(item => item.id)).toEqual([abandoned])
+        expect(yield* LeaseEndings.sweepOnce({ store, lookup: Option.some(lookup), settledThreads: true })).toBe(0)
+        expect(recorder.named('backlog lease sweep').map(span => span.attributes['dshx.backlog.settled_returned'])).toEqual([undefined, 1, 0])
+
+        const reopened = yield* store.applySignal({ id: abandoned, status: 'doing', link: { type: 'thread', target: 'session-bbbbbb' }, reason: 'mentioned in a thread' })
+        expect(reopened.ok && reopened.value.item.status).toBe('doing')
+      }),
+    ).pipe(Effect.provide(DshxEffect.tracerLayer)),
+  )
+
+  it('needs every linked thread settled', () => {
+    const work = [
+      { id: 1, threadIds: ['a'] },
+      { id: 2, threadIds: ['a', 'b'] },
+      { id: 3, threadIds: [] },
+    ]
+    expect(ThreadLifecycle.settledReturns({ work, settled: new Set(['a']) })).toEqual([{ id: 1, threadId: 'a' }])
+    expect(ThreadLifecycle.settledReturns({ work, settled: new Set(['a', 'b']) }).map(entry => entry.id)).toEqual([1, 2])
+  })
 })

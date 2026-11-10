@@ -118,7 +118,30 @@ const idleThreadNudges = (input: {
   return nudges
 }
 
+/**
+ * An item a settled thread can hand back: still `doing` with a status no one set by hand, no live claim (the lease sweep
+ * owns claims) and no linked revision, since a revision means the work reached history and a later signal finishes it.
+ */
+const returnsWhenSettled = (input: { readonly item: Pick<BacklogItem, 'status' | 'humanFields' | 'links'>; readonly claimed: boolean }): boolean =>
+  input.item.status === 'doing' &&
+  !input.item.humanFields.includes('status') &&
+  !input.claimed &&
+  !input.item.links.some(link => link.type === 'revision')
+
+/** The items whose every linked thread settled, with the one named in their event; one still open keeps the item. */
+const settledReturns = (input: {
+  readonly work: readonly { readonly id: number; readonly threadIds: readonly string[] }[]
+  readonly settled: ReadonlySet<string>
+}): { readonly id: number; readonly threadId: string }[] =>
+  input.work.flatMap(entry => {
+    const first = entry.threadIds[0]
+    if (first === undefined || !entry.threadIds.every(threadId => input.settled.has(threadId))) return []
+    return [{ id: entry.id, threadId: first }]
+  })
+
 export class ThreadLifecycle {
+  static readonly returnsWhenSettled = returnsWhenSettled
+  static readonly settledReturns = settledReturns
   static readonly outcome = outcome
   static readonly replyText = replyText
   static readonly openToResolution = openToResolution

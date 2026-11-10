@@ -862,6 +862,16 @@ export class BacklogStore extends Context.Service<
     }) => Effect.Effect<BacklogResult<BacklogDetail & { readonly merged: readonly string[] }>, BacklogWriteFailed | BacklogMergeInvalid>
     /** Marks gates met, as the gate watch saw them: a system write with what resolved each, never over a resolved gate. */
     readonly resolveGates: (input: { readonly id: number; readonly resolved: readonly { readonly gateId: string; readonly detail: string }[] }) => Detailed
+    /**
+     * The items a settled thread may hand back: `doing` with a status no one set by hand, no live claim and no linked
+     * revision, with the threads they link to. What the settled-thread sweep reads.
+     */
+    readonly threadWork: Effect.Effect<readonly { readonly id: number; readonly threadIds: readonly string[] }[]>
+    /**
+     * A linked thread settled before anything landed: the item returns to `todo` so it is ready again, and a delegate that
+     * thread held is cleared. A status set by hand, a linked revision or a live claim keeps it where it is.
+     */
+    readonly returnFromSettledThread: (input: { readonly id: number; readonly threadId: string; readonly reason: string }) => Detailed
     /** Every stored claim, live or lapsed, with the item it holds: what the lease sweep reads. */
     readonly leases: Effect.Effect<readonly { readonly id: number; readonly lease: BacklogLease }[]>
     /** Hands an item to the agent of a thread started for it, without a lease: it shows who works on it. */
@@ -1699,6 +1709,22 @@ export class BacklogStore extends Context.Service<
         )
       })
 
+      const returnFromSettledThread = Effect.fn('backlog store return from settled thread')(function* (input: {
+        readonly id: number
+        readonly threadId: string
+        readonly reason: string
+      }) {
+        const at = yield* Clock.currentTimeMillis
+        const held = (yield* Ref.get(state)).leases.get(input.id)
+        return yield* withItem(input.id, item => {
+          if (!ThreadLifecycle.returnsWhenSettled({ item, claimed: held !== undefined && held.expiresAt > at })) return unchanged(item)
+          const change: BacklogChange = { status: 'todo' }
+          if (item.delegate === `agent:${input.threadId}`) change.delegate = null
+          const event = { kind: 'moved', detail: `doing → todo (${input.reason})`, threadId: input.threadId } as const
+          return Effect.map(touch(item, { kind: 'system' }, event, change), found)
+        })
+      })
+
       const applyThreadAttention = Effect.fn('backlog store apply thread attention')(function* (input: {
         readonly id: number
         readonly threadId: string
@@ -1851,6 +1877,17 @@ export class BacklogStore extends Context.Service<
         release,
         merge,
         resolveGates,
+        threadWork: Effect.flatMap(Clock.currentTimeMillis, at =>
+          Effect.map(Ref.get(state), current =>
+            [...current.records.values()].flatMap(item => {
+              const held = current.leases.get(item.id)
+              if (!ThreadLifecycle.returnsWhenSettled({ item, claimed: held !== undefined && held.expiresAt > at })) return []
+              const threadIds = item.links.flatMap(link => (link.type === 'thread' ? [link.target] : []))
+              return threadIds.length === 0 ? [] : [{ id: item.id, threadIds }]
+            }),
+          ),
+        ),
+        returnFromSettledThread,
         leases: Effect.map(Ref.get(state), current => [...current.leases].map(([id, lease]) => ({ id, lease }))),
         delegateTo,
         acknowledge,

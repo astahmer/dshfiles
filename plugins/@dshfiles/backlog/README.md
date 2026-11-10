@@ -451,6 +451,10 @@ On by default (`lifecycleSignals`). Items move without anyone filing them:
 - A revision on the project's main branch (`main` unless jj-integration resolves another for that repository) whose description says `Closes b:k3f9` (also `Fixes`, `Resolves`, `Completes`,
   `Implements`; several ids with commas or `and`) links that revision and moves the item to Done. A bare
   mention such as `part of b:12` closes nothing.
+- A thread settled before anything landed hands its work back: the same minute sweep that ends claims moves an
+  unclaimed In progress item to To do once every thread it links is settled (thread-sidebar's `status` call) and no
+  revision is linked, and clears a delegate that thread held. A status you set by hand, a linked revision or a live
+  claim keeps the item where it is. Without thread-sidebar nothing moves.
 - A linked thread whose turn ended **blocked** or **failed** marks its open items as blocked, so they reach the
   Inbox instead of sitting silently In progress. Its next finished turn clears that flag again; a cancellation,
   a token ceiling and a crash-interrupted turn leave the item alone.
@@ -458,7 +462,7 @@ On by default (`lifecycleSignals`). Items move without anyone filing them:
   that many days. The Inbox attention and comment name the thread; active threads, closed items and items with
   an existing attention request are left alone. The default `0` keeps this opt-in.
 
-Signals only move forward (never Done back to In progress, never out of Dropped) and never over a status or
+Apart from that settled-thread hand-back, signals only move forward (never Done back to In progress, never out of Dropped) and never over a status or
 attention you set by hand; the link is recorded either way. Only the block this signal set is cleared later,
 so a `blocked` an agent flagged itself stays until someone clears it or closes the item. Closing an item clears
 agent/system attention and pending suggestions; closed items stay out of the Inbox even if older stored state still

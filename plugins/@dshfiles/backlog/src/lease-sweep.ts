@@ -2,8 +2,10 @@ import { DshxPlugin, type EffectApiClient } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { threadActionsApi } from '@dshfiles/thread-sidebar/thread-actions-api'
 import { Cause, Clock, Effect, Layer, Option, Schedule } from 'effect'
+import { BacklogSettingsTag } from './backlog-settings.js'
 import type { BacklogLease } from './item-relations.js'
 import { BacklogStore } from './store.js'
+import { ThreadLifecycle } from './thread-lifecycle.js'
 
 const THREAD_LOOKUP_CONCURRENCY = 4
 
@@ -59,22 +61,33 @@ const holderLookup =
 
 /**
  * One sweep: every live claim's thread is looked up (when `lookup` can answer), and each claim that lapsed or lost its
- * thread is released by the system, which returns its item to `todo`.
+ * thread is released by the system, which returns its item to `todo`. With `settledThreads`, an unclaimed `doing` item
+ * whose every linked thread settled before a revision was linked also returns to `todo`.
  */
 const sweepOnce = Effect.fn('backlog lease sweep')(function* (input: {
   readonly store: BacklogStore['Service']
   readonly lookup: Option.Option<(sessionId: string) => Effect.Effect<readonly [string, HolderThread]>>
+  readonly settledThreads?: boolean
 }) {
   const leases = yield* input.store.leases
-  if (leases.length === 0) return 0
+  const work = Option.isSome(input.lookup) && input.settledThreads === true ? yield* input.store.threadWork : []
+  if (leases.length === 0 && work.length === 0) return 0
   const now = yield* Clock.currentTimeMillis
   const live = leases.filter(entry => entry.lease.expiresAt > now)
-  const holders = Option.isSome(input.lookup) ? [...new Set(live.map(entry => sessionOf(entry.lease.holder)))] : []
-  const threads = new Map(Option.isSome(input.lookup) ? yield* Effect.forEach(holders, input.lookup.value, { concurrency: THREAD_LOOKUP_CONCURRENCY }) : [])
+  const sessions = Option.isSome(input.lookup) ? [...new Set([...live.map(entry => sessionOf(entry.lease.holder)), ...work.flatMap(entry => entry.threadIds)])] : []
+  const threads = new Map(Option.isSome(input.lookup) ? yield* Effect.forEach(sessions, input.lookup.value, { concurrency: THREAD_LOOKUP_CONCURRENCY }) : [])
   const ended = endings({ leases, threads, now })
-  yield* Effect.annotateCurrentSpan({ 'dshx.backlog.leases': leases.length, 'dshx.backlog.leases_ended': ended.length })
+  const settled = new Set([...threads].flatMap(([sessionId, thread]) => (thread === 'settled' ? [sessionId] : [])))
+  const returned = ThreadLifecycle.settledReturns({ work, settled })
+  yield* Effect.annotateCurrentSpan({
+    'dshx.backlog.leases': leases.length,
+    'dshx.backlog.leases_ended': ended.length,
+    'dshx.backlog.settled_returned': returned.length,
+  })
   for (const end of ended) yield* input.store.release({ id: end.id, actor: { kind: 'system' }, reason: end.reason })
-  return ended.length
+  for (const entry of returned)
+    yield* input.store.returnFromSettledThread({ id: entry.id, threadId: entry.threadId, reason: `its thread ${entry.threadId} settled before a revision was linked` })
+  return ended.length + returned.length
 })
 
 /**
@@ -84,6 +97,7 @@ const sweepOnce = Effect.fn('backlog lease sweep')(function* (input: {
 export const LeaseSweep = Layer.effectDiscard(
   Effect.gen(function* () {
     const store = yield* BacklogStore
+    const settings = yield* BacklogSettingsTag
     const hostApis = yield* HostApis
     const threadActions = hostApis.client(threadActionsApi)
 
@@ -91,7 +105,8 @@ export const LeaseSweep = Layer.effectDiscard(
       const served = (yield* hostApis.list).find(api => api.owner === threadActionsApi.owner && api.id === threadActionsApi.id)
       if (served === undefined) return yield* sweepOnce({ store, lookup: Option.none() })
       const hasStatus = served.methods.some(method => method.name === 'status')
-      return yield* sweepOnce({ store, lookup: Option.some(holderLookup({ threadActions, hasStatus })) })
+      const settledThreads = (yield* settings.get).lifecycleSignals
+      return yield* sweepOnce({ store, lookup: Option.some(holderLookup({ threadActions, hasStatus })), settledThreads })
     })
 
     const tick = sweep.pipe(
