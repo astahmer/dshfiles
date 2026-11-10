@@ -33,6 +33,7 @@ import {
 } from './registry.js'
 import { PanelTitles } from './panel-titles.js'
 import { createDockPaneActions, migrateDockVisibility, rightPaneVisibility } from './right-panel-mode.js'
+import { createRightPaneContents } from './right-pane-contents.js'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { createMainPanelSources } from './panel-sources.js'
 import { panelMainTarget } from './panel-main-target.js'
@@ -151,7 +152,7 @@ export default defineClient({
     let syncMainTabs: (() => void) | undefined
     let resettingLayout = false
     // On a phone the same controls open the thread panel sheet instead of the remembered desktop right pane.
-    const dockActions = phoneAwareDockActions(createDockPaneActions())
+    const dockActions = phoneAwareDockActions(createDockPaneActions(rightPaneVisibility, createRightPaneContents(registry)))
     ctx.effect(() => {
       // Legacy settings are decode-only compatibility data, never renderer choices.
       ctx.get('mainSurface')?.setMode('workbench')
