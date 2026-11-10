@@ -315,11 +315,11 @@ export default defineClient({
                 const contributor = registry.list().find(panel => panel.mainPanelId === panelId && !panel.hiddenFromAdd)
                 if (scope !== undefined && contributor?.scopedComponent !== undefined) {
                   const Panel = contributor.scopedComponent
-                  return panelProps => <Panel {...panelProps} panelId={contributor.id} scope={scope} />
+                  return panelProps => <Panel {...panelProps} scope={scope} />
                 }
                 if (scope === undefined && contributor !== undefined) {
                   const Panel = contributor.component
-                  return panelProps => <Panel {...panelProps} panelId={contributor.id} />
+                  return panelProps => <Panel {...panelProps} />
                 }
                 if (scope !== undefined)
                   return () => (
