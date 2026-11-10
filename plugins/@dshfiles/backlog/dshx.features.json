@@ -250,6 +250,11 @@
           "id": "backlog.feed-unit-panel-poll",
           "file": "plugins/@dshfiles/backlog/src/panel-poll.test.ts",
           "testName": "polls the revision every 5 s, and only every minute while the Host pushes changes"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.feed-paging",
+          "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
         }
       ],
       "telemetry": [
@@ -791,7 +796,7 @@
     {
       "id": "lifecycle-signals",
       "title": "Move items from thread and revision signals",
-      "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; a request for input that thread raised is settled as soon as its question is answered, by the user or by another Agent answering for them; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. Signals only move forward and never over a status or attention the user set by hand.",
+      "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it; a linked thread whose turn ended blocked or failed flags its open items as blocked until a finished turn clears that same flag; a request for input that thread raised is settled as soon as its question is answered, by the user or by another Agent answering for them; with threadResolution on, Jev reads a finished reply and leaves a Done suggestion on the items it resolved, never a silent close. An unclaimed In progress item whose every linked thread settled before a revision was linked returns to To do. Apart from that, signals only move forward and never over a status or attention the user set by hand.",
       "surfaces": ["host", "settings", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -929,6 +934,18 @@
           "id": "backlog.lifecycle-unit-resolution-none",
           "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
           "testName": "suggests nothing when the reply only reports progress, leaves work, or Jev fails"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-host-settled-thread",
+          "file": "plugins/@dshfiles/backlog/src/work-queue.test.ts",
+          "testName": "returns an item to todo once every linked thread settled with no revision linked, and only then"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-settled-thread",
+          "file": "plugins/@dshfiles/backlog/src/work-queue.test.ts",
+          "testName": "needs every linked thread settled"
         }
       ],
       "telemetry": [
@@ -1322,6 +1339,11 @@
           "kind": "gherkin",
           "id": "backlog.inbox-filters",
           "featureFile": "tooling/dshx/e2e/features/backlog-views.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.inbox-thread-acknowledge",
+          "featureFile": "tooling/dshx/e2e/features/backlog-work-queue.feature"
         }
       ],
       "telemetry": [

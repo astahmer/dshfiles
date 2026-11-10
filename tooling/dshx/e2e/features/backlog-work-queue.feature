@@ -57,3 +57,16 @@ Feature: Backlog work queue
     Then the inspector shows b:1 claimed by the first agent thread only
     When the claim is released in the inspector
     Then the inspector shows b:1 unclaimed in "Todo"
+
+  @scenario:backlog.inbox-thread-acknowledge
+  Scenario: A finished agent thread shows under its item in the Inbox until it is acknowledged there
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell" is booted
+    And a Command Code account backed by a local fake provider is added
+    And the backlog Inbox also lists finished threads
+    And the Backlog panel is opened
+    And "Review the migration" is captured as a work item
+    When an agent thread this browser never opened claims b:1
+    And the Inbox is opened on its "All" tab
+    Then the Inbox lists that agent thread under "Review the migration"
+    When that agent thread is acknowledged from the Inbox
+    Then the Inbox no longer lists "Review the migration" and the thread is read

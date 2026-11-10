@@ -169,3 +169,12 @@ Feature: Backlog views
     And the "Work log" previews b:1 titled "Composer drops pasted chips"
     When the backlog preview is opened in the Backlog panel
     Then the backlog detail shows "Composer drops pasted chips"
+
+  @scenario:backlog.feed-paging
+  Scenario: The feed mounts its newest page first and older entries once scrolled to the top
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When 160 items are captured through the backlog API
+    And the Backlog panel is opened
+    Then the feed mounts the newest 150 of 160 items
+    When the feed is scrolled to its top
+    Then the feed mounts all 160 items, oldest first

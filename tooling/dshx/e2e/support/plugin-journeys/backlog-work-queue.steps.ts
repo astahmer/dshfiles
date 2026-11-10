@@ -118,7 +118,94 @@ When('its parent is opened from the inspector', async ({ page }: { page: Page })
   await expect(peek(page).getByRole('region', { name: 'Sub-issues', exact: true })).toBeVisible()
 })
 
+const feed = (page: Page) => page.getByRole('feed', { name: 'Backlog feed', exact: true })
+const seededTitle = (index: number): string => `Seeded item ${String(index).padStart(3, '0')}`
+
+When('{int} items are captured through the backlog API', async ({ page }: { page: Page }, count: number) => {
+  const call = await backlogCall(page)
+  // oxlint-disable-next-line no-await-in-loop -- one capture after another keeps the feed order the numbering expects.
+  for (let index = 1; index <= count; index += 1) await call('capture', { text: seededTitle(index), project: null })
+})
+
+Then('the feed mounts the newest {int} of {int} items', async ({ page }: { page: Page }, shown: number, total: number) => {
+  await recordAssertion(page, 'backlog-feed-first-page', async () => {
+    await expect(feed(page).getByRole('article')).toHaveCount(shown)
+    await expect(feed(page).getByRole('article').last()).toContainText(seededTitle(total))
+    await expect(feed(page).getByRole('article').first()).toContainText(seededTitle(total - shown + 1))
+  })
+})
+
+When('the feed is scrolled to its top', async ({ page }: { page: Page }) => {
+  await feed(page).evaluate(element => {
+    element.scrollTop = 0
+  })
+})
+
+Then('the feed mounts all {int} items, oldest first', async ({ page }: { page: Page }, total: number) => {
+  await recordAssertion(page, 'backlog-feed-older-page', async () => {
+    await expect(feed(page).getByRole('article')).toHaveCount(total)
+    await expect(feed(page).getByRole('article').first()).toContainText(seededTitle(1))
+  })
+  await finishJourneyAssertions(page)
+})
+
 const firstHolders = new WeakMap<Page, string>()
+const backgroundThreads = new WeakMap<Page, { readonly sessionId: string; readonly title: string }>()
+const BACKGROUND_THREAD_TITLE = 'Claiming agent'
+const createdThread = Schema.Struct({ sessionId: Schema.String })
+const attentionState = Schema.Struct({ sessions: Schema.Array(Schema.Struct({ sessionId: Schema.String })) })
+const inboxRegion = (page: Page) => page.getByRole('region', { name: 'Inbox', exact: true })
+const sidebarApi = (page: Page, apiId: string) => connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/thread-sidebar', apiId, version: 1 })
+
+When('the backlog Inbox also lists finished threads', async ({ page }: { page: Page }) => {
+  const settings = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/settings-shell', apiId: 'settings-shell', version: 1 })
+  await settings('set', { namespace: 'dshfiles-backlog', patch: { inboxThreads: 'all' } })
+})
+
+// Started through the Host so this browser never shows the thread: viewing a finished thread acknowledges it.
+When('an agent thread this browser never opened claims b:{int}', async ({ page }: { page: Page }, ordinal: number) => {
+  const actions = await sidebarApi(page, 'thread-actions')
+  const { sessionId } = Schema.decodeUnknownSync(createdThread)(await actions('create', { title: BACKGROUND_THREAD_TITLE }))
+  const [provider = '', model = ''] = FAKE_MODEL.split('/')
+  await actions('selectModel', { sessionId, provider, model })
+  await actions('prompt', { sessionId, text: toolDirective('backlog_claim', { id: `b:${await backlogRef(page, ordinal)}` }) })
+  await expect.poll(async () => (await readClaim(page, ordinal)).lease?.holder, { timeout: 30_000 }).toBe(`agent:${sessionId}`)
+  const attention = await sidebarApi(page, 'thread-sidebar-attention')
+  await expect
+    .poll(async () => Schema.decodeUnknownSync(attentionState)(await attention('state')).sessions.some(entry => entry.sessionId === sessionId), {
+      timeout: 30_000,
+    })
+    .toBe(true)
+  backgroundThreads.set(page, { sessionId, title: BACKGROUND_THREAD_TITLE })
+})
+
+Then('the Inbox lists that agent thread under {string}', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'backlog-inbox-thread-row', async () => {
+    const thread = backgroundThreads.get(page)
+    expect(thread).toBeDefined()
+    const row = inboxRegion(page).getByRole('listitem').filter({ hasText: title })
+    await expect(row.getByRole('button', { name: `Open thread ${thread?.title ?? ''}`, exact: true })).toBeVisible()
+    await expect(row.getByRole('button', { name: `Acknowledge thread ${thread?.title ?? ''}`, exact: true })).toBeVisible()
+  })
+})
+
+When('that agent thread is acknowledged from the Inbox', async ({ page }: { page: Page }) => {
+  await inboxRegion(page)
+    .getByRole('button', { name: `Acknowledge thread ${backgroundThreads.get(page)?.title ?? ''}`, exact: true })
+    .click()
+})
+
+Then('the Inbox no longer lists {string} and the thread is read', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'backlog-inbox-thread-acknowledged', async () => {
+    const thread = backgroundThreads.get(page)
+    await expect(inboxRegion(page).getByRole('button', { name: `Acknowledge thread ${thread?.title ?? ''}`, exact: true })).toHaveCount(0)
+    await expect(inboxRegion(page).getByRole('listitem').filter({ hasText: title })).toHaveCount(0)
+    const attention = await sidebarApi(page, 'thread-sidebar-attention')
+    const unread = Schema.decodeUnknownSync(attentionState)(await attention('state')).sessions.map(entry => entry.sessionId)
+    expect(unread).not.toContain(thread?.sessionId)
+  })
+  await finishJourneyAssertions(page)
+})
 
 When('an agent thread claims b:{int}', async ({ page }: { page: Page }, ordinal: number) => {
   await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
