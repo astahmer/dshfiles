@@ -157,12 +157,44 @@ so an agent can inspect a workspace's change shape before reading it. For a remo
 
 ## Why the rules rather than the site
 
-The site is a GitHub-PR product, and the `pulls.review` CLI needs a git
-checkout. A DSH thread workspace is a jj workspace with no `.git`, and the
-CLI's dev server gates its browser behind a one-time pairing code, so embedding
-it would depend on another project's dev-server internals. Reusing the core
-package gets the real grouping without that coupling. See
-[the plan](../../../plans/pulls-review/README.md) for the measured evidence.
+The site is a GitHub-PR product and its UI is Vue, which DSH's React client cannot
+reuse. Embedding the shipping CLI (`npx pulls.review@0.3.3`) was measured in a thread
+workspace and rejected:
+
+1. A thread workspace has no `.git` (`.jj/repo` and `working_copy` only), so the CLI's
+   git-backed targets resolve nothing. It works only with `GIT_DIR` pointed at the
+   colocated main checkout and an explicit range (`main...<commit>`), never `/worktree`.
+2. The dev server gates the browser behind a one-time code printed on the first
+   untrusted connection. Consuming it from the URL fragment is racy: pairing succeeded
+   once, then failed four times in a row in the same flow with no new code printed.
+3. A deep link to a ref route (`/compare/A...B`) resolves `./assets` under the ref path,
+   so the entry bundle 404s (`/compare/assets/index-*.js`); the CLI's own printed URL hits
+   this.
+
+`@pulls.review/core` (MIT, `packages/core`) exports the patch parser and the rule-based
+grouper with no model call and no GitHub token. On a 366k-line jj patch it parsed and
+grouped 1789 files, so the scopes here are pulls.review's own behavior, not a lookalike.
+
+The Summarize route is the thread's own provider rather than a configured cheap model,
+so a review plugin does not depend on another plugin's settings. Its route, parse and
+failure paths are unit-tested; a profile without an account can only show the failure.
+
+A DSH "Local agent" adapter for the pulls.review CLI
+(`packages/cli/src/agents/dsh.ts` in [antfu/pulls.review](https://github.com/antfu/pulls.review))
+was written and committed on a local branch, not pushed: the upstream PR is the owner's
+call. It takes the task on stdin, maps the `--json` projection (`session` to a resumable
+id, `text`/`tool_call`/`tool_result` to the transcript, `final` to the answer), resumes
+with `--session-id`, refuses a per-run model because the profile owns it, and honors
+`PULLS_REVIEW_DSH_PROFILE`. DSH has no per-run tool restriction, so its docs tell users to
+point the analysis profile at a read-only tool set.
+
+## Not done
+
+- **Open in pulls.review** for a GitHub PR branch. A thread's branch is usually detached
+  in jj, so resolving its PR needs `gh` against a git dir the workspace does not have.
+  Nice to have; [pull-requests](../pull-requests/README.md) already links a thread's PR.
+- No component test pins the facet's file-name join for paths with spaces, unicode or
+  binary files; both parsers were checked by hand to agree on real jj output.
 
 ## Host API
 
