@@ -77,9 +77,7 @@ describe('undo sessions', () => {
         )
         yield* Effect.promise(() => root.plugin(SessionStore))
         prompted(root.sessions.create(SessionId('session-live'), { meta: { cwd: '/workspace/shared' } }))
-        const plugin = yield* Effect.promise(
-          () => new Promise<CordisContext>(resolve => void root.plugin({ name: 'session-undo-probe', apply: resolve })),
-        )
+        const plugin = yield* Effect.promise(() => new Promise<CordisContext>(resolve => void root.plugin({ name: 'session-undo-probe', apply: resolve })))
         expect(yield* liveThreadsOf(root, [], plugin)).toEqual([{ sessionId: 'session-live', cwd: '/workspace/shared', parentSessionId: null }])
       }),
     ),
