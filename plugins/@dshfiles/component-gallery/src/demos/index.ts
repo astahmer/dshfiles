@@ -1,6 +1,7 @@
 import type { GalleryCategory } from './types.js'
 import { agents2Demos } from './agents-2.js'
 import { agentsDemos } from './agents.js'
+import { codeDemos } from './code.js'
 import { interactionDemos } from './interaction.js'
 import { kitDemos } from './kit.js'
 import { motionDemos } from './motion.js'
@@ -36,6 +37,12 @@ export const galleryCategories: readonly GalleryCategory[] = [
     label: 'Revisions',
     description: 'Revision timelines, merge conflicts, checks, landing pipelines and call stacks.',
     demos: revisionsDemos,
+  },
+  {
+    id: 'code',
+    label: 'Code',
+    description: 'Source, stack traces and diffs inside agent cards.',
+    demos: codeDemos,
   },
   {
     id: 'interaction',
