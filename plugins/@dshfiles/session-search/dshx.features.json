@@ -47,6 +47,51 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "find-in-thread",
+      "title": "Find every match in one thread",
+      "summary": "Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the thread_find agent tool. An archived Session is indexed for that request.",
+      "surfaces": ["host", "storage", "api", "tool"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: session-search findInThread API and thread_find tool",
+      "configuration": [],
+      "states": ["matches", "no-match", "not-owner"],
+      "failureModes": [
+        "Text without a letter or digit returns no matches instead of an FTS5 syntax error.",
+        "When another plugin owns sessionQuery, ownsService is false and the caller says the index does not serve the profile."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-search.find-order",
+          "file": "plugins/@dshfiles/session-search/tests/find-in-session.spec.ts",
+          "testName": "returns every matching current event of one Session in seq order, with a snippet"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-search.find-api",
+          "file": "plugins/@dshfiles/session-search/src/host-effect.test.ts",
+          "testName": "reads the owned worker index through the Effect API bridge"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "session-search.find-no-browser-surface",
+          "reason": "The find bar that calls this API belongs to @dshfiles/chat and is walked by its own journey."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
     }
   ]
 }

@@ -1,6 +1,10 @@
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 
+import { FIND_LIMIT_MAX, findMatchSchema, indexHealthSchema } from './api-schemas.js'
+
+export { indexHealthSchema, type IndexHealth } from './api-schemas.js'
+
 /** A JSON value as a session log stores it. */
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
@@ -52,24 +56,16 @@ const sessionEventSearchRequestSchema = Schema.Struct({
 })
 export type SessionEventSearchRequest = typeof sessionEventSearchRequestSchema.Type
 
-const countSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
-const durationSchema = Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0))
-
-export const indexHealthSchema = Schema.Struct({
-  sessions: countSchema,
-  documents: countSchema,
-  indexBytes: countSchema,
-  behindSessions: countSchema,
-  behindBytes: countSchema,
-  ingesting: Schema.Boolean,
-  lastIngestMs: durationSchema,
-  /** Slowest ingest pass since the worker started; a search waits behind a running pass. */
-  slowestIngestMs: durationSchema,
-  lastSearchMs: durationSchema,
-  slowestSearchMs: durationSchema,
-  lastError: Schema.NullOr(Schema.String),
+/** Every current-surface event of one Session matching an FTS5 expression, in seq order; see `FindQuery`. */
+const findInSessionRequestSchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1)),
+  query: Schema.String.check(Schema.isMinLength(1)),
+  limit: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(FIND_LIMIT_MAX)),
 })
-export type IndexHealth = typeof indexHealthSchema.Type
+export type FindInSessionRequest = typeof findInSessionRequestSchema.Type
+
+export const findInSessionResultSchema = Schema.Struct({ matches: Schema.Array(findMatchSchema), hasMore: Schema.Boolean })
+export type FindInSessionResult = typeof findInSessionResultSchema.Type
 
 export const sessionHeaderSchema = Schema.Struct({
   version: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
@@ -120,6 +116,7 @@ export class SearchWorkerFailed extends Schema.TaggedError<SearchWorkerFailed>()
 export class SearchWorkerRpcs extends RpcGroup.make(
   Rpc.make('SearchSessions', { payload: sessionSearchRequestSchema, success: searchSessionsResultSchema, error: SearchWorkerFailed }),
   Rpc.make('SearchEvents', { payload: sessionEventSearchRequestSchema, success: searchEventsResultSchema, error: SearchWorkerFailed }),
+  Rpc.make('FindInSession', { payload: findInSessionRequestSchema, success: findInSessionResultSchema, error: SearchWorkerFailed }),
   Rpc.make('StartIngest', { payload: { root: Schema.String.check(Schema.isMinLength(1)) }, success: indexHealthSchema, error: SearchWorkerFailed }),
   Rpc.make('SetArchived', { payload: { archivedSessionIds: Schema.Array(Schema.String) }, success: indexHealthSchema, error: SearchWorkerFailed }),
   Rpc.make('Health', { success: indexHealthSchema, error: SearchWorkerFailed }),

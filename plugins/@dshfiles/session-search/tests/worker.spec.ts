@@ -104,6 +104,17 @@ describe('owned search backend over the real worker', () => {
     })
   })
 
+  it('finds every match of one session in transcript order through the worker', async () => {
+    await boot()
+    await waitForIndex(2)
+    const sessionId = 'session-11111111-0000-4000-8000-000000000000'
+    const found = await client?.findInSession({ sessionId, query: '"retry" "storm"*', limit: 50 })
+    expect(found?.matches.length).toBeGreaterThan(1)
+    const seqs = found?.matches.map(match => match.seq) ?? []
+    expect(seqs).toEqual([...seqs].sort((left, right) => left - right))
+    expect(found?.matches.every(match => match.snippet.toLowerCase().includes('retry'))).toBe(true)
+  })
+
   it('applies the event filters the finder and the session controller send', async () => {
     const context = await boot()
     await waitForIndex(2)

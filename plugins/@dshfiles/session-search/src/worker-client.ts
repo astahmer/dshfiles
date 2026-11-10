@@ -11,6 +11,8 @@ import { RpcClient, type RpcClientError } from 'effect/rpc'
 import {
   SearchWorkerFailed,
   SearchWorkerRpcs,
+  type FindInSessionRequest,
+  type FindInSessionResult,
   type IndexHealth,
   type SearchEventsResult,
   type SearchSessionsResult,
@@ -53,6 +55,7 @@ export class SearchWorker extends Context.Service<
   {
     readonly searchSessions: (request: SessionSearchRequest) => WorkerCall<SearchSessionsResult>
     readonly searchEvents: (request: SessionEventSearchRequest) => WorkerCall<SearchEventsResult>
+    readonly findInSession: (request: FindInSessionRequest) => WorkerCall<FindInSessionResult>
     readonly health: WorkerCall<IndexHealth>
     /** Wake the ingest loop now, for example after a Session event was committed. */
     readonly nudge: WorkerCall<IndexHealth>
@@ -85,6 +88,7 @@ export class SearchWorker extends Context.Service<
         return SearchWorker.of({
           searchSessions: request => call(client.SearchSessions(request)),
           searchEvents: request => call(client.SearchEvents(request)),
+          findInSession: request => call(client.FindInSession(request)),
           health: call(client.Health()),
           nudge: call(client.Nudge()),
           startIngest: root => call(client.StartIngest({ root })),

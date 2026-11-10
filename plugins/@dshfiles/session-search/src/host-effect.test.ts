@@ -57,6 +57,19 @@ describe('session-search Effect Host bridge', () => {
           },
         },
       })
+      const find = await host.connection.requestApi({
+        packageId: '@dshfiles/session-search',
+        apiId: 'session-search',
+        method: 'findInThread',
+        version: 1,
+        input: { sessionId, text: 'owner ind' },
+      })
+      expect(await find.json()).toMatchObject({
+        result: {
+          ok: true,
+          value: { output: { ownsService: true, hasMore: false, matches: [{ seq: 1, type: 'user/message', snippet: 'owner index' }] } },
+        },
+      })
     } finally {
       await host.dispose()
     }

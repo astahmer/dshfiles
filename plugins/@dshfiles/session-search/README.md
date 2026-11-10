@@ -36,6 +36,25 @@ The freeze, the baseline and the decisions behind this backend are in [Host loop
   false plus zero counters when another backend holds the service, and the Host logs the conflict instead of building
   an index nothing reads.
 
+## Find in one thread
+
+`sessionQuery.searchEvents` ranks and keeps the best event per Session, which suits a palette but not a find bar that
+walks one thread top to bottom. The `findInThread` method of this plugin's `session-search` API (agent tool
+`thread_find`, read-only) returns every current-surface event of one Session whose indexed text has all the typed words,
+in seq order, with a short snippet:
+
+- Each word is quoted, so punctuation and FTS5 operators stay literal; the last word matches as a prefix, so results
+  follow typing. Text with no letter or digit returns nothing.
+- The default limit is 200 and the most is 1 000; `hasMore` says when a thread has more.
+- An archived Session is indexed for that request, as a targeted search is.
+- A match is one event: several hits inside one tool output count once. Core's text extraction leaves model thinking
+  out of the index, and tool payloads are capped at 8 KB per event, so neither a thought nor a hit past that cap is
+  found.
+- `ownsService: false` means another plugin owns `sessionQuery` and this index is not built.
+
+Clients import the contract from `@dshfiles/session-search/search-api`; the Chat find bar is its first caller
+([Chat: find in thread](../chat/README.md#find-in-thread)).
+
 ## Measured
 
 Bench: `pnpm bench:owned` (gated on `OWNED_BENCH=1`; it copies a byte-bounded subset of the newest logs the stock index

@@ -17,6 +17,10 @@
     "./search-worker": {
       "types": "./src/search-worker.ts",
       "default": "./dist/search-worker.js"
+    },
+    "./search-api": {
+      "types": "./src/api.ts",
+      "default": "./dist/search-api.js"
     }
   },
   "scripts": {

@@ -1,7 +1,7 @@
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer, ManagedRuntime } from 'effect'
 
-import type { IndexHealth, SearchEventsResult, SearchSessionsResult, SessionEventSearchRequest, SessionSearchRequest } from './protocol.js'
+import type { FindInSessionRequest, FindInSessionResult, IndexHealth, SearchEventsResult, SearchSessionsResult, SessionEventSearchRequest, SessionSearchRequest } from './protocol.js'
 import { SearchWorker, type SearchWorkerOptions } from './worker-client.js'
 
 type PortCalls = {
@@ -38,6 +38,7 @@ export const openSearchWorker = (options: SearchWorkerOptions) => {
   return {
     port,
     health: () => run(worker => worker.health),
+    findInSession: (request: FindInSessionRequest): Promise<FindInSessionResult> => run(worker => worker.findInSession(request)),
     nudge: () => run(worker => worker.nudge),
     startIngest: (root: string) => run(worker => worker.startIngest(root)),
     close: () => runtime.dispose(),

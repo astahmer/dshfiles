@@ -161,6 +161,18 @@ const Handlers = SearchWorkerRpcs.toLayer(
           return yield* timedSearch(() => index.searchSessions(request))
         }),
       SearchEvents: request => timedSearch(() => ({ sessionId: request.sessionId, ...index.searchEvents(request) })),
+      // A find names its Session, so an archived (cold) one is read back for this request, as a targeted search is.
+      FindInSession: request =>
+        Effect.gen(function* () {
+          const root = (yield* Ref.get(progress)).root
+          if (root !== undefined) {
+            yield* Effect.tryPromise({
+              try: () => indexSessions({ index, root, budgetMs: 1_000, windowBytes, now: Date.now }, [request.sessionId]),
+              catch: indexFailure,
+            })
+          }
+          return yield* timedSearch(() => index.findInSession(request))
+        }),
       Health: () => health,
       Nudge: () => Effect.andThen(Queue.offer(wake, undefined), health),
       SetArchived: request =>

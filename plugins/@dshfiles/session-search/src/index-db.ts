@@ -9,7 +9,16 @@ import { DatabaseSync, type SQLOutputValue, type StatementSync } from 'node:sqli
 import * as Schema from 'effect/Schema'
 import * as SchemaGetter from 'effect/SchemaGetter'
 import { withoutUndefined } from './optional-fields.js'
-import type { EventFilters, IndexHealth, SearchMatch, SessionEventSearchRequest, SessionHeaderRow, SessionSearchRequest } from './protocol.js'
+import type {
+  EventFilters,
+  FindInSessionRequest,
+  FindInSessionResult,
+  IndexHealth,
+  SearchMatch,
+  SessionEventSearchRequest,
+  SessionHeaderRow,
+  SessionSearchRequest,
+} from './protocol.js'
 import { sessionHeaderSchema } from './protocol.js'
 import { DocumentText } from './text.js'
 
@@ -112,6 +121,11 @@ const rankedRowSchema = Schema.Struct({
   surface: Schema.String,
   marked_text: Schema.String,
 })
+
+const findRowSchema = Schema.Struct({ seq: numberLike, type: Schema.String, time: numberLike, marked_text: Schema.String })
+
+/** A find shows one line per match, shorter than a session search's excerpt. */
+const FIND_SNIPPET_CHARS = 160
 
 const countRowSchema = Schema.Struct({ count: numberLike })
 const pageCountRowSchema = Schema.Struct({ page_count: numberLike })
@@ -594,6 +608,30 @@ export class SearchIndex {
     return {
       header: first === undefined ? this.sessionHeader(request.sessionId) : this.#match(first).header,
       matches: rows.slice(0, request.limit).map(row => this.#match(row)),
+      hasMore: rows.length > request.limit,
+    }
+  }
+
+  /**
+   * Every matching document of one Session's current surface in transcript order, for a find bar that steps through
+   * them; ranking would reorder what the reader expects to walk top to bottom.
+   */
+  findInSession(request: FindInSessionRequest): FindInSessionResult {
+    const rows = this.#prepare(
+      `SELECT d.seq AS seq, d.type AS type, d.time AS time, snippet(session_documents, 0, ?, ?, '…', 24) AS marked_text
+       FROM session_documents AS d
+       WHERE session_documents MATCH ? AND d.session_id = ? AND d.surface = 'current'
+       ORDER BY d.seq ASC, d.rowid ASC LIMIT ?`,
+    )
+      .all(MARKER_START, MARKER_END, request.query, request.sessionId, request.limit + 1)
+      .map(value => Schema.decodeUnknownSync(findRowSchema)(value))
+    return {
+      matches: rows.slice(0, request.limit).map(row => ({
+        seq: row.seq,
+        type: row.type,
+        time: row.time,
+        snippet: DocumentText.snippet(row.marked_text, FIND_SNIPPET_CHARS),
+      })),
       hasMore: rows.length > request.limit,
     }
   }

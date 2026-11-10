@@ -10,6 +10,7 @@ import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer, Option, Schema, Stream } from 'effect'
 
 import { sessionSearchApi } from './api.js'
+import { findExpression } from './find-query.js'
 import { ProjectionCachePrune } from './projection-cache-prune.js'
 import { ProjectionCacheRebuild } from './projection-cache-rebuild.js'
 import { SessionQueryOwnership } from './engine-registration-promise.js'
@@ -33,6 +34,9 @@ const persistenceConfig = Schema.decodeUnknownOption(Schema.Struct({ config: Sch
 
 /** A committed Session event wakes the ingest loop, coalesced so a busy turn does not wake it per event. */
 const NUDGE_DEBOUNCE = '500 millis'
+
+/** Matches a find returns when the caller names no limit: a long thread's common word, not its whole history. */
+const FIND_DEFAULT_LIMIT = 200
 
 /** Projection checkpoint upkeep starts after the boot burst, and the rebuild pauses this long between logs. */
 const CHECKPOINT_UPKEEP_DELAY = '2 minutes'
@@ -130,6 +134,16 @@ export default DshxPlugin.make({
           const health = yield* (yield* SearchWorker).health
           return { ...health, ownsService: true }
         }).pipe(Effect.withSpan('session search health')),
+      findInThread: input =>
+        Effect.gen(function* () {
+          if (!(yield* (yield* SessionQueryOwnership).owned)) return { ownsService: false, matches: [], hasMore: false }
+          const query = findExpression(input.text)
+          if (query === null) return { ownsService: true, matches: [], hasMore: false }
+          const limit = input.limit ?? FIND_DEFAULT_LIMIT
+          const found = yield* (yield* SearchWorker).findInSession({ sessionId: input.sessionId, query, limit })
+          yield* Effect.annotateCurrentSpan({ 'dshx.find.matches': found.matches.length, 'dshx.find.has_more': found.hasMore })
+          return { ownsService: true, matches: found.matches, hasMore: found.hasMore }
+        }).pipe(Effect.withSpan('session search find', { attributes: { 'dsh.session.id': input.sessionId } })),
     }),
   ],
 })
