@@ -54,7 +54,8 @@ export class Forwarder extends Context.Service<
   {
     readonly forward: (input: {
       readonly signal: OtlpSignal
-      readonly body: Buffer
+      /** Read only when a forward URL is set, so an in-process batch is serialized only to be forwarded. */
+      readonly body: () => Buffer
       readonly headers: IncomingHttpHeaders
       readonly boundPort: number | null
     }) => Effect.Effect<void>
@@ -101,7 +102,7 @@ export class Forwarder extends Context.Service<
 
       const forward = Effect.fn('otlp forward')(function* (input: {
         readonly signal: OtlpSignal
-        readonly body: Buffer
+        readonly body: () => Buffer
         readonly headers: IncomingHttpHeaders
         readonly boundPort: number | null
       }) {
@@ -109,7 +110,7 @@ export class Forwarder extends Context.Service<
         if (target === null) return
         yield* FiberSet.run(
           inFlight,
-          send({ target, signal: input.signal, body: input.body, headers: input.headers }).pipe(
+          send({ target, signal: input.signal, body: input.body(), headers: input.headers }).pipe(
             permits.withPermitsIfAvailable(1),
             Effect.flatMap(sent =>
               Option.isNone(sent)

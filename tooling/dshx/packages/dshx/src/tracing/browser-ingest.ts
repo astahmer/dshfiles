@@ -149,7 +149,7 @@ const createForwarder = (options: BrowserTracesForwarderOptions = {}): BrowserTr
   let windowCount = 0
 
   const target = () => {
-    const config = OtlpTraceExport.configFrom(env, LocalOtlpEndpointRegistry.current()?.baseUrl)
+    const config = OtlpTraceExport.configFrom(env, LocalOtlpEndpointRegistry.current())
     return config === undefined ? undefined : { ...config, serviceName: BROWSER_SERVICE_NAME }
   }
 

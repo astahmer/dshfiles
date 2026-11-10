@@ -31,7 +31,15 @@ const decoderOf = <Decoded>(input: { readonly schema: Schema.Decoder<Decoded>; r
   }
 }
 
+const decodeTraceObject = Schema.decodeUnknownEffect(otlpTraceRequestSchema)
+
 export class OtlpBody {
+  /** A batch the dshx exporter of this process handed over as an object, never serialized. */
+  static readonly decodeTraceRequest = (request: unknown) =>
+    Effect.mapError(
+      decodeTraceObject(request),
+      cause => new OtlpRequestRejected({ status: 400, reason: 'The handed-over batch is not an OTLP ExportTraceServiceRequest.', cause }),
+    )
   static readonly decodeTraces = decoderOf({ schema: otlpTraceRequestSchema, protobuf: OtlpProtobuf.decodeTraces, label: 'ExportTraceServiceRequest' })
   static readonly decodeLogs = decoderOf({ schema: otlpLogsRequestSchema, protobuf: OtlpProtobuf.decodeLogs, label: 'ExportLogsServiceRequest' })
   static readonly decodeMetrics = decoderOf({ schema: otlpMetricsRequestSchema, protobuf: OtlpProtobuf.decodeMetrics, label: 'ExportMetricsServiceRequest' })

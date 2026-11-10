@@ -1,6 +1,6 @@
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import * as Schema from 'effect/Schema'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineApi, method } from '../src/api/index.js'
 import { registerApi } from '../src/api/host-runtime.js'
 import { ApiChannelModel } from '../src/api/channel.js'
@@ -21,7 +21,7 @@ import {
   withSpan,
 } from '../src/tracing/index.js'
 import { LocalOtlpEndpointRegistry } from '../src/tracing/local-endpoint.js'
-import { OtlpTraceExport, type FinishedSpan } from '../src/tracing/otlp-exporter.js'
+import { OtlpTraceExport, type FinishedSpan, type OtlpTraceRequest } from '../src/tracing/otlp-exporter.js'
 import { TracerModel, type Tracer } from '../src/tracing/tracer.js'
 
 const ENDPOINT_ENV = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector.test:4318/' }
@@ -166,7 +166,11 @@ describe('in-process receiver hand-off', () => {
   it('starts recording when a receiver is published after the tracer was created, without the env headers', async () => {
     const sink = collector()
     let baseUrl: string | undefined
-    const tracer = TracerModel.create({ env: { OTEL_EXPORTER_OTLP_HEADERS: 'x-api-key=k' }, localEndpoint: () => baseUrl, fetch: sink.fetch })
+    const tracer = TracerModel.create({
+      env: { OTEL_EXPORTER_OTLP_HEADERS: 'x-api-key=k' },
+      localEndpoint: () => (baseUrl === undefined ? undefined : { baseUrl }),
+      fetch: sink.fetch,
+    })
     expect(tracer.enabled).toBe(false)
     expect(tracer.startSpan('before')).toBe(TracerModel.noopSpan)
     baseUrl = 'http://127.0.0.1:4318'
@@ -178,14 +182,37 @@ describe('in-process receiver hand-off', () => {
     expect(sink.spans().map(span => span.name)).toEqual(['after'])
   })
 
+  it('hands batches to an in-process receiver instead of POSTing, and retries a rejected handoff', async () => {
+    const sink = collector()
+    const delivered: string[][] = []
+    let failures = 1
+    const deliverTraces = async (request: OtlpTraceRequest) => {
+      if (failures-- > 0) throw new Error('store busy')
+      delivered.push(request.resourceSpans.flatMap(resource => resource.scopeSpans.flatMap(scope => scope.spans.map(span => span.name))))
+    }
+    const exporter = OtlpTraceExport.createBatchExporter({
+      config: () => OtlpTraceExport.configFrom({}, { baseUrl: 'http://127.0.0.1:4318', deliverTraces }),
+      fetch: sink.fetch,
+      initialBackoffMs: 1,
+      maxBackoffMs: 1,
+      scheduleDelayMs: 1,
+    })
+    exporter.enqueue(finishedSpan('handed'))
+    await vi.waitFor(() => expect(delivered).toEqual([['handed']]))
+    expect(sink.requests).toEqual([])
+    expect(exporter.stats()).toEqual({ queued: 0, dropped: 0, exported: 1 })
+  })
+
   it('keeps an environment endpoint over a published receiver and stays off when the SDK is disabled', async () => {
     const sink = collector()
-    const tracer = TracerModel.create({ env: ENDPOINT_ENV, localEndpoint: () => 'http://127.0.0.1:4318', fetch: sink.fetch })
+    const tracer = TracerModel.create({ env: ENDPOINT_ENV, localEndpoint: () => ({ baseUrl: 'http://127.0.0.1:4318' }), fetch: sink.fetch })
     await tracer.withSpan('one', {}, async () => undefined)
     await tracer.flush()
     expect(sink.requests.map(request => request.url)).toEqual(['http://collector.test:4318/v1/traces'])
-    expect(TracerModel.create({ env: { OTEL_SDK_DISABLED: 'true' }, localEndpoint: () => 'http://127.0.0.1:4318' }).enabled).toBe(false)
-    expect(TracerModel.create({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: 'file:///x' }, localEndpoint: () => 'http://127.0.0.1:4318' }).enabled).toBe(false)
+    expect(TracerModel.create({ env: { OTEL_SDK_DISABLED: 'true' }, localEndpoint: () => ({ baseUrl: 'http://127.0.0.1:4318' }) }).enabled).toBe(false)
+    expect(TracerModel.create({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: 'file:///x' }, localEndpoint: () => ({ baseUrl: 'http://127.0.0.1:4318' }) }).enabled).toBe(
+      false,
+    )
   })
 })
 

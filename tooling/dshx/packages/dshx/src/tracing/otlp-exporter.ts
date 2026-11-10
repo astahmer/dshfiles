@@ -47,7 +47,18 @@ export interface ExportConfig {
   readonly url: string
   readonly headers: ReadonlyMap<string, string>
   readonly serviceName: string
+  /** The local receiver's in-process handoff: the batch is passed as an object instead of POSTed to `url`. */
+  readonly deliver?: OtlpTraceDelivery | undefined
 }
+
+/** The `ExportTraceServiceRequest` JSON object one batch encodes to, before serialization. */
+export type OtlpTraceRequest = ReturnType<typeof encodeTraceRequest>
+
+/**
+ * Stores one encoded batch in this process; a rejection is retried like a failed POST. It takes `unknown` because
+ * another plugin's dshx copy, of any version, encoded the batch: the receiver decodes it as it decodes a POST body.
+ */
+export type OtlpTraceDelivery = (request: unknown) => Promise<void>
 
 type OtlpAnyValue =
   | { readonly stringValue: string }
@@ -211,7 +222,10 @@ const serviceNameOf = (env: Environment): string => env.OTEL_SERVICE_NAME?.trim(
  * receiver, see `LocalOtlpEndpointRegistry`) is the target, without the environment's headers, which belong to a
  * configured collector. No endpoint at all, or `OTEL_SDK_DISABLED=true`, means no export.
  */
-const exportConfigFrom = (env: Environment, localBaseUrl?: string): ExportConfig | undefined => {
+const exportConfigFrom = (
+  env: Environment,
+  local?: { readonly baseUrl: string; readonly deliverTraces?: OtlpTraceDelivery | undefined },
+): ExportConfig | undefined => {
   if (sdkDisabled(env)) return undefined
   const tracesEndpoint = env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT?.trim()
   const baseEndpoint = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim()
@@ -222,8 +236,8 @@ const exportConfigFrom = (env: Environment, localBaseUrl?: string): ExportConfig
         ? `${baseEndpoint.replace(/\/+$/u, '')}/v1/traces`
         : undefined
   if (raw === undefined) {
-    const localUrl = localBaseUrl === undefined ? undefined : httpUrl(`${localBaseUrl.replace(/\/+$/u, '')}/v1/traces`)
-    return localUrl === undefined ? undefined : { url: localUrl, headers: new Map(), serviceName: serviceNameOf(env) }
+    const localUrl = local === undefined ? undefined : httpUrl(`${local.baseUrl.replace(/\/+$/u, '')}/v1/traces`)
+    return localUrl === undefined ? undefined : { url: localUrl, headers: new Map(), serviceName: serviceNameOf(env), deliver: local?.deliverTraces }
   }
   const url = httpUrl(raw)
   if (url === undefined) return undefined
@@ -296,12 +310,17 @@ const createBatchExporter = (options: BatchExporterOptions): BatchExporter => {
     try {
       const config = options.config()
       if (config === undefined) return 'drop'
+      const request = encodeTraceRequest({ serviceName: config.serviceName, spans: batch, resource: options.resource })
+      if (config.deliver !== undefined) {
+        await config.deliver(request)
+        return 'sent'
+      }
       const headers = new Headers([...config.headers])
       headers.set('content-type', 'application/json')
       const response = await send(config.url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(encodeTraceRequest({ serviceName: config.serviceName, spans: batch, resource: options.resource })),
+        body: JSON.stringify(request),
         signal: AbortSignal.timeout(exportTimeoutMs),
       })
       await response.body?.cancel().catch(() => undefined)

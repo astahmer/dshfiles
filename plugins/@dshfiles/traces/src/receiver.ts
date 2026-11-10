@@ -148,6 +148,11 @@ export class Receiver extends Context.Service<
   {
     readonly status: Effect.Effect<ReceiverSnapshot>
     readonly changes: Stream.Stream<ListenStatus>
+    /**
+     * Stores a trace batch this process's dshx exporter hands over as an object, counted and forwarded like a
+     * `/v1/traces` request: the same spans without JSON encoding, an HTTP round trip and JSON parsing.
+     */
+    readonly deliverTraces: (request: unknown) => Effect.Effect<void, OtlpRequestRejected>
   }
 >()('@dshfiles/traces/Receiver') {
   static readonly layer = Layer.effect(
@@ -184,6 +189,32 @@ export class Receiver extends Context.Service<
       })
       const rejected = Ref.update(counters, current => ({ ...current, rejectedRequests: current.rejectedRequests + 1 }))
 
+      const count = Effect.fnUntraced(function* (signal: OtlpSignal, result: { readonly accepted: number; readonly rejected: number }) {
+        const receivedAt = yield* Clock.currentTimeMillis
+        yield* Ref.update(counters, current => ({
+          ...current,
+          requests: { ...current.requests, [signal]: current.requests[signal] + 1 },
+          accepted: { ...current.accepted, [signal]: current.accepted[signal] + result.accepted },
+          rejectedItems: current.rejectedItems + result.rejected,
+          lastReceivedAt: receivedAt,
+        }))
+      })
+
+      const deliverTraces = (request: unknown) =>
+        Effect.gen(function* () {
+          yield* count('traces', yield* ingest.ingestTraceRequest(request))
+          const boundPort = (yield* SubscriptionRef.get(listenStatus)).boundPort
+          yield* forwarder.forward({
+            signal: 'traces',
+            body: () => Buffer.from(JSON.stringify(request)),
+            headers: { 'content-type': 'application/json' },
+            boundPort,
+          })
+        }).pipe(
+          Effect.tapError(() => rejected),
+          Effect.withTracerEnabled(false),
+        )
+
       const store = Effect.fnUntraced(function* (input: {
         readonly request: IncomingMessage
         readonly response: ServerResponse
@@ -192,16 +223,9 @@ export class Receiver extends Context.Service<
       }) {
         const raw = yield* readBody(input.request)
         const result = yield* ingest.ingest(input.signal, { body: yield* decodeContent(raw, input.request.headers['content-encoding']), wire: input.wire })
-        const receivedAt = yield* Clock.currentTimeMillis
-        yield* Ref.update(counters, current => ({
-          ...current,
-          requests: { ...current.requests, [input.signal]: current.requests[input.signal] + 1 },
-          accepted: { ...current.accepted, [input.signal]: current.accepted[input.signal] + result.accepted },
-          rejectedItems: current.rejectedItems + result.rejected,
-          lastReceivedAt: receivedAt,
-        }))
+        yield* count(input.signal, result)
         const boundPort = (yield* SubscriptionRef.get(listenStatus)).boundPort
-        yield* forwarder.forward({ signal: input.signal, body: raw, headers: input.request.headers, boundPort })
+        yield* forwarder.forward({ signal: input.signal, body: () => raw, headers: input.request.headers, boundPort })
         respond(input.response, 200, input.wire)
         return { bodyBytes: raw.length, accepted: result.accepted, rejected: result.rejected }
       })
@@ -308,7 +332,7 @@ export class Receiver extends Context.Service<
         } satisfies ReceiverSnapshot
       })
 
-      return Receiver.of({ status, changes: SubscriptionRef.changes(listenStatus) })
+      return Receiver.of({ status, changes: SubscriptionRef.changes(listenStatus), deliverTraces })
     }),
   )
 }

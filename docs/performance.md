@@ -162,7 +162,22 @@ index tap. Every owned Host bundle embeds the dshx runtime, and the process-wide
 (`Symbol.for('@dshfiles/dshx.tracing.v3')`) is installed by whichever bundle loads first, so the profile names that
 bundle's file. The ~260 ms per 20 s is the dshx OTLP batch exporter
 ([otlp-exporter.ts](../tooling/dshx/packages/dshx/src/tracing/otlp-exporter.ts)) JSON-encoding spans and POSTing them,
-by default to this process's own traces receiver. Still open; the owner is dshx tracing, not shared-streams.
+by default to this process's own traces receiver. The owner is dshx tracing, not shared-streams.
+
+The traces receiver now publishes an in-process handoff with its endpoint (`deliverTraces`): the dshx span exporter
+passes each encoded batch as an object, so the Host's own spans skip `JSON.stringify`, the loopback HTTP request and
+the receiver's `JSON.parse` ([host-edges.ts](../plugins/@dshfiles/traces/src/host-edges.ts)). The receiver still
+decodes the object with its OTLP schema, counts it as a `/v1/traces` request and serializes it only when a forward URL
+is set. Scratch benchmark, not the live Host (Node 22.23.3, load ~30 on 10 cores, 2,000 eight-attribute spans in four
+512-span batches, receiver decode excluded on both sides, five rounds):
+
+| Path                                 | Wall per 2,000 spans | Process CPU |
+| ------------------------------------ | -------------------- | ----------- |
+| Old: JSON POST to the local receiver | 14–69 ms             | 13–81 ms    |
+| New: in-process `deliverTraces`      | 2–12 ms              | 2–19 ms     |
+
+A live 20 s Host profile of both halves is still pending: every owned Host bundle embeds dshx, so it needs the
+rebuilt bundles and a user-approved restart.
 
 ## Thread-content search (palette `#…`)
 

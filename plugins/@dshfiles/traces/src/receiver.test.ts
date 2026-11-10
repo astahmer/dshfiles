@@ -1,12 +1,13 @@
 import { createServer, type IncomingMessage } from 'node:http'
 import { gzipSync } from 'node:zlib'
 import { DshxEffect } from '@dshfiles/dshx/effect'
-import { recordSpans } from '@dshfiles/dshx/tracing'
+import { localOtlpEndpoint, recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer, Ref } from 'effect'
 import { parseForwardUrl } from './forwarder.js'
+import { LocalEndpointLive } from './host-edges.js'
 import { SdkFixtures } from './otlp/sdk-fixture.test-support.js'
-import { MAX_BODY_BYTES } from './receiver.js'
+import { MAX_BODY_BYTES, Receiver } from './receiver.js'
 import { ReceiverHarness } from './receiver.test-support.js'
 import { TraceRepo } from './trace-repo.js'
 
@@ -156,6 +157,27 @@ describe('OTLP/HTTP receiver', () => {
       const self = yield* ReceiverHarness.eventually(ReceiverHarness.status, current => current.forward.url === null)
       expect(self.message).toBe('The forward URL points at this receiver; forwarding is off.')
     }).pipe(Effect.scoped, Effect.provide(ReceiverHarness.receiverLayer({ mode: 'both' }))),
+  )
+
+  it.live('publishes an in-process handoff that stores, counts and forwards a trace batch without HTTP', () =>
+    Effect.gen(function* () {
+      const viewer = yield* upstream
+      const fixture = yield* Effect.promise(() => SdkFixtures.traces())
+      yield* ReceiverHarness.updateSettings({ forwardUrl: `http://127.0.0.1:${String(viewer.port)}/` })
+      yield* ReceiverHarness.untilState('listening')
+      const endpoint = yield* ReceiverHarness.eventually(
+        Effect.sync(() => localOtlpEndpoint()),
+        published => published?.deliverTraces !== undefined,
+      )
+      yield* Effect.promise(() => endpoint?.deliverTraces?.(fixture.json) ?? Promise.reject(new Error('no handoff published')))
+      expect(yield* storedSpans).toBe(2)
+      const counted = yield* ReceiverHarness.eventually(ReceiverHarness.status, current => current.forward.forwarded === 1)
+      expect(counted).toMatchObject({ requests: { traces: 1 }, accepted: { traces: 2 }, rejectedRequests: 0 })
+      expect(yield* Ref.get(viewer.forwarded)).toEqual([{ path: '/v1/traces', type: 'application/json', bytes: JSON.stringify(fixture.json).length }])
+      const rejected = yield* Receiver.use(receiver => receiver.deliverTraces({ resourceSpans: 'nope' })).pipe(Effect.flip)
+      expect(rejected.status).toBe(400)
+      expect((yield* ReceiverHarness.status).rejectedRequests).toBe(1)
+    }).pipe(Effect.scoped, Effect.provide(LocalEndpointLive.pipe(Layer.provideMerge(ReceiverHarness.receiverLayer({ mode: 'both' }))))),
   )
 
   it('parses forward URLs', () => {

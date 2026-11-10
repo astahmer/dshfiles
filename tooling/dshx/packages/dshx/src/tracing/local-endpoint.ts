@@ -4,11 +4,18 @@
  * set. Every plugin bundles its own dshx copy, so the value lives on `globalThis` under a versioned symbol.
  */
 
+import type { OtlpTraceDelivery } from './otlp-exporter.js'
+
 export interface LocalOtlpEndpoint {
   /** OTLP/HTTP base URL, e.g. `http://127.0.0.1:4318`; exporters append `/v1/<signal>`. */
   readonly baseUrl: string
   /** Package that published it, for diagnostics. */
   readonly owner: string
+  /**
+   * Stores a trace batch without serializing it: the dshx span exporter hands batches here instead of POSTing JSON to
+   * `baseUrl`. Optional, so a dshx copy that predates it, and any other exporter, still POSTs.
+   */
+  readonly deliverTraces?: OtlpTraceDelivery | undefined
 }
 
 const LOCAL_ENDPOINT_KEY = Symbol.for('@dshfiles/dshx.otlp-local-endpoint.v1')
@@ -33,7 +40,7 @@ const normalizedBaseUrl = (raw: string): string | undefined => {
 const publish = (endpoint: LocalOtlpEndpoint): (() => void) => {
   const baseUrl = normalizedBaseUrl(endpoint.baseUrl)
   if (baseUrl === undefined) return () => undefined
-  const published: LocalOtlpEndpoint = Object.freeze({ baseUrl, owner: endpoint.owner })
+  const published: LocalOtlpEndpoint = Object.freeze({ baseUrl, owner: endpoint.owner, deliverTraces: endpoint.deliverTraces })
   holder[LOCAL_ENDPOINT_KEY] = published
   return () => {
     if (holder[LOCAL_ENDPOINT_KEY] === published) delete holder[LOCAL_ENDPOINT_KEY]

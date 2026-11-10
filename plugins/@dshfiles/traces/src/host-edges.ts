@@ -2,7 +2,7 @@ import { createHostApiClient } from '@dshfiles/dshx/host'
 import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { publishLocalOtlpEndpoint } from '@dshfiles/dshx/tracing'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
-import { Effect, FiberHandle, Layer, Stream } from 'effect'
+import { Effect, FiberHandle, FiberSet, Layer, Stream } from 'effect'
 import { ThreadAttention, ThreadMarkFailed } from './alerts/alert-engine.js'
 import { Receiver, type ListenStatus } from './receiver.js'
 
@@ -38,14 +38,20 @@ export const ThreadAttentionLive = Layer.effect(
   }),
 )
 
-/** Publish the bound receiver to this process's exporters while it listens; withdraw it otherwise. */
+/**
+ * Publish the bound receiver to this process's exporters while it listens; withdraw it otherwise. The dshx span
+ * exporter hands its batches to `deliverTraces` instead of POSTing them to the URL: the profiled ~260 ms per 20 s of
+ * JSON encoding and loopback HTTP for the Host's own spans.
+ */
 export const LocalEndpointLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const receiver = yield* Receiver
     const published = yield* FiberHandle.make()
+    const run = yield* FiberSet.makeRuntimePromise()
+    const deliverTraces = (request: unknown) => run(receiver.deliverTraces(request))
     const publish = (baseUrl: string) =>
       Effect.acquireRelease(
-        Effect.sync(() => publishLocalOtlpEndpoint({ baseUrl, owner: OWNER })),
+        Effect.sync(() => publishLocalOtlpEndpoint({ baseUrl, owner: OWNER, deliverTraces })),
         withdraw => Effect.sync(withdraw),
       ).pipe(Effect.andThen(Effect.never), Effect.scoped)
     yield* DshxPlugin.worker(

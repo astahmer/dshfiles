@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { randomBytes } from 'node:crypto'
-import { LocalOtlpEndpointRegistry } from './local-endpoint.js'
+import { LocalOtlpEndpointRegistry, type LocalOtlpEndpoint } from './local-endpoint.js'
 import { SpanRecorders } from './recorder.js'
 import { TraceparentModel, type SpanContext } from './traceparent.js'
 import {
@@ -292,7 +292,7 @@ const createRecordingTracer = (exporter: BatchExporter | undefined, exportEnable
  */
 const createTracer = (input: {
   readonly env: Readonly<Record<string, string | undefined>>
-  readonly localEndpoint?: (() => string | undefined) | undefined
+  readonly localEndpoint?: (() => Pick<LocalOtlpEndpoint, 'baseUrl' | 'deliverTraces'> | undefined) | undefined
   readonly fetch?: typeof fetch | undefined
   readonly scheduleDelayMs?: number | undefined
 }): Tracer => {
@@ -328,7 +328,7 @@ const processTracer = (): Tracer => {
   // SAFETY: only this module writes the versioned symbol, and always a Tracer.
   const holder = globalThis as { [TRACER_KEY]?: Tracer }
   if (holder[TRACER_KEY] !== undefined) return holder[TRACER_KEY]
-  const tracer = createTracer({ env: process.env, localEndpoint: () => LocalOtlpEndpointRegistry.current()?.baseUrl })
+  const tracer = createTracer({ env: process.env, localEndpoint: LocalOtlpEndpointRegistry.current })
   holder[TRACER_KEY] = tracer
   process.once('beforeExit', () => void tracer.flush())
   return tracer
