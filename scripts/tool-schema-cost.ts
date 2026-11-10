@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import * as Schema from 'effect/Schema'
 import { SessionLogs } from './self-improve-log.ts'
@@ -7,7 +7,10 @@ import { SessionLogs } from './self-improve-log.ts'
  * Per-owner token cost of the tool schemas and fixed instructions one Session request carries, read from its
  * last `request/header`. Tokens use DSH TokenMeter's fixed density (characters / 4), as the context breakdown does.
  *
- *   node scripts/tool-schema-cost.ts <session.v4.jsonl.zstd | .jsonl> [--json]
+ *   node scripts/tool-schema-cost.ts <session.v4.jsonl.zstd | .jsonl> [--json | --capture <out.json>]
+ *
+ * `--capture` writes the request's full tool schemas and instruction texts as `{ tools, instructions }`, the catalog
+ * tool-search's real-model evaluation (`plugins/@dshfiles/tool-search/src/cache-eval.test.ts`) replays.
  */
 
 const toolSchema = Schema.Struct({ name: Schema.String, description: Schema.optionalKey(Schema.String), parameters: Schema.Unknown })
@@ -56,7 +59,7 @@ const ownerOf = (name: string, sources: readonly { readonly plugin: string; read
   return name.startsWith('mcp__') ? 'mcp' : 'core/native'
 }
 
-const [logPath, flag] = process.argv.slice(2)
+const [logPath, flag, capturePath] = process.argv.slice(2)
 if (logPath === undefined) {
   console.error('Usage: node scripts/tool-schema-cost.ts <session log (.jsonl or .jsonl.zstd)> [--json]')
   process.exit(1)
@@ -64,6 +67,7 @@ if (logPath === undefined) {
 
 let tools: readonly (typeof toolSchema.Type)[] | undefined
 const instructions: { kind: string; tokens: number }[] = []
+const instructionTexts: { kind: string; text: string }[] = []
 for await (const record of SessionLogs.stream(logPath)) {
   if (record.type === 'request/header') {
     const header = decodeHeader(record.data)
@@ -77,7 +81,9 @@ for await (const record of SessionLogs.stream(logPath)) {
   const message = 'message' in decoded.value ? decoded.value.message : decoded.value
   const kind = record.type === 'system/message' ? 'system-prompt' : (message.source?.kind ?? 'user')
   if (kind === 'user') continue
-  instructions.push({ kind, tokens: tokens(message.content.map(block => block.text ?? '').join('')) })
+  const text = message.content.map(block => block.text ?? '').join('')
+  instructions.push({ kind, tokens: tokens(text) })
+  instructionTexts.push({ kind, text })
 }
 if (tools === undefined) {
   console.error('No request/header in this log: the Session has not sent a model request yet. Send one, then rerun.')
@@ -102,7 +108,11 @@ const report = {
   instructions,
   owners: [...owners.values()].sort((left, right) => right.tokens - left.tokens),
 }
-if (flag === '--json') {
+if (flag === '--capture') {
+  if (capturePath === undefined) throw new Error('--capture needs an output path.')
+  await writeFile(capturePath, JSON.stringify({ tools, instructions: instructionTexts }))
+  console.log(`captured ${String(report.tools)} tools and ${String(instructionTexts.length)} instruction messages to ${capturePath}`)
+} else if (flag === '--json') {
   console.log(JSON.stringify(report, null, 2))
 } else {
   console.log(`tools ${String(report.tools)}  bytes ${String(report.toolBytes)}  tokens ${String(report.toolTokens)}`)
