@@ -113,7 +113,13 @@ export class PluginControls extends Context.Service<
             enabled: result.enabled ?? null,
             application: result.application,
             restartReason: result.restartReason ?? null,
-            error: result.error === undefined ? null : [result.error.code, result.error.diagnostic].filter(part => part !== undefined).join(': ').slice(0, MAX_REASON),
+            error:
+              result.error === undefined
+                ? null
+                : [result.error.code, result.error.diagnostic]
+                    .filter(part => part !== undefined)
+                    .join(': ')
+                    .slice(0, MAX_REASON),
             warnings: (result.warnings ?? []).slice(0, 50),
           }
           return change

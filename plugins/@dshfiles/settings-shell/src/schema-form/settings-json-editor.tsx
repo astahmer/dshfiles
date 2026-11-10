@@ -200,7 +200,11 @@ export const SettingsJsonEditor = (props: {
             spellCheck={false}
             value={text}
           />
-          <ul aria-live="polite" className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:gap-1 dshx:p-0" id={`settings-json-diagnostics-${props.namespace}`}>
+          <ul
+            aria-live="polite"
+            className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:gap-1 dshx:p-0"
+            id={`settings-json-diagnostics-${props.namespace}`}
+          >
             {parsed.diagnostics.map(diagnostic => (
               <li className="dshx:text-xs dshx:text-destructive" data-diagnostic={diagnostic.code} key={`${diagnostic.code}:${diagnostic.path.join('.')}`}>
                 {diagnosticText(diagnostic, t)}
@@ -228,7 +232,12 @@ export const SettingsJsonEditor = (props: {
             </Alert>
           )}
           <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
-            <Button disabled={draft === undefined || blocking || stale || state.kind === 'saving'} onClick={() => save(draft?.revision)} size="sm" type="button">
+            <Button
+              disabled={draft === undefined || blocking || stale || state.kind === 'saving'}
+              onClick={() => save(draft?.revision)}
+              size="sm"
+              type="button"
+            >
               {t('json.save')}
             </Button>
             <Button disabled={draft === undefined || state.kind === 'saving'} onClick={() => send({ type: 'discard' })} size="sm" type="button" variant="ghost">

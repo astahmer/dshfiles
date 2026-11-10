@@ -60,7 +60,8 @@ const shellEn = {
   'json.diag.notObject': 'The document must be one JSON object.',
   'json.diag.unknownKey': '{path} is not a setting of this plugin. Remove it, or pick one with Insert setting.',
   'json.diag.type': '{path} must be {expected}.',
-  'json.conflict': 'These settings changed since you started editing. Load the latest values (your draft is dropped) or save only the fields you changed over them.',
+  'json.conflict':
+    'These settings changed since you started editing. Load the latest values (your draft is dropped) or save only the fields you changed over them.',
   'json.reload': 'Load latest',
   'json.saveOver': 'Save my changes over them',
   'json.refused': 'DSH refused this change; your draft is kept. Check each value in the Form view, or open the configuration file.',
