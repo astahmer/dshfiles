@@ -150,7 +150,7 @@ Then('each turn names the jj revision its edits left', async ({ page }: { page: 
     await expect.poll(() => exists(join(projectFor(page), 'checkpoint-2.txt')), { timeout: 30_000 }).toBe(true)
     await expect(checkpoints).toHaveCount(2, { timeout: 30_000 })
     for (const checkpoint of await checkpoints.all())
-      await expect(checkpoint.locator('[data-session-undo-revision]')).toHaveText(/^jj:[0-9a-f]{12}$|Jujutsu revision/)
+      await expect(checkpoint.locator('[data-session-undo-revision]').getByRole('link', { name: /^Jujutsu revision:/ })).toBeVisible()
     await expect(checkpoints.first().getByRole('button', { name: 'Restore to after this turn', exact: true })).toHaveCount(1)
     await expect(checkpoints.last().getByRole('button', { name: 'Restore to after this turn', exact: true })).toHaveCount(0)
   })
