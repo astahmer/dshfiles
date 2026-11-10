@@ -2736,6 +2736,12 @@
         "fill textbox \"Capture\" \"Two lane demo\"",
         "press Enter",
         "click text \"Two lane demo\"",
+        "click button \"Status of b:#1\"",
+        "press 2",
+        "fill textbox \"Comment\" \"Splitting the timeline into a conversation and a work log.\"",
+        "click button \"Reply\"",
+        "expect text \"Splitting the timeline*\"",
+        "hover list \"Conversation\"",
         "expect list \"Conversation\""
       ],
       "surfaces": ["client", "host", "storage", "tool"],
