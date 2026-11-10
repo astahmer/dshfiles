@@ -13,7 +13,7 @@
  * trigger instead of a parallel tree.
  */
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import clsx from 'clsx'
 import {
@@ -40,9 +40,12 @@ import { parsePastedComposerText } from '../../paste-references.ts'
 import { LargePasteModel } from '../../large-paste.ts'
 import { isImageMediaType } from '../service.ts'
 import { ContextMeter } from './ContextMeter.tsx'
+import { AnnotationsPill } from './AnnotationsPill.tsx'
 import { observeControlRow } from './control-row-layout.ts'
 import { observeRunRowPlacement } from './run-row-placement.ts'
 import css from './InputBar.module.css'
+
+const noSubscription = (): (() => void) => () => {}
 
 /** `@dshfiles/workbench`'s `KeptThreadViews.shownEvent`: a kept thread view was shown again without remounting. */
 const THREAD_VIEW_SHOWN_EVENT = 'dshfiles:thread-view-shown'
@@ -84,7 +87,11 @@ export const InputBar = memo(function InputBar({
     () => input === undefined || resolveDraftAttachments === undefined ? [] : resolveDraftAttachments(input.attachmentIds),
     [resolveDraftAttachments, input?.attachmentIds],
   )
-  const empty = draft.trim() === '' && attachments.length === 0
+  const annotationCount = useSyncExternalStore(
+    keyboard?.annotations.subscribe ?? noSubscription,
+    () => keyboard?.annotations.snapshot().length ?? 0,
+  )
+  const empty = draft.trim() === '' && attachments.length === 0 && annotationCount === 0
   const uploads = useFileUploads(snapshot => snapshot)
   // Send waits for every picked file: uploading and failed drafts both hold
   // the gate (a failed upload is retried or removed, never silently dropped).
@@ -522,6 +529,7 @@ export const InputBar = memo(function InputBar({
           <div className={css.overlayAnchor} data-composer-overlay>{renderSlot('conversation.input.overlay', {})}</div>
         )}
         {accessory !== undefined && <div className={css.accessory}>{accessory}</div>}
+        {keyboard === undefined ? null : <AnnotationsPill annotations={keyboard.annotations} t={t} />}
         {renderSlot('conversation.input.attachments', {
           attachments,
           canAcceptDrop,

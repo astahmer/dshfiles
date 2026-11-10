@@ -4,10 +4,9 @@ import { decodeJson } from '@dshfiles/dshx/json'
 import * as Schema from 'effect/Schema'
 
 const SNIPPET_SOURCE = 'composer-snippet'
-const SNIPPET_OPEN_EVENT = 'dshfiles:open-composer-snippet'
 
 const snippetSchema = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('quote'), text: Schema.String, comment: Schema.optionalKey(Schema.String) }),
+  Schema.Struct({ kind: Schema.Literal('quote'), text: Schema.String }),
   Schema.Struct({ kind: Schema.Literal('note'), text: Schema.String }),
   Schema.Struct({
     kind: Schema.Literal('comment'),
@@ -20,7 +19,7 @@ const snippetSchema = Schema.Union([
 
 type Snippet = typeof snippetSchema.Type
 
-type SnippetAttachment = Exclude<ComposerAttachment, { kind: 'file' }>
+type SnippetAttachment = Exclude<ComposerAttachment, { kind: 'file' | 'annotation' }>
 
 /** The slice of `@dshfiles/input-trigger`'s source contract this chip needs; its client types re-declare the upstream conversation package this fork replaces. */
 interface SnippetSource {
@@ -29,7 +28,6 @@ interface SnippetSource {
   readonly showGroupTitle: boolean
   candidates(): Promise<readonly never[]>
   onPick(): undefined
-  openReference(session: { readonly sessionId: string }, reference: { readonly ref: string }): boolean
   readonly codec: { clipboardText(ref: string): string; serialize(ref: string): Promise<string> }
 }
 
@@ -53,23 +51,7 @@ export class ComposerSnippets {
     const snippet = decodeJson(snippetSchema, ref)
     if (snippet.kind === 'note') return `<note>\n${snippet.text}\n</note>`
     if (snippet.kind === 'comment') return `<comment path="${snippet.path}" lines="${ComposerSnippets.lines(snippet)}">\n${snippet.text}\n</comment>`
-    if (snippet.kind === 'quote' && snippet.comment !== undefined) return `${ComposerSnippets.clipboardText(snippet)}\n\n<note>\n${snippet.comment}\n</note>`
     return ComposerSnippets.clipboardText(snippet)
-  }
-
-  /** The annotation a quote chip carries; undefined for every other chip. */
-  static annotationOf = (input: { readonly source: string; readonly ref: string }): { readonly comment: string | undefined } | undefined => {
-    if (input.source !== SNIPPET_SOURCE) return undefined
-    const snippet = decodeJson(snippetSchema, input.ref)
-    return snippet.kind === 'quote' ? { comment: snippet.comment } : undefined
-  }
-
-  /** Rewrites a quote chip's ref with its comment; an empty comment removes it. */
-  static withComment = (ref: string, comment: string): string => {
-    const snippet = decodeJson(snippetSchema, ref)
-    if (snippet.kind !== 'quote') return ref
-    const trimmed = comment.trim()
-    return JSON.stringify(trimmed === '' ? { kind: snippet.kind, text: snippet.text } : { ...snippet, comment: trimmed })
   }
 
   /** Registers the chips' serializer with the input-trigger pipeline; a draft holding one cannot send without it. */
@@ -84,12 +66,6 @@ export class ComposerSnippets {
       codec: {
         clipboardText: ref => ComposerSnippets.clipboardText(decodeJson(snippetSchema, ref)),
         serialize: ref => Promise.resolve(ComposerSnippets.serialize(ref)),
-      },
-      openReference: (_session, reference) => {
-        const snippet = decodeJson(snippetSchema, reference.ref)
-        if (snippet.kind !== 'quote') return false
-        window.dispatchEvent(new CustomEvent(SNIPPET_OPEN_EVENT, { detail: snippet.text }))
-        return true
       },
     })
   }

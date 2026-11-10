@@ -19,6 +19,7 @@ import { ConversationContent } from './native/skeleton/ConversationContent.tsx'
 import { ConversationWidthControls } from './native/skeleton/ConversationWidthControls.tsx'
 import { DefaultConversationViews } from './native/skeleton/DefaultConversationViews.tsx'
 import { InputBar } from './native/skeleton/InputBar.tsx'
+import { DraftAnnotations } from './native/input/draft-annotations.ts'
 
 // The presentation-only Host kit is not the boundary under test. Keep the real
 // Content factory body, Session view selection, InputBar, and Lexical binding.
@@ -149,6 +150,7 @@ const fixture = (id: string, initialView = 'chat', fixtureOptions: FixtureOption
     keyboard: {
       editor,
       snapshot: input,
+      annotations: new DraftAnnotations(),
       submit: vi.fn(),
       steerQueue: vi.fn(),
       paste: vi.fn(),
