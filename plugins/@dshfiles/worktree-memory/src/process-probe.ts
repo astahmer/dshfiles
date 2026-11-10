@@ -95,6 +95,12 @@ export class ProcessProbe extends Context.Service<
     readonly pressure: Effect.Effect<MemoryPressure>
     /** Scratch DSH Hosts with their owners and orphan flags: one `ps` and the dshx record files, no working-directory probes. */
     readonly scratchHosts: Effect.Effect<ScratchProbe, ProbeFailed>
+    /**
+     * The scratch summary for readers (the status item in every tab, the agent tool): one probe serves every caller
+     * within the TTL and concurrent callers join it. A stop reads `scratchHosts` instead and drops this cache.
+     */
+    readonly scratchSummary: Effect.Effect<ScratchHosts, ProbeFailed>
+    readonly invalidateScratch: Effect.Effect<void>
     /** The scratch process table alone, for a stop that re-checks identities right before signalling. */
     readonly scratchTable: Effect.Effect<ScratchProcessRow[], ProbeFailed>
   }
@@ -233,6 +239,10 @@ export class ProcessProbe extends Context.Service<
       })
 
       const [cachedProbe, invalidate] = yield* Effect.cachedInvalidateWithTTL(probe(true), exit => (exit._tag === 'Success' ? SNAPSHOT_TTL : Duration.zero))
+      const [cachedScratch, invalidateScratch] = yield* Effect.cachedInvalidateWithTTL(
+        Effect.map(scratchHosts, result => result.summary),
+        exit => (exit._tag === 'Success' ? SNAPSHOT_TTL : Duration.zero),
+      )
 
       const snapshot = Effect.fn('worktree-memory snapshot')(function* (input: { readonly fresh: boolean }) {
         if (input.fresh) yield* invalidate
@@ -245,6 +255,8 @@ export class ProcessProbe extends Context.Service<
         processTable: psRows,
         pressure,
         scratchHosts,
+        scratchSummary: cachedScratch,
+        invalidateScratch,
         scratchTable: psRows,
       })
     }),
@@ -361,6 +373,7 @@ export class ProcessStopper extends Context.Service<
           refused: verdicts.filter(entry => entry.verdict === 'recycled' || entry.verdict === 'not-scratch' || entry.verdict === 'protected').length,
         }
         yield* Effect.annotateCurrentSpan({ 'worktree_memory.orphans.stopped': result.stopped, 'worktree_memory.orphans.refused': result.refused })
+        yield* probe.invalidateScratch
         if (signalled.length > 0) yield* FiberSet.run(escalations, escalateOrphans(signalled))
         return result
       })

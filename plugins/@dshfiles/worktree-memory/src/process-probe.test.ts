@@ -38,6 +38,22 @@ describe.runIf(supported)('ProcessProbe', () => {
       }),
     )
 
+    layer.effect('serves concurrent scratch readers and every read within the TTL from one probe', () =>
+      Effect.gen(function* () {
+        const probe = yield* ProcessProbe
+        yield* TestClock.setTime(50_000)
+        const [first, joined] = yield* Effect.all([probe.scratchSummary, probe.scratchSummary], { concurrency: 'unbounded' })
+        expect(joined).toBe(first)
+        yield* TestClock.adjust(10_000)
+        expect(yield* probe.scratchSummary).toBe(first)
+        yield* TestClock.adjust(6_000)
+        expect(yield* probe.scratchSummary).not.toBe(first)
+        const cached = yield* probe.scratchSummary
+        yield* probe.invalidateScratch
+        expect(yield* probe.scratchSummary).not.toBe(cached)
+      }),
+    )
+
     layer.effect('refuses a target the snapshot does not list', () =>
       Effect.gen(function* () {
         const stopper = yield* ProcessStopper

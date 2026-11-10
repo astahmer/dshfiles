@@ -44,7 +44,7 @@ export default DshxPlugin.make({
         }
       }),
       stop: input => ProcessStopper.use(stopper => stopper.stop(input.targets)),
-      scratchHosts: () => ProcessProbe.use(probe => Effect.map(probe.scratchHosts, result => result.summary)),
+      scratchHosts: () => ProcessProbe.use(probe => probe.scratchSummary),
       stopOrphans: () => ProcessStopper.use(stopper => stopper.stopOrphans()),
     }),
   ],
