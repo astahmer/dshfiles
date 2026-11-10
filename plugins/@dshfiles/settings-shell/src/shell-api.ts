@@ -22,8 +22,8 @@ const pluginEntrySchema = Schema.Struct({
   moduleName: Schema.String,
   enabled: Schema.Boolean,
   phase: Schema.NullOr(Schema.String),
-  /** Why the profile patch cannot change this entry; absent when it can. */
-  readOnlyReason: Schema.optionalKey(Schema.String),
+  /** Why the profile patch cannot change this entry; null when it can. */
+  readOnlyReason: Schema.NullOr(Schema.String),
 })
 export type PluginEntry = typeof pluginEntrySchema.Type
 
@@ -31,9 +31,9 @@ const pluginChangeSchema = Schema.Struct({
   entryId: Schema.String,
   changed: Schema.Boolean,
   enabled: Schema.NullOr(Schema.Boolean),
-  application: Schema.String,
-  restartReason: Schema.optionalKey(Schema.String),
-  error: Schema.optionalKey(Schema.String),
+  application: Schema.Literals(['applied', 'restart-required', 'overridden', 'failed', 'cancelled']),
+  restartReason: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.String),
   warnings: Schema.Array(Schema.String).check(Schema.isMaxLength(50)),
 })
 export type PluginChange = typeof pluginChangeSchema.Type
@@ -45,13 +45,13 @@ const SOURCE_LABELS = {
   unknown: 'source unknown',
 } as const
 
-const APPLICATION_LABELS: Readonly<Record<string, string>> = {
+const APPLICATION_LABELS = {
   applied: 'applied to the running DSH',
   'restart-required': 'saved; takes effect after the user restarts DSH',
   overridden: 'saved, but a higher-priority profile layer keeps the previous value; edit that layer in cordis.patch.yml',
   failed: 'not applied',
   cancelled: 'cancelled',
-}
+} satisfies Record<PluginChange['application'], string>
 
 const fieldRowSchema = Schema.Struct({
   path: Schema.Array(Schema.String).check(Schema.isMaxLength(16)),
@@ -59,10 +59,10 @@ const fieldRowSchema = Schema.Struct({
   source: Schema.Literals(['user', 'composition', 'default', 'unknown']),
   explicit: Schema.Boolean,
   equalsInherited: Schema.Boolean,
-  override: Schema.optionalKey(Schema.String),
-  inherited: Schema.optionalKey(Schema.String),
-  schemaDefault: Schema.optionalKey(Schema.String),
-  effective: Schema.optionalKey(Schema.String),
+  override: Schema.NullOr(Schema.String),
+  inherited: Schema.NullOr(Schema.String),
+  schemaDefault: Schema.NullOr(Schema.String),
+  effective: Schema.NullOr(Schema.String),
 })
 
 export const settingsShellApi = defineApi({
@@ -203,8 +203,8 @@ export const settingsShellApi = defineApi({
             [
               `${field.path.join('.')} = ${field.effective ?? 'unset'}`,
               field.explicit ? `override${field.equalsInherited ? ' (equals inherited)' : ''}` : SOURCE_LABELS[field.source],
-              field.inherited === undefined ? undefined : `inherits ${field.inherited}`,
-              field.schemaDefault === undefined || field.schemaDefault === field.inherited ? undefined : `schema default ${field.schemaDefault}`,
+              field.inherited === null ? undefined : `inherits ${field.inherited}`,
+              field.schemaDefault === null || field.schemaDefault === field.inherited ? undefined : `schema default ${field.schemaDefault}`,
             ]
               .filter(part => part !== undefined)
               .join(' · '),
@@ -237,7 +237,7 @@ export const settingsShellApi = defineApi({
                     `${entry.entryId} · ${entry.moduleName}`,
                     entry.enabled ? 'enabled' : 'disabled',
                     entry.phase ?? 'not running',
-                    entry.readOnlyReason === undefined ? undefined : `read-only (${entry.readOnlyReason})`,
+                    entry.readOnlyReason === null ? undefined : `read-only (${entry.readOnlyReason})`,
                   ]
                     .filter(part => part !== undefined)
                     .join(' · '),
@@ -256,9 +256,9 @@ export const settingsShellApi = defineApi({
         render: output =>
           [
             `${output.entryId}: ${output.changed ? (output.enabled === false ? 'disabled' : 'enabled') : 'already in that state'}`,
-            APPLICATION_LABELS[output.application] ?? output.application,
-            output.restartReason === undefined ? undefined : `restart reason: ${output.restartReason}`,
-            output.error,
+            APPLICATION_LABELS[output.application],
+            output.restartReason === null ? undefined : `restart reason: ${output.restartReason}`,
+            output.error ?? undefined,
             ...output.warnings,
           ]
             .filter(part => part !== undefined)

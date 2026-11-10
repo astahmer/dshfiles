@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-plugin-manager'
 import { HostContext } from '@dshfiles/dshx/effect'
-import { Context, Effect, Layer, Option, Schema } from 'effect'
+import { Context, Effect, Layer, Schema } from 'effect'
 import type { PluginChange, PluginEntry } from './shell-api.js'
 
 /**
@@ -45,7 +45,17 @@ const MAX_REASON = 300
 /** The plugin-manager surface these controls read; `PluginManager` satisfies it with its branded entry ids. */
 export interface PluginManagerSurface<Id extends string> {
   listPlugins(): Promise<readonly PluginInfoLike<Id>[]>
-  setPluginEnabled(id: Id, enabled: boolean): Promise<unknown>
+  setPluginEnabled(id: Id, enabled: boolean): Promise<PluginChangeResult>
+}
+
+/** What these controls read of the manager's change result; `ChangeResult` satisfies it. */
+export interface PluginChangeResult {
+  readonly changed: boolean
+  readonly application: PluginChange['application']
+  readonly restartReason?: string
+  readonly enabled?: boolean
+  readonly error?: { readonly code: string; readonly diagnostic?: string }
+  readonly warnings?: readonly string[]
 }
 
 export interface PluginInfoLike<Id extends string> {
@@ -55,15 +65,6 @@ export interface PluginInfoLike<Id extends string> {
   readonly fiberPhase: string | null
   readonly readOnlyReason?: string
 }
-
-const changeResultSchema = Schema.Struct({
-  changed: Schema.Boolean,
-  application: Schema.String,
-  restartReason: Schema.optionalKey(Schema.String),
-  enabled: Schema.optionalKey(Schema.Boolean),
-  error: Schema.optionalKey(Schema.Struct({ code: Schema.String, diagnostic: Schema.optionalKey(Schema.String) })),
-  warnings: Schema.optionalKey(Schema.Array(Schema.String)),
-})
 
 const reasonOf = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause)).slice(0, MAX_REASON)
 
@@ -94,7 +95,7 @@ export class PluginControls extends Context.Service<
             moduleName: row.moduleName,
             enabled: row.enabled,
             phase: row.fiberPhase,
-            ...(row.readOnlyReason === undefined ? {} : { readOnlyReason: row.readOnlyReason }),
+            readOnlyReason: row.readOnlyReason ?? null,
           })),
         ).pipe(Effect.withSpan('settings-shell plugin inventory read'))
         const setEnabled = Effect.fn('settings-shell plugin enablement write')(function* (input: { readonly entryId: string; readonly enabled: boolean }) {
@@ -102,23 +103,20 @@ export class PluginControls extends Context.Service<
           const rows = yield* entries
           const row = rows.find(candidate => candidate.entryId === input.entryId)
           if (row === undefined) return yield* Effect.fail(new PluginEntryUnknown({ entryId: input.entryId }))
-          const raw = yield* Effect.tryPromise({
+          const result = yield* Effect.tryPromise({
             try: () => found.setPluginEnabled(row.entryId, input.enabled),
             catch: cause => new PluginManagerFailed({ reason: reasonOf(cause), cause }),
           })
-          const result = Option.getOrUndefined(Schema.decodeUnknownOption(changeResultSchema)(raw))
-          if (result === undefined) return yield* Effect.fail(new PluginManagerFailed({ reason: 'The plugin manager answered in an unknown shape.' }))
-          return {
+          const change: PluginChange = {
             entryId: input.entryId,
             changed: result.changed,
             enabled: result.enabled ?? null,
             application: result.application,
-            ...(result.restartReason === undefined ? {} : { restartReason: result.restartReason }),
-            ...(result.error === undefined
-              ? {}
-              : { error: [result.error.code, result.error.diagnostic].filter(part => part !== undefined).join(': ').slice(0, MAX_REASON) }),
+            restartReason: result.restartReason ?? null,
+            error: result.error === undefined ? null : [result.error.code, result.error.diagnostic].filter(part => part !== undefined).join(': ').slice(0, MAX_REASON),
             warnings: (result.warnings ?? []).slice(0, 50),
           }
+          return change
         })
         return PluginControls.of({ list, setEnabled })
       })(),

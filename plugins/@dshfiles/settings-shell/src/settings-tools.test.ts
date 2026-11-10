@@ -214,7 +214,17 @@ describe('settings tools: inspect', () => {
         const inspection = yield* tools.inspect({ namespace: 'workbench' })
         expect(inspection).toMatchObject({ namespace: 'workbench', revision: 4, writable: true, applies: 'live', truncated: false })
         expect(inspection.fields).toEqual([
-          { path: ['maxTabs'], title: 'Max tabs', source: 'composition', explicit: false, equalsInherited: false, inherited: '20', schemaDefault: '12', effective: '20' },
+          {
+            path: ['maxTabs'],
+            title: 'Max tabs',
+            source: 'composition',
+            explicit: false,
+            equalsInherited: false,
+            override: null,
+            inherited: '20',
+            schemaDefault: '12',
+            effective: '20',
+          },
           {
             path: ['dense'],
             title: 'Dense',
@@ -226,7 +236,17 @@ describe('settings tools: inspect', () => {
             schemaDefault: 'false',
             effective: 'false',
           },
-          { path: ['label'], title: 'Label', source: 'unknown', explicit: false, equalsInherited: false, inherited: '"seeded"', effective: '"seeded"' },
+          {
+            path: ['label'],
+            title: 'Label',
+            source: 'unknown',
+            explicit: false,
+            equalsInherited: false,
+            override: null,
+            inherited: '"seeded"',
+            schemaDefault: null,
+            effective: '"seeded"',
+          },
         ])
         expect((yield* tools.inspect({ namespace: 'workbench', query: 'most' })).fields.map(field => field.path)).toEqual([['maxTabs']])
         expect((yield* Effect.flip(tools.inspect({ namespace: 'nope' })))._tag).toBe('SettingsNamespaceUnknown')

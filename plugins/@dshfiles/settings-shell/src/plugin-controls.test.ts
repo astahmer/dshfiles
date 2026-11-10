@@ -19,15 +19,23 @@ describe('plugin controls', () => {
           listPlugins: async () => entries,
           setPluginEnabled: async (id, enabled) => {
             calls.push([id, enabled])
-            return { changed: true, application: 'restart-required', restartReason: 'host-module', stage: 'enable', target: id, enabled }
+            return { changed: true, application: 'restart-required', restartReason: 'host-module', enabled }
           },
         })
         expect((yield* controls.list).map(entry => [entry.entryId, entry.readOnlyReason])).toEqual([
-          ['dshfiles-backlog', undefined],
+          ['dshfiles-backlog', null],
           ['ui-cordis', 'management-required'],
         ])
         const disabled = yield* controls.setEnabled({ entryId: 'dshfiles-backlog', enabled: false })
-        expect(disabled).toEqual({ entryId: 'dshfiles-backlog', changed: true, enabled: false, application: 'restart-required', restartReason: 'host-module', warnings: [] })
+        expect(disabled).toEqual({
+          entryId: 'dshfiles-backlog',
+          changed: true,
+          enabled: false,
+          application: 'restart-required',
+          restartReason: 'host-module',
+          error: null,
+          warnings: [],
+        })
         const reenabled = yield* controls.setEnabled({ entryId: 'dshfiles-backlog', enabled: true })
         expect(reenabled.enabled).toBe(true)
         expect(calls).toEqual([

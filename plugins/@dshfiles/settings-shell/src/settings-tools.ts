@@ -87,10 +87,10 @@ export interface SettingFieldRow {
   readonly source: SettingSource
   readonly explicit: boolean
   readonly equalsInherited: boolean
-  readonly override?: string
-  readonly inherited?: string
-  readonly schemaDefault?: string
-  readonly effective?: string
+  readonly override: string | null
+  readonly inherited: string | null
+  readonly schemaDefault: string | null
+  readonly effective: string | null
 }
 
 export interface SettingsInspection {
@@ -106,13 +106,13 @@ const secretPathsSchema = Schema.Array(Schema.Struct({ path: Schema.Array(Schema
 const asJson = (value: unknown): JsonValue | undefined => Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(value))
 
 /** JSON text of one layer's value, cut to a bound a model reads comfortably. */
-const jsonText = (value: JsonValue | undefined): string | undefined => {
-  if (value === undefined) return undefined
+const jsonText = (value: JsonValue | undefined): string | null => {
+  if (value === undefined) return null
   const text = JSON.stringify(value)
   return jsonBytes(text) > MAX_FIELD_VALUE_BYTES ? `${text.slice(0, MAX_FIELD_VALUE_BYTES)}…` : text
 }
 
-const fieldRows = (descriptor: SettingsRow, query: string | undefined): { readonly fields: SettingFieldRow[]; readonly truncated: boolean } => {
+const fieldRows = (descriptor: SettingsRow, query: string | undefined) => {
   const secrets = Option.getOrElse(Schema.decodeUnknownOption(secretPathsSchema)(descriptor.secrets ?? []), () => [])
   const fields = SettingsSchemaModel.settingFields({
     schema: asJson(descriptor.schema) ?? null,
@@ -126,20 +126,16 @@ const fieldRows = (descriptor: SettingsRow, query: string | undefined): { readon
   const matching = fields.filter(field => needle === '' || `${field.path.join('.')} ${field.title} ${field.description}`.toLowerCase().includes(needle))
   const rows = matching.slice(0, MAX_INSPECTED_FIELDS).map(field => {
     const provenance = SettingProvenanceModel.of({ field, value, base, user })
-    const override = provenance.explicit ? jsonText(SettingsSchemaModel.valueAt(user, field.path)) : undefined
-    const inherited = jsonText(provenance.inherited)
-    const schemaDefault = jsonText(provenance.schemaDefault)
-    const effective = jsonText(provenance.effective)
     const row: SettingFieldRow = {
       path: [...field.path],
       title: field.title,
       source: provenance.source,
       explicit: provenance.explicit,
       equalsInherited: provenance.equalsInherited,
-      ...(override === undefined ? {} : { override }),
-      ...(inherited === undefined ? {} : { inherited }),
-      ...(schemaDefault === undefined ? {} : { schemaDefault }),
-      ...(effective === undefined ? {} : { effective }),
+      override: provenance.explicit ? jsonText(SettingsSchemaModel.valueAt(user, field.path)) : null,
+      inherited: jsonText(provenance.inherited),
+      schemaDefault: jsonText(provenance.schemaDefault),
+      effective: jsonText(provenance.effective),
     }
     return row
   })
