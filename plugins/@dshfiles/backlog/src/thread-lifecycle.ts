@@ -123,10 +123,7 @@ const idleThreadNudges = (input: {
  * owns claims) and no linked revision, since a revision means the work reached history and a later signal finishes it.
  */
 const returnsWhenSettled = (input: { readonly item: Pick<BacklogItem, 'status' | 'humanFields' | 'links'>; readonly claimed: boolean }): boolean =>
-  input.item.status === 'doing' &&
-  !input.item.humanFields.includes('status') &&
-  !input.claimed &&
-  !input.item.links.some(link => link.type === 'revision')
+  input.item.status === 'doing' && !input.item.humanFields.includes('status') && !input.claimed && !input.item.links.some(link => link.type === 'revision')
 
 /** The items whose every linked thread settled, with the one named in their event; one still open keeps the item. */
 const settledReturns = (input: {

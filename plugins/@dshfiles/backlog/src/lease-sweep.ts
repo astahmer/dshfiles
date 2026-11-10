@@ -74,7 +74,9 @@ const sweepOnce = Effect.fn('backlog lease sweep')(function* (input: {
   if (leases.length === 0 && work.length === 0) return 0
   const now = yield* Clock.currentTimeMillis
   const live = leases.filter(entry => entry.lease.expiresAt > now)
-  const sessions = Option.isSome(input.lookup) ? [...new Set([...live.map(entry => sessionOf(entry.lease.holder)), ...work.flatMap(entry => entry.threadIds)])] : []
+  const sessions = Option.isSome(input.lookup)
+    ? [...new Set([...live.map(entry => sessionOf(entry.lease.holder)), ...work.flatMap(entry => entry.threadIds)])]
+    : []
   const threads = new Map(Option.isSome(input.lookup) ? yield* Effect.forEach(sessions, input.lookup.value, { concurrency: THREAD_LOOKUP_CONCURRENCY }) : [])
   const ended = endings({ leases, threads, now })
   const settled = new Set([...threads].flatMap(([sessionId, thread]) => (thread === 'settled' ? [sessionId] : [])))
@@ -86,7 +88,11 @@ const sweepOnce = Effect.fn('backlog lease sweep')(function* (input: {
   })
   for (const end of ended) yield* input.store.release({ id: end.id, actor: { kind: 'system' }, reason: end.reason })
   for (const entry of returned)
-    yield* input.store.returnFromSettledThread({ id: entry.id, threadId: entry.threadId, reason: `its thread ${entry.threadId} settled before a revision was linked` })
+    yield* input.store.returnFromSettledThread({
+      id: entry.id,
+      threadId: entry.threadId,
+      reason: `its thread ${entry.threadId} settled before a revision was linked`,
+    })
   return ended.length + returned.length
 })
 
