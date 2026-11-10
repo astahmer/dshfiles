@@ -57,18 +57,23 @@ test('normalizes common Git origin formats to a lowercase host and repository pa
   expect(normalizeProjectOrigin('not a repository URL')).toBeNull()
 })
 
-test('reads and caches a local Git origin using the requested project path', async () => {
+test('caches a local Git origin until its .git/config changes', async () => {
   const path = await mkdtemp(join(tmpdir(), 'multi-host-project-origin-'))
   try {
     execFileSync('git', ['init', '--quiet'], { cwd: path })
     execFileSync('git', ['-C', path, 'config', 'remote.origin.url', 'git@GitHub.com:Owner/Repo.git'])
     const services = testServices()
-    const first = await Effect.runPromise(readProjectOrigins({ localPaths: [path], remote: [] }).pipe(Effect.provide(services)))
+    const read = () => Effect.runPromise(readProjectOrigins({ localPaths: [path], remote: [] }).pipe(Effect.provide(services)))
+    using recorder = recordSpans()
+    const first = await read()
+    const cached = await read()
     execFileSync('git', ['-C', path, 'config', 'remote.origin.url', 'https://github.com/owner/updated.git'])
-    const second = await Effect.runPromise(readProjectOrigins({ localPaths: [path], remote: [] }).pipe(Effect.provide(services)))
+    const updated = await read()
 
     expect(first.origins).toEqual([{ kind: 'local', path, origin: 'github.com/Owner/Repo' }])
-    expect(second.origins).toEqual(first.origins)
+    expect(cached.origins).toEqual(first.origins)
+    expect(updated.origins).toEqual([{ kind: 'local', path, origin: 'github.com/owner/updated' }])
+    expect(recorder.named('multi-host project origins').map(span => span.attributes['dshx.multi-host.origin_local_reads'])).toEqual([1, 0, 1])
   } finally {
     await rm(path, { recursive: true, force: true })
   }
@@ -124,6 +129,52 @@ test('reads all runtimes on one SSH host in one command and caches by runtime pa
   expect(second.origins).toEqual(first.origins)
   expect(commands).toHaveLength(1)
   expect(commands[0]).toContain("'/work/Atlas'\\''s project'")
+})
+
+test('answers pending instead of waiting for an unreachable SSH host, and joins its one read', async () => {
+  const host: HostRecord = {
+    schemaVersion: 2,
+    id: 'host-slow',
+    name: 'Asleep',
+    connector: { kind: 'ssh', sshTarget: 'asleep' },
+    hidden: false,
+    createdAt: '2026-11-04T00:00:00.000Z',
+  }
+  const runtime: RuntimeRecord = {
+    schemaVersion: 2,
+    id: 'runtime-slow',
+    hostId: host.id,
+    name: 'asleep',
+    locator: { kind: 'ssh', remoteHome: '/home/remote' },
+    identity: null,
+    createdAt: '2026-11-04T00:00:00.000Z',
+  }
+  let runs = 0
+  const services = testServices({
+    host,
+    runtimes: [runtime],
+    sshRun: () =>
+      Effect.sync(() => {
+        runs += 1
+      }).pipe(
+        Effect.andThen(Effect.sleep('2500 millis')),
+        Effect.as({ code: 255, stdout: '', stderr: '', timedOut: false, outputExceeded: false, durationMs: 2500 }),
+      ),
+  })
+  const input = { localPaths: [], remote: [{ runtimeId: runtime.id, paths: ['/work/slow'] }] }
+  const read = () => Effect.runPromise(readProjectOrigins(input).pipe(Effect.provide(services)))
+
+  const started = performance.now()
+  const [first, joined] = await Promise.all([read(), read()])
+  const waitedMs = performance.now() - started
+  await new Promise(resolve => setTimeout(resolve, 1_200))
+  const settled = await read()
+
+  expect(waitedMs).toBeLessThan(2_000)
+  expect(first).toEqual({ origins: [{ kind: 'remote', runtimeId: runtime.id, path: '/work/slow', origin: null }], pending: true })
+  expect(joined).toEqual(first)
+  expect(settled).toEqual({ origins: first.origins })
+  expect(runs).toBe(1)
 })
 
 test('records the project origins span without exposing input paths', async () => {

@@ -235,6 +235,7 @@ export const useRemoteSidebarThreads = (enabled: boolean, localProjects: readonl
     queryKey: ['thread-sidebar', 'remote-project-origins', originInput],
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.projectOrigins(originInput, { signal: hostSignal }) }),
     staleTime: 5 * 60_000,
+    refetchInterval: query => (query.state.data?.pending === true ? 3_000 : false),
     retry: false,
     enabled: enabled && originInput.localPaths.length > 0 && originInput.remote.length > 0,
   })

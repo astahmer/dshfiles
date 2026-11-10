@@ -420,6 +420,7 @@ const projectOriginsOutputSchema = Schema.Struct({
       origin: Schema.NullOr(Schema.String.check(Schema.isMaxLength(4096))),
     }),
   ).check(Schema.isMaxLength(13_000)),
+  pending: Schema.optional(Schema.Boolean),
 })
 const localProjectFilePathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096)).check(
   Schema.makeFilter(path =>
@@ -816,7 +817,8 @@ const effectMultiHostApi = defineApi({
     projectOrigins: method({
       input: projectOriginsInputSchema,
       output: projectOriginsOutputSchema,
-      description: 'Read the Git origin URL for local project paths and paths on registered remote runtimes, in bounded batches. Read-only.',
+      description:
+        'Read the Git origin URL for local project paths and paths on registered remote runtimes, in bounded batches. A remote host slower than 1.5 s answers null with pending: true while its read finishes into the cache; ask again. Read-only.',
       tool: { name: 'multi_host_project_origins', readOnly: true, render: compactJson },
     }),
     /** Connect if needed and round-trip once; the chip menu shows the latency as the host's status. */
