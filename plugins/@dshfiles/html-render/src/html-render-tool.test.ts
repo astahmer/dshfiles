@@ -1,8 +1,9 @@
+import type { JsonValue } from '@dshfiles/dshx/json'
 import { describe, expect, it } from 'vitest'
 import { HtmlPageLimits, HtmlPageModel } from './html-page.js'
 import { createHtmlRenderHost, textOf } from './test-host.js'
 
-const runTool = async (args: unknown) => {
+const runTool = async (args: JsonValue) => {
   const host = await createHtmlRenderHost()
   try {
     return await host.run('html_render', args)

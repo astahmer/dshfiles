@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { JsonValue } from '@dshfiles/dshx/json'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
@@ -54,7 +55,7 @@ export const createHtmlRenderHost = async (options: { readonly renderer?: Screen
   }
   const handle = await host.ctx.agents.create({ sessionId: SessionId(randomUUID()), meta: { cwd: workspace } })
   cleanups.push(() => handle.dispose())
-  const run = (name: string, args: unknown, callId: string = randomUUID()) =>
+  const run = (name: string, args: JsonValue, callId: string = randomUUID()) =>
     host.tools.execute({ callId: ToolCallId(callId), name, arguments: args, signal: AbortSignal.timeout(60_000), agent: handle.agent })
   return {
     ctx: host.ctx,

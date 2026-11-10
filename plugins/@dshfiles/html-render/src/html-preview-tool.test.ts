@@ -1,5 +1,6 @@
 import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { JsonValue } from '@dshfiles/dshx/json'
 import { afterEach, describe, expect, it } from 'vitest'
 import { HtmlPageLimits, HtmlPageModel } from './html-page.js'
 import { createHtmlRenderHost, textOf } from './test-host.js'
@@ -16,7 +17,7 @@ const fixture = async () => {
   const host = await createHtmlRenderHost()
   cleanups.push(host.dispose)
   await mkdir(join(host.workspace, 'site', 'assets'), { recursive: true })
-  return { workspace: host.workspace, outside: host.outside, preview: (args: unknown) => host.run('html_preview', args) }
+  return { workspace: host.workspace, outside: host.outside, preview: (args: JsonValue) => host.run('html_preview', args) }
 }
 
 describe('html_preview tool', () => {
