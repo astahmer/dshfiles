@@ -27,6 +27,16 @@ This package is not included in the web profile by default. Add `@dshfiles/tool-
 
 **`progressive`**. A search adds its matches to the agent's tool list for the rest of the Session, as described below. On routes whose adapter declares a mid-conversation tool update mode (`toolUpdate`: Anthropic Messages models with `supportsMidConvoToolChanges`, Codex models with `supportsToolSearch`) DSH appends the additions as `tool-addition` developer messages and declares them deferred, so the cached prefix survives; on every other route, Claude Code CLI included, each search rewrites the tool list and loses the cache.
 
+Real-model evaluation of both modes against no tool-search (20 tasks, the live 468-tool catalog, the Codex route), ranking recall and the go/no-go: [docs/tool-diet.md](../../../docs/tool-diet.md#tool-search-cache-safe-mode-on-a-real-model-2026-11-10). Rerun it with a `{ tools, instructions }` capture of a live request:
+
+```sh
+node scripts/tool-schema-cost.ts ~/.dsh/sessions/<project>/<session-id>/session.v4.jsonl.zstd --capture /path/to/capture.json
+DSH_TOOL_SEARCH_EVAL=1 DSH_TOOL_SEARCH_EVAL_CATALOG=/path/to/capture.json DSH_TOOL_SEARCH_BENCHMARK_EFFORT=medium \
+  DSH_TOOL_SEARCH_EVAL_OUTPUT=/tmp/tool-search-eval.json pnpm --dir plugins/@dshfiles/tool-search exec vitest run src/cache-eval.test.ts
+```
+
+`DSH_TOOL_SEARCH_EVAL_TASKS` and `DSH_TOOL_SEARCH_EVAL_MODES` (comma-separated) narrow the run; `DSH_TOOL_SEARCH_BENCHMARK_ACCOUNT` and `_MODEL` pick the ai-accounts Codex route.
+
 ## Behavior and safety
 
 Every live agent gets a scope-local `tool_search` tool. Initial visibility is limited to `alwaysVisible`; other eligible global tools can be found by exact name, name fragments, or BM25-ranked name/description matches. A selection updates only this plugin's per-agent `tools.restrict({ deny })` contribution, which names the deferred global tools. Tools an agent gets from its own scope or an agent preset's scope (`bash`, `read`, `write`, … in a stock profile) are not global, are never deferred and stay visible: a restriction filters everything an agent inherits, so an allow list of global names would hide them. DSH's tool registry still intersects other restrictions and policies; selected-but-denied tools are reported as `unavailable`. Scoped tools remain governed by DSH's scoped registry rules.

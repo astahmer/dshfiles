@@ -158,25 +158,109 @@ model: 9/12 tasks against 12/12 direct.
    in a parent scope of each agent, and `tools.restrict()` filters everything an agent inherits, so the plugin's
    `allow` list of global names hid them (`unknown tool "bash"`). The plugin now denies only the deferred global
    names; `agent-loop.integration.test.ts` runs a preset-scoped `bash` through the real tool registry.
-2. **Prompt-cache churn.** The tool list changes after every search, so the cached prefix the provider keeps for an
-   unchanged header is lost each time; the Codex benchmark recorded almost no cached input in progressive mode
-   against 72 % cached direct.
-3. **Paraphrase misses**, above: BM25 over names and descriptions only.
-4. **Code Mode** calls nested through `run_code` are rejected by design.
+2. **Prompt-cache churn, depending on the route.** In `progressive` mode the tool list grows after every search.
+   Routes whose adapter declares a `toolUpdate` mode keep the cache anyway: the agent loop appends a `tool-addition`
+   developer message and `projectToolUpdates` declares the addition deferred (Codex `addition-only`, measured below at
+   98 % of later-request input cached; pi-ai Anthropic Messages models `in-history`). Every other route rewrites the
+   tool list, and the Claude Code CLI adapter (the Claude route in `web`) respawns its process, because the tool list
+   is part of its process signature. The earlier "almost no cached input" benchmark sent prompts of 476 to 3,061
+   tokens, under Codex's 1,024-token cache minimum. `cache-safe` mode, below, removes the dependency on the route.
+3. **Paraphrase misses**, above. Fixed by family aliases and synonyms, below: 37 of 40 queries in the top 5.
+4. **The model does not search.** Asked about the ChatGPT allowance or a DSH setting, the model sometimes answered
+   that it cannot see them instead of calling `tool_search`. Fixed in `cache-safe` mode by naming the deferred
+   families in the `tool_search` description.
+5. **Code Mode** calls nested through `run_code` are rejected by design.
 
-### Recommendation
+## tool-search cache-safe mode on a real model, 2026-11-10
 
-Usable now; adopting it in `web` is a restart and the user's call. With the defaults an agent keeps every core tool
-and starts at 8.2k tool tokens instead of 68.9k (−88 %), at one extra request per tool family a task needs and a
-prompt-cache miss after each discovery. Try it in `web` as a reversible trial (remove the row to undo) rather than a
-default: the cache churn and paraphrase misses only show their real cost on long multi-turn Sessions with the Claude
-route, which neither run above covers.
+`cache-safe` (now the plugin default) declares one tool list for the whole Session: the agent-plane tools, the
+core globals, `tool_search` and a `tool_call { name, args }` proxy, 36 tools. `tool_search` returns each match's
+description and parameter schema as text in its result, so discovery appends to the conversation instead of
+changing the cached prefix. `tool_call` decodes `args` on the Host against the target's JSON Schema (Effect
+`SchemaRepresentation.fromJsonSchemaDocument`), then runs the target through `ToolRuntime.execute` as a nested call:
+pre-execute policies, guards, approval and post-execute policies apply, the card uses the target's presentation, and
+a destructive opt-in such as `confirm: true` is still required by the target's schema. The deferred tools stay in
+the registry (only the request assembly omits them, through an agent-scoped `system-prompt/assemble` listener), so
+a call by a deferred tool's real name runs too. Tests: `src/cache-safe.integration.test.ts`.
+
+### Ranking
+
+Plural folding, query stopwords, a synonym map (`remind` → schedule, `land` → rebase main, `allowance` →
+quota, …) and per-family alias words appended to every member (`backlog_*`: task, todo, item, tracker; `schedule_*`:
+reminder, later, timer; …), with the name-token bonus lowered from 50 to 3. Top-5 recall, `ToolSearchModel.rank`
+over the 468 live schemas (`src/ranking-recall.test.ts`, `DSH_TOOL_SEARCH_CATALOG=<captured header>`):
+
+| Query set                                  | Before | After |
+| ------------------------------------------ | -----: | ----: |
+| The 20 queries above                       |  14/20 | 20/20 |
+| 20 new intent-phrased queries              |   6/20 | 17/20 |
+| Total                                      |  50 %  | 92.5 % |
+
+The new queries were written before the alias table, but the table was then tuned on all 40, so 92.5 % is an
+optimistic figure. The three remaining misses rank 7 to 11: "mark that item as done" (`backlog_update`), "which
+remote machines can run threads" (`multi_host_list`), "remember that I prefer pnpm" (`memory_note`). On the owned
+bundles' fixture catalog (437 tools, the native ones absent) the test pins at least 90 %: 33 of 36.
+
+### Evaluation
+
+`src/cache-eval.test.ts` (opt-in, `DSH_TOOL_SEARCH_EVAL=1`) runs 20 tasks phrased by intent across backlog, jj,
+preview, schedule, usage, multi-host (read-only), settings, memory, traces, threads, AI accounts, background jobs,
+secrets, pull requests, whiteboards and `bash`/`read`/`edit`. It registers the 468 tool schemas and the 74.8k
+characters of fixed instructions one live `web` request carried (captured from its Session log), with the agent-plane
+tools mounted in an agent preset scope as in `web`, on the real `codex-alex2` route (`gpt-6-luna`, medium effort,
+existing ai-accounts login, the provider-benchmark adapter). Every tool answers from in-memory fixtures; success
+means an accepted tool ran with acceptable arguments, the fixture side effect happened (the edited file, the created
+reminder, the renamed thread) and the answer carries the fixture fact. Tasks alternate the configuration order; each
+task is a fresh Session, as a new thread is.
+
+| Configuration                     | Success | Requests | Input tokens | Cached input | Uncached input | Billed-equivalent | Wall time |
+| --------------------------------- | ------: | -------: | -----------: | -----------: | -------------: | ----------------: | --------: |
+| No tool-search (468 tools)        |   17/20 |       47 |    2,969,123 | 2,079,744 (70 %) |      889,379 |         1,099,069 |     159 s |
+| Progressive tool-search (35–40)   |   18/20 |       59 |    1,362,406 | 1,072,512 (79 %) |      289,894 |           399,924 |     202 s |
+| Cache-safe tool-search (36)       |   18/20 |       64 |    1,486,656 | 1,123,328 (76 %) |      363,328 |           478,634 |     209 s |
+| Cache-safe with family hints (36) |   19/20 |       67 |    1,559,237 | 1,193,600 (77 %) |      365,637 |           487,915 |     208 s |
+
+The first three rows are one interleaved run (170 provider requests); the last is a cache-safe-only rerun after the
+family hints landed. Input tokens are provider-reported prompt tokens (uncached plus cached); billed-equivalent is
+uncached input + 10 % of cached input + output, the input-token cost at a 90 % cache discount. The first request of
+each task is mostly uncached in every configuration (25 to 40 %, a new Session); from the second request on, cached
+input is 99.7 % without tool-search, 98.1 % progressive, 97.9 % cache-safe and 93.8 % in the rerun.
+
+Against no tool-search, cache-safe with family hints sends 47 % fewer input tokens and 56 % fewer billed-equivalent
+tokens, at 43 % more requests and 31 % more wall time: one `tool_search` round trip per tool family a task needs.
+
+Failures, by cause:
+
+| Configuration                | Fixture gap (an exploratory call the fixtures do not answer)                                            | Tool-search                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| No tool-search               | `backlog-open` (`backlog_projects` empty), `thread-archive` (`thread_list` empty), `edit-port` (8-request cap) | —                                             |
+| Progressive                  | —                                                                                                       | `settings-read`, `subscription-left`: never searched |
+| Cache-safe                   | `whiteboards` (`project_list` empty)                                                                     | `subscription-left`: never searched           |
+| Cache-safe with family hints | `backlog-open` (`backlog_projects` empty)                                                                | —                                             |
+
+### Decision
+
+**Go for `cache-safe`, no-go for `progressive` as a default.** The user's three conditions:
+
+1. **Keeps the cache.** Cache-safe declares the same 36 tools on every request of a Session on every route; on
+   Codex 94 to 98 % of input after a Session's first request came from cache, as without tool-search. Progressive
+   kept it on Codex too, but only because that route declares `addition-only` tool updates; on the Claude Code CLI
+   route every search respawns the CLI.
+2. **Significant token reduction.** 47 % fewer input tokens and 56 % fewer billed-equivalent tokens than the full
+   468-tool list.
+3. **Task success not lower.** 19/20 with family hints against 17/20 without tool-search, every failure on both sides
+   a fixture gap; before the hints, tool-search's own failure mode (the model not searching) cost one task.
+
+Adopting it in `web` is the user's call and a Host restart: add `@dshfiles/tool-search` to the seed with no config
+(cache-safe is the default); removing the row undoes it. Not measured: the Claude routes (the `claude_work` account
+was at 9 % of its session quota), long multi-turn Sessions, more than one repetition per task, and real tool bodies
+(fixtures stand in for them; the run is in-process, not in a scratch DSH).
 
 ## Next levers, by size
 
-1. **Fewer schemas per request.** tool-search, measured above: 88 % fewer tool tokens on the first request with the
-   default core set. Not in `web`: adding it changes every agent's first step and needs a restart, so it is the
-   user's call.
+1. **Fewer schemas per request.** tool-search in `cache-safe` mode, measured above: 36 tools instead of 468, 56 %
+   fewer billed-equivalent tokens on the eval tasks with the cache kept. Not in `web`: adding it changes every
+   agent's first step and needs a restart, so it is the user's call.
 2. **Gate rarely used families behind a setting.** No owned plugin has such a pattern, and dshx's `ApiToolExposure`
    (`tooling/dshx/packages/dshx/src/api/types.ts`) has no condition, so this needs a dshx feature (a settings
    predicate on `tool:`) first. The
