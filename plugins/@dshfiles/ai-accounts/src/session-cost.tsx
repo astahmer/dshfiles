@@ -4,13 +4,13 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@dshfiles/plugin-
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CoinsIcon } from '@dshfiles/plugin-ui/icons'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useRef } from 'react'
+import type { SessionUsageCostOwnerProps } from '@dshfiles/chat/session-usage-cost'
+import { useMemo } from 'react'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
 import { CostEstimateModel, SESSION_COST_PROJECTION_KEY, sessionCostViewSchema } from './cost-estimate.js'
 import { AiAccountsSchema } from './effect-schema.js'
 import { fetchedAgo } from './pricing-status.js'
-import { SessionCostDisplay, sessionCostDockScope } from './session-cost-display.js'
 import { usePreferences } from './use-preferences.js'
 
 /** What the composer's projection hook hands over before `sessionCostViewSchema` decodes it. */
@@ -31,24 +31,46 @@ const MATCH_LABEL = {
 }
 
 /**
- * The estimated session cost beside the composer's own token stats.
+ * The estimated session cost as its own dock entry beside the composer's token stats (`separate` placement).
  *
  * The composer supplies `useProjection` to every dock entry; an older composer
  * that does not, or a Host without the cost projection or the quote method,
  * renders nothing rather than a guess.
  */
 export const SessionCostDockEntry = (props: { readonly useProjection?: unknown }): JSX.Element | null => {
-  const { costEstimates } = usePreferences()
-  if (!costEstimates || !isProjectionHook(props.useProjection)) return null
+  const { costEstimates, costPlacement } = usePreferences()
+  if (!costEstimates || costPlacement !== 'separate' || !isProjectionHook(props.useProjection)) return null
   return <SessionCostReadout useProjection={props.useProjection} />
 }
 
-const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): JSX.Element | null => {
+/**
+ * The estimate inside Chat's usage pill (`inside` placement): after its label, and beside each bucket of its dialog.
+ * Chat renders one contribution per placement; each reads the same quote cache.
+ */
+export const SessionUsageCost = (props: SessionUsageCostOwnerProps): JSX.Element | null => {
+  const { costEstimates, costPlacement } = usePreferences()
+  if (!costEstimates || costPlacement !== 'inside') return null
+  return <SessionUsageCostAmount placement={props.placement} useProjection={props.useProjection} />
+}
+
+const SessionUsageCostAmount = (props: SessionUsageCostOwnerProps): JSX.Element | null => {
+  const { session } = useSessionCostEstimate(props.useProjection)
+  if (session === null || !session.priced) return null
+  if (props.placement === 'pill') return <span data-ai-accounts-session-cost="">{` · ${CostEstimateModel.formatEstimate(session)}`}</span>
+  const bucket = { input: session.cost.input, cacheRead: session.cost.cacheRead, cacheWrite: session.cost.cacheWrite, output: session.cost.output }[
+    props.placement
+  ]
+  return (
+    <span className="dshx:ml-1.5 dshx:inline-block dshx:min-w-14 dshx:text-right dshx:font-medium" data-ai-accounts-session-cost="">
+      {CostEstimateModel.formatUsd(bucket)}
+    </span>
+  )
+}
+
+const useSessionCostEstimate = (useProjection: ProjectionHook) => {
   const accounts = useApi(aiAccountsApi)
-  const { costPlacement, pricingOverrides } = usePreferences()
-  const markerRef = useRef<HTMLSpanElement | null>(null)
-  const displayRef = useRef<SessionCostDisplay | null>(null)
-  const raw = props.useProjection(SESSION_COST_PROJECTION_KEY)
+  const { pricingOverrides } = usePreferences()
+  const raw = useProjection(SESSION_COST_PROJECTION_KEY)
   const view = useMemo(() => {
     const parsed = AiAccountsSchema.decodeResult(sessionCostViewSchema, raw)
     return parsed._tag === 'Success' ? parsed.success : null
@@ -65,50 +87,16 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
     () => (view === null || quotes === undefined || quotes === null ? null : CostEstimateModel.estimateCost({ groups: view.groups, quotes: quoteMap })),
     [quoteMap, quotes, view],
   )
+  return { view, quotes, quoteMap, quotesQuery, session }
+}
+
+const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): JSX.Element | null => {
+  const { view, quotes, quoteMap, quotesQuery, session } = useSessionCostEstimate(props.useProjection)
   const turn = useMemo(
     () => (session === null || view === null || view.turn === null ? null : CostEstimateModel.estimateCost({ groups: view.turn.groups, quotes: quoteMap })),
     [quoteMap, session, view],
   )
-  const inlineValue = useMemo(
-    () =>
-      session === null || !session.priced
-        ? undefined
-        : {
-            amount: CostEstimateModel.formatEstimate(session),
-            description: `Estimated thread cost ${CostEstimateModel.formatEstimate(session)}. Estimate from published API prices, not an invoice.`,
-            rows: [
-              ...(session.tokens.uncachedInputTokens + session.tokens.cacheReadTokens + session.tokens.cacheWriteTokens > 0
-                ? [{ tokens: undefined, amount: undefined }]
-                : []),
-              { tokens: session.tokens.uncachedInputTokens, amount: CostEstimateModel.formatUsd(session.cost.input) },
-              { tokens: session.tokens.cacheReadTokens, amount: CostEstimateModel.formatUsd(session.cost.cacheRead) },
-              ...(session.tokens.cacheWriteTokens > 0
-                ? [{ tokens: session.tokens.cacheWriteTokens, amount: CostEstimateModel.formatUsd(session.cost.cacheWrite) }]
-                : []),
-              { tokens: session.tokens.outputTokens, amount: CostEstimateModel.formatUsd(session.cost.output) },
-            ],
-          },
-    [session],
-  )
-  const hasInlineValue = inlineValue !== undefined
-
-  useEffect(() => {
-    if (costPlacement !== 'inside' || !hasInlineValue || typeof document === 'undefined') return
-    const display = new SessionCostDisplay(document, () => sessionCostDockScope(markerRef.current))
-    displayRef.current = display
-    display.start()
-    return () => {
-      displayRef.current = null
-      display.dispose()
-    }
-  }, [costPlacement, hasInlineValue])
-
-  useEffect(() => {
-    displayRef.current?.sync(inlineValue)
-  }, [inlineValue])
-
   if (session === null || !session.priced || quotes === undefined || quotes === null) return null
-  if (costPlacement === 'inside') return <span ref={markerRef} style={{ display: 'none' }} />
   const fetchedAt = quotes.fetchedAt
 
   return (
