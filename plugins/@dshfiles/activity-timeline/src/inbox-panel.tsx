@@ -269,7 +269,6 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.list({ view, limit: 100 }, { signal: hostSignal }) }),
     // The changed event keeps the list current; polling only covers a disconnected event stream.
     refetchInterval: eventStatus === 'live' ? 60_000 : 10_000,
-    retry: 1,
   })
   const settle = (outcome: { readonly ok: boolean; readonly message: string } | null): void => {
     if (outcome !== null) setNotice({ tone: outcome.ok ? 'ok' : 'error', text: outcome.message })

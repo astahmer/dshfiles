@@ -168,7 +168,6 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
     queryKey: statusKey,
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.status({}, { signal: hostSignal }) }),
     refetchInterval: 15_000,
-    retry: 1,
   })
   const refresh = useMutation({
     mutationFn: () => runHostRequest({ request: hostSignal => api.refresh({}, { signal: hostSignal }) }),

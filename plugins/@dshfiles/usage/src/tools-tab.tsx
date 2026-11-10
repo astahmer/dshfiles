@@ -84,7 +84,6 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
       }),
     placeholderData: keepPreviousData,
     refetchInterval: 60_000,
-    retry: 1,
   })
 
   const report = query.data

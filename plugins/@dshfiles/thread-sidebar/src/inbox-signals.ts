@@ -62,14 +62,12 @@ export const useInboxThreadSignals = (options: { readonly enabled: boolean }): I
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.list({ view: 'needs-you', limit: 200 }, { signal: hostSignal }) }),
     enabled: options.enabled,
     refetchInterval,
-    retry: 1,
   })
   const other = useQuery({
     queryKey: inboxKeys.view('other'),
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.list({ view: 'other', limit: 200 }, { signal: hostSignal }) }),
     enabled: options.enabled,
     refetchInterval,
-    retry: 1,
   })
   const signals = useMemo(() => {
     const items = [...(needsYou.data?.items ?? []), ...(other.data?.items ?? [])]

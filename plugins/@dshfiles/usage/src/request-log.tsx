@@ -86,7 +86,6 @@ export const RequestLog = (props: {
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.requests(query, { signal: hostSignal }) }),
     placeholderData: keepPreviousData,
     refetchInterval: 30_000,
-    retry: 1,
   })
   const now = page.dataUpdatedAt === 0 ? mountedAt : page.dataUpdatedAt
   const onSort = (column: SortColumn): void =>

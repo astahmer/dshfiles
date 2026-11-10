@@ -51,7 +51,6 @@ export const activityFeedQueries = {
         }),
       getNextPageParam: page => page.nextCursor,
       refetchInterval: 5_000,
-      retry: 1,
     }),
   /** The tail the panel auto-scrolls for, and the older history it keeps above it. */
   items: (pages: readonly ActivityPage[]) => ({

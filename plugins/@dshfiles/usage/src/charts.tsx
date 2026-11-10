@@ -73,7 +73,6 @@ export const UsageCharts = (props: {
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.charts(query, { signal: hostSignal }) }),
     placeholderData: keepPreviousData,
     refetchInterval: 60_000,
-    retry: 1,
   })
   const monthOfNow = new Date(now)
   const jevRange = {
@@ -86,7 +85,6 @@ export const UsageCharts = (props: {
     placeholderData: keepPreviousData,
     refetchInterval: 60_000,
     refetchIntervalInBackground: true,
-    retry: 1,
   })
   const view = charts.data
 

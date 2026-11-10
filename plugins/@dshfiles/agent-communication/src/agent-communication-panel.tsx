@@ -352,7 +352,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     queryKey: diagnosticsKey,
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.diagnostics({ limit: REPORT_LIMIT }, { signal: hostSignal }) }),
     refetchInterval: 30_000,
-    retry: 1,
   })
   const diagnostics = diagnosticsQuery.data
   const sessionLabel = EntityLabels.useSessionLabel(props.sessions)

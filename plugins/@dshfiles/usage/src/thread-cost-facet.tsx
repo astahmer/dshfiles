@@ -79,7 +79,6 @@ export const ThreadCostFacet = (props: {
     queryKey: ['dshfiles-usage', 'thread-cost', query],
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.requests(query, { signal: hostSignal }) }),
     refetchInterval: 30_000,
-    retry: 1,
   })
   const rows = useMemo(() => page.data?.rows ?? [], [page.data])
   const turns = useMemo(() => turnsOf(rows), [rows])

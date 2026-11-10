@@ -138,7 +138,6 @@ export const ActivityTimelinePanel = (props: {
     queryKey: statsKey,
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.stats({}, { signal: hostSignal }) }),
     refetchInterval: 30_000,
-    retry: 1,
   })
   const detailQuery = useQuery({
     queryKey: ['activity-timeline', 'event', selected?.id],

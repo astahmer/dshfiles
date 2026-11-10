@@ -18,7 +18,6 @@ export const InboxGlyph = (props: { readonly size?: number; readonly navigation:
     queryKey: inboxKeys.view('needs-you'),
     queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.list({ view: 'needs-you', limit: 100 }, { signal: hostSignal }) }),
     refetchInterval: eventStatus === 'live' ? 60_000 : 15_000,
-    retry: 1,
   })
   InboxNotifications.useBlockingAlerts(needsYou.data?.items, item => void openSubject(item.subject))
   const count = needsYou.data?.counts.needsYou ?? 0
