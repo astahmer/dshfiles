@@ -585,6 +585,14 @@ For jj: `provision` is the same verb as `jj-threads.provision`, and
 `jj restore --from 'at_operation(<op>, @)' --into @`. A restore touches only that workspace's working-copy files:
 history, bookmarks and other workspaces stay where they are.
 
+## Revision sections
+
+`@dshfiles/jj-integration/revision-sections` declares `RevisionSections`, a registry of components the jj panel
+(`@dshfiles/jujutsu`) renders under a selected revision's details with its repository root, change id (reverse hex, as
+`jj log` prints it) and commit id. A plugin adds one with `plugin.add(RevisionSections, { id, order, Component })`
+and returns `null` when it has nothing for that revision; the panel renders nothing when no plugin adds one.
+`@dshfiles/backlog` lists the items linking to the revision there.
+
 ## Agent tools
 
 - `jj_thread_isolate`: before the first code edit, create a dedicated jj workspace when the current Session is not isolated. It starts from the configured bookmark. The Session cwd stays unchanged, so use the returned absolute path for all file operations and as shell `workdir`; status and rebase tools follow the isolated workspace automatically.
