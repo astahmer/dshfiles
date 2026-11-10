@@ -32,7 +32,8 @@ export const TranscriptFindBar = (props: TranscriptFindBarProps) => (
 )
 
 /** The page's highlight registry, absent in a browser without the CSS Custom Highlight API. */
-const highlightRegistry = (): HighlightRegistry | undefined => ('CSS' in globalThis && 'highlights' in CSS && 'Highlight' in globalThis ? CSS.highlights : undefined)
+const highlightRegistry = (): HighlightRegistry | undefined =>
+  'CSS' in globalThis && 'highlights' in CSS && 'Highlight' in globalThis ? CSS.highlights : undefined
 
 const clearMarks = (): void => {
   highlightRegistry()?.delete(TranscriptFind.highlightName)
