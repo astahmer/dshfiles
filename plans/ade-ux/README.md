@@ -3,19 +3,21 @@
 Phases 0–6 shipped. The design, decisions, per-phase evidence and the migration map now live in
 [docs/ade-ux](../../docs/ade-ux/README.md); this plan tracks only the open items below. When all of them close, delete it.
 
-- [ ] Restart the live DSH Host when convenient. Host halves changed in activity-timeline, agent-questions,
-      thread-sidebar, jj-integration, ai-accounts, backlog, traces, hmr-gate, diff-viewed, agent-toolkit, references,
-      settings-shell and memory; rebuild the canonical checkout first (`dshx checkout sync`).
+The live `web` Host restarted on 2026-11-10 with every Host half these phases changed, so the rollout item is closed;
+Done / Restore releasing and recreating the workspace is shipped (settle cleanup plus the restore-on-next-turn hook in
+[jj-integration](../../plugins/@dshfiles/jj-integration/README.md#settle-cleanup)). The re-run items below were not
+re-run after that restart.
 
 - [ ] Browser push for blocking items (needs a Host/service-worker feasibility check; record a Host gap only if no
-      plugin route works).
+      plugin route works). No plugin registers a service worker or push subscription yet.
 
 - [ ] Native `ask_user_question` forms reach the Inbox in scratch (provider covers timed-schema forms only).
 
-- [ ] Done / Restore releases and recreates the workspace (C3 in [t3code parity](../t3code-parity.md)).
-
 - [ ] git-worktree workspaces get only the This-turn Changes scope (the VCS port has no diff verb); no
       rebase-without-land verb (History's previewed rebase stands in).
+
+- [ ] Live check that Unsettle or Unarchive of a thread whose workspace settle cleanup removed restores the folder on
+      its next turn (source and the `threads.restore` integration tests only so far).
 
 - [ ] Physical iPhone test; iOS back swipe moves between threads; native header, composer chips and the core font
       stepper are still under 44 px.

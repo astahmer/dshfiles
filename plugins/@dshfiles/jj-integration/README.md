@@ -510,6 +510,11 @@ before removing, so settling never forces work away. Each settle leaves a
 `jj-integration settle cleanup` span with the settled, targeted and removed
 counts.
 
+Restoring such a thread (Unsettle, Unarchive) needs no extra step: before its
+next turn builds its prompt, the Host checks the Session's folder out again from
+its repository when it is gone, registers it again and logs
+`workspace.restored` (`thread lifecycle restore missing` span).
+
 The activity read is the same Session list a Rebase guard uses (15 s per
 attempt, all waiting on the same read). When the Host's Session list stays
 unreadable, every Session reads as `activity-unknown` and the run removes
