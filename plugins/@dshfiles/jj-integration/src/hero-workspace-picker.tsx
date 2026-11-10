@@ -1,7 +1,7 @@
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { workspaceListed } from '@dshfiles/plugin-ui/lib/workspace-listed'
-import { errorMessage, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import {
   ProjectFolderPicker,
   type DirectoryPickerPort,
@@ -14,7 +14,7 @@ import { ProjectFolderSetup } from '@dshfiles/workspace-folder-picker/project-fo
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import { hostDestination, multiHostApi, multiHostQueries, RemoteSessionBootstrap, shouldBootstrapRemoteSession } from '@dshfiles/multi-host/destination'
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useCallback, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi } from './api.js'
 import { mainViewSessionId } from './main-view-session.js'
 import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor } from './destination-bar.js'
@@ -22,12 +22,11 @@ import type { JjIntegrationTranslate } from './locales.js'
 import { NoFolderWorkspace } from './no-folder.js'
 import { prepareRemoteFolder, RemoteDestinationChips } from './remote-destination.js'
 import { recentProjectPaths } from './recent-projects.js'
-import { watchWorkspaceRegistry } from './workspace-registry-watch.js'
+import { workspaceRegistryKey } from './workspace-registry-key.js'
 
 const NO_FOLDER_ID = 'dshfiles:no-folder'
 const RECENT_PROJECT_COUNT = 5
 const pinnedWorkspaceIds = [NO_FOLDER_ID]
-const projectsQueryKey = ['jj-integration', 'projects']
 
 /**
  * Replaces the native New-thread project picker: registered projects first, the per-thread workspaces on their own
@@ -86,18 +85,19 @@ export const HeroWorkspacePicker = (
       ownerRuntimeId: currentSessionOwner.data,
       destinationRuntimeId: destination.runtimeId,
     })
-  const queryClient = useQueryClient()
-  useEffect(
-    () => watchWorkspaceRegistry({ workspaces: services.workspaces, onChange: () => void queryClient.invalidateQueries({ queryKey: projectsQueryKey }) }),
-    [services, queryClient],
+  const registry = useSyncExternalStore(
+    useCallback((listener: () => void) => services.workspaces.list.subscribe(listener), [services]),
+    () => workspaceRegistryKey(services.workspaces.list.getSnapshot().items),
   )
   const projects = useQuery({
-    queryKey: projectsQueryKey,
+    queryKey: ['jj-integration', 'projects', registry],
     enabled: !remote,
     // Every New thread remounts this picker, and the Host classifies each registered workspace against jj; the
-    // registered list changes only when a folder is added or removed, which the registry watch above invalidates, so a
-    // remount reuses it instead of rescanning the store.
+    // registered list changes only when a folder is added or removed, so a remount with the same Workspaces reuses it
+    // instead of rescanning the store. Each plugin owns its query cache, so a folder another plugin registers reaches
+    // this one only through the Client Workspace list the key follows.
     staleTime: 60_000,
+    placeholderData: keepPreviousData,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.projects({}, { signal: hostSignal }) }),
   })
   const pickerCapabilities = useQuery({
