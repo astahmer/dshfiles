@@ -666,10 +666,9 @@ const startAccountsHost = (input: {
 
   let registeredProviders: ReadonlySet<string> = new Set()
   let announcedRoutes: string | undefined
+  let appliedInputs: string | undefined
   const applyRouteSnapshot = (sourceFile: AccountStoreFile): void => {
-    runtime.accountLogin?.reconcile(
-      AccountLoginHostModel.accountsFromFile({ ...sourceFile, accounts: [...sourceFile.accounts, ...(runtime.accountSetup?.candidates() ?? [])] }),
-    )
+    const candidates = runtime.accountSetup?.candidates() ?? []
     const nextConfig = configFromAccountsFile(sourceFile)
     const takenProviders = new Set(
       llm
@@ -678,9 +677,14 @@ const startAccountsHost = (input: {
         .filter(id => !registeredProviders.has(id)),
     )
     const { routes: nextRoutes, rejected } = ProviderRoutes.buildRoutes(nextConfig, { takenProviders })
+    const enabled = [...nextRoutes].filter(([, route]) => route.enabled)
+    // Every `ai-accounts/read` lands here. The snapshot is a function of these inputs alone, so a read that finds them
+    // unchanged keeps the routes, pool, profiles, login reconciliation and registrations it already applied.
+    const inputs = JSON.stringify([sourceFile, candidates, [...takenProviders].sort(), enabled.map(([id]) => catalogState.discovered(id) ?? null)])
+    if (inputs === appliedInputs && runtime.accounts !== undefined) return
+    runtime.accountLogin?.reconcile(AccountLoginHostModel.accountsFromFile({ ...sourceFile, accounts: [...sourceFile.accounts, ...candidates] }))
     for (const reason of rejected) ctx.logger.warn(`ai-accounts: skipped account ${reason}`)
     runtime.rejectedRoutes = rejected
-    const enabled = [...nextRoutes].filter(([, route]) => route.enabled)
     const providers = enabled.map(([id]) => id)
     const directoryEntries = enabled.map(([id, route]) => ({
       provider: id,
@@ -691,7 +695,7 @@ const startAccountsHost = (input: {
 
     // Every `ai-accounts/read` lands here, and each replace broadcasts `llm/adapters-updated`, which makes every open page
     // re-read the model catalog; announce only when the file, setup candidates or discovered models moved.
-    const announced = JSON.stringify([sourceFile, runtime.accountSetup?.candidates() ?? [], enabled.map(([id]) => catalogState.discovered(id) ?? null)])
+    const announced = JSON.stringify([sourceFile, candidates, enabled.map(([id]) => catalogState.discovered(id) ?? null)])
     const unchanged = announced === announcedRoutes
     announcedRoutes = announced
     if (adapterRegistration === undefined) {
@@ -725,6 +729,7 @@ const startAccountsHost = (input: {
     reasoningDefaults.clear()
     for (const [id, pins] of buildReasoningDefaults()) reasoningDefaults.set(id, pins)
     runtime.accounts = { config, pool }
+    appliedInputs = inputs
   }
 
   applyRouteSnapshot(initialFile)
