@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apply } from '../src/index.ts'
+import { apply } from '../src/host.ts'
 
 const context = (authenticatedUrl: (url: string) => string) => {
   const output: string[] = []
