@@ -58,6 +58,7 @@ import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogPeek } from './item-peek.js'
 import { ItemsView } from './items-view.js'
+import { usePrimaryModifierHeld, viewForShortcut } from './modifier-hints.js'
 import { panelDraftKey } from './panel-draft.js'
 import { panelPreferences, views } from './panel-preferences.js'
 import { BacklogProjectPaths } from './project-paths.js'
@@ -699,11 +700,21 @@ export const BacklogPanel = (props: {
     return true
   }
 
+  const modifierHeld = usePrimaryModifierHeld()
+
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
-    if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return
+    if (isTyping(event.target) || event.altKey) return
+    const modified = event.metaKey || event.ctrlKey
+    if (modified) {
+      const shortcutView = viewForShortcut(event.key)
+      if (shortcutView === undefined) return
+      event.preventDefault()
+      switchView(shortcutView)
+      return
+    }
     if (event.target instanceof HTMLElement && event.target.closest('[role="menu"], [role="dialog"]') !== null) return
     if (event.key === 'Enter' && event.target instanceof HTMLElement && event.target.closest('button, a[href]') !== null) return
-    const viewKey = views[Number(event.key) - 1]
+    const viewKey = viewForShortcut(event.key)
     if (viewKey !== undefined) switchView(viewKey)
     else if (event.key === 'j' || event.key === 'ArrowDown') moveCursor(1)
     else if (event.key === 'k' || event.key === 'ArrowUp') moveCursor(-1)
@@ -772,6 +783,14 @@ export const BacklogPanel = (props: {
                     >
                       <Icon aria-hidden className="dshx:size-3.5" />
                       <span className="dshx:@max-pane-compact:sr-only">{viewLabels[entry]}</span>
+                      {modifierHeld && (
+                        <kbd
+                          aria-hidden
+                          className="dshx:font-mono dshx:text-[10px] dshx:text-muted-foreground dshx:tabular-nums dshx:-ml-0.5"
+                        >
+                          {index + 1}
+                        </kbd>
+                      )}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>{`${viewLabels[entry]} (${String(index + 1)})`}</TooltipContent>
