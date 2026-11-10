@@ -339,7 +339,7 @@ export default defineClient({
 
     // Free-docking tabs (the workbench) get the same page names as the strip: the destination section labels.
     ctx.effect(() => {
-      const releases = KNOWN_SECTIONS.map(section => metadata?.plugin?.add(PanelTitles, { panelId: section.panelId, title: section.label }) ?? (() => {}))
+      const releases = PanelTitlesModel.destinationTitles([]).map(title => metadata?.plugin?.add(PanelTitles, title) ?? (() => {}))
       return () => releases.forEach(release => release())
     }, 'main-tabs: destination tab titles for the workbench')
 
@@ -381,6 +381,11 @@ export default defineClient({
           const registeredPanels = new Set(ctx.slots.entriesOfSlot('main').flatMap(entry => entry.options.key ?? []))
           const contributedSections = useRegistry(DestinationSections)
           const titles = useMemo(() => PanelTitlesModel.destinationTitles(contributedSections), [contributedSections])
+          useEffect(() => {
+            const contributed = PanelTitlesModel.destinationTitles(contributedSections).slice(KNOWN_SECTIONS.length)
+            const releases = contributed.map(title => metadata?.plugin?.add(PanelTitles, title) ?? (() => {}))
+            return () => releases.forEach(release => release())
+          }, [contributedSections])
           // Tab titles name the page, not the plugin: a destination section's label, else the label without "Plugin: ".
           const panelLabels = new Map(
             ctx.slots.entriesOfSlot('sidebar.panellist').flatMap(entry => {

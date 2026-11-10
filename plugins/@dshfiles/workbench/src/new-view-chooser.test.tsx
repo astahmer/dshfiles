@@ -34,6 +34,15 @@ describe('NewViewChooser', () => {
     expect(screen.getByText('No matching views.')).toBeDefined()
   })
 
+  it('shows and searches the qualified discovery name without changing the tab title', () => {
+    const definitions = [source('agents', 'Directory', { discoveryTitle: 'Agents › Directory' })]
+    render(<NewViewChooser definitions={definitions} onSelect={() => undefined} />)
+    expect(screen.getByRole('button', { name: 'Agents › Directory' })).toBeDefined()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search views' }), { target: { value: 'agents' } })
+    expect(screen.getByRole('button', { name: 'Agents › Directory' })).toBeDefined()
+    expect(definitions[0]?.title).toBe('Directory')
+  })
+
   it('lists workspace views without separate current-conversation sources', () => {
     const definitions = [
       source('backlog', 'Backlog'),

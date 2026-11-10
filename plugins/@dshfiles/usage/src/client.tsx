@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { AccountUsageView, type AccountUsageViewProps } from '@dshfiles/ai-accounts/account-usage-view'
 import { UsageNavigation, type UsageQuotaTarget } from '@dshfiles/ai-accounts/quota-views'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
-import { defineClient } from '@dshfiles/dshx/client'
+import { defineClient, MenuItem } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { WorkbenchMainNavigation, workbenchPanels } from '@dshfiles/workbench/registry'
 import { AccountUsageDashboard } from './account-usage-dashboard.js'
@@ -82,7 +82,7 @@ export default defineClient({
           target: { view: 'forecast' },
         },
       ] as const satisfies readonly { id: string; label: string; aliases: readonly string[]; target: UsageQuotaTarget }[]
-      for (const row of quotaRows)
+      for (const row of quotaRows) {
         plugin.add(PaletteActions, {
           id: `@dshfiles/usage/${row.id}`,
           group: 'destination',
@@ -90,6 +90,14 @@ export default defineClient({
           aliases: row.aliases,
           run: () => openQuota(row.target),
         })
+        plugin.add(MenuItem, {
+          id: `@dshfiles/usage/${row.id}`,
+          menu: 'workbench.new-view',
+          title: row.label,
+          keywords: row.aliases,
+          run: () => openQuota(row.target),
+        })
+      }
     }
     /**
      * Open the thread a request belongs to. A subagent's own session is not

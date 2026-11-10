@@ -85,6 +85,8 @@ import {
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
+import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { registerWorkbenchPaletteActions } from './workbench-palette.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { KeyboardShortcutModel, parseChord } from './keyboard-shortcuts.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
@@ -1005,6 +1007,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   )
 
   useEffect(() => PaletteBridge.addActions(paletteActions), [paletteActions])
+  useEffect(() => {
+    const registry = workbenchPanels()
+    const existingMainPanelIds = new Set(orderedHeaderEntries.flatMap(entry => (entry.kind === 'panel' && entry.panelId !== undefined ? [entry.panelId] : [])))
+    return registerWorkbenchPaletteActions({ registry, existingMainPanelIds, addActions: PaletteBridge.addActions })
+  }, [orderedHeaderEntries])
 
   const renderCustomizeRow = (options: {
     entry: { id: string; label: string }

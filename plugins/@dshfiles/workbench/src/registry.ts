@@ -35,6 +35,7 @@ export interface WorkbenchPanelDefinition {
   /** Stable across reloads: saved layouts refer to panels by this id. Prefix it with the owning plugin. */
   readonly id: string
   readonly title: string
+  readonly discoveryTitle?: string
   readonly component: ComponentType<WorkbenchPanelProps>
   /** An owned contributor may expose independent scoped occurrences (e.g. two repositories). */
   readonly scopedComponent?: ComponentType<WorkbenchPanelProps & { readonly scope: string }>
@@ -273,6 +274,7 @@ export const workbenchPanels = (): WorkbenchPanelRegistry => (globalThis.dshfile
 export interface PanelTitle {
   readonly panelId: string
   readonly title: string
+  readonly discoveryTitle?: string
 }
 
 /** "Usage: Analytics" → "Analytics"; a label without a prefix is kept. */

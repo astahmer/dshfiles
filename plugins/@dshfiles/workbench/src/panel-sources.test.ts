@@ -28,6 +28,17 @@ describe('main panel sources', () => {
     sources.dispose()
   })
 
+  it('updates the discovery title without changing the tab title or component', () => {
+    const registry = createWorkbenchPanelRegistry()
+    const sources = createMainPanelSources(registry)
+    sources.sync([{ key: 'agents', title: 'Directory', discoveryTitle: 'Agents › Directory' }], () => null)
+    const first = registry.get('main/agents')
+    expect(first?.discoveryTitle).toBe('Agents › Directory')
+    sources.sync([{ key: 'agents', title: 'Directory', discoveryTitle: 'People › Directory' }], () => null)
+    expect(registry.get('main/agents')).toMatchObject({ title: 'Directory', discoveryTitle: 'People › Directory', component: first?.component })
+    sources.dispose()
+  })
+
   it('keeps runtime entries restorable without offering them as reusable views', () => {
     const registry = createWorkbenchPanelRegistry()
     const sources = createMainPanelSources(registry)

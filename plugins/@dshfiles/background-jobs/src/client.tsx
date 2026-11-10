@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, useRegistry } from '@dshfiles/dshx/client'
+import { defineClient, MenuItem, useRegistry } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { ToolCallSections, type ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-sections'
@@ -105,7 +105,7 @@ export default defineClient({
         { id: 'processes-dev-servers', label: 'Observe › Processes › Dev servers', aliases: ['Dev servers', 'Preview servers', 'Ports'], tab: 'dev-servers' },
         { id: 'processes-ram', label: 'Observe › Processes › RAM', aliases: ['RAM', 'Process memory'], tab: 'ram' },
       ] as const
-      for (const row of rows)
+      for (const row of rows) {
         plugin.add(PaletteActions, {
           id: `@dshfiles/background-jobs/${row.id}`,
           group: 'destination',
@@ -113,6 +113,14 @@ export default defineClient({
           aliases: row.aliases,
           run: () => openProcesses(row.tab),
         })
+        plugin.add(MenuItem, {
+          id: `@dshfiles/background-jobs/${row.id}`,
+          menu: 'workbench.new-view',
+          title: row.label,
+          keywords: row.aliases,
+          run: () => openProcesses(row.tab),
+        })
+      }
     }
     ctx.effect(
       () =>

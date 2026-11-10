@@ -389,6 +389,8 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
 
 ### Plugin UI and state
 
+Every reusable view must be discoverable and openable from both the command palette and the New tab view chooser. Use the same qualified destination name where a short name is ambiguous, and cover registration, availability and removal in tests. Contextual runtime occurrences are not reusable views.
+
 Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
 `plugin-ui` and `plugin-state` carry the workflow. The rules that break silently
 — `dshx:` utilities with `cn`, no native `title` or `<select>`, rebuild

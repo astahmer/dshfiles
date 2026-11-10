@@ -386,7 +386,7 @@
     {
       "id": "main-panel-sources",
       "title": "Choose plugin views and one Settings hub",
-      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use producer-declared Plugin: View names, including Settings Shell: Settings and AI Accounts: Preview. Conversations open only from the thread list or New thread, never as a separate Rich Composer/current-conversation choice. Search matches full qualified names; special ordering uses stable IDs. Restored reusable panels refresh their captions without changing IDs or remounting, while user conversation, scoped and resource titles remain untouched. Empty right/bottom panes and semantic Start use the same chooser; Settings leaves and runtime occurrences are not primary suggestions.",
+      "summary": "Every group's accessible New tab plus opens an actual chooser tab. Reusable templates use qualified destination names when available, such as Agents › Directory; their tab captions stay short. Conversations open only from the thread list or New thread, never as a separate Rich Composer/current-conversation choice. Search matches full qualified names; special ordering uses stable IDs. Restored reusable panels refresh their captions without changing IDs or remounting, while user conversation, scoped and resource titles remain untouched. Empty right/bottom panes and semantic Start use the same chooser; Settings leaves and runtime occurrences are not primary suggestions.",
       "reach": ["click button \"New tab\"", "expect region \"Choose a view\""],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
