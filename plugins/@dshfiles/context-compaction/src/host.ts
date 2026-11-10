@@ -1,8 +1,13 @@
-import { BasicCompactionEngine } from '@deepseek-ai/dsh-compaction-basic'
+import type {} from '@deepseek-ai/dsh-agent'
+import { BasicCompactionEngine, type ResolvedConfig } from '@deepseek-ai/dsh-compaction-basic'
 import type { ImageBlock, Message } from '@deepseek-ai/dsh-llm'
-import { DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import type {} from '@deepseek-ai/dsh-token-meter'
+import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { Llm } from '@dshfiles/dshx/effect/llm'
-import { Effect, Layer, Schema } from 'effect'
+import type { SessionId } from '@dshfiles/dshx/ids'
+import { Context, Effect, Layer, Schema } from 'effect'
+import { compactionApi, type CompactionThreshold } from './compaction-api.js'
+import { compactionThresholdTokens } from './compaction-threshold.js'
 import { compactionRequestBudget, MIN_REQUEST_BUDGET_BYTES } from './budget.js'
 import { serializedMessageBytes, summarizeInChunks, SummaryRequestFailed } from './chunked-summary.js'
 
@@ -78,8 +83,13 @@ const summarizeBounded = Effect.fn('context compaction run')(function* (request:
 })
 
 /** The stock engine with its single summary request bounded to the route's safe input, split and reduced as needed. */
-const engineWith = (summarize: (request: SummaryRequest) => Promise<SummaryResult>) =>
+const engineWith = (summarize: (request: SummaryRequest) => Promise<SummaryResult>, onConfig: (config: ResolvedConfig) => void) =>
   class ContextCompactionEngine extends BasicCompactionEngine {
+    constructor(...args: ConstructorParameters<typeof BasicCompactionEngine>) {
+      super(...args)
+      onConfig(this.config)
+    }
+
     protected override summarize(input: SummarizeInput, agent: CompactionAgent, signal?: AbortSignal): Promise<SummaryResult> {
       return summarize({
         input,
@@ -91,21 +101,70 @@ const engineWith = (summarize: (request: SummaryRequest) => Promise<SummaryResul
     }
   }
 
+class CompactionThresholdFailure extends Schema.TaggedError<CompactionThresholdFailure>()(
+  'CompactionThresholdFailure',
+  { provider: Schema.String, model: Schema.String, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'compaction-threshold-failure' },
+) {
+  override get message(): string {
+    return `Could not read the context capacity of ${this.provider}/${this.model}. Check that model in Settings › Models, then retry.`
+  }
+}
+
+/** The running engine's trigger for one live thread, priced as `compactIfNeeded` prices it. */
+class CompactionThresholds extends Context.Service<
+  CompactionThresholds,
+  { readonly read: (sessionId: SessionId) => Effect.Effect<CompactionThreshold | null, CompactionThresholdFailure> }
+>()('@dshfiles/context-compaction/CompactionThresholds') {}
+
 const CompactionEngine = (config: typeof CompactionConfig.Type) =>
-  Layer.effectDiscard(
+  Layer.effect(
+    CompactionThresholds,
     Effect.gen(function* () {
       const host = yield* HostContext
+      const llm = yield* Llm
       const summarize = yield* DshxPlugin.callbackWithSignal(summarizeBounded)
+      let policy: ResolvedConfig | undefined
       // A failed provider request reaches the engine as the provider's own error, as the stock engine throws it.
-      const engine = engineWith(request =>
-        summarize({ signal: request.signal }, request).catch((error: unknown) => {
-          throw error instanceof SummaryRequestFailed ? error.cause : error
-        }),
+      const engine = engineWith(
+        request =>
+          summarize({ signal: request.signal }, request).catch((error: unknown) => {
+            throw error instanceof SummaryRequestFailed ? error.cause : error
+          }),
+        resolved => {
+          policy = resolved
+        },
       )
       yield* Effect.acquireRelease(
         Effect.sync(() => host.ctx.plugin(engine, config)),
         fiber => Effect.promise(() => fiber.dispose()),
       )
+      return CompactionThresholds.of({
+        read: Effect.fn('context compaction threshold read')(function* (sessionId: SessionId) {
+          const session = host.ctx.get('agents')?.get(sessionId)?.session
+          const header = session?.requestHeader()?.config
+          if (session === undefined || header === undefined || policy === undefined || header.provider === '' || header.model === '') return null
+          const route = { provider: header.provider, model: header.model }
+          const info = yield* llm.modelInfo(route).pipe(Effect.mapError(cause => new CompactionThresholdFailure({ ...route, cause })))
+          const contextWindow = info.context?.contextWindow
+          if (contextWindow === undefined) return null
+          const thresholdTokens = compactionThresholdTokens({
+            config: policy,
+            route,
+            contextWindow,
+            reservedCompletionTokens: header.maxTokens ?? info.defaultMaxTokens ?? 0,
+          })
+          if (thresholdTokens === null) return null
+          const measured = host.ctx.get('tokenMeter')?.measure(session).totalTokens
+          return {
+            ...route,
+            auto: policy.auto,
+            contextWindow,
+            thresholdTokens,
+            usedTokens: measured === undefined || !Number.isFinite(measured) ? null : Math.max(0, Math.round(measured)),
+          }
+        }),
+      })
     }),
   )
 
@@ -114,4 +173,5 @@ export default DshxPlugin.make({
   inject: ['llm'],
   Config: CompactionConfig,
   layer: config => CompactionEngine(config).pipe(Layer.provide(Llm.layer)),
+  apis: [Api.bind(compactionApi, { threshold: input => CompactionThresholds.use(thresholds => thresholds.read(input.sessionId)) })],
 })

@@ -42,6 +42,42 @@
           "source": "model-stream"
         }
       ]
+    },
+    {
+      "id": "compaction-threshold",
+      "title": "Next automatic compaction for a thread",
+      "summary": "The threshold API (agent tool compaction_threshold) returns the token count at which automatic compaction next runs for one live thread: the running engine's policy, the thread's routed model and context window, its output reservation, and the engine's own pressure reading. agent-plan shows it beside the composer's context meter.",
+      "surfaces": ["host", "api", "tool"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: threshold API and agent tool",
+      "configuration": [],
+      "states": ["unrouted-null", "no-window-null", "no-budget-null", "threshold"],
+      "failureModes": ["The route's model info lookup can fail; the API returns compaction-threshold-failure naming the route to fix in Settings › Models."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.threshold-api",
+          "file": "tests/compaction-threshold.spec.ts",
+          "testName": "reads the running engine policy, the routed output cap and the meter for a live thread"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "context-compaction.threshold-browser-journey",
+          "reason": "This Host API has no browser surface of its own; the agent-plan.compaction-meter journey drives it through the agent-plan chip."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
     }
   ]
 }
