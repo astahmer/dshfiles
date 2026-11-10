@@ -26,7 +26,17 @@
           "coveredBy": ["sidebar-right.resident-window-default", "sidebar-right.resident-window-views"]
         }
       ],
-      "states": ["native-absent-workbench-fallback", "workbench", "detached", "moved", "hidden", "closed", "cleanup-rejected", "resident-pruned", "resident-restored"],
+      "states": [
+        "native-absent-workbench-fallback",
+        "workbench",
+        "detached",
+        "moved",
+        "hidden",
+        "closed",
+        "cleanup-rejected",
+        "resident-pruned",
+        "resident-restored"
+      ],
       "failureModes": [
         "A missing target leaves its native occurrence retained, never creates fake content.",
         "Provider cleanup rejection preserves the authoritative tab.",

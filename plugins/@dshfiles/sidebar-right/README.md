@@ -39,9 +39,9 @@ The bridge stores **presentation endpoints and derived metadata only**. Native s
 
 A Sidebar Session view holds a whole Session with its live follow, and a kept-mounted editor or Workbench body holds its tab. Unbounded, a long-lived page keeps one of those per visited thread. The plugin therefore keeps a view, its resource pins and its kept-mounted bodies only for the on-screen Session plus the most recently shown others.
 
-| Setting (`dshfiles-sidebar-right`) | Default | Meaning |
-| ---------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
-| `residentThreads`                   | `4`     | Threads besides the on-screen one whose side-panel tabs stay loaded. `0` keeps every visited thread loaded (pre-bound). |
+| Setting (`dshfiles-sidebar-right`) | Default | Meaning                                                                                                                 |
+| ---------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `residentThreads`                  | `4`     | Threads besides the on-screen one whose side-panel tabs stay loaded. `0` keeps every visited thread loaded (pre-bound). |
 
 The setting applies live, with no restart. A thread that leaves the window releases its resource pins and its Session reference; showing it again reopens its tabs and remounts their bodies. Workbench restored records follow the same window, so a record saved for a non-resident thread is not acquired on reload.
 
