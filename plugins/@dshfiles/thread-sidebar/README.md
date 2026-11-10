@@ -167,8 +167,13 @@ Use the scratch executable/browser overrides described by `verify-dsh` when the
 personal launcher rewrites the scratch home or bundled Chromium is unavailable.
 The six affected packages pass focused tests/typechecks and Host bundle imports.
 The four scratch journeys pass without a provider response or live-instance restart.
-This does not establish cross-device draft sync, arbitrary plugin compatibility,
-or deployment into an existing profile. New profile rows require user-controlled
+The live `web` profile was checked after its restart (2026-11-10): an empty New
+thread adds no Host Session, two typed drafts in one project reopen with their own
+text from their **Draft: …** rows, and both survive a page reload. In a project
+that isolates new threads, the first typed text also provisions that draft's
+thread workspace, so an abandoned typed draft leaves a blank Session and an empty
+workspace to archive. This does not establish cross-device draft sync or
+arbitrary plugin compatibility. New profile rows require user-controlled
 activation/restart; merely building an isolated worktree does not update the GUI.
 
 **Moving a row between sections.** Drag a thread row onto another section header
