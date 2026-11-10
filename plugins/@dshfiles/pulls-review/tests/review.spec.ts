@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from '@effect/vitest'
 import { Effect, Layer, Option, Schema } from 'effect'
 import { MAX_FILES, reviewResultSchema } from '../src/api.js'
 import { JjReadFailed, ReviewJj, type JjReadInput, type JjReadOutput } from '../src/jj.js'
+import { ProjectBase } from '../src/project-base.js'
 import { ReviewWorkspace, type ReviewInput } from '../src/review.js'
 
 const PATCH = [
@@ -76,6 +77,22 @@ describe('reviewWorkspace', () => {
         truncated: false,
       })
       expect(result.status === 'ok' ? result.scopes.map(scope => scope.key) : []).toEqual(['code'])
+    }),
+  )
+
+  it.effect("starts from the project's main branch before main, then its origin copy, when the project names one", () =>
+    Effect.gen(function* () {
+      const develop = Layer.succeed(ProjectBase, ProjectBase.of({ defaultFor: () => Effect.succeed('develop') }))
+      const local = yield* reviewOver({ read: fakeRun({ revisions: ['main', 'develop', '@'] }), path: workspace }).pipe(Effect.provide(develop))
+      expect(local).toMatchObject({ status: 'ok', base: 'develop', range: 'develop..@' })
+      const remote = yield* reviewOver({ read: fakeRun({ revisions: ['main', 'develop@origin', '@'] }), path: workspace }).pipe(Effect.provide(develop))
+      expect(remote).toMatchObject({ status: 'ok', base: 'develop@origin' })
+      const absent = yield* reviewOver({ read: fakeRun({ revisions: ['main', '@'] }), path: workspace }).pipe(Effect.provide(develop))
+      expect(absent).toMatchObject({ status: 'ok', base: 'main' })
+      const explicit = yield* reviewOver({ read: fakeRun({ revisions: ['main', 'develop', '@'] }), path: workspace, base: 'main' }).pipe(
+        Effect.provide(develop),
+      )
+      expect(explicit).toMatchObject({ status: 'ok', base: 'main' })
     }),
   )
 

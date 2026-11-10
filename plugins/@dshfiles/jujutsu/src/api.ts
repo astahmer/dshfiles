@@ -53,7 +53,7 @@ const commitIdSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{40}|[a
 const revisionRefSchema = Schema.String.check(Schema.isPattern(/^(?:[a-f0-9]{1,64}|[k-z]{1,32})$/))
 const REVISION_REF_HINT = 'Revisions may be a full commit id, a unique commit id prefix or a change id prefix, as jj log prints them.'
 const remoteNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/))
-const bookmarkNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/))
+export const bookmarkNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,254}$/))
 export const workspaceNameSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/))
 
 const pathListSchema = Schema.Array(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1024))).check(Schema.isMinLength(1), Schema.isMaxLength(100))
@@ -323,9 +323,10 @@ export const jujutsuApi = defineApi({
       },
     }),
     graphNavigation: method({
-      input: Schema.Struct({ repoId: repoIdSchema }),
+      input: Schema.Struct({ repoId: repoIdSchema, bookmark: Schema.optionalKey(bookmarkNameSchema) }),
       output: Schema.Union([graphNavigationSchema, readFailureSchema]),
-      description: 'Resolve the current, main@origin, main and default-workspace landmarks in one call. Read-only.',
+      description:
+        'Resolve the current, main@origin, main and default-workspace landmarks in one call; `bookmark` names the project main branch the main landmarks use (main by default). Read-only.',
       tool: { name: 'jj_graph_navigation', readOnly: true, render: compactJson },
     }),
     revisionRelationship: method({
@@ -341,10 +342,14 @@ export const jujutsuApi = defineApi({
       tool: { name: 'jj_graph_slice', readOnly: true, render: compactJson },
     }),
     referenceGraph: method({
-      input: Schema.Struct({ repoId: repoIdSchema, reference: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)) }),
+      input: Schema.Struct({
+        repoId: repoIdSchema,
+        reference: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+        bookmark: Schema.optionalKey(bookmarkNameSchema),
+      }),
       output: Schema.Union([referenceGraphSchema, readFailureSchema]),
       description:
-        'A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks. Read-only.',
+        'A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks; `bookmark` names the project main branch those main landmarks use (main by default). Read-only.',
       tool: {
         name: 'jj_reference_graph',
         readOnly: true,

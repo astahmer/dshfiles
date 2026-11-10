@@ -274,7 +274,11 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     const catalog = createSnapshotStore<readonly ConversationWorkbenchSession[]>([])
     const refreshCatalog = (): void => {
       const list = sessions.list.getSnapshot()
-      catalog.set(list.ids.map(id => ({ id, title: list.byId[id]?.displayTitle ?? id })))
+      const next = list.ids.map(id => ({ id, title: list.byId[id]?.displayTitle ?? id }))
+      // The list changes on every running-state or projection update; panel sources depend only on ids
+      // and titles, and each sync re-derives a panel id for every Session × view.
+      if (ConversationWorkbenchSources.sameCatalog(catalog.getSnapshot(), next)) return
+      catalog.set(next)
     }
     const offCatalog = sessions.list.subscribe(refreshCatalog)
     refreshCatalog()

@@ -11,7 +11,8 @@ import css from './ConversationRoot.module.css'
  */
 export function ConversationHeader({ sessionId, useSession, useConversation, renderSlot }: ConversationHeaderProps) {
   const session = useSession(s => s)
-  const conversation = useConversation(s => s)
+  const activeTargets = useConversation(s => s.activeTargets)
+  const conversation = activeTargets === undefined ? undefined : { activeTargets }
   const blank = session === undefined || conversation === undefined
     || (session.blank && conversationPhase(session, conversation) === 'blank')
   return (

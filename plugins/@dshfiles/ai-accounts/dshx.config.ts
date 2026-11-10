@@ -4,7 +4,7 @@ import { defineConfig } from '@dshfiles/dshx'
 export default defineConfig({
   name: '@dshfiles/ai-accounts',
   profile: 'vanilla',
-  host: { entry: 'src/host.ts', bundleDependencies: ['@dshfiles/session-controller'] },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/session-controller'] },
   modules: {
     'account-login-api': 'src/account-login-api.ts',
     'account-session-api': 'src/account-session-api.ts',

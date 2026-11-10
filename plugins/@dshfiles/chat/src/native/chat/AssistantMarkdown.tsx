@@ -97,7 +97,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         )
         break
       case 'reasoning':
-        if (block.text.trim() === '') break
+        if (!/\S/u.test(block.text)) break
         rendered.push(
           <ProcessReasoning
             key={i}

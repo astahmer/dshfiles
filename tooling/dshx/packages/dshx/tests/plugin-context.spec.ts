@@ -343,6 +343,29 @@ describe('keyed', () => {
     expect(plugin.list(Exporters).get()).toEqual([])
     expect(cleanups).toEqual(['gen-1'])
   })
+
+  it('does not set up again while its owner tears down, when a provider withdraws in the same teardown', () => {
+    const scope = PluginContextModel.createScope()
+    let active = true
+    const plugin = PluginContextModel.create({
+      owner: '@test/owner',
+      scope,
+      isActive: () => active,
+      slots: () => fakeSlots().slots,
+      decorate: component => component,
+      services,
+    })
+    const provider = createPlugin('@test/provider')
+    provider.plugin.provide(CounterContract, { count: () => 1 })
+    const setups: string[] = []
+    plugin.keyed(plugin.use(CounterContract), live => {
+      setups.push(live.status)
+    })
+    active = false
+    provider.dispose()
+    scope.dispose()
+    expect(setups).toEqual(['active'])
+  })
 })
 
 describe('services', () => {

@@ -147,6 +147,8 @@ describe('PluginStorage', () => {
         expect(yield* storage.set('records/one', { value: 1 })).toMatchObject({ key: 'records/one', value: { value: 1 } })
         expect(yield* storage.get('records/one')).toEqual(Option.some(expect.objectContaining({ value: { value: 1 } })))
         expect((yield* storage.list({ prefix: 'records/' })).entries.map(entry => entry.key)).toEqual(['records/one'])
+        expect((yield* storage.listAll({ prefix: 'records/' })).map(entry => entry.key)).toEqual(['records/one'])
+        expect((yield* storage.listAll()).map(entry => entry.key)).toEqual(['other', 'records/one'])
         expect(yield* storage.delete('records/one')).toBe(true)
 
         expect([...(yield* Fiber.join(changes))]).toEqual([

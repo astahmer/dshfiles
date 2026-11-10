@@ -391,10 +391,20 @@ const workspaceForLineage = (
   byId: Readonly<Record<string, SessionSummary>>,
   workspaceBySession: ReadonlyMap<string, string>,
 ): string | undefined => {
+  // Called per listed row on every list publish: the visited set exists only past a direct parent.
   let cursor: string | undefined = session.id
-  const visited = new Set<string>()
-  while (cursor !== undefined && !visited.has(cursor)) {
-    visited.add(cursor)
+  let parentId: string | undefined
+  let visited: Set<string> | undefined
+  for (let hop = 0; cursor !== undefined; hop += 1) {
+    if (hop === 1) {
+      if (cursor === session.id) return undefined
+      parentId = cursor
+    }
+    if (hop >= 2) {
+      visited ??= new Set([session.id, parentId ?? session.id])
+      if (visited.has(cursor)) return undefined
+      visited.add(cursor)
+    }
     const workspaceId = workspaceBySession.get(cursor)
     if (workspaceId !== undefined) return workspaceId
     cursor = byId[cursor]?.parentId
@@ -649,6 +659,25 @@ const hasRunningDescendant = (input: {
   return false
 }
 
+/** `hasRunningDescendant` for several roots in one pass over the list, instead of one pass and one index per root. */
+const hasRunningDescendantOfAny = (input: {
+  readonly sessionIds: ReadonlySet<string>
+  readonly sessions: Parameters<typeof hasRunningDescendant>[0]['sessions']
+}): boolean => {
+  const byId = new Map(input.sessions.map(session => [session.id, session] as const))
+  for (const session of input.sessions) {
+    if (session.blank || !session.running) continue
+    let cursor = session.parentId
+    const visited = new Set<string>([session.id])
+    while (cursor !== undefined && !visited.has(cursor)) {
+      if (input.sessionIds.has(cursor)) return true
+      visited.add(cursor)
+      cursor = byId.get(cursor)?.parentId
+    }
+  }
+  return false
+}
+
 /**
  * What dropping a row into a section changes. A section is a status, so entering one sets its status
  * and clears the statuses that outrank it; archived is the exception, since restoring should bring a
@@ -763,6 +792,7 @@ export class SidebarOrganization {
   static readonly nextIdleTransitionAt = nextIdleTransitionAt
   static readonly isAutoSettleCandidate = isAutoSettleCandidate
   static readonly hasRunningDescendant = hasRunningDescendant
+  static readonly hasRunningDescendantOfAny = hasRunningDescendantOfAny
   static readonly sectionForSession = sectionForSession
   static readonly sectionDropPlan = sectionDropPlan
   static readonly remoteSectionDropPlan = remoteSectionDropPlan

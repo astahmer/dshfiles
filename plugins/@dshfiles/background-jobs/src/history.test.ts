@@ -6,35 +6,39 @@ import { Context, Effect, FileSystem, Layer, Path, Schema } from 'effect'
 import { HistoryConfig, HistoryIndex } from './history.js'
 import { jobStateSchema } from './types.js'
 
+const recent = Date.now() - 60_000
 const record = (type: string, data: Record<string, string | number | boolean>): string => `${JSON.stringify({ type, data })}\n`
 
 const sessionLog =
   record('session', { version: 4, id: 'session-aaaa', createdAt: 1, cwd: '/Users/astahmer/dev/dshfiles' }) +
   record('session/title', { title: 'Fix the delayed rebase button' }) +
-  record('job/registered', { jobId: 'bash-1', owner: 'session-aaaa', kind: 'bash', label: 'cd /x && pnpm test', startedAt: 1_000 }) +
+  record('job/registered', { jobId: 'bash-1', owner: 'session-aaaa', kind: 'bash', label: 'cd /x && pnpm test', startedAt: recent }) +
   record('job/settled', {
     jobId: 'bash-1',
     owner: 'session-aaaa',
     kind: 'bash',
     label: 'cd /x && pnpm test',
-    startedAt: 1_000,
+    startedAt: recent,
     finishedAt: 2_000,
     status: 'completed',
     cause: 'producer',
     detail: 'exit code: 0',
   }) +
-  record('job/registered', { jobId: 'bash-2', owner: 'session-aaaa', kind: 'bash', label: 'jj log', startedAt: 3_000 })
+  record('job/registered', { jobId: 'bash-2', owner: 'session-aaaa', kind: 'bash', label: 'jj log', startedAt: recent + 1_000 })
 
-const scratchSessions = Effect.gen(function* () {
-  const fileSystem = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
-  const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: 'background-jobs-' })
-  const sessionDirectory = path.join(root, '--Users-astahmer-dev-dshfiles--', 'session-aaaa')
-  yield* fileSystem.makeDirectory(sessionDirectory, { recursive: true })
-  const logPath = path.join(sessionDirectory, 'session.v4.jsonl')
-  yield* fileSystem.writeFileString(logPath, sessionLog)
-  return { root, statePath: path.join(root, 'state.json'), logPath }
-})
+const scratchSessionsWith = (sessionLog: string) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: 'background-jobs-' })
+    const sessionDirectory = path.join(root, '--Users-astahmer-dev-dshfiles--', 'session-aaaa')
+    yield* fileSystem.makeDirectory(sessionDirectory, { recursive: true })
+    const logPath = path.join(sessionDirectory, 'session.v4.jsonl')
+    yield* fileSystem.writeFileString(logPath, sessionLog)
+    return { root, statePath: path.join(root, 'state.json'), logPath }
+  })
+
+const scratchSessions = scratchSessionsWith(sessionLog)
 
 const historyIndex = (config: Parameters<typeof HistoryConfig.layer>[0]) =>
   Layer.build(HistoryIndex.layer.pipe(Layer.provide(HistoryConfig.layer(config)))).pipe(Effect.map(context => Context.get(context, HistoryIndex)))
@@ -96,7 +100,7 @@ describe('job history index', () => {
 
         yield* fileSystem.writeFileString(
           scratch.logPath,
-          record('job/registered', { jobId: 'bash-3', owner: 'session-aaaa', kind: 'bash', label: 'pnpm lint', startedAt: 4_000 }),
+          record('job/registered', { jobId: 'bash-3', owner: 'session-aaaa', kind: 'bash', label: 'pnpm lint', startedAt: recent + 2_000 }),
           { flag: 'a' },
         )
         const second = yield* historyIndex(scratch)
@@ -170,4 +174,30 @@ describe('job history index', () => {
       }),
     )
   })
+})
+
+it.layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))(it => {
+  it.effect('drops a settled job once it is a day old', () =>
+    Effect.gen(function* () {
+      const stale = Date.now() - 25 * 60 * 60 * 1000
+      const log =
+        record('session', { version: 4, id: 'session-aaaa', createdAt: 1, cwd: '/Users/astahmer/dev/dshfiles' }) +
+        record('job/registered', { jobId: 'bash-old', owner: 'session-aaaa', kind: 'bash', label: 'jj log', startedAt: stale }) +
+        record('job/settled', {
+          jobId: 'bash-old',
+          owner: 'session-aaaa',
+          kind: 'bash',
+          label: 'jj log',
+          startedAt: stale,
+          status: 'completed',
+          cause: 'producer',
+          detail: 'exit code: 0',
+          finishedAt: stale + 1_000,
+        })
+      const index = yield* historyIndex(yield* scratchSessionsWith(log))
+      yield* index.pass
+      const snapshot = yield* index.snapshot
+      expect(sortedIds(snapshot.jobs)).toEqual([])
+    }),
+  )
 })

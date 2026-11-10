@@ -336,8 +336,8 @@ const make = Effect.gen(function* () {
     return (yield* Cache.get(displayLoads, input.repoId + '\0' + String(input.limit))).state
   })
 
-  const graphNavigation = Effect.fn('jujutsu graph navigation')(function* (repoId: string) {
-    return yield* GraphNavigationReads.readGraphNavigation(repositories.run(yield* repositories.resolve(repoId)))
+  const graphNavigation = Effect.fn('jujutsu graph navigation')(function* (repoId: string, bookmark?: string) {
+    return yield* GraphNavigationReads.readGraphNavigation(repositories.run(yield* repositories.resolve(repoId)), bookmark)
   })
 
   const relationship = Effect.fn('jujutsu revision relationship')(function* (input: {
@@ -364,9 +364,13 @@ const make = Effect.gen(function* () {
     return yield* GraphNavigationReads.readGraphSlice({ run, commitId: yield* RevisionReads.resolveCommitId(run, input.commitId), mode: input.mode })
   })
 
-  const referenceGraph = Effect.fn('jujutsu reference graph')(function* (input: { readonly repoId: string; readonly reference: string }) {
+  const referenceGraph = Effect.fn('jujutsu reference graph')(function* (input: {
+    readonly repoId: string
+    readonly reference: string
+    readonly bookmark?: string | undefined
+  }) {
     const repo = yield* repositories.resolve(input.repoId)
-    return yield* ReferenceGraphModel.read({ run: repositories.run(repo), reference: input.reference })
+    return yield* ReferenceGraphModel.read({ run: repositories.run(repo), reference: input.reference, bookmark: input.bookmark })
   })
 
   /**

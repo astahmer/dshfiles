@@ -3,12 +3,13 @@ import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Clock, Context, Effect, FileSystem, Layer, Option, Path } from 'effect'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { CleanupKindView, CleanupResult, CleanupTarget } from './api.js'
-import { CleanupJobModel, type CleanupJobRequest, type CleanupTrigger } from './cleanup-jobs.js'
+import { CleanupJobModel, MAX_CLEANUP_MESSAGE_LENGTH, type CleanupJobRequest, type CleanupJobView, type CleanupTrigger } from './cleanup-jobs.js'
+import { CleanupOwnership } from './cleanup-ownership.js'
 import { CleanupRunner, type CleanupReporter } from './cleanup-runner.js'
 import { filterCleanupTargets } from './cleanup-targets.js'
 import { ActivityLog, SessionReads, WorkspaceRegistry } from './host-edges-promise.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
-import { JjSettings } from './jj-settings.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
 import { MergedPullRequests } from './merged-pull-requests.js'
@@ -50,7 +51,7 @@ const make = Effect.gen(function* () {
   const activity = yield* SessionActivity
   const requests = yield* IntegrationRequests
   const isolated = yield* IsolatedSessions
-  const settings = yield* JjSettings
+  const projectBookmarks = yield* ProjectBookmarks
   const sync = yield* WorkspaceSync
   const log = yield* ActivityLog
   const path = yield* Path.Path
@@ -82,6 +83,23 @@ const make = Effect.gen(function* () {
   })
 
   /**
+   * The repository that owns `target`: the last scan as cached (it never starts one, since the panel polls this, and it
+   * still knows a thread workspace whose folder is gone), then the cached location, then the jobs that already tied it
+   * to a project (a workspace cleanup half-removed). Null when nothing traces it, e.g. a folder outside every repository.
+   */
+  const owningRepository = Effect.fn('cleanup owner resolve')(function* (
+    target: string | null | undefined,
+    recorded: Effect.Effect<readonly CleanupJobView[]>,
+  ) {
+    if (target === null || target === undefined) return null
+    const known = CleanupOwnership.owner({ path, repositories: yield* views.cached, target })
+    if (known !== null) return known
+    const located = yield* views.bestEffortLocation(target)
+    if (Option.isSome(located)) return located.value.repoRoot
+    return CleanupOwnership.ownerFromJobs({ path, jobs: yield* recorded, target })
+  })
+
+  /**
    * Merged pull requests per thread Session, asked of every served provider of this plugin's own contract. A Host
    * without the provider (pull-requests not installed) simply marks nothing as merged, so those workspaces fall back to
    * `integrated` and are never removed for a reason nobody could verify.
@@ -105,9 +123,22 @@ const make = Effect.gen(function* () {
     return found
   })
 
-  const scan = Effect.fn('cleanup scan')(function* (input: CleanupRequest & { readonly apply: boolean; readonly trigger: CleanupTrigger }) {
+  const scan = Effect.fn('cleanup scan')(function* (
+    input: CleanupRequest & { readonly apply: boolean; readonly trigger: CleanupTrigger; readonly report?: CleanupReporter | undefined },
+  ) {
     const kinds = input.trigger === 'automatic' ? input.kinds.filter(kind => kind !== 'secondary') : input.kinds
-    const scopedRepoRoot = input.path === undefined ? undefined : (yield* threads.locate(input.path)).repoRoot
+    const requested = input.path
+    // A thread workspace whose folder is gone cannot locate itself, but its project still can be cleaned.
+    const scopedRepoRoot =
+      requested === undefined
+        ? undefined
+        : yield* threads.locate(requested).pipe(
+            Effect.map(location => location.repoRoot),
+            Effect.catch(error =>
+              Effect.flatMap(owningRepository(requested, Effect.succeed([])), owner => (owner === null ? Effect.fail(error) : Effect.succeed(owner))),
+            ),
+          )
+    if (scopedRepoRoot !== undefined && input.report !== undefined) yield* input.report.scoped(scopedRepoRoot)
     yield* views.invalidate
     const [registeredRepositories, currentActivity, sessionRecords] = yield* Effect.all(
       [
@@ -194,11 +225,13 @@ const make = Effect.gen(function* () {
           .pipe(Effect.catch(warnAndSkip('list secondary workspaces', repository.repoRoot)))
         // The registry canonicalizes the path it is given, so a workspace whose checkout folder is gone cannot be
         // resolved by path; matching the recorded one keeps that row cleanable instead of failing the whole scan.
-        const registeredByPath = new Map<string, Workspace>((yield* registry.list).map(workspace => [workspace.path, workspace]))
+        // jj and the registry may spell one Windows folder with a different drive-letter case or separator.
+        const pathKey = (candidate: string): string => (path.sep === '\\' ? candidate.replaceAll('/', '\\').toLowerCase() : candidate)
+        const registeredByPath = new Map<string, Workspace>((yield* registry.list).map(workspace => [pathKey(workspace.path), workspace]))
         // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- secondary workspaces are few and each registry read is a map lookup.
         for (const workspace of secondary) {
-          const resolved = workspace.missing ? registeredByPath.get(workspace.path) : yield* registry.resolveByPath(workspace.path)
-          const registered = resolved?.path === workspace.path ? resolved : undefined
+          const resolved = workspace.missing ? registeredByPath.get(pathKey(workspace.path)) : yield* registry.resolveByPath(workspace.path)
+          const registered = resolved !== undefined && pathKey(resolved.path) === pathKey(workspace.path) ? resolved : undefined
           workspaceIds.set(workspace.path, registered?.id ?? null)
           const sessionCwds = yield* Effect.filter(sessionRecords ?? [], record =>
             WorkspaceSessionPath.includes({ fileSystem, path, sessionCwd: record.cwd, workspacePath: workspace.path }),
@@ -315,17 +348,22 @@ const make = Effect.gen(function* () {
           yield* isolated.forget(workspace.path)
           const correlationId = randomUUID()
           yield* log.emit({ type: 'workspace.discarded', summary: `Removed JJ workspace ${workspace.name}`, path: workspace.path, correlationId })
-          if (workspace.kind !== 'secondary') yield* sync.enqueue({ repoRoot, bookmark: (yield* settings.get).bookmark, correlationId })
+          if (workspace.kind !== 'secondary') yield* sync.enqueue({ repoRoot, bookmark: yield* projectBookmarks.bookmarkFor(repoRoot), correlationId })
           workspaces.push({ ...workspace, outcome: 'removed' })
           yield* report.settleItem('removed')
           continue
         }
         if (result?.status === 'has-work') {
-          workspaces.push({ ...workspace, outcome: 'has-work', ...(result.error !== null && { message: result.error }) })
+          workspaces.push({ ...workspace, outcome: 'has-work', ...(result.error !== null && { message: result.error.slice(0, MAX_CLEANUP_MESSAGE_LENGTH) }) })
           yield* report.settleItem('kept')
           continue
         }
-        workspaces.push({ ...workspace, outcome: 'failed', message: result?.error ?? 'Workspace cleanup returned no result.' })
+        // The API caps a row message; a longer one (a deep thread path) would fail every read of the job.
+        workspaces.push({
+          ...workspace,
+          outcome: 'failed',
+          message: (result?.error ?? 'Workspace cleanup returned no result.').slice(0, MAX_CLEANUP_MESSAGE_LENGTH),
+        })
         yield* report.settleItem('failed')
       }
     }
@@ -334,7 +372,9 @@ const make = Effect.gen(function* () {
       yield* report.beginItem(entry.name)
       const removed = yield* threads.removeUntrackedEntry({ repoRoot: entry.repoRoot, name: entry.name }).pipe(Effect.result)
       untracked.push(
-        removed._tag === 'Success' ? { ...entry, outcome: 'removed' } : { ...entry, outcome: 'failed', message: removed.failure.message.slice(0, 400) },
+        removed._tag === 'Success'
+          ? { ...entry, outcome: 'removed' }
+          : { ...entry, outcome: 'failed', message: removed.failure.message.slice(0, MAX_CLEANUP_MESSAGE_LENGTH) },
       )
       yield* report.settleItem(removed._tag === 'Success' ? 'removed' : 'failed')
     }
@@ -357,7 +397,14 @@ const make = Effect.gen(function* () {
     return result
   })
 
+  /** A failure lands in the activity timeline on the repository that owns it, with the reason and the safe next step. */
+  const reportSettled = Effect.fnUntraced(function* (job: CleanupJobView) {
+    for (const failure of CleanupOwnership.failures(job))
+      yield* log.emit({ type: 'workspace.cleanup-failed', summary: failure.summary, detail: failure.detail, path: failure.repoRoot, level: 'attention' })
+  })
+
   const runner = yield* CleanupRunner.make({
+    onSettled: reportSettled,
     execute: ({ request, report }) =>
       Effect.gen(function* () {
         const planned = yield* scan({
@@ -367,6 +414,7 @@ const make = Effect.gen(function* () {
           targets: request.targets,
           apply: true,
           trigger: request.trigger,
+          report,
         })
         yield* report.planned(planned.workspaces.length + planned.untracked.length)
         return yield* apply({ scan: planned, trigger: request.trigger, report })
@@ -384,17 +432,32 @@ const make = Effect.gen(function* () {
     } satisfies CleanupResult
   })
 
+  /** A request without a folder (a settle) still belongs to a project when every workspace it targets does. */
+  const start = Effect.fn('cleanup start')(function* (request: CleanupJobRequest) {
+    const repoRoot = request.path === null ? CleanupOwnership.ownerOfTargets(request.targets ?? []) : yield* owningRepository(request.path, runner.trail)
+    return yield* runner.start(request, repoRoot)
+  })
+
   const startManual = (input: CleanupRequest) => {
     const scope = { path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' as const }
-    return runner.start(input.targets === undefined ? scope : { ...scope, targets: [...input.targets] })
+    return start(input.targets === undefined ? scope : { ...scope, targets: [...input.targets] })
   }
+
+  /** The trail, or only the jobs of the repository that owns `forPath` (a project or one of its thread workspaces). */
+  const jobs = Effect.fn('cleanup jobs read')(function* (forPath?: string | undefined) {
+    const trail = yield* runner.trail
+    if (forPath === undefined) return { repoRoot: null, jobs: trail }
+    const repoRoot = yield* owningRepository(forPath, Effect.succeed(trail))
+    yield* Effect.annotateCurrentSpan({ 'dshx.cleanup.owner_found': repoRoot !== null })
+    return { repoRoot, jobs: repoRoot === null ? trail : trail.filter(job => CleanupJobModel.belongsTo(job, repoRoot)) }
+  })
 
   return {
     preview,
     startManual,
-    start: (request: CleanupJobRequest) => runner.start(request),
+    start,
     live: runner.live,
-    jobs: runner.trail,
+    jobs,
   }
 })
 

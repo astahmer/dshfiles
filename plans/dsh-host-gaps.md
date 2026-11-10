@@ -132,6 +132,7 @@ resources use the supported plugin-owned route in row 65.
 | 99 | The first connection re-announces `connection/reset` after `apply` reads | core client connection carrier; native `ui-settings`, `ui-cordis`; forks `agent-preset`, `model-selection` | host | upstream | Every native store reads once in `apply` and again on `connection/reset`, which the first connection also emits a few hundred ms later (`ui-settings` documents it: "startup normally costs two reads", budgeted in its `startup-rpc-budget` e2e). Scratch fresh load 2026-11-06: `settings/describe` ×2 (281 KB each), `dynamicCordisRunner/inventory` ×2, plus one extra `session/modelCatalog` and `agentPresets/list`. The second read is the only guard against an invalidation lost before the event stream connected, so a store cannot drop it safely. Upstream ask: a connection generation on the context (or no reset for the first connection), so a store whose `apply` read already belongs to the current connection skips the duplicate. |
 | 100 | Teach the exit in `send_message`'s parent refusal | thread-sidebar (contract), native `dsh-tool-subagent-control` | host | upstream | b:22t4: `send_message` on a thread started with `thread_create` refuses with `subagent "<id>" belongs to another parent session`. The refusal is correct — a created thread is a root thread, not a child — but it names no working channel, so the Agent guesses; no plugin can rewrite another tool's error text. Workaround shipped: the `AGENTS.md` waiting table and `docs/agent-tool-parity.md` now name the channel per relation (`thread_prompt` for a thread you started, `dshx_comm_send` for any other top-level thread). Upstream ask: append that alternative to the refusal. |
 | 101 | Opt-in completion notices between threads | thread-sidebar | host | own | b:eqtb: nothing wakes an Agent for a thread it started with `thread_create`/`thread_fork`, so it stalls unless it polls or arms a reminder. No native verb subscribes one thread to another's completion. Plugin-owned implementation shipped in `@dshfiles/thread-sidebar`: durable `thread_subscriptions` storage domain, `thread_subscribe`/`thread_unsubscribe`/`thread_subscriptions` tools plus a thread-menu toggle and row badge, and a watcher over the public `session/event` stream that classifies `turn/end` and delivers ONE compact notice through session-controller's `sessions.message` with `wake: true` (the same inbox path native subagent settlement uses). Nothing is delivered without an edge, so the default stays silent. Residual, owned: no Host event publishes archive/unarchive, so an edge whose endpoint is archived elsewhere is dropped on the next delivery pass or by the archive path this plugin performs, not at the archive instant; notices also mirror completion classification and answer previews the Host has no subscription contract for, so a native subscription verb would remove that duplication. |
+| 102 | Byte-bounded prepared-session cache | session-search | host | upstream | The core `SessionQueryEngine` retains up to `preparedSessionCacheSize` (default 5) restored cold Sessions, and each prepared Session holds that Session's whole decoded log: five of them retained 1,376 MB of the live Host's heap (sampled at `SessionLogScanner.write`, 2026-11-08). The owned backend can only lower the entry count — `profiles/web` now runs 1 — while bounding by retained bytes, or streaming one page from the log instead of materialising the Session, needs the core engine. |
 
 ### Row 76 detail — answered native question form flashes back
 
@@ -307,6 +308,20 @@ hook, the payload, and what a plugin does with it today. Filing is a public post
 6. **`traceparent` on native requests (row 85).** Let the browser Connection forward a `traceparent` header (or
    envelope field) on every RPC, and have native controllers (`session/follow`, `session/create`, `session/prompt`)
    expose it to plugin listeners, so a browser interaction and the Host work it starts are one trace.
+
+### Draft ready to file: session replay retention
+
+One ask, with the 2026-11-09 measurement in [RAM usage](../docs/ram-usage.md#what-the-memory-is):
+
+1. **Trim settled attempt streams.** A restarted Host with 6 attached clients holds a 2.82 GB live heap; 2.03 GB of it
+   is strings under `assistant/message → data.stream[] → chunk.replayState.blocks[] → thinkingSignature` for the live
+   Sessions. Dropping the _duplicate_ stream copy is now done locally by the
+   [`@dshfiles/agent-loop` fork](../plugins/@dshfiles/agent-loop/README.md), measured at 433 KB per 760 messages
+   (~9.5 % of `assistant/message` bytes) — useful, but it does not explain a multi-GB heap. What is left to ask upstream
+   is the real question: a supported _retention_ bound for decoded Session events (per-client replay copies, the
+   `request/header` tool catalog repeated per request group), or a documented "safe to drop after settle" guarantee for
+   the whole embedded stream so older settled attempts can be trimmed. A client-side per-thread bound is the matching
+   ask for the browser tab, measured at 3.3 GB in one renderer. Not filed: publishing is the user's call.
 
 ## Triage, 2026-10-19
 

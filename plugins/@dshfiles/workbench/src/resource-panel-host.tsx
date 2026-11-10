@@ -1,10 +1,19 @@
-import { useLayoutEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { sidebarResourcePanels } from '@dshfiles/sidebar-right/resource-panels'
 import type { WorkbenchPanelProps } from './registry.js'
+
+/**
+ * How long an attached resource panel may stay empty before the shell says so. The declarer portals a tab body into
+ * the element on its own render pass, so an empty child list at attach time is normal; a panel that never receives one
+ * would otherwise stay a blank tab with only its title.
+ */
+const NO_VIEW_DELAY_MS = 800
 
 /** The sidebar declarer portals genuine scoped slots into this element; no renderer authority crosses here. */
 export const ResourcePanelHost = (props: WorkbenchPanelProps): JSX.Element => {
   const target = useRef<HTMLDivElement>(null)
+  const [empty, setEmpty] = useState(false)
   useLayoutEffect(() => {
     const element = target.current
     if (element === null) return
@@ -14,7 +23,33 @@ export const ResourcePanelHost = (props: WorkbenchPanelProps): JSX.Element => {
     const element = target.current
     if (element !== null) sidebarResourcePanels().setVisible(props.panelId, element, props.visible ?? true)
   }, [props.panelId, props.visible])
-  return <div ref={target} className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col" />
+  useEffect(() => {
+    const element = target.current
+    if (element === null) return
+    const review = (): void => setEmpty(element.childElementCount === 0)
+    const observer = new MutationObserver(review)
+    observer.observe(element, { childList: true })
+    const timer = globalThis.setTimeout(review, NO_VIEW_DELAY_MS)
+    return () => {
+      observer.disconnect()
+      globalThis.clearTimeout(timer)
+    }
+  }, [props.panelId])
+  return (
+    <div className="dshx-root dshx:relative dshx:h-full dshx:min-h-0">
+      <div ref={target} className="dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col" />
+      {empty ? (
+        <div className="dshx:absolute dshx:inset-0 dshx:flex dshx:flex-col dshx:items-center dshx:justify-center dshx:gap-3 dshx:p-4 dshx:text-center">
+          <p className="dshx:text-sm dshx:text-muted-foreground" role="status">
+            This panel has no view to show.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => props.onClose?.() ?? sidebarResourcePanels().close(props.panelId)}>
+            Close panel
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 /**

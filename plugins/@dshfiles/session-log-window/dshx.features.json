@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "bounded-session-log-window",
+      "title": "Read a stored Session log by its window, not its whole event list",
+      "summary": "Serve the newest events, the first events and the events a predicate selects from one bounded byte window of the JSONL zstd log, so a reader that needs a few events never decodes 86 MB of a large Session; the tail also folds the projection cache's checkpoint over the window.",
+      "surfaces": ["host", "storage"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
+      "configuration": [],
+      "states": ["tail", "head", "whole-log-fallback"],
+      "failureModes": [
+        "A backend, format or log the window cannot parse answers undefined, and the caller falls back to the full read instead of receiving a short window.",
+        "A projection checkpoint that lags past the decoded window refuses to restore, so a fold never starts from rows the window cannot prove."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-log-window.tail-matches-full-read",
+          "file": "plugins/@dshfiles/session-log-window/src/window.test.ts",
+          "testName": "decodes the same events as the full log read, from the newest frames back to the first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-log-window.recent-events",
+          "file": "plugins/@dshfiles/session-log-window/src/window.test.ts",
+          "testName": "finds the newest matching events without decoding a log larger than the window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-log-window.head",
+          "file": "plugins/@dshfiles/session-log-window/src/window.test.ts",
+          "testName": "reads the first events of a log far larger than the head window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-log-window.no-backend",
+          "file": "plugins/@dshfiles/session-log-window/src/window.test.ts",
+          "testName": "answers undefined for a Host with no JSONL persistence backend"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "The package performs file reads for a calling Host plugin, which owns the span and records the window's bytes and phases as attributes."
+        }
+      ]
+    }
+  ],
+  "ioDelegation": [
+    {
+      "file": "plugins/@dshfiles/session-log-window/src/window.ts",
+      "tracedBy": "session tail read",
+      "reason": "Every open runs inside the calling plugin's session tail read span, which records the window's bytes, frames and per-phase timings."
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import type { StorageListInput, StoredEntry } from '@dshfiles/dshx/api'
+import type { StoredEntry } from '@dshfiles/dshx/api'
 import { PluginStorage } from '@dshfiles/dshx/effect/plugin-storage'
 import { Context, Effect, Layer, Option, Schema, Semaphore, Stream } from 'effect'
 import { automationRecordSchema, runRecordSchema, type AutomationRecord, type RunRecord } from './automations-api.js'
@@ -40,16 +40,12 @@ const make = Effect.gen(function* () {
   const lock = yield* Semaphore.make(1)
   const failed = (operation: string) => (cause: unknown) => new AutomationStorageFailure({ operation, cause })
 
+  /**
+   * Every entry under one prefix, in key order. `run/` holds thousands of keys, and paging it at the wire maximum made
+   * each page re-scan and re-sort the shared key table, so one snapshot read replaces the whole cursor walk.
+   */
   const listEntries = Effect.fn('automation store list')(function* (prefix: string) {
-    const out: StoredEntry[] = []
-    let cursor: string | undefined
-    do {
-      const input: StorageListInput = cursor === undefined ? { prefix, limit: 500 } : { prefix, limit: 500, cursor }
-      const page = yield* storage.list(input).pipe(Effect.mapError(failed('list')))
-      out.push(...page.entries)
-      cursor = page.cursor ?? undefined
-    } while (cursor !== undefined)
-    return out
+    return yield* storage.listAll({ prefix }).pipe(Effect.mapError(failed('list')))
   })
 
   const decodeAll = <A>(entries: readonly StoredEntry[], decode: (entry: StoredEntry) => Option.Option<A>) => {
@@ -73,10 +69,35 @@ const make = Effect.gen(function* () {
   /** Runs newest first: of one automation, or of every automation. */
   const runs = Effect.fn('automation store runs')(function* (input: { readonly automationId?: string | undefined; readonly limit: number }) {
     const entries = yield* listEntries(input.automationId === undefined ? RUN_PREFIX : runPrefix(input.automationId))
-    // The key starts with the zero-padded start time, so the newest runs are the last keys: history older than the
-    // requested rows is never decoded.
-    const newest = entries.toSorted((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0)).slice(0, input.limit)
-    return decodeAll(newest, entry => decodeRun(entry.value)).toSorted((a, b) => b.startedAt - a.startedAt)
+    const byAutomation = new Map<string, StoredEntry[]>()
+    for (const entry of entries) {
+      const prefix = entry.key.slice(0, entry.key.lastIndexOf('/') + 1)
+      const group = byAutomation.get(prefix)
+      if (group === undefined) byAutomation.set(prefix, [entry])
+      else group.push(entry)
+    }
+    /**
+     * Keys sort by start time within an automation, so only its newest `limit` keys can reach the result; runs sharing
+     * the cut-off start time are kept too, so ties resolve as a full sort would.
+     */
+    const candidates: RunRecord[] = []
+    for (const [prefix, group] of byAutomation) {
+      const newest: RunRecord[] = []
+      let cutoffStamp: string | undefined
+      for (const entry of group.toReversed()) {
+        const stamp = entry.key.slice(prefix.length, prefix.length + 15)
+        if (newest.length >= input.limit && stamp !== cutoffStamp) break
+        Option.match(decodeRun(entry.value), {
+          onNone: () => undefined,
+          onSome: run => {
+            newest.push(run)
+            cutoffStamp = stamp
+          },
+        })
+      }
+      candidates.push(...newest.toReversed())
+    }
+    return candidates.toSorted((a, b) => b.startedAt - a.startedAt).slice(0, input.limit)
   })
 
   const recordRun = Effect.fn('automation store record run')(function* (run: RunRecord) {
@@ -128,5 +149,6 @@ export class AutomationStore extends Context.Service<
     readonly changes: Stream.Stream<void>
   }
 >()('@dshfiles/project-automations/AutomationStore') {
-  static readonly layer = Layer.effect(AutomationStore, make).pipe(Layer.provide(PluginStorage.layerFor(NAMESPACE)))
+  static readonly layerWithoutStorage = Layer.effect(AutomationStore, make)
+  static readonly layer = AutomationStore.layerWithoutStorage.pipe(Layer.provide(PluginStorage.layerFor(NAMESPACE)))
 }

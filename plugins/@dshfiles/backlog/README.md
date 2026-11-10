@@ -133,7 +133,9 @@ Feed, Inbox, Items, Board, search results and project item groups share Cmd/Ctrl
 Shift-click ranges. Plain clicks keep the existing open behavior and clear the batch. Right-click a selected
 item to apply the menu's counted actions to the entire selection, including the existing explicit permanent-delete
 confirmation. Filter changes and collapsed Items groups remove hidden targets; project overview groups keep separate
-selection scopes. Items also has select-all-visible and the batch action bar.
+selection scopes. Items also has select-all-visible and the batch action bar. The bar stays on one line and never
+hides the last row: below 42rem its buttons keep only their icon, and below 28rem Set kind, Pin and Unpin move into
+More actions.
 
 Status, kind and drops update the view before the Host answers. While you type, chips under the capture
 box show the kind, tags and links triage will derive.
@@ -236,10 +238,10 @@ changes and can be reverted), never parsed out of its description.
   occurrence: same title, body, kind, priority, tags, project and parent, criteria unchecked, due one step after the
   previous due date and past today. The rule moves to the new item and both link each other, so reopening and closing
   the old one never creates a second occurrence. No automation is involved.
-- **Gates** (**Waits on**): an item can wait on a pull request merging, a jj revision reaching `main`, a project check
+- **Gates** (**Waits on**): an item can wait on a pull request merging, a jj revision reaching the project's main branch, a project check
   passing in a thread linked to the item, or a date. An open gate keeps it out of the Ready view (`is:gated`) and shows
   an hourglass chip. A Host gate watch resolves them on the `revisionPollMinutes` cadence from what the Host already
-  watches: pull-request state through `@dshfiles/pull-requests`, one `jj log` per repository for `main`, and
+  watches: pull-request state through `@dshfiles/pull-requests`, one `jj log` per repository for its main branch, and
   `@dshfiles/project-checks` receipts. A date gate follows the calendar and is never stored as met.
 - **Pull requests**: GitHub pull and GitLab merge-request URLs are PR links. **Link PR…** in the inspector or
   `backlog_link_pr` links one as `fixes` (or `implements` with `closes: false`) and asks `@dshfiles/pull-requests` to
@@ -336,6 +338,20 @@ in the toast and nothing is started, so a jj failure never falls back to a share
 Failures after creation keep the thread and the toast still offers it: a refused model switch leaves the Host default
 model, and a failed link is logged rather than losing the thread.
 
+### A start survives a Host restart
+
+A start is written to the backlog's own SQLite file before its Session exists: the item ids, the agent, the placement,
+the model route and the prompt request id. The row is refreshed after every step (create, model, rename, prompt) and
+removed once the thread is prompted and the items are linked, so a row a boot still finds is work the user already
+asked for. The recovery pass runs ten seconds after boot and every twenty seconds after that: it takes a row nobody
+refreshed for 45 seconds, reuses the Session that start created, links the items and clears the row. The opening message
+is always prompted with the request id recorded by the start: the Host answers `accepted` for a message it already
+holds, so a resumed start never delivers it twice and never drops it. Nothing is created twice, and a start a live Host is
+still running is skipped. A start that keeps failing (three attempts, or ten minutes) becomes a comment and a
+`blocked` flag on its item naming the handle to reply with, so a lost thread is visible instead of silent. This covers
+the window between `sessions.create` and the item link: the comment that asked for the thread was already saved, so the
+recovered start is the same request, not a new one.
+
 ### Smart reply routing
 
 Off by default (Settings → `dshfiles-backlog` → _Smart thread routing_); plain replies stay regular comments by default, so adding context cannot unexpectedly start a thread. Turn it on to classify plain replies before they are saved; when configured Jev receives that submitted text using the same Host-held TypeSafe credential as triage. Jev starts a linked `@dsh` thread when confidence meets _Reply thread threshold_. If Jev is off, its key is unavailable, or the request fails, a conservative leading-verb keyword fallback routes explicit work requests and leaves other text as a reply. A leading `@agent` remains an explicit, deterministic dispatch and does not need Jev.
@@ -409,7 +425,7 @@ work.
 On by default (`lifecycleSignals`). Items move without anyone filing them:
 
 - A user message that mentions `b:k3f9` (or a legacy `b:12`) links that thread to the item and moves it to In progress.
-- A revision on `main` whose description says `Closes b:k3f9` (also `Fixes`, `Resolves`, `Completes`,
+- A revision on the project's main branch (`main` unless jj-integration resolves another for that repository) whose description says `Closes b:k3f9` (also `Fixes`, `Resolves`, `Completes`,
   `Implements`; several ids with commas or `and`) links that revision and moves the item to Done. A bare
   mention such as `part of b:12` closes nothing.
 - A linked thread whose turn ended **blocked** or **failed** marks its open items as blocked, so they reach the
@@ -424,8 +440,8 @@ attention you set by hand; the link is recorded either way. Only the block this 
 so a `blocked` an agent flagged itself stays until someone clears it or closes the item. Closing an item clears
 agent/system attention and pending suggestions; closed items stay out of the Inbox even if older stored state still
 has a flag. Hand-set attention is preserved on the item and can resurface if it is reopened. Revisions are read with
-`jj log --ignore-working-copy` on `main` every `revisionPollMinutes` (5) in each repository an open item
-names, plus `revisionRepositories`; an unchanged `main` costs one call.
+`jj log --ignore-working-copy` on that main branch every `revisionPollMinutes` (5) in each repository an open item
+names, plus `revisionRepositories`; an unchanged main branch costs one call.
 
 Working on an item is the Agent's job past that point: every thread is told (a system-prompt section, not just
 the tool descriptions) to move the item to Done with `backlog_update` once the thread resolved it, and when only

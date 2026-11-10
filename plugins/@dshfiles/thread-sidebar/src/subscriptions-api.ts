@@ -40,6 +40,10 @@ const renderSubscriptions = (output: ThreadSubscriptionsSnapshot): string =>
  * Opt-in completion notices between threads. An Agent subscribes the thread it runs before ending a turn that waits
  * on another thread; while subscribed, that thread's turn completion queues one compact notice into the subscriber,
  * which wakes it when it is idle. The subscription is durable Host state and shows in the sidebar's thread menu.
+ *
+ * The tool inputs are plain `Schema.Struct`, never `SchemaHelpers.strictStruct`: a strict-Struct wrapper publishes no
+ * object JSON Schema, so dshx registers the tool as taking no arguments and every call fails input validation. The
+ * contract's own Standard Schema adapter still rejects unknown keys (`onExcessProperty: 'error'`).
  */
 export const threadSubscriptionsApi = defineApi({
   id: 'thread-subscriptions',
@@ -47,19 +51,17 @@ export const threadSubscriptionsApi = defineApi({
   owner: '@dshfiles/thread-sidebar',
   methods: {
     state: method({
-      input: SchemaHelpers.strictStruct(
-        Schema.Struct({
-          subscriberSessionId: Schema.optional(sessionIdSchema),
-          targetSessionId: Schema.optional(sessionIdSchema),
-        }),
-      ),
+      input: Schema.Struct({
+        subscriberSessionId: Schema.optional(sessionIdSchema),
+        targetSessionId: Schema.optional(sessionIdSchema),
+      }),
       output: threadSubscriptionsSchema,
       description:
         'List thread subscriptions: which thread is notified when which other thread finishes a turn. Filter by subscriber or target; omit both for every edge. Nothing is delivered without a subscription. Read-only.',
       tool: { name: 'thread_subscriptions', readOnly: true, render: renderSubscriptions },
     }),
     subscribe: method({
-      input: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema, subscriberSessionId: Schema.optional(sessionIdSchema) })),
+      input: Schema.Struct({ sessionId: sessionIdSchema, subscriberSessionId: Schema.optional(sessionIdSchema) }),
       output: threadSubscriptionsSchema,
       description: `Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) is queued into the subscriber and wakes it when it is idle. Defaults the subscriber to the calling thread. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.`,
       tool: {
@@ -70,7 +72,7 @@ export const threadSubscriptionsApi = defineApi({
       },
     }),
     unsubscribe: method({
-      input: SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema, subscriberSessionId: Schema.optional(sessionIdSchema) })),
+      input: Schema.Struct({ sessionId: sessionIdSchema, subscriberSessionId: Schema.optional(sessionIdSchema) }),
       output: threadSubscriptionsSchema,
       description: `Stop the notices for one pair: no further completion of the target reaches the subscriber. Defaults the subscriber to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: {

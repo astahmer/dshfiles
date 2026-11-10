@@ -2,23 +2,11 @@ import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  LayersIcon,
-  LinkIcon,
-  MessageSquareIcon,
-  MessagesSquareIcon,
-  PinIcon,
-  PlusIcon,
-  WandSparklesIcon,
-  XIcon,
-} from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronRightIcon, LayersIcon, LinkIcon, MessageSquareIcon, PinIcon, PlusIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useVirtualizer } from '@dshfiles/plugin-ui/virtual'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -38,6 +26,7 @@ import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
 import { BacklogReference } from './backlog-reference.js'
+import { BulkSelectionBar, bulkSelectionBarClearance } from './bulk-selection-bar.js'
 import { DueDates } from './due-date.js'
 
 type GroupBy = 'status' | 'kind' | 'project' | 'attention' | 'priority' | 'parent' | 'due'
@@ -451,6 +440,7 @@ export const ItemsView = (props: {
     estimateSize: index => (entries[index]?.kind === 'row' ? 40 : 36),
     getItemKey: index => entries[index]?.key ?? index,
     overscan: 12,
+    paddingEnd: selected.size === 0 ? 0 : bulkSelectionBarClearance,
   })
   return (
     <div className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
@@ -589,66 +579,15 @@ export const ItemsView = (props: {
         </div>
       </div>
       {selected.size === 0 ? null : (
-        <div className="dshx:absolute dshx:bottom-4 dshx:left-1/2 dshx:z-30 dshx:flex dshx:max-w-[calc(100%-1rem)] dshx:-translate-x-1/2 dshx:flex-wrap dshx:items-center dshx:justify-center dshx:gap-1 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-bottom-2">
-          <span title="Shift-click selects a range; Cmd/Ctrl-click toggles items" className="dshx:mr-2 dshx:tabular-nums">
-            {selected.size} selected
-          </span>
-          <button
-            type="button"
-            onClick={startThreadForSelection}
-            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent"
-          >
-            <MessagesSquareIcon aria-hidden className="dshx:size-3.5" /> Start thread
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent">
-              Move to <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="dshx-root">
-              {BacklogItems.statuses.map(status => (
-                <DropdownMenuItem key={status} className="dshx:gap-2 dshx:text-[13px]" onSelect={() => updateSelected({ status })}>
-                  <ItemGlyphs.StatusIcon status={status} />
-                  {ItemGlyphs.statusLabels[status]}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent">
-              Set kind <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="dshx-root">
-              {BacklogItems.kinds.map(kind => (
-                <DropdownMenuItem key={kind} className="dshx:gap-2 dshx:text-[13px]" onSelect={() => updateSelected({ kind })}>
-                  <ItemGlyphs.KindIcon kind={kind} />
-                  {ItemGlyphs.kindLabels[kind]}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <button
-            type="button"
-            onClick={() => updateSelected({ pinned: true })}
-            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent"
-          >
-            <PinIcon className="dshx:size-3.5" /> Pin
-          </button>
-          <button
-            type="button"
-            onClick={() => updateSelected({ pinned: false })}
-            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent"
-          >
-            Unpin
-          </button>
-          <button
-            type="button"
-            aria-label="Clear selection"
-            onClick={clearSelection}
-            className="dshx:rounded-md dshx:p-1.5 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
-          >
-            <XIcon className="dshx:size-3.5" />
-          </button>
-        </div>
+        <BulkSelectionBar
+          count={selected.size}
+          onStartThread={startThreadForSelection}
+          onClear={clearSelection}
+          onPin={() => updateSelected({ pinned: true })}
+          onUnpin={() => updateSelected({ pinned: false })}
+          onStatus={status => updateSelected({ status })}
+          onKind={kind => updateSelected({ kind })}
+        />
       )}
     </div>
   )

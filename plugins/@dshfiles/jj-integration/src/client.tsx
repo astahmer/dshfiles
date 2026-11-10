@@ -40,6 +40,7 @@ import { ThreadPreparation, ThreadWarmup } from './thread-warmup.js'
 import { awaitWorkspaceSetup, SETUP_WAIT_TIMEOUT_MS, setupWaitsForRun } from './workspace-setup-wait.js'
 import { WorkspaceSetupDock } from './workspace-setup-dock.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
+import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
@@ -49,6 +50,9 @@ import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSet
 import { requestThreadSettle } from './settle-request.js'
 import { requestReplaceThreadTab } from './main-tab-replacement.js'
 import { TurnEndStatusRefreshModel, type TurnEndStatusRefresh } from './turn-end-status-refresh.js'
+import { useProjectBookmark } from './project-bookmark-query.js'
+import { ProjectMainBranchPanel } from './project-main-branch-panel.js'
+import { ProjectSettingsPanels, type ProjectSettingsPanelProps } from '@dshfiles/workspace-folder-picker/project-settings-panels'
 import { NativeAsideOwners } from '@dshfiles/workbench/registry'
 
 const PANEL_ID = 'jj-integration'
@@ -125,6 +129,16 @@ export default defineClient({
       return changes?.status === 'active' ? changes.value.review(input) : false
     }
     const changesAvailable = (): boolean => metadata?.plugin?.use(Changes).get()?.status === 'active'
+    // Settings › Projects (workspace-folder-picker) shows each project's main branch, chosen here.
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      const MainBranch = (props: ProjectSettingsPanelProps): JSX.Element => (
+        <PluginQueryProvider>
+          <ProjectMainBranchPanel {...props} />
+        </PluginQueryProvider>
+      )
+      plugin.add(ProjectSettingsPanels, { id: 'main-branch', order: 0, Panel: plugin.bind(MainBranch) })
+    }
     ctx.effect(() => {
       const sheet = document.createElement('style')
       sheet.dataset.dshfilesRemoteDestination = ''
@@ -360,7 +374,7 @@ export default defineClient({
         }
       }, [newestTurnHasEnded, props.turn.end?.time, queryClient, status.dataUpdatedAt, statusQueryKey, statusRefresh])
       const turnEndRefreshIsPending = TurnEndStatusRefreshModel.turnEndRefreshPending(statusRefresh)
-      const bookmark = useBookmark()
+      const bookmark = useProjectBookmark(path, useBookmark())
       const thread = status.data?.thread
       const [previousThread, setPreviousThread] = useState(thread)
       useEffect(() => {
@@ -388,20 +402,13 @@ export default defineClient({
       // The workspace's activity, not just this Session's: a sibling thread writing in the same workspace blocks
       // integration here exactly as it blocks the header control.
       const readWorkspaceRunning = useCallback(
-        (): boolean =>
-          Object.values(ctx.sessions.list.getSnapshot().byId).some(
-            session => session.running && (threadSessionIds.includes(String(session.id)) || (threadPath !== undefined && session.cwd === threadPath)),
-          ),
+        (): boolean => WorkspaceActivityIndex.isRunning({ byId: ctx.sessions.list.getSnapshot().byId, sessionIds: threadSessionIds, path: threadPath }),
         [threadSessionIds, threadPath],
       )
-      const readWorkspaceQuestion = useCallback((): boolean => {
-        const sessions = ctx.sessions.list.getSnapshot().byId
-        const asks = (session: SessionSummary | undefined): boolean => ThreadRebaseEligibilityModel.hasPendingUserQuestion(session?.projectionValues) === true
-        return (
-          threadSessionIds.some(sessionId => asks(sessions[SessionId(sessionId)])) ||
-          (threadPath !== undefined && Object.values(sessions).some(session => session.cwd === threadPath && asks(session)))
-        )
-      }, [threadSessionIds, threadPath])
+      const readWorkspaceQuestion = useCallback(
+        (): boolean => WorkspaceActivityIndex.hasQuestion({ byId: ctx.sessions.list.getSnapshot().byId, sessionIds: threadSessionIds, path: threadPath }),
+        [threadSessionIds, threadPath],
+      )
       const readClientCanRebase = useCallback(
         (): boolean | undefined =>
           ThreadRebaseEligibilityModel.canRebase(threadSessionIds, sessionId => {
@@ -758,7 +765,7 @@ export default defineClient({
     const sharedWorkspaceMoves = new Map<string, DeferredMove>()
     const sharedThreadWorkspaceMove = (sessionId: SessionSummary['id'], workspaceId: string): DeferredMove | undefined => {
       const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
-      if (workspace === undefined || !Schema.is(threadWorkspaceNameEffect)(workspace.path.split('/').at(-1))) return undefined
+      if (workspace === undefined || !Schema.is(threadWorkspaceNameEffect)(workspace.path.split(/[\\/]/u).at(-1))) return undefined
       if (!workspaceHasOtherSession({ sessionId, workspaceSessionIds: workspace.sessionIds })) return undefined
       const key = `${sessionId}\u0000${workspaceId}`
       const cached = sharedWorkspaceMoves.get(key)
@@ -857,7 +864,7 @@ export default defineClient({
         if (input.request.base === undefined) return
         // Reusing a client spare skips the Host rename, so the requested name is not always the folder's: read it back.
         const listed = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === input.workspaceId)
-        const name = listed?.path.split('/').at(-1) ?? input.name
+        const name = listed?.path.split(/[\\/]/u).at(-1) ?? input.name
         workspaceToggle.getSnapshot().context.client.keepSpare(WorkspaceToggle.spareKey(input.request.projectWorkspaceId, input.request.base), {
           workspaceId: input.workspaceId,
           name,

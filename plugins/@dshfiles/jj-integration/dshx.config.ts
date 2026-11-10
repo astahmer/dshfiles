@@ -8,8 +8,9 @@ export default defineConfig({
     settings: 'src/settings.ts',
     'merged-pull-requests': 'src/merged-pull-requests.ts',
     'no-folder': 'src/no-folder.ts',
+    'project-bookmark': 'src/project-bookmark-query.ts',
   },
-  host: { entry: 'src/host.ts', bundleDependencies: ['@dshfiles/vcs-provider-port', '@dshfiles/jj-cli', '@dshfiles/git-cli'] },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/vcs-provider-port', '@dshfiles/jj-cli', '@dshfiles/git-cli'] },
   client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

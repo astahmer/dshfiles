@@ -65,8 +65,28 @@ describe('ModelCatalogDirectory.scheduleRefresh', () => {
     catalog.scheduleRefresh()
     await vi.advanceTimersByTimeAsync(50)
     catalog.scheduleRefresh()
-    await vi.advanceTimersByTimeAsync(50)
+    await vi.advanceTimersByTimeAsync(1_000)
     expect(modelCatalog).toHaveBeenCalledTimes(3)
+  })
+
+  it('reads twice for the bursts of one thread switch, the last read starting after the last event', async () => {
+    const { catalog, modelCatalog } = fixture()
+    await catalog.load()
+    const readsStartedAt: number[] = []
+    modelCatalog.mockImplementation(async () => {
+      readsStartedAt.push(performance.now())
+      return { ok: true as const, value: catalogValue }
+    })
+    let lastEventAt = 0
+    for (let burst = 0; burst < 6; burst += 1) {
+      lastEventAt = performance.now()
+      catalog.scheduleRefresh()
+      await vi.advanceTimersByTimeAsync(150)
+    }
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(modelCatalog).toHaveBeenCalledTimes(3)
+    expect(readsStartedAt.at(-1)).toBeGreaterThan(lastEventAt)
+    expect(catalog.store.getSnapshot()).toEqual({ value: catalogValue, status: 'ready', error: null })
   })
 
   it('shares one catalog read with another owner refreshing for the same burst', async () => {
@@ -113,8 +133,29 @@ describe('ModelCatalogDirectory.scheduleRefresh', () => {
     const { catalog, modelCatalog } = fixture()
     await catalog.load()
     catalog.scheduleRefresh()
-    catalog.resetGeneration()
+    catalog.connectionReset()
     await vi.advanceTimersByTimeAsync(50)
+    expect(modelCatalog).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('ModelCatalogDirectory.connectionReset', () => {
+  it('reads once at boot: reads wait for the first connected generation, which needs no reread', async () => {
+    const ctx = new Context()
+    const modelCatalog = vi.fn(async () => ({ ok: true as const, value: catalogValue }))
+    ctx.provide('remote', { session: { modelCatalog } })
+    const catalog = new ModelCatalogDirectory(ctx, false)
+    const boot = catalog.load()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(modelCatalog).not.toHaveBeenCalled()
+
+    catalog.connectionReset()
+    await boot
+    expect(modelCatalog).toHaveBeenCalledTimes(1)
+    expect(catalog.store.getSnapshot().status).toBe('ready')
+
+    catalog.connectionReset()
+    await vi.advanceTimersByTimeAsync(0)
     expect(modelCatalog).toHaveBeenCalledTimes(2)
   })
 })

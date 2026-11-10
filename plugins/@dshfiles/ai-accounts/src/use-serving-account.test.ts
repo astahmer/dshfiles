@@ -17,11 +17,12 @@ describe('serving account query boundary', () => {
         },
         'one',
         true,
+        null,
       )
       expect(await client.fetchQuery(absent)).toBeNull()
       expect(servingAccountPollInterval(true, client.getQueryData(absent.queryKey))).toBe(false)
       for (const value of [{}, snapshot('other'), { ...snapshot('one'), lastSuccessful: { accountId: 'guessed' } }]) {
-        expect(await client.fetchQuery(servingAccountQuery({ snapshot: async () => wire(value) }, 'one', false))).toBeNull()
+        expect(await client.fetchQuery(servingAccountQuery({ snapshot: async () => wire(value) }, 'one', false, 1))).toBeNull()
       }
     } finally {
       client.clear()
@@ -30,15 +31,37 @@ describe('serving account query boundary', () => {
   it('keys by selected chat and running state, with bounded active polling independent of quota', async () => {
     const client = new QueryClient()
     try {
-      const active = servingAccountQuery({ snapshot: async input => snapshot(input.sessionId ?? '') }, 'one', true)
+      const active = servingAccountQuery({ snapshot: async input => snapshot(input.sessionId ?? '') }, 'one', true, 1)
       await client.fetchQuery(active)
       expect(servingAccountPollInterval(true, client.getQueryData(active.queryKey))).toBe(1500)
-      expect(active.queryKey).not.toEqual(servingAccountQuery({ snapshot: async () => snapshot('two') }, 'two', true).queryKey)
-      const idle = servingAccountQuery({ snapshot: async () => snapshot('one') }, 'one', false)
+      expect(active.queryKey).not.toEqual(servingAccountQuery({ snapshot: async () => snapshot('two') }, 'two', true, 1).queryKey)
+      const idle = servingAccountQuery({ snapshot: async () => snapshot('one') }, 'one', false, 1)
       expect(idle.queryKey).not.toEqual(active.queryKey)
       await client.fetchQuery(idle)
       expect(servingAccountPollInterval(false, client.getQueryData(idle.queryKey))).toBe(false)
-      expect(servingAccountQuery({ snapshot: async () => snapshot('one') }, null, false).enabled).toBe(false)
+      expect(servingAccountQuery({ snapshot: async () => snapshot('one') }, null, false, null).enabled).toBe(false)
+    } finally {
+      client.clear()
+    }
+  })
+  it('reuses an idle snapshot until the Session moves, and rereads a running one on every mount', async () => {
+    const client = new QueryClient()
+    let reads = 0
+    const counted = {
+      snapshot: async (input: { readonly sessionId?: string | undefined }) => {
+        reads += 1
+        return snapshot(input.sessionId ?? '')
+      },
+    }
+    try {
+      await client.fetchQuery(servingAccountQuery(counted, 'one', false, 10))
+      await client.fetchQuery(servingAccountQuery(counted, 'one', false, 10))
+      expect(reads).toBe(1)
+      await client.fetchQuery(servingAccountQuery(counted, 'one', false, 11))
+      expect(reads).toBe(2)
+      await client.fetchQuery(servingAccountQuery(counted, 'one', true, 11))
+      await client.fetchQuery(servingAccountQuery(counted, 'one', true, 12))
+      expect(reads).toBe(4)
     } finally {
       client.clear()
     }
@@ -60,12 +83,13 @@ describe('serving account query boundary', () => {
       },
       'old',
       true,
+      null,
     )
     const pending = client.fetchQuery(old).catch(() => null)
     try {
       await client.cancelQueries({ queryKey: old.queryKey })
       expect(signal?.aborted).toBe(true)
-      const next = servingAccountQuery({ snapshot: async () => snapshot('new') }, 'new', true)
+      const next = servingAccountQuery({ snapshot: async () => snapshot('new') }, 'new', true, null)
       expect(await client.fetchQuery(next)).toEqual(snapshot('new'))
       release?.()
       await pending

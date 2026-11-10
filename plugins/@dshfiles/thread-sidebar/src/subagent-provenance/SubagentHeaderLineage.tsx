@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import type { SessionProjectionMap, SessionSummary, SessionProjectionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionListState, SessionProjectionMap, SessionSummary, SessionProjectionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
@@ -23,7 +23,55 @@ type SubagentCatalogSnapshot = Omit<SessionProjectionSnapshot, 'values' | 'state
   state: 'loading' | 'ready' | 'error' | 'migration-required'
   entries: (SessionProjectionMap['subagentCatalog'][number] & { activity: 'running' | 'inactive' })[]
 }
-type Catalogs = Readonly<Record<SessionId, SubagentCatalogSnapshot>>
+type CatalogLookup = (sessionId: SessionId) => SubagentCatalogSnapshot | undefined
+type CatalogProjections = Readonly<Record<SessionId, { readonly values: { readonly subagentCatalog?: readonly { readonly id: string }[] } }>>
+
+/**
+ * Catalog reads for one mounted header. A list publish happens several times a second while a turn streams, so nothing
+ * here folds every Session's projection: a catalog is built only when a header row asks for it, and the parent of the
+ * shown thread is found by a scan that allocates nothing.
+ */
+export class SubagentCatalogs {
+  static lookup(input: {
+    readonly projections: SessionListState['projectionsBySession']
+    readonly summaries: Readonly<Record<SessionId, SessionSummary>>
+    readonly statuses: ReadonlyMap<SessionId, { readonly running?: boolean | undefined }>
+  }): CatalogLookup {
+    const built = new Map<SessionId, SubagentCatalogSnapshot | undefined>()
+    return sessionId => {
+      if (built.has(sessionId)) return built.get(sessionId)
+      const snapshot = input.projections[sessionId]
+      const catalog: SubagentCatalogSnapshot | undefined =
+        snapshot === undefined
+          ? undefined
+          : {
+              state: snapshot.state === 'idle' ? (snapshot.values.subagentCatalog === undefined ? 'loading' : 'ready') : snapshot.state,
+              error: snapshot.error,
+              entries: (snapshot.values.subagentCatalog ?? []).map(entry => ({
+                ...entry,
+                activity: (input.statuses.get(entry.id)?.running ?? input.summaries[entry.id]?.running) === true ? ('running' as const) : ('inactive' as const),
+              })),
+            }
+      built.set(sessionId, catalog)
+      return catalog
+    }
+  }
+
+  /** The Session whose subagent catalog lists `childSessionId`, first match in projection order. */
+  static parentOf(projections: CatalogProjections, childSessionId: SessionId): SessionId | undefined {
+    for (const parentId in projections) {
+      // SAFETY: projectionsBySession is keyed by SessionId; for-in widens keys to string.
+      const catalog = projections[parentId as SessionId]?.values.subagentCatalog
+      if (catalog === undefined) continue
+      for (const entry of catalog) {
+        if (entry.id !== childSessionId) continue
+        // SAFETY: same key as above, a SessionId of projectionsBySession.
+        return parentId as SessionId
+      }
+    }
+    return undefined
+  }
+}
 
 /** Business actions supplied by the slot registration. */
 export interface SubagentCatalogInjected {
@@ -39,7 +87,7 @@ interface CatalogRowsProps {
   parentSessionId: SessionId
   currentSessionId: SessionId | undefined
   catalog: SubagentCatalogSnapshot
-  catalogs: Catalogs
+  catalogOf: CatalogLookup
   summaries: Readonly<Record<SessionId, SessionSummary>>
   expanded: ReadonlySet<SessionId>
   level: number
@@ -200,7 +248,7 @@ function CatalogRows({
   parentSessionId,
   currentSessionId,
   catalog,
-  catalogs,
+  catalogOf,
   summaries,
   expanded,
   level,
@@ -223,7 +271,7 @@ function CatalogRows({
     }
   }, [running])
   const emptyLoading = catalog.state === 'loading' && catalog.entries.length === 0
-  const reserveDisclosure = catalog.entries.some(entry => entry.mode !== 'external' && !isKnownLeaf(catalogs[entry.id]))
+  const reserveDisclosure = catalog.entries.some(entry => entry.mode !== 'external' && !isKnownLeaf(catalogOf(entry.id)))
   return (
     <>
       {emptyLoading && <CatalogLoadingRows t={t} />}
@@ -245,7 +293,7 @@ function CatalogRows({
       {catalog.entries.map(entry => {
         // An external execution has no local child Session, so it is a leaf that cannot be opened.
         const external = entry.mode === 'external'
-        const childCatalog = catalogs[entry.id]
+        const childCatalog = catalogOf(entry.id)
         const isCurrent = entry.id === currentSessionId
         const isExpanded = expanded.has(entry.id)
         const knownLeaf = external || isKnownLeaf(childCatalog)
@@ -382,7 +430,7 @@ function CatalogRows({
                     parentSessionId={entry.id}
                     currentSessionId={currentSessionId}
                     catalog={childCatalog}
-                    catalogs={catalogs}
+                    catalogOf={catalogOf}
                     summaries={summaries}
                     expanded={expanded}
                     level={level + 1}
@@ -466,24 +514,8 @@ function CatalogDropdown({
   const projections = sessionState.projectionsBySession
   const summaries = sessionState.byId
   const statuses = useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
-  const catalogs = useMemo<Catalogs>(
-    () =>
-      Object.fromEntries(
-        Object.entries(projections).map(([id, snapshot]) => [
-          id,
-          {
-            state: snapshot.state === 'idle' ? (snapshot.values.subagentCatalog === undefined ? 'loading' : 'ready') : snapshot.state,
-            error: snapshot.error,
-            entries: (snapshot.values.subagentCatalog ?? []).map(entry => ({
-              ...entry,
-              activity: (statuses.get(entry.id)?.running ?? summaries[entry.id]?.running) === true ? ('running' as const) : ('inactive' as const),
-            })),
-          },
-        ]),
-      ),
-    [projections, summaries, statuses],
-  )
-  const catalog = catalogs[rootSessionId]
+  const catalogOf = useMemo(() => SubagentCatalogs.lookup({ projections, summaries, statuses }), [projections, summaries, statuses])
+  const catalog = catalogOf(rootSessionId)
   const [hoverMenu, sendHoverMenu] = useMachine(catalogMenuHover)
   const open = hoverMenu.matches('openHover') || hoverMenu.matches('openPinned')
   const [menuPosition, setMenuPosition] = useState<CSSProperties>()
@@ -505,7 +537,7 @@ function CatalogDropdown({
     const visit = (parentSessionId: SessionId): void => {
       if (closing.has(parentSessionId) || !expanded.has(parentSessionId)) return
       closing.add(parentSessionId)
-      const branch = catalogs[parentSessionId]
+      const branch = catalogOf(parentSessionId)
       for (const entry of branch?.entries ?? []) {
         visit(entry.id)
       }
@@ -672,7 +704,7 @@ function CatalogDropdown({
                 parentSessionId={rootSessionId}
                 currentSessionId={currentSessionId}
                 catalog={presentedCatalog}
-                catalogs={catalogs}
+                catalogOf={catalogOf}
                 summaries={summaries}
                 expanded={expanded}
                 level={1}
@@ -752,12 +784,7 @@ export function SubagentHeaderLineage({
   const agentLabel = SubagentRouteLabelModel.displayedAgentRouteLabel(useProjection('threadSidebarModelRoute'), useProjection('subagent'))
   const parentId = useSessions(state => {
     if (address?.childSessionId === lineageSessionId) return address.parentSessionId
-    for (const [parentId, snapshot] of Object.entries(state.projectionsBySession)) {
-      if (!snapshot.values.subagentCatalog?.some(entry => entry.id === lineageSessionId)) continue
-      // SAFETY: projectionsBySession is keyed by SessionId; Object.entries widens keys to string.
-      return parentId as SessionId
-    }
-    return undefined
+    return SubagentCatalogs.parentOf(state.projectionsBySession, lineageSessionId)
   })
   const shared = { useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, t }
   // Root sessions carry no breadcrumb; their descendant count lives in the

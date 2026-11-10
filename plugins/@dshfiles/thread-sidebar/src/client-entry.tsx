@@ -589,11 +589,15 @@ export default defineClient({
       ),
     )
 
-    // Notification sounds fire in a background tab, where no gesture can resume an audio context:
-    // unlock it on the first interaction so a later alert still rings.
+    // Notification sounds fire in a background tab. A browser with sticky user activation (`navigator.userActivation`)
+    // resumes a context created at the first sound, so only the others open the device on the first gesture: opening
+    // it blocks the main thread for 100–300 ms, which would land on the click that starts a turn.
     ctx.effect(() => {
+      if ('userActivation' in navigator) return () => undefined
       const unlockNotificationAudio = (): void => {
-        void ThreadNotificationAudioModel.unlock()
+        const unlock = (): void => void ThreadNotificationAudioModel.unlock()
+        if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(unlock, { timeout: 500 })
+        else unlock()
       }
       window.addEventListener('pointerdown', unlockNotificationAudio, { capture: true, once: true })
       window.addEventListener('keydown', unlockNotificationAudio, { capture: true, once: true })

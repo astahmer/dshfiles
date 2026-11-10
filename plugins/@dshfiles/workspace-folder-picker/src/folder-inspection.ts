@@ -99,7 +99,7 @@ export class FolderInspector extends Context.Service<
       const home = yield* ProjectHome
 
       const inspect = Effect.fn('project inspect')(function* (rawPath: string) {
-        const path = rawPath.startsWith('~/') ? join(home, rawPath.slice(2)) : rawPath
+        const path = rawPath.startsWith('~/') || rawPath.startsWith('~\\') ? join(home, rawPath.slice(2)) : rawPath
         const info = yield* fs.stat(path).pipe(Effect.mapError(cause => new FolderUnreadable({ path, cause })))
         if (info.type !== 'Directory') return yield* new FolderUnreadable({ path })
         const [git, jj] = yield* Effect.all([lookup.resolve('git'), lookup.resolve('jj')], { concurrency: 'unbounded' })

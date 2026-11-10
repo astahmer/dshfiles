@@ -5,14 +5,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
-import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
+import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer } from 'effect'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createRendererAssetHandler } from '../src/renderer-assets.js'
 import { RENDERER_ENTRY_FILE, RENDERER_ROUTE } from '../src/renderer-route.js'
 
-const platformLayer = Layer.mergeAll(nodeFileSystemLayer, nodePathLayer)
+const platformLayer = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
 
 let directory: string
 let server: Server

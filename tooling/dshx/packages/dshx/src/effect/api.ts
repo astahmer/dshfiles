@@ -14,7 +14,7 @@ import type {
 import { ApiProtocolModel } from '../api/common.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import { HostContext } from './host-context.js'
-import { PluginInactive, type PluginRuntime } from './plugin-runtime.js'
+import { inactiveError, PluginInactive, type PluginRuntime } from './plugin-runtime.js'
 import { thrownForApi } from './wire-error.js'
 
 /** The Host refused to publish an event: the contract declares no such event, its payload failed the schema, or the API is not served. */
@@ -71,7 +71,7 @@ export const bind = <const Methods extends Record<string, AnyApiMethodDefinition
     for (const [method, handler] of Object.entries<(input: never, call: ApiCall) => Effect.Effect<unknown, unknown, unknown>>(implementation)) {
       promised[method] = async context => {
         const runtime = await runtimeFor(context.signal).catch((cause: unknown) => {
-          if (cause instanceof PluginInactive) throw ApiProtocolModel.error('unavailable', cause.message, contract.id, method, true, cause)
+          if (cause instanceof PluginInactive) throw inactiveError({ cause, apiId: contract.id, method })
           throw cause
         })
         // SAFETY: the dispatch validated `context.input` against this method's contract input schema, and

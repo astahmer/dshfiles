@@ -33,6 +33,12 @@
       "local": "locale"
     }
   ],
-  "added": ["src/native/demand-refresh.ts"],
-  "delta": ["src/native/index.ts", "src/native/store.ts"]
+  "added": [
+    "src/native/demand-refresh.ts"
+  ],
+  "delta": [
+    "src/native/index.ts",
+    "src/native/store.ts",
+    "src/native/ModelListEditor.tsx"
+  ]
 }

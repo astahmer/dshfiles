@@ -38,6 +38,7 @@
     "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/session-log-window": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/thread-sidebar": "workspace:*",
     "@effect/platform-node": "catalog:",

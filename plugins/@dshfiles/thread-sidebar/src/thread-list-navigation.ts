@@ -73,6 +73,41 @@ const sectionHeaderOf = (button: HTMLButtonElement): HTMLButtonElement | null =>
 }
 
 export class ThreadListNavigationModel {
+  /** Every thread id of a windowed list, in order, so range selection covers rows that are not mounted. */
+  static readonly virtualThreadIds = new WeakMap<Element, readonly string[]>()
+
+  /** Mounted rows in DOM order, with each windowed list expanded to all of its ids and its mounted children. */
+  static orderedIds(list: HTMLElement, rows: readonly VisibleThreadRow[]): string[] {
+    const childIdsByParent = new Map<string, string[]>()
+    for (const row of rows) {
+      const parentId = parentRowButton(row.button)?.dataset.threadId
+      if (parentId !== undefined) childIdsByParent.set(parentId, [...(childIdsByParent.get(parentId) ?? []), row.id])
+    }
+    const ordered: string[] = []
+    const seen = new Set<string>()
+    const push = (id: string): void => {
+      if (seen.has(id)) return
+      seen.add(id)
+      ordered.push(id)
+    }
+    const expanded = new Set<Element>()
+    for (const row of rows) {
+      const windowed = row.button.closest('[data-virtual-thread-rows]')
+      const ids = windowed === null || !list.contains(windowed) ? undefined : ThreadListNavigationModel.virtualThreadIds.get(windowed)
+      if (windowed === null || ids === undefined) {
+        push(row.id)
+        continue
+      }
+      if (expanded.has(windowed)) continue
+      expanded.add(windowed)
+      for (const id of ids) {
+        push(id)
+        for (const childId of childIdsByParent.get(id) ?? []) push(childId)
+      }
+    }
+    return ordered
+  }
+
   static visibleRows(list: HTMLElement): VisibleThreadRow[] {
     return Array.from(list.querySelectorAll<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)).flatMap(button => {
       const id = button.dataset.threadId
@@ -114,7 +149,7 @@ export class ThreadListNavigationModel {
       input.onSelectionChange(
         ThreadSelectionModel.extend({
           state: input.selection,
-          orderedIds: input.rows.map(candidate => candidate.id),
+          orderedIds: ThreadListNavigationModel.orderedIds(input.list, input.rows),
           sessionId: row.id,
           fallbackAnchorId: input.fallbackAnchorId,
         }),
@@ -147,7 +182,7 @@ export class ThreadListNavigationModel {
       const rows = ThreadListNavigationModel.visibleRows(input.list)
       if (rows.length === 0) return
       event.preventDefault()
-      input.onSelectionChange(ThreadSelectionModel.selectAll(rows.map(row => row.id)))
+      input.onSelectionChange(ThreadSelectionModel.selectAll(ThreadListNavigationModel.orderedIds(input.list, rows)))
       return
     }
     if (primaryModifier) return
@@ -242,6 +277,29 @@ export class ThreadListNavigationModel {
     const direction = navigationDirection(event.key)
     if (direction === undefined) return
 
+    if ((event.key === 'Home' || event.key === 'End') && input.list.querySelector('[data-virtual-thread-rows]') !== null) {
+      // A windowed list has not mounted its far end: scroll there, and focus once the new rows are in.
+      event.preventDefault()
+      const toStart = event.key === 'Home'
+      input.list.scrollTop = toStart ? 0 : input.list.scrollHeight
+      input.list.ownerDocument.defaultView?.requestAnimationFrame(() => {
+        const edgeRows = ThreadListNavigationModel.visibleRows(input.list)
+        ThreadListNavigationModel.focusRow({
+          rows: edgeRows,
+          index: toStart ? 0 : edgeRows.length - 1,
+          direction,
+          selection: input.selection,
+          extend: event.shiftKey,
+          fallbackAnchorId: activeButton.dataset.threadId ?? rows[activeIndex]?.id ?? '',
+          onSelectionChange: input.onSelectionChange,
+          onLookahead: input.onLookahead,
+          switchThread: false,
+          open: input.open,
+          list: input.list,
+        })
+      })
+      return
+    }
     const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : Math.max(0, Math.min(rows.length - 1, activeIndex + direction))
     if (nextIndex === activeIndex && !event.shiftKey) {
       event.preventDefault()

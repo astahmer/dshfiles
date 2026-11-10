@@ -13,10 +13,11 @@ import { Clock, Duration, Effect, FiberHandle, Layer, Queue, Ref, Schema } from 
 import { RpcServer } from 'effect/rpc'
 
 import { SearchIndex } from './index-db.js'
-import { runIngestPass } from './ingest.js'
+import { IdleBackoff, indexSessions, runIngestPass } from './ingest.js'
+
+const IDLE_SLEEP = IdleBackoff.first
 import { SearchWorkerFailed, SearchWorkerRpcs, workerConfigSchema, type IndexHealth } from './protocol.js'
 
-const IDLE_SLEEP = Duration.seconds(5)
 const BUSY_SLEEP = Duration.millis(50)
 const BACKFILL_ROWIDS = 2_000
 
@@ -58,6 +59,13 @@ const Handlers = SearchWorkerRpcs.toLayer(
     // A committed session event cuts the loop's sleep short, so fresh content is searchable without waiting out the idle delay.
     const wake = yield* Queue.dropping<void>(1)
     const loop = yield* FiberHandle.make<never, never>()
+    // The user's archived Sessions: cold history, dropped from the index and only read back for a targeted search.
+    const archived = yield* Ref.make<ReadonlySet<string>>(new Set())
+    // A large prune is reclaimed once per process; a second VACUUM would only rewrite an already-compact file.
+    // An hour between compactions: the index re-bloats as archived Sessions are pruned again, and a once-per-process
+    // flag left every later pass with the garbage the first one never saw.
+    const COMPACTION_INTERVAL_MS = 60 * 60_000
+    let lastCompactionAt = 0
 
     const health = Effect.flatMap(Ref.get(progress), (current): Effect.Effect<IndexHealth, SearchWorkerFailed> =>
       Effect.try({
@@ -76,16 +84,19 @@ const Handlers = SearchWorkerRpcs.toLayer(
       }),
     )
 
-    const pause = (duration: Duration.Duration) => Effect.raceFirst(Effect.sleep(duration), Effect.asVoid(Queue.take(wake)))
+    // True when a wake ended the pause, false when the time ran out.
+    const pause = (duration: Duration.Duration) => Effect.raceFirst(Effect.as(Effect.sleep(duration), false), Effect.as(Queue.take(wake), true))
+    let idlePasses = 0
 
     const pass = (root: string) =>
       Effect.gen(function* () {
         const startedAt = yield* Clock.currentTimeMillis
+        const cold = yield* Ref.get(archived)
         yield* Ref.update(progress, current => ({ ...current, ingesting: true }))
         const outcome = yield* Effect.tryPromise(async () => {
           // One bounded step per loop, so searches still run between steps while an older index gains its conversation table.
           const backfilled = index.backfillConversation(BACKFILL_ROWIDS) && index.backfillRowMap(BACKFILL_ROWIDS)
-          const result = await runIngestPass({ index, root, budgetMs: 1_000, windowBytes, now: Date.now })
+          const result = await runIngestPass({ index, root, budgetMs: 1_000, windowBytes, now: Date.now, archived: cold })
           return { backfilled, result }
         }).pipe(Effect.result)
         const elapsed = (yield* Clock.currentTimeMillis) - startedAt
@@ -94,6 +105,15 @@ const Handlers = SearchWorkerRpcs.toLayer(
           return IDLE_SLEEP
         }
         const result = outcome.success.result
+        // Dropping archived Sessions empties most of the file; give the bytes back once, in a step of its own so a
+        // failure is reported instead of swallowed by the pass.
+        // Un-merged FTS5 segments are the real garbage after a prune (measured 1.82 GB of a 2.01 GB index), and the page
+        // freelist stays small, so the trigger is bytes per document as well as free pages.
+        if (Date.now() - lastCompactionAt > COMPACTION_INTERVAL_MS && (index.freePageRatio() > 0.25 || index.bytesPerDocument() > 2_048)) {
+          const reclaimed = yield* Effect.try({ try: () => (index.compact(), true), catch: error => describeError(error) }).pipe(Effect.result)
+          if (reclaimed._tag === 'Success') lastCompactionAt = Date.now()
+          else yield* Effect.logWarning('session-search: the index could not be compacted yet', reclaimed.failure)
+        }
         yield* Ref.update(progress, current => ({
           ...current,
           ingesting: false,
@@ -110,7 +130,9 @@ const Handlers = SearchWorkerRpcs.toLayer(
       Effect.gen(function* () {
         const root = (yield* Ref.get(progress)).root
         if (root === undefined) return yield* Effect.asVoid(Queue.take(wake))
-        yield* pause(yield* pass(root))
+        const next = yield* pass(root)
+        idlePasses = next === IDLE_SLEEP ? idlePasses + 1 : 0
+        if (yield* pause(next === IDLE_SLEEP ? IdleBackoff.after(idlePasses) : next)) idlePasses = 0
       }),
     )
 
@@ -124,10 +146,29 @@ const Handlers = SearchWorkerRpcs.toLayer(
       })
 
     return {
-      SearchSessions: request => timedSearch(() => index.searchSessions(request)),
+      SearchSessions: request =>
+        Effect.gen(function* () {
+          // A targeted search names the Sessions it wants, so cold ones are read back for this request only.
+          if (request.sessionIds !== undefined && request.sessionIds.length > 0) {
+            const root = (yield* Ref.get(progress)).root
+            if (root !== undefined) {
+              yield* Effect.tryPromise({
+                try: () => indexSessions({ index, root, budgetMs: 1_000, windowBytes, now: Date.now }, request.sessionIds ?? []),
+                catch: indexFailure,
+              })
+            }
+          }
+          return yield* timedSearch(() => index.searchSessions(request))
+        }),
       SearchEvents: request => timedSearch(() => ({ sessionId: request.sessionId, ...index.searchEvents(request) })),
       Health: () => health,
       Nudge: () => Effect.andThen(Queue.offer(wake, undefined), health),
+      SetArchived: request =>
+        Effect.gen(function* () {
+          yield* Ref.set(archived, new Set(request.archivedSessionIds))
+          yield* Queue.offer(wake, undefined)
+          return yield* health
+        }),
       StartIngest: request =>
         Effect.gen(function* () {
           yield* Ref.update(progress, current => ({ ...current, root: request.root }))

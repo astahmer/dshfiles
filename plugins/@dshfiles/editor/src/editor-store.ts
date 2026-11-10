@@ -55,7 +55,7 @@ interface DocumentEntry {
 
 const documentId = (sessionId: string, path: string): string => sessionId + '\n' + path
 
-const baseName = (path: string): string => path.split('/').filter(Boolean).at(-1) ?? path
+const baseName = (path: string): string => path.split(/[\\/]/u).filter(Boolean).at(-1) ?? path
 
 /**
  * Open files across sessions. Content comes from the Host `workspaceFiles` namespace (`readBytes`, so the exact

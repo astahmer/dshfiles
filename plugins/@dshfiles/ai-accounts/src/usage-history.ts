@@ -1,5 +1,5 @@
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
-import { asZodSchema } from './effect-zod-schema.js'
+import { toStorageSchema } from '@dshfiles/dshx/host'
 import { MAX_USAGE_HISTORY_POINTS, quotaSnapshotSchema, usageMetaSchema } from './usage-history-model.js'
 import type { QuotaSnapshot } from './usage-history-model.js'
 
@@ -107,17 +107,18 @@ const thinUsageHistoryPoints = (points: readonly QuotaSnapshot[], bucketMinutes:
   })
 }
 
+/** The JSON home of the history before SQLite; `usage-history-store.ts` imports it once and never writes it. */
 export const usageHistoryDomain = defineDomain({
   name: USAGE_HISTORY_DOMAIN,
   version: 1,
   // `initial` is the shape the type is inferred from, so it carries every field.
   global: {
-    schema: asZodSchema(usageMetaSchema),
-    initial: { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 5, retentionDays: 90 },
+    schema: toStorageSchema(usageMetaSchema),
+    initial: { lastReadAt: null, lastAttemptAt: null, intervalMinutes: 5, retentionDays: 30 },
   },
   tables: {
     /** Keyed by account, interval, and interval bucket. */
-    quota: { valueSchema: asZodSchema(quotaSnapshotSchema), __key: 'quota' },
+    quota: { valueSchema: toStorageSchema(quotaSnapshotSchema), __key: 'quota' },
   },
 })
 
