@@ -1,6 +1,9 @@
 # HextaUI blocks — what to adopt
 
 Source: [hextaui.com/blocks](https://hextaui.com/blocks), surveyed 2026-10-19 (25 blocks: 16 AI, 9 Settings).
+Two blocks have shipped as design references and are documented by their plugins: Test Results as the
+[`test-runs`](../plugins/@dshfiles/test-runs/README.md) card and Agent Todos as the
+[`agent-plan`](../plugins/@dshfiles/agent-plan/README.md) plan card for `todo_write`. The rest below is open.
 
 ## Licence decides the route
 
@@ -9,8 +12,6 @@ Source: [hextaui.com/blocks](https://hextaui.com/blocks), surveyed 2026-10-19 (2
 | 65 components, 9 hooks, 5 utilities | MIT                                            | **Port** into `@dshfiles/plugin-ui` with the shadcn CLI, keeping the MIT notice and provenance |
 | Prompt Input block                  | Free to install, under the HextaUI Pro License | Design reference until someone reads the Pro License for open-source redistribution            |
 | The other 24 blocks                 | Paid HextaUI Pro                               | **Design reference only**: rebuild against DSH with dshx; never vendor their code              |
-
-`test-runs` is the first one done this way: rebuilt from the published demo video, no Pro code.
 
 Stack mismatch to settle before any port: HextaUI uses shadcn's `base-vega` style on **Base UI** primitives with
 **Tabler** icons; `plugin-ui` is shadcn on **Radix** with **lucide**. A ported component either gets rewritten onto
@@ -22,11 +23,9 @@ Rank: **P1** fills a real gap in a plugin we own, **P2** polishes something that
 
 | Block                            | Where it would land                                              | Rank | Why / Host check                                                                                                                                                                                |
 | -------------------------------- | ---------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Test Results                     | `test-runs`                                                      | done | Shipped as the bash-card takeover. Live counter and full height are Host gaps.                                                                                                                  |
 | Diff Review                      | new `edit-cards` plugin, or `diff-viewed`                        | P1   | The video's "Edited `src/cart/pricing.ts` +2 0.7s" card: replace the `edit` / `write` tool views with a `PatchView` card (`@dshfiles/plugin-ui/diff`). Same keyed-slot takeover as `test-runs`. |
-| Stack Trace                      | `plugin-ui` component, used by `test-runs` and a bash error view | P1   | Generalise the `test-runs` failure detail (code frame, collapsed framework frames) into one component; then render Node/Python traces in failed bash cards.                                     |
+| Stack Trace                      | `plugin-ui` component, used by `test-runs` and a bash error view | P1   | Generalise the `test-runs` failure detail (code frame, collapsed framework frames) into one component; then render Node/Python traces in failed bash cards. Start from `plugin-ui`'s `motion/call-stack-tree` and `traces`' `stack-frames.ts` parser (V8, JVM, Gecko, Python).                                     |
 | Code Block                       | `plugin-ui` component                                            | P1   | `test-runs` code frames are plain mono; a shared block with Shiki (already slimmed in `src/shiki-slim.ts`), wrap toggle, copy and download serves test-runs, diffs and `read` cards.            |
-| Agent Todos                      | `tool.call.toolview` key `todo_write` (check name)               | P2   | Native todo card is a list; HextaUI shows progress and the active item. Pure view over existing args.                                                                                           |
 | Subagents                        | `thread-sidebar` `SubagentProvenanceToolRow`                     | P2   | We already own the subagent row; borrow the per-child status and duration layout.                                                                                                               |
 | Tool Calls                       | `tool-meta`                                                      | P2   | Grouped call states ("asks first", approval) — check against `dsh-client-ui-approval` before building anything.                                                                                 |
 | Prompt Input                     | `rich-composer`                                                  | P2   | Attachments row, model chip, stop/retry states. Blocked on the Pro License question above.                                                                                                      |
@@ -48,7 +47,7 @@ Rank: **P1** fills a real gap in a plugin we own, **P2** polishes something that
 1. Shared `CodeBlock` and `StackTrace` in `plugin-ui`, moving `test-runs`' frame code onto them (one PR-sized change each).
 2. `edit-cards`: Diff Review-style cards for file edits, reusing `CodeBlock`.
 3. Stack traces in failed bash cards (same fallback pattern as `test-runs`).
-4. P2 polish, one plugin at a time, starting with Agent Todos.
+4. P2 polish, one plugin at a time.
 
 ## Open questions
 
