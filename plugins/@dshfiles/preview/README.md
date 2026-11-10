@@ -101,6 +101,14 @@ thread header chip ─► previewApi.devServers ─► lsof/ss + ps + cwd probe 
   gets `image: null` while the page is still. `mirrorInput` replays one click, wheel, key or text gesture in page
   viewport pixels. Both are Client methods; agents keep `preview_screenshot`, `preview_click` and `preview_type`.
 
+## Proposed Agent browser hand-off
+
+This is a design, not a shipped capability. A highlight request should name the thread, page and a ref from that page's latest `preview_snapshot`. Preview resolves the ref in the Host browser, obtains its viewport rectangle, and publishes a short-lived overlay event scoped to that thread and page. The Agent browser draws the rectangle over the mirrored image, scaling viewport coordinates to the displayed image as it already does for input. A stale or ambiguous ref, a closed page, or an element outside the viewport must return a useful failure rather than highlight a guessed target. Navigation, a new snapshot or expiry clears the highlight.
+
+Use a separate, bounded overlay event rather than adding an overlay to `mirrorFrame`: a highlight can change when the JPEG hash does not, and it must not be baked into page screenshots or require a new frame transport. An event carries an identity and expiry; a scoped current-overlay read on subscription catches events missed while the panel is closed or reconnecting. Neither channel grants access to another thread's page. Overlay state is ephemeral, not durable page content.
+
+For the reverse direction, a user enters pick mode on the mirror and selects a point or region in displayed-image coordinates. Preview maps it to the Host viewport and resolves the target on the actual page, not in the GUI image. Reuse the annotations capture and `annotationsApi.create` path to store bounded, privacy-filtered element metadata in the chosen thread and insert editable feedback into its composer; do not reuse the extension's unassigned intake as though it already attached a Session. No screenshot or form value is captured by default. A changed page, private element, missing target or stale viewport must refuse or mark the annotation stale, never attach it to a different element. Cancel leaves no annotation. The exact cross-plugin contract and region-selection UX remain implementation work.
+
 ## Security
 
 - Navigation is limited to loopback hosts by default; only top-level navigations are checked, so a page may still load
