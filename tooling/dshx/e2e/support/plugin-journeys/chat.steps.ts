@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { createRequire } from 'node:module'
+import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Given, When, Then } from '../bdd.js'
@@ -7,6 +8,7 @@ import { bootComposedPluginProfile } from '../boot.js'
 import { profileFor, recordAssertion, finishJourneyAssertions, visitIsolatedPluginProfile } from '../steps.js'
 import { seedFailedFirstRequestSession, seedInterruptedSession } from '../seed-interrupted-session.mjs'
 import { seedChatImageLinkSession } from '../seed-chat-image-link-session.mjs'
+import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
 const replayMarker = 'provider-replay-private-marker'
 const browserFrames = new WeakMap<Page, string[]>()
@@ -423,5 +425,40 @@ Then('the image link opens in the gallery rather than a side panel', async ({ pa
   })
   await page.keyboard.press('Escape')
   await expect(lightbox).toBeHidden()
+  await finishJourneyAssertions(page)
+})
+
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+
+const sendPrompt = async (page: Page, text: string): Promise<void> => {
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await composer.fill(text)
+  await composer.press('Enter')
+}
+
+When('the fake model answers, then answers again at High effort in a fresh workspace', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-chat-route-change-')
+  const workspace = join(root, 'chat-route-change')
+  await mkdir(workspace)
+  await registerWorkspaceFolder(page, workspace)
+  await startThreadWithModel(page, { project: 'chat-route-change', model: 'commandcode_work/gpt-6-luna' })
+  const answers = page.getByText(/^Answered by /)
+  await sendPrompt(page, 'Say hello')
+  await expect(answers).toHaveCount(1, { timeout: 60_000 })
+  await page
+    .getByRole('button', { name: /gpt-6-luna/ })
+    .last()
+    .click()
+  await page.getByText('Effort', { exact: true }).click()
+  await page.getByText('High', { exact: true }).click()
+  await sendPrompt(page, 'Say hello again')
+  await expect(answers).toHaveCount(2, { timeout: 60_000 })
+})
+
+Then('the transcript marks the effort change once', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'chat-route-change-marks-effort', async () => {
+    await expect(page.getByRole('note', { name: 'Effort default → high', exact: true })).toBeVisible()
+    await expect(page.locator('[data-chat-route-change]')).toHaveCount(1)
+  })
   await finishJourneyAssertions(page)
 })

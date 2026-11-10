@@ -8,6 +8,8 @@
 
 ![Find in thread across the whole transcript](docs/screenshots/find-in-thread.png)
 
+![Mark where the model or effort changed](docs/screenshots/route-change-markers.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.
@@ -79,6 +81,7 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/chat/use-chat-viewport.ts`, `use-chat-scroll.ts`, `ChatView.tsx` (also) | a commit's scroll work (follow the tail, restore, keep a paging anchor) runs from a ResizeObserver delivery after the next layout instead of inside the layout effect, so a streamed publication or a first open no longer forces a synchronous layout; the older-rows sentinel reads its first scroll offset in its observer callback |
 | `src/session-usage-cost.ts`, `src/native/chat/StatsPills.tsx`, `src/native/apply.ts` (also) | new: the published `@dshfiles/chat/session-usage-cost` seat; the composer usage pill declares it as a child of its dock entry and renders it after its label and beside each bucket of its dialog (below) |
 | `src/native/conversation-nodes/assistant.ts`, `turn-tail.ts`, `AssistantMarkdown.tsx` (also) | text visibility is carried per streamed block and tested with `/\S/` instead of `trim()`, so a chunk no longer copies the whole message text |
+| `src/native/conversation-nodes/route-change.ts`, `register.ts`, `src/native/chat/RouteChangeRow.tsx`, `RouteChangeRow.module.css`, `register-node-renderers.ts`, `src/native/locale.ts` | new: the `route-change` Definition and its keyed renderer (below), registered beside the request-prompt node, with three labels |
 | `src/transcript-find.ts`, `src/transcript-find-bar.tsx`, `ChatView.tsx` (also), `ChatView.module.css` (also), `turn-rail-items.ts`, `apply.ts` (also), `src/client-entry.tsx` (also) | new: the find bar (below); `ChatView` renders it and registers the view as a `Find in thread` target, `turnStarts` maps an event seq to its Turn, `apply` decorates `ChatView` so the bar reads the session-search API, and the client entry adds the command |
 
 ### Find in thread
@@ -101,6 +104,15 @@ Session ([Session search: find in one thread](../session-search/README.md#find-i
 - Without session-search the bar says to add it and restart DSH; with another `sessionQuery` backend it says to disable
   the stock row. With no Chat view on screen the command hands the key back to the browser.
 - Agents get the same read as the `thread_find` tool.
+
+### Model and effort switch markers
+
+A quiet row (`Model a → b`, `Account a → b`, `Effort a → b`) marks a request whose route differs from the request
+before it. The Session logs a `request/header` only when the request configuration changes, and the
+`route-change` Definition compares each one's provider, model and reasoning effort with the previous one, so fallbacks,
+account switches and picker changes all show where they took effect, not where they were chosen. A header that changed
+only its tools is silent. The row sits at the request, at group-tree position `turn`, so a folded Turn still shows it.
+The first header of a loaded window has no predecessor there and gets no row until older history loads.
 
 ### Focus a Turn, Step or tool call from another plugin
 

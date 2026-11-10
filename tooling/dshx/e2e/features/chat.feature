@@ -20,6 +20,13 @@ Feature: Chat browser journeys
     When the seeded transcript thread is opened
     Then find in thread jumps to an unmounted turn and steps through every match
 
+  @scenario:chat.route-change-markers
+  Scenario: The transcript marks where the reasoning effort changed between requests
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/session-controller, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model answers, then answers again at High effort in a fresh workspace
+    Then the transcript marks the effort change once
+
   @scenario:session-controller.lean-session-follow
   Scenario: A real Host follow renders history without provider replay blocks in browser frames
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted

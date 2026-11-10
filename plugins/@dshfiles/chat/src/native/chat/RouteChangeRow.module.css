@@ -1,0 +1,26 @@
+/* Route-change marker: one quiet 24px line where a request ran on another model, account or effort. */
+.root {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  padding: 2px 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: calc(12px + var(--dsh-content-font-delta-secondary, 0px));
+}
+
+.icon {
+  flex: none;
+}
+
+.text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value {
+  color: var(--dsw-alias-label-secondary);
+}

@@ -356,6 +356,55 @@
           "reason": "Client-only: the find bar renders browser state; its Host read is the session-search findInThread API, which gets the automatic api-dispatch span there."
         }
       ]
+    },
+    {
+      "id": "route-change-markers",
+      "title": "Mark where the model or effort changed",
+      "summary": "A quiet row in the transcript where a request ran on another model, account or reasoning effort than the request before it, read from the Session's own request/header events, so fallbacks and account switches show too; it stays visible when the Turn is folded.",
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: route-change row",
+      "configuration": [],
+      "states": ["unchanged", "model-changed", "account-changed", "effort-changed"],
+      "failureModes": [
+        "The first request of a loaded window has no predecessor in the window, so a change at that edge is not marked until older history loads."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"dshx_fake_commandcode/gpt-6-luna*\"",
+        "click text \"Effort\"",
+        "click text \"High\"",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Say hello\"",
+        "press Enter",
+        "expect note \"Effort*\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.route-change-marker",
+          "file": "plugins/@dshfiles/chat/tests/route-change.test.ts",
+          "testName": "marks a request whose model or effort differs from the request before it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.route-change-silent",
+          "file": "plugins/@dshfiles/chat/tests/route-change.test.ts",
+          "testName": "stays silent for the first header and for a header that changed only its tools"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.route-change-markers",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the marker is derived in the browser from Session events already sent to it."
+        }
+      ]
     }
   ]
 }
