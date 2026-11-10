@@ -18,6 +18,11 @@ interface ToolSearchConfig {
   readonly reportSchemaMetrics?: boolean
 }
 
+interface Filter {
+  readonly allow?: ReadonlySet<string>
+  readonly deny?: ReadonlySet<string>
+}
+
 interface AgentEvent {
   readonly agent: TestAgent
 }
@@ -34,7 +39,7 @@ interface AgentContext {
   readonly tools: {
     readonly get: (name: string) => RegisteredTool | undefined
     readonly schemas: () => ToolSchema[]
-    readonly restrict: (filter: { readonly allow?: readonly string[] }) => () => void
+    readonly restrict: (filter: { readonly allow?: readonly string[]; readonly deny?: readonly string[] }) => () => void
     readonly register: (tool: RegisteredTool) => () => void
   }
 }
@@ -75,14 +80,10 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
   ])
   const globalTools = new Map<string, RegisteredTool>([...schemas.values()].map(tool => [tool.name, { ...tool }]))
   const scopedTools = new Map<TestAgent, Map<string, RegisteredTool>>()
-  const restrictions = new Map<TestAgent, Set<string>[]>()
+  const restrictions = new Map<TestAgent, Filter[]>()
   const listeners = new Map<string, Set<(payload?: AgentEvent) => void>>()
-  const visibleGlobals = (agent: TestAgent): ToolSchema[] => {
-    const filters = restrictions.get(agent)
-    if (filters === undefined || filters.length === 0) return [...schemas.values()]
-    const allowed = filters.slice(1).reduce((intersection, current) => new Set([...intersection].filter(name => current.has(name))), new Set(filters[0]))
-    return [...schemas.values()].filter(tool => allowed.has(tool.name))
-  }
+  const admits = (agent: TestAgent, name: string) => (restrictions.get(agent) ?? []).every(filter => (filter.allow?.has(name) ?? true) && !(filter.deny?.has(name) ?? false))
+  const visibleGlobals = (agent: TestAgent): ToolSchema[] => [...schemas.values()].filter(tool => admits(agent, tool.name))
   const makeAgent = (id: string, restored: readonly string[] = []): TestAgent => {
     let agent: TestAgent
     const context = {
@@ -96,9 +97,12 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
             parameters: tool.parameters,
           })),
         ],
-        restrict: (filter: { readonly allow?: readonly string[] }) => {
+        restrict: (filter: { readonly allow?: readonly string[]; readonly deny?: readonly string[] }) => {
           const filters = restrictions.get(agent) ?? []
-          const allowed = new Set(filter.allow ?? [])
+          const allowed: Filter = {
+            ...(filter.allow === undefined ? {} : { allow: new Set(filter.allow) }),
+            ...(filter.deny === undefined ? {} : { deny: new Set(filter.deny) }),
+          }
           filters.push(allowed)
           restrictions.set(agent, filters)
           emit('tools/change')
@@ -144,8 +148,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
       get: (name: string, scope?: TestAgent) => {
         const tool = globalTools.get(name)
         if (tool === undefined || scope === undefined) return tool
-        const allowed = restrictions.get(scope)?.reduce((intersection, current) => new Set([...intersection].filter(candidate => current.has(candidate))))
-        return allowed === undefined || allowed.has(name) ? tool : undefined
+        return admits(scope, name) ? tool : undefined
       },
     },
     agents: { list: () => agents },
@@ -187,7 +190,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
     searchTool,
     restrictAgent: (agent: TestAgent, allow: readonly string[]) => {
       const filters = restrictions.get(agent) ?? []
-      filters.push(new Set(allow))
+      filters.push({ allow: new Set(allow) })
       restrictions.set(agent, filters)
       emit('tools/change')
     },

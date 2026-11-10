@@ -12,7 +12,7 @@
       "configuration": [
         {
           "key": "alwaysVisible",
-          "defaultValue": "[]",
+          "defaultValue": "the native core tools (read, write, edit, apply_patch, bash, glob, grep, todo_write, skill, ask_user_question, job_*, subagent*, …)",
           "constraints": "Trimmed names; only * is a wildcard.",
           "coveredBy": ["tool-search.ranking-limits-and-patterns"]
         },

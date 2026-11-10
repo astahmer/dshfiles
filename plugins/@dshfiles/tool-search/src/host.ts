@@ -6,9 +6,40 @@ import { Context, Effect, Exit, Layer, Ref, Schema, Scope } from 'effect'
 import { serializedSchemaBytes } from './schema-measurement.js'
 import { ToolSearchModel } from './search.js'
 
-const defaultConfig = { alwaysVisible: [], maxResults: 5, maxQueryChars: 512, reportSchemaMetrics: false }
+/** The native core tools an agent needs on its first step; agent-plane registrations stay visible regardless. */
+const nativeCoreTools = [
+  'read',
+  'write',
+  'edit',
+  'apply_patch',
+  'bash',
+  'glob',
+  'grep',
+  'todo_write',
+  'skill',
+  'ask_user_question',
+  'job_*',
+  'subagent*',
+  'send_message',
+  'list_agents',
+  'interrupt_agent',
+  'web_search',
+  'web_fetch',
+  'present',
+  'read_image',
+  'create_goal',
+  'get_goal',
+  'update_goal',
+  'complete_blocked_goal',
+  'extend_goal_budget',
+  'exit_plan_mode',
+  'workflow',
+  'working_directory',
+  'compaction_threshold',
+]
+const defaultConfig = { alwaysVisible: nativeCoreTools, maxResults: 5, maxQueryChars: 512, reportSchemaMetrics: false }
 const configSchema = Schema.Struct({
-  alwaysVisible: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  alwaysVisible: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(nativeCoreTools))),
   maxResults: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(100)).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(5)),
   ),
@@ -48,9 +79,11 @@ interface AgentState {
   readonly agent: Agent
   readonly scope: Scope.Closeable
   readonly eligibleNames: Set<string>
+  /** Global names an agent-plane registration (an agent preset's `bash`, `read`, …) shadowed at attachment. */
+  readonly shadowedNames: ReadonlySet<string>
   readonly selectedNames: Set<string>
   readonly admitFutureGlobalTools: boolean
-  allowedNames: readonly string[]
+  deniedNames: readonly string[]
   liftRestriction: (() => void) | undefined
 }
 
@@ -111,15 +144,21 @@ class ToolSearch extends Context.Service<
           return new Set([...eligibleNames].filter(name => visible.has(name) && !isAlwaysVisible(name)))
         }
 
+        /**
+         * A restriction filters everything an agent inherits, agent presets' scopes included, so an allow list of
+         * global names would hide the agent's own tools. Deny only the deferred global names instead.
+         */
         const refreshRestriction = (state: AgentState) =>
           Effect.gen(function* () {
-            const next = [...globals().keys()].filter(name => state.selectedNames.has(name) || isAlwaysVisible(name)).sort(ToolSearchModel.compareToolNames)
-            const unchanged = next.length === state.allowedNames.length && next.every((name, index) => name === state.allowedNames[index])
+            const next = [...globals().keys()]
+              .filter(name => !state.selectedNames.has(name) && !isAlwaysVisible(name) && !state.shadowedNames.has(name))
+              .sort(ToolSearchModel.compareToolNames)
+            const unchanged = next.length === state.deniedNames.length && next.every((name, index) => name === state.deniedNames[index])
             if (state.liftRestriction !== undefined && unchanged) return
-            const liftNext = yield* ownedSync(() => state.agent.ctx.tools.restrict({ allow: next }))
+            const liftNext = yield* ownedSync(() => state.agent.ctx.tools.restrict({ deny: next }))
             const liftPrevious = state.liftRestriction
             state.liftRestriction = liftNext
-            state.allowedNames = next
+            state.deniedNames = next
             if (liftPrevious !== undefined) yield* ownedSync(liftPrevious)
           })
 
@@ -197,19 +236,25 @@ class ToolSearch extends Context.Service<
           if (states.has(agent)) return
           const registeredGlobals = globals()
           const eligibleNames = new Set<string>()
+          const shadowedNames = new Set<string>()
           let admitFutureGlobalTools = true
           for (const name of registeredGlobals.keys()) {
-            if (ctx.tools.get(name, agent) === ctx.tools.get(name)) eligibleNames.add(name)
-            else admitFutureGlobalTools = false
+            const scoped = ctx.tools.get(name, agent)
+            if (scoped === ctx.tools.get(name)) eligibleNames.add(name)
+            else {
+              admitFutureGlobalTools = false
+              if (scoped !== undefined) shadowedNames.add(name)
+            }
           }
           const scope = yield* Scope.fork(pluginScope)
           const state: AgentState = {
             agent,
             scope,
             eligibleNames,
+            shadowedNames,
             selectedNames: restoreSelectedFromHeader(agent, eligibleNames),
             admitFutureGlobalTools,
-            allowedNames: [],
+            deniedNames: [],
             liftRestriction: undefined,
           }
           states.set(agent, state)

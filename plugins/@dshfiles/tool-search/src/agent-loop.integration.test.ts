@@ -2,6 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { LlmAdapter, LlmRuntime, ToolCallId, createUserMessage, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { bindScopeParent, createScope, scopeOf } from '@deepseek-ai/dsh-scope'
 import { SessionStore } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -132,6 +133,107 @@ const runScenario = async (progressive: boolean): Promise<ScenarioResult> => {
     await ctx.fiber.dispose()
   }
 }
+
+class ScriptedBashAdapter extends LlmAdapter {
+  readonly requests: (readonly string[])[] = []
+
+  async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    this.requests.push((options.tools ?? []).map(tool => tool.name).sort())
+    if (this.requests.length === 1) {
+      for (const chunk of toolCallChunks('bash-1', 'bash', JSON.stringify({ command: 'pwd' }))) yield chunk
+      return
+    }
+    yield { type: 'block-start', index: 0, blockType: 'text' }
+    yield { type: 'text-delta', index: 0, text: 'Done.' }
+    yield { type: 'block-end', index: 0, block: { type: 'text', text: 'Done.' } }
+    yield { type: 'finish', reason: { kind: 'stop' } }
+  }
+}
+
+const textTool = (input: { readonly name: string; readonly description: string; readonly run: (args: { readonly command: string }) => string }) =>
+  defineTool({
+    name: input.name,
+    description: input.description,
+    parameters: { command: { type: 'string' } },
+    output: {
+      schema: { type: 'object', properties: { text: { type: 'string' } }, additionalProperties: false },
+      render: (_args, result) => [{ type: 'text', text: result.text ?? '' }],
+    },
+    execute: async args => ({ text: input.run({ command: args.command ?? '' }) }),
+  })
+
+/** Agent presets mount `bash`, `read`, … in a parent scope of each agent, outside the global catalog. */
+const runPresetToolScenario = async (config: Record<string, unknown>) => {
+  const ctx = new Context()
+  const commands: string[] = []
+  let disposeAgent: (() => Promise<void>) | undefined
+  let disposePreset: (() => Promise<void>) | undefined
+
+  try {
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(TokenMeter)
+    await ctx.plugin(AgentLoop)
+    ctx.tools.register(textTool({ name: 'glob', description: 'Find files by glob pattern.', run: () => 'none' }))
+    ctx.tools.register(textTool({ name: 'backlog_list', description: 'List backlog items.', run: () => 'none' }))
+    if (toolSearch.setup === undefined) throw new Error('Tool-search Host setup is missing')
+    await ctx.plugin({ ...toolSearch, apply: toolSearch.setup }, config)
+
+    const adapter = new ScriptedBashAdapter()
+    ctx.llm.registerAdapter(['tool-search-preset-test'], adapter)
+    const handle = await ctx.agents.create({
+      sessionId: SessionId('tool-search-preset-tools'),
+      agentOptions: { provider: 'tool-search-preset-test', model: 'scripted' },
+    })
+    disposeAgent = () => handle.dispose()
+
+    const presetKey = { preset: 'core' }
+    const agentKey = scopeOf(handle.agent.ctx)
+    if (agentKey === undefined) throw new Error('agent has no scope key')
+    bindScopeParent(agentKey, presetKey)
+    const preset = await new Promise<ReturnType<typeof createScope>>(resolve => {
+      ctx.plugin({ inject: ['tools'], apply: (presetOwner: Context) => resolve(createScope(presetOwner, presetKey)) })
+    })
+    disposePreset = preset.dispose
+    preset.ctx.tools.register(
+      textTool({
+        name: 'bash',
+        description: 'Run a shell command.',
+        run: args => {
+          commands.push(args.command)
+          return 'ok'
+        },
+      }),
+    )
+
+    await handle.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Print the directory.' }], source: { kind: 'user' } }))
+    await handle.agent.whenIdle()
+    return { commands, requests: adapter.requests }
+  } finally {
+    await disposeAgent?.()
+    await disposePreset?.()
+    await ctx.fiber.dispose()
+  }
+}
+
+describe('tool-search with agent-plane tools', () => {
+  it('keeps the agent preset tools visible and callable while deferring global tools', async () => {
+    const result = await runPresetToolScenario({ alwaysVisible: [] })
+
+    expect(result.commands).toEqual(['pwd'])
+    expect(result.requests[0]).toEqual(['bash', 'tool_search'])
+  })
+
+  it('shows the native core globals by default', async () => {
+    const result = await runPresetToolScenario({})
+
+    expect(result.requests[0]).toEqual(['bash', 'glob', 'tool_search'])
+  })
+})
 
 describe('tool-search AgentLoop integration', () => {
   it('compares direct and progressive discovery for a scripted file write', async () => {
