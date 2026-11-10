@@ -14,7 +14,8 @@ import {
   IconSettingsOutlineRegular,
   IconUnarchiveOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useApi, useApiQuery, useRegistry } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
+import { PhonePairingQr } from '@dshfiles/phone-pairing/contract'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -413,6 +414,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const refetchClientUpdates = clientUpdates.refetch
   const [reloadPopoverOpen, setReloadPopoverOpen] = useState(false)
   const launchUrlCopy = useCopyFeedback()
+  const pairingQr = useContract(PhonePairingQr)
   const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
   const [splitBounds, setSplitBounds] = useState<SidebarSplitBounds>({
     value: SIDEBAR_HEADER_MIN_HEIGHT,
@@ -1686,6 +1688,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               <TooltipContent side="top">{text(props.t, 'threadSidebarCopyLaunchUrl')}</TooltipContent>
             </Tooltip>
           )}
+          {pairingQr.status === 'active' ? <pairingQr.value.Button /> : null}
           {visibleFooterEntries.map((entry, index) => {
             const concealed = !footerEntryInline(entry, index)
             const item = (

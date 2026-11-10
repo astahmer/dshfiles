@@ -1485,6 +1485,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "PhonePairingQr",
+      "importFrom": "@dshfiles/phone-pairing/contract",
+      "owner": "@dshfiles/phone-pairing",
+      "source": "plugins/@dshfiles/phone-pairing/src/contract.ts:8",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/phone-pairing.qr",
+      "kind": "contract",
+      "title": "PhonePairingQr",
+      "summary": "The pairing QR, rendered by the plugin that owns phone access where the sidebar footer shows its actions. The sidebar renders nothing while phone-pairing is absent, so copying the launch URL keeps working without it.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(PhonePairingQr) to consume; only @dshfiles/phone-pairing provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/phone-pairing's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/phone-pairing.qr"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "previewRenderApi",
       "importFrom": "@dshfiles/preview/render-api",
       "owner": "@dshfiles/preview",
@@ -2321,7 +2343,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: WorkbenchPanelRegistry, createWorkbenchPanelRegistry, NativeAsideOwners, workbenchPanels, PanelTitle, withoutPluginPrefix, panelTabTitle"
+        "Also exports: WorkbenchPanelRegistry, createWorkbenchPanelRegistry, MainNavigationResult, WorkbenchMainNavigation, NativeAsideOwners, workbenchPanels, PanelTitle, withoutPluginPrefix, panelTabTitle"
       ],
       "source": "plugins/@dshfiles/workbench/src/registry.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -2788,7 +2810,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 26 catalog feature(s)",
+        "Used by 27 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2984,7 +3006,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › subagent-traces"
       ],
       "details": [
-        "Used by 107 catalog feature(s)",
+        "Used by 108 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
