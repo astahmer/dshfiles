@@ -3946,6 +3946,9 @@ importers:
       '@dshfiles/frame-layout':
         specifier: workspace:*
         version: link:../frame-layout
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.1.2(effect@4.1.2)(vitest@4.1.12)

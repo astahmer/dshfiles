@@ -28,7 +28,8 @@ import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { ChatReferenceTitleStore } from './chat-reference-titles.js'
 import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
-import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
+import type {} from '@dshfiles/rich-composer/conversation-contract'
+import { ComposerChangesBar, ComposerLocation, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
 import { DEFAULT_PANEL_SCOPE, DOCK_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
@@ -271,10 +272,10 @@ export default defineClient({
         composerSlot(ComposerChangesBar),
       ),
     )
-    ctx.slots.inject('conversation.composer.dock', () =>
+    ctx.slots.inject('conversation.composer.location', () =>
       ctx.slots.register(
-        { name: 'conversation.composer.dock', id: 'dshfiles-jujutsu-chips', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
-        composerSlot(ComposerChips),
+        { name: 'conversation.composer.location', id: 'dshfiles-jujutsu-chips', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
+        composerSlot(ComposerLocation),
       ),
     )
     ctx.slots.inject('conversation.session.header.utilities', () =>
