@@ -44,7 +44,7 @@ import { ServiceMapView } from './service-map.js'
 import { TraceList } from './trace-list.js'
 import { Schema, type Types } from 'effect'
 import { tracesTabSchema, WINDOW_OPTIONS, type TracesView } from './view-state.js'
-import { panelStores } from './panel-stores.js'
+import { panelStores, useWorkbenchScopeKey } from './panel-stores.js'
 
 const ALL = '__all__'
 
@@ -79,7 +79,8 @@ export const TracesPanel = (props: {
   const client = useApi(tracesApi)
   const firing = useFiringCount()
   const queryClient = useQueryClient()
-  const stores = useMemo(() => panelStores(props.panelId), [props.panelId])
+  const scopeKey = useWorkbenchScopeKey()
+  const stores = useMemo(() => panelStores(props.panelId, scopeKey), [props.panelId, scopeKey])
   const view = stores.traces.useValue()
   const [traceId, setTraceId] = useState<string | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)

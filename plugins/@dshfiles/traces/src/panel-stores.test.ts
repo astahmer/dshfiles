@@ -20,4 +20,15 @@ describe('trace panel presentation stores', () => {
     expect(restored.logs.get().search).toBe('log search')
     expect(restored.board.get()).toBe('jobs')
   })
+
+  it('keeps the same semantic tab apart in two Workbench project scopes', () => {
+    const projectA = panelStores('tab/panel:traces', 'project:/work/a')
+    const projectB = panelStores('tab/panel:traces', 'project:/work/b')
+    projectA.traces.set({ ...projectA.traces.get(), tab: 'boards', search: 'a' })
+    projectA.board.set('jobs')
+    expect(projectB.traces.get().search).toBe('')
+    expect(projectB.traces.get().tab).toBe('traces')
+    expect(projectB.board.get()).not.toBe('jobs')
+    expect(panelStores('tab/panel:traces', 'project:/work/a').traces.get().search).toBe('a')
+  })
 })

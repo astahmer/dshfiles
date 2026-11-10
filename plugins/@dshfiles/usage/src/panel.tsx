@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Page } from '@dshfiles/plugin-ui/components/page'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { workbenchTabs } from '@dshfiles/workbench/tabs'
 import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -43,9 +44,18 @@ type Preferences = typeof preferencesSchema.Type
 const DEFAULT_PREFERENCES: Preferences = { tab: 'charts', preset: '7d', customFrom: '', customTo: '', bucket: 'day', groupBy: 'model', purposes: [] }
 type UsageDateRange = { readonly from: number; readonly to: number }
 
-const createPanelState = (panelId?: string) => {
+const scopeKeyOf = (): string => workbenchTabs().getSnapshot().scopeKey
+/** Two projects open the same semantic tab id, so the Workbench scope key joins the occurrence identity. */
+const occurrence = (panelId: string, scopeKey = scopeKeyOf()): string => `${scopeKey}/${panelId}`
+const useScopeKey = (): string => {
+  const tabs = workbenchTabs()
+  const read = (): string => tabs.getSnapshot().scopeKey
+  return useSyncExternalStore(tabs.subscribe, read, read)
+}
+
+const createPanelState = (key: string | undefined) => {
   const preferences = createStoredValue({
-    key: panelId === undefined ? 'dshfiles-usage:view.v1' : `dshfiles-usage:view.v1/panel/${encodeURIComponent(panelId)}`,
+    key: key === undefined ? 'dshfiles-usage:view.v1' : `dshfiles-usage:view.v1/panel/${encodeURIComponent(key)}`,
     schema: preferencesSchema,
     fallback: DEFAULT_PREFERENCES,
   })
@@ -67,11 +77,12 @@ const createPanelState = (panelId?: string) => {
   }
 }
 const panelStates = new Map<string | undefined, ReturnType<typeof createPanelState>>()
-const panelState = (panelId?: string) => {
-  const existing = panelStates.get(panelId)
+const panelState = (panelId?: string, scopeKey?: string) => {
+  const key = panelId === undefined ? undefined : occurrence(panelId, scopeKey)
+  const existing = panelStates.get(key)
   if (existing !== undefined) return existing
-  const state = createPanelState(panelId)
-  panelStates.set(panelId, state)
+  const state = createPanelState(key)
+  panelStates.set(key, state)
   return state
 }
 
@@ -141,7 +152,7 @@ export class UsageTabs {
 }
 
 export const UsagePanel = (props: { readonly openThread: OpenThread; readonly panelId?: string }): JSX.Element => {
-  const state = panelState(props.panelId)
+  const state = panelState(props.panelId, useScopeKey())
   const storedPreferences = state.preferences
   const api = useApi(usageApi)
   const queryClient = useQueryClient()

@@ -2,6 +2,7 @@ import { AccountQuotaViews, USAGE_QUOTA_VIEWS, type UsageQuotaTarget, type Usage
 import { useContract } from '@dshfiles/dshx/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { workbenchTabs } from '@dshfiles/workbench/tabs'
 import { useSyncExternalStore } from 'react'
 
 const VIEW_LABELS = { accounts: 'Accounts', history: 'History', forecast: 'Forecast' } satisfies Record<UsageQuotaView, string>
@@ -40,11 +41,15 @@ const createLocation = () => {
   }
 }
 const locations = new Map<string | undefined, ReturnType<typeof createLocation>>()
+const scopeKeyOf = (): string => workbenchTabs().getSnapshot().scopeKey
+/** Two projects open the same semantic tab id, so the Workbench scope key joins the occurrence identity. */
+const occurrence = (panelId: string, scopeKey = scopeKeyOf()): string => `${scopeKey}/${panelId}`
 const locationFor = (panelId?: string) => {
-  const existing = locations.get(panelId)
+  const key = panelId === undefined ? undefined : occurrence(panelId)
+  const existing = locations.get(key)
   if (existing !== undefined) return existing
   const location = createLocation()
-  locations.set(panelId, location)
+  locations.set(key, location)
   return location
 }
 
