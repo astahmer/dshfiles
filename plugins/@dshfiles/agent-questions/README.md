@@ -7,6 +7,12 @@ root Sessions. It persists each child question under a stable id, binds it to on
 direct parent and child Session, and keeps the answer available for a later wait
 after Host restart.
 
+Native tool approvals are different: DSH pins an in-process child's approval
+policy to `never` and rejects its request before any answerer can hold it. This
+bundle cannot turn that denial into a pending approval or grant it from the parent.
+The child reports the limitation and the parent handles the operation in its own
+scope. A human-authorized escalation contract is tracked in [Host gap 105](../../../plans/dsh-host-gaps.md).
+
 The contract exposes separate request and wait operations. The child tool
 returns the question id when Host shutdown interrupts a wait and accepts that id
 to reattach directly. Answers are scoped to the exact parent Session that owns
