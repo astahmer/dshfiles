@@ -54,6 +54,17 @@ describe.skipIf(!jjAvailable)('workspaces agents isolate for themselves', () => 
     expect(repeated.name).toBe(childWorkspace.name)
   })
 
+  it('lets a thread created in its own workspace adopt it, and gives a subagent started there a new one', async () => {
+    const created = isolatedWorkspace(await harness.runTool('jj_thread_isolate', {}, { sessionId: 'session-seed', cwd: repo }))
+    await harness.register(created.path, ['session-root'])
+
+    const root = isolatedWorkspace(await harness.runTool('jj_thread_isolate', {}, { sessionId: 'session-root', cwd: created.path }))
+    const child = isolatedWorkspace(await harness.runTool('jj_thread_isolate', {}, { sessionId: 'session-root-child', cwd: created.path }))
+
+    expect(root.path).toBe(created.path)
+    expect(child.path).not.toBe(created.path)
+  })
+
   it('keeps the workspace while its work is unlanded or its Session works, then removes it once it landed', async () => {
     const subagent = { sessionId: 'session-subagent', cwd: repo }
     harness.setSession(subagent.sessionId, { running: true, questions: 0 })

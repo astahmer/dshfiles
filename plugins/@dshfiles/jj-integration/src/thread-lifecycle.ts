@@ -124,6 +124,14 @@ const make = Effect.gen(function* () {
           Effect.fail(new NotARepository({ detail: 'Workspace isolation requires a Session inside a local jj or git repository.' })),
         ),
       )
+    if (location.threadName !== undefined) {
+      const current = yield* registry.resolveByPath(location.workspaceRoot)
+      // A subagent starts in its parent's workspace; only a Session alone in its thread workspace adopts it.
+      if (current !== undefined && !workspaceHasOtherSession({ sessionId, workspaceSessionIds: current.sessionIds })) {
+        yield* isolated.set({ sessionId, name: location.threadName, path: location.workspaceRoot })
+        return { name: location.threadName, path: location.workspaceRoot, created: false }
+      }
+    }
     const thread = yield* threads.provision(location.repoRoot)
     const project = yield* registry.resolveByPath(location.repoRoot)
     if ((yield* registry.resolveByPath(thread.path)) === undefined)
