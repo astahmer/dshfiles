@@ -53,7 +53,7 @@ describe('createStoredValue', () => {
   it('persists valid writes and rejects invalid ones', () => {
     const stored = createStoredValue({ key: KEY, schema: countSchema, fallback: null })
     expect(stored.set({ count: 2 })).toBe(true)
-    expect(JSON.parse(localStorage.getItem(KEY) ?? '')).toEqual({ count: 2 })
+    expect(localStorage.getItem(KEY)).toBe(JSON.stringify({ count: 2 }))
     expect(stored.set({ count: 1.5 })).toBe(false)
     expect(stored.get()).toEqual({ count: 2 })
   })
