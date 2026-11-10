@@ -155,6 +155,10 @@ const make = Effect.gen(function* () {
       (target: string) => target,
       (backend, target) => backend.snapshotFiles(target),
     ),
+    snapshotRevision: on(
+      (target: string, _snapshot: string) => target,
+      (backend, target, snapshot) => backend.snapshotRevision(target, snapshot),
+    ),
     restoreFiles: on(
       (target: string, _snapshot: string) => target,
       (backend, target, snapshot) => backend.restoreFiles(target, snapshot),

@@ -113,6 +113,7 @@ export const promiseThreads = (input: { readonly service: Service; readonly run:
     bookmarks: (path: string) => call(service.bookmarks(path)),
     workingCopyCommitId: (path: string, signal?: AbortSignal) => call(service.workingCopyCommitId(path), signal),
     snapshotFiles: (path: string, signal?: AbortSignal) => call(service.snapshotFiles(path), signal),
+    snapshotRevision: (path: string, snapshot: string) => call(service.snapshotRevision(path, snapshot)),
     restoreFiles: (path: string, snapshot: string, signal?: AbortSignal) => call(service.restoreFiles(path, snapshot), signal),
     revisionGraph: (path: string) => call(service.revisionGraph(path)),
   }

@@ -657,6 +657,18 @@ const make = Effect.gen(function* () {
     )
   })
 
+  /**
+   * The revision a snapshot's working copy holds: `@`, or its parent when `@` is an empty, undescribed change the agent
+   * left after `jj commit` or `jj new`. Null for a snapshot this backend did not take.
+   */
+  const snapshotRevision = Effect.fn('thread workspaces snapshot revision')(function* (target: string, operationId: string) {
+    if (!OPERATION_ID.test(operationId)) return null
+    const revset = `at_operation(${operationId}, coalesce(@ ~ (empty() & description(exact:"")), @-))`
+    const line = (yield* jj(['--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'commit_id ++ " " ++ change_id ++ "\\n"'], target)).split('\n')[0] ?? ''
+    const [commitId = '', changeId = ''] = line.trim().split(' ')
+    return isCommitId(commitId) && changeId.length > 0 ? { commitId, changeId } : null
+  })
+
   const workingCopyCommitId = Effect.fn('thread workspaces working copy')(function* (target: string) {
     const commitId = (yield* jj(['log', '--no-graph', '-r', '@', '-T', 'commit_id'], target)).trim()
     if (!isCommitId(commitId)) return yield* jjFailed('Could not resolve the current working-copy revision.')
@@ -1802,6 +1814,7 @@ const make = Effect.gen(function* () {
     bookmarks,
     workingCopyCommitId,
     snapshotFiles,
+    snapshotRevision,
     restoreFiles,
     revisionGraph,
   }

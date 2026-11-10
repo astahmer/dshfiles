@@ -915,6 +915,8 @@ const make = Effect.gen(function* () {
     bookmarks,
     workingCopyCommitId,
     snapshotFiles,
+    // A git snapshot is a commit outside every branch: it names no revision a reader would open.
+    snapshotRevision: () => Effect.succeed(null),
     restoreFiles,
     revisionGraph,
   } satisfies ThreadWorkspacesBackend

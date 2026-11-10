@@ -99,6 +99,22 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     await expect(threads.restoreFiles(thread.path, 'not-an-operation')).rejects.toThrow('not a jj operation id')
   })
 
+  it('names the revision a snapshot holds: @, or its parent past an empty undescribed change', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'shared.txt'), 'edited\n')
+    const edited = await threads.snapshotFiles(thread.path)
+    expect(await threads.snapshotRevision(thread.path, edited)).toEqual({ commitId: commitIdAt(thread.path, '@'), changeId: changeIdAt(thread.path, '@') })
+
+    jj(thread.path, 'commit', '-m', 'agent commit')
+    const committed = await threads.snapshotFiles(thread.path)
+    expect(await threads.snapshotRevision(thread.path, committed)).toEqual({ commitId: commitIdAt(thread.path, '@-'), changeId: changeIdAt(thread.path, '@-') })
+    // The snapshot keeps naming the revision as it was, after the working copy moved on.
+    writeFileSync(join(thread.path, 'later.txt'), 'later\n')
+    await threads.snapshotFiles(thread.path)
+    expect((await threads.snapshotRevision(thread.path, edited))?.commitId).not.toBe(commitIdAt(thread.path, '@'))
+    expect(await threads.snapshotRevision(thread.path, 'not-an-operation')).toBeNull()
+  })
+
   it('identifies non-thread secondary workspaces by their owning JJ checkout', async () => {
     const secondaryPath = join(root, 'secondary')
     jj(repo, 'workspace', 'add', secondaryPath, '--name', 'secondary')

@@ -120,6 +120,11 @@ export type DiscardOutcome = { readonly status: 'discarded' } | { readonly statu
 
 export type ManagedThread = ThreadLocation & { readonly threadName: string }
 
+export interface SnapshotRevision {
+  readonly commitId: string
+  readonly changeId: string
+}
+
 /** One VCS backend for thread workspaces. Every method is the same contract whichever backend serves it. */
 export interface ThreadWorkspacesBackend {
   readonly vcs: VcsKind
@@ -179,6 +184,8 @@ export interface ThreadWorkspacesBackend {
   readonly workingCopyCommitId: (target: string) => Effect.Effect<string, ThreadWorkspaceError>
   /** Record the workspace's files and return an opaque token `restoreFiles` accepts; moves nothing. */
   readonly snapshotFiles: (target: string) => Effect.Effect<string, ThreadWorkspaceError>
+  /** The revision a snapshot's files are in, when the VCS names one a reader can open; null otherwise. */
+  readonly snapshotRevision: (target: string, snapshot: string) => Effect.Effect<SnapshotRevision | null, ThreadWorkspaceError>
   /** Put the workspace's files back to a snapshot; returns a snapshot of what they were. */
   readonly restoreFiles: (target: string, snapshot: string) => Effect.Effect<string, ThreadWorkspaceError>
   readonly revisionGraph: (target: string) => Effect.Effect<string, ThreadWorkspaceError>
