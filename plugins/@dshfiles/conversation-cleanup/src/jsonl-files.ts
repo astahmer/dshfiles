@@ -3,6 +3,7 @@ import { Effect, FileSystem, Path, Schema } from 'effect'
 
 export class JsonlPurgeRefused extends Schema.TaggedError<JsonlPurgeRefused>()('JsonlPurgeRefused', {
   reason: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
 }) {
   override get message(): string {
     return `Conversation purge stopped: ${this.reason} Older generations may already be removed. Inspect the configured session storage before retrying.`
@@ -111,7 +112,7 @@ export const purgeJsonlFiles = Effect.fn('conversation jsonl purge')(function* (
   // The pinned backend uses nanosecond metadata unavailable through Effect FileSystem; this is its exact 0.2.1-rc.2 revision adapter.
   const currentRevision = Effect.tryPromise({
     try: () => stat(path.join(directory, selected.name), { bigint: true }),
-    catch: () => new JsonlPurgeRefused({ reason: 'The current log identity could not be read.' }),
+    catch: cause => new JsonlPurgeRefused({ reason: 'The current log identity could not be read.', cause }),
   }).pipe(Effect.map(identity => [identity.dev, identity.ino, identity.size, identity.mtimeNs, identity.ctimeNs].join(':')))
   if ((yield* currentRevision) !== input.expectedRevision) {
     return yield* new JsonlPurgeRefused({ reason: 'The computed log location does not match the previewed persistence revision.' })

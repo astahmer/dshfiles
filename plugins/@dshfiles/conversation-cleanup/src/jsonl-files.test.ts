@@ -3,7 +3,7 @@ import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, FileSystem, Layer, Path } from 'effect'
 
-import { jsonlSessionDirectory, purgeJsonlFiles } from './jsonl-files.js'
+import { JsonlPurgeRefused, jsonlSessionDirectory, purgeJsonlFiles } from './jsonl-files.js'
 
 const platform = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
 const purge = Effect.fnUntraced(function* (input: Omit<Parameters<typeof purgeJsonlFiles>[0], 'expectedRevision'>) {
@@ -27,6 +27,13 @@ const fixture = Effect.gen(function* () {
 })
 
 describe('JSONL file purge', () => {
+  it('retains an underlying failure without exposing it in the recovery message', () => {
+    const cause = new Error('private storage path')
+    const refusal = new JsonlPurgeRefused({ reason: 'The current log identity could not be read.', cause })
+    expect(refusal.cause).toBe(cause)
+    expect(refusal.message).not.toContain(cause.message)
+  })
+
   it.layer(platform)(it => {
     it.effect('removes all canonical generations and encodings, retaining lock inode and sidecars', () =>
       Effect.gen(function* () {
