@@ -1,14 +1,13 @@
-# Inline chat UI — make ongoing work readable
+# Inline chat UI — remaining P2 cards
 
 Goal: someone glancing at a thread can tell **what the agent is doing, what it changed, what it is waiting on, and
-what failed**, without opening terminal dumps. Everything here renders inline in the transcript or in the strip
-above the composer; nothing needs a new panel.
-
-Sources surveyed 2026-10-19: [affectUI](https://www.affectui.com/components) (55 components, agent-focused),
-[Vercel AI Elements](https://github.com/vercel/ai-elements), [prompt-kit](https://github.com/ibelick/prompt-kit),
-[Agent Elements](https://github.com/21st-dev/agent-elements), [simple-ai](https://github.com/Alwurts/simple-ai),
-[assistant-ui](https://github.com/assistant-ui/assistant-ui). [HextaUI](hextaui-blocks.md) is planned separately;
-this plan absorbs its P1 rows (edit cards, code block, stack trace).
+what failed**, without opening terminal dumps. The P1 cards and the first P2 shipped and are documented where they
+live: the kit pieces (`ToolCard`, `StatusIcon`, `StackTrace`, `CodeFrame`) in the
+[plugin-ui README](../plugins/@dshfiles/plugin-ui/README.md), the plan card, pinned step, live activity strip,
+failure card and compaction meter in [agent-plan](../plugins/@dshfiles/agent-plan/README.md) (its next-compaction
+trigger in [context-compaction](../plugins/@dshfiles/context-compaction/README.md#next-compaction)), and the turn
+summary in [turn-summary](../plugins/@dshfiles/turn-summary/README.md). Edit cards stay native. This file keeps only
+the P2 cards nobody built yet. [HextaUI](hextaui-blocks.md) is planned separately.
 
 ## Licences
 
@@ -18,100 +17,37 @@ this plan absorbs its P1 rows (edit cards, code block, stack trace).
 | prompt-kit     | MIT                                                 | **Port**                                                                                                  |
 | Agent Elements | MIT (small, last push 2026-04)                      | **Port** pieces; do not depend on it                                                                      |
 | simple-ai      | MIT                                                 | **Port** pieces                                                                                           |
-| assistant-ui   | MIT                                                 | Skip: a chat runtime; DSH owns messages and state                                                         |
 | affectUI       | 40 free items + paid Pro; Pro forbids public source | **Design reference** only; the free/Pro badge is client-rendered, check each item before copying anything |
 
-All of them are shadcn + Vercel AI SDK `UIMessage` shaped. Port the **view**, then feed it DSH blocks
-(`ToolResultNode`, `args`, `time`/`callTime`), never the AI SDK types.
+Port the **view**, then feed it DSH blocks (`ToolResultNode`, `args`, `time`/`callTime`), never the AI SDK types.
+Build on the Host primitives and `plugin-ui`; no new dependencies from the libraries (`streamdown`, full Shiki,
+`motion`). Every card registers a `defineSettings` switch (`applies: 'live'`) and falls back to the native view when
+off.
 
-## Seams (verified in DSH 0.2.1-rc.2 types)
+## P2 audit (2026-11-10)
 
-| Seam                                                                                                                | Use                                                                                   |
-| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `tool.call.toolview` keyed per tool (`bash`, `edit`, `todo_write`, …)                                               | Replace one tool's card; render the native entry as fallback (pattern in `test-runs`) |
-| `conversation.chat.node` keyed by node kind (`tool-call`, `compaction`, `steering`, `turn-error`, `model-retry`, …) | Wrap or replace a node renderer (pattern in `tool-meta`)                              |
-| `conversation.chat.assistant-actions`                                                                               | Per-turn footer: turn summary, checkpoint                                             |
-| `conversation.input.activity`, `conversation.input.plan`, `conversation.input.dock`                                 | Live strip above the composer                                                         |
+| Card                                                                                        | State           | Owner / note                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Context meter** (affectUI Context Window, AI Elements `context`)                          | done            | Ring and breakdown: native `dsh-token-meter` projections drawn by `rich-composer`. Cost: `ai-accounts`. Next compaction: `agent-plan` meter-line chip over the `context-compaction` threshold API. |
+| **Compaction marker** (affectUI Compact Breakdown)                                          | already existed | `chat` fork's `compaction` node: "Compacted N history items (~X tokens)", summary on expand                                                                                                        |
+| **Subagent tree** (affectUI Agent Tree, Agent Elements SubagentTool)                        | already existed | `thread-sidebar` `SubagentProvenanceToolRow`: name, model, working/done state, live preview of the child's steps. No per-child duration                                                            |
+| **Steering echo** (affectUI Agent Steering)                                                 | already existed | `chat` fork renders steering rows where the agent took them, plus the pending steering bubble                                                                                                      |
+| **Decision inbox** (affectUI Agent/Decision Inbox)                                          | already existed | `activity-timeline` Inbox ("Needs you" across threads) with the `attention_*` agent tools                                                                                                          |
+| **Checkpoint** (AI Elements `checkpoint`)                                                   | partly          | `session-undo` rewinds to before any recorded turn, files included. Missing: the jj revision a turn produced, shown on the turn                                                                    |
+| **Approval card** (affectUI Approval Card / Permission Request, AI Elements `confirmation`) | open            | `input.permission`; native `dsh-client-ui-approval` owns the decision, restyle only                                                                                                                |
+| **Citations** (AI Elements `sources`, `inline-citation`)                                    | open            | `tool.call.toolview` for the web tools (`web-fetch-readable` and `web-search-brave` have no client yet): source chips for fetched pages                                                            |
 
-## Shared kit first (`@dshfiles/plugin-ui`)
+## Open cards
 
-The Host already ships most of what the libraries offer, in `@deepseek-ai/dsh-client-ui-primitives`: `CodeBlock`,
-`CodeToolbar`, `TerminalBlock` (ANSI), `DisclosureRow` (the native 24px process row), `TextShimmer` and
-`useCodeHighlighter` (Shiki themed by the Host's `--shiki-token-*` variables). The kit wraps those instead of
-porting library code, so cards look native and follow the theme.
+1. **Citations.** Wrap the native `web_fetch` / `web_search` rows (the `tool-meta` pattern) and add one chip per
+   source URL: host name, opens the page. Owner: a client half in `web-fetch-readable`, or `agent-plan` if both web
+   tools should share it.
+2. **Checkpoint revision.** On each finished turn (`turnTail`, not `assistant-actions`: that seat carries only the
+   message id), name the jj revision the turn's edits landed in, linked through `jujutsu`; "restore to here" reuses
+   `session-undo`'s rewind. Needs a turn → revision mapping: `session-undo` records the jj operation at turn start,
+   not a revision.
+3. **Approval card.** Restyle `input.permission` (risk badge, command preview, keyboard hints) without taking the
+   decision from the native approval package.
 
-| Piece                                 | Status                               | Built on                                                                                   |
-| ------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `ToolCard`, `StatusIcon`              | done (`components/tool-card`)        | `DisclosureRow`; status glyphs for a step (`row`) or a file/run (`group`)                  |
-| `CodeFrame`, `StackTrace`, `FilePath` | done (`components/stack-trace`)      | `useCodeHighlighter`; keeps the file's own line numbers, which the Host `CodeBlock` cannot |
-| Terminal                              | not needed                           | Use the Host `TerminalBlock` directly                                                      |
-| `LiveTimer`                           | local in `agent-plan` (`useNow`)     | Kept local until a second plugin needs one; then move it into the kit                      |
-| `FileTree`                            | not needed yet                       | The turn summary lists edited files flat (path + `+N −M`); a tree waits for a real need   |
-
-## Cards, ranked
-
-**P1** makes ongoing work easier to follow today. **P2** polishes. **—** skip.
-
-| Card                                                                                                 | Seam                                           | Rank   | What it shows                                                                                                                                                                                                                                           | Host check                                                                                                                   |
-| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **Turn summary** (affectUI Change Summary, AI Elements Commit)                                       | `turnTail` (not `assistant-actions`)           | done   | Shipped in `@dshfiles/turn-summary`: "Edited 3 files +42 −7 · ran 6 commands · 1 failed · tests 40/42 · 1m 12s"; files, commands and failures open their lists, files open in the editor                                                         | `assistant-actions` owner props carry only the message id; `turnTail` carries the turn, its data and `openFile`             |
-| **Edit card** (HextaUI Diff Review, affectUI Inline Diff, Agent Elements EditTool)                   | `toolview` `edit`, `write`                     | native | Checked 2026-10-19 in a scratch DSH: the native row already shows path, size and +/− counts, expands to a language-labelled diff that folds long hunks, has Inspect, and the turn gets an "Edited pricing.ts +4 −1" chip; `tool-meta` adds the duration | A takeover would duplicate core. Revisit only for extras the native card lacks (line numbers, wrap/copy toolbar on the diff) |
-| **Plan / todo progress** (affectUI Agent Plan, AI Elements `plan` + `task`, Agent Elements TodoTool) | `toolview` `todo_write` + `input.plan`         | done   | Shipped in `@dshfiles/agent-plan`: steps with done/active/pending, "Step 2 of 3", elapsed per step; the current step pinned beside the native plan-mode chip                                                                                            | Timing from successive `todo/write` event times, followed across turns while the plan keeps a step                          |
-| **Tool group summary** (affectUI Tool Call Card group)                                               | `turnTail` + turn Definition                   | done   | Shipped as `@dshfiles/turn-summary`: "Ran 6 commands · edited 3 files · 1 failed ›" under each finished turn, failures listed                                                                                                                           | The step group header has no seam (Host gap); the line lives under the turn instead                                          |
-| **Live activity strip** (affectUI Agent Lanes, AI Elements `queue`)                                  | `input.activity`                               | done   | Shipped in `@dshfiles/agent-plan`: running tool calls with a live timer, background jobs, subagents; queued messages stay in the native queue dock                                                                                                       | Neither `background-jobs` nor `queue-reorder` exports a contract module; the strip reads `tool/*` and `job/*` Session events |
-| **Failure card**                                                                                     | `chat.node` `turn-error`, `model-retry`        | done   | Shipped in `@dshfiles/agent-plan`: retry count, "Retry" / "Ask to fix" under the native row, through the dshx `Composer` contract (writes, never sends)                                                                                                  | Actions need a `Composer` provider (`@dshfiles/rich-composer`)                                                               |
-| **Context meter** (affectUI Context Window, AI Elements `context`)                                   | `input.left`                                   | P2     | Tokens used / limit, cost, next compaction                                                                                                                                                                                                              | `usage` reads per-request usage; limit per model from the model directory                                                    |
-| **Compaction marker** (affectUI Compact Breakdown)                                                   | `chat.node` `compaction`                       | P2     | What was summarised, tokens before/after                                                                                                                                                                                                                | Summary payload is an instruction envelope; show counts, not text                                                            |
-| **Subagent tree** (affectUI Agent Tree, Agent Elements SubagentTool)                                 | `toolview` `subagent` (thread-sidebar owns it) | P2     | Children with status, model, duration, last step                                                                                                                                                                                                        | Extend `SubagentProvenanceToolRow`, do not add a second owner                                                                |
-| **Approval card** (affectUI Approval Card / Permission Request, AI Elements `confirmation`)          | `input.permission`                             | P2     | Risk badge, command preview, keyboard shortcuts                                                                                                                                                                                                         | Native `dsh-client-ui-approval` owns the decision; restyle only                                                              |
-| **Checkpoint** (AI Elements `checkpoint`)                                                            | `assistant-actions`                            | P2     | jj revision the turn produced, "restore to here"                                                                                                                                                                                                        | `jujutsu` already resolves revisions; restore = existing jj action                                                           |
-| **Steering echo** (affectUI Agent Steering)                                                          | `chat.node` `steering`                         | P2     | Queued note shown where the agent picked it up                                                                                                                                                                                                          | —                                                                                                                            |
-| **Decision inbox** (affectUI Agent/Decision Inbox)                                                   | sidebar                                        | P2     | Threads that need you, across sessions                                                                                                                                                                                                                  | Blocked by the cross-thread inbox Host gap (agent-questions)                                                                 |
-| **Citations** (AI Elements `sources`, `inline-citation`)                                             | `toolview` web tools                           | P2     | Source chips for fetched pages                                                                                                                                                                                                                          | —                                                                                                                            |
-| Thinking / chain of thought, message actions, reactions, voice, model picker                         | native                                         | —      | Core already renders these; no seam worth the upkeep                                                                                                                                                                                                    | —                                                                                                                            |
-
-## Order
-
-1. ~~Kit: `ToolCard`, `StatusIcon`, `CodeFrame`, `StackTrace`; `test-runs` moved onto them.~~ Done.
-2. ~~Edit card~~: covered by the native `edit`/`write` cards (see the table).
-3. ~~Tool group summary~~: done as `@dshfiles/turn-summary` (under the turn; the group header has no seam).
-4. ~~Plan/todo progress card + pinned step.~~ Done in `@dshfiles/agent-plan`.
-5. ~~Live activity strip.~~ Done in `@dshfiles/agent-plan`.
-6. ~~Turn summary~~: done in `@dshfiles/turn-summary` (line counts, tests, duration, lists).
-7. ~~Failure card~~ done in `@dshfiles/agent-plan`; then P2s one plugin at a time.
-
-**Resume here:** the P1s are done and `@dshfiles/agent-plan` is in the `profiles/web` seed (checked 2026-11-05); start the P2s, context meter first.
-
-Each step: a scratch-DSH screenshot through the fake provider (`[[call <tool> {...}]]` directives, see `test-runs`
-verification) and a catalog `reach`.
-
-## Decisions
-
-1. Build on the Host primitives and `plugin-ui`'s Radix parts; no new dependencies from the libraries (`streamdown`, full Shiki, `motion`).
-2. Turn summary is a footer under each turn (`turnTail`; see 5).
-3. Every card is configurable: its plugin registers a `defineSettings` namespace (`applies: 'live'`) with an `enabled` switch plus one switch per behaviour, and the catalog `configuration` lists each key. Turning a card off falls back to the native view.
-4. The live activity strip and the pinned step sit **beside** the native `input.activity` / `input.plan` occupants
-   (voice input, plan-mode chip), never replace them. Both are single slots whose occupants take injected props, so
-   `agent-plan` wraps the occupant in place (the `tool-meta` pattern) and registers its own entry at priority 100 only
-   for profiles with no native occupant.
-5. The turn summary stays in `turnTail`: `assistant-actions` gets only a message id.
-
-## Progress
-
-| Step                      | State | Where                                                                                                          |
-| ------------------------- | ----- | -------------------------------------------------------------------------------------------------------------- |
-| 4 Plan card + pinned step | done | `@dshfiles/agent-plan` (`plan-card`, `pinned-step`), journeys `agent-plan.plan-card`, `agent-plan.pinned-step` |
-| 5 Live activity strip | done | `@dshfiles/agent-plan` (`live-activity-strip`), journey `agent-plan.activity-strip` |
-| 6 Turn summary footer | done | `@dshfiles/turn-summary` (`turn-summary-line`), unit `turn-summary.model-footer` |
-| 7 Failure card | done | `@dshfiles/agent-plan` (`failure-card`), journey `agent-plan.failure-card` |
-
-Scratch caveat (2026-11-04): with the workspace's own core (`node_modules/@deepseek-ai/dsh`) every scratch and journey
-tool call crashed with "Cannot read properties of undefined (reading 'prepare')": that install's `dsh-base` links
-`@deepseek-ai/dsh-tools@0.2.1-rc.2(cfc185…)` while its `dsh-agent-loop` links the `(e82ac2…)` peer variant, so the
-agent loop's `registry[TOOL_RUNTIME_SCHEDULER]` symbol lookup misses. `main`'s lockfile already carries both variants
-and the crash reproduces without `agent-plan`. Verified instead with `DSHX_DSH_EXECUTABLE` pointing at a flat 0.2.1-rc.2
-install that has one `dsh-tools`. The reaches use the `jev-setup-chat-thread` seed so they need no tool call to set up.
-
-## Open questions
-
-None open for the P1s.
+Each card: a scratch-DSH screenshot through the fake provider (`[[call <tool> {...}]]` directives) and a catalog
+`reach`.
