@@ -11,19 +11,27 @@ path is excluded.
 ## Where it stands
 
 `pnpm lint` was green when these were measured with `node scripts/lint-ratchet.ts oxlint` and
-`node scripts/lint-ratchet.ts ast-grep` (2026-10-29):
+`node scripts/lint-ratchet.ts ast-grep` (2026-11-10, on a `git archive` of the committed tip, so other
+agents' uncommitted edits in the shared workspace did not count):
 
 | Checker  | Start | Now |
 | -------- | ----- | --- |
-| oxlint   | 2433  | 958 |
-| ast-grep | 461   | 183 |
+| oxlint   | 2433  | 995 |
+| ast-grep | 461   | 150 |
 
-Per rule (oxlint, finding count / cap): `no-native-title` 89 / 309,
-`require-safety-comment-for-type-assertion` 330 / 385, `no-unknown-parameters`
-158 / 224, `no-unsafe-dictionary-type` 162 / 218, `no-unknown-returns` 109 / 123,
-`no-known-value-widening` 87 / 96, `no-runtime-typeof` 23 / 381.
+Every cap equals its count. Per rule (oxlint): `require-safety-comment-for-type-assertion` 297,
+`no-unknown-parameters` 228, `no-unsafe-dictionary-type` 172, `no-unknown-returns` 116,
+`no-known-value-widening` 87, `ui-guidance(no-native-title)` 64, `no-runtime-typeof` 31. Every other rule,
+including error-level findings and unused disable directives, is at 0.
 
-ast-grep: `no-direct-json-parse` 181 / 247, `no-direct-json-parse-tsx` 2 / 4.
+ast-grep: `no-direct-json-parse` 147, `no-direct-json-parse-tsx` 3; every other rule at 0.
+
+2026-11-10: main had drifted past the ratchet: 16 error-level findings plus new findings for
+`no-conditional-empty-object-spread`, `no-index-import`, `no-deeply-nested-ternary` and others, mostly
+from the newly landed agent-loop fork and phone-pairing. agent-loop/src/native and
+sidebar-right/src/native are pinned native forks and are now excluded like the other forks. The three files
+that load a fork's vendored `index.ts` entry are listed in `astGrepNativeEntryImporters`.
+phone-pairing/experiments is a standalone prototype that nothing imports, and oxlint ignores it.
 
 2026-11-04: dshx `src` is down to two deliberate sites: `config/resolve.ts` parses
 raw so it can see an own `__proto__` key, which a schema decode drops, and
@@ -34,10 +42,9 @@ other site goes through `src/json.ts` with its owning schema or `jsonValueSchema
 
 ## Remaining work, in order
 
-Re-measure first: a 2026-11-10 run in a shared thread workspace (with other agents' code edits in it) counted
-oxlint 1154 and ast-grep 173 with several rules over their caps (`error`, `no-conditional-empty-object-spread`,
-`no-index-import`, `require-safety-comment-for-type-assertion`), so main may have drifted past the ratchet.
-
+Measure a clean tree: in a shared workspace, other agents' uncommitted edits change the counts. Running
+`git --git-dir=<repo>/.git archive <commit> | tar -x -C <dir>`, symlinking `node_modules` and running the
+ratchet there counts exactly what is committed.
 
 1. **dshx** — `src` done (2026-11-04). Remaining: about 76
    `no-direct-json-parse` sites in `tooling/dshx/packages/dshx/tests`, then the
