@@ -517,11 +517,14 @@ export interface DshPlatformClient {
 
 export class DshPlatformError extends Error {
   readonly code: string
+  /** JSON details a remote handler sent with its failure, already bounded and redacted by the caller that decoded them. */
+  readonly details: Readonly<Record<string, JsonValue>> | undefined
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, details?: Readonly<Record<string, JsonValue>>) {
     super(message)
     this.name = 'DshPlatformError'
     this.code = code
+    this.details = details
   }
 }
 

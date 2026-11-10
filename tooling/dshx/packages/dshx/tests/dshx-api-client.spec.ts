@@ -24,6 +24,12 @@ const notesHost = defineHost({
   apis: [
     notesApi.host({
       get: ({ input }) => {
+        if (input.id === 'refused')
+          throw new PluginApiError('Peer refused: see http://host/?token=abc123 for more.', {
+            code: 'peer-refused',
+            details: { reason: 'cursor-ahead', cursor: 42, authToken: 'abc123', nested: { url: 'http://host/?token=abc123' } },
+          })
+        if (input.id === 'huge') throw new PluginApiError('Too much.', { code: 'huge', details: { blob: 'x'.repeat(10_000) } })
         if (input.id !== 'a') throw new PluginApiError(`No note ${input.id}.`, { code: 'not-found' })
         return { id: 'a', text: 'first' }
       },
@@ -46,6 +52,29 @@ describe('connectDshxApiClient', () => {
       const controller = new AbortController()
       controller.abort()
       await expect(notes.count(undefined, { signal: controller.signal })).rejects.toMatchObject({ kind: 'aborted' })
+    } finally {
+      await host.dispose()
+    }
+  })
+
+  it('keeps the message and JSON details of a remote failure, redacted and bounded', async () => {
+    const host = await createTestHost()
+    try {
+      await host.mount(notesHost, { packageId: '@test/notes' })
+      const notes = await connectDshxApiClient(notesApi, { origin: 'http://dshx.test', fetch: host.connection.fetch })
+      const refused = await notes.safe.get({ id: 'refused' })
+      expect(refused).toMatchObject({
+        ok: false,
+        error: {
+          kind: 'remote',
+          remoteCode: 'peer-refused',
+          message: 'Peer refused: see http://host/?token=[redacted] for more.',
+          remoteDetails: { reason: 'cursor-ahead', cursor: 42, authToken: '[redacted]', nested: { url: 'http://host/?token=[redacted]' } },
+        },
+      })
+      const huge = await notes.safe.get({ id: 'huge' })
+      expect(huge).toMatchObject({ ok: false, error: { kind: 'remote', remoteCode: 'huge', message: 'Too much.' } })
+      expect(!huge.ok && huge.error.remoteDetails).toBeUndefined()
     } finally {
       await host.dispose()
     }

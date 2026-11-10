@@ -15,7 +15,7 @@ const responseSchema = withUnknownProperties({
     withUnknownProperties({ ok: Schema.Literal(true), value: Schema.Unknown }),
     withUnknownProperties({
       ok: Schema.Literal(false),
-      error: withUnknownProperties({ code: Schema.optional(Schema.String), message: Schema.String }),
+      error: withUnknownProperties({ code: Schema.optional(Schema.String), message: Schema.String, details: Schema.optional(Schema.Unknown) }),
     }),
   ]),
 })
@@ -33,7 +33,36 @@ export interface DshxApiCallerOptions {
   readonly fetch?: typeof fetch
 }
 
-const safeMessage = (message: string): string => message.replace(/([?&]token=)[^&\s]*/gi, '$1[redacted]')
+const MAX_REMOTE_MESSAGE = 1000
+const MAX_REMOTE_DETAILS = 8192
+const SECRET_KEY = /token|cookie|authorization|secret|password|credential|api[-_]?key/i
+
+const redact = (text: string): string =>
+  text.replace(/([?&]token=)[^&\s"']*/gi, '$1[redacted]').replace(/(authorization|cookie)\s*[:=]\s*[^\s,;"']+/gi, '$1=[redacted]')
+
+const safeMessage = (message: string): string => redact(message).slice(0, MAX_REMOTE_MESSAGE)
+
+const detailsSchema = Schema.Record(Schema.String, jsonValueSchema)
+
+const isJsonArray = (value: JsonValue): value is readonly JsonValue[] => Array.isArray(value)
+
+const redactJson = (value: JsonValue): JsonValue => {
+  if (typeof value === 'string') return redact(value)
+  if (isJsonArray(value)) return value.map(redactJson)
+  if (value === null || typeof value !== 'object') return value
+  return redactRecord(value)
+}
+
+const redactRecord = (record: Readonly<Record<string, JsonValue>>): Record<string, JsonValue> =>
+  Object.fromEntries(Object.entries(record).map(([key, item]) => [key, SECRET_KEY.test(key) ? '[redacted]' : redactJson(item)]))
+
+/** The details a remote failure carried, when they are a JSON object small enough to keep; secrets are redacted. */
+const safeDetails = (details: unknown): Readonly<Record<string, JsonValue>> | undefined => {
+  const decoded = Schema.decodeUnknownOption(detailsSchema)(details)
+  if (Option.isNone(decoded) || Object.keys(decoded.value).length === 0) return undefined
+  const redacted = redactRecord(decoded.value)
+  return JSON.stringify(redacted).length > MAX_REMOTE_DETAILS ? undefined : redacted
+}
 
 /** Calls one versioned DSHX Host API using an existing authenticated native session. */
 export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version, fetch: request = fetch }: DshxApiCallerOptions): DshxApiCall => {
@@ -79,7 +108,7 @@ export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version,
     }
     if (!parsed.value.result.ok) {
       const failure = parsed.value.result.error
-      throw new DshPlatformError(failure.code ?? 'remote-error', safeMessage(failure.message))
+      throw new DshPlatformError(failure.code ?? 'remote-error', safeMessage(failure.message), safeDetails(failure.details))
     }
     const output = Schema.decodeUnknownOption(outputSchema)(parsed.value.result.value)
     if (Option.isNone(output) || output.value.version !== version) {
