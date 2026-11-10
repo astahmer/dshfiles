@@ -1,11 +1,11 @@
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 import { AssistantStreamAttempt } from '../src/native/assistant-stream.ts'
 
 const attempt = () =>
-  new AssistantStreamAttempt('session-1' as SessionId, 1, () => 1, 1, 1, () => undefined)
+  new AssistantStreamAttempt(SessionId('session-1'), 1, () => 1, 1, 1, () => undefined)
 
 const blocks = [{ signature: 'sig-1' }]
 

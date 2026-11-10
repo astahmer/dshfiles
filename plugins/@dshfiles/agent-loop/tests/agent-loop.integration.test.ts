@@ -45,7 +45,7 @@ interface Observed {
   readonly secondRequestBlocks: number
 }
 
-const observedRun = async (loop: unknown): Promise<Observed> => {
+const observedRun = async (installLoop: (ctx: Context) => Promise<void>): Promise<Observed> => {
   const ctx = new Context()
   try {
     await ctx.plugin(SessionProjectionRegistry)
@@ -55,7 +55,7 @@ const observedRun = async (loop: unknown): Promise<Observed> => {
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(TokenMeter)
-    await ctx.plugin(loop as typeof UpstreamAgentLoop)
+    await installLoop(ctx)
 
     const adapter = new ReplayAdapter()
     ctx.llm.registerAdapter(['replay-test'], adapter)
@@ -97,8 +97,12 @@ const observedRun = async (loop: unknown): Promise<Observed> => {
 
 describe('agent-loop fork', () => {
   it('stores the replay envelope once and still replays it to the provider', async () => {
-    const upstream = await observedRun(UpstreamAgentLoop)
-    const forked = await observedRun(ForkedAgentLoop)
+    const upstream = await observedRun(async ctx => {
+      await ctx.plugin(UpstreamAgentLoop)
+    })
+    const forked = await observedRun(async ctx => {
+      await ctx.plugin(ForkedAgentLoop)
+    })
 
     // Before: the envelope's block list sits on the message source and on the terminal stream record.
     expect(upstream.sourceBlocks).toBe(1)
