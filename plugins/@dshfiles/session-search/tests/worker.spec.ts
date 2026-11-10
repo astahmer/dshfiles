@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs'
+import { appendFile, stat, truncate } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -169,6 +170,38 @@ describe('owned search backend over the real worker', { timeout: 30_000 }, () =>
     await waitFor(
       async () => (await context.sessionQuery.searchSessions({ query: 'afterthought', limit: 5 })).items.length > 0,
       'the appended frame to be indexed',
+    )
+  })
+
+  it('reports a corrupt log as lastError and keeps indexing once it is repaired', async () => {
+    const context = await boot()
+    await waitForIndex(2)
+    const brokenPath = join(home, 'sessions', 'project', 'session-11111111-0000-4000-8000-000000000000', 'session.v4.jsonl.zstd')
+    const intactSize = (await stat(brokenPath)).size
+    await appendFile(brokenPath, Buffer.alloc(4))
+    await client?.nudge()
+
+    let lastError: string | null = null
+    const deadline = Date.now() + 5_000
+    while (Date.now() <= deadline && lastError === null) {
+      lastError = (await client?.health())?.lastError ?? null
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    expect(lastError).toContain('corrupt session log')
+
+    // The worker owns the log shape it can resume from: repairing the torn tail must let the loop retry the same pass.
+    await truncate(brokenPath, intactSize)
+    const healthyPath = join(home, 'sessions', 'project', 'session-22222222-0000-4000-8000-000000000000', 'session.v4.jsonl.zstd')
+    await appendSessionLogEvent(healthyPath, {
+      type: 'user/message',
+      seq: 12,
+      time: 1_700_000_000_999,
+      data: { id: 'msg-recovered', role: 'user', content: [{ type: 'text', text: 'the recovered marker' }], source: { kind: 'user' } },
+    })
+    await client?.nudge()
+    await waitFor(
+      async () => (await context.sessionQuery.searchSessions({ query: 'recovered marker', limit: 5 })).items.length > 0,
+      'the ingest loop to index a later log after a corrupt one',
     )
   })
 

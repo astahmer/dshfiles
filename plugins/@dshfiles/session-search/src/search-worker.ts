@@ -16,6 +16,7 @@ import { RpcServer } from 'effect/rpc'
 import { SqlClient } from 'effect/sql'
 import type { SqlError } from 'effect/sql/SqlError'
 
+import { describeError, indexFailure } from './failure.js'
 import { indexMigrations, SearchIndex } from './index-db.js'
 import { IdleBackoff, indexSessions, runIngestPass } from './ingest.js'
 
@@ -40,10 +41,6 @@ type Progress = {
   readonly behindSessions: number
   readonly behindBytes: number
 }
-
-const describeError = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 500)
-
-const indexFailure = (cause: unknown) => new SearchWorkerFailed({ code: 'session-search-index-failed', reason: describeError(cause), cause })
 
 const Handlers = SearchWorkerRpcs.toLayer(
   Effect.gen(function* () {
@@ -108,30 +105,35 @@ const Handlers = SearchWorkerRpcs.toLayer(
             archived: cold,
             isArchived: sessionId => Effect.map(Ref.get(archived), current => current.has(sessionId)),
           })
+          // Dropping archived Sessions empties most of the file; give the bytes back once, in a step of its own so a
+          // failure is reported instead of swallowed by the pass.
+          // Un-merged FTS5 segments are the real garbage after a prune (measured 1.82 GB of a 2.01 GB index), and the page
+          // freelist stays small, so the trigger is bytes per document as well as free pages.
+          if (Date.now() - lastCompactionAt > COMPACTION_INTERVAL_MS) {
+            const freePageRatio = yield* index.freePageRatio()
+            const bytesPerDocument = yield* index.bytesPerDocument()
+            if (freePageRatio > 0.25 || bytesPerDocument > 2_048) {
+              const reclaimed = yield* index.compact().pipe(
+                Effect.as(true),
+                Effect.catch(error => Effect.succeed(describeError(error))),
+              )
+              if (reclaimed === true) lastCompactionAt = Date.now()
+              else yield* Effect.logWarning('session-search: the index could not be compacted yet', reclaimed)
+            }
+          }
           return { backfilled: conversationReady && rowMapReady, result }
-        }).pipe(Effect.result)
+        }).pipe(
+          // The loop must survive whatever one pass hits: a corrupt log or a sync read error is a failed attempt that is
+          // reported and retried, not the end of ingest for the life of the worker.
+          Effect.catchDefect(defect => Effect.fail(indexFailure(defect))),
+          Effect.result,
+        )
         const elapsed = (yield* Clock.currentTimeMillis) - startedAt
         if (outcome._tag === 'Failure') {
           yield* Ref.update(progress, current => ({ ...current, ingesting: false, lastIngestMs: elapsed, lastError: describeError(outcome.failure) }))
           return IDLE_SLEEP
         }
         const result = outcome.success.result
-        // Dropping archived Sessions empties most of the file; give the bytes back once, in a step of its own so a
-        // failure is reported instead of swallowed by the pass.
-        // Un-merged FTS5 segments are the real garbage after a prune (measured 1.82 GB of a 2.01 GB index), and the page
-        // freelist stays small, so the trigger is bytes per document as well as free pages.
-        if (Date.now() - lastCompactionAt > COMPACTION_INTERVAL_MS) {
-          const freePageRatio = yield* index.freePageRatio()
-          const bytesPerDocument = yield* index.bytesPerDocument()
-          if (freePageRatio > 0.25 || bytesPerDocument > 2_048) {
-            const reclaimed = yield* index.compact().pipe(
-              Effect.as(true),
-              Effect.catch(error => Effect.succeed(describeError(error))),
-            )
-            if (reclaimed === true) lastCompactionAt = Date.now()
-            else yield* Effect.logWarning('session-search: the index could not be compacted yet', reclaimed)
-          }
-        }
         yield* Ref.update(progress, current => ({
           ...current,
           ingesting: false,

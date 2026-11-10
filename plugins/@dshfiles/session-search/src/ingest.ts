@@ -12,6 +12,7 @@ import * as Duration from 'effect/Duration'
 import * as Effect from 'effect/Effect'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import { indexFailure } from './failure.js'
 import { FrameLog, type SessionLogFile } from './frame-log.js'
 import type { BatchInput, DocumentRow, SearchIndex, SessionCursor } from './index-db.js'
 import { withoutUndefined } from './optional-fields.js'
@@ -43,6 +44,9 @@ export interface IngestPassOptions {
 
 const GROUP_SESSIONS = 64
 const GROUP_MS = 250
+
+/** The log container is synchronous, and a corrupt or unreadable log is an expected failure of one pass, not a defect. */
+const attempt = <A>(evaluate: () => A) => Effect.try({ try: evaluate, catch: indexFailure })
 
 /**
  * Every committed Session event already wakes the loop (the Host nudges it), so the idle poll only catches logs written
@@ -163,7 +167,7 @@ const sameCursor = (left: SessionCursor | undefined, right: SessionCursor | unde
 
 export const runIngestPass = Effect.fn('session-search ingest pass')(function* (options: IngestPassOptions) {
   const startedAt = options.now()
-  const logs = FrameLog.list(options.root)
+  const logs = yield* attempt(() => FrameLog.list(options.root))
   const cursors = yield* options.index.cursors()
   let ingested = 0
   let documents = 0
@@ -195,6 +199,7 @@ export const runIngestPass = Effect.fn('session-search ingest pass')(function* (
         return { count, written, skipped }
       }),
     )
+  // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- one session at a time, so a pass stops at its byte and time budget and commits bounded groups in log order.
   for (const log of logs) {
     if (options.archived?.has(log.sessionId) === true) {
       if (cursors.has(log.sessionId)) {
@@ -220,7 +225,7 @@ export const runIngestPass = Effect.fn('session-search ingest pass')(function* (
       continue
     }
     if (grouped.length === 0) groupStartedAt = options.now()
-    const batch = stageSession({ ...options, log, cursor })
+    const batch = yield* attempt(() => stageSession({ ...options, log, cursor }))
     grouped.push({ batch, cursor })
     stagedBytes += batch.documents.reduce((sum, document) => sum + Buffer.byteLength(document.text), 0)
     if (grouped.length >= GROUP_SESSIONS || options.now() - groupStartedAt >= GROUP_MS || stagedBytes >= 8 * 1024 * 1024) {
@@ -250,11 +255,11 @@ export const indexSessions = Effect.fn('session-search index sessions')(function
   const cursors = yield* options.index.cursors()
   const wanted = new Set(sessionIds.filter(sessionId => !cursors.has(sessionId)))
   if (wanted.size === 0) return 0
-  const logs = FrameLog.list(options.root)
+  const logs = yield* attempt(() => FrameLog.list(options.root))
   let documents = 0
   for (const log of logs) {
     if (!wanted.delete(log.sessionId)) continue
-    const batch = stageSession({ ...options, log, cursor: undefined })
+    const batch = yield* attempt(() => stageSession({ ...options, log, cursor: undefined }))
     const written = yield* options.index.sql.withTransaction(
       Effect.gen(function* () {
         if ((yield* options.index.cursor(log.sessionId)) !== undefined) return false
