@@ -4,15 +4,21 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { SessionRecord } from '@deepseek-ai/dsh-session-query'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { resolve } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { afterEach, expect, it, vi } from 'vitest'
 import { ApiSessionList } from '../../src/native/list.ts'
 
 const contexts = new Set<Context>()
+const roots = new Set<string>()
 
 afterEach(async () => {
+  vi.useRealTimers()
   await Promise.all([...contexts].map(ctx => ctx.fiber.dispose()))
   contexts.clear()
+  await Promise.all([...roots].map(root => rm(root, { recursive: true, force: true })))
+  roots.clear()
 })
 
 const hostContext = async (): Promise<Context> => {
@@ -79,6 +85,112 @@ it('adds a created Session and keeps a disposed one without reading the corpus a
   await new Promise(resolve => setImmediate(resolve))
   expect((await list.list()).map(item => item.sessionId).sort()).toEqual(['cold-shared', 'fresh'])
   expect(reads).toBe(1)
+})
+
+const storeFixture = async (ctx: Context) => {
+  const root = await mkdtemp(join(tmpdir(), 'list-corpus-store-'))
+  roots.add(root)
+  const headers = new Map<string, SessionRecord['header']>()
+  const statted: string[] = []
+  const store = (project: string, id: string): Promise<string | undefined> => {
+    headers.set(id, fixtureSession(ctx, id).header)
+    return mkdir(join(root, project, id), { recursive: true })
+  }
+  // SAFETY: the corpus probe reads only the backend root and stat.
+  ctx.provide('sessionPersistence', {
+    root,
+    stat: async (id: string) => {
+      statted.push(id)
+      const header = headers.get(id)
+      return header === undefined ? undefined : { header, revision: 'r1' }
+    },
+  } as never)
+  return { root, headers, statted, store }
+}
+
+const listedIds = async (list: ApiSessionList): Promise<string[]> => (await list.list()).map(item => item.sessionId).sort()
+
+it('lists and announces a Session another process stored after the corpus was read', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  const ctx = await hostContext()
+  const store = await storeFixture(ctx)
+  await store.store('project-a', 'cold-first')
+  const first = coldRecord(ctx, 'cold-first')
+  let reads = 0
+  // SAFETY: list() reads only listSessions from the query service.
+  ctx.provide('sessionQuery', {
+    listSessions: async () => {
+      reads += 1
+      return [first]
+    },
+  } as never)
+  const announced: string[] = []
+  ctx.on('api-session/added', summary => {
+    announced.push(summary.sessionId)
+  })
+  const list = new ApiSessionList(ctx, 8)
+  using recorder = recordSpans()
+  expect(await listedIds(list)).toEqual(['cold-first'])
+
+  await store.store('project-b', 'written-behind')
+  vi.setSystemTime(Date.now() + 2_000)
+  expect(await listedIds(list)).toEqual(['cold-first', 'written-behind'])
+  expect(announced).toEqual(['written-behind'])
+  expect(store.statted).toEqual(['written-behind'])
+  expect(reads).toBe(1)
+  expect(recorder.named('session corpus revalidate')[0]?.attributes).toMatchObject({
+    'dshx.session-controller.changed_projects': 1,
+    'dshx.session-controller.added': 1,
+  })
+})
+
+it('probes the store at most once a second and reads only unknown Session directories', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  const ctx = await hostContext()
+  const store = await storeFixture(ctx)
+  await store.store('project-a', 'cold-first')
+  const first = coldRecord(ctx, 'cold-first')
+  // SAFETY: list() reads only listSessions from the query service.
+  ctx.provide('sessionQuery', { listSessions: async () => [first] } as never)
+  const list = new ApiSessionList(ctx, 8)
+  using recorder = recordSpans()
+  await list.list()
+
+  await list.list()
+  expect(recorder.named('session corpus revalidate')).toHaveLength(0)
+
+  const fresh = fixtureSession(ctx, 'fresh')
+  ctx.emit('session/created', fresh)
+  await store.store('project-a', 'fresh')
+  vi.setSystemTime(Date.now() + 2_000)
+  expect(await listedIds(list)).toEqual(['cold-first', 'fresh'])
+  expect(store.statted).toEqual([])
+  expect(recorder.named('session corpus revalidate')).toHaveLength(1)
+
+  vi.setSystemTime(Date.now() + 2_000)
+  await list.list()
+  expect(recorder.named('session corpus revalidate')[1]?.attributes).toMatchObject({ 'dshx.session-controller.changed_projects': 0 })
+})
+
+it('scans a Session directory again until its log is stored', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  const ctx = await hostContext()
+  const store = await storeFixture(ctx)
+  await store.store('project-a', 'cold-first')
+  const first = coldRecord(ctx, 'cold-first')
+  // SAFETY: list() reads only listSessions from the query service.
+  ctx.provide('sessionQuery', { listSessions: async () => [first] } as never)
+  const list = new ApiSessionList(ctx, 8)
+  await list.list()
+
+  await mkdir(join(store.root, 'project-b', 'half-written'), { recursive: true })
+  vi.setSystemTime(Date.now() + 2_000)
+  expect(await listedIds(list)).toEqual(['cold-first'])
+
+  store.headers.set('half-written', fixtureSession(ctx, 'half-written').header)
+  vi.setSystemTime(Date.now() + 2_000)
+  expect(await listedIds(list)).toEqual(['cold-first', 'half-written'])
+  expect(store.statted).toEqual(['half-written', 'half-written'])
 })
 
 it('drops a disposed Session persistence never stored', async () => {

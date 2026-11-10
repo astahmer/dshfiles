@@ -1,10 +1,11 @@
 /** Cold-safe Session list and search projection. */
 
+import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
-import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+import { type Session, type SessionEvent, type SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type { ProjectionSnapshot, SessionProjectionMap } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { readColdSessionLog, SessionQueryError, type SessionRecord, type SessionSearchCursor } from '@deepseek-ai/dsh-session-query'
@@ -13,6 +14,7 @@ import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import * as Schema from 'effect/Schema'
 import { coldReads } from './cold-reads.ts'
+import { changedProjects, corpusRootOf, type ProjectStamps, readProjectStamps, storedSessionIds } from './corpus-signature.ts'
 import { ListMetadataStore, type RecoveredListMetadata } from './list-metadata-store.ts'
 import {
   SESSION_SEARCH_RESULT_LIMIT,
@@ -37,6 +39,13 @@ const DRAFT_LOG_MAX_BYTES = 16 * 1024
 const RECOVERY_SAVE_EVERY = 256
 /** What a metadata-less cold row shows: unknown, so visible and dated by its creation. */
 const UNKNOWN_METADATA: SessionListMetadata = { blank: false, lastPromptAt: null }
+/**
+ * A Session another process stores (another Host on this home, an import, a seeded fixture) raises no
+ * `session/created` here, so a list served from the cached corpus first compares the store's project directory times,
+ * at most this often: 3 ms for 801 projects on the live home (2026-11-10), against 3.1-9.0 s to re-enumerate its
+ * 3,018 Sessions. Only moved project directories are read, and only unknown Session ids are stat'ed.
+ */
+const CORPUS_PROBE_EVERY_MS = 1_000
 
 /** A caller's projection allowlist; `undefined` reads every registered column. */
 type ProjectionSelection = ReadonlySet<string> | undefined
@@ -144,6 +153,10 @@ export class ApiSessionList {
 
   /** Bumped on every change while no corpus is cached, so a read that started earlier cannot cache a corpus it predates. */
   private persistedGeneration = 0
+  /** Project directory times the cached corpus reflects; `undefined` when the store has no directory layout. */
+  private persistedStamps: ProjectStamps | undefined
+  private corpusProbedAt = 0
+  private revalidation: Promise<void> | undefined
   private lastInvalidation: 'none' | 'created' | 'disposed' = 'none'
   private createdInvalidations = 0
   private disposedInvalidations = 0
@@ -281,7 +294,11 @@ export class ApiSessionList {
   private async persistedSessions(signal: AbortSignal | undefined): Promise<ReadonlyMap<string, SessionRecord>> {
     signal?.throwIfAborted()
     const persisted = this.persisted
-    if (persisted !== undefined) return persisted
+    if (persisted !== undefined) {
+      const revalidation = this.revalidatePersisted(persisted)
+      if (revalidation !== undefined) await (signal === undefined ? revalidation : abortable(revalidation, signal))
+      return persisted
+    }
     const read = this.persistedRead ?? this.startPersistedRead()
     return signal === undefined ? read : abortable(read, signal)
   }
@@ -289,10 +306,15 @@ export class ApiSessionList {
   private startPersistedRead(): Promise<ReadonlyMap<string, SessionRecord>> {
     const generation = this.persistedGeneration
     const read = withSpan('session corpus read', {}, async span => {
-      const listed = await this.ctx.sessionQuery.listSessions(this.lifetime.signal)
+      // The stamps are read before the enumeration finishes, so a Session stored meanwhile moves them again.
+      const [stamps, listed] = await Promise.all([this.projectStampsNow(), this.ctx.sessionQuery.listSessions(this.lifetime.signal)])
       const records = new Map(listed.map(record => [record.header.id, record]))
       const current = this.persistedGeneration === generation
-      if (current) this.persisted = records
+      if (current) {
+        this.persisted = records
+        this.persistedStamps = stamps
+        this.corpusProbedAt = Date.now()
+      }
       span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { records: records.size, current } }))
       return records
     })
@@ -304,6 +326,68 @@ export class ApiSessionList {
     // caller's to observe and this chain stays silent.
     read.then(settle, settle).catch(() => undefined)
     return read
+  }
+
+  private corpusRoot(): string | undefined {
+    return corpusRootOf(this.ctx.get('sessionPersistence'))
+  }
+
+  private projectStampsNow(): Promise<ProjectStamps | undefined> {
+    const root = this.corpusRoot()
+    return root === undefined ? Promise.resolve(undefined) : readProjectStamps(root)
+  }
+
+  /**
+   * Add the Sessions stored behind this Host since the corpus was read, and announce each one to open lists.
+   * @returns the probe a list waits on, or `undefined` when none is due.
+   */
+  private revalidatePersisted(cached: Map<string, SessionRecord>): Promise<void> | undefined {
+    if (this.revalidation !== undefined) return this.revalidation
+    const previous = this.persistedStamps
+    const root = this.corpusRoot()
+    const now = Date.now()
+    if (previous === undefined || root === undefined || now - this.corpusProbedAt < CORPUS_PROBE_EVERY_MS) return undefined
+    this.corpusProbedAt = now
+    const revalidation = withSpan('session corpus revalidate', {}, async span => {
+      const next = await readProjectStamps(root)
+      if (next === undefined) return
+      const changed = changedProjects({ previous, next })
+      const added: SessionRecord[] = []
+      const settled = new Map(next)
+      const persistence = this.ctx.get('sessionPersistence')
+      for (const project of changed) {
+        const ids = await storedSessionIds(join(root, project)).catch(() => [])
+        for (const id of ids.filter(id => !cached.has(id))) {
+          const stored = await persistence?.stat(SessionId(id), { signal: this.lifetime.signal }).catch(() => undefined)
+          // A directory whose log is not written yet is scanned again at the next probe.
+          if (stored === undefined) {
+            const before = previous.get(project)
+            if (before === undefined) settled.delete(project)
+            else settled.set(project, before)
+            continue
+          }
+          added.push({
+            header: structuredClone(stored.header),
+            live: this.ctx.sessions.get(stored.header.id) !== undefined,
+            persisted: true,
+            ...(stored.formatStatus === undefined ? {} : { formatStatus: stored.formatStatus }),
+          })
+        }
+      }
+      span.setAttributes(pluginAttributes({ plugin: 'session-controller', attributes: { projects: next.size, changed_projects: changed.length, added: added.length } }))
+      if (this.persisted !== cached || this.persistedStamps !== previous) return
+      this.persistedStamps = settled
+      for (const record of added.filter(record => !cached.has(record.header.id))) {
+        cached.set(record.header.id, record)
+        const live = this.ctx.sessions.get(record.header.id)
+        if (live !== undefined) this.ctx.emit('api-session/added', this.summaryFor(live))
+        else if (record.header.cwd !== undefined) this.ctx.emit('api-session/added', this.summarizeCold(record))
+      }
+    })
+      .catch((error: unknown) => { this.ctx.logger.warn(`api-session.list: the Sessions stored behind this Host were not read: ${String(error)}`) })
+      .finally(() => { this.revalidation = undefined })
+    this.revalidation = revalidation
+    return revalidation
   }
 
   private persistedChanged(reason: 'created' | 'disposed', session: Session): void {

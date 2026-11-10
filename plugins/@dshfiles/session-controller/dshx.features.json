@@ -212,6 +212,12 @@
           "span": "session corpus read",
           "file": "plugins/@dshfiles/session-controller/tests/host/list-corpus-cache.test.ts",
           "testName": "records bounded corpus cache and invalidation diagnostics"
+        },
+        {
+          "kind": "custom",
+          "span": "session corpus revalidate",
+          "file": "plugins/@dshfiles/session-controller/tests/host/list-corpus-cache.test.ts",
+          "testName": "lists and announces a Session another process stored after the corpus was read"
         }
       ]
     }
