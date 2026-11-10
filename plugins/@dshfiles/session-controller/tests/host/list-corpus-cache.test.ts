@@ -40,8 +40,7 @@ const coldRecord = (ctx: Context, id: string): SessionRecord => {
   return { header: session.header, live: false, persisted: true }
 }
 
-const fixtureSession = (ctx: Context, id: string) =>
-  ctx.sessions.prepare(SessionId(id), { meta: { createdAt: 100, cwd: resolve('cold-list-fixture') } })
+const fixtureSession = (ctx: Context, id: string) => ctx.sessions.prepare(SessionId(id), { meta: { createdAt: 100, cwd: resolve('cold-list-fixture') } })
 
 it('reads the persisted Sessions once for many lists', async () => {
   const ctx = await hostContext()
