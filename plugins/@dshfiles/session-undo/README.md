@@ -25,7 +25,8 @@ thread has a recorded turn (its tooltip names the turn's prompt), **Rewind to an
   rewound thread's own subagents do not count. Archive or finish the other thread, or give this one its own thread
   workspace; **Rewind anyway** (`allowSharedDirectory: true`) restores regardless. When the Host cannot list its live
   threads, the restore is refused the same way rather than guessed. A turn with no file snapshot rewinds only the
-  conversation and is never refused.
+  conversation and is never refused. A prompt is kept for every recorded turn, so a turn whose checkpoint is still being
+  taken when the next prompt arrives still names it.
 - **Every finished turn names its revision.** When a turn ends in a jj workspace, the files are snapshotted again and, when the revision moved, the turn's action row shows it as `jj:<commit>`: the reference opens the Jujutsu panel on that revision, and **Restore to after this turn** rewinds to the start of the next recorded turn, so the files and the conversation come back as this turn left them. The latest turn offers no Restore (nothing later to drop), a turn that changed no file names no revision, and a git workspace names none: a snapshot commit is not a revision a reader would open. `turnRevisions` off skips the turn-end snapshot and hides both. The row requires the `@dshfiles/chat` fork's assistant-actions seat.
 - **Redo** puts the files back as they were before the undo or rewind, brings the original thread back and archives the fork.
   A new turn in the fork drops its redo, as in an editor.
@@ -49,7 +50,8 @@ turns recorded before it can still be undone.
 
 ```sh
 pnpm --dir plugins/@dshfiles/session-undo test     # undo/redo, rewind N, shared folders, refusals, fork failure, the snapshot gate,
-                                                   # the turn-end revision (named only when the files changed, none for git)
+                                                   # the turn-end revision (named only when the files changed, none for git),
+                                                   # one prompt per pending turn
 pnpm --dir plugins/@dshfiles/session-undo test:e2e # scratch DSH: undo and redo a turn's file in a jj project and in a git-only
                                                    # repository; three turns write files, rewind past two, redo; each finished
                                                    # turn names its revision and Restore returns past it

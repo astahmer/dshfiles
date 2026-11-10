@@ -290,7 +290,7 @@ export class SessionUndo extends Context.Service<
       const domain = yield* storage.open(UndoHistory.domain)
       const table = domain.table('history')
       const running = yield* Ref.make<ReadonlySet<string>>(new Set())
-      const prompts = yield* Ref.make<ReadonlyMap<string, { readonly turn: number; readonly text: string }>>(new Map())
+      const prompts = yield* Ref.make<ReadonlyMap<string, ReadonlyMap<number, string>>>(new Map())
       const ready = yield* Ref.make<ReadonlyMap<string, Deferred.Deferred<void>>>(new Map())
       const checkpoints = yield* FiberSet.make()
 
@@ -314,11 +314,12 @@ export class SessionUndo extends Context.Service<
         const checkpoint = Effect.gen(function* () {
           if (previous !== undefined) yield* Deferred.await(previous)
           const taken = yield* files.snapshot(input.cwd)
-          const prompt = (yield* Ref.get(prompts)).get(input.sessionId)
           const at = yield* Clock.currentTimeMillis
           yield* domain.withWriteLock(
-            Effect.flatMap(record(input.sessionId), current =>
-              store(
+            Effect.gen(function* () {
+              const prompt = (yield* Ref.get(prompts)).get(input.sessionId)?.get(input.turn)
+              const current = yield* record(input.sessionId)
+              yield* store(
                 input.sessionId,
                 UndoHistory.withCheckpoint(current, {
                   turn: input.turn,
@@ -326,15 +327,15 @@ export class SessionUndo extends Context.Service<
                   cwd: input.cwd,
                   provider: Option.getOrNull(Option.map(taken, snapshot => snapshot.provider)),
                   snapshot: Option.getOrNull(Option.map(taken, snapshot => snapshot.snapshot)),
-                  prompt: prompt?.turn === input.turn ? prompt.text : '',
+                  prompt: prompt ?? '',
                   at,
                   ...Option.match(
                     Option.flatMapNullishOr(taken, snapshot => snapshot.revision),
                     { onNone: () => ({}), onSome: before => ({ before }) },
                   ),
                 }),
-              ),
-            ),
+              )
+            }),
           )
         }).pipe(
           Effect.catchTag('UndoHistoryUnavailable', error => Effect.logWarning('session-undo: the turn checkpoint was not stored', error)),
@@ -373,8 +374,17 @@ export class SessionUndo extends Context.Service<
         readonly turn: number
         readonly text: string
       }) {
-        if ((yield* Ref.get(prompts)).get(input.sessionId)?.turn === input.turn) return
-        yield* Ref.update(prompts, current => new Map(current).set(input.sessionId, { turn: input.turn, text: input.text }))
+        if ((yield* Ref.get(prompts)).get(input.sessionId)?.has(input.turn)) return
+        yield* Ref.update(prompts, current => {
+          const sessionPrompts = new Map(current.get(input.sessionId))
+          sessionPrompts.set(input.turn, input.text)
+          while (sessionPrompts.size > 20) {
+            const oldest = sessionPrompts.keys().next().value
+            if (oldest === undefined) break
+            sessionPrompts.delete(oldest)
+          }
+          return new Map(current).set(input.sessionId, sessionPrompts)
+        })
         yield* domain.withWriteLock(
           Effect.gen(function* () {
             const current = yield* table.get(input.sessionId).pipe(Effect.mapError(unavailable))

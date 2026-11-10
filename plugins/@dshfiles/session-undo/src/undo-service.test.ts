@@ -103,6 +103,24 @@ const setup = Effect.gen(function* () {
 })
 
 describe('session undo', () => {
+  it.effect('keeps each prompt while earlier checkpoints are still pending', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const release = yield* Deferred.make<void>()
+        const files = workspace('v0', Deferred.await(release))
+        const sessions = sessionsFake()
+        const service = yield* undoWith({ files: files.files, sessions: sessions.sessions })
+        for (const turn of [1, 2, 3]) {
+          yield* service.turnStarted({ sessionId: 's1', turn, forkAtSeq: turn, cwd: '/repo' })
+          yield* service.promptEntered({ sessionId: 's1', turn, text: `prompt ${turn}` })
+        }
+        yield* Deferred.succeed(release, undefined)
+        yield* service.whenReady('s1')
+        expect((yield* service.history('s1')).checkpoints.map(checkpoint => checkpoint.prompt)).toEqual(['prompt 1', 'prompt 2', 'prompt 3'])
+      }),
+    ),
+  )
+
   it.effect('undoes the last turn into a fork cut before it with its files restored, and redoes it', () =>
     Effect.scoped(
       Effect.gen(function* () {
