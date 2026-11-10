@@ -1,7 +1,7 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
-import { isListedUnsentThread, presentUnsentThread } from './unsent-threads.js'
+import { isListedUnsentThread, presentUnsentRows } from './unsent-threads.js'
 
 const session = (id: string, blank = true): SessionSummary => ({
   id: SessionId(id),
@@ -28,11 +28,26 @@ describe('unsent thread rows', () => {
 
   it('labels new and typed rows without changing blankness or durable titles', () => {
     const source = session('new')
-    const labels = { newChatLabel: 'New chat', draftLabel: (preview: string) => `Draft: ${preview}` }
-    expect(presentUnsentThread({ session: source, draft: undefined, ...labels })).toMatchObject({ displayTitle: 'New chat', blank: true })
-    expect(presentUnsentThread({ session: source, draft: { preview: 'Fix this' }, ...labels })).toMatchObject({ displayTitle: 'Draft: Fix this', blank: true })
-    expect(source.displayTitle).toBe('project folder')
     const sent = session('sent', false)
-    expect(presentUnsentThread({ session: sent, draft: { preview: 'follow-up' }, ...labels })).toBe(sent)
+    const labels = { newChatLabel: 'New chat', draftLabel: (preview: string) => `Draft: ${preview}` }
+    const byId = { [source.id]: source, [sent.id]: sent }
+    const presented = new WeakMap<SessionSummary, SessionSummary>()
+    expect(presentUnsentRows({ byId, drafts: {}, presented, ...labels })[source.id]).toMatchObject({ displayTitle: 'New chat', blank: true })
+    const typed = presentUnsentRows({ byId, drafts: { new: { preview: 'Fix this' } }, presented, ...labels })
+    expect(typed[source.id]).toMatchObject({ displayTitle: 'Draft: Fix this', blank: true })
+    expect(source.displayTitle).toBe('project folder')
+    expect(typed[sent.id]).toBe(sent)
+  })
+
+  it('keeps the record and every presented row when a publish changed nothing they show', () => {
+    const sent = session('sent', false)
+    const labels = { newChatLabel: 'New chat', draftLabel: (preview: string) => `Draft: ${preview}` }
+    const presented = new WeakMap<SessionSummary, SessionSummary>()
+    const withoutBlank = { [sent.id]: sent }
+    expect(presentUnsentRows({ byId: withoutBlank, drafts: {}, presented, ...labels })).toBe(withoutBlank)
+    const blank = session('new')
+    const first = presentUnsentRows({ byId: { [sent.id]: sent, [blank.id]: blank }, drafts: {}, presented, ...labels })
+    const second = presentUnsentRows({ byId: { [sent.id]: { ...sent, running: true }, [blank.id]: blank }, drafts: {}, presented, ...labels })
+    expect(second[blank.id]).toBe(first[blank.id])
   })
 })

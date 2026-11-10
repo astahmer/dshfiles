@@ -9,6 +9,7 @@ import { quotaContinuationSummarySchema } from './quota-continuation-model.js'
 import { fastModeUsageHistorySchema } from './fast-mode-usage-model.js'
 import { extraUsageSchema } from './extra-usage-schema.js'
 import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } from './usage-history-model.js'
+import { ShellCommand } from './shell-command.js'
 
 /**
  * Wire contract for the accounts page.
@@ -70,7 +71,13 @@ export class AccountsRules {
   }
 }
 
-const isPlainHomePath = (path: string): boolean => (path.startsWith('/') || path.startsWith('~/')) && !path.includes('\0') && !path.split('/').includes('..')
+// A Windows Host's homes are drive-absolute (`C:\Users\…`) and split on either separator; this schema also runs in the
+// browser, so no node:path. A POSIX path keeps its `/`-only rules.
+const isPlainHomePath = (path: string): boolean => {
+  if (path.includes('\0')) return false
+  if (ShellCommand.isWindowsAbsolutePath(path)) return !path.split(/[\\/]/u).includes('..')
+  return (path.startsWith('/') || path.startsWith('~/')) && !path.split('/').includes('..')
+}
 
 const isModelText = (maximum: number) => Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(maximum))
 
@@ -284,10 +291,24 @@ export const usageCardSchema = Schema.Struct({
   bankedResetExpiries: AiAccountsSchema.list(Schema.NullOr(Schema.Number.check(Schema.isFinite())), 20),
   /** Missing from older Hosts and from providers without pay-as-you-go spend. */
   extraUsage: Schema.optional(extraUsageSchema),
+  /**
+   * When the provider last answered with this content. A reading held back or kept through a failure keeps its own
+   * time, so it can be older than the sweep. Older Hosts omit it; read the sweep's `readAt` instead.
+   */
+  readAt: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  /** The earliest time a read can reach the provider while reads are held back; a refresh before it reuses this reading. */
+  nextReadAt: Schema.optional(Schema.Number.check(Schema.isFinite())),
+  /** Why the latest read did not replace this older reading. */
+  readFailure: Schema.optional(
+    Schema.Struct({
+      status: Schema.Literals(['rate-limited', 'error']),
+      message: Schema.NullOr(Schema.String.check(Schema.isMaxLength(300))),
+    }),
+  ),
 })
 
 export const accountsUsageSchema = Schema.Struct({
-  /** When the sweep that produced these cards finished. */
+  /** When the sweep that produced these cards finished; a card's own `readAt` says how old its content is. */
   readAt: Schema.Number.check(Schema.isFinite()),
   /** The machine the Host reads quota from, shown on every card. */
   hostName: Schema.String.check(Schema.isMaxLength(255)),
@@ -758,7 +779,8 @@ export const aiAccountsApi = defineApi({
     refreshUsage: method({
       input: Schema.Void,
       output: accountsUsageSchema,
-      description: 'Read live subscription quota now, bypassing the shared short-lived cache. Call only when the user asked for a fresh reading.',
+      description:
+        'Read live subscription quota now, bypassing the shared short-lived cache. A card’s own `readAt` says when its provider answered, and `nextReadAt` when reads are held back (Claude shares one reading and backs off after a 429), so check them rather than assuming the reading is new. Call only when the user asked for a fresh reading.',
       tool: { name: 'ai_accounts_refresh_quota', render: compactJson },
     }),
 
@@ -797,7 +819,7 @@ export const aiAccountsApi = defineApi({
         render: output => (output.accepted ? 'Queued the stored continuation.' : 'The Host did not accept the continuation.'),
       },
     }),
-    /** Change whether a waiting quota-blocked turn resumes automatically at its known reset. */
+    /** Change whether a waiting quota-blocked turn resumes automatically at its reset, or on a growing backoff when the provider named none. */
     setQuotaContinuationAutoRetry: method({
       input: Schema.Struct({
         continuationId: Schema.String.check(Schema.isUUID()),
@@ -805,7 +827,8 @@ export const aiAccountsApi = defineApi({
         enabled: Schema.Boolean,
       }),
       output: Schema.Struct({ updated: Schema.Boolean }),
-      description: 'Change whether one quota-blocked turn resumes automatically at its known reset. Call only when the user asked for that.',
+      description:
+        'Change whether one quota-blocked turn resumes automatically at its reset, or on a growing backoff when the provider named none. Call only when the user asked for that.',
       tool: {
         name: 'ai_accounts_set_auto_retry',
         render: output => (output.updated ? 'Updated automatic retry for that continuation.' : 'That continuation was not found.'),

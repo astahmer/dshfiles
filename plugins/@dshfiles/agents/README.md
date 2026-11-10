@@ -28,12 +28,12 @@ where a thread starts.
   reads, because a preset and system prompt are fixed when the thread is created.
 - **The `@` menu.** `@agent:` (or `@a:`) lists agents right away; a partial handle such as `@rev`
   lists matching agents beside files and threads. A plain `@` stays with files and threads.
-- **Every mention is a preview.** A rendered `@{handle}` explicit reference (and legacy `@handle` mention)
-  that names a saved agent is a link: clicking it (or pressing Enter) opens a card above the reference with its glyph, name, description, model route,
-  tool preset, memory scope, delegation, routine, instructions and recent threads, plus **Open in
-  Agents**. Sent messages both ways are covered — the conversation's own `@handle` chip and the plain
-  mention in Markdown, so a backlog item's comments work too. An unknown, misspelled or removed handle
-  stays plain text, and a code block or the composer is left alone.
+- **One chip, one card.** Picking an agent in the `@` menu inserts the agent chip; a sent `@{handle}` and a
+  written mention in an answer render that same chip, so the composer, sent messages and Markdown answers agree.
+  Hovering the chip (or clicking it, or pressing Enter) opens the shared card with its glyph, name, description,
+  model route, tool preset, memory scope, delegation, routine, instructions and recent threads, plus
+  **Open in Agents**. A legacy `@handle` mention in an answer still opens the same card. An unknown,
+  misspelled or removed handle stays plain text, and a code block is left alone.
 - **A memory scope of its own.** An agent may name a memory scope (`agent:<handle>` by default). `@dshfiles/memory`
   reads it through this plugin's contract for every thread the agent started, and a subagent inherits it from the
   thread that spawned it, so those threads carry the project block plus that scope's notes; memory keeps one store and

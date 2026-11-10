@@ -5,5 +5,6 @@
   "send-after-upload": "Its composer pill exists only while an attachment upload is still running. The upload is an XHR in a Web Worker that only a Playwright route can hold, and that route ends when `dshx dev open` disconnects, so no reach path can keep the pill on screen for `dshx dev shot`; the send-after-upload.queued-send journey covers it.",
   "shared-runtime": "Loads the one shared copy of the Client UI modules. It renders no surface of its own to screenshot.",
   "shortcuts": "Installs keyboard chords only. Every visible result belongs to the surface whose control the chord drives, not to this plugin.",
-  "ui-styles": "Compiles and injects the shared plugin stylesheet once per page. It has no screen of its own, only the sheets other plugins render with."
+  "ui-styles": "Compiles and injects the shared plugin stylesheet once per page. It has no screen of its own, only the sheets other plugins render with.",
+  "settings-web-search": "A whole-row fork of the stock Web search page. It replaces the stock settings row inside the Plugin Manager's Plugins panel, which the seeded scratch profile does not install, so no scratch walk can open it; the settings-shell journey 'The Web search plugin page comes from the owned fork' opens it through that panel and proves the page renders."
 }

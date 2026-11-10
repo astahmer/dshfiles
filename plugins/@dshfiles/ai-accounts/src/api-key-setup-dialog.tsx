@@ -6,7 +6,7 @@ import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type ProjectFolderSelection, type WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { AccountsRules, aiAccountsApi, type AccountDraft, type SecretCatalogKeyOption } from './api.js'
 import { apiKeySetupMachineWithWriter } from './api-key-setup-machine.js'
@@ -41,10 +41,7 @@ export const ApiKeySetupDialog = (props: {
   const api = useApi(aiAccountsApi)
   const { onOpenChange } = props
   const [snapshot, send] = useMachine(apiKeySetupMachineWithWriter)
-  const [manualValue, setManualValue] = useState('')
-  const [selectedCatalogKey, setSelectedCatalogKey] = useState('')
-  const [folderPickerOpen, setFolderPickerOpen] = useState(false)
-  const [cwd, setCwd] = useState<string | null>(null)
+  const { manualValue, selectedCatalogKey, folderPickerOpen, cwd } = snapshot.context
   const catalogQuery = useQuery({ ...aiAccountsQueries.secretCatalogKeys(api, cwd), enabled: props.open && !folderPickerOpen, staleTime: 30_000 })
   const catalogKeys = catalogQuery.data?.items ?? []
   const catalogOptions: readonly ComboboxOption[] = catalogKeys.map(option => ({
@@ -63,13 +60,7 @@ export const ApiKeySetupDialog = (props: {
 
   const close = useCallback(
     (open: boolean): void => {
-      if (!open) {
-        send({ type: 'reset' })
-        setManualValue('')
-        setSelectedCatalogKey('')
-        setFolderPickerOpen(false)
-        setCwd(null)
-      }
+      if (!open) send({ type: 'reset' })
       onOpenChange(open)
     },
     [onOpenChange, send],
@@ -78,34 +69,18 @@ export const ApiKeySetupDialog = (props: {
   useEffect(() => {
     if (props.open) return
     send({ type: 'reset' })
-    setManualValue('')
-    setSelectedCatalogKey('')
-    setFolderPickerOpen(false)
-    setCwd(null)
   }, [props.open, send])
 
   useEffect(() => {
     send({ type: 'reset' })
-    setManualValue('')
-    setSelectedCatalogKey('')
-    setFolderPickerOpen(false)
-    setCwd(null)
   }, [props.draft.instanceId, props.draft.apiKeyEnv, send])
 
   useEffect(() => {
-    if (snapshot.matches('success')) {
-      close(false)
-      return
-    }
-    if (snapshot.matches('error') && snapshot.context.operation === 'manual') setManualValue('')
+    if (snapshot.matches('success')) close(false)
   }, [close, snapshot])
 
   const chooseFolder = (selection: ProjectFolderSelection): void => {
-    send({ type: 'reset' })
-    setManualValue('')
-    setSelectedCatalogKey('')
-    setCwd(selection.canonicalPath)
-    setFolderPickerOpen(false)
+    send({ type: 'folder.chosen', cwd: selection.canonicalPath })
   }
 
   const saveManualKey = (): void => {
@@ -130,7 +105,7 @@ export const ApiKeySetupDialog = (props: {
     return (
       <ProjectFolderPicker
         directoryPicker={props.folderPicker.directoryPicker}
-        onClose={() => setFolderPickerOpen(false)}
+        onClose={() => send({ type: 'folder.close' })}
         onRegisterWorkspace={props.folderPicker.registerWorkspace}
         onSelect={chooseFolder}
         placeholder="Search projects or type / for a folder…"
@@ -178,32 +153,11 @@ export const ApiKeySetupDialog = (props: {
           <details className="dshx:order-2 dshx:text-sm">
             <summary className="dshx:mb-3 dshx:cursor-pointer dshx:text-xs dshx:text-muted-foreground">Import from Secret Catalog</summary>
             <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-              <Button
-                disabled={busy}
-                onClick={() => {
-                  send({ type: 'reset' })
-                  setManualValue('')
-                  setSelectedCatalogKey('')
-                  setFolderPickerOpen(true)
-                }}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
+              <Button disabled={busy} onClick={() => send({ type: 'folder.open' })} size="sm" type="button" variant="outline">
                 {cwd === null ? 'Browse project/local secrets…' : 'Choose another folder…'}
               </Button>
               {cwd !== null ? (
-                <Button
-                  disabled={busy}
-                  onClick={() => {
-                    send({ type: 'reset' })
-                    setCwd(null)
-                    setSelectedCatalogKey('')
-                  }}
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                >
+                <Button disabled={busy} onClick={() => send({ type: 'cwd.cleared' })} size="sm" type="button" variant="ghost">
                   Show global only
                 </Button>
               ) : null}
@@ -222,10 +176,7 @@ export const ApiKeySetupDialog = (props: {
                     disabled={busy}
                     label="Secret Catalog entry"
                     matchTriggerWidth
-                    onValueChange={value => {
-                      send({ type: 'reset' })
-                      setSelectedCatalogKey(value)
-                    }}
+                    onValueChange={value => send({ type: 'catalog.changed', key: value })}
                     options={catalogOptions}
                     placeholder="Choose an entry"
                     searchAbove={0}
@@ -271,7 +222,7 @@ export const ApiKeySetupDialog = (props: {
               className="dshx:font-mono! dshx:text-sm"
               disabled={busy}
               id="ai-account-api-key-value"
-              onChange={event => setManualValue(event.target.value)}
+              onChange={event => send({ type: 'manual.changed', value: event.target.value })}
               placeholder="Enter key"
               spellCheck={false}
               type="password"

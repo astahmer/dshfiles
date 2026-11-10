@@ -174,6 +174,12 @@ type InternalQueryState<T> =
   | { readonly status: 'success'; readonly fetchStatus: ApiFetchStatus; readonly data: T; readonly error: null }
   | { readonly status: 'error'; readonly fetchStatus: 'idle'; readonly data: T | undefined; readonly error: ApiError }
 
+/** One requested read: `manual` rides with the id it was asked under, so a reconnect resumes it and a settle ends it. */
+interface ApiQueryRequest {
+  readonly id: number
+  readonly manual: boolean
+}
+
 export function useApiQuery<const Methods extends Record<string, AnyApiMethodDefinition>, K extends keyof Methods & string>(
   contract: ApiContract<Methods>,
   method: K,
@@ -190,19 +196,20 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
     error: null,
   })
   const fingerprint = runtime().useMemo(() => ApiProtocolModel.stableJson(input), [input])
-  const [revision, setRevision] = runtime().useState(0)
-  const manualRevision = runtime().useRef(0)
+  const [request, setRequest] = runtime().useState<ApiQueryRequest>({ id: 0, manual: false })
+  const requestId = request.id
+  const settleRequest = runtime().useCallback(() => {
+    setRequest(current => (current.manual ? { ...current, manual: false } : current))
+  }, [])
 
   runtime().useEffect(() => {
-    const manuallyRequested = manualRevision.current === revision && revision > 0
-    if (manuallyRequested) manualRevision.current = -1
+    const manuallyRequested = request.manual
     if (options?.enabled === false && !manuallyRequested) {
       setState(previous =>
         previous.status === 'success' ? { ...previous, fetchStatus: 'idle' } : { status: 'pending', fetchStatus: 'idle', data: undefined, error: null },
       )
       return undefined
     }
-    let manualPending = manuallyRequested
     return ApiClientLifecycle.startQuery<ApiClientOutput<Methods[K]>>({
       available: () => ApiRuntimeModel.connectionAvailable(api),
       subscribe: listener => ApiRuntimeModel.subscribeConnection(api, listener),
@@ -216,30 +223,25 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
           return { status: 'pending', fetchStatus, data: undefined, error: null }
         }),
       onSuccess: data => {
-        manualPending = false
+        settleRequest()
         setState({ status: 'success', fetchStatus: 'idle', data, error: null })
       },
       onError: error => {
-        manualPending = false
+        settleRequest()
         setState(previous => ({ status: 'error', fetchStatus: 'idle', data: previous.data, error }))
       },
-      onReconnect: () =>
-        setRevision(value => {
-          if (manualPending) manualRevision.current = value + 1
-          return value + 1
-        }),
+      // A reconnect keeps asking while a manual read is unanswered, `enabled: false` included.
+      onReconnect: () => setRequest(current => ({ id: current.id + 1, manual: current.manual })),
       invoke: signal => {
         const query: ApiQueryMethod<Methods[K]> = { call: api[method] }
         return query.call(input, { signal })
       },
     })
-  }, [api, method, fingerprint, revision, options?.enabled, options?.signal])
+    // `manual` belongs to the id it was requested under: settling it must record the read, not start another.
+  }, [api, method, fingerprint, requestId, options?.enabled, options?.signal, settleRequest])
 
   const refetch = runtime().useCallback(() => {
-    setRevision(value => {
-      manualRevision.current = value + 1
-      return value + 1
-    })
+    setRequest(current => ({ id: current.id + 1, manual: true }))
   }, [])
   return { ...state, refetch }
 }

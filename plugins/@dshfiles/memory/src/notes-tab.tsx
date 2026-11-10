@@ -29,6 +29,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import {
   ArrowUpRightIcon,
   CopyIcon,
@@ -48,7 +49,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { memoryApi, type MemoryNoteType, type PanelNote } from './api.ts'
 import { noteStatusBadge, noteStatusLabels, originLabels, originShortLabels, PanelFormat } from './panel-format.ts'
-import { NoteSelectionModel } from './note-selection.js'
+import { noteForgetMachine } from './note-forget-machine.js'
 import { useNoteEditor } from './use-note-editor.js'
 
 const noteTypeOptions: readonly { readonly value: MemoryNoteType | ''; readonly label: string }[] = [
@@ -542,18 +543,21 @@ export const NotesTab = (props: {
 }): JSX.Element => {
   const api = useApi(memoryApi)
   const queryClient = useQueryClient()
+  const [forgetSnapshot, sendForget] = useMachine(noteForgetMachine, {
+    input: {
+      forget: async ({ id, reason }) => {
+        await api.forgetNote({ id, reason })
+      },
+      refresh: () => void queryClient.invalidateQueries({ queryKey: ['dshfiles-memory'] }),
+    },
+  })
+  const selection: ListSelection<number> = forgetSnapshot.context.selection
   const [search, setSearch] = useState('')
   const [type, setType] = useState<NoteTypeFilter>('')
   const [status, setStatus] = useState<NoteStatusFilter>('valid')
   const [origin, setOrigin] = useState<NoteOriginFilter>('')
   const [sort, setSort] = useState<NoteSort>('newest')
   const [view, setView] = useState<'list' | 'grid'>('list')
-  const [selectMode, setSelectMode] = useState(false)
-  const [selection, setSelection] = useState<ListSelection<number>>(() => ListSelectionModel.empty())
-  const [confirmingForget, setConfirmingForget] = useState(false)
-  const [forgetReason, setForgetReason] = useState('')
-  const [forgetFailure, setForgetFailure] = useState<string | null>(null)
-  const [forgetPending, setForgetPending] = useState(false)
   const [archivedSuggestions, setArchivedSuggestions] = useState<ReadonlySet<number>>(() => new Set())
   const searchRef = useRef<HTMLInputElement | null>(null)
   const focusNoteId = props.focusNoteId
@@ -602,14 +606,10 @@ export const NotesTab = (props: {
   useEffect(() => {
     const query = (notes.data ?? []).filter(note => (origin === '' ? true : note.origin === origin))
     const timeout = window.setTimeout(() => {
-      const visibleIds = query.filter(note => note.status === 'valid').map(note => note.id)
-      setSelection(current => {
-        const next = ListSelectionModel.prune({ state: current, visibleIds })
-        return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
-      })
+      sendForget({ type: 'visible', ids: query.filter(note => note.status === 'valid').map(note => note.id) })
     }, 0)
     return () => window.clearTimeout(timeout)
-  }, [notes.data, origin])
+  }, [notes.data, origin, sendForget])
 
   const visibleNotes = useMemo(() => {
     const filtered = (notes.data ?? [])
@@ -630,33 +630,17 @@ export const NotesTab = (props: {
   })
   const selected = visibleNotes.find(note => note.id === props.selectedId) ?? (selectedFallback.data ?? []).find(note => note.id === props.selectedId)
   const selectedIds = useMemo(() => new Set(selection.ids), [selection.ids])
-  const toggleNote = (id: number): void => setSelection(current => ListSelectionModel.toggle({ state: current, id }))
-  const extendNote = (id: number): void => setSelection(current => ListSelectionModel.extend({ state: current, orderedIds, id }))
-  const forgetSelected = async (): Promise<void> => {
-    setForgetPending(true)
-    setForgetFailure(null)
-    try {
-      const outcome = await NoteSelectionModel.forget({
-        ids: selection.ids,
-        reason: forgetReason,
-        forget: async ({ id, reason }) => {
-          await api.forgetNote({ id, reason })
-        },
-      })
-      await queryClient.invalidateQueries({ queryKey: ['dshfiles-memory'] })
-      if (outcome.failed.length > 0) {
-        setSelection({ ids: outcome.failed, anchorId: outcome.failed[0] })
-        setForgetFailure(`${String(outcome.forgotten.length)} forgotten; ${String(outcome.failed.length)} could not be forgotten.`)
-        return
-      }
-      setConfirmingForget(false)
-      setSelection(ListSelectionModel.empty())
-    } catch (error) {
-      setForgetFailure(errorMessage(error, 'The selected notes could not be forgotten. Try Forget selected again.'))
-    } finally {
-      setForgetPending(false)
-    }
-  }
+  const toggleNote = (id: number): void => sendForget({ type: 'select.toggle', id })
+  const extendNote = (id: number): void => sendForget({ type: 'select.extend', id, orderedIds })
+  const forgetFailure =
+    forgetSnapshot.context.failure === null
+      ? null
+      : forgetSnapshot.context.failure.kind === 'partial'
+        ? `${String(forgetSnapshot.context.failure.forgotten)} forgotten; ${String(forgetSnapshot.context.failure.failed)} could not be forgotten.`
+        : errorMessage(forgetSnapshot.context.failure.error, 'The selected notes could not be forgotten. Try Forget selected again.')
+  const forgetPending = forgetSnapshot.matches('forgetting')
+  const confirmingForget = forgetSnapshot.matches('confirming') || forgetPending
+  const selectMode = !forgetSnapshot.matches('browsing')
   const filtered = search.trim().length > 0 || type !== '' || status !== 'valid' || origin !== ''
   return (
     <TooltipProvider delayDuration={500}>
@@ -770,8 +754,7 @@ export const NotesTab = (props: {
                     aria-label="Select notes"
                     aria-pressed={selectMode}
                     onClick={() => {
-                      setSelectMode(!selectMode)
-                      if (selectMode) setSelection(ListSelectionModel.empty())
+                      sendForget({ type: 'select.mode', on: !selectMode })
                     }}
                   >
                     <SquareCheckBigIcon />
@@ -795,7 +778,7 @@ export const NotesTab = (props: {
                 type="checkbox"
                 aria-label="Select all visible notes"
                 checked={ListSelectionModel.isComplete({ state: selection, orderedIds })}
-                onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds }))}
+                onChange={() => sendForget({ type: 'select.all', orderedIds })}
                 className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
               />
               <span className="dshx:text-muted-foreground">Select all visible notes</span>
@@ -904,14 +887,12 @@ export const NotesTab = (props: {
                 size="xs"
                 variant="destructive"
                 onClick={() => {
-                  setForgetReason('')
-                  setForgetFailure(null)
-                  setConfirmingForget(true)
+                  sendForget({ type: 'forget.ask' })
                 }}
               >
                 Forget selected
               </Button>
-              <Button size="xs" variant="ghost" onClick={() => setSelection(ListSelectionModel.empty())}>
+              <Button size="xs" variant="ghost" onClick={() => sendForget({ type: 'select.clear' })}>
                 Clear
               </Button>
             </div>
@@ -938,7 +919,7 @@ export const NotesTab = (props: {
         <AlertDialog
           open={confirmingForget}
           onOpenChange={open => {
-            if (!open && !forgetPending) setConfirmingForget(false)
+            if (!open && forgetSnapshot.matches('confirming')) sendForget({ type: 'forget.cancel' })
           }}
         >
           <AlertDialogContent className="dshx-root" size="sm">
@@ -949,8 +930,8 @@ export const NotesTab = (props: {
             <Input
               aria-label="Reason for forgetting"
               placeholder="Reason (optional)"
-              value={forgetReason}
-              onChange={event => setForgetReason(event.currentTarget.value)}
+              value={forgetSnapshot.context.reason}
+              onChange={event => sendForget({ type: 'forget.reason', reason: event.currentTarget.value })}
               className="dshx:h-8"
             />
             {forgetFailure === null ? null : <p className="dshx:text-xs dshx:text-destructive">{forgetFailure}</p>}
@@ -961,7 +942,7 @@ export const NotesTab = (props: {
                 disabled={forgetPending || selection.ids.length === 0}
                 onClick={event => {
                   event.preventDefault()
-                  void forgetSelected()
+                  sendForget({ type: 'forget.confirm' })
                 }}
               >
                 {forgetPending ? 'Forgetting…' : `Forget ${String(selection.ids.length)} notes`}

@@ -52,7 +52,6 @@ import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
-import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { integrationQueueMachine, type IntegrationJob, type IntegrationJobPhase } from './integration-queue-machine.js'
@@ -68,6 +67,7 @@ import {
   type ThreadIntegrationCategory,
 } from './thread-integration-state.js'
 import { useToast } from './toast.js'
+import { ProjectBookmarkQuery } from './project-bookmark-query.js'
 import { threadAtQueryKey } from './thread-query-keys.js'
 import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
@@ -98,6 +98,12 @@ const GroupLoadMoreSentinel = (props: { readonly enabled: boolean; readonly rese
 }
 
 type ToneClasses = { readonly solid: string; readonly text: string; readonly chip: string; readonly dot: string }
+
+/** The one-line notice a queued integration shows, in the tone its outcome earns. */
+interface IntegrationNotice {
+  readonly tone: 'default' | 'destructive'
+  readonly text: string
+}
 
 const toneClasses = {
   conflicts: {
@@ -199,7 +205,7 @@ const WorkspaceSyncLine = (props: { readonly t: JjIntegrationTranslate }): JSX.E
     // A Host older than this client has no workspaceSync method: show nothing until DSH restarts.
     queryFn: ({ signal }) =>
       runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => api.workspaceSync({}, { signal: hostSignal }) }).catch(() => ({ sync: null })),
-    refetchInterval: query => (query.state.data?.sync?.state === 'running' ? 2_000 : false),
+    refetchInterval: query => (query.state.data?.sync?.state === 'running' || query.state.data?.sync?.state === 'queued' ? 2_000 : false),
   })
   const view = sync.data?.sync
   if (view === null || view === undefined) return null
@@ -207,7 +213,7 @@ const WorkspaceSyncLine = (props: { readonly t: JjIntegrationTranslate }): JSX.E
   return (
     <Alert variant={outcome === 'failed' || outcome === 'conflicted' ? 'destructive' : 'default'} data-sync-outcome={outcome}>
       <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        {view.state === 'running' ? <Spinner /> : null}
+        {view.state === 'running' || view.state === 'queued' ? <Spinner /> : null}
         <span>{describeWorkspaceSync(props.t, view)}</span>
         {view.restartNeeded && restart !== null ? (
           <Button size="sm" variant="outline" onClick={() => void restart.run(NO_PALETTE_CONTEXT)}>
@@ -812,7 +818,6 @@ export const ThreadWorkspacesPanel = (props: {
       toast.show({ text: errorMessage(error, t('autoIntegrationSaveFailed')), success: false })
     }
   }
-  const [notice, setNotice] = useState<{ readonly tone: 'default' | 'destructive'; readonly text: string } | null>(null)
   const repositories = useQuery({
     queryKey: threadQueryKeys.repositories,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => api.repositories({}, { signal: hostSignal }) }),
@@ -853,44 +858,32 @@ export const ThreadWorkspacesPanel = (props: {
             })),
           }
         })
-        setNotice(null)
         toast.show({ text: t('integrationComplete', { count: result.revisions.length, bookmark: result.bookmark }), success: true })
         return
       }
-      setNotice({
-        tone: result.status === 'nothing-to-land' ? 'default' : 'destructive',
-        text: result.status === 'nothing-to-land' ? t('upToDateNoChanges') : describeLandResult(t, result),
-      })
     },
-    onError: error =>
-      IntegrationRecovery.isQueued(error)
-        ? setNotice({ tone: 'default', text: t('integrationQueuedHint', { bookmark: props.bookmark }) })
-        : setNotice({ tone: 'destructive', text: errorMessage(error, t('loadFailed')) }),
     onSettled: refreshAfterChange,
   })
   const [queueSnapshot, queueSend] = useMachine(integrationQueueMachine, {
-    input: { client: { land: ({ path, signal }) => rebase.mutateAsync({ path, signal }) } },
+    input: {
+      client: {
+        land: ({ path, signal }) => rebase.mutateAsync({ path, signal }),
+        integrationProgress: ({ path, signal }) =>
+          runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => api.integrationProgress({ path }, { signal: hostSignal }) }),
+      },
+    },
   })
-  const activeIntegrationPath = queueSnapshot.context.activePath
-  const integrationProgress = useQuery({
-    queryKey: ['jj-integration', 'integration-progress', activeIntegrationPath],
-    enabled: activeIntegrationPath !== null,
-    retry: false,
-    queryFn: ({ signal }) =>
-      activeIntegrationPath === null
-        ? Promise.resolve({ progress: null })
-        : runHostRequest({
-            signal,
-            timeoutMs: 15_000,
-            request: hostSignal => api.integrationProgress({ path: activeIntegrationPath }, { signal: hostSignal }),
-          }),
-    refetchInterval: query => (activeIntegrationPath !== null && query.state.status !== 'error' ? 350 : false),
-  })
-  useEffect(() => {
-    if (activeIntegrationPath === null || integrationProgress.data?.progress === null || integrationProgress.data?.progress === undefined) return
-    queueSend({ type: 'progress', path: activeIntegrationPath, phase: integrationProgress.data.progress.phase })
-  }, [activeIntegrationPath, integrationProgress.data?.progress, queueSend])
+  const repositoriesWithThreads = useMemo(() => repositories.data?.repositories.filter(repository => repository.threads.length > 0), [repositories.data])
+  const panelBookmark = ProjectBookmarkQuery.shared({ repositories: repositoriesWithThreads ?? [], fallback: props.bookmark })
   const integrationJobs = queueSnapshot.context.jobs
+  const integrationNotice = queueSnapshot.context.notice
+  const noticeOf = (pending: NonNullable<typeof integrationNotice>): IntegrationNotice => {
+    if (pending.kind === 'queued') return { tone: 'default', text: t('integrationQueuedHint', { bookmark: panelBookmark }) }
+    if (pending.kind === 'failed') return { tone: 'destructive', text: pending.message.length > 0 ? pending.message : t('loadFailed') }
+    if (pending.result.status === 'nothing-to-land') return { tone: 'default', text: t('upToDateNoChanges') }
+    return { tone: 'destructive', text: describeLandResult(t, pending.result) }
+  }
+  const notice = integrationNotice === null ? null : noticeOf(integrationNotice)
   const queueBusy = queueSnapshot.hasTag('busy')
   const discard = useDiscardConfirmation({
     client: {
@@ -904,7 +897,6 @@ export const ThreadWorkspacesPanel = (props: {
   const [search, setSearch] = useState('')
   const [shownCounts, setShownCounts] = useState<Readonly<Partial<Record<RowGroup, number>>>>({})
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string>>(new Set())
-  const repositoriesWithThreads = useMemo(() => repositories.data?.repositories.filter(repository => repository.threads.length > 0), [repositories.data])
   const showRepositoryHeader = (repositoriesWithThreads?.length ?? 0) > 1 || autoIntegrationApplies || excludedRepositoryRoots.length > 0
   const threads = useMemo(
     () => repositoriesWithThreads?.flatMap(repository => repository.threads.map(thread => ({ repository, thread }))) ?? [],
@@ -995,7 +987,6 @@ export const ThreadWorkspacesPanel = (props: {
   const selectedEligiblePaths = eligibleEntries.filter(entry => selectedPaths.has(entry.thread.path)).map(entry => entry.thread.path)
   const startIntegration = (paths: readonly string[]): void => {
     if (queueBusy || rebasesPending) return
-    for (const path of paths) void queryClient.removeQueries({ queryKey: ['jj-integration', 'integration-progress', path] })
     queueSend({ type: 'start', paths })
     setSelectedPaths(new Set())
   }
@@ -1064,13 +1055,13 @@ export const ThreadWorkspacesPanel = (props: {
     {
       id: 'ready',
       title: t('readyToIntegrate'),
-      description: t('readyDescription', { bookmark: props.bookmark }),
+      description: t('readyDescription', { bookmark: panelBookmark }),
       tone: 'ready',
     },
     {
       id: 'blocked',
       title: t('blockedHeading'),
-      description: t('blockedDescription', { bookmark: props.bookmark }),
+      description: t('blockedDescription', { bookmark: panelBookmark }),
       tone: 'blocked',
     },
     {
@@ -1082,7 +1073,7 @@ export const ThreadWorkspacesPanel = (props: {
     {
       id: 'completed',
       title: t('completedHeading'),
-      description: t('completedDescription', { bookmark: props.bookmark }),
+      description: t('completedDescription', { bookmark: panelBookmark }),
       tone: 'no-changes',
     },
   ]
@@ -1103,6 +1094,7 @@ export const ThreadWorkspacesPanel = (props: {
     { id: 'missing', label: t('lifecycleMissing') },
   ]
   const lifecycleComboboxOptions: readonly ComboboxOption[] = lifecycleOptions.map(option => ({ value: option.id, label: option.label }))
+  const activeIntegrationPath = queueSnapshot.context.activePath
   const queuedCount = Math.max(queueSnapshot.context.queue.length - (activeIntegrationPath === null ? 0 : 1), 0)
   const failedPaths = [...integrationJobs.entries()].filter(([, job]) => job.phase === 'failed').map(([path]) => path)
   const activeTitle = activeIntegrationPath === null ? undefined : entries.find(entry => entry.thread.path === activeIntegrationPath)?.thread
@@ -1117,7 +1109,7 @@ export const ThreadWorkspacesPanel = (props: {
       <Page
         scroll
         heading={t('title')}
-        description={t('subtitle', { bookmark: props.bookmark })}
+        description={t('subtitle', { bookmark: panelBookmark })}
         {...(threads.length > 0 ? { count: threads.length } : {})}
         actions={[
           {
@@ -1236,7 +1228,7 @@ export const ThreadWorkspacesPanel = (props: {
                 <StatusGlyph status="ready" decorative />
                 <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
                   <p className="dshx:text-sm dshx:font-semibold">{t('readyBannerTitle', { count: counts.ready })}</p>
-                  <p className="dshx:text-xs dshx:text-muted-foreground">{t('readyBannerBody', { bookmark: props.bookmark })}</p>
+                  <p className="dshx:text-xs dshx:text-muted-foreground">{t('readyBannerBody', { bookmark: panelBookmark })}</p>
                 </div>
                 {selectedEligiblePaths.length === 0 ? null : (
                   <Button size="sm" variant="ghost" disabled={queueBusy || rebasesPending} onClick={() => setSelectedPaths(new Set())}>
@@ -1307,7 +1299,7 @@ export const ThreadWorkspacesPanel = (props: {
                                         />
                                       </div>
                                     </TooltipTrigger>
-                                    <TooltipContent>{t('autoIntegrationToggleHint', { bookmark: props.bookmark })}</TooltipContent>
+                                    <TooltipContent>{t('autoIntegrationToggleHint', { bookmark: repository.bookmark ?? props.bookmark })}</TooltipContent>
                                   </Tooltip>
                                 ) : null}
                               </div>
@@ -1328,7 +1320,7 @@ export const ThreadWorkspacesPanel = (props: {
                                 openSession={props.openSession}
                                 openChanges={props.openChanges}
                                 t={t}
-                                bookmark={props.bookmark}
+                                bookmark={repository.bookmark ?? props.bookmark}
                                 bookmarks={repository.bookmarks}
                                 selected={selectedPaths.has(entry.thread.path)}
                                 selectable={entry.assessment.category === 'ready'}

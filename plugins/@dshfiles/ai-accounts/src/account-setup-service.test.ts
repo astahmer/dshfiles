@@ -195,6 +195,15 @@ describe('Host-owned provisional account lifecycle', () => {
     expect(cleanupCandidate).toHaveBeenCalled()
   })
 
+  it('answers a second completion of a failed verification from the discarded phase, not the failed promise', async () => {
+    const { service } = await harness(async () => {
+      throw new Error('verification fixture failed')
+    })
+    const pending = await service.prepare({ kind: 'codex', requestId })
+    await expect(service.complete(pending.operationId)).rejects.toThrow('could not be verified')
+    await expect(service.complete(pending.operationId)).rejects.toThrow('no longer active or its configuration is changing')
+  })
+
   it('tombstones a cancellation that arrives before prepare, including an in-flight prepare', async () => {
     const { service, store } = await harness()
     await service.discard(requestId)

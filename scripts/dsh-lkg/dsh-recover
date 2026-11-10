@@ -89,4 +89,34 @@ echo "dsh-recover: last known good $(basename "$VERSION")"
 echo "dsh-recover: state $HOME_DIR (DSH_LKG_CLEAN=1 starts without live data)"
 echo "dsh-recover: changes made here stay here; the live installation is untouched"
 
-exec env DSH_HOME="$HOME_DIR" DSH_LKG_RECOVER=1 "$NODE" "$ENTRY" web --port "$PORT" "$@"
+# Live data can be newer than the snapshot: a plugin store migrated after it was taken refuses to open
+# (SqliteStoreVersionUnsupported) and fails the whole Host. Recovery must still boot, so such a store is set
+# aside in the recovery clone only (that plugin starts empty here) and the Host starts again.
+mkdir -p "$HOME_DIR/logs"
+HOST_LOG="$HOME_DIR/logs/recover-host.log"
+attempt=0
+while :; do
+  attempt=$((attempt + 1))
+  rm -f "$HOST_LOG.status"
+  { env DSH_HOME="$HOME_DIR" DSH_LKG_RECOVER=1 "$NODE" "$ENTRY" web --port "$PORT" "$@" 2>&1; echo $? >"$HOST_LOG.status"; } | tee "$HOST_LOG"
+  status="$(cat "$HOST_LOG.status" 2>/dev/null || echo 1)"
+  newer="$(awk -v home="$HOME_DIR/" -v q="'" '
+    /SqliteStoreVersionUnsupported/ { pending = 1; next }
+    pending && /filename:/ {
+      start = index($0, q)
+      rest = substr($0, start + 1)
+      path = substr(rest, 1, index(rest, q) - 1)
+      if (start > 0 && index(path, home) == 1) print path
+      pending = 0
+    }
+  ' "$HOST_LOG" | sort -u)"
+  if [ -z "$newer" ] || [ "$attempt" -ge 5 ]; then
+    exit "$status"
+  fi
+  printf '%s\n' "$newer" | while IFS= read -r store; do
+    echo "dsh-recover: $store was written by a newer DSH than this snapshot; that plugin starts empty here (kept as $store.newer-than-lkg)"
+    for file in "$store" "$store-wal" "$store-shm"; do
+      if [ -e "$file" ]; then mv -f "$file" "$file.newer-than-lkg"; fi
+    done
+  done
+done

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createWorkspaceFileIndex, RETAINED_INDEX_LIMIT, RETAINED_INDEX_TTL_MS, walkWorkspaceFiles } from './workspace-files.js'
+import { createWorkspaceFileIndex } from './workspace-files.js'
+import { RETAINED_INDEX_LIMIT, RETAINED_INDEX_TTL_MS } from './workspace-index-machine.js'
+import { WorkspaceWalk } from './workspace-walk.js'
 import type { WorkspaceFilesState } from '@dshfiles/dshx/client'
 
 interface Tree {
@@ -31,7 +33,7 @@ const workspace: Tree = {
 describe('walkWorkspaceFiles', () => {
   it('lists files breadth-first, skips .git/.jj/node_modules and directories it cannot list', async () => {
     const { list, listed } = lister(workspace, new Set(['locked']))
-    const result = await walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
+    const result = await WorkspaceWalk.walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
     expect(result).toEqual({ files: ['README.md', 'src/index.ts', 'src/lib/deep.ts'], truncated: false })
     expect(listed.some(path => path.startsWith('node_modules') || path.startsWith('.git') || path.startsWith('.jj'))).toBe(false)
   })
@@ -44,7 +46,7 @@ describe('walkWorkspaceFiles', () => {
       ]),
     )
     const { list } = lister(wide)
-    const result = await walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
+    const result = await WorkspaceWalk.walkWorkspaceFiles({ list, signal: new AbortController().signal, onProgress: () => undefined })
     expect(result.truncated).toBe(true)
     expect(result.files).toHaveLength(20_000)
   })
@@ -229,6 +231,7 @@ describe('createWorkspaceFileIndex relist bursts', () => {
         await vi.advanceTimersByTimeAsync(3)
       }
       await vi.advanceTimersByTimeAsync(200)
+      // SAFETY: `arrayContaining` is an asymmetric matcher, so `toMatchObject` reads it as an unknown partial.
       await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ files: expect.arrayContaining(['d0/b.ts', 'd29/b.ts']) as unknown }))
       expect(replies.at(-1)).toMatchObject({ status: 'ready', truncated: false })
 
@@ -241,6 +244,7 @@ describe('createWorkspaceFileIndex relist bursts', () => {
       d0['c.ts'] = 'file'
       emit('d0')
       await vi.advanceTimersByTimeAsync(200)
+      // SAFETY: `arrayContaining` is an asymmetric matcher, so `toMatchObject` reads it as an unknown partial.
       await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ files: expect.arrayContaining(['d0/c.ts']) as unknown }))
       stop()
       index.dispose()
@@ -266,7 +270,7 @@ describe('walkWorkspaceFiles with .gitignore', () => {
       ['packages/app/.gitignore', 'generated/\n!keep.log\n'],
     ])
     const { list, listed } = lister(tree)
-    const result = await walkWorkspaceFiles({
+    const result = await WorkspaceWalk.walkWorkspaceFiles({
       list,
       readText: async path => gitignores.get(path) ?? '',
       signal: new AbortController().signal,
@@ -275,5 +279,65 @@ describe('walkWorkspaceFiles with .gitignore', () => {
     expect(result.files).toEqual(['.gitignore', 'README.md', 'packages/app/.gitignore', 'packages/app/keep.log', 'packages/app/index.ts'])
     expect(listed).not.toContain('dist')
     expect(listed).not.toContain('packages/app/generated')
+  })
+})
+
+describe('createWorkspaceFileIndex walk and relist overlap', () => {
+  it('keeps a directory change that lands while a fresh walk is reading it', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const tree: Tree = Object.fromEntries(Array.from({ length: 65 }, (_, directory) => [`d${String(directory)}`, { 'old.ts': 'file' as const }]))
+      // More directories than watch slots, so a stale index really walks again while its watches stay live.
+      const gates: (() => void)[] = []
+      let gateNextD0 = false
+      const list = async (path: string) => {
+        const node =
+          path === '' || path === '.'
+            ? tree
+            : path
+                .split('/')
+                .reduce<Tree | 'file' | undefined>((current, part) => (current === 'file' || current === undefined ? undefined : current[part]), tree)
+        if (node === undefined || node === 'file') throw new Error(`not a directory: ${path}`)
+        // Capture what this directory holds now: a change emitted after this stays unseen by this walk.
+        const entries = Object.entries(node).map(([name, child]) => ({ name, type: child === 'file' ? 'file' : 'directory' }))
+        if (path === 'd0' && gateNextD0) {
+          gateNextD0 = false
+          await new Promise<void>(resolve => gates.push(resolve))
+        }
+        return { entries }
+      }
+      const release = async () => {
+        await vi.waitFor(() => expect(gates.length).toBeGreaterThan(0))
+        gates.splice(0).forEach(resolve => resolve())
+      }
+      const { watch, emit } = watcher()
+      let clock = 0
+      const index = createWorkspaceFileIndex({ list: (_sessionId, path) => list(path), watch, now: () => clock })
+      const replies: WorkspaceFilesState[] = []
+      gateNextD0 = true
+      index.request('ses_1', reply => replies.push(reply))
+      await release()
+      // SAFETY: `arrayContaining` is an asymmetric matcher, so `toMatchObject` reads it as an unknown partial.
+      await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ status: 'ready', files: expect.arrayContaining(['d0/old.ts']) as unknown }))
+
+      clock = 60_000
+      const d0 = tree.d0
+      if (d0 === undefined || d0 === 'file') throw new Error('fixture')
+      gateNextD0 = true
+      index.request('ses_1', reply => replies.push(reply))
+      await vi.waitFor(() => expect(gates.length).toBeGreaterThan(0))
+      d0['new.ts'] = 'file'
+      emit('d0')
+      await vi.advanceTimersByTimeAsync(200)
+      expect(replies.at(-1)).toMatchObject({ status: 'indexing' })
+
+      // The walk read d0 before the change, so only a trailing relist can show the new file.
+      await release()
+      // SAFETY: `arrayContaining` is an asymmetric matcher, so `toMatchObject` reads it as an unknown partial.
+      await vi.waitFor(() => expect(replies.at(-1)).toMatchObject({ status: 'ready', files: expect.arrayContaining(['d0/new.ts']) as unknown }))
+      index.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

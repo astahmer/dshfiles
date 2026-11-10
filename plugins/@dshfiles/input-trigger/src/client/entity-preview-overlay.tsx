@@ -6,7 +6,7 @@
 import { useRegistry } from '@dshfiles/dshx/client'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 
 import { EntityKinds, EntityPreview, EntityRegistryModel, type EntityAnchorRect, type EntityKind, type EntityPreviewRequest } from '../entity-registry.js'
 
@@ -15,6 +15,9 @@ const widthOf = (kind: EntityKind, request: EntityPreviewRequest): 'default' | '
   if (width === undefined) return 'default'
   return typeof width === 'function' ? width({ id: request.id, range: request.range }) : width
 }
+
+/** Moving the pointer from a reference into the card must not close it, so leaving waits out a short grace. */
+const CLOSE_GRACE_MS = 140
 
 /** Each kind's headless decorations, mounted once while the kind is registered. */
 const KindDecorations = (props: { readonly kinds: readonly EntityKind[] }): JSX.Element => (
@@ -41,18 +44,38 @@ const PreviewCard = (props: { readonly kinds: readonly EntityKind[] }): JSX.Elem
   const byKind = useMemo(() => new Map(props.kinds.map(kind => [kind.kind, kind])), [props.kinds])
   const [request, setRequest] = useState<EntityPreviewRequest | null>(null)
   const [anchor, setAnchor] = useState<EntityAnchorRect | null>(null)
+  const closeTimer = useRef<number | undefined>(undefined)
+  const cancelClose = useCallback((): void => {
+    if (closeTimer.current === undefined) return
+    window.clearTimeout(closeTimer.current)
+    closeTimer.current = undefined
+  }, [])
+  const dismiss = useCallback((): void => {
+    cancelClose()
+    closeTimer.current = window.setTimeout(() => {
+      closeTimer.current = undefined
+      setRequest(null)
+    }, CLOSE_GRACE_MS)
+  }, [cancelClose])
 
   useEffect(() => {
     const open = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
       const parsed = EntityPreview.decodeRequest(event.detail)
       if (parsed === null) return
+      cancelClose()
       setAnchor(parsed.anchor)
       setRequest(parsed)
     }
+    const hide = (): void => dismiss()
     window.addEventListener(EntityPreview.event, open)
-    return () => window.removeEventListener(EntityPreview.event, open)
-  }, [])
+    window.addEventListener(EntityPreview.dismissEvent, hide)
+    return () => {
+      cancelClose()
+      window.removeEventListener(EntityPreview.event, open)
+      window.removeEventListener(EntityPreview.dismissEvent, hide)
+    }
+  }, [cancelClose, dismiss])
 
   // A landing message scrolls the conversation; the card follows the reference instead of disappearing under it.
   useEffect(() => {
@@ -80,7 +103,10 @@ const PreviewCard = (props: { readonly kinds: readonly EntityKind[] }): JSX.Elem
   // A kind whose provider unloaded since the click has nothing to draw; the reference stays plain text.
   if (kind === undefined || Preview === undefined) return null
   const box = anchor ?? request.anchor
-  const close = (): void => setRequest(null)
+  const close = (): void => {
+    cancelClose()
+    setRequest(null)
+  }
   return (
     <Popover open onOpenChange={open => !open && close()}>
       <PopoverAnchor asChild>
@@ -103,6 +129,8 @@ const PreviewCard = (props: { readonly kinds: readonly EntityKind[] }): JSX.Elem
         sideOffset={6}
         collisionPadding={8}
         aria-label={`${kind.label} preview`}
+        onPointerEnter={cancelClose}
+        onPointerLeave={dismiss}
         className={cn(
           'dshx-root dshx:flex dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0',
           widthOf(kind, request) === 'wide' ? 'dshx:w-[34rem]' : 'dshx:w-[30rem]',

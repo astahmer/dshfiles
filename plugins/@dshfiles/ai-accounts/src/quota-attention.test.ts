@@ -28,6 +28,8 @@ const summary = (overrides: Partial<QuotaContinuationSummary> = {}): QuotaContin
   failedModel: 'gpt-6-luna',
   failedAt: 1,
   resetAt: null,
+  retryAt: null,
+  retryAttempt: 0,
   autoRetry: false,
   snoozedUntil: null,
   state: 'waiting',
@@ -36,14 +38,17 @@ const summary = (overrides: Partial<QuotaContinuationSummary> = {}): QuotaContin
   ...overrides,
 })
 
-const until = async (read: () => Promise<AttentionList>, done: (list: AttentionList) => boolean): Promise<AttentionList> => {
+const untilState = async <State>(read: () => Promise<State>, done: (state: State) => boolean, failure: string): Promise<State> => {
   for (let attempt = 0; attempt < 400; attempt += 1) {
-    const list = await read()
-    if (done(list)) return list
+    const state = await read()
+    if (done(state)) return state
     await new Promise(resolvePromise => setTimeout(resolvePromise, 25))
   }
-  throw new Error('the inbox never reached the expected state')
+  throw new Error(failure)
 }
+
+const until = (read: () => Promise<AttentionList>, done: (list: AttentionList) => boolean): Promise<AttentionList> =>
+  untilState(read, done, 'the inbox never reached the expected state')
 
 describe('ai-accounts quota inbox provider', () => {
   it('states each waiting continuation as a blocking, resumable item about its thread', () => {
@@ -53,14 +58,14 @@ describe('ai-accounts quota inbox provider', () => {
         subject: { kind: 'session', id: 'session-quota', label: 'Fix login' },
         reason: 'Stopped by the gpt-6-luna on codex_work usage limit.',
         detail:
-          'The account did not report when its quota resets. Resume continues the stopped turn now; open the thread to switch it to another account or model first.',
+          'The account did not report when its quota resets, so the thread retries on a growing backoff from 30 seconds up to every 10 minutes. Resume continues the stopped turn now; open the thread to switch it to another account or model first.',
         severity: 'blocking',
         verbs: ['Resume', 'Open', 'Done', 'Snooze', 'MuteSource'],
       },
     ])
   })
 
-  it('lists a quota-blocked thread in the inbox, resumes it on Resume, and resolves a dismissed one', async () => {
+  it('lists a quota-blocked thread in the inbox, resumes it on Resume, retires it on Done, and repairs a done item an earlier boot left waiting', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ai-accounts-attention-'))
     const previousHome = process.env.DSH_HOME
     process.env.DSH_HOME = root
@@ -77,18 +82,22 @@ describe('ai-accounts quota inbox provider', () => {
     const releaseAgents = host.ctx.provide('agents', {} as never)
     let runtime: ManagedRuntime.ManagedRuntime<never, never> | undefined
     const service = createQuotaContinuationService({ context: host.ctx, readResetAt: async () => null, sessionController, now: () => 1_000_000 })
-    try {
-      await host.ctx.plugin(Storage)
-      await host.ctx.plugin(StorageJson, { root: join(root, 'storage') })
-      await host.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
-      await host.mount(activityTimeline, { packageId: '@dshfiles/activity-timeline', native: true })
-      runtime = ManagedRuntime.make(
+    const startProvider = async (): Promise<ManagedRuntime.ManagedRuntime<never, never>> => {
+      const started = ManagedRuntime.make(
         QuotaAttention.layerFor(() => service).pipe(
           Layer.provideMerge(HostApis.layer),
           Layer.provideMerge(Layer.succeed(HostContext, HostContext.of({ ctx: host.ctx, packageId: '@dshfiles/ai-accounts' }))),
         ),
       )
-      await runtime.runPromise(Effect.void)
+      await started.runPromise(Effect.void)
+      return started
+    }
+    try {
+      await host.ctx.plugin(Storage)
+      await host.ctx.plugin(StorageJson, { root: join(root, 'storage') })
+      await host.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
+      await host.mount(activityTimeline, { packageId: '@dshfiles/activity-timeline', native: true })
+      runtime = await startProvider()
       const inbox = createHostApiClient(host.ctx, attentionApi, '@test/inbox-page')
       const agent = (id: string) => ({ id: SessionId(id), session: { seq: 4 }, inbox: { nextTurn: [], nextStep: [] } })
 
@@ -122,12 +131,55 @@ describe('ai-accounts quota inbox provider', () => {
         () => inbox.list({}),
         list => list.counts.blocking === 0,
       )
+
+      await service.recordFailure(agent('session-done'), 'codex_work', false)
+      host.ctx.emit('dshfiles/attention/ready', { version: 1 })
+      const third = await until(
+        () => inbox.list({}),
+        list => list.counts.blocking === 1,
+      )
+      const doneItem = third.items[0]
+      const doneContinuationId = doneItem?.dedupeKey ?? ''
+      await inbox.done({ id: doneItem?.id ?? '' })
+      await untilState(
+        () => service.list(),
+        listed => !listed.continuations.some(continuation => continuation.continuationId === doneContinuationId),
+        'Done in the inbox never dismissed the stored continuation',
+      )
+      expect((await service.list()).continuations.map(continuation => continuation.continuationId)).not.toContain(doneContinuationId)
+      await until(
+        () => inbox.list({ view: 'closed' }),
+        list => list.items.some(entry => entry.subject.id === 'session-done' && entry.resolvedAt !== null),
+      )
+      await until(
+        () => inbox.list({}),
+        list => list.counts.blocking === 0,
+      )
       const closed = await inbox.list({ view: 'closed' })
       expect(closed.items.map(entry => [entry.subject.id, entry.resolvedAt !== null])).toEqual(
         expect.arrayContaining([
           ['session-resume', true],
           ['session-dismiss', true],
+          ['session-done', true],
         ]),
+      )
+
+      // A done item outlives the provider that should have dismissed it: the next boot retires that continuation.
+      await service.recordFailure(agent('session-legacy'), 'codex_work', false)
+      host.ctx.emit('dshfiles/attention/ready', { version: 1 })
+      const stale = await until(
+        () => inbox.list({}),
+        list => list.counts.blocking === 1,
+      )
+      const staleContinuationId = stale.items[0]?.dedupeKey ?? ''
+      await runtime.dispose()
+      await inbox.done({ id: stale.items[0]?.id ?? '' })
+      expect((await service.list()).continuations.map(continuation => continuation.continuationId)).toContain(staleContinuationId)
+      runtime = await startProvider()
+      await untilState(
+        () => service.list(),
+        listed => !listed.continuations.some(continuation => continuation.continuationId === staleContinuationId),
+        'a continuation left waiting under a done item was not retired on the next boot',
       )
     } finally {
       await runtime?.dispose()

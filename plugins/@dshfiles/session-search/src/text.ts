@@ -43,12 +43,22 @@ export class DocumentText {
     return text.replaceAll('\0', '\uFFFD').replaceAll(MARKER_START, '\uFFFD').replaceAll(MARKER_END, '\uFFFD')
   }
 
-  /** Cap by code points so a multi-byte character is never split in half. */
+  /**
+   * Cap by code points so a multi-byte character is never split in half. The scan stops at the cap instead of
+   * materializing every code point: a 300 000-character tool payload used to cost 1 ms to keep its first 8 192.
+   */
   static truncate(text: string, maxChars: number): TruncatedText {
     if (maxChars <= 0) return { text: '', truncated: text.length > 0 }
-    const characters = Array.from(text)
-    if (characters.length <= maxChars) return { text, truncated: false }
-    return { text: characters.slice(0, maxChars).join(''), truncated: true }
+    if (text.length <= maxChars) return { text, truncated: false }
+    let end = 0
+    let characters = 0
+    while (end < text.length && characters < maxChars) {
+      const lead = text.charCodeAt(end)
+      const trail = text.charCodeAt(end + 1)
+      end += lead >= 0xd800 && lead <= 0xdbff && trail >= 0xdc00 && trail <= 0xdfff ? 2 : 1
+      characters += 1
+    }
+    return end >= text.length ? { text, truncated: false } : { text: text.slice(0, end), truncated: true }
   }
 
   private static normalizeMarked(markedText: string): MarkedText {

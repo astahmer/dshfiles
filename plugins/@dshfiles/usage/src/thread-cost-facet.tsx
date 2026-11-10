@@ -53,7 +53,7 @@ const turnsOf = (rows: readonly RequestView[]): readonly ThreadCostTurn[] => {
 const money = (value: number | null): string => UsageFormattingModel.formatCost(value)
 
 /**
- * The thread panel's Cost facet (plans/ade-ux §4.4): the route the thread's last request took, what each turn cost,
+ * The thread panel's Cost facet (docs/ade-ux §4.4): the route the thread's last request took, what each turn cost,
  * and links to this thread's requests (Usage › Requests, filtered) and to Traces. Costs are list-price estimates.
  */
 export const ThreadCostFacet = (props: {

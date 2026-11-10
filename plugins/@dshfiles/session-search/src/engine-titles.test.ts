@@ -30,9 +30,8 @@ it('folds a Session title once until that Session appends an event', async () =>
   await engine.readTitleSnapshots([first, second])
   const again = await engine.readTitleSnapshots([second, first])
   expect(again.map(result => result.sessionId)).toEqual(['second', 'first'])
-  const session = ctx.sessions.prepare(first, { meta: { createdAt: 1 } })
-  // SAFETY: the memo reacts to any event of the Session; the event body is irrelevant to it.
-  ctx.emit('session/event', session, { seq: 1, type: 'session/title', time: 1, data: {} } as never)
+  // SAFETY: the memo keys its cache on the emitted Session's id; no other part of the event is read.
+  ctx.emit('session/event', { id: first, header: { id: first } } as never, { seq: 1, type: 'session/title', time: 1, data: {} } as never)
   await engine.readTitleSnapshots([first, second])
   expect(asked).toEqual([['first', 'second'], ['first']])
 })

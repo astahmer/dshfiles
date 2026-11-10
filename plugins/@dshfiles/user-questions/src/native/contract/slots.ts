@@ -200,10 +200,51 @@ export function createWaterfallRequest(
   return { channel, result: completion.promise, isDelegation: reason => reason === delegated }
 }
 
+/**
+ * Where one pending question's foreground wait stands. Exactly one phase is
+ * active, so a held question can never also be focused or editing, and a live
+ * deadline only exists while counting.
+ */
+export type QuestionWaitPhase =
+  /** Counting down to `deadline`; absent for a request that carried none. */
+  | { readonly kind: 'counting'; readonly deadline: number | undefined }
+  /** Frozen by focus, holding the remaining duration for a later resume. */
+  | { readonly kind: 'paused'; readonly remainingMs: number | undefined }
+  /** The user edited a draft: the request now waits indefinitely. */
+  | { readonly kind: 'editing'; readonly remainingMs: number | undefined }
+  /** The user took over the wait; the waterfall waits like a blocking question. */
+  | { readonly kind: 'waiting' }
+  /** The local countdown rejected the waterfall with `ASK_TIMED_OUT`. */
+  | { readonly kind: 'timedOut' }
+  /** The card left the registry; no wait runs any more. */
+  | { readonly kind: 'closed' }
+
+/**
+ * The one answer attempt a card records, so every presentation renders the same
+ * in-flight, sent or failed controls.
+ */
+export type QuestionSubmission =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'submitting'; readonly intent: 'answer' | 'cancel'; readonly channel: 'waterfall' | 'rpc' }
+  /** The waterfall accepted it; the projection closes the card when the Host records it. */
+  | { readonly kind: 'sent'; readonly intent: 'answer' | 'cancel' }
+  | { readonly kind: 'failed'; readonly reason: 'error'; readonly message: string }
+  /** The Remote answer was taken but the panel could not be withdrawn. */
+  | { readonly kind: 'failed'; readonly reason: 'sent' }
+  /** The question continued while a waterfall attempt was in flight; the draft can go again. */
+  | { readonly kind: 'failed'; readonly reason: 'resubmit' }
+
+/** Render one thrown value as a card's failed attempt. */
+const failureMessageOf = (cause: unknown): string => cause instanceof Error ? cause.message : String(cause)
+
 /** Reactive card state read by every mounted presentation of one question. */
 export interface QuestionCardSnapshot {
   /** Mirrors the projection row; `open` until the projection says otherwise. */
   readonly state: UserQuestionState
+  /** The single active wait phase. */
+  readonly phase: QuestionWaitPhase
+  /** The single answer attempt, `idle` until the user sends or cancels. */
+  readonly submission: QuestionSubmission
   /** User-visible foreground wait presentation. */
   readonly waitState: 'counting' | 'focused' | 'editing' | 'waiting' | 'continued'
   /**
@@ -249,18 +290,13 @@ export class PendingQuestion {
    */
   readonly dismissal: 'hide' | 'cancel'
 
-  #state: UserQuestionState = 'open'
+  #projection: UserQuestionState = 'open'
+  #phase: QuestionWaitPhase = { kind: 'counting', deadline: undefined }
+  #submission: QuestionSubmission = { kind: 'idle' }
   #waterfall: QuestionWaterfallChannel | undefined
   #rpc: QuestionRpcChannel | undefined
   #seat: QuestionSeat | undefined
-  #timedWait = false
   #timer: ReturnType<typeof setInterval> | undefined
-  #deadline: number | undefined
-  #remainingMs: number | undefined
-  #focused = false
-  #engaged = false
-  #held = false
-  #closed = false
   readonly #siblings: (() => readonly string[]) | undefined
   readonly #listeners = new Set<() => void>()
   #snapshot: QuestionCardSnapshot
@@ -326,27 +362,54 @@ export class PendingQuestion {
   readonly getSnapshot = this.snapshot
 
   private createSnapshot(): QuestionCardSnapshot {
-    const channel = this.#waterfall !== undefined
-      ? 'waterfall'
-      : this.#state === 'continued' && this.#rpc !== undefined ? 'rpc' : 'none'
-    const waitState = this.#state === 'continued'
-      ? 'continued'
-      : this.#held ? 'waiting'
-        : this.#engaged ? 'editing'
-          : this.#focused ? 'focused' : 'counting'
+    const phase = this.#phase
     return {
-      state: this.#state,
-      waitState,
-      countdown: this.#timedWait
-        ? {
-          remainingMs: this.#deadline === undefined
-            ? this.#remainingMs ?? 0
-            : Math.max(0, this.#deadline - Date.now()),
-          running: this.#deadline !== undefined,
+      state: this.#projection,
+      phase,
+      submission: this.#submission,
+      waitState: this.#waitStateOf(phase),
+      countdown: this.#countdownOf(phase),
+      channel: this.#channelOf(),
+      closed: phase.kind === 'closed',
+    }
+  }
+
+  #channelOf(): QuestionCardSnapshot['channel'] {
+    if (this.#waterfall !== undefined) return 'waterfall'
+    return this.#projection === 'continued' && this.#rpc !== undefined ? 'rpc' : 'none'
+  }
+
+  #waitStateOf(phase: QuestionWaitPhase): QuestionCardSnapshot['waitState'] {
+    if (this.#projection === 'continued') return 'continued'
+    switch (phase.kind) {
+      case 'paused': return 'focused'
+      case 'editing': return 'editing'
+      case 'waiting': return 'waiting'
+      case 'counting':
+      case 'timedOut':
+      case 'closed': return 'counting'
+    }
+  }
+
+  /**
+   * The countdown a timed request shows. Its presence follows the attached
+   * waterfall, because a request without a deadline never displayed one.
+   */
+  #countdownOf(phase: QuestionWaitPhase): QuestionCardSnapshot['countdown'] {
+    if (this.#waterfall?.deadline === undefined) return undefined
+    switch (phase.kind) {
+      case 'counting': {
+        const deadline = phase.deadline
+        return {
+          remainingMs: deadline === undefined ? 0 : Math.max(0, deadline - Date.now()),
+          running: deadline !== undefined,
         }
-        : undefined,
-      channel,
-      closed: this.#closed,
+      }
+      case 'paused':
+      case 'editing': return { remainingMs: phase.remainingMs ?? 0, running: false }
+      case 'waiting': return { remainingMs: 0, running: false }
+      case 'timedOut':
+      case 'closed': return undefined
     }
   }
 
@@ -362,7 +425,8 @@ export class PendingQuestion {
    * the component would leave the tool call waiting past its deadline.
    */
   #reschedule(): void {
-    const wanted = this.#deadline !== undefined && !this.#closed
+    const phase = this.#phase
+    const wanted = phase.kind === 'counting' && phase.deadline !== undefined
     if (wanted === (this.#timer !== undefined)) return
     if (!wanted) {
       clearInterval(this.#timer)
@@ -373,10 +437,10 @@ export class PendingQuestion {
   }
 
   #tick(): void {
-    const deadline = this.#deadline
-    /* v8 ignore next -- #reschedule clears the interval in the same publish that drops the deadline. */
-    if (deadline === undefined) return
-    if (Date.now() >= deadline) {
+    const phase = this.#phase
+    /* v8 ignore next -- #reschedule clears the interval in the same publish that leaves the counting phase. */
+    if (phase.kind !== 'counting' || phase.deadline === undefined) return
+    if (Date.now() >= phase.deadline) {
       this.timeout()
       return
     }
@@ -389,13 +453,11 @@ export class PendingQuestion {
    */
   attachWaterfall(channel: QuestionWaterfallChannel): void {
     this.#waterfall = channel
-    this.#timedWait = channel.deadline !== undefined
-    if (!this.#held && !this.#engaged) {
-      this.#deadline = channel.deadline
-      if (this.#focused && channel.deadline !== undefined) {
-        this.#remainingMs = Math.max(0, channel.deadline - Date.now())
-        this.#deadline = undefined
-      }
+    const phase = this.#phase
+    if (phase.kind === 'counting') {
+      this.#phase = { kind: 'counting', deadline: channel.deadline }
+    } else if (phase.kind === 'paused' && channel.deadline !== undefined) {
+      this.#phase = { kind: 'paused', remainingMs: Math.max(0, channel.deadline - Date.now()) }
     }
     this.publish()
   }
@@ -407,8 +469,7 @@ export class PendingQuestion {
   detachWaterfall(channel: QuestionWaterfallChannel): void {
     if (this.#waterfall !== channel) return
     this.#waterfall = undefined
-    this.#timedWait = false
-    this.#deadline = undefined
+    if (this.#phase.kind === 'counting') this.#phase = { kind: 'counting', deadline: undefined }
     this.publish()
   }
 
@@ -442,18 +503,31 @@ export class PendingQuestion {
    * @param state - `open` or `continued`.
    */
   setState(state: UserQuestionState): void {
-    if (this.#state === state) return
-    this.#state = state
+    if (this.#projection === state) return
+    this.#projection = state
+    if (state === 'continued' && this.#waterfallAttempt()) {
+      this.#submission = { kind: 'failed', reason: 'resubmit' }
+    }
     this.publish()
+  }
+
+  /** Whether a recorded attempt is still waiting for the card to close. */
+  #waterfallAttempt(): boolean {
+    const submission = this.#submission
+    return submission.kind === 'sent'
+      || (submission.kind === 'submitting' && submission.channel === 'waterfall')
+  }
+
+  /** Whether an attempt is in flight; a second one would race it. */
+  #inFlight(): boolean {
+    return this.#submission.kind === 'submitting' || this.#submission.kind === 'sent'
   }
 
   /** Stop this Client's countdown indefinitely; the waterfall then waits like a blocking question. */
   takeTime(): void {
-    if (this.#held) return
-    this.#held = true
-    this.#focused = false
-    this.#remainingMs = undefined
-    this.#deadline = undefined
+    const phase = this.#phase
+    if (phase.kind === 'waiting' || phase.kind === 'timedOut' || phase.kind === 'closed') return
+    this.#phase = { kind: 'waiting' }
     this.publish()
   }
 
@@ -462,10 +536,12 @@ export class PendingQuestion {
    * @param now - current Client epoch time.
    */
   holdFocus(now = Date.now()): void {
-    if (this.#held || this.#engaged || this.#focused) return
-    this.#remainingMs = this.#deadline === undefined ? undefined : Math.max(0, this.#deadline - now)
-    this.#deadline = undefined
-    this.#focused = true
+    const phase = this.#phase
+    if (phase.kind !== 'counting') return
+    this.#phase = {
+      kind: 'paused',
+      remainingMs: phase.deadline === undefined ? undefined : Math.max(0, phase.deadline - now),
+    }
     this.publish()
   }
 
@@ -474,10 +550,11 @@ export class PendingQuestion {
    * @param now - current Client epoch time.
    */
   releaseFocus(now = Date.now()): void {
-    if (!this.#focused) return
-    this.#focused = false
-    this.#deadline = this.#timedWait && this.#remainingMs !== undefined ? now + this.#remainingMs : undefined
-    this.#remainingMs = undefined
+    const phase = this.#phase
+    if (phase.kind !== 'paused') return
+    const remainingMs = phase.remainingMs
+    const resumed = remainingMs !== undefined && this.#waterfall?.deadline !== undefined
+    this.#phase = { kind: 'counting', deadline: resumed ? now + remainingMs : undefined }
     this.publish()
   }
 
@@ -486,25 +563,23 @@ export class PendingQuestion {
    * @param now - current Client epoch time used to preserve the remaining duration.
    */
   engage(now = Date.now()): void {
-    if (this.#held || this.#engaged) return
-    if (this.#remainingMs === undefined && this.#deadline !== undefined) {
-      this.#remainingMs = Math.max(0, this.#deadline - now)
-    }
-    this.#engaged = true
-    this.#focused = false
-    this.#deadline = undefined
+    const phase = this.#phase
+    if (phase.kind !== 'counting' && phase.kind !== 'paused') return
+    const remainingMs = phase.kind === 'paused'
+      ? phase.remainingMs
+      : phase.deadline === undefined ? undefined : Math.max(0, phase.deadline - now)
+    this.#phase = { kind: 'editing', remainingMs }
     this.publish()
   }
 
   /** Local countdown reached zero: settle the waterfall with `ASK_TIMED_OUT`, keep the card. */
   timeout(): void {
-    if (this.#held || this.#engaged || this.#focused) return
+    if (this.#phase.kind !== 'counting') return
     const channel = this.#waterfall
     if (channel === undefined) return
     this.#waterfall = undefined
-    this.#timedWait = false
-    this.#deadline = undefined
     channel.reject('ASK_TIMED_OUT')
+    this.#phase = { kind: 'timedOut' }
     this.publish()
   }
 
@@ -515,43 +590,93 @@ export class PendingQuestion {
 
   /** Mark the card removed from the registry; the mounted composer clears its draft. */
   close(): void {
-    if (this.#closed) return
-    this.#closed = true
+    if (this.#phase.kind === 'closed') return
+    this.#phase = { kind: 'closed' }
+    this.#submission = { kind: 'idle' }
     this.publish()
   }
 
-  /**
-   * Submit the whole answer batch through the live waterfall, or through the
-   * Remote path once the question is continued.
-   * @param answer - complete structured answer batch.
-   */
-  answer(answer: QuestionAnswer): Promise<void> {
+  /** Clear a failed attempt so the next edit starts from idle. */
+  resetSubmission(): void {
+    if (this.#submission.kind !== 'failed') return
+    this.#submission = { kind: 'idle' }
+    this.publish()
+  }
+
+  async #answerWaterfall(answer: QuestionAnswer): Promise<void> {
     const waterfall = this.#waterfall
-    if (waterfall !== undefined) {
-      return settlePendingComposer(() => { waterfall.resolve(answer) }, 'pending question settlement failed')
-    }
+    if (waterfall === undefined) throw new Error('no channel accepts an answer yet')
+    await settlePendingComposer(() => { waterfall.resolve(answer) }, 'pending question settlement failed')
+  }
+
+  async #answerRemote(answer: QuestionAnswer): Promise<void> {
     const rpc = this.#rpc
-    if (this.#state === 'continued' && rpc !== undefined) {
-      return rpc.answer(answer).then((accepted) => {
-        if (!accepted) throw new Error('this question is no longer answerable')
-      })
-    }
-    return Promise.reject(new Error('no channel accepts an answer yet'))
+    if (rpc === undefined || this.#projection !== 'continued') throw new Error('no channel accepts an answer yet')
+    const accepted = await rpc.answer(answer)
+    if (!accepted) throw new Error('this question is no longer answerable')
   }
 
   /**
-   * Close the panel. A tool-call-keyed card only leaves the composer seat: the
-   * request stands, the countdown keeps running here, and the tool call row
-   * reopens it. A card the Host never named ends its request instead, because
-   * nothing could bring it back.
+   * Submit the whole answer batch and record the attempt on the card, so the
+   * panel renders one in-flight, sent or failed state instead of its own flags.
+   * A second attempt while one stands is a no-op.
+   * @param answer - complete structured answer batch.
+   */
+  async submit(answer: QuestionAnswer): Promise<void> {
+    if (this.#inFlight()) return
+    const remote = this.#channelOf() === 'rpc'
+    this.#submission = { kind: 'submitting', intent: 'answer', channel: remote ? 'rpc' : 'waterfall' }
+    this.publish()
+    try {
+      if (!remote) {
+        await this.#answerWaterfall(answer)
+        this.#submission = { kind: 'sent', intent: 'answer' }
+        this.publish()
+        return
+      }
+      await this.#answerRemote(answer)
+      this.#submission = { kind: 'idle' }
+      this.publish()
+      await this.dismiss().catch(() => {
+        this.#submission = { kind: 'failed', reason: 'sent' }
+        this.publish()
+      })
+    } catch (error) {
+      this.#submission = { kind: 'failed', reason: 'error', message: failureMessageOf(error) }
+      this.publish()
+    }
+  }
+
+  /**
+   * End the request through its waterfall, recording the attempt like an
+   * answer; a tool-call-keyed card only leaves its seat instead.
+   */
+  async cancel(): Promise<void> {
+    if (this.dismissal === 'hide') {
+      await this.dismiss()
+      return
+    }
+    if (this.#inFlight()) return
+    this.#submission = { kind: 'submitting', intent: 'cancel', channel: 'waterfall' }
+    this.publish()
+    try {
+      const waterfall = this.#waterfall
+      if (waterfall === undefined) throw new Error('no channel accepts a cancellation yet')
+      await settlePendingComposer(() => { waterfall.reject('ASK_CANCELLED') }, 'pending question cancellation failed')
+      this.#submission = { kind: 'sent', intent: 'cancel' }
+      this.publish()
+    } catch (error) {
+      this.#submission = { kind: 'failed', reason: 'error', message: failureMessageOf(error) }
+      this.publish()
+    }
+  }
+
+  /**
+   * Withdraw the panel from the composer seat without ending the request: the
+   * countdown keeps running here and the tool call row reopens it.
    */
   dismiss(): Promise<void> {
-    if (this.dismissal === 'hide') {
-      return settlePendingComposer(() => { this.#seat?.hide() }, 'pending question hide failed')
-    }
-    const waterfall = this.#waterfall
-    if (waterfall === undefined) return Promise.reject(new Error('no channel accepts a cancellation yet'))
-    return settlePendingComposer(() => { waterfall.reject('ASK_CANCELLED') }, 'pending question cancellation failed')
+    return settlePendingComposer(() => { this.#seat?.hide() }, 'pending question hide failed')
   }
 }
 

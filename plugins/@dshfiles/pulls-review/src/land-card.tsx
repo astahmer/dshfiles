@@ -1,4 +1,4 @@
-import { jjIntegrationApi, type LandResult, type ThreadView } from '@dshfiles/jj-integration/api'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { projectChecksApi } from '@dshfiles/project-checks/api'
 import { useApi } from '@dshfiles/dshx/client'
 import {
@@ -18,9 +18,10 @@ import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { ClockIcon, GitMergeIcon, History, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState } from 'react'
+import { errorMessage, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { LandCardModel, type LandReadiness, type LandThread } from './land-readiness.js'
+import { landCardMachine } from './land-machine.js'
 
 export interface LandCardProps {
   readonly sessionId: string
@@ -89,13 +90,6 @@ const landChecks = (input: {
   return rows
 }
 
-const describeResult = (result: LandResult): string => {
-  if (result.status === 'landed') return `Landed ${String(result.revisions.length)} revision${result.revisions.length === 1 ? '' : 's'} on ${result.bookmark}.`
-  if (result.status === 'nothing-to-land') return `Nothing to land: ${result.bookmark} already has this work.`
-  if (result.status === 'needs-description') return 'Describe every revision before landing; History lets you write the descriptions.'
-  return `Landing stopped on conflicts. Resolve them in this workspace, then land again.`
-}
-
 /**
  * The top of the Changes facet: where this thread's work would land and whether it can, with one primary Land. Land
  * goes through jj-integration's own `land` method, so every Host guard (busy threads, undescribed revisions, conflicts)
@@ -105,8 +99,6 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
   const jj = useApi(jjIntegrationApi)
   const checksApi = useApi(projectChecksApi)
   const queryClient = useQueryClient()
-  const [confirming, setConfirming] = useState(false)
-  const [notice, setNotice] = useState<{ readonly tone: 'success' | 'failure'; readonly text: string } | null>(null)
   const status = useQuery({
     queryKey: landStatusQueryKey(props.cwd),
     refetchInterval: 15_000,
@@ -123,27 +115,17 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
     void queryClient.invalidateQueries({ queryKey: landStatusQueryKey(props.cwd) })
     props.onLanded()
   }
-  const land = useMutation({
-    mutationFn: (thread: ThreadView) =>
-      runHostRequest({ timeoutMs: 300_000, request: signal => jj.land({ path: thread.path, sessionId: props.sessionId }, { signal }) }),
-    onSuccess: result =>
-      setNotice({ tone: result.status === 'landed' || result.status === 'nothing-to-land' ? 'success' : 'failure', text: describeResult(result) }),
-    onError: error => setNotice({ tone: 'failure', text: errorMessage(error, 'Landing failed. Refresh the card and try again.') }),
-    onSettled: refresh,
-  })
-  const queue = useMutation({
-    mutationFn: (thread: ThreadView) =>
-      runHostRequest({ timeoutMs: 30_000, request: signal => jj.queueLand({ path: thread.path, sessionId: props.sessionId }, { signal }) }),
-    onError: error => setNotice({ tone: 'failure', text: errorMessage(error, 'Could not queue the land. Try again once the thread is idle.') }),
-    onSettled: refresh,
-  })
-  const unqueue = useMutation({
-    mutationFn: (thread: ThreadView) => runHostRequest({ timeoutMs: 30_000, request: signal => jj.cancelQueuedLand({ path: thread.path }, { signal }) }),
-    onSuccess: result => {
-      if (result.status === 'integrating') setNotice({ tone: 'failure', text: 'The land already started; wait for it to finish.' })
+  const [landSnapshot, sendLand] = useMachine(landCardMachine, {
+    input: {
+      land: thread => runHostRequest({ timeoutMs: 300_000, request: signal => jj.land({ path: thread.path, sessionId: props.sessionId }, { signal }) }),
+      queue: thread => runHostRequest({ timeoutMs: 30_000, request: signal => jj.queueLand({ path: thread.path, sessionId: props.sessionId }, { signal }) }),
+      unqueue: thread => runHostRequest({ timeoutMs: 30_000, request: signal => jj.cancelQueuedLand({ path: thread.path }, { signal }) }),
+      refresh,
     },
-    onSettled: refresh,
   })
+  const notice = landSnapshot.context.notice
+  const busy = landSnapshot.matches('landing') || landSnapshot.matches('queuing') || landSnapshot.matches('unqueuing')
+  const confirming = landSnapshot.matches('confirming')
 
   if (status.isPending)
     return (
@@ -167,7 +149,7 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
 
   const bookmark = status.data.bookmark
   const thread = status.data.thread
-  const readiness: LandReadiness = LandCardModel.readiness({ thread, threadBusy: props.threadBusy, pending: land.isPending })
+  const readiness: LandReadiness = LandCardModel.readiness({ thread, threadBusy: props.threadBusy, pending: landSnapshot.matches('landing') })
   const checkSummary = LandCardModel.checks(checks.data)
   const revisions = thread?.unlanded ?? []
 
@@ -196,8 +178,8 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:py-1 dshx:pr-1 dshx:pl-2">
           <ClockIcon aria-hidden className="dshx:size-3.5 dshx:text-muted-foreground" />
           <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">Lands on {bookmark} once the thread is idle.</p>
-          <Button disabled={unqueue.isPending} onClick={() => unqueue.mutate(thread)} size="xs" type="button" variant="ghost">
-            {unqueue.isPending ? <Spinner /> : <Undo2Icon aria-hidden className="dshx:size-3.5" />}
+          <Button disabled={busy} onClick={() => sendLand({ type: 'unqueue', thread })} size="xs" type="button" variant="ghost">
+            {busy ? <Spinner /> : <Undo2Icon aria-hidden className="dshx:size-3.5" />}
             Undo
           </Button>
         </div>
@@ -206,20 +188,19 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
           <Button
             aria-describedby={readiness.reason === undefined ? undefined : 'land-card-reason'}
             aria-label={`Land ${String(revisions.length)} revision${revisions.length === 1 ? '' : 's'} on ${bookmark}`}
-            disabled={!readiness.canLand}
+            disabled={!readiness.canLand || busy}
             onClick={() => {
-              setNotice(null)
-              setConfirming(true)
+              sendLand({ type: 'ask', thread })
             }}
             size="sm"
             type="button"
           >
-            {land.isPending ? <Spinner /> : <GitMergeIcon aria-hidden className="dshx:size-3.5" />}
+            {landSnapshot.matches('landing') ? <Spinner /> : <GitMergeIcon aria-hidden className="dshx:size-3.5" />}
             Land
           </Button>
           {readiness.canQueue ? (
-            <Button disabled={queue.isPending} onClick={() => queue.mutate(thread)} size="sm" type="button" variant="outline">
-              {queue.isPending ? <Spinner /> : <ClockIcon aria-hidden className="dshx:size-3.5" />}
+            <Button disabled={busy} onClick={() => sendLand({ type: 'queue', thread })} size="sm" type="button" variant="outline">
+              {landSnapshot.matches('queuing') ? <Spinner /> : <ClockIcon aria-hidden className="dshx:size-3.5" />}
               Land when idle
             </Button>
           ) : null}
@@ -236,7 +217,12 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
         </p>
       )}
       {thread === null ? null : (
-        <AlertDialog onOpenChange={setConfirming} open={confirming}>
+        <AlertDialog
+          onOpenChange={open => {
+            if (!open) sendLand({ type: 'cancel' })
+          }}
+          open={confirming}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
@@ -257,8 +243,9 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
+                disabled={busy}
                 onClick={() => {
-                  land.mutate(thread)
+                  sendLand({ type: 'confirm' })
                 }}
               >
                 Land on {bookmark}

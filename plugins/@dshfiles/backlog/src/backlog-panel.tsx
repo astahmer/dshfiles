@@ -40,12 +40,14 @@ import {
   PlayIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useAutosave } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, keepPreviousData, useIsMutating, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Effect, Schema } from 'effect'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
 import { backlogApi, BacklogViews, type BacklogBackfillResult, type BacklogSummaryView } from './api.js'
 import { BackfillDialog } from './backfill-dialog.js'
+import { backfillStatusQueries } from './backfill-queries.js'
 import { BoardView } from './board-view.js'
 import { setBacklogViewSelection, type BacklogView, type BacklogViewSelection } from './view-selection.js'
 import { Composer, type ComposerThread } from './composer.js'
@@ -383,33 +385,25 @@ const openJevKeySettings = (): void => {
   )
 }
 
+type JevSettingsDraft = { readonly jevEnabled: boolean; readonly autoTriage: boolean }
+
 const BacklogSettingsPanel = (): JSX.Element => {
   const settings = useSettings(backlogSettings)
-  const [jevEnabled, setJevEnabled] = useState(settings.value?.jevEnabled ?? false)
-  const [autoTriage, setAutoTriage] = useState(settings.value?.autoTriage ?? false)
-  const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
-  const [dirty, setDirty] = useState(false)
-
-  useEffect(() => {
-    if (dirty || settings.status !== 'ready') return
-    setJevEnabled(settings.value?.jevEnabled ?? false)
-    setAutoTriage(settings.value?.autoTriage ?? false)
-  }, [dirty, settings.status, settings.value?.autoTriage, settings.value?.jevEnabled])
-
-  const save = async (): Promise<void> => {
-    setError(null)
-    setSaved(false)
-    try {
+  const autosave = useAutosave<JevSettingsDraft>({
+    initial: { jevEnabled: settings.value?.jevEnabled ?? false, autoTriage: settings.value?.autoTriage ?? false },
+    save: async draft => {
       if (settings.status !== 'ready' || !settings.writable) throw new Error('Backlog settings are not writable right now.')
-      if (!(await settings.set('jevEnabled', jevEnabled))) throw new Error('Backlog could not save Jev settings.')
-      if (!(await settings.set('autoTriage', autoTriage))) throw new Error('Backlog could not save automatic triage settings.')
-      setDirty(false)
-      setSaved(true)
-    } catch (cause) {
-      setError(errorMessage(cause, 'Could not save Jev settings.'))
-    }
-  }
+      if (!(await settings.set('jevEnabled', draft.jevEnabled))) throw new Error('Backlog could not save Jev settings.')
+      if (!(await settings.set('autoTriage', draft.autoTriage))) throw new Error('Backlog could not save automatic triage settings.')
+    },
+  })
+  const loadedJevEnabled = settings.value?.jevEnabled ?? false
+  const loadedAutoTriage = settings.value?.autoTriage ?? false
+  const { draft, error, send, state } = autosave
+  useEffect(() => {
+    if (settings.status !== 'ready') return
+    send({ type: 'sync', value: { jevEnabled: loadedJevEnabled, autoTriage: loadedAutoTriage } })
+  }, [loadedAutoTriage, loadedJevEnabled, send, settings.status])
 
   return (
     <section className="dshx-root dshx:mx-auto dshx:w-full dshx:max-w-2xl dshx:p-5 dshx:@max-pane-narrow:p-3" aria-labelledby="backlog-jev-settings-title">
@@ -423,20 +417,16 @@ const BacklogSettingsPanel = (): JSX.Element => {
         className="dshx:mt-5 dshx:flex dshx:flex-col dshx:gap-4"
         onSubmit={event => {
           event.preventDefault()
-          void save()
+          send({ type: 'flush' })
         }}
       >
         <label className="dshx:flex dshx:items-start dshx:gap-3 dshx:text-sm">
           <input
             type="checkbox"
             aria-label="Enable Jev"
-            checked={jevEnabled}
+            checked={draft.jevEnabled}
             disabled={!settings.writable || settings.status !== 'ready'}
-            onChange={event => {
-              setJevEnabled(event.currentTarget.checked)
-              setDirty(true)
-              setSaved(false)
-            }}
+            onChange={event => send({ type: 'edit', value: { ...draft, jevEnabled: event.currentTarget.checked } })}
             className="dshx:mt-0.5"
           />
           <span className="dshx:flex dshx:flex-col dshx:gap-1">
@@ -448,13 +438,9 @@ const BacklogSettingsPanel = (): JSX.Element => {
           <input
             type="checkbox"
             aria-label="Triage new items automatically"
-            checked={autoTriage}
+            checked={draft.autoTriage}
             disabled={!settings.writable || settings.status !== 'ready'}
-            onChange={event => {
-              setAutoTriage(event.currentTarget.checked)
-              setDirty(true)
-              setSaved(false)
-            }}
+            onChange={event => send({ type: 'edit', value: { ...draft, autoTriage: event.currentTarget.checked } })}
             className="dshx:mt-0.5"
           />
           <span className="dshx:flex dshx:flex-col dshx:gap-1">
@@ -474,10 +460,10 @@ const BacklogSettingsPanel = (): JSX.Element => {
         </div>
         {error === null ? null : (
           <p className="dshx:text-sm dshx:text-destructive" role="alert">
-            {error}
+            {errorMessage(error, 'Could not save Jev settings.')}
           </p>
         )}
-        {saved ? (
+        {state === 'saved' ? (
           <p className="dshx:text-sm dshx:text-success" role="status">
             Jev settings saved.
           </p>
@@ -507,36 +493,17 @@ export const BacklogPanel = (props: {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
   const triagePending = useIsMutating({ mutationKey: BACKLOG_TRIAGE_MUTATION_KEY }) > 0
-  const [backfillJob, setBackfillJob] = useState<BacklogBackfillResult | null>(null)
-  const [backfillError, setBackfillError] = useState<string | null>(null)
-  const backfillJobId = backfillJob?.jobId
+  const [backfillStarted, setBackfillStarted] = useState<BacklogBackfillResult | null>(null)
+  const [backfillStartError, setBackfillStartError] = useState<string | null>(null)
+  const backfillJobId = backfillStarted?.jobId ?? null
+  const backfill = useQuery(backfillStatusQueries.status({ client: api, jobId: backfillJobId }))
+  // The run's own answer stands in until the first poll lands, and covers a Host that reports no job id at all.
+  const backfillJob = backfill.data === undefined ? backfillStarted : backfill.data
   const backfillJobState = backfillJob?.state
-  useEffect(() => {
-    if (backfillJobId === undefined || backfillJobId === null || backfillJobState === 'completed' || backfillJobState === 'failed') return
-    let stopped = false
-    let timer: number | undefined
-    const refresh = async (): Promise<void> => {
-      try {
-        const next = await api.backfillTriageStatus({ jobId: backfillJobId })
-        if (stopped) return
-        if (next === null) {
-          setBackfillError('This backfill is no longer available in this Host process.')
-          return
-        }
-        setBackfillJob(next)
-        if (next.state === 'queued' || next.state === 'running') timer = window.setTimeout(() => void refresh(), 1_000)
-      } catch (error) {
-        if (stopped) return
-        setBackfillError(errorMessage(error, 'Could not read backfill progress.'))
-        timer = window.setTimeout(() => void refresh(), 5_000)
-      }
-    }
-    timer = window.setTimeout(() => void refresh(), 1_000)
-    return () => {
-      stopped = true
-      if (timer !== undefined) window.clearTimeout(timer)
-    }
-  }, [api, backfillJobId, backfillJobState])
+  const backfillError =
+    backfillStartError ??
+    (backfill.error === null ? null : errorMessage(backfill.error, 'Could not read backfill progress.')) ??
+    (backfillJobId !== null && backfill.isSuccess && backfill.data === null ? 'This backfill is no longer available in this Host process.' : null)
   const stored = preferences.useValue()
   const view = stored.view
   const setPreference = (change: Partial<typeof stored>): void => {
@@ -1068,6 +1035,7 @@ export const BacklogPanel = (props: {
                 openId={openId}
                 select={select}
                 openThread={props.openThread}
+                threadTitle={sessionId => threads.find(thread => thread.id === sessionId)?.title}
                 openInbox={props.openInbox}
                 acknowledgeThread={thread =>
                   void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
@@ -1214,12 +1182,13 @@ export const BacklogPanel = (props: {
           triageOff={triageOff}
           progress={backfillJob}
           error={backfillError}
-          onError={message => setBackfillError(message.length === 0 ? null : message)}
+          onError={message => setBackfillStartError(message.length === 0 ? null : message)}
           run={async request => {
-            setBackfillError(null)
-            setBackfillJob(null)
+            setBackfillStartError(null)
+            setBackfillStarted(null)
             const started = await actions.backfillTriage.mutateAsync(request)
-            setBackfillJob(started)
+            if (started.jobId !== null) queryClient.setQueryData(backfillStatusQueries.key(started.jobId), started)
+            setBackfillStarted(started)
             void queryClient.invalidateQueries({ queryKey: [BacklogQueries.key] })
           }}
           close={() => setBackfillOpen(false)}

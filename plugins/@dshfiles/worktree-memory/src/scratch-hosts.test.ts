@@ -1,7 +1,7 @@
 import { Option } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { orphanAlertVisible } from './orphan-alert.js'
-import { ScratchHostDetector, type ScratchProcessRow, type ScratchRecord } from './scratch-hosts.js'
+import { decodeRecord, detect, guardStop, parsePs, type ScratchProcessRow, type ScratchRecord } from './scratch-hosts.js'
 import type { ScratchHosts } from './types.js'
 
 const HOST = 500
@@ -31,7 +31,7 @@ const record = (input: Partial<ScratchRecord> & Pick<ScratchRecord, 'hostPid' | 
 
 const live = row({ pid: HOST, ppid: 1, command: 'node /x/dsh/lib/bin.js --profile web --port 3080' })
 
-describe('ScratchHostDetector.detect', () => {
+describe('detect', () => {
   it('labels a recorded Host by its live owner and flags one whose owner is dead or recycled', () => {
     const owner = row({ pid: 900, ppid: 1, command: 'node dshx dev up', startedAt: T0 })
     const recycled = row({ pid: 901, ppid: 1, command: 'zsh', startedAt: T0 + 60_000 })
@@ -46,7 +46,7 @@ describe('ScratchHostDetector.detect', () => {
     ]
     const records = [record({ hostPid: 1001, ownerPid: 900 }), record({ hostPid: 1002, ownerPid: 777, kind: 'e2e' }), record({ hostPid: 1003, ownerPid: 901 })]
 
-    const result = ScratchHostDetector.detect({ rows, records, now: NOW, hostPid: HOST, alert: ALERT })
+    const result = detect({ rows, records, now: NOW, hostPid: HOST, alert: ALERT })
 
     const byPid = new Map(result.hosts.map(host => [host.pid, host]))
     expect(byPid.get(1001)).toMatchObject({
@@ -71,7 +71,7 @@ describe('ScratchHostDetector.detect', () => {
       dsh(2003, 2100, 6003),
     ]
 
-    const result = ScratchHostDetector.detect({ rows, records: [], now: NOW, hostPid: HOST, alert: ALERT })
+    const result = detect({ rows, records: [], now: NOW, hostPid: HOST, alert: ALERT })
 
     expect(result.hosts.map(host => [host.pid, host.orphan, host.reason, host.owner])).toEqual([
       [2001, true, 'legacy-detached', null],
@@ -82,7 +82,7 @@ describe('ScratchHostDetector.detect', () => {
 
   it('ignores a record whose start time does not match the pid it names', () => {
     const rows = [live, dsh(3001, 1, 7001, { startedAt: NOW - 10 * 60 * 1000 })]
-    const result = ScratchHostDetector.detect({ rows, records: [record({ hostPid: 3001, ownerPid: 777 })], now: NOW, hostPid: HOST, alert: ALERT })
+    const result = detect({ rows, records: [record({ hostPid: 3001, ownerPid: 777 })], now: NOW, hostPid: HOST, alert: ALERT })
     expect(result.hosts[0]).toMatchObject({ owner: null, orphan: false })
   })
 
@@ -95,24 +95,24 @@ describe('ScratchHostDetector.detect', () => {
       row({ pid: 4002, ppid: 1, command: 'pnpm exec dsh --profile dshx-boot --port 8001' }),
       dsh(4003, 4002, 8001, { pgid: 4002 }),
     ]
-    const result = ScratchHostDetector.detect({ rows, records: [], now: NOW, hostPid: HOST, alert: ALERT })
+    const result = detect({ rows, records: [], now: NOW, hostPid: HOST, alert: ALERT })
     expect(result.hosts.map(host => host.pid)).toEqual([4002])
     expect(result.hosts[0]?.processCount).toBe(2)
   })
 })
 
-describe('ScratchHostDetector.decodeRecord', () => {
+describe('decodeRecord', () => {
   it('decodes a record file and rejects malformed or foreign JSON', () => {
     const valid = JSON.stringify({ hostPid: 10, hostStartedAt: T0, ownerPid: 11, ownerStartedAt: T0, workspace: '/w', kind: 'e2e', command: 'pnpm check:e2e' })
-    expect(Option.getOrNull(ScratchHostDetector.decodeRecord(valid))).toMatchObject({ hostPid: 10, kind: 'e2e' })
-    expect(Option.isNone(ScratchHostDetector.decodeRecord('{not json'))).toBe(true)
-    expect(Option.isNone(ScratchHostDetector.decodeRecord(JSON.stringify({ hostPid: 10, kind: 'prod' })))).toBe(true)
+    expect(Option.getOrNull(decodeRecord(valid))).toMatchObject({ hostPid: 10, kind: 'e2e' })
+    expect(Option.isNone(decodeRecord('{not json'))).toBe(true)
+    expect(Option.isNone(decodeRecord(JSON.stringify({ hostPid: 10, kind: 'prod' })))).toBe(true)
   })
 })
 
-describe('ScratchHostDetector.parsePs', () => {
+describe('parsePs', () => {
   it('reads pid, ppid, pgid, rss, cpu, start time and arguments', () => {
-    const rows = ScratchHostDetector.parsePs(
+    const rows = parsePs(
       ['  83004     1 83004 204800  12.5 Fri Nov  6 09:00:00 2026     node dsh/lib/bin.js --profile dshx-boot --port 57717', 'garbage'].join('\n'),
     )
     expect(rows).toEqual([
@@ -129,7 +129,7 @@ describe('ScratchHostDetector.parsePs', () => {
   })
 })
 
-describe('ScratchHostDetector.guardStop', () => {
+describe('guardStop', () => {
   const rows = [
     row({ pid: 400, ppid: 1, command: 'supervisor' }),
     { ...live, ppid: 400 },
@@ -139,16 +139,16 @@ describe('ScratchHostDetector.guardStop', () => {
   ]
 
   it('signals a group leader as a group and a member of another group as a tree', () => {
-    expect(ScratchHostDetector.guardStop({ target: { pid: 5001, startedAt: T0 }, rows, hostPid: HOST })).toBe('signal-group')
-    expect(ScratchHostDetector.guardStop({ target: { pid: 5002, startedAt: T0 }, rows, hostPid: HOST })).toBe('signal-tree')
+    expect(guardStop({ target: { pid: 5001, startedAt: T0 }, rows, hostPid: HOST })).toBe('signal-group')
+    expect(guardStop({ target: { pid: 5002, startedAt: T0 }, rows, hostPid: HOST })).toBe('signal-tree')
   })
 
   it('refuses a gone, recycled or non-scratch pid and never the live Host or its supervisor', () => {
-    expect(ScratchHostDetector.guardStop({ target: { pid: 6000, startedAt: T0 }, rows, hostPid: HOST })).toBe('gone')
-    expect(ScratchHostDetector.guardStop({ target: { pid: 5001, startedAt: T0 + 1000 }, rows, hostPid: HOST })).toBe('recycled')
-    expect(ScratchHostDetector.guardStop({ target: { pid: 5003, startedAt: T0 }, rows, hostPid: HOST })).toBe('not-scratch')
-    expect(ScratchHostDetector.guardStop({ target: { pid: HOST, startedAt: T0 }, rows, hostPid: HOST })).toBe('protected')
-    expect(ScratchHostDetector.guardStop({ target: { pid: 400, startedAt: T0 }, rows, hostPid: HOST })).toBe('protected')
+    expect(guardStop({ target: { pid: 6000, startedAt: T0 }, rows, hostPid: HOST })).toBe('gone')
+    expect(guardStop({ target: { pid: 5001, startedAt: T0 + 1000 }, rows, hostPid: HOST })).toBe('recycled')
+    expect(guardStop({ target: { pid: 5003, startedAt: T0 }, rows, hostPid: HOST })).toBe('not-scratch')
+    expect(guardStop({ target: { pid: HOST, startedAt: T0 }, rows, hostPid: HOST })).toBe('protected')
+    expect(guardStop({ target: { pid: 400, startedAt: T0 }, rows, hostPid: HOST })).toBe('protected')
   })
 })
 

@@ -4,8 +4,8 @@ import { pluginUiVite } from '@dshfiles/plugin-ui/vite'
 export default defineConfig({
   profile: 'vanilla',
   modules: { 'model-handoff-api': 'src/model-handoff-api.ts' },
-  host: { entry: 'src/host.ts' },
-  client: { entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
+  client: { entry: 'src/client.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: {
     sourcemap: true,
     declarations: true,

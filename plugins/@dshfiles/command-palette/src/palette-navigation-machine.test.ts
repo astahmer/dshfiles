@@ -4,11 +4,15 @@ import { paletteNavigationMachine } from './palette-navigation-machine.js'
 
 test('backs through prefixes and file destinations before requesting palette close', () => {
   const actor = createActor(paletteNavigationMachine, { input: { mode: 'all' } }).start()
+  let closes = 0
+  actor.on('close', () => {
+    closes += 1
+  })
   actor.send({ type: 'query.change', query: 'thread:session-missing' })
 
   actor.send({ type: 'back' })
   expect(actor.getSnapshot().context.query).toBe('session-missing')
-  expect(actor.getSnapshot().context.closeRequested).toBe(false)
+  expect(closes).toBe(0)
 
   actor.send({ type: 'files.navigate' })
   expect(actor.getSnapshot().context.mode).toBe('files')
@@ -22,7 +26,7 @@ test('backs through prefixes and file destinations before requesting palette clo
   actor.send({ type: 'back' })
   expect(actor.getSnapshot().context.query).toBe('')
   actor.send({ type: 'back' })
-  expect(actor.getSnapshot().context.closeRequested).toBe(true)
+  expect(closes).toBe(1)
   actor.stop()
 })
 
@@ -33,12 +37,16 @@ test('synchronizing the externally selected mode resets navigation state', () =>
 
   actor.send({ type: 'mode.sync', mode: 'threads' })
 
-  expect(actor.getSnapshot().context).toMatchObject({ mode: 'threads', query: '', backStack: [], selected: '', notice: null, closeRequested: false })
+  expect(actor.getSnapshot().context).toMatchObject({ mode: 'threads', query: '', backStack: [], selected: '', notice: null })
   actor.stop()
 })
 
-test('resets selection and notice on changes and rearms handled close requests', () => {
+test('resets selection and notice on changes and emits close only when nothing is left', () => {
   const actor = createActor(paletteNavigationMachine, { input: { mode: 'all' } }).start()
+  let closes = 0
+  actor.on('close', () => {
+    closes += 1
+  })
   actor.send({ type: 'query.change', query: 'session-one' })
   actor.send({ type: 'selection.change', value: 'row-one' })
   actor.send({ type: 'notice.show', message: 'Old notice.' })
@@ -58,31 +66,33 @@ test('resets selection and notice on changes and rearms handled close requests',
 
   actor.send({ type: 'query.change', query: '' })
   actor.send({ type: 'back' })
-  expect(actor.getSnapshot().context.closeRequested).toBe(true)
-  actor.send({ type: 'close.handled' })
-  expect(actor.getSnapshot().context.closeRequested).toBe(false)
+  expect(closes).toBe(1)
   actor.send({ type: 'back' })
-  expect(actor.getSnapshot().context.closeRequested).toBe(true)
+  expect(closes).toBe(2)
   actor.stop()
 })
 
 test('entering Ask DSH clears the query and Escape leaves it before closing the palette', () => {
   const actor = createActor(paletteNavigationMachine, { input: { mode: 'all' } }).start()
+  let closes = 0
+  actor.on('close', () => {
+    closes += 1
+  })
   actor.send({ type: 'query.change', query: 'thread:session-one' })
 
   actor.send({ type: 'back' })
   actor.send({ type: 'ask.enter' })
-  expect(actor.getSnapshot().context).toMatchObject({ ask: true, query: '', closeRequested: false })
+  expect(actor.getSnapshot().context).toMatchObject({ ask: true, query: '' })
 
   actor.send({ type: 'query.change', query: 'how do I rebind a shortcut?' })
   actor.send({ type: 'back' })
-  expect(actor.getSnapshot().context).toMatchObject({ ask: true, query: '', closeRequested: false })
+  expect(actor.getSnapshot().context).toMatchObject({ ask: true, query: '' })
 
   actor.send({ type: 'back' })
-  expect(actor.getSnapshot().context).toMatchObject({ ask: false, closeRequested: false })
+  expect(actor.getSnapshot().context).toMatchObject({ ask: false })
 
   actor.send({ type: 'back' })
-  expect(actor.getSnapshot().context.closeRequested).toBe(true)
+  expect(closes).toBe(1)
   actor.stop()
 })
 
@@ -108,6 +118,6 @@ test('Ask DSH treats palette prefixes as question text', () => {
   actor.send({ type: 'query.change', query: '> how do commands work?' })
 
   actor.send({ type: 'back' })
-  expect(actor.getSnapshot().context).toMatchObject({ ask: true, query: '', closeRequested: false })
+  expect(actor.getSnapshot().context).toMatchObject({ ask: true, query: '' })
   actor.stop()
 })

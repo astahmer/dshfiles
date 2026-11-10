@@ -210,6 +210,9 @@ const mount = async (
 
 beforeEach(() => {
   vi.useFakeTimers()
+  // These tests drive every API call themselves; the page-wide read batcher flushes on a timer, which fake timers
+  // would never fire, so keep each read on its own route (the documented opt-out).
+  window.localStorage.setItem('dshx:batch', 'off')
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal(
     'ResizeObserver',
@@ -876,7 +879,6 @@ describe('actual account setup view with operation-owned QueryClient data', () =
         return result.error
       }
       const finishError = await apiFailure(kind, 'completeAccountConnection')
-      const pollError = await apiFailure('contract', 'getAccountConnection')
       host.completeAccountConnection.mockRejectedValueOnce(finishError)
       const onCreated = vi.fn()
       const view = await mount({ accountId: existing.instanceId, onCreated }, existingFile)
@@ -887,14 +889,15 @@ describe('actual account setup view with operation-owned QueryClient data', () =
       expect(document.body.textContent).not.toContain('could not be verified')
       expect([...document.querySelectorAll('button')].some(item => item.textContent === 'Verify subscription and reconnect')).toBe(false)
       expect(document.querySelector('[aria-label="Sign-in method"]')).toBeNull()
-      // The terminal query failure must not replace uncertainty with a false
-      // expired/rejected result or encourage a duplicate connection attempt.
-      host.getAccountConnection.mockRejectedValue(pollError)
+      // An unreadable completion result is terminal: the view stops polling and keeps the uncertain message instead
+      // of replacing it with a false expired/rejected result or encouraging a duplicate connection attempt.
+      const readsBefore = host.getAccountConnection.mock.calls.length
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(1_001)
+        await vi.advanceTimersByTimeAsync(5_001)
       })
       await flush()
-      expect(view.client.getQueryState(['ai-accounts', 'account-connection', request.operationId])?.error).toBe(pollError)
+      expect(host.getAccountConnection.mock.calls.length).toBe(readsBefore)
+      expect(view.client.getQueryState(['ai-accounts', 'account-connection', request.operationId])?.error ?? null).toBeNull()
       expect(document.body.textContent).toContain('Sign-in may already be saved')
       expect(document.body.textContent).toContain('check your accounts')
       expect(document.body.textContent).not.toContain('could not be verified')

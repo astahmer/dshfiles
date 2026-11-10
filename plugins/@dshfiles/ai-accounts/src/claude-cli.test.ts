@@ -188,6 +188,50 @@ it('holds a tool call until DSH answers it, then continues the same claude proce
   expect(processOf(fourth)).toBe(processOf(third))
 })
 
+it('never runs a bare tool name the CLI rejects, so its retry runs once and gets its own result', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'claude-cli-bare-'))
+  directories.push(directory)
+  const executable = join(directory, 'claude')
+  // Like the real CLI: the bare name is answered "No such tool available" locally, then the model retries prefixed.
+  writeFileSync(
+    executable,
+    FAKE_CLAUDE.replace(
+      "event({ type: 'message_start', message: { usage: { input_tokens: 10 } } })",
+      `event({ type: 'message_start', message: { usage: { input_tokens: 10 } } })
+  event({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_bare', name: tools[0].name } })
+  event({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"value":"ping"}' } })
+  event({ type: 'content_block_stop', index: 0 })
+  event({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 5 } })
+  event({ type: 'message_stop' })
+  event({ type: 'message_start', message: { usage: { input_tokens: 10 } } })`,
+    ),
+  )
+  chmodSync(executable, 0o755)
+  const cli = new ClaudeCliSessions({ configDir: () => join(directory, '.claude'), executable })
+  sessions.push(cli)
+  const [model] = anthropicProvider().getModels()
+  if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
+  const tool = { name: 'echo_tool', description: 'Echo a value', parameters: { type: 'object', properties: { value: { type: 'string' } } } }
+  const messages: Message[] = [{ role: 'user', content: 'please call the tool', timestamp: 1 }]
+  const context = () => normalizeContext({ systemPrompt: 'You are inside DSH.', tools: [tool as never], messages })
+  const options = { sessionId: 'session-bare-tool' }
+
+  const first = await finished(cli.stream(model, context(), options))
+  expect(first.stopReason).toBe('toolUse')
+  expect(first.content.filter(block => block.type === 'toolCall')).toMatchObject([{ id: 'toolu_1', name: 'echo_tool' }])
+
+  messages.push(first, {
+    role: 'toolResult',
+    toolCallId: 'toolu_1',
+    toolName: 'echo_tool',
+    content: [{ type: 'text', text: 'pong' }],
+    isError: false,
+    timestamp: 2,
+  })
+  const second = await finished(cli.stream(model, context(), options))
+  expect(textOf(second)).toBe('tool said pong')
+})
+
 /** A `claude` that answers "done" at once and never answers "hold", so a held request stays in flight. */
 const SLOW_CLAUDE = `#!/usr/bin/env node
 const { createInterface } = require('node:readline')
@@ -345,4 +389,48 @@ it('skips a non-JSON line from the CLI instead of throwing out of its stdout han
   const message = await finished(cli.stream(model, context, { sessionId: 'session-noisy' }))
 
   expect(textOf(message)).toBe('still here')
+})
+
+const IDLE_PROCESS_TIMEOUT_MS = 30 * 60_000
+
+it('keeps a claude process that is awaiting a tool call past the idle timeout', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'claude-cli-held-'))
+  directories.push(directory)
+  const executable = join(directory, 'claude')
+  writeFileSync(executable, FAKE_CLAUDE)
+  chmodSync(executable, 0o755)
+  const cli = new ClaudeCliSessions({ configDir: () => join(directory, '.claude'), executable })
+  sessions.push(cli)
+  const [model] = anthropicProvider().getModels()
+  if (model === undefined) throw new Error('pi-ai lists no Anthropic model')
+  const tool = { name: 'echo_tool', description: 'Echo a value', parameters: { type: 'object', properties: { value: { type: 'string' } } } }
+  const messages: Message[] = [{ role: 'user', content: 'please call the tool', timestamp: 1 }]
+  const context = () => normalizeContext({ systemPrompt: 'You are inside DSH.', tools: [tool as never], messages })
+  const options = { sessionId: 'session-held-tool' }
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    const first = await finished(cli.stream(model, context(), options))
+    expect(first.stopReason).toBe('toolUse')
+    expect(cli.processCount).toBe(1)
+
+    vi.advanceTimersByTime(IDLE_PROCESS_TIMEOUT_MS + 1)
+    expect(cli.processCount).toBe(1)
+
+    messages.push(first, {
+      role: 'toolResult',
+      toolCallId: 'toolu_1',
+      toolName: 'echo_tool',
+      content: [{ type: 'text', text: 'pong' }],
+      isError: false,
+      timestamp: 2,
+    })
+    const second = await finished(cli.stream(model, context(), options))
+    expect(textOf(second)).toBe('tool said pong')
+    expect(cli.processCount).toBe(1)
+
+    vi.advanceTimersByTime(IDLE_PROCESS_TIMEOUT_MS + 1)
+    expect(cli.processCount).toBe(0)
+  } finally {
+    vi.useRealTimers()
+  }
 })

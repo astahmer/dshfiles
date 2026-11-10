@@ -75,11 +75,11 @@
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "cmdk": "catalog:",
+    "effect": "catalog:",
     "motion": "catalog:",
     "react-remove-scroll": "2.7.2",
     "tailwind-merge": "catalog:",
-    "xstate": "catalog:",
-    "zod": "catalog:"
+    "xstate": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

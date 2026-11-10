@@ -100,6 +100,9 @@ const withTable = async <T>(ctx: Context, run: (table: KvTableLike) => T | Promi
 
 const entryOf = (record: StoredRecord): StoredEntry => ({ key: record.key, value: record.value, updatedAt: record.updatedAt })
 
+/** What a whole-prefix read takes: the prefix, and nothing that would make it a page. */
+export type StorageListAllInput = Pick<StorageListInput, 'prefix'>
+
 const list = (table: KvTableLike, namespace: string, input: StorageListInput): StoragePage => {
   const prefix = recordKey(namespace, input.prefix ?? '')
   const after = input.cursor === undefined ? undefined : recordKey(namespace, input.cursor)
@@ -112,6 +115,23 @@ const list = (table: KvTableLike, namespace: string, input: StorageListInput): S
   return { entries: page, cursor: keys.length > limit ? (page.at(-1)?.key ?? null) : null }
 }
 
+/**
+ * One prefix, read once. `keys()` is an unsorted snapshot, so a complete prefix listing costs one scan and one sort no
+ * matter how it is asked for; paging it at `limit` repeats both per page. Returns exactly what paging `list` to
+ * exhaustion returns, from one snapshot, and takes no cursor because a caller wanting the whole prefix starts at its
+ * beginning.
+ */
+const listAll = (table: KvTableLike, namespace: string, prefix: string | undefined): StoredEntry[] => {
+  const recordPrefix = recordKey(namespace, prefix ?? '')
+  const keys: string[] = []
+  for (const key of table.keys()) if (key.startsWith(recordPrefix)) keys.push(key)
+  keys.sort()
+  return keys.flatMap(key => {
+    const record = table.get(key)
+    return record === undefined ? [] : [entryOf(record)]
+  })
+}
+
 export interface PluginStorage {
   /** The entry under `key`, or undefined. */
   get(key: string): Promise<StoredEntry | undefined>
@@ -121,6 +141,12 @@ export interface PluginStorage {
   delete(key: string): Promise<boolean>
   /** Keys in code-unit order, starting with `prefix`, after `cursor`; `cursor` of the result is null on the last page. */
   list(input?: StorageListInput): Promise<StoragePage>
+  /**
+   * Every entry under `prefix` in one snapshot and one pass, in the order paging `list` to exhaustion yields.
+   * Host-only: the browser-facing `list` keeps its page size cap, so a Host caller that needs the whole prefix asks once
+   * instead of walking 500-key pages and re-scanning the shared key table on every one.
+   */
+  listAll(input?: StorageListAllInput): Promise<StoredEntry[]>
 }
 
 /**
@@ -150,6 +176,11 @@ const pluginStorage = (ctx: Context, namespace: string): PluginStorage => {
       withTable(ctx, table =>
         list(table, checkedNamespace, Schema.decodeUnknownSync(PluginStorageContract.listInput)({ ...input, namespace: checkedNamespace })),
       ),
+    listAll: async (input = {}) =>
+      withTable(ctx, table => {
+        const checkedPrefix = Schema.decodeUnknownSync(PluginStorageContract.listInput)({ prefix: input.prefix ?? '', namespace: checkedNamespace }).prefix
+        return listAll(table, checkedNamespace, checkedPrefix)
+      }),
   }
 }
 

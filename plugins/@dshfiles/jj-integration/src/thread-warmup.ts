@@ -27,15 +27,49 @@ export interface PreparedWarm<Composer extends WarmComposer = WarmComposer> {
   readonly target: (signal: AbortSignal) => Promise<Composer>
 }
 
+export type WarmSettled = 'pending' | 'ready' | 'kept' | 'failed'
+
+/**
+ * What one warm destination has become: resolving where it would go, provisioning a workspace, ready to hand over,
+ * kept where the thread already is, or finalized by the send, an abandon or a failure. A finalized warm keeps the
+ * phase, so a late provisioning step can still rescue the workspace it created.
+ */
+export type WarmPhase<Composer extends WarmComposer = WarmComposer> =
+  | { readonly _tag: 'pending' }
+  | { readonly _tag: 'provisioning'; readonly request: ToggleRequest; readonly workspaceId: string | null }
+  | { readonly _tag: 'ready'; readonly request: ToggleRequest; readonly workspaceId: string; readonly composer: Composer }
+  | { readonly _tag: 'kept' }
+  | { readonly _tag: 'abandoned' }
+  | { readonly _tag: 'consumed' }
+  | { readonly _tag: 'failed' }
+
+/** The destination a resolved lookup leaves: wait for a provisioned workspace, or stay put. */
+const destinationPhase = <Composer extends WarmComposer>(phase: WarmPhase<Composer>, request: ToggleRequest | null): WarmPhase<Composer> => {
+  if (phase._tag !== 'pending') return phase
+  return request === null || !request.isolate ? { _tag: 'kept' } : { _tag: 'provisioning', request, workspaceId: null }
+}
+
+/** The workspace an abandon may keep spare, when provisioning already got that far. */
+const spareOf = <Composer extends WarmComposer>(phase: WarmPhase<Composer>): { readonly request: ToggleRequest; readonly workspaceId: string } | null => {
+  if (phase._tag === 'ready') return { request: phase.request, workspaceId: phase.workspaceId }
+  if (phase._tag === 'provisioning' && phase.workspaceId !== null) return { request: phase.request, workspaceId: phase.workspaceId }
+  return null
+}
+
+const settledOf = (phase: WarmPhase<WarmComposer>): WarmSettled => {
+  if (phase._tag === 'ready') return 'ready'
+  if (phase._tag === 'kept') return 'kept'
+  if (phase._tag === 'pending' || phase._tag === 'provisioning') return 'pending'
+  return 'failed'
+}
+
 interface WarmRecord<Composer extends WarmComposer> extends WarmInput {
   readonly ports: WarmPorts<Composer>
   readonly controller: AbortController
   destinationTask: Promise<ToggleRequest | null>
   composerTask: Promise<Composer | undefined>
   cancelTimer: () => void
-  settled: 'pending' | 'ready' | 'kept' | 'failed'
-  resolved: ToggleRequest | null
-  provisioned: { readonly workspaceId: string; readonly name: string } | null
+  phase: WarmPhase<Composer>
 }
 
 export interface WarmScheduler {
@@ -114,12 +148,14 @@ export class ThreadWarmup<Composer extends WarmComposer = WarmComposer> {
       destinationTask: Promise.resolve(null),
       composerTask: Promise.resolve(undefined),
       cancelTimer: () => {},
-      settled: 'pending',
-      resolved: null,
-      provisioned: null,
+      phase: { _tag: 'pending' },
     }
     record.destinationTask = Promise.resolve()
       .then(() => ports.destination(controller.signal))
+      .then(request => {
+        record.phase = destinationPhase(record.phase, request)
+        return request
+      })
       .catch(cause => {
         this.fail(input.sessionId, record)
         throw cause
@@ -127,16 +163,17 @@ export class ThreadWarmup<Composer extends WarmComposer = WarmComposer> {
     record.composerTask = record.destinationTask
       .then(async request => {
         controller.signal.throwIfAborted()
-        if (request === null || !request.isolate) {
-          record.settled = 'kept'
+        if (request === null || !request.isolate) return undefined
+        const landed = await ports.isolate(request, controller.signal)
+        if (record.phase._tag === 'abandoned') {
+          ports.keepSpare({ workspaceId: landed.workspaceId, name: input.name, request })
+          record.phase = { _tag: 'consumed' }
           return undefined
         }
-        record.resolved = request
-        const landed = await ports.isolate(request, controller.signal)
-        record.provisioned = { workspaceId: landed.workspaceId, name: input.name }
+        record.phase = { _tag: 'provisioning', request, workspaceId: landed.workspaceId }
         const composer = await ports.composerIn(landed.workspaceId, controller.signal)
         controller.signal.throwIfAborted()
-        record.settled = 'ready'
+        record.phase = { _tag: 'ready', request, workspaceId: landed.workspaceId, composer }
         return composer
       })
       .catch(cause => {
@@ -153,7 +190,7 @@ export class ThreadWarmup<Composer extends WarmComposer = WarmComposer> {
   /** The warm a first send of that New thread takes, when it is still the one prepared for it. */
   for(input: WarmInput): PreparedWarm<Composer> | undefined {
     const record = this.records.get(input.sessionId)
-    if (record === undefined || record.settled === 'failed') return undefined
+    if (record === undefined || record.phase._tag === 'failed') return undefined
     if (record.name !== input.name || record.sourceWorkspaceId !== input.sourceWorkspaceId) return undefined
     return {
       destination: async () => record.destinationTask,
@@ -167,16 +204,20 @@ export class ThreadWarmup<Composer extends WarmComposer = WarmComposer> {
 
   /** The send took the destination: stop owning it, and never keep its workspace as a spare. */
   consume(sessionId: string): void {
-    this.forget(sessionId, this.records.get(sessionId))
+    const record = this.records.get(sessionId)
+    if (record === undefined) return
+    record.phase = { _tag: 'consumed' }
+    this.forget(sessionId, record)
   }
 
   /** The thread was abandoned or re-targeted: keep what was provisioned as this project's spare. */
   abandon(sessionId: string): void {
     const record = this.records.get(sessionId)
     if (record === undefined) return
+    const spare = spareOf(record.phase)
     this.forget(sessionId, record)
-    if (record.provisioned === null || record.resolved === null) return
-    record.ports.keepSpare({ ...record.provisioned, request: record.resolved })
+    record.phase = { _tag: 'abandoned' }
+    if (spare !== null) record.ports.keepSpare({ ...spare, name: record.name })
   }
 
   dispose(): void {
@@ -184,14 +225,14 @@ export class ThreadWarmup<Composer extends WarmComposer = WarmComposer> {
   }
 
   /** Test seam: whether that Session still has a warm, and where it stands. */
-  state(sessionId: string): { readonly settled: WarmRecord<Composer>['settled']; readonly name: string } | undefined {
+  state(sessionId: string): { readonly settled: WarmSettled; readonly name: string } | undefined {
     const record = this.records.get(sessionId)
-    return record === undefined ? undefined : { settled: record.settled, name: record.name }
+    return record === undefined ? undefined : { settled: settledOf(record.phase), name: record.name }
   }
 
   private fail(sessionId: string, record: WarmRecord<Composer>): void {
     if (this.records.get(sessionId) !== record) return
-    record.settled = 'failed'
+    record.phase = { _tag: 'failed' }
     this.forget(sessionId, record)
   }
 

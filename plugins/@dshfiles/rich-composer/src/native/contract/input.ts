@@ -87,6 +87,12 @@ export interface InsertTextRequest {
   readonly continue?: boolean
 }
 
+/** One reference span a plain-text draft still names, as the source's restore grammar reports it. */
+export interface RestoredDraftReference extends ReferenceInsert {
+  readonly start: number
+  readonly end: number
+}
+
 /** Trigger hit used to open one source programmatically. */
 export interface InputTriggerHit {
   readonly trigger: '/' | '@'
@@ -126,6 +132,12 @@ export interface InputTriggerController {
    * @returns the claim, or undefined when no source claims the token; rejects when catalog warmup fails.
    */
   resolveClaim(token: string, signal: AbortSignal): Promise<CommandClaim | undefined>
+  /**
+   * Rebuild the reference chips a plain-text draft's serialized references still name.
+   * @param text - draft text to scan with every source's restore grammar.
+   * @returns ordered, non-overlapping spans.
+   */
+  restoreReferences(text: string): readonly RestoredDraftReference[]
   /**
    * @param source - chip owner, or undefined for a text reference.
    * @param reference - source id and glyph.
@@ -184,6 +196,11 @@ export interface InputTarget {
 export interface SessionInput extends InputTarget {
   /** Replace the whole draft with plain text, removing inline reference chips. */
   setDraft(text: string): void
+  /**
+   * Rebuild reference chips from the current plain-text draft, using each trigger source's own restore grammar.
+   * @returns whether any chip was restored.
+   */
+  restoreReferences(): boolean
   /** Append ordered browser-owned attachment ids; busy admission phases refuse. */
   addAttachments(ids: readonly DraftAttachmentId[]): boolean
   /** Remove one browser-owned attachment id; busy admission phases refuse. @returns whether the id was removed. */
@@ -341,6 +358,15 @@ export type InputEvent =
   | { readonly type: 'sink-settled'; readonly attempt: SubmitAttempt; readonly ok: boolean; readonly outcome?: SubmitOutcome; readonly message?: string }
   /** Commit an attachment-only send whose empty draft did not need an attempt. */
   | { readonly type: 'send-committed' }
+  /** A restored draft carried this command token; start the claim resolution when the pipeline can answer. */
+  | { readonly type: 'restore-request'; readonly token: string; readonly rev: number }
+  /** Ask for the pending restore's claim resolution (the machine mints its abort signal). */
+  | { readonly type: 'restore-start' }
+  /** The resolved claim for the restore that requested it. */
+  | { readonly type: 'restore-resolved'; readonly token: string; readonly rev: number; readonly claim: CommandClaim }
+  /** The restore could not resolve a claim; the literal token stays and Enter still adjudicates it. */
+  | { readonly type: 'restore-failed'; readonly token: string; readonly rev: number }
+  | { readonly type: 'restore-cancel' }
   | { readonly type: 'release' }
 
 /**
@@ -366,3 +392,7 @@ export type InputEffect =
    * sends have no draft to retain).
    */
   | { readonly type: 'commit-draft'; readonly retainSuffixOf: string | null }
+  /** Resolve one restored command token through the trigger pipeline (the signal aborts with the restore). */
+  | { readonly type: 'resolve-claim'; readonly token: string; readonly rev: number; readonly signal: AbortSignal }
+  /** Rebuild the restored command chip at the revision its restore produced. */
+  | { readonly type: 'apply-claim'; readonly claim: CommandClaim; readonly token: string; readonly rev: number }

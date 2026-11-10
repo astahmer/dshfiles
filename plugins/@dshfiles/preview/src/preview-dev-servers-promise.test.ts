@@ -1,7 +1,8 @@
 import { DshxEffect, HostContext } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
-import { Effect, Layer } from 'effect'
+import { Duration, Effect, Layer } from 'effect'
+import { TestClock } from 'effect/testing'
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { PreviewDevServers, type ProbeExec } from './preview-dev-servers-promise.js'
 
@@ -25,19 +26,37 @@ const fakeExec =
     return command === 'ps' ? outputs.ps : ''
   }
 
-/** The Host context a probe reads: one Session whose checkout holds the python server's cwd. */
-const testContext = {
-  get: (name: string) => (name === 'sessionController' ? { list: async () => ({ items: [{ sessionId: 'session-b', cwd: '/repo-threads/b' }] }) } : undefined),
-  inject: () => undefined,
-}
-
 const readCwdLink = (path: string) => Effect.succeed(path === '/proc/700/cwd' ? '/repo-threads/b' : '/')
 
-const probeLayer = (exec: ProbeExec) =>
-  PreviewDevServers.makeLayer({ exec, readCwdLink }).pipe(
-    Layer.provide(HostContext.layer({ ctx: testContext as never, packageId: '@dshfiles/preview' })),
+/** A Host context whose one Session's checkout holds the python server's cwd, counting the corpus folds. */
+const contextOf = (input: {
+  readonly list: () => Promise<{ items: readonly { readonly sessionId: string; readonly cwd: string }[] }>
+  readonly onList: () => void
+}) => ({
+  get: (name: string) =>
+    name === 'sessionController'
+      ? {
+          list: async () => {
+            input.onList()
+            return input.list()
+          },
+        }
+      : undefined,
+  inject: () => undefined,
+})
+
+const layerFor = (input: { readonly exec: ProbeExec; readonly ctx?: unknown }) =>
+  PreviewDevServers.makeLayer({ exec: input.exec, readCwdLink }).pipe(
+    Layer.provide(
+      HostContext.layer({
+        ctx: (input.ctx ?? contextOf({ list: async () => ({ items: [] }), onList: () => undefined })) as never,
+        packageId: '@dshfiles/preview',
+      }),
+    ),
     Layer.provide(nodeFileSystemLayer),
   )
+
+const oneSession = async () => ({ items: [{ sessionId: 'session-b', cwd: '/repo-threads/b' }] })
 
 describe('PreviewDevServers', () => {
   it.effect('runs each probe command under a preview port-probe span and caches one probe for every caller', () => {
@@ -54,7 +73,12 @@ describe('PreviewDevServers', () => {
       // Linux reads /proc/<pid>/cwd instead of a second lsof pass.
       expect(calls).toHaveLength(process.platform === 'linux' ? 2 : 3)
       expect(recorder.named('preview port-probe').map(span => span.attributes['process.executable.name'])).toEqual(expect.arrayContaining([socketTool, 'ps']))
-    }).pipe(Effect.provide(probeLayer(fakeExec(calls))), Effect.provide(DshxEffect.tracerLayer), Effect.ensuring(Effect.sync(() => recorder.stop())))
+      expect(recorder.named('preview session-list')).toHaveLength(1)
+    }).pipe(
+      Effect.provide(layerFor({ exec: fakeExec(calls), ctx: contextOf({ list: oneSession, onList: () => undefined }) })),
+      Effect.provide(DshxEffect.tracerLayer),
+      Effect.ensuring(Effect.sync(() => recorder.stop())),
+    )
   })
 
   it.effect('reports an unsupported platform instead of an empty list', () =>
@@ -62,7 +86,7 @@ describe('PreviewDevServers', () => {
       const servers = yield* PreviewDevServers
       const probe = yield* servers.read(true)
       expect(probe.supported).toBe(process.platform === 'darwin' || process.platform === 'linux')
-    }).pipe(Effect.provide(probeLayer(fakeExec([])))),
+    }).pipe(Effect.provide(layerFor({ exec: fakeExec([]) }))),
   )
 
   it.effect('skips the process table, cwd probes and Session fold when nothing is listening', () => {
@@ -74,22 +98,12 @@ describe('PreviewDevServers', () => {
       return ''
     }
     let listed = 0
-    const quietContext = {
-      get: (name: string) =>
-        name === 'sessionController'
-          ? {
-              list: async () => {
-                listed += 1
-                return { items: [] }
-              },
-            }
-          : undefined,
-      inject: () => undefined,
-    }
-    const layer = PreviewDevServers.makeLayer({ exec }).pipe(
-      Layer.provide(HostContext.layer({ ctx: quietContext as never, packageId: '@dshfiles/preview' })),
-      Layer.provide(nodeFileSystemLayer),
-    )
+    const quietContext = contextOf({
+      list: async () => ({ items: [] }),
+      onList: () => {
+        listed += 1
+      },
+    })
     return Effect.gen(function* () {
       const servers = yield* PreviewDevServers
       const probe = yield* servers.read(true)
@@ -97,6 +111,87 @@ describe('PreviewDevServers', () => {
       expect(calls).toHaveLength(1)
       expect(calls[0]).toMatch(new RegExp(`^${socketTool} `))
       expect(listed).toBe(0)
-    }).pipe(Effect.provide(layer))
+    }).pipe(Effect.provide(layerFor({ exec, ctx: quietContext })))
+  })
+
+  it.effect('shares one round across the polls of a window and folds the Session list only after its own TTL', () => {
+    const calls: string[] = []
+    let listed = 0
+    const context = contextOf({
+      list: oneSession,
+      onList: () => {
+        listed += 1
+      },
+    })
+    const rounds = () => calls.filter(call => call.startsWith(`${socketTool} `) && !call.includes('-d cwd')).length
+    return Effect.gen(function* () {
+      const servers = yield* PreviewDevServers
+      yield* servers.read(false)
+      yield* servers.read(false)
+      yield* servers.read(false)
+      // Three thread polls inside the round TTL are one `lsof`/`ps` round and one Session fold.
+      expect(rounds()).toBe(1)
+      expect(listed).toBe(1)
+
+      yield* TestClock.adjust('9 seconds')
+      yield* servers.read(false)
+      expect(rounds()).toBe(2)
+      // Session directories change when a thread moves, not every poll: the fold outlives several rounds.
+      expect(listed).toBe(1)
+
+      yield* TestClock.adjust('5 minutes')
+      yield* servers.read(false)
+      expect(listed).toBe(2)
+    }).pipe(Effect.provide(layerFor({ exec: fakeExec(calls), ctx: context })))
+  })
+
+  it.effect('costs one probe round per window and a handful of Session folds for four open threads over 30 idle minutes', () => {
+    const calls: string[] = []
+    let listed = 0
+    const context = contextOf({
+      list: oneSession,
+      onList: () => {
+        listed += 1
+      },
+    })
+    const rounds = () => calls.filter(call => call.startsWith(`${socketTool} `) && !call.includes('-d cwd')).length
+    const offsets = [0, 2_500, 5_000, 7_500]
+    return Effect.gen(function* () {
+      const servers = yield* PreviewDevServers
+      // Four open threads poll every 10 s, a quarter window apart; each thread's poll is a read of the same round.
+      for (let elapsed = 0; elapsed < 1_800_000; elapsed += 2_500) {
+        if (elapsed > 0) yield* TestClock.adjust(Duration.millis(2_500))
+        for (const offset of offsets) {
+          if (elapsed >= offset && (elapsed - offset) % 10_000 === 0) yield* servers.read(false)
+        }
+      }
+      // 720 thread polls in 30 minutes; a 9 s round is one per 10 s poll window, not one per thread.
+      expect(rounds()).toBe(180)
+      expect(listed).toBe(6)
+    }).pipe(Effect.provide(layerFor({ exec: fakeExec(calls), ctx: context })))
+  })
+
+  it.effect('keeps the listener list when the Session fold fails, then attributes again with the next one', () => {
+    const calls: string[] = []
+    let failing = true
+    const context = contextOf({
+      list: async () => {
+        if (failing) throw new Error('session controller timed out')
+        return oneSession()
+      },
+      onList: () => undefined,
+    })
+    return Effect.gen(function* () {
+      const servers = yield* PreviewDevServers
+      const unattributed = yield* servers.read(false)
+      expect(unattributed.supported).toBe(true)
+      expect(unattributed.servers).toEqual([])
+
+      failing = false
+      yield* TestClock.adjust('9 seconds')
+      const attributed = yield* servers.read(false)
+      expect(attributed.servers.map(server => server.sessionIds)).toEqual([['session-b']])
+      expect(calls.length).toBeGreaterThan(0)
+    }).pipe(Effect.provide(layerFor({ exec: fakeExec(calls), ctx: context })))
   })
 })

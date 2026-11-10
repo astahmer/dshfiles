@@ -1,6 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ClientSessions } from '../src/native/client/sessions/service.ts'
 import { Session } from '../src/native/client/sessions/session.ts'
@@ -83,6 +84,27 @@ afterEach(async () => {
 })
 
 describe('local view readiness and operation retention', () => {
+  it('opens the same session held by an unsubscribed retained scope', async () => {
+    const opened: Session[] = []
+    vi.spyOn(Session.prototype, 'open').mockImplementation(function (this: Session) {
+      opened.push(this)
+      return Promise.resolve()
+    })
+    const { sessions } = fixture()
+    const ids = Array.from({ length: 5 }, (_, index) => SessionId(`session-retained-${index}`))
+    for (const sessionId of ids) {
+      sessions.handleSessionAdded({ sessionId, agentAvailable: false, updatedAt: 0, running: false, blank: false })
+    }
+    const references = ids.map(id => sessions.retainAgentScope(id))
+    const first = references[0]!
+    const view = sessions.retain(ids[0]!, { source: 'mainView' })
+    expect(view.binding.session).toBe(first.binding.session)
+    expect(opened[0] === first.binding.session).toBe(true)
+    await expect(view.ready).resolves.toBe(first.binding)
+    view.release()
+    for (const reference of references) reference.release()
+  })
+
   it('resolves local presentation synchronously even when both views release in the same turn', async () => {
     const { sessions, remote, stream } = fixture()
     const handle = sessions.drafts.create(options)
@@ -163,5 +185,55 @@ describe('local view readiness and operation retention', () => {
     await ctx.fiber.dispose()
     await rejected
     await expect(handle.settled).rejects.toThrow('disposed')
+  })
+})
+
+describe('released session generations', () => {
+  it('keeps the last three released threads open for a switch back and retires older ones', () => {
+    const opened: Session[] = []
+    vi.spyOn(Session.prototype, 'open').mockImplementation(function (this: Session) {
+      opened.push(this)
+      return Promise.resolve()
+    })
+    const { sessions } = fixture()
+    const ids = Array.from({ length: 5 }, (_, index) => SessionId(`session-switched-${index}`))
+    for (const sessionId of ids) sessions.handleSessionAdded({ sessionId, agentAvailable: false, updatedAt: 0, running: false, blank: false })
+    const firstView = sessions.retain(ids[0]!, { source: 'mainView' })
+    const firstSession = firstView.binding.session
+    firstView.release()
+    expect(sessions.retainInfo(ids[0]!).getSnapshot().referenceCount).toBe(0)
+    expect(sessions.list.getSnapshot().byId[ids[0]!]?.retainedBy.mainView).toBeUndefined()
+    const again = sessions.retain(ids[0]!, { source: 'mainView' })
+    expect(again.binding.session).toBe(firstSession)
+    again.release()
+    for (const id of ids.slice(1)) sessions.retain(id, { source: 'mainView' }).release()
+    expect(sessions.binding(ids[0]!)).toBeUndefined()
+    expect(sessions.binding(ids[1]!)).toBeUndefined()
+    expect(ids.slice(2).every(id => sessions.binding(id) !== undefined)).toBe(true)
+    expect(sessions.retain(ids[0]!, { source: 'mainView' }).binding.session).not.toBe(firstSession)
+  })
+
+  it('publishes one list change for a switch that retains and releases several sources', async () => {
+    vi.spyOn(Session.prototype, 'open').mockImplementation(() => Promise.resolve())
+    const { sessions } = fixture()
+    const [from, to] = [SessionId('session-switch-from'), SessionId('session-switch-to')]
+    for (const sessionId of [from, to]) sessions.handleSessionAdded({ sessionId, agentAvailable: false, updatedAt: 0, running: false, blank: false })
+    const main = sessions.retain(from, { source: 'mainView' })
+    const side = sessions.retain(from, { source: 'sidebarView' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    let publications = 0
+    const stop = sessions.list.subscribe(() => {
+      publications += 1
+    })
+    sessions.retain(to, { source: 'mainView' })
+    main.release()
+    sessions.retain(to, { source: 'sidebarView' })
+    side.release()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    stop()
+
+    expect(publications).toBe(1)
+    expect(sessions.list.getSnapshot().byId[to]?.retainedBy).toEqual({ mainView: 1, sidebarView: 1 })
+    expect(sessions.list.getSnapshot().byId[from]?.retainedBy).toEqual({})
   })
 })

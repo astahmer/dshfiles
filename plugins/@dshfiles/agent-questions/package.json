@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@dshfiles/activity-timeline": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },
@@ -73,7 +74,10 @@
       "inject": [
         "@deepseek-ai/dsh-client-connection"
       ],
-      "locales": []
+      "locales": [],
+      "external": [
+        "@dshfiles/shared-runtime"
+      ]
     }
   },
   "dshx": {

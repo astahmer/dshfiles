@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Deferred, Effect, Fiber } from 'effect'
 import type { CleanupResult } from './api.js'
-import type { CleanupJobRequest } from './cleanup-jobs.js'
+import type { CleanupJobRequest, CleanupJobView } from './cleanup-jobs.js'
 import { CleanupRunner } from './cleanup-runner.js'
 
 const request: CleanupJobRequest = { path: '/work/sample', olderThanHours: 6, kinds: ['empty', 'integrated'], trigger: 'manual' }
@@ -112,6 +112,38 @@ describe('CleanupRunner', () => {
       yield* Fiber.join(waiting)
       expect(yield* runner.live).toBeUndefined()
       expect((yield* runner.trail)[0]).toMatchObject({ state: 'done', progress: { total: 3, removed: 1, current: null } })
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('hands a failed job, linked to the repository its scan traced, to the settle hook with its recovery', () =>
+    Effect.gen(function* () {
+      const settled: CleanupJobView[] = []
+      const runner = yield* CleanupRunner.make({
+        onSettled: job => Effect.sync(() => settled.push(job)),
+        execute: ({ report }) =>
+          Effect.gen(function* () {
+            yield* report.scoped('/work/sample')
+            return yield* Effect.fail(new RemovalFailed('jj workspace forget exited 1'))
+          }),
+      })
+      // Asked from an isolated thread workspace: the start cannot name the project yet, the scan does.
+      const started = yield* runner.start({ ...request, path: '/work/sample-threads/thread-aaaaaa' })
+      yield* Effect.flip(started.done)
+      expect(settled).toHaveLength(1)
+      expect(settled[0]).toMatchObject({ state: 'failed', repoRoot: '/work/sample', error: 'jj workspace forget exited 1' })
+      expect(settled[0]?.recovery).toContain('the sample Jujutsu panel')
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('keeps the repository the start traced and still settles when the settle hook fails', () =>
+    Effect.gen(function* () {
+      const runner = yield* CleanupRunner.make({
+        onSettled: () => Effect.die(new Error('activity timeline unavailable')),
+        execute: ({ report }) => Effect.as(report.scoped('/elsewhere'), result(0)),
+      })
+      const started = yield* runner.start(request, '/work/sample')
+      expect(yield* started.done).toEqual(result(0))
+      expect((yield* runner.trail)[0]).toMatchObject({ state: 'done', repoRoot: '/work/sample', recovery: null })
     }).pipe(Effect.scoped),
   )
 })

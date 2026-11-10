@@ -34,10 +34,9 @@ const cleanupForbidden = new PluginApiError(
   'Permanent global cleanup requires a root conversation with Full access. Use the owner’s Conversation cleanup settings instead; do not elevate permissions automatically.',
   { code: 'cleanup-forbidden' },
 )
-const previewExpired = new PluginApiError(
-  'This preview expired, was already used, or belongs to a previous Host. Generate a new preview before deleting.',
-  { code: 'stale-preview' },
-)
+const previewExpired = new PluginApiError('This preview expired, was already used, or belongs to a previous Host. Generate a new preview before deleting.', {
+  code: 'stale-preview',
+})
 const storageChanged = new PluginApiError('Session storage changed since the preview. Generate a new preview.', { code: 'stale-backend' })
 
 type Storage = { readonly root: string; readonly identity: symbol }
@@ -80,8 +79,7 @@ const makeCleanup = Effect.gen(function* () {
 
   const readFlags = Effect.fn('conversation cleanup flags')(function* () {
     const descriptor = ctx.settings.describe().find(item => item.ns === 'thread-sidebar')
-    const sidebar =
-      descriptor === undefined ? undefined : yield* decodeSidebarSettings(descriptor.value).pipe(Effect.mapError(() => lifecycleUnavailable))
+    const sidebar = descriptor === undefined ? undefined : yield* decodeSidebarSettings(descriptor.value).pipe(Effect.mapError(() => lifecycleUnavailable))
     const archived = new Set<string>(ctx.workspaceRegistry.archivedSessionIds)
     const settled = new Set(sidebar?.settledSessionIds ?? [])
     return { archived, settled, isCandidate: (sessionId: string) => archived.has(sessionId) || settled.has(sessionId) }
@@ -171,11 +169,9 @@ const makeCleanup = Effect.gen(function* () {
         if (Option.isNone(acquired)) return failed('Session storage is locked by another writer. Finish that writer, then preview again.')
         const writer = acquired.value
         const locked = yield* storageCall(signal => ctx.sessionPersistence.stat(sessionId, { signal }))
-        if (yield* hasActivity(sessionId))
-          return skipped('Session acquired background activity. Finish its jobs or remove its schedules, then preview again.')
+        if (yield* hasActivity(sessionId)) return skipped('Session acquired background activity. Finish its jobs or remove its schedules, then preview again.')
         const latest = yield* readFlags()
-        if (attached(sessionId) || !latest.isCandidate(sessionId))
-          return skipped('Session became loaded or its lifecycle changed. Generate a fresh preview.')
+        if (attached(sessionId) || !latest.isCandidate(sessionId)) return skipped('Session became loaded or its lifecycle changed. Generate a fresh preview.')
         if (locked?.revision !== input.snapshot.revision || writer.header.id !== sessionId || writer.header.cwd !== input.snapshot.header.cwd)
           return skipped('Session changed while acquiring its write lock. Generate a fresh preview.')
         yield* authorize(input.caller)
@@ -194,7 +190,9 @@ const makeCleanup = Effect.gen(function* () {
       Effect.catchDefect(defect =>
         Effect.logWarning('Conversation cleanup failed; inspect this session before retrying.', { sessionId, defect }).pipe(
           Effect.as(
-            failed('Deletion did not complete. Inspect Host storage diagnostics, then generate a fresh preview. Historical generations may already have been removed.'),
+            failed(
+              'Deletion did not complete. Inspect Host storage diagnostics, then generate a fresh preview. Historical generations may already have been removed.',
+            ),
           ),
         ),
       ),
@@ -215,11 +213,7 @@ const makeCleanup = Effect.gen(function* () {
     if (plan === undefined || plan.preview.expiresAt <= now) return yield* Effect.fail(previewExpired)
     const storage = yield* backend()
     if (!sameStorage(plan.storage, storage)) return yield* Effect.fail(storageChanged)
-    const results = yield* Effect.forEach(
-      plan.snapshots,
-      snapshot => purgeSnapshot({ snapshot, storage, caller: input.caller }),
-      { concurrency: 1 },
-    )
+    const results = yield* Effect.forEach(plan.snapshots, snapshot => purgeSnapshot({ snapshot, storage, caller: input.caller }), { concurrency: 1 })
     return { results }
   })
 

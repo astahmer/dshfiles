@@ -15,9 +15,15 @@ export interface EditorSaveClient {
   readonly write: (request: EditorSaveRequest, overwrite: boolean, signal: AbortSignal) => Promise<EditorWriteOutput>
 }
 
+export interface EditorDiscardRequest {
+  readonly documentId: string
+  readonly path: string
+}
+
 interface EditorSaveContext {
   readonly activeDocumentId: string | null
   readonly approved: ReadonlySet<string>
+  readonly discard: EditorDiscardRequest | null
   readonly operationId: number
   readonly pending: EditorSaveRequest | null
   readonly overwrite: boolean
@@ -26,6 +32,11 @@ interface EditorSaveContext {
 
 interface EditorSaveEvent {
   readonly type: 'approve' | 'overwrite' | 'cancel'
+}
+
+interface EditorDiscardRequestEvent {
+  readonly type: 'discard.request'
+  readonly document: EditorDiscardRequest
 }
 
 interface EditorSaveRequestEvent {
@@ -38,7 +49,7 @@ interface EditorDocumentChangedEvent {
   readonly documentId: string | null
 }
 
-type EditorSaveMachineEvent = EditorSaveEvent | EditorSaveRequestEvent | EditorDocumentChangedEvent
+type EditorSaveMachineEvent = EditorSaveEvent | EditorSaveRequestEvent | EditorDocumentChangedEvent | EditorDiscardRequestEvent
 
 type EditorSaveResult =
   | { readonly operationId: number; readonly documentId: string; readonly bufferVersion: number; readonly status: 'saved'; readonly sha256: string }
@@ -95,6 +106,8 @@ export const editorSaveMachine = setup({
     alreadyApprovedAndActive: ({ context, event }) =>
       event.type === 'save.request' && event.request.documentId === context.activeDocumentId && context.approved.has(event.request.documentId),
     belongsToActiveDocument: ({ context, event }) => event.type === 'save.request' && event.request.documentId === context.activeDocumentId,
+    anotherDocument: ({ context, event }) => event.type === 'document.changed' && event.documentId !== context.activeDocumentId,
+    discardRequested: ({ context }) => context.discard !== null,
   },
   actions: {
     updateActiveDocument: assign(({ event }) => (event.type === 'document.changed' ? { activeDocumentId: event.documentId } : {})),
@@ -102,6 +115,7 @@ export const editorSaveMachine = setup({
       event.type === 'document.changed'
         ? {
             activeDocumentId: event.documentId,
+            discard: null,
             operationId: context.operationId + 1,
             pending: null,
             overwrite: false,
@@ -109,6 +123,8 @@ export const editorSaveMachine = setup({
           }
         : {},
     ),
+    requestDiscard: assign(({ event }) => (event.type === 'discard.request' ? { discard: event.document } : {})),
+    clearDiscard: assign(() => ({ discard: null })),
     beginSave: assign(({ context, event }) =>
       event.type === 'save.request' ? { operationId: context.operationId + 1, pending: event.request, overwrite: false, failure: null } : {},
     ),
@@ -120,9 +136,11 @@ export const editorSaveMachine = setup({
 }).createMachine({
   id: 'editorSave',
   initial: 'idle',
-  context: { activeDocumentId: null, approved: new Set(), operationId: 0, pending: null, overwrite: false, failure: null },
+  context: { activeDocumentId: null, approved: new Set(), discard: null, operationId: 0, pending: null, overwrite: false, failure: null },
+  on: { 'discard.request': { actions: 'requestDiscard' } },
   states: {
     idle: {
+      always: { guard: 'discardRequested', target: 'discard' },
       on: {
         'document.changed': { actions: 'updateActiveDocument' },
         'save.request': [
@@ -135,6 +153,12 @@ export const editorSaveMachine = setup({
       on: {
         approve: { target: 'writing', actions: 'grantApproval' },
         cancel: { target: 'idle', actions: 'clearPending' },
+        'document.changed': { target: 'idle', actions: 'changeActiveDocument' },
+      },
+    },
+    discard: {
+      on: {
+        cancel: { target: 'idle', actions: 'clearDiscard' },
         'document.changed': { target: 'idle', actions: 'changeActiveDocument' },
       },
     },
@@ -179,7 +203,7 @@ export const editorSaveMachine = setup({
         ],
         onError: { target: 'failed', actions: 'recordUnexpectedFailure' },
       },
-      on: { 'document.changed': { target: 'idle', actions: 'changeActiveDocument' } },
+      on: { 'document.changed': { guard: 'anotherDocument', target: 'idle', actions: 'changeActiveDocument' } },
     },
     conflict: {
       on: {
@@ -189,6 +213,7 @@ export const editorSaveMachine = setup({
       },
     },
     failed: {
+      always: { guard: 'discardRequested', target: 'discard' },
       on: {
         'save.request': [
           { guard: 'alreadyApprovedAndActive', target: 'writing', actions: 'beginSave' },

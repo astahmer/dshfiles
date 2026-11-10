@@ -42,8 +42,9 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   the block a new thread in a folder would get (the Agent toolkit page shows it). Other plugins import the contract from
   `@dshfiles/memory/api`.
 - **Citations as usage.** The block asks agents to cite memory they used as `memory: <id>`. A citation marks the tool
-  call that returned the id as used and ranks the cited item higher in later blocks. In conversation replies, citations
-  are clickable links that open a compact, scrollable inline preview of the note, digest or bounded message excerpt, with an
+  call that returned the id as used and ranks the cited item higher in later blocks. In conversation replies a citation
+  is a chip in an answer and in a sent message alike; hovering it (or clicking it) opens a compact, scrollable inline
+  preview of the note, digest or bounded message excerpt, with an
   **Open in Memory** button that takes the same item to the Memory page (notes open their detail, digests open their
   row). The whole `memory: <id>` token carries the link, and the preview uses the `preview` API method, which does not
   create a synthetic memory-tool usage record.

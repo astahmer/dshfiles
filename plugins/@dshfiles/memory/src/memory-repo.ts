@@ -26,6 +26,13 @@ export type StoredThread = ThreadDigest & {
   readonly lastUsedAt: number | null
 }
 
+/** What the thread finder needs from a digest: no body, so a whole Session list is one cheap query. */
+export type ThreadSummary = {
+  readonly id: string
+  readonly title: string
+  readonly updatedAt: number
+}
+
 /** Claude Code's memory types: who the user is, feedback on the agent's work, project context, external pointers. */
 export type NoteCategory = 'user' | 'feedback' | 'project' | 'reference'
 
@@ -290,6 +297,7 @@ const NoteRow = Schema.Struct({
 const Nullable = <S extends Schema.Top>(schema: S) => Schema.optionalKey(Schema.NullOr(schema))
 
 const decodeThreads = Schema.decodeUnknownEffect(Schema.Array(ThreadRow))
+const decodeThreadSummaries = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String, title: Schema.String, updated_at: Schema.Number })))
 const decodeNotes = Schema.decodeUnknownEffect(Schema.Array(NoteRow))
 const decodeIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.Number })))
 const decodeTextIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.String })))
@@ -496,6 +504,7 @@ export class MemoryRepo extends Context.Service<
     readonly version: Effect.Effect<number>
     readonly putThread: (digest: ThreadDigest) => Effect.Effect<'new' | 'updated' | 'unchanged' | 'duplicate', StoreError>
     readonly thread: (id: string) => Effect.Effect<StoredThread | undefined, StoreError>
+    readonly threadsByIds: (ids: readonly string[]) => Effect.Effect<readonly ThreadSummary[], StoreError>
     readonly blockThreads: (input: {
       readonly projects?: readonly string[]
       readonly excludeProjects?: readonly string[]
@@ -865,6 +874,14 @@ export class MemoryRepo extends Context.Service<
           `session-${id.replace(/^session-/, '')}%`,
         ])
         return row === undefined ? undefined : threadOf(row)
+      }, storeFailure)
+
+      const threadsByIds = Effect.fn('memory repo threads by ids')(function* (ids: readonly string[]) {
+        if (ids.length === 0) return []
+        const found = yield* rows(decodeThreadSummaries, 'select id, title, updated_at from threads where id in (select value from json_each(?))', [
+          JSON.stringify(ids),
+        ])
+        return found.map((row): ThreadSummary => ({ id: row.id, title: row.title, updatedAt: row.updated_at }))
       }, storeFailure)
 
       /**
@@ -1586,6 +1603,7 @@ export class MemoryRepo extends Context.Service<
         version: Ref.get(version),
         putThread,
         thread,
+        threadsByIds,
         blockThreads,
         addNote,
         note,

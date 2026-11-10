@@ -12,7 +12,7 @@ DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the n
 
 ## Use
 
-Settings is **one page in the stage** (plan [`plans/ade-ux`](../../../plans/ade-ux/README.md) §4.6).
+Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux/README.md) §4.6).
 
 - **Open**: the rail's **Settings**, the sidebar gear, `Mod+,` (Desktop) / `Mod+Alt+,` (Web), the command palette
   (_Open Settings_, or _Settings: <entry>_ for each entry), or another plugin (below). Every one of them opens the same

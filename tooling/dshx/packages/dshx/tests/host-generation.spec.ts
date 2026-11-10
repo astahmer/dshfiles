@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { HOST_GENERATION_DIRECTORY, HOST_GENERATION_MANIFEST } from '../src/host/generation-contract.js'
 import { createHostGenerationPlugin } from '../src/host/generation.js'
 import type { CreatedHostPlugin } from '../src/host/runtime.js'
+import type { JsonValue } from '../src/json.js'
 
 const temporaryDirectories: string[] = []
 
@@ -81,7 +82,7 @@ const startGeneration = async (options: { readonly generation: string; readonly 
     manifestUrl,
   })
   const root = new Context()
-  const fiber = root.plugin({ name: 'generation-manager', apply: (ctx: Context, config?: unknown) => manager.apply(ctx, config) })
+  const fiber = root.plugin({ name: 'generation-manager', apply: (ctx: Context, config?: JsonValue) => manager.apply(ctx, config) })
   await fiber
   return { fiber, events, publish }
 }

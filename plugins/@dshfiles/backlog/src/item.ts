@@ -223,9 +223,14 @@ const kindPrefixes = new Map<string, BacklogKind>([
   ['question', 'question'],
 ])
 
+const sessionIdPattern = /^(?:session-)?[0-9a-f]{6,}(?:-[0-9a-f]+)*$/iu
+
+/** A DSH thread target is a session id, never a word from prose (`session-controller` is a package, not a thread). */
+const isSessionId = (target: string): boolean => sessionIdPattern.test(target)
+
 const linkPatterns: readonly { readonly type: BacklogLink['type']; readonly pattern: RegExp }[] = [
   { type: 'revision', pattern: /(?<![\w/])jj:([\w.@/-]+[\w])/g },
-  { type: 'thread', pattern: /(?<![\w/-])(session-[\w-]{6,})/g },
+  { type: 'thread', pattern: /(?<![\w/-])(session-[0-9a-f]{6,}(?:-[0-9a-f]+)*)/giu },
   { type: 'branch', pattern: /(?<![\w/])branch:([\w./-]+[\w])/g },
   { type: 'workspace', pattern: /(?<![\w/])workspace:([^\s)]+)/g },
   { type: 'url', pattern: /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g },
@@ -310,8 +315,8 @@ const THREADS_DIRECTORY_SUFFIX = '-threads'
  * from, so the workspace path is folded to its repository and never listed as a project of its own.
  */
 const projectPath = (path: string): string => {
-  const normalized = path.replace(/\/+$/u, '')
-  const separator = normalized.lastIndexOf('/')
+  const normalized = path.replace(/[\\/]+$/u, '')
+  const separator = Math.max(normalized.lastIndexOf('/'), normalized.lastIndexOf('\\'))
   if (separator < 0) return normalized
   const parent = normalized.slice(0, separator)
   if (parent.length <= THREADS_DIRECTORY_SUFFIX.length || !parent.endsWith(THREADS_DIRECTORY_SUFFIX)) return normalized
@@ -454,6 +459,7 @@ export class BacklogItems {
   static readonly extractLinks = extractLinks
   static readonly extractTags = extractTags
   static readonly uniqueLinks = uniqueLinks
+  static readonly isSessionId = isSessionId
   static readonly sameLink = sameLink
   static readonly projectPath = projectPath
   static readonly projectOf = projectOf

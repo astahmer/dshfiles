@@ -23,10 +23,10 @@ describe('editor engine loader machine', () => {
     const loadEngine = vi.fn(async () => engine)
     const actor = createActor(editorEngineLoaderMachine, { input: { loadEngine } }).start()
 
-    actor.send({ type: 'activate' })
+    actor.send({ type: 'editable.changed', editable: true })
     await waitFor(actor, snapshot => snapshot.matches('ready'))
-    actor.send({ type: 'deactivate' })
-    actor.send({ type: 'activate' })
+    actor.send({ type: 'editable.changed', editable: false })
+    actor.send({ type: 'editable.changed', editable: true })
 
     expect(loadEngine).toHaveBeenCalledOnce()
     expect(actor.getSnapshot().matches('ready')).toBe(true)
@@ -39,9 +39,9 @@ describe('editor engine loader machine', () => {
     const loadEngine = vi.fn(() => request.promise)
     const actor = createActor(editorEngineLoaderMachine, { input: { loadEngine } }).start()
 
-    actor.send({ type: 'activate' })
+    actor.send({ type: 'editable.changed', editable: true })
     expect(actor.getSnapshot().matches('loading')).toBe(true)
-    actor.send({ type: 'deactivate' })
+    actor.send({ type: 'editable.changed', editable: false })
     request.resolve(engine)
     await Promise.resolve()
 
@@ -59,10 +59,10 @@ describe('editor engine loader machine', () => {
     })
     const actor = createActor(editorEngineLoaderMachine, { input: { loadEngine } }).start()
 
-    actor.send({ type: 'activate' })
+    actor.send({ type: 'editable.changed', editable: true })
     await waitFor(actor, snapshot => snapshot.matches('error'))
-    actor.send({ type: 'deactivate' })
-    actor.send({ type: 'activate' })
+    actor.send({ type: 'editable.changed', editable: false })
+    actor.send({ type: 'editable.changed', editable: true })
     await waitFor(actor, snapshot => snapshot.matches('ready'))
 
     expect(loadEngine).toHaveBeenCalledTimes(2)
@@ -70,16 +70,32 @@ describe('editor engine loader machine', () => {
     actor.stop()
   })
 
+  it('records the load start so the panel can report the first open', async () => {
+    const request = deferred<CodeEditorEngine>()
+    const loadEngine = vi.fn(() => request.promise)
+    const actor = createActor(editorEngineLoaderMachine, { input: { loadEngine } }).start()
+
+    expect(actor.getSnapshot().context.loadStartedAt).toBeNull()
+    actor.send({ type: 'editable.changed', editable: true })
+    expect(actor.getSnapshot().matches('loading')).toBe(true)
+    expect(actor.getSnapshot().context.loadStartedAt).toEqual(expect.any(Number))
+    request.resolve(engine)
+    await waitFor(actor, snapshot => snapshot.matches('ready'))
+
+    expect(actor.getSnapshot().context.loadStartedAt).toEqual(expect.any(Number))
+    actor.stop()
+  })
+
   it('recovers from an editor surface creation failure after deactivation', async () => {
     const loadEngine = vi.fn(async () => engine)
     const actor = createActor(editorEngineLoaderMachine, { input: { loadEngine } }).start()
 
-    actor.send({ type: 'activate' })
+    actor.send({ type: 'editable.changed', editable: true })
     await waitFor(actor, snapshot => snapshot.matches('ready'))
     actor.send({ type: 'create.failed' })
     expect(actor.getSnapshot().matches('error')).toBe(true)
-    actor.send({ type: 'deactivate' })
-    actor.send({ type: 'activate' })
+    actor.send({ type: 'editable.changed', editable: false })
+    actor.send({ type: 'editable.changed', editable: true })
     await waitFor(actor, snapshot => snapshot.matches('ready'))
 
     expect(loadEngine).toHaveBeenCalledTimes(2)

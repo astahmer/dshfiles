@@ -28,7 +28,7 @@ const withoutPluginPrefix = (label: string): string => {
 }
 
 /**
- * Every name a view's tab or pane may carry (plans/ade-ux Phase 3b): tab titles drop the "Plugin: View" prefix and use
+ * Every name a view's tab or pane may carry (docs/ade-ux Phase 3b): tab titles drop the "Plugin: View" prefix and use
  * the rail section label when main-tabs supplies it, while compositions without it keep the navigation label minus its
  * prefix. Matches the qualified name too, for pane registrations that keep their own title.
  */
@@ -65,7 +65,7 @@ const moreDestinationsButton = (page: Page): Locator =>
     .first()
 
 /**
- * Where each former left-nav page lives in the thread sidebar's fixed rail (plans/ade-ux Phase 3a): destination tab,
+ * Where each former left-nav page lives in the thread sidebar's fixed rail (docs/ade-ux Phase 3a): destination tab,
  * then section. Mirrors KNOWN_SECTIONS in @dshfiles/thread-sidebar/destinations; the sidebar's own test pins those.
  */
 const railLocations = new Map<string, { readonly destination: string; readonly section: string }>([
@@ -98,7 +98,7 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Messages', { destination: 'Agents', section: 'Messages' }],
   ['Memory', { destination: 'Knowledge', section: 'Memory' }],
   ['Secrets', { destination: 'Settings', section: 'Secrets' }],
-  // Plain labels the page-kit migration (plans/ade-ux Phase 1b) gave these pages.
+  // Plain labels the page-kit migration (docs/ade-ux Phase 1b) gave these pages.
   ['Review', { destination: 'Land', section: 'Review' }],
   ['Backlog', { destination: 'Work', section: 'Backlog' }],
   ['Land', { destination: 'Land', section: 'Workspaces' }],
@@ -111,7 +111,7 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
 ])
 
 /**
- * Pages merged into another page in Phase 5 (plans/ade-ux §6): Usage took Quota history and forecast as views of its
+ * Pages merged into another page in Phase 5 (docs/ade-ux §6): Usage took Quota history and forecast as views of its
  * Quota tab; Processes took RAM as a tab. Each lists where the page is when the merged page's owner runs, then where it
  * stays without it (compositions that leave usage or background-jobs out keep the standalone page).
  */

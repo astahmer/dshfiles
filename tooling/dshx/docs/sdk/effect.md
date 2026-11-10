@@ -73,13 +73,24 @@ export default DshxPlugin.make({
 })
 ```
 
-### `DshxPlugin.make({ name, inject?, Config?, settings?, layer, main?, apis?, tools? })`
+### `DshxPlugin.make({ name, inject?, Config?, settings?, layer, main?, apis?, tools?, lazy? })`
 
 Returns a `defineHost` definition: default-export it. On activation it builds
 `Layer.provideMerge(layer, Layer.mergeAll(HostContext.layer, tracerLayer))` with `Layer.buildWithScope` into one
 `Scope`, so the dshx tracer also covers layer construction. `layer` may be a function of the decoded `Config` (an
 Effect Schema, validated by the Loader and decoded again here). `main` is forked into the Scope after the build and
 interrupted on unload. The Cordis disposer closes the Scope; finalizers run in reverse order.
+
+`lazy: true` (opt-in, default off) keeps that static surface — tools, API contracts, settings and prompt contributions
+still register at activation — but builds `layer` and starts `main` on the first API or tool call instead. Use it only
+for a plugin whose boot-time side effects are optional: until that first call the plugin subscribes to nothing, indexes
+nothing and provides no Cordis service another row needs, because a layer that never builds cannot. `Config` is still
+decoded at activation, so an invalid row config fails the row at boot. The first call pays the build; its
+`plugin activate` span carries `dshx.plugin.lazy: true` and is nested under the call that triggered it. A build failure
+refuses that call and every later one with an API error whose `remoteCode` is `plugin-inactive` (tools answer with the
+same message), and the Host log carries the `PluginActivationError` cause. Unloading before the build finishes
+interrupts it and refuses the calls that were waiting. v1 has no unload-on-idle: once built, a lazy plugin stays built
+until its row unloads.
 
 A failing build closes the Scope, logs `Cause.pretty` under `dshx:plugin` and rejects activation with a
 `PluginActivationError` whose `cause` is the Cause. The type checker refuses handlers, tools and a `main` that need a

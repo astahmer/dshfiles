@@ -84,6 +84,36 @@ describe('Host API events', () => {
     expect(await next()).toBeUndefined()
   })
 
+  it('drops events instead of buffering without bound for a browser that stops reading', async () => {
+    const fixture = hostFixture()
+    const bigApi = defineApi({
+      id: 'big',
+      version: 1,
+      owner: '@acme/big',
+      methods: {},
+      events: { changed: event({ schema: Schema.Struct({ text: Schema.String }), description: 'A large payload.' }) },
+    })
+    await registerApi(fixture.context as never, '@acme/big', bigApi.host({}))
+    await vi.waitFor(() => expect(fixture.routes.has(ApiChannelModel.eventsPath)).toBe(true))
+    const controller = new AbortController()
+    const response = await fixture.routes.get(ApiChannelModel.eventsPath)!.fetch(new Request('http://localhost/api/dshx-events', { signal: controller.signal }))
+    const reader = response.body!.getReader()
+    // The catalog frame is read; from here the browser stops reading while events keep arriving.
+    await reader.read()
+    const text = 'x'.repeat(100_000)
+    for (let index = 0; index < 40; index += 1) await HostApiEventsModel.publish(fixture.context as never, bigApi, 'changed', { text })
+    let received = 0
+    for (;;) {
+      const next = await Promise.race([reader.read(), new Promise<'idle'>(resolve => setTimeout(() => resolve('idle'), 250))])
+      if (next === 'idle' || next.done === true) break
+      received += next.value.byteLength
+      if (received > 4_000_000) break
+    }
+    controller.abort()
+    // 40 x 100 KB would be 4 MB buffered; the byte budget keeps roughly one window instead.
+    expect(received).toBeLessThan(2_500_000)
+  })
+
   it('rejects a payload its schema refuses, and an event the contract does not declare', async () => {
     const fixture = hostFixture()
     await registerApi(fixture.context as never, '@acme/jobs', jobsApi.host({ board: () => ({ rows: 0 }) }))
@@ -122,6 +152,31 @@ class FakeEventSource {
 }
 
 const browserClient = () => ApiRuntimeModel.createClient({ get: () => ({ rpc: { call: vi.fn() } }) }, jobsApi, '@acme/viewer')
+
+/** A client whose Host generation can go away and come back, like a restarted leader. */
+const reconnectingClient = () => {
+  const listeners = new Set<() => void>()
+  let description: { readonly version: string } | undefined
+  const hostDescription = {
+    getSnapshot: () => description,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+  }
+  const client = ApiRuntimeModel.createClient(
+    { get: (name: string) => (name === 'connection' ? { rpc: { call: vi.fn() }, hostDescription } : undefined) },
+    jobsApi,
+    '@acme/viewer',
+  )
+  return {
+    client,
+    restoreConnection: () => {
+      description = { version: '2' }
+      for (const listener of listeners) listener()
+    },
+  }
+}
 
 const subscribe = () => {
   const statuses: ApiEventStatus[] = []
@@ -191,5 +246,39 @@ describe('browser API events', () => {
     const unsubscribe = ApiClientEventsModel.subscribe(browserClient(), 'changed', { onEvent: () => undefined, onStatus: status => statuses.push(status) })
     expect(statuses).toEqual(['unavailable'])
     unsubscribe()
+  })
+
+  it('reopens the missing stream once the Host connection is restored', () => {
+    vi.stubGlobal('EventSource', undefined)
+    const fixture = reconnectingClient()
+    const statuses: ApiEventStatus[] = []
+    const unsubscribe = ApiClientEventsModel.subscribe(fixture.client, 'changed', { onEvent: () => undefined, onStatus: status => statuses.push(status) })
+    expect(statuses).toEqual(['unavailable'])
+    expect(FakeEventSource.instances).toHaveLength(0)
+
+    vi.stubGlobal('EventSource', FakeEventSource)
+    fixture.restoreConnection()
+    expect(FakeEventSource.instances).toHaveLength(1)
+    expect(statuses).toEqual(['unavailable', 'connecting'])
+    FakeEventSource.instances[0]!.send({ type: 'catalog', events: [key] })
+    expect(statuses).toEqual(['unavailable', 'connecting', 'live'])
+    unsubscribe()
+  })
+
+  it('does not let a closed stream revive the hub after a new one opened', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource)
+    const first = subscribe()
+    const stale = first.source
+    first.unsubscribe()
+    expect(stale.close).toHaveBeenCalledOnce()
+
+    const second = subscribe()
+    expect(second.statuses).toEqual(['connecting'])
+    stale.send({ type: 'catalog', events: [key] })
+    stale.send({ type: 'event', key, version: 2, data: { running: 7 } })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(second.statuses).toEqual(['connecting'])
+    expect(second.payloads).toEqual([])
+    second.unsubscribe()
   })
 })

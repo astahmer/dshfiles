@@ -26,6 +26,10 @@ const sameDraft = (left: ComposerState, right: ComposerState): boolean =>
   left.attachmentIds.length === right.attachmentIds.length &&
   left.attachmentIds.every((id, index) => right.attachmentIds[index] === id)
 
+/** The Host's own words when it refused the destination: sending again cannot help, and they say what will. */
+const destinationRefusal = (error: unknown): string | undefined =>
+  error instanceof Error && 'remoteCode' in error && error.remoteCode === 'destination-rejected' ? error.message : undefined
+
 export const deferWorkspaceSubmit = async (input: {
   readonly actor: WorkspaceToggleActor
   readonly source: WorkspaceComposer
@@ -143,9 +147,9 @@ export const deliverFirstSend = async <Composer extends WorkspaceComposer>(input
     input.clearSource()
     if (input.showsSource()) input.show(target.sessionId)
     return 'sent'
-  } catch {
+  } catch (error) {
     if (input.signal.aborted) return 'cancelled'
-    input.source.input.notify('error', input.failureMessage)
+    input.source.input.notify('error', destinationRefusal(error) ?? input.failureMessage)
     return 'failed'
   } finally {
     release()

@@ -8,7 +8,13 @@ import type { ShellRenderSlot } from './native/slots.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
 import type { SectionRow } from './settings-view.js'
 import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
-import { createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, SETTINGS_WORKBENCH_HUB_ID, settingsWorkbenchPanelId } from './workbench-panels.js'
+import {
+  createSettingsWorkbenchHub,
+  registerSettingsWorkbenchPanels,
+  SETTINGS_WORKBENCH_HUB_ID,
+  type SettingsOpenRequest,
+  settingsWorkbenchPanelId,
+} from './workbench-panels.js'
 import type { ShellTranslate } from './native/locales.js'
 
 // The shared Node primitive double omits the native Settings navigation glyphs.
@@ -67,8 +73,10 @@ describe('Settings workbench sources', () => {
     const close = vi.fn()
     const fields: unknown[] = []
     const t: ShellTranslate = key => key
+    const openRequests = createSnapshotStore<SettingsOpenRequest | undefined>(undefined)
     const Hub = createSettingsWorkbenchHub({
       groups,
+      openRequests,
       closeSettings: close,
       view: input => {
         fields.push(input.field)
@@ -121,6 +129,10 @@ describe('Settings workbench sources', () => {
       expect(host.querySelector('[role="dialog"]')).toBeNull()
       expect(host.querySelectorAll('[data-settings-view="tab"]')).toHaveLength(2)
       expect(fields.every(field => field === undefined)).toBe(true)
+
+      await act(async () => openRequests.set({ sectionId: 'plugin:example' }))
+      expect(first.querySelector('input[aria-label="Original plugin control"]')).not.toBeNull()
+      expect(second.querySelector('input[aria-label="Original plugin control"]')).not.toBeNull()
     } finally {
       await act(async () => root.unmount())
       host.remove()

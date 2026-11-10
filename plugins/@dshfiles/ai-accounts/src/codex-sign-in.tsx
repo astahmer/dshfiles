@@ -1,9 +1,10 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useEffect } from 'react'
 import { aiAccountsLoginApi } from './account-login-api.js'
+import { useDeviceSignIn } from './device-sign-in.js'
 import { beginLoginQuery } from './login-query.js'
 
 /** The official CLI owns credentials; only validated device instructions reach the browser. */
@@ -17,56 +18,43 @@ export const CodexSignIn = (props: {
   const { instanceId, onConnected, operationId } = props
   const api = useApi(aiAccountsLoginApi)
   const client = useQueryClient()
-  const operation = props.operationId === undefined ? {} : { operationId: props.operationId }
+  const operation = operationId === undefined ? {} : { operationId }
   const key =
-    props.operationId === undefined
-      ? (['ai-accounts', 'codex-login', instanceId] as const)
-      : (['ai-accounts', 'codex-login', instanceId, props.operationId] as const)
-  const completed = useRef(false)
-  const alive = useRef(true)
-  const ownsAttempt = useRef(false)
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-      if (ownsAttempt.current)
-        void api.cancel({ instanceId: instanceId, confirm: true, ...(operationId !== undefined && { operationId }) }).catch(() => undefined)
-    }
-  }, [api, instanceId, operationId])
-  const begin = useMutation({
-    mutationFn: () =>
-      beginLoginQuery(client, key, () => api.begin({ instanceId, ...operation, ...(props.replaceExisting === true && { replaceExisting: true }) })),
-    onSuccess: next => {
-      ownsAttempt.current = next.status === 'starting' || next.status === 'waiting'
-      if (!alive.current) {
-        if (ownsAttempt.current) void api.cancel({ instanceId: instanceId, confirm: true, ...operation }).catch(() => undefined)
-        return
-      }
-      client.setQueryData(key, next)
+    operationId === undefined ? (['ai-accounts', 'codex-login', instanceId] as const) : (['ai-accounts', 'codex-login', instanceId, operationId] as const)
+  const { snapshot, send } = useDeviceSignIn({
+    instanceId,
+    ...(operationId !== undefined && { operationId }),
+    ports: {
+      begin: async () => {
+        const next = await beginLoginQuery(client, key, () =>
+          api.begin({ instanceId, ...operation, ...(props.replaceExisting === true && { replaceExisting: true }) }),
+        )
+        client.setQueryData(key, next)
+        return next
+      },
+      cancel: async () => {
+        await api.cancel({ instanceId, confirm: true, ...operation })
+      },
+      onConnected: () => onConnected(),
+      onCancelled: () => {
+        props.onCancelled?.()
+        void client.invalidateQueries({ queryKey: key, exact: true })
+      },
     },
   })
+  const starting = snapshot.matches('starting')
   const status = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => api.status({ instanceId: instanceId }, { signal }),
-    enabled: !begin.isPending,
+    enabled: !starting,
     refetchInterval: query => (query.state.data?.status === 'starting' || query.state.data?.status === 'waiting' ? 1_000 : false),
+    staleTime: 1_000,
     retry: false,
   })
-  const cancel = useMutation({
-    mutationFn: () => api.cancel({ instanceId: instanceId, confirm: true, ...operation }),
-    onSuccess: () => {
-      ownsAttempt.current = false
-      props.onCancelled?.()
-      return client.invalidateQueries({ queryKey: key, exact: true })
-    },
-  })
   useEffect(() => {
-    if (status.data?.status === 'complete' && begin.isSuccess && !completed.current) {
-      completed.current = true
-      ownsAttempt.current = false
-      onConnected()
-    }
-  }, [status.data?.status, begin.isSuccess, onConnected])
+    if (status.data === undefined) return
+    send({ type: 'observed', status: status.data.status })
+  }, [send, status.data])
   const active = status.data?.status === 'starting' || status.data?.status === 'waiting'
   return (
     <section className="dshx:flex dshx:flex-col dshx:gap-3 dshx:rounded-lg dshx:border dshx:p-4">
@@ -92,19 +80,19 @@ export const CodexSignIn = (props: {
         </a>
       ) : null}
       <p role="status" className="dshx:text-sm dshx:text-muted-foreground">
-        {status.data?.message ?? (begin.isPending ? 'Starting Codex sign-in…' : 'Ready to connect.')}
+        {status.data?.message ?? (starting ? 'Starting Codex sign-in…' : 'Ready to connect.')}
       </p>
-      {status.isError || begin.isError || cancel.isError ? (
+      {status.isError || snapshot.context.failure !== null ? (
         <p role="alert" className="dshx:text-sm dshx:text-destructive">
           Codex sign-in is unavailable on this Host. A newly built Host needs a user-managed restart; otherwise check the official Codex client is installed.
         </p>
       ) : null}
       <div className="dshx:flex dshx:flex-wrap dshx:gap-2">
-        <Button disabled={begin.isPending || active} onClick={() => begin.mutate()}>
+        <Button disabled={starting || active} onClick={() => send({ type: 'begin' })}>
           {active ? 'Waiting for approval…' : 'Continue with Codex'}
         </Button>
         {active ? (
-          <Button variant="outline" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
+          <Button variant="outline" disabled={snapshot.matches('cancelling')} onClick={() => send({ type: 'cancel' })}>
             Cancel sign-in
           </Button>
         ) : null}

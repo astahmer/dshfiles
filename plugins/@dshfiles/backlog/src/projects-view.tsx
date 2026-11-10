@@ -9,7 +9,7 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 
 import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
-import type { BacklogStatus } from './item.js'
+import { BacklogItems, type BacklogStatus } from './item.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import type { StartThreadItem } from './start-thread.js'
@@ -221,7 +221,11 @@ const Overview = (props: {
   const needsSelection = useBacklogSelection({ items: needsYou, openId: null, scope })
   const activeSelection = useBacklogSelection({ items: active.slice(0, 12), openId: null, scope })
   const recentSelection = useBacklogSelection({ items: recent, openId: null, scope })
-  const threads = [...new Set(projectItems.flatMap(item => item.links.filter(link => link.type === 'thread').map(link => link.target)))]
+  const threads = [
+    ...new Set(
+      projectItems.flatMap(item => item.links.filter(link => link.type === 'thread' && BacklogItems.isSessionId(link.target)).map(link => link.target)),
+    ),
+  ]
   const revisions = [...new Set(projectItems.flatMap(item => item.links.filter(link => link.type === 'revision').map(link => link.target)))]
   const agents = project.actors.filter(actor => actor.startsWith('agent:'))
   const total = progressStatuses.reduce((sum, status) => sum + project.counts[status], 0)

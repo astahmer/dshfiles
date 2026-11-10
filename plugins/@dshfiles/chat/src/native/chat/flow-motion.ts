@@ -5,6 +5,9 @@
  * and clears temporary styles.
  */
 import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react'
+import {
+  applyFoldBatch, batchCancelled, type FoldBatchEffect, type FoldBatchEvent, type FoldBatchState,
+} from './fold-batch.ts'
 import { useSearchableHidden, type HiddenTransition } from './searchable-hidden.ts'
 
 const FADE_OUT_MS = 70
@@ -142,29 +145,49 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
   const running = new Map<HTMLElement, () => void>()
   let folding = 0
   const foldIdleListeners = new Set<() => void>()
-  let batchScheduled = false
+  let batch: FoldBatchState = { kind: 'idle' }
   const boxes = new Map<HTMLElement, OwnedBox>()
   let frameRequest: number | null = null
-  let batch = false
-  let cancelled = false
   let clearEpoch = 0
   let batchCleanup: (() => void) | null = null
   let cancelEmptyBatch: (() => void) | null = null
-  /** The batch is committing hidden rows and its final geometry; idle listeners wait until both land. */
-  let settling = false
   let anchoringDisabled = false
 
+  function transitionBatch(event: FoldBatchEvent): readonly FoldBatchEffect[] {
+    const step = applyFoldBatch(batch, event)
+    batch = step.state
+    return step.effects
+  }
+
+  /** Drop the handles a settling batch owns; its commit writes the final geometry itself. */
+  function dropBatchHandles(): void {
+    if (frameRequest !== null) cancelAnimationFrame(frameRequest)
+    frameRequest = null
+    batchCleanup = null
+    cancelEmptyBatch = null
+  }
+
   function cancelInput(): void {
-    if (batch) cancelled = true
+    transitionBatch({ kind: 'cancelInput' })
   }
 
   function resumeInput(): void {
-    if (batch) cancelled = false
+    transitionBatch({ kind: 'resumeInput' })
   }
 
   /** Rows inside a closing ancestor change with it and never join a batch on their own. */
   function batchMember(box: InputFoldBox): boolean {
     return box.element.parentElement?.closest('[data-chat-motion="collapse"]') === null
+  }
+
+  /** Finish held closing rows and start held revealing rows when no batch will drive them. */
+  function releaseHeld(): void {
+    if (!transitionBatch({ kind: 'release' }).includes('releaseHeld')) return
+    const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    for (const box of [...boxes.values()]) {
+      if (reduced || (box.held && box.closing)) box.finish()
+      else if (box.held) box.release()
+    }
   }
 
   function runBatch(current: InputFoldDriver): void {
@@ -187,9 +210,13 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
     const owned = [...boxes.values()]
     const members = owned.filter(batchMember)
       .sort((left, right) => left.element.compareDocumentPosition(right.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)
-    if (!members.some(box => box.closing)) return
-    batch = true
-    cancelled = false
+    if (!members.some(box => box.closing)) {
+      releaseHeld()
+      return
+    }
+    const scheduled = batch
+    if (scheduled.kind !== 'scheduled') return
+    if (!transitionBatch({ kind: 'start', epoch: scheduled.epoch }).includes('begin')) return
     const travelling = current.begin(members.map(box => box.closing ? box : {
       element: box.element,
       height: box.height - box.fromHeight,
@@ -226,29 +253,28 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
     let started: number | undefined
     let displacement = 0
     const settle = (finishCancelled: boolean): void => {
-      batch = false
-      batchCleanup = null
-      cancelEmptyBatch = null
-      settling = true
+      if (!transitionBatch({ kind: 'settle' }).includes('commit')) return
+      dropBatchHandles()
       try {
         for (const box of owned) if (boxes.get(box.element) === box) box.finish()
         current.finish(finishCancelled)
       } finally {
-        settling = false
+        if (transitionBatch({ kind: 'settled' }).includes('notifyIdle') && folding === 0) notifyIdle()
       }
-      if (folding === 0) notifyIdle()
       // Rows that changed while this batch ran wait in place; the next flush drives or releases them.
-      if ([...boxes.values()].some(box => box.held)) flushBatch()
+      if ([...boxes.values()].some(box => box.held)) scheduleBatch()
     }
     cancelEmptyBatch = () => {
       if (members.some(box => box.closing && boxes.get(box.element) === box)) return
       if (frameRequest !== null) cancelAnimationFrame(frameRequest)
       frameRequest = null
+      transitionBatch({ kind: 'cancelInput' })
       settle(true)
     }
     const tick = (now: number): void => {
       frameRequest = null
       started ??= now
+      const cancelled = batchCancelled(batch)
       const elapsed = reduced ? CLOSE_DELAY_MS + CLOSE_MS : now - started
       const linear = Math.min(1, Math.max(0, (elapsed - CLOSE_DELAY_MS) / CLOSE_MS))
       const progress = linear * linear * (3 - 2 * linear)
@@ -295,28 +321,27 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
   }
 
   function flushBatch(): void {
-    batchScheduled = false
+    const scheduled = batch
+    if (scheduled.kind !== 'scheduled') return
     // Rows that change during a batch are held until it settles, which flushes again.
-    if (batch) return
     const current = [...boxes.values()].some(box => box.closing) ? driver() : null
     if (current !== null) {
       runBatch(current)
       return
     }
-    const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
-    // Without a batch, a held closing row finishes at once and a held revealing row starts its own transition.
-    for (const box of [...boxes.values()]) {
-      if (reduced || (box.held && box.closing)) box.finish()
-      else if (box.held) box.release()
-    }
+    releaseHeld()
   }
 
   function scheduleBatch(): void {
-    if (batchScheduled) return
-    batchScheduled = true
-    // After the whole commit's collapses and reveals have started, before any box changes size.
+    const current: FoldBatchState = batch
+    if (current.kind === 'scheduled') return
     const epoch = clearEpoch
-    queueMicrotask(() => { if (epoch === clearEpoch) flushBatch() })
+    transitionBatch({ kind: 'schedule', epoch })
+    if (batch.kind !== 'scheduled' || batch.epoch !== epoch) return
+    // After the whole commit's collapses and reveals have started, before any box changes size.
+    queueMicrotask(() => {
+      if (batch.kind === 'scheduled' && batch.epoch === epoch) flushBatch()
+    })
   }
 
   function foldStarted(): void {
@@ -328,7 +353,7 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
 
   function foldEnded(): void {
     folding = Math.max(0, folding - 1)
-    if (folding === 0 && !settling) notifyIdle()
+    if (folding === 0 && batch.kind !== 'settling') notifyIdle()
   }
 
   function notifyIdle(): void {
@@ -375,7 +400,7 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
     }
     const { style } = element
     // A running batch owns the scrollport; a row closing now keeps its size until the next batch drives it.
-    const held = batch
+    const held = batch.kind === 'running'
     element.dataset.chatMotion = 'collapse'
     foldStarted()
     scheduleBatch()
@@ -446,7 +471,7 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
       element.addEventListener('transitionend', onEnd)
     }
     // A running batch owns the scrollport; a row revealed now waits at zero size until the next flush.
-    const held = batch
+    const held = batch.kind === 'running'
     if (!held) startTransition()
     running.set(element, finish)
     const box: OwnedBox = { element, height, marginTop, fromHeight: 0, fromMarginTop: 0, closing: false, held, finish,
@@ -460,24 +485,24 @@ export function createFlowMotion(driver: () => InputFoldDriver | null, foldingCh
 
   function clear(): void {
     clearEpoch++
-    batchScheduled = false
-    batch = false
-    cancelled = false
-    if (frameRequest !== null) cancelAnimationFrame(frameRequest)
-    frameRequest = null
-    batchCleanup?.()
-    batchCleanup = null
-    cancelEmptyBatch = null
+    if (transitionBatch({ kind: 'clear' }).includes('clear')) {
+      if (frameRequest !== null) cancelAnimationFrame(frameRequest)
+      frameRequest = null
+      const cleanup = batchCleanup
+      batchCleanup = null
+      cancelEmptyBatch = null
+      cleanup?.()
+    }
     foldIdleListeners.clear()
     for (const cancel of [...running.values()]) cancel()
   }
 
   return {
     collapse, reveal, cancelMotion, foldActive, onFoldIdle, cancelInput, resumeInput, clear,
-    inputActive: () => batch || (batchScheduled && [...boxes.values()].some(box => box.closing && batchMember(box))),
+    inputActive: () => batch.kind === 'running'
+      || (batch.kind === 'scheduled' && [...boxes.values()].some(box => box.closing && batchMember(box))),
   }
 }
-
 function useFlowTransition(motion: FlowMotionRows | undefined, grow: boolean): HiddenTransition | undefined {
   const current = useRef<HTMLElement | null>(null)
   useLayoutEffect(() => () => {

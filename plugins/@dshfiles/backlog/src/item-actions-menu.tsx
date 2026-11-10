@@ -160,7 +160,9 @@ export const BacklogItemMenu = (props: {
               Retrieve tweet content
             </ContextMenuItem>
           )}
-          {many ? null : (
+          {many ? (
+            <BacklogSyncControls.BatchMenuItems items={selection} />
+          ) : (
             <>
               <ContextMenuSeparator />
               <BacklogSyncControls.MenuItems itemId={item.id} project={item.project} onLink={setLinkBinding} />

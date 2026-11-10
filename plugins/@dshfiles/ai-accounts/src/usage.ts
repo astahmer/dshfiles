@@ -238,6 +238,9 @@ export class ProviderUsageModel {
     bankedResetExpiries: [],
   })
 
+  /** Dates a card with the moment of its read, unless it already says when its content is from. */
+  static stamped = (card: UsageCard, readAt: number): UsageCard => (card.readAt === undefined ? { ...card, readAt } : card)
+
   /** Percent remaining, clamped to one decimal, from a percent used. */
   static remainingFromUsed = (usedPercent: number): number => Math.max(0, Math.min(100, Math.round((100 - usedPercent) * 10) / 10))
 

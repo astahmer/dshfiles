@@ -205,6 +205,35 @@ test('dropping a row into a section plans exactly the statuses that section mean
   }
 })
 
+test('a remote row reaches the sections whose drop plan writes no Host verb', () => {
+  // Pinned and Archived are Host verbs on the runtime owning the Session, and a remote row never unpins.
+  assert.deepEqual(SidebarOrganization.remoteDropSections, ['active', 'parked', 'inactive', 'settled'])
+  assert.equal(SidebarOrganization.remoteSectionDropPlan('pinned'), null)
+  assert.equal(SidebarOrganization.remoteSectionDropPlan('archived'), null)
+  assert.deepEqual(SidebarOrganization.remoteSectionDropPlan('settled'), {
+    archive: false,
+    unarchive: false,
+    pin: false,
+    unpin: false,
+    park: false,
+    unpark: true,
+    settle: true,
+    unsettle: false,
+    idleOverride: null,
+  })
+  assert.deepEqual(SidebarOrganization.remoteSectionDropPlan('active'), {
+    archive: false,
+    unarchive: false,
+    pin: false,
+    unpin: false,
+    park: false,
+    unpark: true,
+    settle: false,
+    unsettle: true,
+    idleOverride: 'active',
+  })
+})
+
 test('a dropped Active or Inactive override outranks idleness only until the thread changes', () => {
   const classify = (session: SessionSummary, idleSectionOverrides?: SidebarPreferences['idleSectionOverrides']) =>
     SidebarOrganization.sectionForSession({
@@ -585,4 +614,21 @@ test('the shipped row order lists every hover action once, with settle in archiv
   assert.deepEqual([...DEFAULT_THREAD_ROW_ACTION_ORDER].sort(), [...THREAD_ROW_ACTIONS].sort())
   assert.equal(DEFAULT_THREAD_ROW_ACTION_ORDER.indexOf('settle'), THREAD_ROW_ACTIONS.indexOf('archive'))
   assert.equal(DEFAULT_THREAD_ROW_ACTION_ORDER.at(-1), 'restore')
+})
+
+test('a running grandchild under any of several roots blocks them, found in one pass like the per-root check', () => {
+  const sessions = [
+    { id: 'root', running: false, blank: false },
+    { id: 'blank-middle', running: false, blank: true, parentId: 'root' },
+    { id: 'grandchild', running: true, blank: false, parentId: 'blank-middle' },
+    { id: 'other', running: false, blank: false },
+    { id: 'self-running', running: true, blank: false },
+  ]
+  for (const roots of [['root'], ['other'], ['self-running'], ['other', 'root']]) {
+    assert.equal(
+      SidebarOrganization.hasRunningDescendantOfAny({ sessionIds: new Set(roots), sessions }),
+      roots.some(sessionId => SidebarOrganization.hasRunningDescendant({ sessionId, sessions })),
+    )
+  }
+  assert.equal(SidebarOrganization.hasRunningDescendantOfAny({ sessionIds: new Set(['root']), sessions }), true)
 })

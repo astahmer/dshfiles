@@ -7,7 +7,14 @@ import { fileURLToPath } from 'node:url'
 import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
 import { backlogLabel, backlogRef, withBacklogRefs } from './backlog-refs.js'
-import { finishJourneyAssertions, openSettingsDialog, recordAssertion, restartScratchProfileInBrowser, settingsNavEntry, visitIsolatedPluginProfile } from '../steps.js'
+import {
+  finishJourneyAssertions,
+  openSettingsDialog,
+  recordAssertion,
+  restartScratchProfileInBrowser,
+  settingsNavEntry,
+  visitIsolatedPluginProfile,
+} from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { openActivity } from './activity-timeline.steps.js'
@@ -184,10 +191,17 @@ const legacyLinearRowPatch = (team: string) => `- id: dshfiles-backlog
         pushAgentComments: false
 `
 
-Given('the isolated plugin profile {string} is booted with a saved Linear sync row for team {string}', async ({ page }: { page: Page }, packageId: string, team: string) => {
-  const profile = await bootComposedPluginProfile({ packageIds: [packageId], profileLabel: `${packageId}-legacy-sync-row`, cordisPatch: legacyLinearRowPatch(team) })
-  await visitIsolatedPluginProfile(page, profile)
-})
+Given(
+  'the isolated plugin profile {string} is booted with a saved Linear sync row for team {string}',
+  async ({ page }: { page: Page }, packageId: string, team: string) => {
+    const profile = await bootComposedPluginProfile({
+      packageIds: [packageId],
+      profileLabel: `${packageId}-legacy-sync-row`,
+      cordisPatch: legacyLinearRowPatch(team),
+    })
+    await visitIsolatedPluginProfile(page, profile)
+  },
+)
 
 const remoteSync = (page: Page) => page.getByRole('region', { name: 'Remote sync' })
 const scratchFolders = new WeakMap<Page, string>()
@@ -256,7 +270,9 @@ When('the file of item b:{int} is edited to the title {string}', async ({ page }
 })
 
 When('item b:{int} is synced from its sync chip', async ({ page }: { page: Page }, _id: number) => {
-  await peek(page).getByRole('button', { name: /^Remote sync: .+\.md, /u }).click()
+  await peek(page)
+    .getByRole('button', { name: /^Remote sync: .+\.md, /u })
+    .click()
   await page.getByRole('dialog').getByRole('button', { name: 'Sync now', exact: true }).click()
   await page.keyboard.press('Escape')
 })
@@ -267,6 +283,45 @@ Then('item b:{int} is titled {string}', async ({ page }: { page: Page }, id: num
     await expect(feed(page)).toContainText(title)
   })
   expect(await backlogLabel(page, id)).toMatch(/^b:/u)
+  await finishJourneyAssertions(page)
+})
+
+When('the Items view selects two items to mirror', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  const checkboxFor = async (id: number) =>
+    page.getByRole('row', { name: `Item ${await backlogLabel(page, id)}` }).getByRole('checkbox', { name: `Select ${await backlogLabel(page, id)}` })
+  await (await checkboxFor(1)).click()
+  await (await checkboxFor(2)).click({ modifiers: ['ControlOrMeta'] })
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+})
+
+Then('the context menu offers a batch create for the files binding', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-sync-batch-submenu', async () => {
+    const row = page.getByRole('row', { name: `Item ${await backlogLabel(page, 2)}`, exact: true })
+    await row.click({ button: 'right' })
+    await expect(contextMenu(page)).toContainText('2 selected')
+    await contextMenu(page).getByRole('menuitem', { name: 'Create in…', exact: true }).hover()
+    await expect(
+      page
+        .getByRole('menu')
+        .last()
+        .getByRole('menuitem', { name: /^Create 2 in Markdown files · /u }),
+    ).toBeVisible()
+  })
+})
+
+When('the batch create is clicked for both selected items', async ({ page }: { page: Page }) => {
+  await page.getByRole('menuitem', { name: /^Create 2 in Markdown files · /u }).click()
+  await expect(page.getByRole('alert')).toContainText('Created 2 remote items in Markdown files', { timeout: 15_000 })
+})
+
+Then('the scratch folder holds a file for each selected item', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-sync-batch-created', async () => {
+    for (const [index, title] of ['First batch mirror', 'Second batch mirror'].entries()) {
+      const text = await readFile(await fileOfItem(page, index + 1), 'utf8')
+      expect(text).toContain(`title: ${title}`)
+    }
+  })
   await finishJourneyAssertions(page)
 })
 
@@ -305,7 +360,9 @@ Then('backlog item b:{int} offers {string} in its context menu', async ({ page }
 When('backlog item b:{int} is linked through {string} to {string}', async ({ page }: { page: Page }, id: number, binding: string, issue: string) => {
   const target = await contextTarget(page, id, 'feed')
   await target.click({ button: 'right' })
-  await contextMenu(page).getByRole('menuitem', { name: `Link to ${binding}…`, exact: true }).click()
+  await contextMenu(page)
+    .getByRole('menuitem', { name: `Link to ${binding}…`, exact: true })
+    .click()
   const dialog = page.getByRole('dialog', { name: `Link ${await backlogLabel(page, id)} through ${binding}` })
   await dialog.getByRole('textbox', { name: 'Remote item', exact: true }).fill(issue)
   await dialog.getByRole('button', { name: 'Link', exact: true }).click()
@@ -1088,6 +1145,108 @@ Then('the batch status action updates only the remaining selected items', async 
   await finishJourneyAssertions(page)
 })
 
+const selectionActions = (page: Page) => page.getByRole('group', { name: 'Selection actions', exact: true })
+const itemsTable = (page: Page) => page.getByRole('table', { name: 'Backlog items' })
+
+/** The bar's tiers follow its panel (28rem narrow, 42rem compact), so a layout change fails here instead of testing the wrong tier. */
+const expectSelectionActionsOnOneLine = async (page: Page, tier: 'compact' | 'narrow'): Promise<void> => {
+  const bar = selectionActions(page)
+  const barBox = await bar.boundingBox()
+  const panelBox = await bar.locator('xpath=..').boundingBox()
+  if (barBox === null || panelBox === null) throw new Error('The selection actions are not laid out.')
+  expect(panelBox.width, `panel width for the ${tier} tier`).toBeLessThan(tier === 'narrow' ? 448 : 672)
+  if (tier === 'compact') expect(panelBox.width, 'panel width for the compact tier').toBeGreaterThanOrEqual(448)
+  expect(barBox.height).toBeLessThanOrEqual(40)
+  expect(barBox.x).toBeGreaterThanOrEqual(panelBox.x)
+  expect(barBox.x + barBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width)
+  expect(await bar.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+}
+
+When('{int} numbered items are captured', async ({ page }: { page: Page }, count: number) => {
+  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  for (let index = 1; index <= count; index += 1) {
+    await capture.fill(`Numbered item ${String(index)}`)
+    await capture.press('Enter')
+    await expect(capture).toHaveText('')
+    await StartupDialogs.dismissProviderSetupIfShown(page)
+  }
+  await expect(feed(page)).toContainText(`Numbered item ${String(count)}`)
+})
+
+When('all {int} items are selected in the Items view', async ({ page }: { page: Page }, count: number) => {
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  await expect(itemsTable(page)).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Select all visible items', exact: true }).click()
+  await expect(selectionActions(page)).toContainText(`${String(count)} selected`)
+})
+
+When('the window is {int}px wide', async ({ page }: { page: Page }, width: number) => {
+  await page.setViewportSize({ width, height: 800 })
+})
+
+Then('the batch action bar keeps every action on one line as icons', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-selection-bar-compact', async () => {
+    await expectSelectionActionsOnOneLine(page, 'compact')
+    const bar = selectionActions(page)
+    const startThread = await bar.getByRole('button', { name: 'Start thread', exact: true }).boundingBox()
+    expect(startThread?.width).toBeLessThan(40)
+    await expect(bar.getByRole('button', { name: 'Unpin', exact: true })).toBeVisible()
+    await expect(bar.getByRole('button', { name: 'More actions', exact: true })).toBeHidden()
+  })
+})
+
+Then('the batch action bar moves Set kind, Pin and Unpin into More actions', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-selection-bar-narrow', async () => {
+    await expectSelectionActionsOnOneLine(page, 'narrow')
+    const bar = selectionActions(page)
+    await expect(bar.getByRole('button', { name: 'Move to' })).toBeVisible()
+    await expect(bar.getByRole('button', { name: 'Set kind' })).toBeHidden()
+    await expect(bar.getByRole('button', { name: 'Pin', exact: true })).toBeHidden()
+    await expect(bar.getByRole('button', { name: 'Unpin', exact: true })).toBeHidden()
+    await bar.getByRole('button', { name: 'More actions', exact: true }).click()
+    await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText(['Set kind', 'Pin', 'Unpin'])
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+  })
+})
+
+Then('the last row scrolls clear of the batch action bar', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-selection-bar-last-row', async () => {
+    await itemsTable(page).evaluate(element => element.scrollTo({ top: element.scrollHeight }))
+    await expect.poll(async () => itemsTable(page).evaluate(element => Math.ceil(element.scrollTop + element.clientHeight) >= element.scrollHeight)).toBe(true)
+    const lastRowBottom = await itemsTable(page).evaluate(element =>
+      Math.max(...Array.from(element.querySelectorAll('[data-index]'), row => row.getBoundingClientRect().bottom)),
+    )
+    const barBox = await selectionActions(page).boundingBox()
+    expect(lastRowBottom).toBeLessThanOrEqual(barBox?.y ?? 0)
+  })
+})
+
+When('More actions applies {string} to the selection', async ({ page }: { page: Page }, action: string) => {
+  await selectionActions(page).getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menu').getByRole('menuitem', { name: action, exact: true }).click()
+})
+
+When("More actions sets the selection's kind to {string}", async ({ page }: { page: Page }, kind: string) => {
+  await selectionActions(page).getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Set kind', exact: true }).hover()
+  await page.getByRole('menu').last().getByRole('menuitem', { name: kind, exact: true }).click()
+})
+
+Then('{int} rows show Pinned', async ({ page }: { page: Page }, count: number) => {
+  await recordAssertion(page, `backlog-selection-bar-pinned-${String(count)}`, async () => {
+    await expect(selectionActions(page)).toHaveCount(0)
+    await expect(itemsTable(page).getByLabel('Pinned', { exact: true })).toHaveCount(count)
+  })
+})
+
+Then('item b:{int} shows the kind {string}', async ({ page }: { page: Page }, id: number, kind: string) => {
+  await recordAssertion(page, 'backlog-selection-bar-more-kind', async () => {
+    await expect(page.getByRole('row', { name: await withBacklogRefs(page, `Item b:${String(id)}`), exact: true })).toContainText(kind)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('Start thread is clicked for the selection', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Start thread', exact: true }).click()
 })
@@ -1129,8 +1288,9 @@ When('a message with the serialized backlog mention is sent', async ({ page }: {
 
 Then('the sent mention renders as a backlog chip {string} titled {string}', async ({ page }: { page: Page }, reference: string, title: string) => {
   await recordAssertion(page, 'backlog-sent-mention-chip', async () => {
-    const chip = page.getByRole('button', { name: `Backlog item ${await withBacklogRefs(page, reference)} · ${title}`, exact: true })
+    const chip = page.getByRole('button', { name: `Preview backlog item ${await withBacklogRefs(page, reference)}`, exact: true })
     await expect(chip).toBeVisible()
+    await expect(chip).toContainText(title)
     // The serialized title and tool hint must not stay in the bubble.
     await expect(page.getByText('backlog_get has its details')).toHaveCount(0)
     await chip.click()
@@ -1141,7 +1301,7 @@ Then('the sent mention renders as a backlog chip {string} titled {string}', asyn
 
 Then('the inline backlog preview shows {string}', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'backlog-reference-inline-preview', async () => {
-    const reference = page.getByRole('button', { name: await withBacklogRefs(page, 'Backlog item b:1'), exact: true })
+    const reference = page.getByRole('button', { name: await withBacklogRefs(page, 'Preview backlog item b:1'), exact: true })
     await expect(reference).toBeVisible()
     const preview = page.locator('[data-dshfiles-backlog-preview]')
     // A scroll closes the card by design, and the conversation can still settle right after the turn lands, so ask

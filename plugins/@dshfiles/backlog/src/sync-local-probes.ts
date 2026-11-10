@@ -21,6 +21,11 @@ const githubRepositoryOfRemotes = (remoteList: string): string | undefined => {
 }
 
 const CLI_TOKEN_TTL = Duration.minutes(5)
+/** A miss is cached only briefly: after `gh auth login` the next attempt should answer, not wait out a stale probe. */
+const CLI_TOKEN_MISS_TTL = Duration.seconds(30)
+
+/** How long one CLI probe answer stays cached: a token for minutes, a miss only until the user can fix the login. */
+export const cliTokenCacheTtl = (hasToken: boolean): Duration.Duration => (hasToken ? CLI_TOKEN_TTL : CLI_TOKEN_MISS_TTL)
 
 /**
  * What the Host machine already knows about a project's tracker: the GitHub repository of its git remote and the token
@@ -45,7 +50,9 @@ export class SyncLocalProbes extends Context.Service<
         ),
       )
       const readCliToken = spawner.string(ChildProcess.make('gh', ['auth', 'token'], { stdin: 'ignore' })).pipe(
-        Effect.timeout('5 seconds'),
+        // The first `gh` run on a machine reads the OS keychain, which can take seconds when it is busy or just woke up.
+        Effect.timeout('20 seconds'),
+        Effect.retry({ times: 1 }),
         Effect.map(output => output.trim()),
         Effect.map(token => (token === '' || /\s/u.test(token) ? Option.none<Redacted.Redacted>() : Option.some(Redacted.make(token)))),
         Effect.orElseSucceed(() => Option.none<Redacted.Redacted>()),
@@ -53,7 +60,11 @@ export class SyncLocalProbes extends Context.Service<
       )
       const cliTokenCache = yield* Cache.makeWith(() => readCliToken, {
         capacity: 1,
-        timeToLive: exit => (Exit.isSuccess(exit) ? CLI_TOKEN_TTL : Duration.zero),
+        timeToLive: exit =>
+          Exit.match(exit, {
+            onSuccess: token => cliTokenCacheTtl(Option.isSome(token)),
+            onFailure: () => Duration.zero,
+          }),
       })
       return SyncLocalProbes.of({ githubRepository, githubCliToken: Cache.get(cliTokenCache, undefined) })
     }),

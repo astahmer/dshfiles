@@ -219,6 +219,18 @@ export class StartThreadForm {
     return row.model.defaultEffort ?? row.model.efforts[0]?.id
   }
 
+  /**
+   * A preview that never ends mid-word: it stops at the last space or line break before the limit and marks the cut, so
+   * a truncated item reads as truncated instead of looking like its tail was lost.
+   */
+  static preview(text: string, maxChars: number): string {
+    const characters = [...text]
+    if (characters.length <= maxChars) return text
+    const head = characters.slice(0, maxChars).join('').trimEnd()
+    const lastBreak = Math.max(head.lastIndexOf('\n'), head.lastIndexOf(' '))
+    return `${(lastBreak <= 0 ? head : head.slice(0, lastBreak)).trimEnd()}…`
+  }
+
   /** The opening message: enough for the agent to find every item without pasting the whole bodies. */
   static message(items: readonly StartThreadItem[]): string {
     const body = items.map((item, index) => {

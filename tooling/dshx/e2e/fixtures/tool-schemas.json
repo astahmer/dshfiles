@@ -1,5 +1,5 @@
 {
-  "hostBundles": 64,
+  "hostBundles": 68,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -15,6 +15,8 @@
     "@dshfiles/attachment-gallery",
     "@dshfiles/background-jobs",
     "@dshfiles/backlog",
+    "@dshfiles/backlog-jira",
+    "@dshfiles/backlog-notion",
     "@dshfiles/capabilities-hub",
     "@dshfiles/command-palette",
     "@dshfiles/context-compaction",
@@ -46,7 +48,9 @@
     "@dshfiles/secret-catalog",
     "@dshfiles/session-search",
     "@dshfiles/session-undo",
+    "@dshfiles/settings-models",
     "@dshfiles/settings-shell",
+    "@dshfiles/settings-web-search",
     "@dshfiles/shared-streams",
     "@dshfiles/test-runs",
     "@dshfiles/thread-share",
@@ -66,12 +70,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 520,
-  "apiToolBindings": 365,
-  "apiToolNameCount": 365,
-  "apiToolSchemas": 364,
+  "apiMethods": 591,
+  "apiToolBindings": 408,
+  "apiToolNameCount": 408,
+  "apiToolSchemas": 407,
   "definedTools": 24,
-  "tools": 388,
+  "tools": 431,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -1037,7 +1041,7 @@
     },
     {
       "name": "ai_accounts_refresh_quota",
-      "description": "Read live subscription quota now, bypassing the shared short-lived cache. Call only when the user asked for a fresh reading.",
+      "description": "Read live subscription quota now, bypassing the shared short-lived cache. A card’s own `readAt` says when its provider answered, and `nextReadAt` when reads are held back (Claude shares one reading and backs off after a 429), so check them rather than assuming the reading is new. Call only when the user asked for a fresh reading.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -1272,7 +1276,7 @@
     },
     {
       "name": "ai_accounts_set_auto_retry",
-      "description": "Change whether one quota-blocked turn resumes automatically at its known reset. Call only when the user asked for that.",
+      "description": "Change whether one quota-blocked turn resumes automatically at its reset, or on a growing backoff when the provider named none. Call only when the user asked for that.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1533,7 +1537,7 @@
     },
     {
       "name": "annotations_list",
-      "description": "List element annotations the user wrote about this Session's DSH UI, with per-status counts. Read-only; it never resolves or acknowledges anything.",
+      "description": "List element annotations the user wrote about this Session's DSH UI, with per-status counts. `sessionId` also takes the key of a composer without a Session, such as `backlog:item:12` for a Backlog item. Read-only; it never resolves or acknowledges anything.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1713,7 +1717,7 @@
     },
     {
       "name": "apply_patch",
-      "description": "Edit one existing text file atomically: reads it first, applies literal replacements in order, ignores identical old/new pairs, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.",
+      "description": "Edit one existing text file atomically: reads it first, applies literal replacements in order, ignores identical old/new pairs, then writes once. Whitespace-tolerant fallback finds a reindented or rewrapped anchor; an ambiguous or missing anchor fails without writing and names the candidate lines. Read the target immediately before patching and keep each anchor unique; shell or script edits invalidate the native read snapshot, so re-read before the native write rather than mixing writers. Use it after inspecting a file with ast-outline, bash or grep instead of `edit`. Read-only when it fails; it never creates a file.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1831,7 +1835,7 @@
     },
     {
       "name": "attention_list",
-      "description": "List inbox items that need the user: one view at a time plus the count of every view and the muted sources. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.",
+      "description": "List inbox items that need the user: one view at a time plus the count of every view and the muted sources. An item published about a subagent Session lists as its parent thread, the one the user acts on. Needs you = blocking and failed items not done, snoozed, resolved or muted. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -2352,7 +2356,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           }
         },
         "required": [
@@ -2368,7 +2372,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           },
           "file": {
             "type": "object",
@@ -2427,7 +2431,7 @@
         "type": "object",
         "properties": {
           "text": {
-            "description": "Free text. First line is the title; a `bug:`/`idea:`/`note:`/`question:`/`task:` prefix sets the kind; `#tags`, `b:<id>`, `jj:<rev>`, `branch:<name>`, session ids and URLs become links.",
+            "description": "Free text. First line is the title; a `bug:`/`idea:`/`note:`/`question:`/`task:` prefix sets the kind; `!1` (urgent) to `!4` (low) sets the priority; `#tags`, `b:<ref>`, `jj:<rev>`, `branch:<name>`, session ids and URLs become links.",
             "type": "string"
           },
           "project": {
@@ -2455,6 +2459,33 @@
               "question"
             ],
             "description": "Overrides the kind the text prefix would derive."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "none",
+              "urgent",
+              "high",
+              "medium",
+              "low"
+            ],
+            "description": "urgent, high, medium, low or none; overrides a `!1`…`!4` written in the text."
+          },
+          "parent": {
+            "type": "string",
+            "description": "Capture it as a sub-issue of this item (`b:k3f9`); three levels deep at most."
+          },
+          "due": {
+            "type": "string",
+            "description": "The date it is due, YYYY-MM-DD with no time."
+          },
+          "template": {
+            "type": "string",
+            "description": "Start from a template in Backlog settings (by name, such as `Bug report`): it adds its title prefix, kind, priority, tags, body and acceptance criteria where the capture left them out. `/template <name>` in the text does the same."
+          },
+          "recurrence": {
+            "type": "string",
+            "description": "`daily`, `weekly`, `monthly` or `cron:<expr>`: finishing it creates the next occurrence."
           },
           "files": {
             "type": "array",
@@ -2510,13 +2541,29 @@
       }
     },
     {
+      "name": "backlog_claim",
+      "description": "Claim one item for this thread before working on it: you become its delegate, it moves to `doing`, this thread is linked and a lease starts. Refused while another agent holds a live claim (the error names it) and for closed items. Any write you make to the item renews the lease; it ends after the idle time in Backlog settings, when this thread is archived or settled, when the item is done, or with backlog_release. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "backlog_comment",
       "description": "Add a progress comment to a backlog item with text or attachments; references in the text become links. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           },
           "text": {
             "description": "Reply text; it may be empty only when the comment includes an attachment.",
@@ -2578,12 +2625,12 @@
     },
     {
       "name": "backlog_delete",
-      "description": "Permanently delete a backlog item and its attachments. This cannot be undone; use it only when the user explicitly asked for deletion and pass confirm: true. Use it when the user asked, never to rewrite items unrelated to the task.",
+      "description": "Permanently delete a backlog item, its attachments and its remote-issue link (the remote issue itself stays). This cannot be undone; use it only when the user explicitly asked for deletion and pass confirm: true. Use it when the user asked, never to rewrite items unrelated to the task.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           },
           "confirm": {
             "description": "Explicit opt-in acknowledging this permanently deletes the item and its attachments.",
@@ -2607,7 +2654,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           }
         },
         "required": [
@@ -2623,7 +2670,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           },
           "url": {
             "type": "string"
@@ -2637,13 +2684,43 @@
       }
     },
     {
+      "name": "backlog_export",
+      "description": "Export the backlog to a new file on the Host: JSONL (one folded item per line, optionally followed by every op) or an SQLite copy. Changes no item; it writes the file the user asked for, so run it only when the user asked for an export.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Absolute path of a new file on the Host, such as /Users/you/backlog.jsonl; an existing file is never overwritten.",
+            "type": "string"
+          },
+          "format": {
+            "description": "`jsonl`: one folded item per line. `sqlite`: a consistent copy of the whole backlog database.",
+            "type": "string",
+            "enum": [
+              "jsonl",
+              "sqlite"
+            ]
+          },
+          "includeOps": {
+            "type": "boolean",
+            "description": "JSONL only: also write every op of the log, after the items."
+          }
+        },
+        "required": [
+          "path",
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "backlog_get",
-      "description": "One backlog item `b:<id>` with its body, links, event history and the items that link to it. Read-only. Use `backlog_get_many` for several at once.",
+      "description": "One backlog item `b:<ref>` with its body, links, event history and the items that link to it. Read-only. Use `backlog_get_many` for several at once.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           }
         },
         "required": [
@@ -2659,10 +2736,10 @@
         "type": "object",
         "properties": {
           "ids": {
-            "description": "Item ids (`b:<id>` numbers). Duplicates are read once; unknown ids are reported, not failed.",
+            "description": "Items as written (`b:k3f9`, `k3f9`, a legacy `b:12`) or their numbers. Duplicates are read once; unknown ones are reported, not failed.",
             "type": "array",
             "items": {
-              "type": "integer"
+              "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
             }
           }
         },
@@ -2674,25 +2751,25 @@
     },
     {
       "name": "backlog_import_remote",
-      "description": "Import an existing Linear or GitHub issue as a new backlog item linked to it, with its title, description, status, labels and comments; an issue already linked returns its item. Run only when the user asked. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "description": "Import one existing remote item as a new backlog item linked to it, with its title, description, status, labels, priority and comments; a remote item already linked through that binding returns its item. Run only when the user asked. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
       "parameters": {
         "type": "object",
         "properties": {
           "backend": {
             "type": "string",
-            "enum": [
-              "linear",
-              "github"
-            ],
-            "description": "Tracker of the issue; omit to read it from the reference (ENG-12 or linear.app is Linear; #42, owner/repo#42 or github.com is GitHub)."
+            "description": "Provider kind of the remote item; omit to read it from the reference (ENG-12 or linear.app is Linear; #42, owner/repo#42 or github.com is GitHub)."
+          },
+          "binding": {
+            "type": "string",
+            "description": "The binding to import through; omit to use the one serving `project`."
           },
           "reference": {
-            "description": "The issue: a URL, a Linear identifier such as ENG-12, or a GitHub issue number such as 42.",
+            "description": "The remote item: a URL, an identifier such as ENG-12, an issue number such as 42 or owner/repo#42, or a file name.",
             "type": "string"
           },
           "project": {
             "type": "string",
-            "description": "Project the new item belongs to; defaults to the project of the first enabled row for that backend."
+            "description": "Project the new item belongs to; defaults to the binding’s project."
           }
         },
         "required": [
@@ -2708,7 +2785,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           },
           "link": {
             "type": "object",
@@ -2769,37 +2846,65 @@
       }
     },
     {
-      "name": "backlog_link_remote",
-      "description": "Link one backlog item to a Linear or GitHub issue (adopting the issue's fields on the first sync, tags merged), create a new issue from it, or unlink it with `remove: true`. The issue URL is added to the item's links. Run only when the user asked; it writes to the remote tracker. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "name": "backlog_link_pr",
+      "description": "Link a pull request to an item as a first-class PR link: its state and checks show on the item (watched through the newest thread linked to the item), and merging it closes the item when `closes` is on. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           },
-          "backend": {
-            "type": "string",
-            "enum": [
-              "linear",
-              "github"
-            ]
-          },
-          "reference": {
-            "description": "The issue: a URL, a Linear identifier such as ENG-12, or a GitHub issue number such as 42.",
+          "url": {
             "type": "string"
           },
-          "create": {
+          "closes": {
             "type": "boolean",
-            "description": "Create a new issue from the item in the configured team or repository instead of linking `reference`."
+            "description": "The PR resolves the item (default true): merging it moves the item to done, unless its status was set by hand."
           },
-          "remove": {
+          "gate": {
             "type": "boolean",
-            "description": "Unlink the item from its issue and stop syncing it; neither side is deleted. Link it again to resume."
+            "description": "Also wait on it: the item is not ready until the PR merges."
           }
         },
         "required": [
           "id",
-          "backend"
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_link_remote",
+      "description": "Link one backlog item to a remote item through a binding (adopting its fields on the first sync, tags merged), create a new remote item from it, or unlink it with `remove: true`. An item may be linked through several bindings, one remote item each. The remote URL is added to the item's links. Run only when the user asked; it writes to the remote tracker. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
+          },
+          "binding": {
+            "type": "string",
+            "description": "The binding to link through; omit to use the one serving the item’s project."
+          },
+          "backend": {
+            "type": "string",
+            "description": "Provider kind (linear, github, files…) when no binding is named; omit to read it from the reference."
+          },
+          "reference": {
+            "description": "The remote item: a URL, an identifier such as ENG-12, an issue number such as 42 or owner/repo#42, or a file name.",
+            "type": "string"
+          },
+          "create": {
+            "type": "boolean",
+            "description": "Create a new remote item from the backlog item through the binding instead of linking `reference`."
+          },
+          "remove": {
+            "type": "boolean",
+            "description": "Unlink the item (from `binding`, from every binding of `backend`, or from all) and stop syncing it; neither side is deleted."
+          }
+        },
+        "required": [
+          "id"
         ],
         "additionalProperties": false
       }
@@ -2812,7 +2917,7 @@
         "properties": {
           "query": {
             "type": "string",
-            "description": "Words that must all match (title, tags, body, comments, original capture, project, links; \"quoted phrases\" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent has:thread|revision|url updated:<7d updated:>30d. Results rank by relevance and say which fields matched."
+            "description": "Words that must all match (title, tags, body, comments, original capture, project, links; \"quoted phrases\" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent (touched by) created:me|agent|system (captured by) has:thread|revision|url|children|parent updated:<7d updated:>30d priority:urgent|high|medium|low|none parent:b:k3f9 is:ready is:blocked-by-deps is:delegated is:claimed delegate:agent has:criteria|plan|summary|due|gate is:plan-pending is:overdue is:gated due:<7d due:>30d. A leading - negates any operator or word (-created:agent, -kind:note, -#tag, -priority:none). Results rank by relevance and say which fields matched."
           },
           "statuses": {
             "type": "array",
@@ -2873,8 +2978,100 @@
             "type": "boolean",
             "description": "Only open items that want the user: attention set, or a triage suggestion waiting; closed items are excluded."
           },
+          "hideAgentItems": {
+            "type": "boolean",
+            "description": "Leave out items an agent captured that the user never touched, unless they ask for attention or wait on a suggestion. Defaults to false: every item is listed."
+          },
+          "ready": {
+            "type": "boolean",
+            "description": "Only ready items (open, unsnoozed, unblocked, no open sub-issue, unclaimed), urgent first then oldest."
+          },
           "limit": {
             "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_merge",
+      "description": "Merge duplicate items into one: their comments (quoted, keeping who wrote them), links, tags, files, sub-issues and remote links where the survivor has none for that binding move to the survivor, links from other items are rewritten to it, and each duplicate is dropped with a `duplicates` link. `b:<duplicate>` references keep working and open the survivor. Every step is in both items' history. Run only when the user asked; an agent must pass `confirm: true`.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "survivor": {
+            "description": "The item that stays (`b:k3f9`)."
+          },
+          "duplicates": {
+            "description": "The duplicates to merge into it; each is dropped with a `duplicates` link and its `b:<ref>` then opens the survivor.",
+            "type": "array",
+            "items": {
+              "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
+            }
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Explicit opt-in an agent must pass when the user asked for this; without it an agent call is refused. The panel never needs it."
+          }
+        },
+        "required": [
+          "survivor",
+          "duplicates"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_peer_status",
+      "description": "Backlog replication across Hosts: the multi-host runtimes this Host can pull the backlog from, whether each is on, how far it was pulled, the ops still to pull, its last error, and which Host runs gate checks and main polling. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "backlog_peer_sync",
+      "description": "Pull backlog changes from enabled peer Hosts now instead of at the next interval, then return the replication status. It adds the peers’ ops to this backlog; run it only when the user asked to sync.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "runtimeId": {
+            "type": "string",
+            "description": "One runtime to pull now; omit to pull every enabled one."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_peers_configure",
+      "description": "Turn backlog replication on or off per multi-host runtime and choose the Host that runs gate checks and main polling. It changes Backlog settings; run it only when the user asked.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "peers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "runtimeId": {
+                  "type": "string"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "runtimeId",
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Runtimes to turn backlog replication on or off for; others keep their setting. Turning one off stops pulling and keeps what was pulled."
+          },
+          "automationHost": {
+            "type": "string",
+            "description": "The backlog Host id (from `backlog_peer_status`) that runs gate checks and main polling; an empty string means this Host."
           }
         },
         "additionalProperties": false
@@ -2885,7 +3082,29 @@
       "description": "Every project items were captured in, with status counts over all items, how many need the user, and who worked on them. Read-only.",
       "parameters": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "hideAgentItems": {
+            "type": "boolean",
+            "description": "Leave out items an agent captured that the user never touched, like the views that hide agent items."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_pull_requests",
+      "description": "The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed) and checks, read from the pull-requests plugin. A PR no thread watches shows `unknown`; `available: false` when that plugin is not loaded. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -2895,7 +3114,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           },
           "attachmentId": {
             "type": "string"
@@ -2909,6 +3128,24 @@
           "id",
           "attachmentId"
         ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_ready",
+      "description": "The ready queue: open (inbox or todo) items nothing open blocks (`depends-on`/`blocks` links), with no open sub-issue, not snoozed and not claimed, urgent first then oldest. Pick the first and claim it with backlog_claim before working on it. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "Absolute project path; null lists ready items outside any project. Omit for every project."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "How many to return; defaults to 20."
+          }
+        },
         "additionalProperties": false
       }
     },
@@ -2964,13 +3201,29 @@
       }
     },
     {
+      "name": "backlog_release",
+      "description": "Give up a claim without finishing: the lease ends, the delegate is cleared and an item still `doing` returns to `todo` so it is ready again. Only the holder may release a live claim; the user can release any from the panel. Say in a backlog_comment what is left. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "backlog_remove_file",
       "description": "Remove one image or file from a backlog item. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           },
           "attachmentId": {
             "type": "string"
@@ -2979,6 +3232,254 @@
         "required": [
           "id",
           "attachmentId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_revert",
+      "description": "Revert one recorded field change of a backlog item: writes the typed value the field held before that change, read from the op log, as a new change. Refused with `stale` when the field changed again since. Run only when the user asked to revert that change, and pass `confirm: true`; an agent call without it is refused.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
+          },
+          "at": {
+            "description": "The `at` time of the item event whose `fieldChanges` lists the change to undo, as `backlog_get` returns it.",
+            "type": "integer"
+          },
+          "field": {
+            "description": "The changed field to put back: title, body, kind, status, project, tags, pinned, attention, priority, parent, criteria, plan, planApproval or summary.",
+            "type": "string",
+            "enum": [
+              "title",
+              "body",
+              "kind",
+              "status",
+              "project",
+              "tags",
+              "pinned",
+              "attention",
+              "priority",
+              "parent",
+              "criteria",
+              "plan",
+              "planApproval",
+              "summary",
+              "due",
+              "recurrence",
+              "gates"
+            ]
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Explicit opt-in an agent must pass when the user asked for this; without it an agent call is refused. The panel never needs it."
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "field"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_schedule_rule",
+      "description": "Schedule a backlog rule as a project automation (via @dshfiles/project-automations): each run starts a thread in the project whose prompt calls backlog tools. For an item that simply repeats, prefer its `recurrence` field. Run only when the user asked; manage or delete the automation with automation_list / automation_delete.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "description": "`triage`: triage the project inbox on each run. `recreate`: capture a fresh copy of the item `id` on each run.",
+            "type": "string",
+            "enum": [
+              "triage",
+              "recreate"
+            ]
+          },
+          "project": {
+            "type": "string",
+            "description": "Absolute project path; defaults to the project of `id`."
+          },
+          "id": {
+            "description": "The item a `recreate` rule copies."
+          },
+          "timing": {
+            "description": "When it runs: { kind: daily, time, timeZone }, weekly with weekdays, cron with an expression, or every N seconds.",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "cron"
+                    ]
+                  },
+                  "expression": {
+                    "type": "string"
+                  },
+                  "timeZone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "expression",
+                  "timeZone"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "daily"
+                    ]
+                  },
+                  "time": {
+                    "type": "string"
+                  },
+                  "timeZone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "time",
+                  "timeZone"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "weekly"
+                    ]
+                  },
+                  "time": {
+                    "type": "string"
+                  },
+                  "timeZone": {
+                    "type": "string"
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "time",
+                  "timeZone",
+                  "weekdays"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "every"
+                    ]
+                  },
+                  "everySeconds": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "everySeconds"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "rule",
+          "timing"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_set_project_guidance",
+      "description": "Set one project’s standing guidance for agents: it opens the first message of threads started from its items and comes back with backlog_get and backlog_ready. Run only when the user asked for this change.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "description": "Absolute project path.",
+            "type": "string"
+          },
+          "guidance": {
+            "description": "Markdown instructions for agents working on this project’s items; empty removes them.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "guidance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_shipped",
+      "description": "What shipped: items that reached `done` per hour, day, week, month or year (or one custom range), newest period first, grouped by project, with each item's linked revisions and pull requests, the previous period's count for the delta, and any cached AI summary. Only items done now count, once, at their last move to done; dropped items never count; agent-captured items count and say so. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "description": "Bucket size: `hour`, `day`, `week` (Monday start), `month` or `year` back from now, or `custom` for one `from`–`to` range.",
+            "type": "string",
+            "enum": [
+              "hour",
+              "day",
+              "week",
+              "month",
+              "year",
+              "custom"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "description": "How many periods, newest first, including the current one; defaults to 24 hours, 14 days, 12 weeks, 12 months or 5 years."
+          },
+          "from": {
+            "type": "integer",
+            "description": "Custom range start, epoch ms, inclusive. Required with `custom`."
+          },
+          "to": {
+            "type": "integer",
+            "description": "Custom range end, epoch ms, exclusive. Required with `custom`."
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Only these absolute project paths; null selects items without a project. Empty or omitted: every project."
+          },
+          "tzOffsetMinutes": {
+            "type": "integer",
+            "description": "Minutes east of UTC that day, week, month and year boundaries follow; defaults to 0."
+          }
+        },
+        "required": [
+          "period"
         ],
         "additionalProperties": false
       }
@@ -2993,7 +3494,7 @@
             "description": "The items the thread works on; every one of them is linked and named in the opening message.",
             "type": "array",
             "items": {
-              "type": "integer"
+              "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
             }
           },
           "workspaceId": {
@@ -3032,18 +3533,379 @@
       }
     },
     {
+      "name": "backlog_summarize_shipped",
+      "description": "A short AI summary of one shipped period, written by the configured triage model (Backlog settings › Triage) and cached per period, bucket and project filter; a cached summary whose items are unchanged is returned without a model call. Changes no item, but calls the model, so run it only when the user asked for a summary.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day",
+              "week",
+              "month",
+              "year",
+              "custom"
+            ]
+          },
+          "start": {
+            "description": "The bucket `start` as `backlog_shipped` returns it.",
+            "type": "integer"
+          },
+          "end": {
+            "description": "The bucket `end` as `backlog_shipped` returns it.",
+            "type": "integer"
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Only these absolute project paths; null selects items without a project. Empty or omitted: every project."
+          },
+          "regenerate": {
+            "type": "boolean",
+            "description": "Call the model again even when a current summary is cached."
+          }
+        },
+        "required": [
+          "period",
+          "start",
+          "end"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_sync_binding_remove",
+      "description": "Remove one sync binding and every item link it holds; items and remote items stay. Run only when the user asked; an agent must pass `confirm: true`.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "binding": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Explicit opt-in an agent must pass when the user asked for this; without it an agent call is refused. The panel never needs it."
+          }
+        },
+        "required": [
+          "binding"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_sync_binding_save",
+      "description": "Add or change one sync binding: which container of which connection syncs with which projects, in which direction, which fields (with value maps), under which conflict policy (lww, local-wins, remote-wins, flag), how often, and whether a pull imports new remote items. A new binding needs `connectionId`; fields left out of a change keep their value. Run only when the user asked for this change. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "binding": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "An existing binding to change; omit to add one. Fields left out keep their saved value."
+              },
+              "connectionId": {
+                "type": "string"
+              },
+              "container": {
+                "type": "string",
+                "description": "Team key, owner/repo or folder. Empty lets the provider derive it from the project (git remote, <project>/backlog)."
+              },
+              "scope": {
+                "type": "string",
+                "description": "Absolute project path, or null to serve every project without a binding of its own."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "pull",
+                  "push",
+                  "two-way"
+                ]
+              },
+              "fieldMap": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "body",
+                        "status",
+                        "tags",
+                        "priority",
+                        "parent",
+                        "links",
+                        "due",
+                        "criteria",
+                        "summary"
+                      ]
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "two-way",
+                        "pull",
+                        "push",
+                        "off"
+                      ]
+                    },
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "local": {
+                            "type": "string"
+                          },
+                          "remote": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "local",
+                          "remote"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "field",
+                    "direction",
+                    "values"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "conflictPolicy": {
+                "type": "string",
+                "enum": [
+                  "lww",
+                  "local-wins",
+                  "remote-wins",
+                  "flag"
+                ]
+              },
+              "pollEverySec": {
+                "type": "integer"
+              },
+              "pushAgentComments": {
+                "type": "boolean"
+              },
+              "importNew": {
+                "type": "boolean"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "options": {
+                "type": "object",
+                "properties": {},
+                "description": "Provider-specific settings the provider lists as binding options (Notion: statusProperty, tagsProperty, priorityProperty, parentProperty). Replaces the saved set."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "binding"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_sync_connection_move",
+      "description": "Move one sync connection earlier or later in the list. Run only when the user asked for that order.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "earlier",
+              "later"
+            ]
+          }
+        },
+        "required": [
+          "instanceId",
+          "direction"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_sync_connection_remove",
+      "description": "Remove one sync connection with its bindings and every item link they hold; items and remote items stay. Run only when the user asked; an agent must pass `confirm: true`.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Explicit opt-in an agent must pass when the user asked for this; without it an agent call is refused. The panel never needs it."
+          }
+        },
+        "required": [
+          "instanceId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_sync_connection_save",
+      "description": "Add or change one sync connection (an account of a provider). The key is stored only as a secret:ALIAS reference. Run only when the user asked for this change. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "object",
+            "properties": {
+              "instanceId": {
+                "description": "Stable id of the connection, lowercase with dashes, e.g. github-work.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Provider kind: linear, github, files, or one a plugin provides.",
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "credential": {
+                "type": "string",
+                "description": "secret:ALIAS reference to the key; empty uses the provider’s Host environment variable (or the gh CLI for GitHub)."
+              },
+              "baseUrl": {
+                "type": "string",
+                "description": "API base URL for a self-hosted instance; empty uses the provider’s default. Jira needs https://<site>.atlassian.net."
+              },
+              "options": {
+                "type": "object",
+                "properties": {},
+                "description": "Provider settings its descriptor lists in connectionOptions, e.g. { email } for Jira. Never a key."
+              }
+            },
+            "required": [
+              "instanceId",
+              "kind",
+              "label"
+            ],
+            "additionalProperties": false
+          },
+          "previousInstanceId": {
+            "type": "string",
+            "description": "The id the connection had, to rename it; its bindings follow."
+          }
+        },
+        "required": [
+          "connection"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_sync_connections",
+      "description": "The sync providers, connections (accounts, with where each key comes from, never the key) and bindings (container, project scope, direction, field map, conflict policy, poll interval, owner Host). Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_sync_discover",
+      "description": "List the containers (teams, repositories, folders) a connection can bind, with the account it signs in as. The key never leaves the Host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "A saved connection id."
+          },
+          "draft": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "credential": {
+                "type": "string"
+              },
+              "baseUrl": {
+                "type": "string"
+              },
+              "options": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            "required": [
+              "kind",
+              "credential",
+              "baseUrl"
+            ],
+            "additionalProperties": false,
+            "description": "An unsaved connection, as a settings form holds it."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backlog_sync_import_all",
+      "description": "Import every open remote item of a binding that no backlog item mirrors yet, idempotently (already linked ones only sync). Comments come on each item's next sync. Run only when the user asked; an agent must pass `confirm: true`. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "binding": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Explicit opt-in an agent must pass when the user asked for this; without it an agent call is refused. The panel never needs it."
+          }
+        },
+        "required": [
+          "binding"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "backlog_sync_now",
-      "description": "Sync linked backlog items with their Linear or GitHub issues now: title, description, status and tags flow both ways (a field both sides changed goes to the side that changed last, with a conflict note on the item), and new comments are carried over once. Run only when the user asked. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "description": "Sync linked backlog items with their remote items now: each binding's field map decides which fields flow which way (a field both sides changed is settled by the binding's conflict policy, with a conflict note on the item), and new comments are carried over once. Run only when the user asked. Without `id` it syncs every linked item or a whole binding, which an agent may run only with `confirm: true`. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
             "description": "One linked item; omit to sync every linked item (of `project`, when given)."
           },
           "project": {
             "type": "string",
             "description": "Only linked items of this project; null selects items without a project."
+          },
+          "binding": {
+            "type": "string",
+            "description": "Run one binding: pull what changed remotely since its last pass, then push local changes of its linked items."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Explicit opt-in an agent must pass when the user asked for this; without it an agent call is refused. The panel never needs it."
           }
         },
         "additionalProperties": false
@@ -3051,14 +3913,14 @@
     },
     {
       "name": "backlog_sync_status",
-      "description": "Remote sync of backlog items: the configured backends (Linear teams, GitHub repositories) with whether a key is bound, and each linked item with its issue, sync state (synced, pending, conflict, error), last sync time, last error and recent conflicts. Read-only.",
+      "description": "Remote sync of backlog items: the providers, connections (accounts) and bindings (sync flows), and each linked item with its binding, remote key, sync state (synced, pending, conflict, error), last sync time, last error and recent conflicts. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
           "ids": {
             "type": "array",
             "items": {
-              "type": "integer"
+              "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
             },
             "description": "Only these items; omit for every linked item."
           }
@@ -3067,34 +3929,50 @@
       }
     },
     {
+      "name": "backlog_sync_test_all",
+      "description": "Test every saved sync connection on the Host (the Test all button), with the same report as backlog_sync_test_connection. The keys never leave the Host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "backlog_sync_test_connection",
-      "description": "Test a Linear or GitHub sync backend (saved or not) on the Host: where its key comes from, the account it signs in as, the team or repository it reaches and, for Linear, every team the key can see. The key never leaves the Host. Read-only.",
+      "description": "Test one sync connection (saved or not) on the Host: where its key comes from, the account it signs in as and the containers it can see. The key never leaves the Host. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
-          "backend": {
+          "connection": {
             "type": "string",
-            "enum": [
-              "linear",
-              "github"
-            ]
+            "description": "A saved connection id."
           },
-          "project": {
-            "type": "string",
-            "description": "Absolute project path the row serves; empty or omitted serves every other project."
-          },
-          "target": {
-            "type": "string",
-            "description": "Linear team key or GitHub owner/repo. Empty: Linear uses the key's only team; GitHub reads the project's github.com git remote."
-          },
-          "secret": {
-            "type": "string",
-            "description": "secret:ALIAS reference to the key. Empty: LINEAR_API_KEY, or GITHUB_TOKEN / GH_TOKEN / a signed-in gh CLI on the Host."
+          "draft": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "credential": {
+                "type": "string"
+              },
+              "baseUrl": {
+                "type": "string"
+              },
+              "options": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            "required": [
+              "kind",
+              "credential",
+              "baseUrl"
+            ],
+            "additionalProperties": false,
+            "description": "An unsaved connection, as a settings form holds it."
           }
         },
-        "required": [
-          "backend"
-        ],
         "additionalProperties": false
       }
     },
@@ -3105,7 +3983,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           }
         },
         "required": [
@@ -3116,7 +3994,7 @@
     },
     {
       "name": "backlog_triage_backfill",
-      "description": "Start a background triage backfill for inbox/todo tasks only (Jev and the configured cheap model). Returns a job id immediately; check backlog_triage_backfill_status to follow progress. A confident answer applies; a hesitant one waits on the item as a suggestion. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "description": "Start a background triage backfill for inbox/todo tasks only (Jev and the configured cheap model). Returns a job id immediately; check backlog_triage_backfill_status to follow progress. A confident answer applies; a hesitant one waits on the item as a suggestion. Run only when the user asked: an agent run over more than 5 items (the default is 25) needs `confirm: true`. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -3127,6 +4005,10 @@
           "retriage": {
             "type": "boolean",
             "description": "Also re-triage inbox/todo tasks already looked at, e.g. after changing the prompt or model."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Explicit opt-in an agent must pass when the user asked for this; without it an agent call is refused. The panel never needs it."
           }
         },
         "additionalProperties": false
@@ -3150,12 +4032,12 @@
     },
     {
       "name": "backlog_update",
-      "description": "Edit or move one backlog item, or ask the user for input with `attention`. Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
+      "description": "Edit or move one backlog item, or ask the user for input with `attention`. Structured sections: `criteria` (acceptance checklist), `plan` (with `planApproval: pending` to wait for the user's go-ahead) and `summary` (when closing). Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.",
       "parameters": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "description": "The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number."
           },
           "title": {
             "type": "string"
@@ -3209,6 +4091,113 @@
           "snoozedUntil": {
             "type": "integer",
             "description": "Hide the item until this epoch-ms time; null wakes it."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "none",
+              "urgent",
+              "high",
+              "medium",
+              "low"
+            ],
+            "description": "urgent, high, medium, low, or none to clear it."
+          },
+          "parent": {
+            "type": "string",
+            "description": "Nest it under this item (`b:k3f9`) as a sub-issue, or null to make it top-level. Refused for itself, a loop, or a fourth level."
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "done": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Acceptance criteria, replacing the whole list ({text, done?, id?}); a criterion with the same text keeps its id and check. null removes them."
+          },
+          "criteriaChecks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "done": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "done"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Check (done: true) or uncheck criteria by their id, as backlog_get returns them, without rewriting the list."
+          },
+          "plan": {
+            "type": "string",
+            "description": "How the work will be done (markdown); null or empty removes it."
+          },
+          "planApproval": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved"
+            ],
+            "description": "`pending` asks the user to approve the plan before you start: the item asks for input until they approve. Only the user can set `approved`; wait for it."
+          },
+          "due": {
+            "type": "string",
+            "description": "The date it is due, YYYY-MM-DD with no time, or null to clear it. Open items past it show as overdue in the Inbox."
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "pr",
+                    "revision",
+                    "check",
+                    "date"
+                  ]
+                },
+                "target": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "target"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Outside conditions it waits on, replacing the list: `pr` (a pull request URL, open until merged), `revision` (a jj change or commit id, open until it is on main), `check` (a project-check action id, open until it passes in a thread linked to the item), `date` (YYYY-MM-DD, open until that day). The item is not ready while a gate is open; gates resolve on their own. null removes them."
+          },
+          "recurrence": {
+            "type": "string",
+            "description": "`daily`, `weekly`, `monthly` or `cron:<min hour dom month dow>`: when the item is done the Host creates the next occurrence with the next due date (criteria unchecked). null stops repeating."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Final summary of what was done, written when closing the item; Shipped shows it."
           }
         },
         "required": [
@@ -3723,6 +4712,26 @@
       }
     },
     {
+      "name": "jj_cancel_workspace_setup",
+      "description": "Cancel one queued or running setup action of a thread workspace. The durable task reports cancelled only after its process group exits, and effects applied before cancellation are not undone. Call only when the user asked to stop it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "taskId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "jj_confirm_action",
       "description": "Apply one prepared jujutsu action by its previewId and return the command message and output. Call only when the user asked, after jj_prepare_action showed them the plan.",
       "parameters": {
@@ -3787,11 +4796,14 @@
     },
     {
       "name": "jj_graph_navigation",
-      "description": "Resolve the current, main@origin, main and default-workspace landmarks in one call. Read-only.",
+      "description": "Resolve the current, main@origin, main and default-workspace landmarks in one call; `bookmark` names the project main branch the main landmarks use (main by default). Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
           "repoId": {
+            "type": "string"
+          },
+          "bookmark": {
             "type": "string"
           }
         },
@@ -3865,6 +4877,7 @@
             "type": "string"
           },
           "limit": {
+            "description": "Revisions in the first page, 1 to 10; omit it for the default page. Use jj_graph_page to continue.",
             "type": "integer"
           }
         },
@@ -4347,8 +5360,24 @@
       }
     },
     {
+      "name": "jj_project_bookmark",
+      "description": "The main branch of the project holding a path: the bookmark its thread workspaces start from, Land advances, and source control and Changes compare against, with the layer that chose it (Settings › Projects choice, dsh.project.json, origin’s default branch, or the global setting). Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "jj_reference_graph",
-      "description": "A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks. Read-only.",
+      "description": "A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks; `bookmark` names the project main branch those main landmarks use (main by default). Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -4356,6 +5385,9 @@
             "type": "string"
           },
           "reference": {
+            "type": "string"
+          },
+          "bookmark": {
             "type": "string"
           }
         },
@@ -4473,8 +5505,28 @@
       }
     },
     {
+      "name": "jj_set_project_bookmark",
+      "description": "Choose the main branch of the project holding a path, as Settings › Projects does: new thread workspaces start from it, Land advances it, and source control and Changes compare against it. `bookmark: null` removes the choice so dsh.project.json, origin’s default branch or the global setting decide again (reverse it the same way). Returns the new resolution. Call only when the user asked to change that project’s main branch.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "bookmark": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "bookmark"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "jj_thread_cleanup",
-      "description": "Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision, no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left). Other JJ workspaces are manual-only and opt-in: present checkouts must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. Missing secondary checkouts can only be forgotten when their root stays absent and no unlanded work or live Session remains; cleanup never deletes their path. JJ snapshots present working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. When targets is present, only matching preview rows are removed. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.",
+      "description": "Remove idle workspaces in one pass, then abandon empty undescribed revisions nothing builds on. Thread workspaces must have no unlanded revision unless one other local bookmark holds all of it (preview rows name it in integratedInto, and the bookmark stays), no live Session working, waiting for an answer or unreadable, no queued integration, and a listed kind; they must also have been unused longer than olderThanHours (empty: never landed; integrated: landed and nothing left, or held by another bookmark). Other JJ workspaces are manual-only and opt-in: present checkouts must be idle, have no queued integration, a clean and verified working copy with no unlanded work, and a reported root outside the primary checkout and threads directory. Missing secondary checkouts can only be forgotten when their root stays absent and no unlanded work or live Session remains; cleanup never deletes their path. JJ snapshots present working-copy files before checking them, preserving them in the working-copy revision. The untracked kind removes stale threads-directory entries no JJ workspace owns. When targets is present, only matching preview rows are removed. Never forces unlanded work. apply: false previews; call with apply: true only when the user asked to clean up.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -4491,6 +5543,7 @@
               "enum": [
                 "empty",
                 "integrated",
+                "merged",
                 "secondary",
                 "untracked"
               ]
@@ -4512,6 +5565,7 @@
                   "enum": [
                     "empty",
                     "integrated",
+                    "merged",
                     "secondary",
                     "untracked"
                   ]
@@ -4635,7 +5689,7 @@
     },
     {
       "name": "jj_thread_rebase",
-      "description": "Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.",
+      "description": "Integrate this thread’s described work into the project’s main branch (Settings › Projects) unless another bookmark is named: rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -4686,7 +5740,7 @@
     },
     {
       "name": "jj_thread_status",
-      "description": "Show this thread’s jj workspace: its revisions not yet on the target bookmark (main by default), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.",
+      "description": "Show this thread’s jj workspace: its revisions not yet on the project’s main branch (Settings › Projects), conflicts, whether the bookmark moved since its last rebase, and whether it is safe to rebase now. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -4700,7 +5754,7 @@
     },
     {
       "name": "jj_thread_workspace_sync",
-      "description": "State of the last sync of the DSH checkout onto main after a rebase: running, done or failed, which plugins were rebuilt, conflicts, and whether DSH needs a restart. Read-only.",
+      "description": "State of the last sync of the DSH checkout onto main after a rebase: queued, running, done or failed, which plugins were rebuilt, conflicts, and whether DSH needs a restart. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -4719,6 +5773,26 @@
         },
         "required": [
           "repoId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "jj_workspace_setup",
+      "description": "Prepare a new thread workspace with the trusted setup actions this project flags: dispatch each once through the durable project-check queue and report their phases. Runs nothing outside a thread workspace of a local repository, and nothing from dsh.project.json. Call only when the user asked to start that setup.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "path"
         ],
         "additionalProperties": false
       }
@@ -5520,7 +6594,7 @@
     },
     {
       "name": "multi_host_checkout_sync",
-      "description": "Fetch and rebase one checkout on an SSH host onto its bookmark origin, keeping that machine edits. Without apply it only reports the commands. Call only when the user asked to update that checkout.",
+      "description": "Sync one jj checkout on an SSH host with <bookmark>@origin. Without apply it fetches (which moves remote bookmarks only), simulates the rebase and reports the incoming and outgoing revisions, the bookmark state, which workspace this is, the others that share the repository, and the recovery commands for that host; no file changes. With apply it rebases, keeping undescribed local edits. It never pushes and never moves a bookmark. Described work origin lacks, a conflict, a conflicted bookmark, a stale working copy or another workspace built on these revisions refuses the sync and leaves the checkout as it was. Pass the head and target of the report as expectedHead and expectedTarget to refuse when the checkout moved since. Call only when the user asked to check or update that checkout.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -5535,6 +6609,12 @@
           },
           "apply": {
             "type": "boolean"
+          },
+          "expectedHead": {
+            "type": "string"
+          },
+          "expectedTarget": {
+            "type": "string"
           }
         },
         "required": [
@@ -6757,7 +7837,7 @@
     },
     {
       "name": "project_checks_actions",
-      "description": "The trusted project actions configured for a thread directory, with each action command line and where it applies. Defaults to the calling thread. Read-only.",
+      "description": "The trusted project actions configured for a thread directory, with each action command line and where it applies, including the runOnWorkspaceCreate / awaitBeforeFirstTurn / onSettle setup flags. Defaults to the calling thread. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -6882,6 +7962,26 @@
       }
     },
     {
+      "name": "project_checks_setup_actions",
+      "description": "The trusted actions flagged to prepare a thread workspace or run on settle, for one workspace and the checkout it belongs to. An action qualifies only when its trusted root contains both. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "workspacePath": {
+            "type": "string"
+          },
+          "repoRoot": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspacePath",
+          "repoRoot"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_checks_tasks",
       "description": "List durable project-check tasks for a thread, including interrupted/unknown work. Defaults to the calling thread. Read-only.",
       "parameters": {
@@ -6951,6 +8051,38 @@
       }
     },
     {
+      "name": "project_clone_retry",
+      "description": "Retry a failed or cancelled clone into the same folder, as a new job; a running or succeeded job is refused. Follow it with project_clone_jobs. Call only when the user asked to retry that clone.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_config_read",
+      "description": "Read the dsh.project.json a repository declares at its root: icon path, default thread workspace, bookmark, trusted check ids and suggested scripts. A missing or invalid file is reported, never thrown; scripts in the file only run after the user imports them into the profile-trusted project checks. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_create",
       "description": "Create a new project folder <parentPath>/<name>: jj git init (colocated), a README.md, a first described commit and a main bookmark, then register it as a project. createGitHubRepository: true also creates a PRIVATE GitHub repository with the GitHub CLI and pushes main; pass it only when the user asked for a GitHub repository. Refuses an existing folder. Call only when the user asked to create a project.",
       "parameters": {
@@ -6991,6 +8123,76 @@
       }
     },
     {
+      "name": "project_icon",
+      "description": "The icon of the project at a folder: the iconPath declared in dsh.project.json, then a short list of conventional paths, then a monogram from the folder name. Cached on the Host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_identities",
+      "description": "The repository identity behind each project folder: the Git/Jujutsu origin when there is one, else the repository root, else the folder itself, so two checkouts of one repository can group as one project. Cached on the Host. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_init",
+      "description": "Turn an existing folder into a project in place: jj git init (colocated), a README.md when it has none, a first described commit and a main bookmark, then register it as a project. Existing files are kept and become the first revision. Refuses a folder that is already a repository or sits inside one. Call only when the user asked to initialize that folder.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_inspect",
+      "description": "Report what a folder is before it becomes a project: no repository, a Git checkout or a Jujutsu repository, its root, origin URL and default branch, and whether Jujutsu can be enabled alongside Git. Never writes. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_list",
       "description": "List registered projects (DSH Workspaces): id, title, path and thread count. Read-only.",
       "parameters": {
@@ -7000,8 +8202,44 @@
       }
     },
     {
+      "name": "project_projects",
+      "description": "List registered projects (DSH Workspaces) on this machine with their workspace id, title and path, leaving out jj thread workspaces. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "project_publish",
+      "description": "Publish a local repository that has no origin: create the GitHub repository with the GitHub CLI, add it as origin and push the bookmark. visibility is required so nothing is created by default; a repository that already has an origin, or no commits, is refused with the next command. Call only when the user asked to publish that repository.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public"
+            ]
+          },
+          "bookmark": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "visibility"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "project_register",
-      "description": "Register an existing directory as a project so threads can live in it. Call only when the user asked for this.",
+      "description": "Register an existing directory as a project so threads can live in it, and report what the folder is. It registers only: it never clones and never enables Jujutsu — read project_inspect, then project_init or jj_open_repository for that. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -7206,7 +8444,7 @@
             "type": "string"
           },
           "base": {
-            "description": "Base bookmark or revision; defaults to the first of main, master or trunk.",
+            "description": "Base bookmark or revision; defaults to the project’s main branch (Settings › Projects, dsh.project.json or origin’s default branch), else the first of main, master or trunk.",
             "type": "string"
           },
           "fromChangeId": {
@@ -7220,6 +8458,32 @@
         },
         "required": [
           "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "pulls_review_revisions",
+      "description": "Review several Jujutsu revisions together: each revision with its own changed files and line counts, ancestors first. The revisions need not be adjacent, and a selection with gaps is reported as such; use jj_details for a patch.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Absolute path of a workspace of the repository.",
+            "type": "string"
+          },
+          "revisions": {
+            "description": "The revisions to review together; they need not be adjacent.",
+            "type": "array",
+            "items": {
+              "description": "A commit id, or a change id, in full or as a unique prefix, as jj log prints them. A revset expression is refused.",
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "path",
+          "revisions"
         ],
         "additionalProperties": false
       }
@@ -9002,6 +10266,22 @@
       }
     },
     {
+      "name": "thread_subscribe",
+      "description": "Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) is queued into the subscriber and wakes it when it is idle. Defaults the subscriber to the calling thread. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "thread_subscriptions",
+      "description": "List thread subscriptions: which thread is notified when which other thread finishes a turn. Filter by subscriber or target; omit both for every edge. Nothing is delivered without a subscription. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
       "name": "thread_unarchive",
       "description": "Restore an archived thread to its recorded place in the sidebar. Call only when the user asked for this.",
       "parameters": {
@@ -9047,6 +10327,14 @@
           "sessionId"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "name": "thread_unsubscribe",
+      "description": "Stop the notices for one pair: no further completion of the target reaches the subscriber. Defaults the subscriber to the calling thread. Call only when the user asked for this.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     },
     {
@@ -10339,6 +11627,15 @@
       }
     },
     {
+      "name": "workspace_folder_browser_capabilities",
+      "description": "Check whether this Host offers its native folder-selection dialog without opening it, and how the Host's folder paths are written.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "workspace_folder_browser_create_directory",
       "description": "Create a child directory in an existing folder; only run when the user explicitly asks to create a folder.",
       "parameters": {
@@ -10427,6 +11724,26 @@
         },
         "required": [
           "targets",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "worktree_memory_stop_orphans",
+      "description": "Stop every orphaned scratch DSH Host (owner gone, or a pre-record Host init adopted more than 2 h ago): SIGTERM on its process group, SIGKILL after 3 s. Each one is re-checked first: it must still run `--profile dshx-boot` with the same start time, and the serving Host and its ancestors are never signalled. Call only when the user asked to stop orphans; pass confirm: true, which is required.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "description": "Must be true: stopping orphaned scratch Hosts ends their process groups.",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
           "confirm"
         ],
         "additionalProperties": false

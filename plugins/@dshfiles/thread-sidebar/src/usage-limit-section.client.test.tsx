@@ -13,6 +13,8 @@ const continuation = (patch: Partial<QuotaContinuation> = {}): QuotaContinuation
   accountId: 'codex_work',
   failedAt: NOW - 60_000,
   resetAt: NOW + 90 * 60_000,
+  retryAt: null,
+  retryAttempt: 0,
   autoRetry: false,
   snoozedUntil: null,
   state: 'waiting',

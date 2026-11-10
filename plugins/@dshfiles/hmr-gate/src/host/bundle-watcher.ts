@@ -143,8 +143,10 @@ const make = Effect.fnUntraced(function* (options: BundleWatcherOptions) {
 
   const pollUnwatched = Effect.gen(function* () {
     for (const [directory, entry] of directories) {
+      // Two map reads skip a healthy directory without suspending a fiber; this fallback poll runs over every watched directory twice a second.
+      if (FiberMap.hasUnsafe(watches, parentKey(directory)) && FiberMap.hasUnsafe(watches, directory)) continue
       yield* openParentWatch(directory, entry)
-      if (yield* FiberMap.has(watches, directory)) continue
+      if (FiberMap.hasUnsafe(watches, directory)) continue
       yield* openWatch(directory, entry)
       request(entry.ids, 0)
     }

@@ -346,6 +346,36 @@ describe('model calls with a purpose and outside a step', () => {
 })
 
 describe('wait spans', () => {
+  it('closes an approval and a compaction left open when their turn ends', () => {
+    using recorder = recordSpans()
+    const observer = coordinator()
+    const observed = session('s-8')
+    emit(observer, observed, 'turn/start', { turn: 1 })
+    emit(observer, observed, 'step/start', { turn: 1, step: 1 })
+    emit(observer, observed, 'tool/call', { turn: 1, step: 1, callId: 'rm', name: 'bash', arguments: '{}' })
+    emit(observer, observed, 'approval/asked', { id: 'a1', toolName: 'bash', callId: 'rm' })
+    emit(observer, observed, 'compaction/start', { compactionId: 'k1', turn: 1 })
+    emit(observer, observed, 'compaction/start', { compactionId: 'k2', turn: null })
+    emit(observer, observed, 'turn/end', { turn: 1, reason: { kind: 'completed' } })
+
+    expect(recorder.named('approval wait')).toHaveLength(1)
+    expect(recorder.span('approval wait').status).toMatchObject({ code: 'error', message: 'TURN_ENDED_BEFORE_DECISION' })
+    expect(recorder.named('compaction')).toHaveLength(1)
+    // A session-level compaction is not this turn's to close.
+    emit(observer, observed, 'compaction/end', { compactionId: 'k2' })
+    expect(recorder.named('compaction')).toHaveLength(2)
+  })
+
+  it("closes a session's open background job when the session is disposed", () => {
+    using recorder = recordSpans()
+    const observer = coordinator()
+    const observed = session('s-9')
+    emit(observer, observed, 'job/registered', { jobId: 'j9', owner: 's-9', kind: 'bash', startedAt: 1 })
+    observer.onDisposed(observed)
+
+    expect(recorder.named('job bash')).toHaveLength(1)
+  })
+
   it('records approval, model retry and background job waits under the right parent', () => {
     using recorder = recordSpans()
     const observer = coordinator()
@@ -431,6 +461,30 @@ describe('content capture', () => {
     expect(recorder.span('execute_tool bash').attributes['gen_ai.tool.call.arguments']).toBe('{"command":"ARGS-SECRET"}')
     expect(String(recorder.span('execute_tool bash').attributes['gen_ai.tool.call.result'])).toContain('TOOL-OUTPUT-SECRET')
     expect(String(recorder.span('invoke_agent deepseek-harness').attributes['gen_ai.output.messages'])).toContain('REPLY-SECRET')
+  })
+
+  it('reuses a frozen context message mapping while still seeing messages added between calls', async () => {
+    capture = true
+    using recorder = recordSpans()
+    const observer = coordinator()
+    const observed = session('s-13')
+    emit(observer, observed, 'turn/start', { turn: 1 })
+    emit(observer, observed, 'user/message', { role: 'user', content: [{ type: 'text', text: 'FIRST-SECRET' }], source: { kind: 'user' } })
+    emit(observer, observed, 'step/start', { turn: 1, step: 1 })
+    await drain(observer.interceptLlm(request(observed.id), () => stream(chunks())))
+    emit(observer, observed, 'step/end', { turn: 1, step: 1 })
+    emit(observer, observed, 'user/message', { role: 'user', content: [{ type: 'text', text: 'SECOND-SECRET' }], source: { kind: 'user' } })
+    emit(observer, observed, 'step/start', { turn: 1, step: 2 })
+    await drain(observer.interceptLlm(request(observed.id), () => stream(chunks())))
+    emit(observer, observed, 'step/end', { turn: 1, step: 2 })
+    emit(observer, observed, 'turn/end', { turn: 1, reason: { kind: 'completed' } })
+
+    const messages = recorder.named('chat kilo-auto/free').map(span => decodeJson(jsonValueSchema, String(span.attributes['gen_ai.input.messages'])))
+    expect(messages[0]).toEqual([{ role: 'user', parts: [{ type: 'text', content: 'FIRST-SECRET' }] }])
+    expect(messages[1]).toEqual([
+      { role: 'user', parts: [{ type: 'text', content: 'FIRST-SECRET' }] },
+      { role: 'user', parts: [{ type: 'text', content: 'SECOND-SECRET' }] },
+    ])
   })
 })
 

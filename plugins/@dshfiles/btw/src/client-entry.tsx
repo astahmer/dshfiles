@@ -17,12 +17,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { MessageCircleQuestionIcon } from '@dshfiles/plugin-ui/icons'
 import { useSelector } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { useSyncExternalStore, type ReactNode } from 'react'
+import { useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { Option, Schema } from 'effect'
 import { BTW_LOCALE_NAMESPACE, btwLocale, type BtwKey } from './locales.js'
 import { createBtwSource } from './btw-source.js'
 import { mainViewThreadId } from './main-view-thread.js'
-import { PrefixCache } from './prefix-cache.js'
+import { PrefixCacheReader } from './prefix-cache.js'
 import { SideChatModel, startSideChat, type ModelRoute, type SideChatActor } from './side-chat-machine.js'
 import { SideQuestionDialog } from './side-question-dialog.js'
 
@@ -92,11 +92,11 @@ type Translate = (key: BtwKey, params?: Record<string, string | number>) => stri
 
 const CacheReading = (props: { readonly reference: SessionReference; readonly t: Translate }): ReactNode => {
   const source = props.reference.binding.eventSource
-  const events = useSyncExternalStore(
-    listener => source.subscribe(listener),
-    () => source.getSnapshot(),
-  )
-  const reading = PrefixCache.firstRequestAfterFork(events.entries.map(entry => entry.event))
+  const read = useMemo(() => {
+    const reader = new PrefixCacheReader()
+    return () => reader.read(source.getSnapshot())
+  }, [source])
+  const reading = useSyncExternalStore(listener => source.subscribe(listener), read)
   if (reading === undefined) return <span>{props.t('cacheWaiting')}</span>
   return (
     <TooltipProvider delayDuration={500}>
@@ -138,7 +138,6 @@ export default defineClient({
     }
 
     const startBtw = (sourceId: SessionId, question: string): SideChatActor => {
-      let held: SessionReference | undefined
       const actor = startSideChat({
         sourceId,
         question,
@@ -162,20 +161,23 @@ export default defineClient({
             )
             if (!selected.ok) throw new Error(selected.error.message)
           },
-          ask: async input => {
-            const childId = ctx.sessions.list.getSnapshot().ids.find(id => id === input.childId)
-            if (childId === undefined) throw new Error('the side chat thread is not listed')
-            held = ctx.sessions.retain(childId, { source: 'btwSideChat' })
-            await held.ready
-            const session = held.binding.session
-            const handle = session.beginSubmission({ mode: 'queue', text: input.question, attachments: [] })
-            const result = await session.prompt([{ type: 'text', text: input.question }], 'queue', undefined, handle.requestId)
-            if (!result.ok) throw new Error(result.error.message)
+          retain: childId => {
+            const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === childId)
+            if (listed === undefined) throw new Error('the side chat thread is not listed')
+            const held = ctx.sessions.retain(listed, { source: 'btwSideChat' })
+            return {
+              ready: held.ready,
+              submit: async question => {
+                const session = held.binding.session
+                const handle = session.beginSubmission({ mode: 'queue', text: question, attachments: [] })
+                const result = await session.prompt([{ type: 'text', text: question }], 'queue', undefined, handle.requestId)
+                if (!result.ok) throw new Error(result.error.message)
+              },
+              release: () => held.release(),
+            }
           },
           openPanel: childId => ctx.sidebarRight.openResource(addressOf(childId), { kind: TAB_KIND, preferNewPane: true }),
           archive: async childId => {
-            held?.release()
-            held = undefined
             sideChats.delete(childId)
             const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === childId)
             if (listed !== undefined) await ctx.workspaces.archiveSession(listed, { stopActivity: true })

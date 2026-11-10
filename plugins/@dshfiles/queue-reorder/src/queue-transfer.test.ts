@@ -1,6 +1,6 @@
 import { waitFor } from '@dshfiles/plugin-ui/machine'
 import { describe, expect, it } from 'vitest'
-import { QueueEditModel, type QueuedBlock, type QueuedRow } from './queue-edit.js'
+import { QueueEditModel, type QueuedBlock, type QueuedRow } from './queue-edit-model.js'
 import { startQueueTransfer, transferTargets, type QueueTransferPorts, type TransferDestination } from './queue-transfer.js'
 
 const text = (value: string): QueuedBlock => ({ type: 'text', text: value })

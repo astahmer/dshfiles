@@ -1,11 +1,15 @@
 import type { PatchLineSelection } from '@dshfiles/plugin-ui/diff'
-import type { ChangesScope } from './changes-scope.js'
+import type { ChangesScope, RevisionSelection } from './changes-scope.js'
 
 /** What the Changes facet remembers about the thread it shows; another thread starts from scratch. */
 export interface FacetSessionState {
   readonly sessionId: string | undefined
   readonly scope: ChangesScope | undefined
   readonly seq: number | undefined
+  /** The graph selection the `revisions` scope shows; it stays while another scope is on screen. */
+  readonly revisions: RevisionSelection | undefined
+  /** The revision a line selection belongs to, when the `revisions` scope made it. */
+  readonly selectionRevision: string | undefined
   readonly focusPath: string | null
   readonly selection: PatchLineSelection | null
   readonly comment: string
@@ -18,6 +22,8 @@ const initial = (sessionId: string | undefined): FacetSessionState => ({
   sessionId,
   scope: undefined,
   seq: undefined,
+  revisions: undefined,
+  selectionRevision: undefined,
   focusPath: null,
   selection: null,
   comment: '',

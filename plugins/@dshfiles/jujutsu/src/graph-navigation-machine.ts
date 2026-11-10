@@ -1,9 +1,23 @@
 import { assign, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
-import type { GraphSlice, Revision, RevisionRelationship } from './api.js'
+import type { GraphLandmark, GraphSlice, Revision, RevisionRelationship } from './api.js'
 import { GraphNavigationModel, type GraphViewFilter, type HiddenGraphHistory } from './graph-navigation.js'
 
 export type GraphSliceMode = 'history' | 'exclusive'
+
+export type ComparisonTarget = GraphLandmark['kind'] | 'revision'
+
+export interface ComparisonState {
+  readonly open: boolean
+  readonly target: ComparisonTarget
+  readonly customTargetId: string
+}
+
+const COMPARISON_TARGETS = new Set<string>(['main', 'main-origin', 'default', 'current', 'revision'])
+
+export const isComparisonTarget = (value: string): value is ComparisonTarget => COMPARISON_TARGETS.has(value)
+
+export const closedComparison: ComparisonState = { open: false, target: 'main', customTargetId: '' }
 
 export interface GraphSliceRequest {
   readonly repoId: string
@@ -47,14 +61,22 @@ interface GraphNavigationContext {
   readonly hidden: readonly HiddenGraphHistory[]
   readonly revealed: readonly Revision[]
   readonly lensSelection: RelationshipLensSelection | null
+  readonly comparison: ComparisonState
   readonly notice: string
 }
 
-type GraphNavigationViewState = Pick<GraphNavigationContext, 'view' | 'hidden' | 'revealed' | 'lensSelection' | 'notice'>
+type GraphNavigationViewState = Pick<GraphNavigationContext, 'view' | 'hidden' | 'revealed' | 'lensSelection' | 'comparison' | 'notice'>
 
 export const selectGraphNavigationViewState = (context: GraphNavigationContext, scope: string): GraphNavigationViewState => {
-  if (context.scope !== scope) return { view: null, hidden: [], revealed: [], lensSelection: null, notice: '' }
-  return { view: context.view, hidden: context.hidden, revealed: context.revealed, lensSelection: context.lensSelection, notice: context.notice }
+  if (context.scope !== scope) return { view: null, hidden: [], revealed: [], lensSelection: null, comparison: closedComparison, notice: '' }
+  return {
+    view: context.view,
+    hidden: context.hidden,
+    revealed: context.revealed,
+    lensSelection: context.lensSelection,
+    comparison: context.comparison,
+    notice: context.notice,
+  }
 }
 
 interface GraphNavigationInput {
@@ -74,6 +96,10 @@ type GraphNavigationEvent =
       readonly targetLabel: string
     }
   | { readonly type: 'relationship.highlight'; readonly commitId: string; readonly targetCommitId: string }
+  | { readonly type: 'comparison.open'; readonly target: ComparisonTarget }
+  | { readonly type: 'comparison.close' }
+  | { readonly type: 'comparison.target'; readonly target: ComparisonTarget }
+  | { readonly type: 'comparison.custom'; readonly value: string }
   | { readonly type: 'reset' }
   | { readonly type: 'view.clear' }
   | { readonly type: 'lens.clear' }
@@ -155,6 +181,7 @@ export const graphNavigationMachine = setup({
     hidden: [],
     revealed: [],
     lensSelection: null,
+    comparison: closedComparison,
     notice: '',
   }),
   initial: 'idle',
@@ -170,6 +197,7 @@ export const graphNavigationMachine = setup({
         hidden: [],
         revealed: [],
         lensSelection: null,
+        comparison: closedComparison,
         notice: '',
       })),
     },
@@ -220,6 +248,27 @@ export const graphNavigationMachine = setup({
           notice: '',
         }
       }),
+    },
+    'comparison.open': {
+      guard: 'hasRepository',
+      actions: assign(({ context, event }) => ({
+        comparison: { open: true, target: event.target, customTargetId: event.target === 'revision' ? '' : context.comparison.customTargetId },
+      })),
+    },
+    'comparison.close': { actions: assign(({ context }) => ({ comparison: { ...context.comparison, open: false } })) },
+    'comparison.target': {
+      guard: 'hasRepository',
+      actions: assign(({ context, event }) => ({
+        comparison: {
+          open: context.comparison.open,
+          target: event.target,
+          customTargetId: event.target === 'revision' ? '' : context.comparison.customTargetId,
+        },
+      })),
+    },
+    'comparison.custom': {
+      guard: 'hasRepository',
+      actions: assign(({ context, event }) => ({ comparison: { ...context.comparison, customTargetId: event.value } })),
     },
     'relationship.highlight': {
       target: '.idle',

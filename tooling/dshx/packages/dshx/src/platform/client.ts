@@ -129,6 +129,12 @@ const modelSelectionSchema = Schema.Struct({
   model: Schema.String,
   reasoningEffort: Schema.optional(Schema.String),
 })
+/** The fields dshx reads from `@dshfiles/session-controller`'s `thread-model` snapshot. */
+const threadModelSnapshotSchema = withUnknownProperties({
+  selection: modelSelectionSchema,
+  revision: Schema.Number.check(Schema.isFinite(), Schema.isInt()),
+  preferSelectedProvider: Schema.Boolean,
+})
 const modelCatalogSchema = Schema.Struct({
   default: modelSelectionSchema,
   routableProviders: Schema.Array(Schema.String),
@@ -451,6 +457,8 @@ export interface DshPlatformTransport {
   archivedSessionIds?(sessionIds: readonly string[]): Promise<readonly string[] | undefined>
   /** Optional composed finder served by the installed Memory plugin; absent means an older Host. */
   findThreads?(input: ThreadFinderCallInput): Promise<ThreadFinderAttempt>
+  /** Session-only model selection served by `@dshfiles/session-controller`; `undefined` means that API is absent. */
+  selectSessionModel?(sessionId: string, selection: ModelSelection): Promise<ModelSelection | undefined>
 }
 
 export interface DshPlatformClient {
@@ -930,10 +938,15 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
     },
     models: {
       list: async () => parseModelCatalog(await transport.rpc('session', 'modelCatalog', {})),
+      // Never fall back to native session.selectModel: it also saves the selection as the deployment default.
       select: async (sessionId, selection) => {
-        const request = { sessionId, ...selection }
-        const result = decode(Schema.Struct({ selected: modelSelectionSchema }), await transport.rpc('session', 'selectModel', { request }))
-        return parseModelSelection(result.selected)
+        const selected = await transport.selectSessionModel?.(sessionId, selection)
+        if (selected === undefined)
+          throw new DshPlatformError(
+            'session-model-unavailable',
+            'This DSH does not serve session-only model selection. Enable @dshfiles/session-controller (its thread-model API) in the profile, then retry.',
+          )
+        return selected
       },
     },
     skills: {
@@ -1205,5 +1218,31 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
       socket.once('close', () => finish(new DshPlatformError('stream-closed', 'DSH closed the session history stream before it returned a cursor.')))
     })
 
-  return makeTypedClient({ rpc, sessionCursor, archivedSessionIds, findThreads })
+  const selectSessionModel = async (sessionId: string, selection: ModelSelection): Promise<ModelSelection | undefined> => {
+    let call: DshxApiCall | undefined
+    try {
+      call = await pluginApi('@dshfiles/session-controller', 'thread-model', ['snapshot', 'select'])
+    } catch (error) {
+      if (error instanceof DshPlatformError && error.code === 'api-not-served') return undefined
+      throw error
+    }
+    if (call === undefined) return undefined
+    const current = decode(threadModelSnapshotSchema, await call('snapshot', { sessionId }))
+    const selected = decode(
+      threadModelSnapshotSchema,
+      await call('select', {
+        sessionId,
+        selection: {
+          provider: selection.provider,
+          model: selection.model,
+          ...(selection.reasoningEffort !== undefined && { reasoningEffort: selection.reasoningEffort }),
+        },
+        expectedRevision: current.revision,
+        preferSelectedProvider: current.preferSelectedProvider,
+      }),
+    )
+    return parseModelSelection(selected.selection)
+  }
+
+  return makeTypedClient({ rpc, sessionCursor, archivedSessionIds, findThreads, selectSessionModel })
 }

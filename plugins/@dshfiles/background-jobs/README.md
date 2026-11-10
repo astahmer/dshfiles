@@ -3,7 +3,7 @@
 ![Observe › Processes with its Jobs, Dev servers and RAM tabs](docs/screenshots/processes-page.png)
 ![Cross-Session background jobs board](docs/screenshots/jobs-board.png)
 
-**Observe › Processes** is one page for what runs on this host for your threads (plans/ade-ux §6):
+**Observe › Processes** is one page for what runs on this host for your threads (docs/ade-ux §6):
 **Jobs** (this board), then the tabs other plugins add through the
 `@dshfiles/background-jobs/process-views` registry — **Dev servers** from `@dshfiles/preview` and
 **RAM** from `@dshfiles/worktree-memory`. Providers depend on background-jobs, never the reverse.
@@ -86,6 +86,11 @@ The Host reads which Sessions run from its agent registry (`ctx.agents`); when t
 marked. The mark clears when the owner runs a turn again. Board rows carry it as `outlivedSince`, so
 `background_jobs_board` shows it to agents and `background_jobs_kill` stops it.
 
+Agents see a compact rendering of the board — one line per job with its id, status, category, elapsed time and a
+short label, plus counts — because the full payload (up to 200 job rows, up to 200 per-Session rows and spill paths)
+averaged ~17k characters per tool result and is only needed by the browser. A job's detail stays available through
+`background_jobs_output`.
+
 Once a minute the Host stops every job that outlived its turn for `stopOutlivedAfterMinutes` (setting namespace
 `dshfiles-background-jobs`, 120 by default; `0` keeps them running until stopped by hand). It kills through the
 same owner fence with the reason `stopped: outlived its turn for N min with no reader`, and leaves a
@@ -120,3 +125,15 @@ never touch the model's own consuming cursor.
 - Cross-Session visibility is the point of the page: every label is a command
   line another Session ran. It is the same information the stock per-Session job
   list shows, only not fenced to one Session.
+
+## Live preview in the transcript
+
+![Live job preview in the transcript and above the composer](docs/screenshots/transcript-job-preview.png)
+
+A call that starts a job (`bash` or `pwsh` with `run_in_background`, either one promoted past its timeout, or a background `workflow`) gets a preview under its tool card, through tool-meta's `ToolCallSections`. Collapsed it shows the job's status, label, progress and elapsed time. Open, it streams the output tail and offers Stop, the owning thread, and Processes.
+
+It reads the client `jobs` service (`watchRows`, `observe`), which is the stream the native header control shares. `observe` runs only while the card is open, and each card subscribes on its own with a selector that ignores output offsets, so an output chunk re-renders that card and never the transcript. Stop is the Jobs board's two-step confirmation over `background_jobs_kill`. A job the registry no longer holds shows no preview.
+
+A turn that ends folds its tool cards, and with them the card of a job still running, so the thread's running jobs also list above the composer (`conversation.input.dock`) with the same expandable card. The dock clears as jobs settle; the card under the tool stays as the history. A running job can show in both places while its turn is open.
+
+Job status is the registry's lifecycle, worded as on the board. A subagent is not a job: its row in `@dshfiles/thread-sidebar` has its own states.

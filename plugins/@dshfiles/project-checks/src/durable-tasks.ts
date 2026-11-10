@@ -51,18 +51,42 @@ export type DurableAttempt = typeof durableAttemptSchema.Type
 export type DurableTaskStatus = typeof durableTaskStatusSchema.Type
 export type DurableAttemptResult = Exclude<DurableAttempt['status'], 'running' | 'unknown'>
 
-const terminalTaskStatus = (status: DurableTaskStatus): boolean =>
-  status === 'succeeded' || status === 'failed' || status === 'cancelled' || status === 'timed-out' || status === 'blocked'
+const TERMINAL: readonly DurableTaskStatus[] = ['succeeded', 'failed', 'cancelled', 'timed-out', 'blocked']
+const OPEN: readonly DurableTaskStatus[] = ['queued', 'running', 'cancel-requested', 'unknown']
+const ACTIVE: readonly DurableTaskStatus[] = ['running', 'cancel-requested']
+const RETRYABLE: readonly DurableTaskStatus[] = ['unknown', 'failed', 'timed-out', 'cancelled']
 
-const activeTaskStatus = (status: DurableTaskStatus): boolean => status === 'running' || status === 'cancel-requested'
+const terminalTaskStatus = (status: DurableTaskStatus): boolean => TERMINAL.includes(status)
+
+/** Every verb and the statuses it applies to: a mutation outside these is a no-op, never a half-applied write. */
+const ALLOWED_FROM = {
+  begin: ['queued'],
+  progress: ACTIVE,
+  finish: ACTIVE,
+  cancel: ['queued', 'running'],
+  unknown: ACTIVE,
+  reconcile: ['unknown'],
+  retry: RETRYABLE,
+  block: OPEN,
+} as const satisfies Record<string, readonly DurableTaskStatus[]>
+
+type TaskVerb = keyof typeof ALLOWED_FROM
+
+const applies = (verb: TaskVerb, status: DurableTaskStatus): boolean => {
+  const allowed: readonly DurableTaskStatus[] = ALLOWED_FROM[verb]
+  return allowed.includes(status)
+}
 
 const lastAttempt = (task: DurableTask): DurableAttempt | undefined => task.attempts[task.attempts.length - 1]
 
 export class DurableTaskModel {
   static readonly isTerminal = terminalTaskStatus
 
+  /** What `retry` accepts, so a caller refuses an impossible retry before writing anything. */
+  static readonly canRetry = (status: DurableTaskStatus): boolean => applies('retry', status)
+
   static readonly begin = (task: DurableTask, input: { readonly attemptId: string; readonly now: number }): DurableTask => {
-    if (task.status !== 'queued') return task
+    if (!applies('begin', task.status)) return task
     if (task.attempts.length >= 100) return { ...task, status: 'blocked', updatedAt: input.now, errorCode: 'attempt-limit' }
     const attempt: DurableAttempt = {
       id: input.attemptId,
@@ -80,7 +104,7 @@ export class DurableTaskModel {
     task: DurableTask,
     input: { readonly attemptId: string; readonly progress: DurableAttempt['progress']; readonly now: number },
   ): DurableTask => {
-    if (!activeTaskStatus(task.status)) return task
+    if (!applies('progress', task.status)) return task
     const attempt = lastAttempt(task)
     if (attempt === undefined || attempt.id !== input.attemptId || attempt.status !== 'running') return task
     return {
@@ -94,7 +118,7 @@ export class DurableTaskModel {
     task: DurableTask,
     input: { readonly attemptId: string; readonly status: DurableAttemptResult; readonly exitCode: number | null; readonly now: number },
   ): DurableTask => {
-    if (!activeTaskStatus(task.status)) return task
+    if (!applies('finish', task.status)) return task
     const attempt = lastAttempt(task)
     if (attempt === undefined || attempt.id !== input.attemptId || attempt.status !== 'running') return task
     return {
@@ -107,13 +131,12 @@ export class DurableTaskModel {
   }
 
   static readonly cancel = (task: DurableTask, now: number): DurableTask => {
-    if (task.status === 'queued') return { ...task, status: 'cancelled', updatedAt: now }
-    if (task.status !== 'running') return task
-    return { ...task, status: 'cancel-requested', updatedAt: now }
+    if (!applies('cancel', task.status)) return task
+    return { ...task, status: task.status === 'queued' ? 'cancelled' : 'cancel-requested', updatedAt: now }
   }
 
   static readonly unknown = (task: DurableTask, now: number): DurableTask => {
-    if (!activeTaskStatus(task.status)) return task
+    if (!applies('unknown', task.status)) return task
     const attempt = lastAttempt(task)
     return {
       ...task,
@@ -131,7 +154,7 @@ export class DurableTaskModel {
     task: DurableTask,
     input: { readonly attemptId: string; readonly status: DurableAttemptResult; readonly exitCode: number | null; readonly now: number },
   ): DurableTask => {
-    if (task.status !== 'unknown') return task
+    if (!applies('reconcile', task.status)) return task
     const attempt = lastAttempt(task)
     if (attempt === undefined || attempt.id !== input.attemptId || attempt.status !== 'unknown') return task
     return {
@@ -144,12 +167,12 @@ export class DurableTaskModel {
   }
 
   static readonly retry = (task: DurableTask, now: number): DurableTask => {
-    if (task.status !== 'unknown' && task.status !== 'failed' && task.status !== 'timed-out' && task.status !== 'cancelled') return task
+    if (!applies('retry', task.status)) return task
     return { ...task, status: 'queued', updatedAt: now, errorCode: null }
   }
 
   static readonly block = (task: DurableTask, input: { readonly errorCode: string; readonly now: number }): DurableTask => {
-    if (terminalTaskStatus(task.status)) return task
+    if (!applies('block', task.status)) return task
     return { ...task, status: 'blocked', updatedAt: input.now, errorCode: input.errorCode }
   }
 }

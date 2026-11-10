@@ -1,1 +1,44 @@
 @import '@dshfiles/plugin-ui/styles.css';
+
+/* The kit sheet scans every owned plugin (`@source '../..'`), which also reads test files and markdown that never
+   ship to a browser: they cost roughly a third of the scan and produce no class the app can render. */
+@source not '../../*/tests';
+@source not '../../*/src/**/*.test.ts';
+@source not '../../*/src/**/*.test.tsx';
+@source not '../../*/src/**/*.spec.ts';
+@source not '../../*/src/**/*.spec.tsx';
+@source not '../../*/**/*.md';
+
+/* Shiki highlights with its `css-variables` theme: each token colour is `var(--shiki-token-*)`
+   with no fallback, and the Web shell defines none of those variables, so every token inherited
+   the plain text colour. Map every scope the theme emits onto the palette for both schemes;
+   `inserted`/`deleted` carry `diff` fences. */
+:root {
+  --shiki-token-comment: #6e7781;
+  --shiki-token-constant: #0550ae;
+  --shiki-token-keyword: #cf222e;
+  --shiki-token-parameter: #953800;
+  --shiki-token-function: #8250df;
+  --shiki-token-string: #0a3069;
+  --shiki-token-string-expression: #0a3069;
+  --shiki-token-punctuation: #6e7781;
+  --shiki-token-link: #0969da;
+  --shiki-token-inserted: #2f9e44;
+  --shiki-token-deleted: #e03131;
+  --shiki-token-changed: #9a6700;
+}
+
+body[data-ds-dark-theme] {
+  --shiki-token-comment: #8b949e;
+  --shiki-token-constant: #79c0ff;
+  --shiki-token-keyword: #ff7b72;
+  --shiki-token-parameter: #ffa657;
+  --shiki-token-function: #d2a8ff;
+  --shiki-token-string: #a5d6ff;
+  --shiki-token-string-expression: #a5d6ff;
+  --shiki-token-punctuation: #8b949e;
+  --shiki-token-link: #58a6ff;
+  --shiki-token-inserted: #69db7c;
+  --shiki-token-deleted: #ff8787;
+  --shiki-token-changed: #d29922;
+}

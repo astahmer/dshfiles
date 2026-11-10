@@ -1,5 +1,5 @@
 import { assign, createActor, fromPromise, setup, useSelector, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
-import type { QueuedBlock, QueuedRow } from './queue-edit.js'
+import type { QueuedBlock, QueuedRow } from './queue-edit-model.js'
 
 /**
  * Moving one queued message, with its attachments, to another thread.

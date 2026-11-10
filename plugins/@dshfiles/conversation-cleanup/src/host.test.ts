@@ -24,23 +24,26 @@ const cleanupEnvelope = Schema.Struct({
   }),
 })
 
-const browserCall = async (host: TestHost, method: 'preview' | 'delete', input: object): Promise<unknown> => {
+type BrowserRequest =
+  | { readonly method: 'preview'; readonly input: Record<never, never> }
+  | { readonly method: 'delete'; readonly input: { readonly previewId: string; readonly confirm: true } }
+
+const browserCall = async <A>(host: TestHost, request: BrowserRequest, output: Schema.Codec<A>): Promise<A> => {
   const response = await host.connection.requestApi({
     packageId: '@dshfiles/conversation-cleanup',
     apiId: cleanupApi.id,
-    method,
+    method: request.method,
     version: cleanupApi.version,
-    input,
+    input: request.input,
   })
   const { result } = Schema.decodeUnknownSync(cleanupEnvelope)(await response.json())
   if (result.error !== undefined) throw Object.assign(new Error(result.error.message), { remoteCode: result.error.code })
-  return result.value?.output
+  return Schema.decodeUnknownSync(output)(result.value?.output)
 }
 
 const browserClient = (host: TestHost) => ({
-  preview: async (input: object) => Schema.decodeUnknownSync(previewSchema)(await browserCall(host, 'preview', input)),
-  delete: async (input: { readonly previewId: string; readonly confirm: true }) =>
-    Schema.decodeUnknownSync(receiptSchema)(await browserCall(host, 'delete', input)),
+  preview: () => browserCall(host, { method: 'preview', input: {} }, previewSchema),
+  delete: (input: { readonly previewId: string; readonly confirm: true }) => browserCall(host, { method: 'delete', input }, receiptSchema),
 })
 
 const fixtureWithCompression = (compression: 'none' | 'zstd') =>
@@ -125,7 +128,7 @@ describe('cleanup with native JSONL persistence', () => {
         const retained = yield* test.seed('ordinary-cold')
         test.lifecycle.settledSessionIds = [settled]
         test.lifecycle.archivedSessionIds = [archived]
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* Effect.promise(() => test.client.preview())
         expect(preview.candidates.map(value => value.sessionId).sort()).toEqual([archived, settled].sort())
         const receipt = yield* Effect.promise(() => test.client.delete({ previewId: preview.previewId, confirm: true }))
         expect(receipt.results.map(value => value.status)).toEqual(['deleted', 'deleted'])
@@ -147,10 +150,10 @@ describe('cleanup with native JSONL persistence', () => {
         const test = yield* fixture
         const target = yield* test.seed('inactive-backend-target')
         test.lifecycle.archivedSessionIds = [target]
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* Effect.promise(() => test.client.preview())
         expect(preview.candidates).toMatchObject([{ sessionId: target }])
         test.backend.active = false
-        yield* Effect.promise(() => expect(test.client.preview({})).rejects.toMatchObject({ remoteCode: 'unsupported-backend' }))
+        yield* Effect.promise(() => expect(test.client.preview()).rejects.toMatchObject({ remoteCode: 'unsupported-backend' }))
         yield* Effect.promise(() =>
           expect(test.client.delete({ previewId: preview.previewId, confirm: true })).rejects.toMatchObject({ remoteCode: 'unsupported-backend' }),
         )
@@ -163,7 +166,7 @@ describe('cleanup with native JSONL persistence', () => {
         const test = yield* fixtureWithCompression('zstd')
         const target = yield* test.seed('compressed-target')
         test.lifecycle.archivedSessionIds = [target]
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* Effect.promise(() => test.client.preview())
         expect(preview.candidates).toMatchObject([{ sessionId: target }])
         expect((yield* Effect.promise(() => test.client.delete({ previewId: preview.previewId, confirm: true }))).results).toMatchObject([
           { sessionId: target, status: 'deleted' },
@@ -187,7 +190,7 @@ describe('cleanup with native JSONL persistence', () => {
           Effect.promise(() => test.host.ctx.sessionPersistence.open(busy, 'write')),
           value => Effect.promise(() => value.close()),
         )
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* Effect.promise(() => test.client.preview())
         expect(preview.protectedCount).toBe(1)
         expect(preview.candidates.map(value => value.sessionId)).toEqual([busy])
         const receipt = yield* Effect.promise(() => test.client.delete({ previewId: preview.previewId, confirm: true }))
@@ -202,7 +205,7 @@ describe('cleanup with native JSONL persistence', () => {
         const changed = yield* test.seed('changed')
         const reopened = yield* test.seed('reopened')
         test.lifecycle.archivedSessionIds = [changed, reopened]
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* Effect.promise(() => test.client.preview())
         const writer = yield* Effect.acquireRelease(
           Effect.promise(() => test.host.ctx.sessionPersistence.open(changed, 'write')),
           value => Effect.promise(() => value.close()),
@@ -220,7 +223,7 @@ describe('cleanup with native JSONL persistence', () => {
         const test = yield* fixture
         const loaded = yield* test.seed('late-loaded')
         test.lifecycle.settledSessionIds = [loaded]
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* Effect.promise(() => test.client.preview())
         test.host.ctx.sessions.create(loaded, { meta: { cwd: test.root } })
         const receipt = yield* Effect.promise(() => test.client.delete({ previewId: preview.previewId, confirm: true }))
         expect(receipt.results).toMatchObject([{ sessionId: loaded, status: 'skipped' }])
@@ -241,7 +244,7 @@ describe('cleanup with native JSONL persistence', () => {
           expect(result._tag).toBe('Failure')
           expect(yield* Effect.promise(() => test.host.ctx.sessionPersistence.stat(target))).toBeDefined()
         }
-        const ownerPreview = yield* Effect.promise(() => test.client.preview({}))
+        const ownerPreview = yield* Effect.promise(() => test.client.preview())
         const ownerReceipt = yield* Effect.promise(() => test.client.delete({ previewId: ownerPreview.previewId, confirm: true }))
         expect(ownerReceipt.results).toMatchObject([{ sessionId: target, status: 'deleted' }])
       }).pipe(Effect.scoped),
@@ -261,7 +264,7 @@ describe('cleanup with native JSONL persistence', () => {
         const detachedPreview = yield* previewAsAgent(test, detached)
         expect((yield* Effect.exit(deleteAsAgent(test, detachedPreview.previewId, detached)))._tag).toBe('Failure')
         expect(yield* Effect.promise(() => test.host.ctx.sessionPersistence.stat(target))).toBeDefined()
-        const ownerPreview = yield* Effect.promise(() => test.client.preview({}))
+        const ownerPreview = yield* Effect.promise(() => test.client.preview())
         expect((yield* Effect.promise(() => test.client.delete({ previewId: ownerPreview.previewId, confirm: true }))).results).toMatchObject([
           { status: 'deleted' },
         ])
@@ -296,7 +299,7 @@ describe('cleanup with native JSONL persistence', () => {
           ...(sessionId === working ? [{ kind: 'job' as const, items: [{ id: 'background-job', label: 'Build' }] }] : []),
           ...(await next()),
         ])
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* Effect.promise(() => test.client.preview())
         expect(preview.candidates).toEqual([])
         expect(preview.protectedCount).toBe(2)
         expect((yield* Effect.promise(() => test.host.ctx.sessionPersistence.list())).length).toBe(2)
@@ -308,7 +311,7 @@ describe('cleanup with native JSONL persistence', () => {
         const test = yield* fixture
         const target = yield* test.seed('late-activity-target')
         test.lifecycle.archivedSessionIds = [target]
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* Effect.promise(() => test.client.preview())
         test.host.ctx.on('workspace/session-activity', async ({ sessionId }, next) => [
           ...(sessionId === target ? [{ kind: 'schedule' as const, items: [{ id: 'new-reminder', label: 'New reminder' }] }] : []),
           ...(await next()),
@@ -325,7 +328,7 @@ describe('cleanup with native JSONL persistence', () => {
         const test = yield* fixture
         const target = yield* test.seed('plugin-caller-target')
         test.lifecycle.archivedSessionIds = [target]
-        const preview = yield* Effect.promise(() => test.client.preview({}))
+        const preview = yield* Effect.promise(() => test.client.preview())
         const pluginClient = createHostApiClient(test.host.ctx, cleanupApi, '@test/cleanup')
         yield* Effect.promise(() =>
           expect(pluginClient.delete({ previewId: preview.previewId, confirm: true })).rejects.toMatchObject({ remoteCode: 'cleanup-forbidden' }),

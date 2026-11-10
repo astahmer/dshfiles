@@ -13,7 +13,7 @@
       "configuration": [],
       "states": ["exact", "fuzzy", "ambiguous", "missing", "written"],
       "failureModes": [
-        "An ambiguous or missing anchor fails before writing and names the candidate lines.",
+        "An ambiguous or missing anchor fails before writing, names the candidate lines and quotes their text so one retry can copy a real anchor.",
         "An empty or unchanged needle is rejected before the file is touched.",
         "Without a working directory, or for a file that does not exist, the tool refuses instead of creating one.",
         "Read-only Sessions and workspace-write escapes retain FS_SANDBOX_DENIED; the Session policy is resolved per call instead of falling back to the deployment policy.",
@@ -44,6 +44,12 @@
           "id": "apply-patch.missing-match",
           "file": "plugins/@dshfiles/apply-patch/tests/apply-edits.test.ts",
           "testName": "fails with missing when no literal or whitespace match exists"
+        },
+        {
+          "kind": "unit-test",
+          "id": "apply-patch.missing-candidates",
+          "file": "plugins/@dshfiles/apply-patch/tests/apply-edits.test.ts",
+          "testName": "names the closest lines when the anchor is absent"
         },
         {
           "kind": "unit-test",

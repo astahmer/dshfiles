@@ -6,6 +6,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, FileSystem, Layer, Path, Schema } from 'effect'
 import { SqlClient, SqlSchema } from 'effect/sql'
 import { SqliteStore } from './sqlite-store.ts'
+import { SqliteStoreOpenFailed } from './errors.ts'
 
 const platform = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
 
@@ -297,4 +298,56 @@ describe('SqliteStore', () => {
       expect(items).toEqual([{ id: 1, label: 'kept', tags: ['a', 'b'] }])
     }).pipe(Effect.provide(platform)),
   )
+
+  it.effect('deferred builds the service on the first call, not when the layer builds', () =>
+    Effect.gen(function* () {
+      const opens: Array<string> = []
+      const deferredLayer = SqliteStore.deferred(
+        Counter,
+        Layer.effect(
+          Counter,
+          Effect.sync(() => {
+            opens.push('open')
+            return Counter.of({ read: () => Effect.succeed(opens.length) })
+          }),
+        ),
+      )
+
+      yield* Effect.gen(function* () {
+        const counter = yield* Counter
+        expect(opens).toEqual([])
+        expect(yield* counter.read()).toBe(1)
+        expect(opens).toEqual(['open'])
+        expect(yield* counter.read()).toBe(1)
+        expect(opens).toEqual(['open'])
+      }).pipe(Effect.provide(deferredLayer), Effect.provide(platform))
+    }),
+  )
+
+  it.effect('deferred retries a failed build on the next call instead of caching the failure', () =>
+    Effect.gen(function* () {
+      let attempts = 0
+      const flaky = SqliteStore.deferred(
+        Counter,
+        Layer.effect(
+          Counter,
+          Effect.suspend(() => {
+            attempts += 1
+            return attempts === 1
+              ? Effect.fail(new SqliteStoreOpenFailed({ filename: ':memory:', step: 'open', cause: 'first attempt' }))
+              : Effect.succeed(Counter.of({ read: () => Effect.succeed(attempts) }))
+          }),
+        ),
+      )
+
+      yield* Effect.gen(function* () {
+        const counter = yield* Counter
+        const first = yield* counter.read().pipe(Effect.flip)
+        expect(first).toBeInstanceOf(SqliteStoreOpenFailed)
+        expect(yield* counter.read()).toBe(2)
+      }).pipe(Effect.provide(flaky), Effect.provide(platform))
+    }),
+  )
 })
+
+class Counter extends Context.Service<Counter, { readonly read: () => Effect.Effect<number> }>()('@dshfiles/sqlite-store/test/Counter') {}

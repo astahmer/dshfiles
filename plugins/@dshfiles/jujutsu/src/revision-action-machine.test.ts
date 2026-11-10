@@ -1,6 +1,6 @@
 import { createActor, waitFor, type InputFrom } from '@dshfiles/plugin-ui/machine'
 import { describe, expect, it } from 'vitest'
-import { previewSchema, type Mutation } from './api.js'
+import { previewSchema, type Mutation, type Revision } from './api.js'
 import { revisionActionMachine } from './revision-action-machine.js'
 import { SchemaHelpers } from './schema-helpers.js'
 
@@ -23,6 +23,29 @@ const preview = SchemaHelpers.decode(previewSchema, {
 })
 
 type Client = InputFrom<typeof revisionActionMachine>['client']
+
+const revision = (commitId: string): Revision => ({
+  commitId,
+  parents: [],
+  changeId: commitId,
+  shortestChangeId: commitId,
+  description: commitId,
+  author: 'Person',
+  authorTime: '2026-10-15T12:00:00Z',
+  bookmarks: [],
+  localBookmarks: [],
+  remoteBookmarksText: '',
+  tags: [],
+  workspaces: [],
+  workingCopy: false,
+  mine: true,
+  immutable: false,
+  divergent: false,
+  empty: false,
+  conflict: false,
+  evolved: false,
+  changeOffset: 0,
+})
 
 const startActions = (client: Partial<Client> = {}) => {
   const signals: AbortSignal[] = []
@@ -208,5 +231,34 @@ describe('revisionActionMachine', () => {
     actor.send({ type: 'reset' })
     expect(signals[0]?.aborted).toBe(true)
     expect(actor.getSnapshot().value).toBe('idle')
+  })
+
+  it('owns the provisioned path and the removal and move surfaces that used to sit beside it', async () => {
+    const { actor } = startActions({
+      confirm: async () => ({ message: 'done', output: 'Created workspace', workspacePath: '/work/dshfiles-threads/topic' }),
+    })
+
+    actor.send({ type: 'workspace.removal.open', commitId: 'c1', name: 'topic' })
+    expect(actor.getSnapshot().context.workspaceRemoval).toEqual({ commitId: 'c1', name: 'topic' })
+    actor.send({ type: 'workspace.removal.close' })
+    expect(actor.getSnapshot().context.workspaceRemoval).toBeNull()
+
+    actor.send({ type: 'move.start', revision: revision('c2') })
+    expect(actor.getSnapshot().context.moveSource?.commitId).toBe('c2')
+    actor.send({ type: 'move.end' })
+    expect(actor.getSnapshot().context.moveSource).toBeNull()
+
+    actor.send({ type: 'prepare', repoId: 'repo', action: rebase, presentation: null })
+    await waitFor(actor, snapshot => snapshot.matches('previewing'))
+    actor.send({ type: 'confirm' })
+    const done = await waitFor(actor, snapshot => snapshot.matches('idle'))
+    expect(done.context.provisionedPath).toBe('/work/dshfiles-threads/topic')
+
+    actor.send({ type: 'workspace.provisioned.clear' })
+    expect(actor.getSnapshot().context.provisionedPath).toBeNull()
+
+    actor.send({ type: 'workspace.removal.open', commitId: 'c1', name: 'topic' })
+    actor.send({ type: 'reset' })
+    expect(actor.getSnapshot().context).toMatchObject({ provisionedPath: null, workspaceRemoval: null, moveSource: null })
   })
 })

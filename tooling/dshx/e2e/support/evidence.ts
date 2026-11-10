@@ -9,7 +9,7 @@ export const EVIDENCE_POLICY = Object.freeze({
   maxTotalBytes: 128 * 1024 * 1024,
   maxAttachmentBytes: 8 * 1024 * 1024,
   maxRunAttachmentBytes: 12 * 1024 * 1024,
-  maxManifestBytes: 512 * 1024,
+  maxManifestBytes: 2 * 1024 * 1024,
 })
 
 export type EvidenceOutcome = 'passed' | 'failed' | 'cancelled'

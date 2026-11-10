@@ -181,6 +181,23 @@ describe('the Notion provider', () => {
     expect(NotionMapping.bodyEdit({ current: '', next: 'y', truncated: true })).toBeNull()
   })
 
+  it.effect('reads a pushed or created record from the write response, without a second page fetch', () => {
+    const fake = fakeNotion()
+    const page = fake.add({ title: 'One', status: 'Not started', markdown: 'Body' })
+    return run(fake, provider =>
+      Effect.gen(function* () {
+        const pushed = yield* provider.push({ ...scopeOf(fake), key: page.id, patch: { title: 'Renamed', priority: 'high' } })
+        expect(pushed).toMatchObject({ title: 'Renamed', body: 'Body', priority: 'high' })
+        expect(fake.requests.filter(request => request.method === 'GET' && request.path === `/pages/${page.id}`)).toEqual([])
+
+        const before = fake.requests.length
+        const created = yield* provider.create({ ...scopeOf(fake), patch: { title: 'Two', body: 'Details' } })
+        expect(created).toMatchObject({ title: 'Two', body: 'Details' })
+        expect(fake.requests.slice(before).map(request => `${request.method} ${request.path}`)).toEqual(['POST /pages', `GET /pages/${created.key}/markdown`])
+      }),
+    )
+  })
+
   it.effect('reads and adds page comments', () => {
     const fake = fakeNotion()
     const page = fake.add({ title: 'Discussed' })

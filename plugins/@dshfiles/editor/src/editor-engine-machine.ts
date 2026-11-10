@@ -7,9 +7,10 @@ interface EditorEngineLoaderInput {
 
 interface EditorEngineLoaderContext extends EditorEngineLoaderInput {
   readonly engine: CodeEditorEngine | null
+  readonly loadStartedAt: number | null
 }
 
-type EditorEngineLoaderEvent = { readonly type: 'activate' } | { readonly type: 'deactivate' } | { readonly type: 'create.failed' }
+type EditorEngineLoaderEvent = { readonly type: 'editable.changed'; readonly editable: boolean } | { readonly type: 'create.failed' }
 
 export const editorEngineLoaderMachine = setup({
   // SAFETY: XState uses empty carriers for inference; runtime context comes from input and events are sent by the panel.
@@ -21,15 +22,20 @@ export const editorEngineLoaderMachine = setup({
   actors: {
     loadEngine: fromPromise<CodeEditorEngine, EditorEngineLoaderInput>(({ input }) => input.loadEngine()),
   },
+  guards: {
+    editable: ({ event }) => event.type === 'editable.changed' && event.editable,
+    notEditable: ({ event }) => event.type === 'editable.changed' && !event.editable,
+  },
 }).createMachine({
   id: 'editorEngineLoader',
   initial: 'idle',
-  context: ({ input }) => ({ ...input, engine: null }),
+  context: ({ input }) => ({ ...input, engine: null, loadStartedAt: null }),
   states: {
     idle: {
-      on: { activate: 'loading' },
+      on: { 'editable.changed': { guard: 'editable', target: 'loading' } },
     },
     loading: {
+      entry: assign(() => ({ loadStartedAt: performance.now() })),
       invoke: {
         src: 'loadEngine',
         input: ({ context }: { readonly context: EditorEngineLoaderContext }) => ({ loadEngine: context.loadEngine }),
@@ -39,13 +45,13 @@ export const editorEngineLoaderMachine = setup({
         },
         onError: { target: 'error' },
       },
-      on: { deactivate: 'idle' },
+      on: { 'editable.changed': { guard: 'notEditable', target: 'idle' } },
     },
     ready: {
       on: { 'create.failed': 'error' },
     },
     error: {
-      on: { deactivate: 'idle' },
+      on: { 'editable.changed': { guard: 'notEditable', target: 'idle' } },
     },
   },
 })

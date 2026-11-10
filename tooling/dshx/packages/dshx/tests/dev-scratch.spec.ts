@@ -771,7 +771,7 @@ describe('dshx dev scratch commands', () => {
       await expect(stat(join(dead.state.stateDir, 'state.json'))).rejects.toThrow()
       expect((await stat(join(fresh.state.stateDir, 'state.json'))).isFile()).toBe(true)
       const warnedState = await ScratchStateRuntime.read(waiting.state.stateDir, 'waiting')
-      expect(warnedState.warnedAt).toBeDefined()
+      expect(ScratchStateRuntime.leaseOf(warnedState)).toEqual({ kind: 'warned', warnedAt: expect.any(String) })
       expect(await readFile(join(waiting.state.stateDir, 'watchdog.log'), 'utf8')).toContain('warning for "waiting"')
     })
 
@@ -842,7 +842,10 @@ describe('dshx dev scratch commands', () => {
       await vi.waitFor(async () => expect(await warningLog()).toContain('warning for "warn-grace"'), { timeout: 15_000, interval: 100 })
       expect(alive(hostPid)).toBe(true)
       expect(alive(watchdogPid)).toBe(true)
-      expect((await ScratchStateRuntime.read(state.stateDir, 'warn-grace')).warnedAt).toBeDefined()
+      expect(ScratchStateRuntime.leaseOf(await ScratchStateRuntime.read(state.stateDir, 'warn-grace'))).toEqual({
+        kind: 'warned',
+        warnedAt: expect.any(String),
+      })
       await vi.waitFor(() => expect(alive(watchdogPid)).toBe(false), { timeout: 20_000, interval: 100 })
       expect(alive(hostPid)).toBe(false)
       await expect(stat(state.home)).rejects.toThrow()
@@ -858,7 +861,7 @@ describe('dshx dev scratch commands', () => {
       expect(doctor.stdout).toContain('answered a pending warning')
       expect(doctor.stdout).toContain('dshx dev keep --name kept')
       expect(doctor.stdout).toContain('of its 10 min grace left')
-      expect((await ScratchStateRuntime.read(instance.state.stateDir, 'kept')).warnedAt).toBeUndefined()
+      expect(ScratchStateRuntime.leaseOf(await ScratchStateRuntime.read(instance.state.stateDir, 'kept'))).toEqual({ kind: 'active' })
 
       const kept = await run(['dev', 'keep', '--state-dir', instance.state.stateDir, '--json'])
       expect(kept.code).toBe(0)

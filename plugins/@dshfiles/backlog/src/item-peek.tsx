@@ -42,7 +42,9 @@ import {
   Undo2Icon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useAutosave } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import {
   useEffect,
   useRef,
@@ -71,14 +73,15 @@ import { BacklogItemMenu } from './item-actions-menu.js'
 import { BacklogSyncControls } from './sync-controls.js'
 import { BacklogText, ItemMarkdown } from './item-text.js'
 import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
-import { submitReply } from './reply-submission.js'
-import type { AgentContinuationSelection, AgentContinuationThread } from './agent-dispatch.js'
+import { composerReplyMachine } from './reply-machine.js'
+import type { AgentContinuationSelection } from './agent-dispatch.js'
 import { ItemPickers } from './item-pickers.js'
 import { DueDates, useToday } from './due-date-hooks.js'
 import { PeekSections } from './peek-sections.js'
 import { BacklogNotices } from './notices.js'
 import { PeekWork } from './peek-work.js'
-import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
+import { startThreadItemOf, StartThreadForm, type StartThreadItem } from './start-thread.js'
+import { BacklogComposerScope } from './composer-tools.js'
 import { BacklogTextBox } from './text-box.js'
 import { actorThreadFor } from './actor-thread.js'
 import { BacklogTriage } from './triage.js'
@@ -265,87 +268,79 @@ const BodyField = (props: {
   readonly projects: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
-  const [editing, setEditing] = useState(false)
-  const [body, setBody] = useState(props.body)
-  const [failed, setFailed] = useState<string | null>(null)
-  const saved = useRef(false)
-  const attachments = useComposerFiles({ onError: setFailed })
-  useEffect(() => {
-    if (!editing) setBody(props.body)
-  }, [props.body, editing])
-  useEffect(() => {
-    if (editing) saved.current = false
-  }, [editing])
-  const save = async (): Promise<void> => {
-    if (saved.current) return
-    saved.current = true
-    setEditing(false)
-    setFailed(null)
-    const pending = [...attachments.files]
-    attachments.clear()
-    const submittedBody = ImageAttachmentReferenceModel.markdownImageReferences(body, pending)
-    if (submittedBody !== props.body) actions.update.mutate({ id: props.id, body: submittedBody })
-    for (const file of pending) {
+  const autosave = useAutosave<string>({
+    initial: props.body,
+    save: async body => {
+      const pending = [...attachments.files]
+      attachments.clear()
+      const submittedBody = ImageAttachmentReferenceModel.markdownImageReferences(body, pending)
+      if (submittedBody !== props.body) actions.update.mutate({ id: props.id, body: submittedBody })
       try {
-        await actions.attachFile.mutateAsync({ id: props.id, file: fileInput(file) })
+        for (const file of pending) await actions.attachFile.mutateAsync({ id: props.id, file: fileInput(file) })
       } catch (error) {
-        setFailed(errorMessage(error, 'That attachment could not be saved.'))
-        return
+        attachments.restore(pending)
+        throw error
       }
-    }
+    },
+  })
+  const attachments = useComposerFiles({ onError: error => autosave.send({ type: 'error', error }) })
+  const begin = (): void => {
+    autosave.send({ type: 'begin', value: props.body })
+  }
+  const save = (): void => {
+    autosave.send({ type: 'flush' })
   }
   const cancel = (): void => {
-    saved.current = true
-    setBody(props.body)
     attachments.clear()
-    setFailed(null)
-    setEditing(false)
+    autosave.send({ type: 'cancel' })
   }
-  if (editing)
+  if (autosave.state === 'synced' || autosave.state === 'saved') {
+    if (props.body === '')
+      return (
+        <button
+          type="button"
+          aria-label="Edit description"
+          onClick={begin}
+          className="dshx:-mx-2 dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent/40"
+        >
+          Add a description…
+        </button>
+      )
     return (
-      <div className="dshx:flex dshx:flex-col dshx:gap-1">
-        <BacklogTextBox
-          ariaLabel="Body"
-          placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads, projects and agents; paste or drop an image."
-          value={body}
-          onChange={setBody}
-          threads={props.threads}
-          projects={props.projects}
-          attachments={attachments}
-          variant="body"
-          autoFocus
-          onBlur={() => void save()}
-          onCancel={cancel}
-          onSubmit={() => void save()}
+      <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-1">
+        <BacklogText
+          text={props.body}
+          onActivate={begin}
+          className="dshx:-mx-2 dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/40"
         />
-        {failed === null ? null : (
-          <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
-            {failed}
-          </p>
-        )}
+        <Button aria-label="Edit description" className="dshx:mt-1 dshx:shrink-0" onClick={begin} size="icon-xs" type="button" variant="ghost">
+          <PencilIcon aria-hidden />
+        </Button>
       </div>
     )
-  if (props.body === '')
-    return (
-      <button
-        type="button"
-        aria-label="Edit description"
-        onClick={() => setEditing(true)}
-        className="dshx:-mx-2 dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent/40"
-      >
-        Add a description…
-      </button>
-    )
+  }
   return (
-    <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-1">
-      <BacklogText
-        text={props.body}
-        onActivate={() => setEditing(true)}
-        className="dshx:-mx-2 dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/40"
+    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+      <BacklogTextBox
+        ariaLabel="Body"
+        placeholder="Add a description… Markdown, b:12 and jj:rev add links; @ mentions items, threads, projects and agents; paste or drop an image."
+        value={autosave.draft}
+        onChange={value => autosave.send({ type: 'edit', value })}
+        threads={props.threads}
+        projects={props.projects}
+        attachments={attachments}
+        variant="body"
+        tools={BacklogComposerScope.item({ id: props.id, surface: 'backlog.description' })}
+        autoFocus
+        onBlur={save}
+        onCancel={cancel}
+        onSubmit={save}
       />
-      <Button aria-label="Edit description" className="dshx:mt-1 dshx:shrink-0" onClick={() => setEditing(true)} size="icon-xs" type="button" variant="ghost">
-        <PencilIcon aria-hidden />
-      </Button>
+      {autosave.error === null ? null : (
+        <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
+          {errorMessage(autosave.error, 'That attachment could not be saved.')}
+        </p>
+      )}
     </div>
   )
 }
@@ -495,11 +490,20 @@ const ReplyEditor = (props: {
       </p>
     )
   return (
-    <ReplyComposer event={props.event} files={initialFiles} threads={props.threads} projects={props.projects} onSave={props.onSave} onCancel={props.onCancel} />
+    <ReplyComposer
+      itemId={props.itemId}
+      event={props.event}
+      files={initialFiles}
+      threads={props.threads}
+      projects={props.projects}
+      onSave={props.onSave}
+      onCancel={props.onCancel}
+    />
   )
 }
 
 const ReplyComposer = (props: {
+  readonly itemId: number
   readonly event: BacklogEvent
   readonly files: readonly ComposerFile[]
   readonly threads: readonly ComposerThread[]
@@ -534,6 +538,7 @@ const ReplyComposer = (props: {
         projects={props.projects}
         attachments={attachments}
         variant="reply"
+        tools={BacklogComposerScope.item({ id: props.itemId, surface: 'backlog.reply' })}
         submitLabel="Save reply"
         submitDisabled={text.trim() === '' && attachments.files.length === 0}
         pending={pending}
@@ -865,61 +870,26 @@ const CommentBox = (props: {
   const actions = useBacklogActions()
   const dispatch = useAgentDispatch()
   const [text, setText] = useState('')
-  const [pending, setPending] = useState(false)
-  const submitting = useRef(false)
-  const [failed, setFailed] = useState<string | null>(null)
-  const [continuationChoice, setContinuationChoice] = useState<{ readonly agentHandle: string; readonly threads: readonly AgentContinuationThread[] } | null>(
-    null,
-  )
-  const continuationResolver = useRef<((selection: AgentContinuationSelection) => void) | null>(null)
-  const attachments = useComposerFiles({ onError: setFailed })
+  const [attachmentFailure, setAttachmentFailure] = useState<string | null>(null)
+  const attachments = useComposerFiles({ onError: setAttachmentFailure })
+  const [reply, send] = useMachine(composerReplyMachine)
+  const sending = reply.matches('saving') || reply.matches('dispatching') || reply.matches('answering')
+  const continuation = reply.context.continuation
 
-  const chooseContinuation = (input: {
-    readonly agent: { readonly handle: string }
-    readonly threads: readonly AgentContinuationThread[]
-  }): Promise<AgentContinuationSelection> =>
-    new Promise(resolve => {
-      continuationResolver.current = resolve
-      setContinuationChoice({
-        agentHandle: input.agent.handle,
-        threads: input.threads.map(thread => ({
-          ...thread,
-          title: props.threads.find(candidate => candidate.id === thread.sessionId)?.title ?? thread.title,
-        })),
-      })
-    })
-
-  const resolveContinuation = (selection: AgentContinuationSelection): void => {
-    const resolve = continuationResolver.current
-    continuationResolver.current = null
-    setContinuationChoice(null)
-    if (selection.kind === 'cancel') setFailed('Comment saved; no thread was started.')
-    resolve?.(selection)
-  }
-
-  useEffect(
-    () => () => {
-      continuationResolver.current?.({ kind: 'cancel' })
-      continuationResolver.current = null
-    },
-    [],
-  )
-
-  /** A leading `@handle` starts that agent's thread; anything else, or a handle nothing matches, stays a comment. */
-  const submit = async (submittedText: string): Promise<void> => {
+  const submit = (submittedText: string): void => {
     const files = [...attachments.files]
-    if ((submittedText.trim() === '' && files.length === 0) || submitting.current) return
-    submitting.current = true
-    setPending(true)
-    setFailed(null)
-    try {
-      const text = ImageAttachmentReferenceModel.markdownImageReferences(submittedText, files)
-      await submitReply({
-        text,
-        files,
+    if ((submittedText.trim() === '' && files.length === 0) || sending) return
+    const markdown = ImageAttachmentReferenceModel.markdownImageReferences(submittedText, files)
+    send({
+      type: 'SUBMIT',
+      text: markdown,
+      files,
+      ports: {
         save: async saved => {
           const payload = saved.map(fileInput)
-          await actions.comment.mutateAsync(payload.length === 0 ? { id: props.item.id, text } : { id: props.item.id, text, files: payload })
+          await actions.comment.mutateAsync(
+            payload.length === 0 ? { id: props.item.id, text: markdown } : { id: props.item.id, text: markdown, files: payload },
+          )
         },
         dispatch:
           dispatch === null
@@ -933,29 +903,30 @@ const CommentBox = (props: {
                     open: props.openCreatedByDefault,
                     smartThreadRouting: props.smartThreadRouting,
                     notificationDelivery: props.threadStartNotifications,
-                    chooseContinuation,
+                    chooseContinuation: input =>
+                      new Promise<AgentContinuationSelection>(resolve => send({ type: 'CONTINUATION_REQUEST', request: input, resolve })),
                   }),
                 answerReply: ({ text: replyText }) => dispatch.answerReply({ item: props.item, text: replyText }),
                 smartReplyAnswers: props.smartReplyAnswers,
               },
-        onAnswering: props.onAnswering,
-        view: {
-          clear: () => {
-            setText('')
-            attachments.clear()
-          },
-          restore: restored => {
-            setText(current => (current === '' ? restored.text : current))
-            attachments.restore(restored.files)
-          },
-          fail: setFailed,
+        clear: () => {
+          setText('')
+          attachments.clear()
         },
-      })
-    } finally {
-      submitting.current = false
-      setPending(false)
-    }
+        restore: restored => {
+          setText(current => (current === '' ? restored.text : current))
+          attachments.restore(restored.files)
+        },
+        reportFailure: undefined,
+        onAnswering: props.onAnswering,
+      },
+    })
   }
+  const continuationThreads = (continuation?.request.threads ?? []).map(thread => ({
+    ...thread,
+    title: props.threads.find(candidate => candidate.id === thread.sessionId)?.title ?? thread.title,
+  }))
+  const failure = attachmentFailure ?? reply.context.failure
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-1">
       <BacklogTextBox
@@ -967,26 +938,27 @@ const CommentBox = (props: {
         projects={props.projects}
         attachments={attachments}
         variant="reply"
+        tools={BacklogComposerScope.item({ id: props.item.id, surface: 'backlog.reply' })}
         submitLabel="Reply"
         submitDisabled={text.trim() === '' && attachments.files.length === 0}
-        pending={pending}
-        onSubmit={submittedText => void submit(submittedText)}
+        pending={sending}
+        onSubmit={submit}
       />
       <CommandDialog
-        open={continuationChoice !== null}
+        open={continuation !== null}
         onOpenChange={open => {
-          if (!open) resolveContinuation({ kind: 'cancel' })
+          if (!open) send({ type: 'CANCEL_CONTINUATION' })
         }}
-        heading={`Continue @${continuationChoice?.agentHandle ?? 'agent'}?`}
+        heading={`Continue @${continuation?.request.agent.handle ?? 'agent'}?`}
         description=" "
       >
         <CommandList>
           <CommandGroup heading="Existing threads">
-            {(continuationChoice?.threads ?? []).map(thread => (
+            {continuationThreads.map(thread => (
               <CommandItem
                 key={thread.sessionId}
                 value={`${thread.title} ${thread.sessionId}`}
-                onSelect={() => resolveContinuation({ kind: 'existing', sessionId: thread.sessionId })}
+                onSelect={() => send({ type: 'CONTINUE', selection: { kind: 'existing', sessionId: thread.sessionId } })}
               >
                 <MessageSquareIcon aria-hidden />
                 <span className="dshx:min-w-0 dshx:truncate">{thread.title}</span>
@@ -995,16 +967,16 @@ const CommentBox = (props: {
             ))}
           </CommandGroup>
           <CommandGroup heading="Start new">
-            <CommandItem value="new thread" onSelect={() => resolveContinuation({ kind: 'new' })}>
+            <CommandItem value="new thread" onSelect={() => send({ type: 'CONTINUE', selection: { kind: 'new' } })}>
               <PlusIcon aria-hidden />
               Start a new thread
             </CommandItem>
           </CommandGroup>
         </CommandList>
       </CommandDialog>
-      {failed === null ? null : (
+      {failure === null ? null : (
         <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
-          {failed}
+          {failure}
         </p>
       )}
     </div>
@@ -1226,7 +1198,7 @@ const PeekBody = (props: {
   }, [item.id])
   const captured = item.events.find(event => event.kind === 'created')?.detail.trim() ?? ''
   const showCapture = captured !== '' && captured !== `${item.title}\n${item.body}`.trim() && captured !== item.title.trim()
-  const relationshipLinks = BacklogItems.uniqueLinks(item.links)
+  const relationshipLinks = BacklogItems.uniqueLinks(item.links).filter(link => link.type !== 'thread' || BacklogItems.isSessionId(link.target))
   const threadsById = new Map(props.threads.map(thread => [thread.id, thread]))
   const threadTitleCounts = new Map<string, number>()
   for (const link of relationshipLinks) {
@@ -1497,7 +1469,7 @@ const PeekBody = (props: {
               agentReplying={agentReplying}
             />
             <CommentBox
-              item={{ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: item.body.slice(0, 500) }}
+              item={{ id: item.id, ref: item.ref, title: item.title, project: item.project, preview: StartThreadForm.preview(item.body, 500) }}
               threads={props.threads}
               projects={props.projectPaths}
               openCreatedByDefault={props.openCreatedByDefault}

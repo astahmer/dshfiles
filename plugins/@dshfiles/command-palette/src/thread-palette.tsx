@@ -197,8 +197,8 @@ const VIEW_BY_PREFIX = {
 const SAME_COMMAND_AS = new Map([['@dshfiles/thread-sidebar/command/session.new', 'new thread']])
 
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
-  const [navigationSnapshot, sendNavigation] = useMachine(paletteNavigationMachine, { input: { mode: props.mode } })
-  const { mode, query, backStack, notice, selected, closeRequested, ask } = navigationSnapshot.context
+  const [navigationSnapshot, sendNavigation, navigationActor] = useMachine(paletteNavigationMachine, { input: { mode: props.mode } })
+  const { mode, query, backStack, notice, selected, ask } = navigationSnapshot.context
   const parsed = PaletteRules.parsePaletteQuery(query)
   // In Ask DSH the whole query is the question: prefixes are ordinary text there.
   const searchText = ask ? query : parsed.text
@@ -207,38 +207,34 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const subview = !ask && (backStack.length > 0 || parsed.prefix !== null)
   useEffect(() => sendNavigation({ type: 'mode.sync', mode: props.mode }), [props.mode, sendNavigation])
   const emptyQuery = deferredQuery.trim().length === 0
-  const [askPending, setAskPending] = useState(false)
-  // Ranking happens within one palette visit, so the instant it opened is the whole clock the memo needs.
-  const [openedAt] = useState(() => Date.now())
-  const askInFlight = useRef(false)
-  const [actionSnapshot, sendAction, actionActor] = useMachine(paletteActionMachine)
   const latestOnClose = useRef(props.onClose)
   latestOnClose.current = props.onClose
   useEffect(() => {
-    const subscription = actionActor.on('completed', () => latestOnClose.current())
+    const subscription = navigationActor.on('close', () => latestOnClose.current())
     return () => subscription.unsubscribe()
-  }, [actionActor])
+  }, [navigationActor])
+  // Ranking happens within one palette visit, so the instant it opened is the whole clock the memo needs.
+  const [openedAt] = useState(() => Date.now())
+  const latestOnAsk = useRef(props.onAsk)
+  latestOnAsk.current = props.onAsk
+  const [actionSnapshot, sendAction, actionActor] = useMachine(paletteActionMachine, {
+    input: { ask: question => latestOnAsk.current(question) },
+  })
   useEffect(() => {
-    if (!closeRequested) return
-    latestOnClose.current()
-    sendNavigation({ type: 'close.handled' })
-  }, [closeRequested, sendNavigation])
-  const submitAsk = async (question: string): Promise<void> => {
-    const trimmed = question.trim()
-    if (trimmed.length === 0 || askInFlight.current) return
-    askInFlight.current = true
-    setAskPending(true)
-    try {
-      await props.onAsk(trimmed)
-      latestOnClose.current()
-    } catch {
-      sendNavigation({ type: 'notice.show', message: props.copy.askFailed })
-    } finally {
-      askInFlight.current = false
-      setAskPending(false)
+    const completed = actionActor.on('completed', () => latestOnClose.current())
+    const askFailed = actionActor.on('askFailed', () => sendNavigation({ type: 'notice.show', message: props.copy.askFailed }))
+    return () => {
+      completed.unsubscribe()
+      askFailed.unsubscribe()
     }
+  }, [actionActor, props.copy.askFailed, sendNavigation])
+  const submitAsk = (question: string): void => {
+    const trimmed = question.trim()
+    if (trimmed.length === 0) return
+    sendAction({ type: 'ask', question: trimmed })
   }
   const runningAction = actionSnapshot.matches('running')
+  const askPending = actionSnapshot.matches('asking')
   const frecency = paletteFrecency.useValue()
   const boosts = useMemo(() => PaletteFrecency.boosts(frecency, openedAt), [frecency, openedAt])
   const registeredActions = useSyncExternalStore(PaletteApi.subscribe, PaletteApi.getSnapshot, PaletteApi.getSnapshot).actions
@@ -405,7 +401,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const activate = (row: PaletteRow): void => {
     if (row.kind === 'ask') {
       // Enter can land before the deferred row catches up with the last keystroke; the live query wins.
-      void submitAsk(query)
+      submitAsk(query)
       return
     }
     if (row.kind === 'backlog') {

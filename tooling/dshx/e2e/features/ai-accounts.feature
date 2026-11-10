@@ -110,6 +110,12 @@ Feature: AI Accounts
     Then an expired quota login keeps its sidebar identity without inventing a percentage
     And quota recovery and explicit hiding preserve saved account identity and order
 
+  @scenario:ai-accounts.usage-refresh
+  Scenario: A failed quota refresh keeps the dated reading and Retry recovers it
+    Given the isolated AI Accounts profile with the status strip is booted
+    When two verified accounts use a controllable loopback quota provider
+    Then a failed quota refresh keeps the last reading, says why and its Retry recovers it
+
   @scenario:ai-accounts.disabled-account-preview
   Scenario: Keep disabled accounts visible and toggle routing from the usage popover
     Given the isolated AI Accounts and thread account controller profile is booted

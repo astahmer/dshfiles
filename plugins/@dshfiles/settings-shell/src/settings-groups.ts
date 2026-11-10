@@ -2,7 +2,7 @@ import type { PluginSettingsPage } from './plugin-settings.js'
 import type { SettingField } from './schema-form/schema-model.js'
 
 /**
- * The task groups of the one Settings page (plan `plans/ade-ux` §4.6). Settings are grouped by what the user is doing,
+ * The task groups of the one Settings page (plan `docs/ade-ux` §4.6). Settings are grouped by what the user is doing,
  * never by the plugin that stores them: every native `settings.section`, every plugin settings namespace and the stage
  * pages other plugins own (AI accounts, MCP servers, Secrets, Hosts, Plugins) are placed in one group here. A section
  * or namespace nobody placed lands in "Other", so nothing becomes unreachable when a plugin adds one.
@@ -54,6 +54,8 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   'dshfiles-new-thread': { group: 'projects', order: 0 },
   'dshfiles-network-access': { group: 'hosts', order: 20 },
   plugins: { group: 'plugins', order: 0 },
+  // dshmarket's own settings section: the community catalog, a full page of its own. Unplaced, it landed under "Other".
+  market: { group: 'plugins', label: 'Plugin Market', order: 10 },
 }
 
 /** Settings namespaces (Loader row ids), including DSH core rows that only have a package name for a title. */

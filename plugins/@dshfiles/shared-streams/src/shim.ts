@@ -37,9 +37,9 @@ const syncListeners = url => {
 const open = url => {
   const existing = streams.get(url)
   if (existing !== undefined) return existing
-  const entry = { source: new EventSource(url), listeners: new Map(), ports: new Map() }
-  entry.source.onopen = () => broadcast(url, { kind: 'open', url })
-  entry.source.onerror = () => broadcast(url, { kind: 'error', url })
+  const entry = { source: new EventSource(url), listeners: new Map(), ports: new Map(), open: false }
+  entry.source.onopen = () => { entry.open = true; broadcast(url, { kind: 'open', url }) }
+  entry.source.onerror = () => { entry.open = false; broadcast(url, { kind: 'error', url }) }
   streams.set(url, entry)
   return entry
 }
@@ -69,6 +69,8 @@ self.onconnect = event => {
       entry.ports.set(port, new Set(Array.isArray(data.types) ? data.types : []))
       syncListeners(data.url)
       try { port.postMessage({ kind: 'ready', url: data.url }) } catch {}
+      // A tab that joins a stream already open never sees the original open frame, so replay it to that port only.
+      if (entry.open) try { port.postMessage({ kind: 'open', url: data.url, replay: true }) } catch {}
       return
     }
     if (data.kind === 'unsubscribe') { drop(port, data.url); return }
@@ -104,13 +106,13 @@ if (globalThis[KEY] !== true && typeof globalThis.EventSource === 'function' && 
   if (worker !== undefined && worker.port !== undefined) {
     const port = worker.port
     const groups = new Map()
-    let fellBack = false
-    let ready = false
+    /** The page's one connection mode: waiting for the worker's ready frame, served by it, or its own native sockets. */
+    let mode = 'awaiting'
     let readyTimer
 
     const fallbackAll = reason => {
-      if (fellBack) return
-      fellBack = true
+      if (mode === 'fallback') return
+      mode = 'fallback'
       globalThis.EventSource = Native
       console.warn('[shared-events] falling back to one EventSource per tab:', reason)
       // The worker stops serving this page, so release the subscriptions it still holds before
@@ -125,18 +127,23 @@ if (globalThis[KEY] !== true && typeof globalThis.EventSource === 'function' && 
       const message = event.data
       if (message === null || typeof message !== 'object') return
       if (message.kind === 'ready') {
-        ready = true
+        if (mode === 'fallback') return
+        mode = 'ready'
         if (readyTimer !== undefined) { clearTimeout(readyTimer); readyTimer = undefined }
         return
       }
       const group = groups.get(message.url)
       if (group === undefined) return
-      for (const instance of [...group]) instance.__receive(message)
+      for (const instance of [...group]) {
+        // A replayed open only lands on instances that have not opened yet; the stream was already open for the rest.
+        if (message.replay === true && instance.readyState !== 0) continue
+        instance.__receive(message)
+      }
     }
     port.start()
 
     const post = message => {
-      if (fellBack) return
+      if (mode === 'fallback') return
       try { port.postMessage(message) } catch {}
     }
 
@@ -162,7 +169,7 @@ if (globalThis[KEY] !== true && typeof globalThis.EventSource === 'function' && 
       }
 
       __subscribe() {
-        if (readyTimer === undefined && !ready && !fellBack) {
+        if (mode === 'awaiting' && readyTimer === undefined) {
           readyTimer = setTimeout(() => fallbackAll('no worker ready frame'), READY_TIMEOUT_MS)
         }
         this.__publishTypes()

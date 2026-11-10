@@ -25,6 +25,34 @@ export const destinationSchema = Schema.Struct({
   bookmarks: Schema.Array(Schema.String),
   isolateByDefault: Schema.Boolean,
   ownedByAnotherSession: Schema.optionalKey(Schema.Boolean),
+  /** The project's main branch, which a new thread workspace starts from; absent outside a repository or from an older Host. */
+  targetBookmark: Schema.optionalKey(Schema.String),
+})
+
+export const projectBookmarkSourceSchema = Schema.Literals(['project', 'file', 'detected', 'global'])
+
+/**
+ * A bookmark name a person or agent may choose as a project's main branch: one token jj and git both accept, so it
+ * never reads as an option or a revset. `RepositoryBookmarks.usableName` applies the same rule to names read from files.
+ */
+export const projectBookmarkNameSchema = Schema.String.check(Schema.isPattern(/^(?![-/])(?!.*\.\.)[^\s"'`\\]{1,200}$/u))
+
+export const setProjectBookmarkInputSchema = Schema.Struct({
+  path: nonEmptyString,
+  /** The bookmark to use from now on, or null to let dsh.project.json, origin’s default branch or the global setting decide again. */
+  bookmark: Schema.NullOr(projectBookmarkNameSchema),
+})
+
+export const projectBookmarkOutputSchema = Schema.Struct({
+  repositoryRoot: nonEmptyString,
+  bookmark: nonEmptyString,
+  source: projectBookmarkSourceSchema,
+  override: Schema.NullOr(Schema.String),
+  declared: Schema.NullOr(Schema.String),
+  detected: Schema.NullOr(Schema.String),
+  fallback: Schema.String,
+  /** Local bookmarks of the repository, to choose from. */
+  bookmarks: Schema.Array(Schema.String),
 })
 
 export const isolatedWorkspaceSchema = Schema.Struct({
@@ -33,7 +61,7 @@ export const isolatedWorkspaceSchema = Schema.Struct({
   created: Schema.Boolean,
 })
 
-export const cleanupKindSchema = Schema.Literals(['empty', 'integrated', 'secondary', 'untracked'])
+export const cleanupKindSchema = Schema.Literals(['empty', 'integrated', 'merged', 'secondary', 'untracked'])
 
 export const cleanupTargetSchema = Schema.Struct({
   repoRoot: nonEmptyString,
@@ -42,7 +70,7 @@ export const cleanupTargetSchema = Schema.Struct({
 })
 
 export const workspaceSyncSchema = Schema.Struct({
-  state: Schema.Literals(['running', 'done', 'failed']),
+  state: Schema.Literals(['queued', 'running', 'done', 'failed']),
   workspace: Schema.String,
   bookmark: Schema.String,
   status: Schema.NullOr(Schema.Literals(['up-to-date', 'synced', 'would-sync', 'refused', 'conflicted', 'build-failed'])),
@@ -123,3 +151,28 @@ export const noFolderOutputSchema = Schema.Struct({ workspaceId: Schema.String }
 export const workspaceSyncOutputSchema = Schema.Struct({ sync: Schema.NullOr(workspaceSyncSchema) })
 
 export const emptyInputSchema = Schema.Struct({})
+
+/** The durable task a trusted setup action runs in a fresh thread workspace, as the composer card shows it. */
+/** The queue mints task ids as the sha256 of session, idempotency key: 64 lowercase hex characters. */
+const durableTaskIdSchema = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/u))
+
+export const workspaceSetupTaskSchema = Schema.Struct({
+  id: durableTaskIdSchema,
+  actionId: nonEmptyString,
+  label: boundedString(80),
+  status: Schema.Literals(['queued', 'running', 'cancel-requested', 'succeeded', 'failed', 'cancelled', 'timed-out', 'unknown', 'blocked']),
+  phase: Schema.Literals(['queued', 'resolving', 'starting', 'recording', 'reconciling']),
+})
+
+export const workspaceSetupSchema = Schema.Struct({
+  /** Actions selected for this workspace: the checkout's trusted root spans both it and the checkout. */
+  tasks: Schema.Array(workspaceSetupTaskSchema).check(Schema.isMaxLength(32)),
+  /** A selected action asked the first turn to wait for it. */
+  awaitsFirstTurn: Schema.Boolean,
+  /** Whether this Session works in a thread workspace at all; anywhere else nothing runs. */
+  applies: Schema.Boolean,
+})
+
+export const workspaceSetupInputSchema = Schema.Struct({ sessionId: nonEmptyString, path: nonEmptyString })
+
+export const cancelWorkspaceSetupInputSchema = Schema.Struct({ sessionId: nonEmptyString, taskId: nonEmptyString })

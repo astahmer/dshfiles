@@ -7,7 +7,7 @@ type WorkspaceSyncOutcome = 'running' | 'updated' | 'up-to-date' | 'kept' | 'con
  * before rewriting anything (or undid its own rebase), so the checkout and its local work are exactly as before.
  */
 export const workspaceSyncOutcome = (view: WorkspaceSyncView): WorkspaceSyncOutcome => {
-  if (view.state === 'running') return 'running'
+  if (view.state === 'queued' || view.state === 'running') return 'running'
   if (view.status === 'refused') return 'kept'
   if (view.status === 'conflicted') return 'conflicted'
   if (view.status === 'up-to-date') return 'up-to-date'

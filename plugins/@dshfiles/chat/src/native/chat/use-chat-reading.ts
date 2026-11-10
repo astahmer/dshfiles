@@ -2,6 +2,7 @@
 import { useLayoutEffect, useState } from 'react'
 import type { ChatScrollPosition, ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatViewport, ViewportLanding, ViewportScroll } from './use-chat-viewport.ts'
+import { ReadingFollowIntent } from './follow-policy.ts'
 import { useScrollFollow, type ScrollFollow } from './use-scroll-follow.ts'
 
 const FOLLOW_THRESHOLD = 24
@@ -35,13 +36,14 @@ export class ChatReading {
     private state: ChatReadingState,
     private readonly onChange: (state: ChatReadingState) => void,
     private readonly follow: ScrollFollow,
+    private readonly intent: ReadingFollowIntent,
   ) {}
 
   /**
    * Expose pending reader ownership to navigation and resize handlers.
    * @returns whether reader input still awaits interval or scrollend sampling.
    */
-  get pending(): boolean { return this.sampleTimer !== null }
+  get pending(): boolean { return this.intent.pending }
   /**
    * Expose the active follow policy.
    * @returns whether content growth retains bottom-follow ownership.
@@ -73,7 +75,8 @@ export class ChatReading {
   /** Release bottom follow and pending sampling for an explicit navigation. */
   pauseFollowing(): void {
     this.cancelPending()
-    this.publish({ ...this.state, followingTail: false })
+    this.intent.setFollowing(false)
+    this.publish(this.state)
   }
 
   /**
@@ -164,7 +167,7 @@ export class ChatReading {
       this.sampled?.({ position: null, movedByReader: scroll.movedByReader, followingTail: true })
       return
     }
-    this.sampleTimer ??= window.setTimeout(this.flushSample, SCROLL_SAMPLE_INTERVAL_MS)
+    this.beginSample()
   }
 
   /**
@@ -181,7 +184,8 @@ export class ChatReading {
         return
       }
       this.viewport.acknowledge(scroll.metrics)
-      this.publish({ ...this.state, followingTail: false })
+      this.intent.setFollowing(false)
+      this.publish(this.state)
       this.refreshActiveTurn()
       return
     }
@@ -199,7 +203,7 @@ export class ChatReading {
   refreshActiveTurn(): void {
     if (this.pending) return
     if (this.state.followingTail) {
-      this.publish({ ...this.state, initialized: true, activeTurn: this.viewport.latestTurn })
+      this.publish({ initialized: true, activeTurn: this.viewport.latestTurn })
       return
     }
     if (this.probeFrame !== null) return
@@ -210,17 +214,23 @@ export class ChatReading {
   private commit(
     landing: ViewportLanding, followingTail: boolean, activeTurn: number | null, initialized = true,
   ): void {
+    this.intent.setFollowing(followingTail)
     if (followingTail) this.store.save(null)
     else if (landing.position !== null) this.store.save(landing.position)
-    this.publish({ initialized, followingTail, activeTurn })
+    this.publish({ initialized, activeTurn })
   }
 
-  private publish(state: ChatReadingState): void {
-    this.follow.setFollowing(state.followingTail)
+  private publish(next: { readonly initialized: boolean; readonly activeTurn: number | null }): void {
+    const state: ChatReadingState = { ...next, followingTail: this.intent.following }
     if (state.initialized === this.state.initialized && state.followingTail === this.state.followingTail
       && state.activeTurn === this.state.activeTurn) return
     this.state = state
     this.onChange(state)
+  }
+
+  private beginSample(): void {
+    this.sampleTimer ??= window.setTimeout(this.flushSample, SCROLL_SAMPLE_INTERVAL_MS)
+    this.intent.beginSample()
   }
 
   private cancelPending(): void {
@@ -228,6 +238,7 @@ export class ChatReading {
     if (this.probeFrame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.probeFrame)
     this.sampleTimer = null
     this.probeFrame = null
+    this.intent.endSample()
   }
 
   private readonly probe = (): void => {
@@ -236,7 +247,7 @@ export class ChatReading {
     const scroll = this.viewport.readScroll()
     if (scroll === null) return
     const activeTurn = this.follow.nearBottom(scroll.metrics) ? this.viewport.latestTurn : this.viewport.readVisibleTurn(scroll.metrics)
-    this.publish({ ...this.state, initialized: true, activeTurn })
+    this.publish({ initialized: true, activeTurn })
   }
 
   private readonly flushSample = (): void => {
@@ -252,7 +263,7 @@ export class ChatReading {
       this.viewport.acknowledge(scroll.metrics)
       if (followingTail || position !== null) this.store.save(position)
       const activeTurn = this.follow.nearBottom(scroll.metrics) ? this.viewport.latestTurn : this.viewport.readVisibleTurn(scroll.metrics)
-      this.publish({ initialized: true, followingTail, activeTurn })
+      this.publish({ initialized: true, activeTurn })
     }
     this.sampled?.({ position, movedByReader: scroll.movedByReader, followingTail })
   }
@@ -268,13 +279,14 @@ export class ChatReading {
 export function useChatReading(
   viewport: ChatViewport, store: PositionStore, initialTurn: number | null,
 ): { reading: ChatReading; state: ChatReadingState } {
+  const [intent] = useState(() => new ReadingFollowIntent(store.read() === null))
   const [state, setState] = useState<ChatReadingState>(() => ({
     initialized: false,
-    followingTail: store.read() === null,
+    followingTail: intent.following,
     activeTurn: initialTurn,
   }))
-  const follow = useScrollFollow(state.followingTail, FOLLOW_THRESHOLD + 1)
-  const [reading] = useState(() => new ChatReading(viewport, store, state, setState, follow))
+  const follow = useScrollFollow(intent, FOLLOW_THRESHOLD + 1)
+  const [reading] = useState(() => new ChatReading(viewport, store, state, setState, follow, intent))
   useLayoutEffect(() => { reading.setStore(store) }, [reading, store])
   useLayoutEffect(() => reading.bindFolds(), [reading])
   useLayoutEffect(() => () => { reading.dispose() }, [reading])

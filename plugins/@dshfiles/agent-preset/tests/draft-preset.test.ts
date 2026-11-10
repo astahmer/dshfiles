@@ -5,10 +5,14 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/draft-client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AgentPresetSeatController, type AgentPresetStage } from '../src/native/seat-store.ts'
+import { AgentPresetSeatController, AgentPresetStageStore } from '../src/native/seat-store.ts'
 import { AgentPresetSectionController } from '../src/native/section-store.ts'
 
 type SeatSession = Pick<SessionSummary, 'id' | 'blank' | 'projectionValues'>
+const stageId = (stages: AgentPresetStageStore): string | undefined => {
+  const stage = stages.read()
+  return stage.kind === 'staged' ? stage.preset : undefined
+}
 const id = (value: string): SessionId => brandString<SessionId>(`session-${value}`)
 const contexts: Context[] = []
 afterEach(async () => {
@@ -57,12 +61,12 @@ function fixture(local = true) {
     },
   })
   ctx.provide('sessionDrafts', drafts)
-  const staged: AgentPresetStage = { id: undefined, introduce: false }
-  const seat = new AgentPresetSeatController(ctx, () => current, staged)
+  const stages = new AgentPresetStageStore()
+  const seat = new AgentPresetSeatController(ctx, () => current, stages)
   return {
     ctx,
     seat,
-    staged,
+    stages,
     list,
     select,
     stagePreset,
@@ -82,7 +86,7 @@ describe('native preset seat with canonical Session drafts', () => {
     expect(b.stagePreset).toHaveBeenCalledExactlyOnceWith(b.sessionId, 'cordis')
     expect(b.list.getSnapshot()[b.sessionId]?.agentPreset).toBe('cordis')
     expect(b.select).not.toHaveBeenCalled()
-    expect(b.staged.id).toBeUndefined()
+    expect(stageId(b.stages)).toBeUndefined()
     await b.seat.load()
     await b.seat.apply()
     expect(b.seat.store.getSnapshot()).toMatchObject({ current: 'cordis', busy: false, error: null })
@@ -109,6 +113,39 @@ describe('native preset seat with canonical Session drafts', () => {
     expect(b.select).not.toHaveBeenCalled()
   })
 
+  it('never shows a refusal and a busy chip at once', async () => {
+    const b = fixture(false)
+    await b.seat.load()
+    let release: () => void = () => {}
+    b.select.mockImplementationOnce(async (_sessionId: SessionId, agentPreset: string) => {
+      await new Promise<void>(resolve => {
+        release = resolve
+      })
+      return { ok: true as const, value: agentPreset }
+    })
+
+    const applying = b.seat.select('cordis')
+    expect(b.seat.store.getSnapshot()).toMatchObject({ busy: true, error: null })
+    release()
+    await applying
+
+    expect(b.seat.store.getSnapshot()).toMatchObject({ busy: false, error: null, current: 'cordis' })
+  })
+
+  it('announces a refused Host selection until the chip acknowledges it, then keeps only its reason', async () => {
+    const b = fixture(false)
+    await b.seat.load()
+    b.select.mockRejectedValueOnce(new Error('materialized already'))
+
+    await b.seat.select('cordis')
+
+    const refusal = b.seat.store.getSnapshot().error
+    expect(refusal).toMatchObject({ reason: 'materialized already' })
+    expect(b.seat.store.getSnapshot().busy).toBe(false)
+    b.seat.dismissRefusal(refusal)
+    expect(b.seat.store.getSnapshot().error).toBe('materialized already')
+  })
+
   it('preserves the native Host path for a materialized blank', async () => {
     const b = fixture(false)
     await b.seat.select('cordis')
@@ -123,14 +160,14 @@ describe('native preset seat with canonical Session drafts', () => {
     await b.seat.select('cordis')
     expect(b.select).not.toHaveBeenCalled()
     expect(b.stagePreset).not.toHaveBeenCalled()
-    expect(b.staged.id).toBeUndefined()
+    expect(stageId(b.stages)).toBeUndefined()
   })
 
   it('synchronizes the Settings default into the captured local blank without selecting it on the Host', async () => {
     const b = fixture()
     const settings = new AgentPresetSectionController(b.ctx)
     await settings.makeDefault('cordis', preset => b.seat.syncBlankSession(b.sessionId, preset))
-    expect(settings.store.getSnapshot()).toMatchObject({ saving: false, error: null })
+    expect(settings.store.getSnapshot()).toMatchObject({ status: 'ready', save: { status: 'idle' } })
     expect(b.list.getSnapshot()[b.sessionId]?.agentPreset).toBe('cordis')
     expect(b.select).not.toHaveBeenCalled()
   })
@@ -167,7 +204,29 @@ describe('native preset seat with canonical Session drafts', () => {
     b.setCurrent({ id: destination, blank: true, projectionValues: {} })
     await b.seat.apply()
     expect(b.stagePreset).toHaveBeenCalledExactlyOnceWith(destination, 'cordis')
-    expect(b.staged.id).toBeUndefined()
+    expect(stageId(b.stages)).toBeUndefined()
     expect(b.select).not.toHaveBeenCalled()
+  })
+
+  it('keeps the chip snapshot and its subscribers when a draft update moves only the preview', async () => {
+    const b = fixture()
+    await b.seat.load()
+    const settled = b.seat.store.getSnapshot()
+    let notifications = 0
+    const stopNotifications = b.seat.store.subscribe(() => {
+      notifications += 1
+    })
+    const stopApply = b.list.subscribe(() => {
+      void b.seat.apply()
+    })
+    b.list.set({ ...b.list.getSnapshot(), [b.sessionId]: { sessionId: b.sessionId, local: true, preview: 'hello' } })
+    await b.seat.apply()
+    expect(b.seat.store.getSnapshot()).toBe(settled)
+    expect(notifications).toBe(0)
+    b.seat.stage('cordis')
+    expect(notifications).toBe(1)
+    expect(b.seat.store.getSnapshot().current).toBe('cordis')
+    stopNotifications()
+    stopApply()
   })
 })

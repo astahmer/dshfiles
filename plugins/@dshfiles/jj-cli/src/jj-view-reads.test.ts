@@ -89,6 +89,28 @@ describe('JjViewReads against real jj', () => {
     }).pipe(Effect.scoped, Effect.provide(JjTestLayer)),
   )
 
+  it.live('drops only the moved store’s cached reads, keeping another repository’s', () =>
+    Effect.gen(function* () {
+      const jj = yield* Jj
+      const reads = yield* JjViewReads
+      const first = yield* temporaryRepository
+      const second = yield* temporaryRepository
+      const recorder = recordSpans()
+
+      expect((yield* recorder.trace(reads.read(describeAt(first.repository)))).stdout).toBe('')
+      expect((yield* recorder.trace(reads.read(describeAt(second.repository)))).stdout).toBe('')
+      expect(recorder.named('jj log')).toHaveLength(2)
+
+      yield* jj.exec({ args: ['describe', '-m', 'first'], cwd: first.repository })
+      expect((yield* recorder.trace(reads.read(describeAt(first.repository)))).stdout).toBe('first\n')
+      expect(recorder.named('jj log')).toHaveLength(3)
+
+      // The other store never moved: its cached read still answers without a spawn.
+      expect((yield* recorder.trace(reads.read(describeAt(second.repository)))).stdout).toBe('')
+      expect(recorder.named('jj log')).toHaveLength(3)
+    }).pipe(Effect.scoped, Effect.provide(JjTestLayer)),
+  )
+
   it.live('does not cache a failed read or a command that is not a view read', () =>
     Effect.gen(function* () {
       const reads = yield* JjViewReads

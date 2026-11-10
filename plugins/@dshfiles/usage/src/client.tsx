@@ -17,7 +17,7 @@ import { UsageQuota } from './quota-tab.js'
 import { ThreadCostFacet } from './thread-cost-facet.js'
 
 const PANEL_ID = 'dshfiles-usage'
-/** The thread panel's Cost facet (plans/ade-ux §4.4): a page tab type of the right pane. */
+/** The thread panel's Cost facet (docs/ade-ux §4.4): a page tab type of the right pane. */
 const COST_FACET_ID = 'dshfiles-usage-cost'
 const TRACES_PANEL_ID = 'traces'
 
@@ -48,7 +48,7 @@ export default defineClient({
         </PluginQueryProvider>
       )
       plugin.provide(AccountUsageView, { Dashboard: plugin.bind(Dashboard) })
-      // Observe › Usage › Quota is where ai-accounts' quota views live now (plans/ade-ux §6); its old entry points and
+      // Observe › Usage › Quota is where ai-accounts' quota views live now (docs/ade-ux §6); its old entry points and
       // saved tabs open it through this contract.
       const openQuota = (target?: UsageQuotaTarget): void => {
         UsageQuota.go(target)

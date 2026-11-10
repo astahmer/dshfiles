@@ -16,9 +16,7 @@ export const receiptSchema = Schema.Struct({
 const renderPreview = (preview: typeof previewSchema.Type): string =>
   [
     `Preview ${preview.previewId} expires ${new Date(preview.expiresAt).toISOString()}: ${preview.candidates.length} eligible, ${preview.protectedCount} protected, ${preview.remainingCount} remaining.`,
-    ...preview.candidates.map(
-      candidate => `${candidate.sessionId} archived=${candidate.archived} settled=${candidate.settled}`,
-    ),
+    ...preview.candidates.map(candidate => `${candidate.sessionId} archived=${candidate.archived} settled=${candidate.settled}`),
   ].join('\n')
 
 const renderReceipt = (receipt: typeof receiptSchema.Type): string => {

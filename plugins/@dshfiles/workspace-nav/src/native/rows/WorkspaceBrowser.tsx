@@ -30,16 +30,22 @@ import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
+  deriveFlat, deriveGroups, deriveSearchResults, indexRowState, orderByRecency, owningGroupKey, owningParentFolder,
   pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { AnimatedRows } from './AnimatedRows.tsx'
 import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
+import {
+  deleteDialogError, deleteDialogOpen, deleteDialogPending, deleteDialogSettled, deleteDialogTitle,
+  renameDialogBlocked, renameDialogView, type DeleteDialog, type RenameDialog,
+} from './workspace-dialogs.ts'
 import css from './WorkspaceBrowser.module.css'
 
 /**
@@ -889,11 +895,19 @@ function SearchResults({
 }
 
 /**
- * Render the browsing region.
+ * Render the browsing region behind the query provider its Session search reads through.
  * @param props - composed slot props (shell owner share + store + injected actions).
  * @returns the region element tree.
  */
-export function WorkspaceBrowser({
+export function WorkspaceBrowser(props: WorkspaceBrowserProps) {
+  return (
+    <PluginQueryProvider>
+      <WorkspaceBrowserBody {...props} />
+    </PluginQueryProvider>
+  )
+}
+
+function WorkspaceBrowserBody({
   wide,
   usePanelInfo,
   expandSidebar,
@@ -977,12 +991,12 @@ export function WorkspaceBrowser({
     return list.ids.filter(id => list.byId[id] !== undefined && !accounted.has(id))
   }, [list, workspaces])
   const orderState = useMemo(
-    () => ({ pinnedSessionIds, archivedSessionIds }),
+    () => indexRowState({ pinnedSessionIds, archivedSessionIds }),
     [archivedSessionIds, pinnedSessionIds],
   )
   const rowState = useMemo<SessionRowState>(
-    () => ({ ...orderState, archivedFilter }),
-    [orderState, archivedFilter],
+    () => ({ pinnedSessionIds, archivedSessionIds, archivedFilter }),
+    [archivedSessionIds, archivedFilter, pinnedSessionIds],
   )
   const flatMemberIds = useMemo(() => sessionMemberIds(list), [list])
   const orderedWorkspaces = useMemo(() => workspaces.map((workspace) => {
@@ -1071,15 +1085,23 @@ export function WorkspaceBrowser({
   // The query outlives the tree and the input (both wide-only) so collapsing
   // does not silently drop an in-progress filter.
   const [query, setQuery] = useState('')
-  const [searchExpanded, setSearchExpanded] = useState(false)
+  /** collapsed = rail button; expanding = rail click waiting out the slide before focus; expanded = the input. */
+  const [searchPhase, setSearchPhase] = useState<'collapsed' | 'expanding' | 'expanded'>('collapsed')
+  const searchExpanded = searchPhase !== 'collapsed'
   const [revealSessionId, setRevealSessionId] = useState<SessionId | undefined>(undefined)
   const normalizedQuery = sanitizeSearchQuery(query).trim()
-  const [remoteSearch, setRemoteSearch] = useState<RemoteSearchState>({
-    query: '',
-    status: 'idle',
-    items: [],
-    hasMore: false,
+  const debouncedQuery = useDebouncedValue({ value: normalizedQuery, delayMs: SEARCH_DEBOUNCE_MS })
+  const searchPage = useQuery({
+    queryKey: ['workspace-nav', 'session-search', debouncedQuery],
+    queryFn: ({ signal }) => searchSessions(debouncedQuery, signal),
+    enabled: debouncedQuery !== '',
   })
+  const remoteSearch = useMemo<RemoteSearchState>(() => {
+    if (debouncedQuery === '') return { query: '', status: 'idle', items: [], hasMore: false }
+    if (searchPage.error !== null) return { query: debouncedQuery, status: 'error', items: [], hasMore: false }
+    if (searchPage.data === undefined) return { query: debouncedQuery, status: 'loading', items: [], hasMore: false }
+    return { query: debouncedQuery, status: 'ready', items: searchPage.data.items, hasMore: searchPage.data.hasMore }
+  }, [debouncedQuery, searchPage.data, searchPage.error])
   const searchRoot = useRef<HTMLDivElement | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
   // Section-header ＋ opens the picker menu (same popover in wide and rail
@@ -1095,7 +1117,7 @@ export function WorkspaceBrowser({
     }
     setRevealSessionId(sessionId)
     setQuery('')
-    setSearchExpanded(false)
+    setSearchPhase('collapsed')
     open(sessionId)
   }
   const acknowledgeSessionReveal = (sessionId: SessionId): void => {
@@ -1105,14 +1127,14 @@ export function WorkspaceBrowser({
     if (normalizedQuery !== '') setRevealSessionId(undefined)
   }, [normalizedQuery])
 
-  // Rail search = expand + land in the search box: the flag arms before the
+  // Rail search = expand + land in the search box: `expanding` arms before the
   // expand request; once the shell flips wide the input mounts and takes focus.
-  const [searchOnExpand, setSearchOnExpand] = useState(false)
+  const searchOnExpand = searchPhase === 'expanding'
   useEffect(() => {
     if (wide && searchOnExpand) {
       const timer = window.setTimeout(() => {
         searchInput.current?.focus({ preventScroll: true })
-        setSearchOnExpand(false)
+        setSearchPhase('expanded')
       }, EXPAND_SLIDE_MS)
       return () => { window.clearTimeout(timer) }
     }
@@ -1120,103 +1142,60 @@ export function WorkspaceBrowser({
   useEffect(() => {
     if (shortcutState.searchRequest === 0) return
     closeAddWorkspace()
-    setSearchExpanded(true)
     if (!wide) {
-      setSearchOnExpand(true)
+      setSearchPhase('expanding')
       expandSidebar()
-    } else searchInput.current?.focus({ preventScroll: true })
+      return
+    }
+    setSearchPhase('expanded')
+    searchInput.current?.focus({ preventScroll: true })
   }, [shortcutState.searchRequest])
 
   useEffect(() => {
-    if (!wide || !searchExpanded || searchOnExpand) return
+    if (!wide || searchPhase !== 'expanded') return
     searchInput.current?.focus({ preventScroll: true })
-  }, [wide, searchExpanded, searchOnExpand])
+  }, [wide, searchPhase])
 
   // Outside-click dismissal stays off while the rail gesture is in flight
-  // (searchOnExpand): the rail click flips the shell wide and mounts this
+  // (expanding): the rail click flips the shell wide and mounts this
   // listener during its own dispatch, then keeps bubbling to document with
   // the now-unmounted rail button as its target — outside searchRoot, so the
   // listener would dismiss the search that click just opened.
   useEffect(() => {
-    if (!wide || !searchExpanded || searchOnExpand) return
+    if (!wide || searchPhase !== 'expanded') return
     const onClick = (event: MouseEvent): void => {
       if (!(event.target instanceof Node) || searchRoot.current?.contains(event.target) === true) return
       searchInput.current?.blur()
       if (normalizedQuery !== '') return
-      setSearchExpanded(false)
+      setSearchPhase('collapsed')
     }
     document.addEventListener('click', onClick)
     return () => { document.removeEventListener('click', onClick) }
-  }, [normalizedQuery, wide, searchExpanded, searchOnExpand])
-
-  useEffect(() => {
-    if (normalizedQuery === '') {
-      setRemoteSearch({ query: '', status: 'idle', items: [], hasMore: false })
-      return
-    }
-    const controller = new AbortController()
-    setRemoteSearch({
-      query: normalizedQuery,
-      status: 'loading',
-      items: [],
-      hasMore: false,
-    })
-    const timer = window.setTimeout(() => {
-      searchSessions(normalizedQuery, controller.signal).then((result) => {
-        if (controller.signal.aborted) return
-        setRemoteSearch({
-          query: normalizedQuery,
-          status: 'ready',
-          items: result.items,
-          hasMore: result.hasMore,
-        })
-      }).catch(() => {
-        if (controller.signal.aborted) return
-        setRemoteSearch({
-          query: normalizedQuery,
-          status: 'error',
-          items: [],
-          hasMore: false,
-        })
-      })
-    }, SEARCH_DEBOUNCE_MS)
-    return () => {
-      window.clearTimeout(timer)
-      controller.abort()
-    }
-  }, [normalizedQuery, searchSessions])
+  }, [normalizedQuery, wide, searchPhase])
 
   // Rename dialog (browser-owned so it outlives row unmounts during collapse).
   // The stored title decides whether confirming is a real rename; the draft is
   // seeded with the label on screen. They differ for a Workspace still
   // carrying its automatic title, so confirming the prefill pins that name.
-  const [renameTarget, setRenameTarget] = useState<{ workspaceId: WorkspaceId; storedTitle: string } | null>(null)
-  const [renameDraft, setRenameDraft] = useState('')
-  const [renaming, setRenaming] = useState(false)
-  const [renameError, setRenameError] = useState<string | null>(null)
-  const renameTrimmed = renameDraft.trim()
-  // Self is excluded by identity, not by title: the draft is seeded with the
-  // localized label, which for an automatically titled Workspace equals its
-  // own displayed title without being a conflict with itself.
-  const renameDuplicate = renameTarget !== null && renameTrimmed !== ''
-    && workspaces.some(w => w.workspaceId !== renameTarget.workspaceId && w.title === renameTrimmed)
-  const renameBlocked = renaming || renameTrimmed === ''
-    || renameTarget === null || renameTrimmed === renameTarget.storedTitle || renameDuplicate
+  const [renameDialog, setRenameDialog] = useState<RenameDialog>({ kind: 'closed' })
+  const rename = renameDialogView(renameDialog)
+  const renameTargetId = rename.target?.workspaceId
+  const renameTrimmed = rename.draft.trim()
+  const renameDuplicate = renameTargetId !== undefined && renameTrimmed !== ''
+    && workspaces.some(w => w.workspaceId !== renameTargetId && w.title === renameTrimmed)
+  const renameBlocked = renameDialogBlocked({ dialog: renameDialog, workspaces })
   const closeRename = () => {
-    if (renaming) return
-    setRenameTarget(null)
-    setRenameError(null)
+    if (rename.renaming) return
+    setRenameDialog({ kind: 'closed' })
   }
   const confirmRename = () => {
-    if (renameBlocked) return
-    setRenaming(true)
-    setRenameError(null)
-    renameWorkspace(renameTarget.workspaceId, renameTrimmed).then(() => {
-      setRenaming(false)
-      setRenameTarget(null)
+    const target = rename.target
+    if (target === null || renameBlocked) return
+    setRenameDialog({ ...target, kind: 'renaming', draft: rename.draft })
+    renameWorkspace(target.workspaceId, renameTrimmed).then(() => {
+      setRenameDialog({ kind: 'closed' })
     }).catch((reason: unknown) => {
-      setRenaming(false)
-      setRenameError(reason instanceof Error ? reason.message : String(reason))
+      setRenameDialog({ ...target, kind: 'failed', draft: rename.draft, error: reason instanceof Error ? reason.message : String(reason) })
     })
   }
 
@@ -1230,36 +1209,31 @@ export function WorkspaceBrowser({
 
   // Delete dialog is separate from the row so a successful removal can
   // unmount that row without tearing down the in-flight confirmation state.
-  const [deleteTarget, setDeleteTarget] = useState<{ workspaceId: WorkspaceId; title: string } | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteCommittedId, setDeleteCommittedId] = useState<WorkspaceId | null>(null)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<DeleteDialog>({ kind: 'closed' })
+  const deleteOpen = deleteDialogOpen(deleteDialog)
+  const deletePending = deleteDialogPending(deleteDialog)
+  const deleteTitle = deleteDialogTitle(deleteDialog)
+  const deleteError = deleteDialogError(deleteDialog)
   useEffect(() => {
-    if (deleteCommittedId === null
-      || workspaces.some(workspace => workspace.workspaceId === deleteCommittedId)) return
-    setDeleting(false)
-    setDeleteCommittedId(null)
-    setDeleteTarget(null)
-  }, [deleteCommittedId, workspaces])
+    if (!deleteDialogSettled({ dialog: deleteDialog, workspaces })) return
+    setDeleteDialog({ kind: 'closed' })
+  }, [deleteDialog, workspaces])
   const closeDelete = () => {
-    if (deleting) return
-    setDeleteTarget(null)
-    setDeleteError(null)
+    if (deletePending) return
+    setDeleteDialog({ kind: 'closed' })
   }
   const confirmDelete = () => {
     /* v8 ignore next -- the Modal is absent without a target and its button is disabled while deleting. */
-    if (deleting || deleteTarget === null) return
-    setDeleting(true)
-    setDeleteCommittedId(null)
-    setDeleteError(null)
-    deleteWorkspace(deleteTarget.workspaceId).then(() => {
+    if (deletePending || deleteDialog.kind !== 'confirming') return
+    const target = deleteDialog
+    setDeleteDialog({ ...target, kind: 'deleting' })
+    deleteWorkspace(target.workspaceId).then(() => {
       // Keep the confirmation pending until this component has rendered the
       // committed list projection without the deleted id. Closing earlier
       // exposes one stale React frame to the next Create Workspace gesture.
-      setDeleteCommittedId(deleteTarget.workspaceId)
+      setDeleteDialog({ ...target, kind: 'awaitingList' })
     }).catch((reason: unknown) => {
-      setDeleting(false)
-      setDeleteError(reason instanceof Error ? reason.message : String(reason))
+      setDeleteDialog({ ...target, kind: 'failed', error: reason instanceof Error ? reason.message : String(reason) })
     })
   }
 
@@ -1278,7 +1252,7 @@ export function WorkspaceBrowser({
               className={clsx(css.search, searchExpanded && css.searchExpanded)}
               onClick={() => {
                 closeAddWorkspace()
-                setSearchExpanded(true)
+                setSearchPhase('expanded')
                 searchInput.current?.focus()
               }}
             >
@@ -1308,7 +1282,7 @@ export function WorkspaceBrowser({
                 onKeyDown={(e) => {
                   if (e.key !== 'Escape') return
                   setQuery('')
-                  setSearchExpanded(false)
+                  setSearchPhase('collapsed')
                 }}
               />
               {searchExpanded && (
@@ -1319,7 +1293,7 @@ export function WorkspaceBrowser({
                   onClick={(e) => {
                     e.stopPropagation()
                     setQuery('')
-                    setSearchExpanded(false)
+                    setSearchPhase('collapsed')
                   }}
                 >
                   <IconCloseFillRegular />
@@ -1463,41 +1437,43 @@ export function WorkspaceBrowser({
                 home={home}
                 t={t}
                 onRenameRequest={(workspaceId, displayTitle) => {
-                  setRenameTarget({
+                  setRenameDialog({
+                    kind: 'editing',
                     workspaceId,
                     storedTitle: storedWorkspaces.find(w => w.workspaceId === workspaceId)?.title ?? displayTitle,
+                    draft: displayTitle,
                   })
-                  setRenameDraft(displayTitle)
-                  setRenameError(null)
                 }}
                 onDeleteRequest={(workspaceId, title) => {
-                  setDeleteTarget({ workspaceId, title })
-                  setDeleteError(null)
+                  setDeleteDialog({ kind: 'confirming', workspaceId, title })
                 }}
               />
             ))}
       </div>
 
       <Modal
-        open={renameTarget !== null}
+        open={rename.open}
         onClose={closeRename}
         closeLabel={t('close')}
         title={t('rename.workspace.title')}
         footer={(
           <>
-            <Button variant="outline" disabled={renaming} onClick={closeRename}>{t('cancel')}</Button>
+            <Button variant="outline" disabled={rename.renaming} onClick={closeRename}>{t('cancel')}</Button>
             <Button variant="primary" disabled={renameBlocked} onClick={confirmRename}>{t('rename')}</Button>
           </>
         )}
       >
         <input
           className={css.renameInput}
-          value={renameDraft}
+          value={rename.draft}
           aria-label={t('field.workspaceName')}
           data-modal-autofocus
-          disabled={renaming}
+          disabled={rename.renaming}
           onFocus={(e) => { e.target.select() }}
-          onChange={(e) => { setRenameDraft(e.target.value); setRenameError(null) }}
+          onChange={(e) => {
+            const draft = e.target.value
+            setRenameDialog(current => current.kind === 'closed' ? current : { ...current, kind: 'editing', draft })
+          }}
           onCompositionStart={() => { composingRef.current = true }}
           onCompositionEnd={() => { composingRef.current = false }}
           onKeyDown={(e) => {
@@ -1510,24 +1486,24 @@ export function WorkspaceBrowser({
         {renameDuplicate && (
           <div className={css.renameError} role="alert">{t('conflict.named', { name: renameTrimmed })}</div>
         )}
-        {renameError !== null && <div className={css.renameError} role="alert">{renameError}</div>}
+        {rename.error !== null && <div className={css.renameError} role="alert">{rename.error}</div>}
       </Modal>
 
       <Modal
-        open={deleteTarget !== null}
+        open={deleteOpen}
         onClose={closeDelete}
         closeLabel={t('close')}
         title={t('delete.workspace')}
-        {...deleteTarget === null
+        {...deleteTitle === undefined
           ? {}
-          : { description: t('delete.desc', { name: deleteTarget.title }) }}
+          : { description: t('delete.desc', { name: deleteTitle }) }}
         footer={(
           <>
-            <Button variant="outline" disabled={deleting} onClick={closeDelete}>{t('cancel')}</Button>
+            <Button variant="outline" disabled={deletePending} onClick={closeDelete}>{t('cancel')}</Button>
             <Button
               variant="outline"
               className={css.deleteAction}
-              disabled={deleting}
+              disabled={deletePending}
               onClick={confirmDelete}
             >
               {t('delete.workspace')}
@@ -1535,7 +1511,7 @@ export function WorkspaceBrowser({
           </>
         )}
       >
-        {deleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
+        {deletePending && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
         {deleteError !== null && <div className={css.renameError} role="alert">{deleteError}</div>}
       </Modal>
     </div>

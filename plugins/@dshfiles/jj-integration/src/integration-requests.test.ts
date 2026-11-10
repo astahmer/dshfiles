@@ -45,6 +45,31 @@ describe('IntegrationRequests', () => {
       }),
     )
 
+    it.effect('lets a new queued integration be cancelled once the previous attempt settled', () =>
+      Effect.gen(function* () {
+        const requests = yield* IntegrationRequests
+        const first = yield* requests.queue({ path: '/repo/reused', sessionId: undefined })
+        expect(yield* requests.passGuard(first)).toBe(true)
+        expect(yield* requests.settle(first)).toBe(true)
+        const second = yield* requests.queue({ path: '/repo/reused', sessionId: 'session-second' })
+        expect(second).not.toBe(first)
+        expect(yield* requests.isCurrent(second)).toBe(true)
+        expect(yield* requests.cancel('/repo/reused')).toBe('cancelled')
+      }),
+    )
+
+    it.effect('returns an attempt that ended without settling to the queue, so it stays cancellable', () =>
+      Effect.gen(function* () {
+        const requests = yield* IntegrationRequests
+        const entry = yield* requests.queue({ path: '/repo/retried', sessionId: undefined })
+        expect(yield* requests.passGuard(entry)).toBe(true)
+        yield* requests.endAttempt('/repo/retried')
+        expect(yield* requests.isCurrent(entry)).toBe(true)
+        expect(yield* requests.hasPassedGuard('/repo/retried')).toBe(false)
+        expect(yield* requests.cancel('/repo/retried')).toBe('cancelled')
+      }),
+    )
+
     it.effect('drops a cancelled entry without settling it, even when the attempt is in flight', () =>
       Effect.gen(function* () {
         const requests = yield* IntegrationRequests
@@ -63,6 +88,16 @@ describe('IntegrationRequests', () => {
         expect(yield* requests.progress('/repo/progress')).toMatchObject({ phase: 'rebasing' })
         yield* TestClock.adjust(Duration.minutes(11))
         expect(yield* requests.progress('/repo/progress')).toBeNull()
+      }),
+    )
+
+    it.effect('keeps a manual integration phase after a cancel, since no queue entry owned it', () =>
+      Effect.gen(function* () {
+        const requests = yield* IntegrationRequests
+        yield* requests.recordProgress({ path: '/repo/manual', phase: 'validating' })
+        expect(yield* requests.cancel('/repo/manual')).toBe('not-queued')
+        expect(yield* requests.progress('/repo/manual')).toMatchObject({ phase: 'validating' })
+        expect(yield* requests.isCurrent({ path: '/repo/manual', sessionId: undefined, queuedAt: 0 })).toBe(false)
       }),
     )
   })

@@ -74,7 +74,10 @@ describe('usage overview', () => {
     expect(UsageOverviewModel.formatResetIn(0 + (1 * 60 + 11) * 60_000 + 30_000, 0)).toBe('Resets in 1h 11m')
     expect(UsageOverviewModel.formatResetIn((5 * 24 + 20) * 3_600_000 + 1, 0)).toBe('Resets in 5d 20h')
     expect(UsageOverviewModel.formatResetIn(10, 20)).toBe('Resetting now')
-    expect(UsageOverviewModel.formatAge(0, (4 * 60 + 38) * 1000)).toBe('00:04:38')
+    expect(UsageOverviewModel.formatReadAge(0, 30_000)).toBe('just now')
+    expect(UsageOverviewModel.formatReadAge(0, 4 * 60_000 + 38_000)).toBe('4m ago')
+    expect(UsageOverviewModel.formatReadAge(0, 71 * 60_000)).toBe('1h 11m ago')
+    expect(UsageOverviewModel.formatReadAge(0, 3 * 24 * 3_600_000)).toBe('3d ago')
     expect(UsageOverviewModel.bankedExpiries([3, null, 1])).toEqual([1, 3, null])
   })
 

@@ -25,7 +25,8 @@ export interface SampleRequest {
   readonly endSeconds?: number | undefined
 }
 
-const boundedInputArgs = (videoPath: string) => [
+/** A non-zero start is an input seek, so ffmpeg decodes the window instead of every frame before it. */
+const boundedInputArgs = (input: { readonly videoPath: string; readonly startSeconds: number }) => [
   '-nostdin',
   '-hide_banner',
   '-loglevel',
@@ -38,12 +39,13 @@ const boundedInputArgs = (videoPath: string) => [
   String(FFMPEG_MAX_PIXELS),
   '-protocol_whitelist',
   'file',
+  ...(input.startSeconds > 0 ? ['-ss', String(input.startSeconds)] : []),
   '-i',
-  videoPath,
+  input.videoPath,
 ]
 
-const windowFilter = (window: { readonly startSeconds: number; readonly windowSeconds: number; readonly scanFps: number }) =>
-  `trim=start=${String(window.startSeconds)}:duration=${String(window.windowSeconds)},setpts=PTS-STARTPTS,fps=${String(window.scanFps)}:eof_action=pass`
+const windowFilter = (window: { readonly windowSeconds: number; readonly scanFps: number }) =>
+  `trim=duration=${String(window.windowSeconds)},setpts=PTS-STARTPTS,fps=${String(window.scanFps)}:eof_action=pass`
 
 /** Content-aware stills from a local MP4: a low-resolution scan, a frame selection, then one bounded extraction pass. */
 export class FrameSampler extends Context.Service<
@@ -83,9 +85,9 @@ export class FrameSampler extends Context.Service<
       const scan = (input: { readonly videoPath: string; readonly startSeconds: number; readonly windowSeconds: number; readonly scanFps: number }) =>
         ffmpeg({
           args: [
-            ...boundedInputArgs(input.videoPath),
+            ...boundedInputArgs(input),
             '-t',
-            String(input.startSeconds + input.windowSeconds),
+            String(input.windowSeconds),
             '-vf',
             `${windowFilter(input)},scale=${String(TweetLimits.videoScanEdge)}:${String(TweetLimits.videoScanHeight)}:force_original_aspect_ratio=decrease,pad=${String(TweetLimits.videoScanEdge)}:${String(TweetLimits.videoScanHeight)}:(ow-iw)/2:(oh-ih)/2,format=rgb24`,
             '-f',
@@ -114,9 +116,9 @@ export class FrameSampler extends Context.Service<
         const select = input.frameIndexes.map(index => `eq(n\\,${String(index)})`).join('+')
         return ffmpeg({
           args: [
-            ...boundedInputArgs(input.videoPath),
+            ...boundedInputArgs(input),
             '-t',
-            String(input.startSeconds + input.windowSeconds),
+            String(input.windowSeconds),
             '-vf',
             `${windowFilter(input)},select='${select}',scale=${String(FRAME_EDGE_PIXELS)}:${String(FRAME_EDGE_PIXELS)}:force_original_aspect_ratio=decrease,setsar=1`,
             '-fps_mode',

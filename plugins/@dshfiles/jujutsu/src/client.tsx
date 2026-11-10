@@ -1,3 +1,4 @@
+import { useProjectBookmark } from '@dshfiles/jj-integration/project-bookmark'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
@@ -46,6 +47,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import {
   ArrowDownIcon,
   CalendarIcon,
+  CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CopyPlusIcon,
@@ -61,17 +63,17 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
 import { defaultRangeExtractor, useVirtualizer } from '@dshfiles/plugin-ui/virtual'
+import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { errorMessage, keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, keepPreviousData, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/workspace-folder-picker/picker'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import * as Schema from 'effect/Schema'
 import { REVISION_PAGE_SIZE, type GraphLandmark, type Mutation, type ReadFailure, type Revision } from './api.js'
-import { ChatReferenceModel } from './chat-reference.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { RevisionGraphModel, reverseHexChangeId, type RevisionGraphRow } from './graph.js'
 import { GraphPagingModel } from './graph-paging.js'
@@ -80,8 +82,10 @@ import { useAutoRefresh } from './auto-refresh.js'
 import { useOpenInEditor } from './open-in-editor.js'
 import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin, STALE_REVISION_ERROR } from './revision-action-machine.js'
+import { revisionLocateMachine } from './revision-locate-machine.js'
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, RevisionDropModel, REVISION_MIME, WORKSPACE_MIME } from './revision-drop.js'
-import { repositoryLoadingState, shouldReregisterRepository } from './repository-loading.js'
+import { repositoryLoadingState } from './repository-loading.js'
+import { repositoryRegistrationMachine } from './repository-registration-machine.js'
 import { openGraphRepository } from './repository-opening.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { GRAPH_DENSITY, GraphLanes, graphWidthFor, RevisionGraphCell, type GraphMetrics } from './revision-graph-cell.js'
@@ -104,6 +108,7 @@ import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js'
 import { GraphRowAnchorModel, type GraphRowAnchor } from './graph-row-anchor.js'
 import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './graph-navigation-controls.js'
+import { ReviewSelectionModel } from './review-selection.js'
 import { useGraphNavigation } from './use-graph-navigation.js'
 import { WorkspaceLabels } from './workspace-labels.js'
 
@@ -135,6 +140,8 @@ interface JujutsuPanelProps {
   readonly visible?: boolean
   /** A panel dedicated to one view; without it the panel switches between both with tabs (the narrow side panel). */
   readonly view?: View
+  /** Open revisions in the review surface, when the plugin that owns it is loaded; false when it could not. */
+  readonly reviewRevisions?: ((input: { readonly workspacePath: string; readonly revisions: readonly string[] }) => boolean) | undefined
 }
 
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
@@ -264,8 +271,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [preferences, setPreference] = usePreferences()
   const diffLayout: PatchLayout =
     preferences.diffLayout !== 'auto' ? preferences.diffLayout : !sidePanel && window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'unified'
-  const autoRegisterPath = useRef<string | null>(null)
-  const recoveredRepositoryPath = useRef<string | null>(null)
   const repositoryRootsById = useRef(new Map<string, string>())
   const scope = props.scope
   const [initialRequest] = useState(() => {
@@ -286,8 +291,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         registeredPaths: props.projects.map(project => project.canonicalPath),
       }),
   )
-  const [pendingReferenceRequest, setPendingReferenceRequest] = useState(initialRequest?.reference ?? null)
-  const [repoId, setRepoId] = useState<string | null>(null)
+  const [locateSnapshot, sendLocate] = useMachine(revisionLocateMachine)
+  useEffect(() => {
+    if (initialRequest?.reference !== undefined) sendLocate({ type: 'reference', reference: initialRequest.reference, path: initialRequest.path })
+  }, [initialRequest, sendLocate])
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
   const [chosenView, setView] = usePanelScopeState<View | null>(scope, 'view', () => PanelScopes.persisted(scope).view ?? null)
@@ -302,6 +309,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [collapsedDays, setCollapsedDays] = usePanelScopeState<ReadonlySet<string>>(scope, 'collapsedDays', () => new Set())
   const [selection, setSelection] = usePanelScopeState<RevisionSelection | null>(scope, 'selection', () => null)
   const [comparisonSelection, setComparisonSelection] = usePanelScopeState<RevisionSelection | null>(scope, 'comparisonSelection', () => null)
+  // Separate from `selection`: a plain click keeps opening one row's details while rows are collected for a review.
+  const [reviewSelection, setReviewSelection] = usePanelScopeState<ListSelection<string>>(scope, 'reviewSelection', () => ListSelectionModel.empty())
+  const [reviewOpenFailed, setReviewOpenFailed] = useState(false)
   useEffect(() => {
     const selectedPath = path.trim()
     if (selectedPath.length > 0) PanelScopes.remember(scope, { path: selectedPath })
@@ -376,15 +386,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [describeDrafts, setDescribeDrafts] = useState<Readonly<Record<string, string>>>({})
   const [remote, setRemote] = useState('')
   const [bookmark, setBookmark] = useState('')
-  const [provisionedPath, setProvisionedPath] = useState<string | null>(null)
   const [workspaceBase, setWorkspaceBase] = useState<Revision | null>(null)
-  const [workspaceRemoval, setWorkspaceRemoval] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
   const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
   const showViewTabs = props.view === undefined || fullDiff !== null
   const [patchDisclosure, setPatchDisclosure] = useState<{ readonly commitId: string; readonly open: boolean } | null>(null)
   const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string } | null>(null)
   const [cleanupOpen, setCleanupOpen] = useState(false)
-  const [moveSource, setMoveSource] = useState<Revision | null>(null)
   const [copyNotice, setCopyNotice] = useState<{ readonly copied: boolean; readonly label: string } | null>(null)
   const mineOnly = preferences.mineOnly
   const hideImmutable = preferences.hideImmutable
@@ -394,65 +401,68 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const confirmResult = actionSnapshot.context.result
   const actionBusy = actionSnapshot.hasTag('busy')
   const { dragOrigin, dropTarget, dropPresentation } = actionSnapshot.context
+  const { provisionedPath, moveSource, workspaceRemoval } = actionSnapshot.context
   const dragSource = dragOrigin?.kind === 'revision' ? dragOrigin.sourceId : null
 
   useEffect(() => {
-    const confirmed = actionActor.on('confirmed', event => {
-      if (event.workspacePath !== null) setProvisionedPath(event.workspacePath)
-    })
     const settled = actionActor.on('settled', event => {
       const root = repositoryRootsById.current.get(event.repoId)
       if (root !== undefined) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(root) })
     })
-    return () => {
-      confirmed.unsubscribe()
-      settled.unsubscribe()
-    }
+    return () => settled.unsubscribe()
   }, [actionActor, queryClient])
 
-  const launchMutation = useMutation({ mutationFn: (cwd: string) => props.launchSession(cwd) })
+  const [registrationSnapshot, sendRegistration, registrationActor] = useMachine(repositoryRegistrationMachine, {
+    input: {
+      client: {
+        register: ({ path: requestedPath, readOnly }) => (readOnly ? api.registerRepository({ path: requestedPath }) : openGraphRepository(api, requestedPath)),
+      },
+      path,
+    },
+  })
+  const repoId = registrationSnapshot.context.repoId
+  const registrationBusy = registrationSnapshot.hasTag('busy')
+  const registrationError = registrationSnapshot.context.error
 
-  const registerMutation = useMutation({
-    mutationFn: (input: { readonly path: string; readonly readOnly?: boolean }) =>
-      input.readOnly === true ? api.registerRepository({ path: input.path }) : openGraphRepository(api, input.path),
-    onSuccess: registered => {
-      repositoryRootsById.current.set(registered.repoId, registered.root)
+  useEffect(() => {
+    const registered = registrationActor.on('registered', event => {
+      const { repoId: registeredRepoId, root } = event.repo
+      repositoryRootsById.current.set(registeredRepoId, root)
       while (repositoryRootsById.current.size > REPOSITORY_ID_LIMIT) {
         const oldestRepoId = repositoryRootsById.current.keys().next().value
         if (oldestRepoId === undefined) break
         repositoryRootsById.current.delete(oldestRepoId)
       }
       sendAction({ type: 'reset' })
-      setProvisionedPath(null)
       setWorkspaceBase(null)
-      setRepoId(registered.repoId)
-      setPath(registered.root)
+      setPath(root)
       setSelection(null)
       setComparisonSelection(null)
-      setMoveSource(null)
-      setWorkspaceRemoval(null)
       setDescribeDrafts({})
       setFullDiff(null)
-      const nextHistory = [registered.root, ...repoHistory.filter(item => item !== registered.root)].slice(0, REPO_HISTORY_LIMIT)
-      setRepoHistory(nextHistory)
-      storedRepoHistory.set(nextHistory)
-      PanelScopes.remember(scope, { path: registered.root })
-      if (scope === DEFAULT_PANEL_SCOPE) storedRepoPath.set(registered.root)
-      void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(registered.root) })
-    },
-  })
-  const { mutate: registerRepository, reset: resetRegistration } = registerMutation
+      setRepoHistory(current => {
+        const nextHistory = [root, ...current.filter(item => item !== root)].slice(0, REPO_HISTORY_LIMIT)
+        storedRepoHistory.set(nextHistory)
+        return nextHistory
+      })
+      PanelScopes.remember(scope, { path: root })
+      if (scope === DEFAULT_PANEL_SCOPE) storedRepoPath.set(root)
+      void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(root) })
+    })
+    return () => registered.unsubscribe()
+  }, [queryClient, registrationActor, scope, sendAction, setComparisonSelection, setPath, setSelection])
+
+  const launchMutation = useMutation({ mutationFn: (cwd: string) => props.launchSession(cwd) })
 
   const autoRefresh = useAutoRefresh({
     preferences,
-    paused: registerMutation.isPending || actionBusy || preview !== undefined,
+    paused: registrationBusy || actionBusy || preview !== undefined,
     surfaceVisible: props.visible ?? true,
     onBecameVisible: () => {
       if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
     },
   })
 
-  const graphGenerationRef = useRef('')
   const [graphGeneration, setGraphGeneration] = useState(0)
   const stateQuery = useQuery({
     queryKey: jujutsuQueryKeys.state(path, REVISION_PAGE_SIZE),
@@ -465,85 +475,55 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const loadedState = useRef<{ readonly state: typeof state; readonly generation: number }>({ state: undefined, generation: 0 })
   loadedState.current = GraphPagingModel.snapshotGeneration(loadedState.current, state)
   const graphSnapshotGeneration = `${graphGeneration}:${loadedState.current.generation}`
-  graphGenerationRef.current = graphSnapshotGeneration
   const graphOnScreen = autoRefresh.visible && view === 'graph' && !diffTabOpen
   useEffect(() => {
-    if (!shouldReregisterRepository({ hasError: stateQuery.error !== null, repoId, path, recoveredPath: recoveredRepositoryPath.current })) return
-    recoveredRepositoryPath.current = path
-    resetRegistration()
-    registerRepository({ path, readOnly: true })
-  }, [path, registerRepository, resetRegistration, repoId, stateQuery.error])
+    if (stateQuery.error === null) return
+    sendRegistration({ type: 'recover', path })
+  }, [path, sendRegistration, stateQuery.error])
   useEffect(() => {
-    if (state !== undefined) recoveredRepositoryPath.current = null
-  }, [state])
+    if (state !== undefined) sendRegistration({ type: 'state.loaded' })
+  }, [state, sendRegistration])
   const debouncedSearch = useDebouncedValue({ value: textFilter.trim(), delayMs: 250 })
-  const debouncedSearchRef = useRef(debouncedSearch)
-  debouncedSearchRef.current = debouncedSearch
-  const [graphPageState, setGraphPageState] = useState<{
-    readonly repoId: string | null
-    readonly query: string
-    readonly generation: string
-    readonly revisions: readonly Revision[]
-    readonly hasMore: boolean
-    readonly failedCursor: string | null
-  }>({ repoId: null, query: '', generation: '', revisions: [], hasMore: false, failedCursor: null })
-  const graphPageMutation = useMutation({
-    mutationFn: async (input: { readonly repoId: string; readonly query: string; readonly generation: string; readonly excludeCommitIds: readonly string[] }) =>
-      throwReadFailure(await api.graphPage({ repoId: input.repoId, query: input.query, excludeCommitIds: [...input.excludeCommitIds] }, {})),
-    onSuccess: (page, input) => {
-      if (!GraphPagingModel.samePageSet(input, { repoId, query: debouncedSearchRef.current, generation: graphGenerationRef.current })) return
-      setGraphPageState(current => {
-        const samePageSet = GraphPagingModel.samePageSet(current, input)
-        const loaded = samePageSet ? current.revisions : []
-        const seen = new Set(loaded.map(revision => revision.commitId))
-        // Two triggers can overlap on one page; a revision already loaded is appended only once.
-        const added = page.revisions.filter(revision => !seen.has(revision.commitId))
-        return {
-          repoId: input.repoId,
-          query: input.query,
-          generation: input.generation,
-          revisions: [...loaded, ...added],
-          hasMore: GraphPagingModel.hasMoreAfterPage({ hasMore: page.hasMore, addedRevisions: added.length }),
-          failedCursor: null,
-        }
-      })
-    },
-    onError: (_error, input) => {
-      if (!GraphPagingModel.samePageSet(input, { repoId, query: debouncedSearchRef.current, generation: graphGenerationRef.current })) return
-      setGraphPageState(current =>
-        GraphPagingModel.samePageSet(current, input) ? { ...current, failedCursor: GraphPagingModel.cursor(input.excludeCommitIds) } : current,
-      )
-    },
+  // The key owns the page set: a changed repository read or search starts over, an unchanged poll keeps the pages.
+  const pageSet = useMemo(() => ({ repoId, query: debouncedSearch, generation: graphSnapshotGeneration }), [repoId, debouncedSearch, graphSnapshotGeneration])
+  const pageSetScope = GraphPagingModel.pageSetScope(pageSet)
+  const [requestedPageSet, setRequestedPageSet] = useState<string | null>(null)
+  const [failedPageSet, setFailedPageSet] = useState<string | null>(null)
+  const graphPageFailed = failedPageSet === pageSetScope
+  const graphPagesQuery = useInfiniteQuery({
+    queryKey: jujutsuQueryKeys.graphPages(path, pageSet),
+    initialPageParam: GraphPagingModel.firstPageExclude({ query: debouncedSearch, baseCommitIds: state?.revisions.map(revision => revision.commitId) ?? [] }),
+    queryFn: async ({ signal, pageParam }) =>
+      throwReadFailure(await api.graphPage({ repoId: repoId ?? '', query: debouncedSearch, excludeCommitIds: [...pageParam] }, { signal })),
+    getNextPageParam: (page, _pages, excludeCommitIds) =>
+      GraphPagingModel.nextPageExclude({ hasMore: page.hasMore, addedCommitIds: page.revisions.map(revision => revision.commitId), excludeCommitIds }),
+    // A search reads its own page set; the graph's own history waits for a top-up or a scroll to ask for it.
+    enabled: repoId !== null && (debouncedSearch.length > 0 || (graphOnScreen && requestedPageSet === pageSetScope)),
+    ...REPOSITORY_QUERY_CACHE,
+    retry: false,
   })
-  const { isPending: graphPagePending, mutate: requestGraphPage } = graphPageMutation
   // A fresh repository read is the retry for a failed page: at most one attempt per refresh, never a loop.
   useEffect(() => {
-    setGraphPageState(current => (current.failedCursor === null ? current : { ...current, failedCursor: null }))
+    setFailedPageSet(null)
   }, [stateQuery.dataUpdatedAt])
   useEffect(() => {
-    setGraphPageState({
-      repoId,
-      query: debouncedSearch,
-      generation: graphSnapshotGeneration,
-      revisions: [],
-      hasMore: debouncedSearch.length > 0 || (state?.graphHasMore ?? false),
-      failedCursor: null,
-    })
-    if (repoId !== null && debouncedSearch.length > 0)
-      requestGraphPage({ repoId, query: debouncedSearch, generation: graphSnapshotGeneration, excludeCommitIds: [] })
-  }, [repoId, debouncedSearch, graphSnapshotGeneration, state?.graphHasMore, requestGraphPage])
+    if (graphPagesQuery.isFetchNextPageError) setFailedPageSet(pageSetScope)
+  }, [graphPagesQuery.isFetchNextPageError, pageSetScope])
 
-  const graphPageIsCurrent = GraphPagingModel.samePageSet(graphPageState, { repoId, query: debouncedSearch, generation: graphSnapshotGeneration })
-  const graphPageRevisions = useMemo(() => (graphPageIsCurrent ? graphPageState.revisions : EMPTY_REVISIONS), [graphPageIsCurrent, graphPageState.revisions])
+  const graphPageRevisions = useMemo(() => graphPagesQuery.data?.pages.flatMap(page => page.revisions) ?? EMPTY_REVISIONS, [graphPagesQuery.data])
+  const { data: graphPagesData, isFetching: graphPagesFetching, fetchNextPage: fetchNextGraphPage } = graphPagesQuery
   // Older history arrives page by page, and those rows are selectable too: selection resolves against every loaded
   // revision, not just the first page the repository query returned.
   const graphRowsInput = useMemo(
     () => (debouncedSearch.length > 0 ? graphPageRevisions : [...(state?.revisions ?? []), ...graphPageRevisions]),
     [debouncedSearch, graphPageRevisions, state?.revisions],
   )
+  // The project's main branch (Settings › Projects, via jj-integration); `main` until it loads or when it is absent.
+  const projectBookmark = useProjectBookmark(path, 'main')
   const navigation = useGraphNavigation({
     repoId,
     root: path,
+    bookmark: projectBookmark,
     refreshedAt: stateQuery.dataUpdatedAt,
     onScreen: graphOnScreen,
     selected: selection ?? undefined,
@@ -551,6 +531,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     revisions: graphRowsInput,
   })
   const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, graphRowsInput), [navigation.extraRevisions, graphRowsInput])
+  const revisionsLoaded = state !== undefined
+  useEffect(() => {
+    sendLocate({ type: 'revisions', revisions: allRevisions, loaded: revisionsLoaded, root: state?.root ?? null })
+  }, [allRevisions, revisionsLoaded, sendLocate, state?.root])
   const editTimeCommitIds = useMemo(
     () =>
       preferences.revisionDate === 'created' && fromDate === '' && toDate === ''
@@ -573,16 +557,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     combine: editTimesByCommitId,
   })
   const selectedRevision = navigation.selectedRevision
-  const [locateRequest, setLocateRequest] = useState<Revision | null>(null)
-  const [pendingLocateId, setPendingLocateId] = useState<string | null>(null)
-  const [locatedId, setLocatedId] = useState<string | null>(null)
-  const pendingReferenceSearch = useRef('')
   useEffect(() => {
-    setLocateRequest(null)
+    sendLocate({ type: 'repository.changed' })
     setComparisonSelection(null)
-    setPendingLocateId(null)
-    setLocatedId(null)
-  }, [repoId, setComparisonSelection])
+  }, [repoId, sendLocate, setComparisonSelection])
 
   const detailsQuery = useQuery({
     queryKey: jujutsuQueryKeys.details(path, selectedRevision?.commitId ?? ''),
@@ -608,19 +586,17 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   useEffect(() => {
     if (!sidePanel) return
     return sidePanelRepository.onRequest(requested => {
-      if (requested.reference !== undefined) setPendingReferenceRequest(requested.reference)
+      if (requested.reference !== undefined) sendLocate({ type: 'reference', reference: requested.reference, path: requested.path })
       if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested.path)) return
-      autoRegisterPath.current = requested.path
-      registerRepository({ path: requested.path })
+      sendRegistration({ type: 'register', path: requested.path })
     })
-  }, [sidePanel, registerRepository])
+  }, [sidePanel, sendRegistration, sendLocate])
 
   useEffect(() => {
     const selectedPath = path.trim()
-    if (repoId !== null || selectedPath.length === 0 || autoRegisterPath.current === selectedPath) return
-    autoRegisterPath.current = selectedPath
-    registerRepository({ path: selectedPath })
-  }, [path, repoId, registerRepository])
+    if (selectedPath.length === 0) return
+    sendRegistration({ type: 'register', path: selectedPath })
+  }, [path, sendRegistration])
 
   useEffect(() => {
     if (state === undefined) return
@@ -628,12 +604,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setDescribeDrafts(current => Object.fromEntries(Object.entries(current).filter(([commitId]) => visibleCommitIds.has(commitId))))
   }, [state])
 
-  const busy = registerMutation.isPending || stateQuery.isFetching || actionBusy
+  const busy = registrationBusy || stateQuery.isFetching || actionBusy
   const repositoryStatus = repositoryLoadingState({
-    registering: registerMutation.isPending,
+    registering: registrationBusy,
     fetching: stateQuery.isFetching,
     hasState: state !== undefined,
-    hasError: stateQuery.error !== null || registerMutation.error !== null,
+    hasError: stateQuery.error !== null || registrationError !== null,
   })
   const loadingRepository = repositoryStatus.loading
 
@@ -645,7 +621,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const defaultBookmark = workingCopy?.localBookmarks[0] ?? localBookmarkNames[0] ?? ''
   const selectedBookmark = localBookmarkNames.includes(bookmark) ? bookmark : defaultBookmark
   const pushedRevision = remoteBookmarkRevision({ revisions: allRevisions, bookmark: selectedBookmark, remote: selectedRemote })
-  const mainRevision = state?.revisions.find(revision => revision.localBookmarks.includes('main') || revision.bookmarks.includes('main'))
+  const mainRevision = state?.revisions.find(revision => revision.localBookmarks.includes(projectBookmark) || revision.bookmarks.includes(projectBookmark))
 
   const revisionsByCommitId = useMemo(() => new Map(allRevisions.map(revision => [revision.commitId, revision])), [allRevisions])
   const graphRows = useMemo(() => {
@@ -661,7 +637,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       hidden: navigation.hidden,
       revealed: new Set(navigation.revealed.map(row => row.commitId)),
     })
-    return RevisionGraphModel.layoutRevisionGraph(graphRevisions, revisionsByCommitId, false)
+    return RevisionGraphModel.layoutRevisionGraph(graphRevisions, revisionsByCommitId, false, projectBookmark)
   }, [
     allRevisions,
     revisionsByCommitId,
@@ -675,6 +651,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     navigation.view,
     navigation.hidden,
     navigation.revealed,
+    projectBookmark,
   ])
   const visibleRevisions = useMemo(
     () =>
@@ -720,6 +697,15 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     graphMetrics,
     graphRows.reduce((maximum, row) => Math.max(maximum, row.laneCount), 1),
   )
+  const graphLoaded = state !== undefined
+  // A filter, a search, a rewrite or another repository takes rows away; a review never includes a row no longer shown.
+  useEffect(() => {
+    if (!graphLoaded) return
+    setReviewSelection(current => {
+      const next = ListSelectionModel.prune({ state: current, visibleIds: visibleRevisions.map(revision => revision.commitId) })
+      return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
+    })
+  }, [graphLoaded, setReviewSelection, visibleRevisions])
   const groups = useMemo(() => groupRows(visibleRevisions, preferences.dateHeadings), [visibleRevisions, preferences.dateHeadings])
   const movingBranch = useMemo(
     () => (dragSource === null || state === undefined ? null : descendantCommitIds(state.revisions, dragSource)),
@@ -786,31 +772,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   })
   const virtualItems = listVirtualizer.getVirtualItems()
   const stickyDayIndex = activeDayIndex(listItems, listVirtualizer.range?.startIndex ?? 0)
-  const graphHasMore = graphPageIsCurrent ? graphPageState.hasMore : debouncedSearch.length > 0 || (state?.graphHasMore ?? false)
+  const graphHasMore = graphPagesQuery.data === undefined ? debouncedSearch.length > 0 || (state?.graphHasMore ?? false) : graphPagesQuery.hasNextPage === true
   const loadedGraphRevisions = (state?.revisions.length ?? 0) + graphPageRevisions.length
-  const graphPageFailedCursor = graphPageIsCurrent ? graphPageState.failedCursor : null
+  const graphPageLoading = graphPagesQuery.isFetchingNextPage || (graphPagesQuery.isFetching && graphPagesQuery.data === undefined)
   const loadMoreGraphRevisions = useCallback((): void => {
     if (repoId === null || !graphOnScreen || stateQuery.isFetching) return
-    const excludeCommitIds = [
-      ...(debouncedSearch.length === 0 ? (state?.revisions.map(revision => revision.commitId) ?? []) : []),
-      ...graphPageRevisions.map(revision => revision.commitId),
-    ]
-    const cursor = GraphPagingModel.cursor(excludeCommitIds)
-    if (!GraphPagingModel.canRequestPage({ hasMore: graphHasMore, pending: graphPagePending, cursor, failedCursor: graphPageFailedCursor })) return
-    requestGraphPage({ repoId, query: debouncedSearch, generation: graphSnapshotGeneration, excludeCommitIds })
-  }, [
-    repoId,
-    graphOnScreen,
-    stateQuery.isFetching,
-    graphHasMore,
-    graphPagePending,
-    graphPageFailedCursor,
-    debouncedSearch,
-    graphSnapshotGeneration,
-    state?.revisions,
-    graphPageRevisions,
-    requestGraphPage,
-  ])
+    if (!graphHasMore || graphPageFailed || graphPagesFetching) return
+    if (graphPagesData === undefined) {
+      setRequestedPageSet(pageSetScope)
+      return
+    }
+    void fetchNextGraphPage()
+  }, [repoId, graphOnScreen, stateQuery.isFetching, graphHasMore, graphPageFailed, graphPagesFetching, graphPagesData, fetchNextGraphPage, pageSetScope])
   // Each page lands below the viewport, so the list tops itself up instead of waiting for a scroll event at the very end of the loaded history.
   useEffect(() => {
     const element = listScrollRef.current
@@ -822,44 +795,34 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       clientHeight: element.clientHeight,
     })
     if (needsTopUp) loadMoreGraphRevisions()
-  }, [loadedGraphRevisions, graphHasMore, graphPagePending, listItems.length, loadMoreGraphRevisions])
+  }, [loadedGraphRevisions, graphHasMore, graphPageFailed, graphPagesFetching, listItems.length, loadMoreGraphRevisions])
 
   const locateRevision = useCallback(
     (revision: Revision): void => {
-      setLocateRequest(null)
-      const listed = visibleRevisions.some(row => row.commitId === revision.commitId)
-      if (!listed) {
-        setLocateRequest(revision)
-        return
-      }
-      setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.committerTime ?? revision.authorTime))))
-      setPendingLocateId(revision.commitId)
+      const visible = visibleRevisions.some(row => row.commitId === revision.commitId)
+      if (visible) setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.committerTime ?? revision.authorTime))))
+      sendLocate({ type: 'locate', revision, visible })
     },
-    [setCollapsedDays, visibleRevisions],
+    [sendLocate, setCollapsedDays, visibleRevisions],
   )
 
+  // The reference resolved to a revision: show the graph that holds it, then let the machine locate its row. A graph
+  // filtered away from the revision shows the machine's banner instead, exactly as the old locate check did.
   useEffect(() => {
-    if (pendingReferenceRequest === null || state === undefined) return
-    const match = ChatReferenceModel.resolve({ reference: pendingReferenceRequest, revisions: allRevisions })
-    if (match === undefined) {
-      const searchKey = `${repoId ?? ''}:${pendingReferenceRequest.kind}:${pendingReferenceRequest.value}`
-      if (pendingReferenceSearch.current !== searchKey) {
-        pendingReferenceSearch.current = searchKey
-        setTextFilter(pendingReferenceRequest.value)
-      }
-      return
-    }
-    pendingReferenceSearch.current = ''
-    setPendingReferenceRequest(null)
+    if (!locateSnapshot.matches('applying')) return
+    const match = locateSnapshot.context.target
+    if (match === null) return
     setView('graph')
     setSelection({ commitId: match.commitId, changeId: match.changeId })
-    if (pendingReferenceRequest.behavior === 'path') {
+    if (locateSnapshot.context.behavior === 'path') {
       setComparisonSelection({ commitId: match.commitId, changeId: match.changeId })
       navigation.beginComparison()
       navigation.applySlice(match, 'history')
     }
-    locateRevision(match)
-  }, [allRevisions, locateRevision, navigation, pendingReferenceRequest, repoId, setComparisonSelection, setSelection, setTextFilter, setView, state])
+    sendLocate({ type: 'locate', revision: match, visible: visibleRevisions.some(row => row.commitId === match.commitId) })
+  }, [locateSnapshot, navigation, sendLocate, setComparisonSelection, setSelection, setView, visibleRevisions])
+
+  const offscreenLocate = locateSnapshot.matches('offscreen') ? locateSnapshot.context.target : null
 
   const resetGraphView = (): void => {
     navigation.reset()
@@ -870,12 +833,15 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setFromDate('')
     setToDate('')
     setCollapsedDays(new Set())
-    setLocateRequest(null)
+    sendLocate({ type: 'reset' })
   }
 
+  // The row the machine is locating: scroll it to the middle and focus it, then hand the flash back to the machine.
   useEffect(() => {
-    if (pendingLocateId === null) return
-    const index = listItems.findIndex(item => item.kind === 'revision' && item.revision.commitId === pendingLocateId)
+    if (!locateSnapshot.matches('locating')) return
+    const commitId = locateSnapshot.context.target?.commitId
+    if (commitId === undefined) return
+    const index = listItems.findIndex(item => item.kind === 'revision' && item.revision.commitId === commitId)
     if (index < 0) return
     scrolledToWorkingCopy.current = repoId
     clearRowAnchor()
@@ -883,15 +849,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const target = listScrollRef.current?.querySelector<HTMLElement>(`[data-index="${index}"] [data-row-focus]`)
     if (target === null || target === undefined) return
     target.focus({ preventScroll: true })
-    setLocatedId(pendingLocateId)
-    setPendingLocateId(null)
-  }, [pendingLocateId, listItems, listVirtualizer, repoId, virtualItems])
-
-  useEffect(() => {
-    if (locatedId === null) return
-    const timeout = window.setTimeout(() => setLocatedId(null), 1800)
-    return () => window.clearTimeout(timeout)
-  }, [locatedId])
+    sendLocate({ type: 'located' })
+  }, [locateSnapshot, listItems, listVirtualizer, repoId, virtualItems, sendLocate])
 
   useEffect(() => {
     if (repoId === null || workingCopyIndex < 0 || listScrollRef.current === null || scrolledToWorkingCopy.current === repoId) return
@@ -914,7 +873,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const moveRowFocus = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === 'Escape' && moveSource !== null) {
       event.preventDefault()
-      setMoveSource(null)
+      sendAction({ type: 'move.end' })
       return
     }
     // Any key can scroll the list (Page Down, Enter on a focused row), so none of them keep a restore pending.
@@ -938,22 +897,22 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const errorMessages = [
     stateQuery.error && errorMessage(stateQuery.error, 'Could not load this repository.'),
-    graphPageMutation.error && errorMessage(graphPageMutation.error, 'Could not load revision results.'),
-    registerMutation.error && errorMessage(registerMutation.error, 'Could not register this repository.'),
+    graphPagesQuery.error && errorMessage(graphPagesQuery.error, 'Could not load revision results.'),
+    registrationError ?? undefined,
     actionSnapshot.context.error,
     launchMutation.error && errorMessage(launchMutation.error, 'A thread could not be opened in this workspace. Try again.'),
   ].filter((message): message is string => Boolean(message))
 
   const askForConfirmation = (action: Mutation, presentation: DropPresentation | null = null): void => {
     if (repoId === null) return
-    if (action.kind === 'workspace-add') setProvisionedPath(null)
-    registerMutation.reset()
+    if (action.kind === 'workspace-add') sendAction({ type: 'workspace.provisioned.clear' })
+    sendRegistration({ type: 'clear.error' })
     sendAction({ type: 'prepare', repoId, action, presentation })
   }
 
   const chooseMoveDestination = (destination: Revision): void => {
     if (moveSource === null) return
-    setMoveSource(null)
+    sendAction({ type: 'move.end' })
     const resolution = RevisionDropModel.resolveRevision({ sourceRevisionId: moveSource.commitId, target: destination, revisions: state?.revisions ?? [] })
     if (resolution.kind === 'invalid') {
       sendAction({ type: 'reject', error: resolution.message })
@@ -1029,8 +988,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     workspaceRemoval === null || repoId === null || state === undefined ? null : (
       <InlineWorkspaceRemoval
         name={workspaceRemoval.name}
-        onCancel={() => setWorkspaceRemoval(null)}
-        onRemoved={() => setWorkspaceRemoval(null)}
+        onCancel={() => sendAction({ type: 'workspace.removal.close' })}
+        onRemoved={() => sendAction({ type: 'workspace.removal.close' })}
         repoId={repoId}
         repoRoot={state.root}
       />
@@ -1154,7 +1113,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const dropOn = (event: DragEvent, revision: Revision): void => {
     event.preventDefault()
-    registerMutation.reset()
+    sendRegistration({ type: 'clear.error' })
     const resolution = dropResolution(event, revision)
     sendAction({
       type: 'drop',
@@ -1171,12 +1130,33 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     setSelection(current => (current?.commitId === revision.commitId ? null : { commitId: revision.commitId, changeId: revision.changeId }))
   }
 
-  const activateRevisionRow = (revision: Revision): void => {
+  const toggleReviewSelection = (revision: Revision): void => {
+    setReviewOpenFailed(false)
+    setReviewSelection(current => ListSelectionModel.toggle({ state: current, id: revision.commitId }))
+  }
+
+  const activateRevisionRow = (revision: Revision, event: MouseEvent): void => {
     if (moveSource !== null) {
       chooseMoveDestination(revision)
       return
     }
+    if (props.reviewRevisions !== undefined && (event.metaKey || event.ctrlKey)) {
+      toggleReviewSelection(revision)
+      return
+    }
+    if (props.reviewRevisions !== undefined && event.shiftKey) {
+      setReviewOpenFailed(false)
+      const orderedIds = visibleRevisions.map(row => row.commitId)
+      setReviewSelection(current => ListSelectionModel.extend({ state: current, orderedIds, id: revision.commitId }))
+      return
+    }
     toggleRevision(revision)
+  }
+
+  const openReviewSelection = (): void => {
+    if (state === undefined) return
+    const revisions = ReviewSelectionModel.reviewIds({ selected: reviewSelection.ids, revisions: visibleRevisions })
+    setReviewOpenFailed(!(props.reviewRevisions?.({ workspacePath: state.root, revisions }) ?? false))
   }
 
   const compareRevision = (revision: Revision, target?: GraphLandmark['kind'] | 'revision'): void => {
@@ -1232,6 +1212,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => openFullDiff(revision, null)}>Show full diff</ContextMenuItem>
+        {props.reviewRevisions !== undefined && (
+          <ContextMenuItem onSelect={() => toggleReviewSelection(revision)}>
+            {reviewSelection.ids.includes(revision.commitId) ? 'Remove from review' : 'Select for review'}
+          </ContextMenuItem>
+        )}
         {!revision.immutable && (
           <ContextMenuItem
             onSelect={() => {
@@ -1250,7 +1235,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         {revision.workspaces
           .filter(name => name !== 'default')
           .map(name => (
-            <ContextMenuItem key={name} onSelect={() => setWorkspaceRemoval({ commitId: revision.commitId, name })} variant="destructive">
+            <ContextMenuItem
+              key={name}
+              onSelect={() => sendAction({ type: 'workspace.removal.open', commitId: revision.commitId, name })}
+              variant="destructive"
+            >
               Remove workspace {name}…
             </ContextMenuItem>
           ))}
@@ -1266,10 +1255,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             Revert onto @
           </ContextMenuItem>
         )}
-        {!revision.immutable && <ContextMenuItem onSelect={() => setMoveSource(revision)}>Rebase branch onto…</ContextMenuItem>}
+        {!revision.immutable && <ContextMenuItem onSelect={() => sendAction({ type: 'move.start', revision })}>Rebase branch onto…</ContextMenuItem>}
         {!revision.immutable && mainRevision !== undefined && mainRevision.commitId !== revision.commitId && (
           <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'rebase', sourceId: revision.commitId, destinationId: mainRevision.commitId })}>
-            Rebase onto main
+            Rebase onto {projectBookmark}
           </ContextMenuItem>
         )}
         <ContextMenuItem onSelect={() => setBookmarkDraft({ commitId: revision.commitId })}>Set bookmark…</ContextMenuItem>
@@ -1308,7 +1297,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       {name === 'default' ? null : (
         <>
           <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => setWorkspaceRemoval({ commitId, name })} variant="destructive">
+          <ContextMenuItem onSelect={() => sendAction({ type: 'workspace.removal.open', commitId, name })} variant="destructive">
             Remove workspace…
           </ContextMenuItem>
         </>
@@ -1650,15 +1639,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           ]}
           onReset={resetGraphView}
         />
-        {locateRequest !== null && (
+        {offscreenLocate !== null && (
           <div className="dshx:flex dshx:flex-none dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-2 dshx:text-xs" role="status">
-            <span>{locateRequest.shortestChangeId} is outside the current view.</span>
+            <span>{offscreenLocate.shortestChangeId} is outside the current view.</span>
             <Button
               onClick={() => {
-                navigation.reveal(locateRequest)
+                navigation.reveal(offscreenLocate)
                 setCollapsedDays(new Set())
-                setPendingLocateId(locateRequest.commitId)
-                setLocateRequest(null)
+                sendLocate({ type: 'revealed', revision: offscreenLocate })
               }}
               size="xs"
               type="button"
@@ -1669,8 +1657,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             <Button
               onClick={() => {
                 resetGraphView()
-                navigation.reveal(locateRequest)
-                setPendingLocateId(locateRequest.commitId)
+                navigation.reveal(offscreenLocate)
+                sendLocate({ type: 'revealed', revision: offscreenLocate })
               }}
               size="xs"
               type="button"
@@ -1678,13 +1666,36 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             >
               Clear filters and locate
             </Button>
-            <Button onClick={() => setLocateRequest(null)} size="xs" type="button" variant="ghost">
+            <Button onClick={() => sendLocate({ type: 'cancel' })} size="xs" type="button" variant="ghost">
               Cancel
             </Button>
           </div>
         )}
         {navigation.comparisonOpen && navigation.comparisonRevision !== undefined && (
           <RelationshipInspector navigation={navigation} onLocate={locateRevision} revisions={allRevisions} selected={navigation.comparisonRevision} />
+        )}
+        {reviewSelection.ids.length > 0 && (
+          <div
+            className="dshx:flex dshx:flex-none dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs"
+            data-testid="revision-review-selection"
+            role="status"
+          >
+            <span className="dshx:tabular-nums">
+              {reviewSelection.ids.length === 1 ? '1 revision selected' : `${String(reviewSelection.ids.length)} revisions selected`}
+            </span>
+            {reviewSelection.ids.length === 1 && <span className="dshx:text-muted-foreground">Select another to review them together.</span>}
+            <Button disabled={reviewSelection.ids.length < 2} onClick={openReviewSelection} size="xs" type="button">
+              Review together
+            </Button>
+            <Button onClick={() => setReviewSelection(ListSelectionModel.empty())} size="xs" type="button" variant="ghost">
+              Clear
+            </Button>
+            {reviewOpenFailed && (
+              <span className="dshx:basis-full dshx:text-destructive" role="alert">
+                The review could not open. Select at most 30 revisions, and add @dshfiles/pulls-review to the profile if it is missing.
+              </span>
+            )}
+          </div>
         )}
         <div
           aria-label="Revisions"
@@ -1713,7 +1724,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
                 Choose a destination for {moveSource.shortestChangeId} · {firstLine(moveSource.description)}. Press Escape to cancel.
               </span>
-              <Button onClick={() => setMoveSource(null)} size="sm" type="button" variant="outline">
+              <Button onClick={() => sendAction({ type: 'move.end' })} size="sm" type="button" variant="outline">
                 Cancel
               </Button>
             </div>
@@ -1778,7 +1789,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       bookmarkMenu={bookmarkMenu}
                       workspaceMenu={workspaceMenu}
                       connectionDimmed={connectionIds !== null && !connectionIds.has(item.revision.commitId)}
-                      highlighted={locatedId === item.revision.commitId || connectionIds?.has(item.revision.commitId) === true}
+                      highlighted={locateSnapshot.context.highlighted === item.revision.commitId || connectionIds?.has(item.revision.commitId) === true}
                       dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
                       dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
                       expanded={
@@ -1807,7 +1818,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       onDragLeave={() => sendAction({ type: 'drag.leave', targetId: item.revision.commitId })}
                       onDragStart={origin => sendAction({ type: 'drag.start', origin })}
                       onDrop={event => dropOn(event, item.revision)}
-                      onToggle={() => activateRevisionRow(item.revision)}
+                      onToggle={event => activateRevisionRow(item.revision, event)}
+                      reviewable={props.reviewRevisions !== undefined}
+                      reviewSelected={reviewSelection.ids.includes(item.revision.commitId)}
                       onDescribe={() => {
                         setSelection({ commitId: item.revision.commitId, changeId: item.revision.changeId })
                         setEditingDescription(item.revision.commitId)
@@ -1829,13 +1842,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               )
             })}
           </div>
-          {graphPagePending && (
+          {graphPageLoading && (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:p-3 dshx:text-xs dshx:text-muted-foreground" role="status">
               <Spinner className="dshx:size-3" />
               {debouncedSearch.length > 0 ? 'Searching all revisions…' : 'Loading older revisions…'}
             </div>
           )}
-          {visibleRevisions.length === 0 && !graphPagePending && (
+          {visibleRevisions.length === 0 && !graphPageLoading && (
             <EmptyState className="dshx:py-6">No revisions match these filters. Change the search or the filters above to see more.</EmptyState>
           )}
         </div>
@@ -1850,7 +1863,14 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
       <EmptyHeader>
         <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">Repository could not be loaded.</EmptyTitle>
-        <Button className="dshx:mt-2" disabled={busy} onClick={() => registerRepository({ path, readOnly: true })} size="sm" type="button" variant="outline">
+        <Button
+          className="dshx:mt-2"
+          disabled={busy}
+          onClick={() => sendRegistration({ type: 'register', path, readOnly: true })}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
           Retry
         </Button>
       </EmptyHeader>
@@ -2092,7 +2112,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           </header>
 
-          <WorkspaceCleanupTrail onFinished={refreshRepository} />
+          <WorkspaceCleanupTrail onFinished={refreshRepository} onReview={() => setCleanupOpen(true)} path={state?.root} />
 
           {rowConfirmAnchorId === null && inlineConfirm !== null && <div className="dshx:border-b dshx:p-2">{inlineConfirm}</div>}
           {removalHidden && inlineRemoval !== null && <div className="dshx:border-b dshx:p-2">{inlineRemoval}</div>}
@@ -2106,7 +2126,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           {(errorMessages.length > 0 || copyNotice !== null || provisionedPath !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
             <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
               {errorMessages.map(message => {
-                const repositoryError = stateQuery.error !== null || registerMutation.error !== null
+                const repositoryError = stateQuery.error !== null || registrationError !== null
                 return (
                   <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
                     <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
@@ -2176,10 +2196,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             onRegisterWorkspace={props.registerWorkspace}
             onSelect={selected => {
               setPickerOpen(false)
-              autoRegisterPath.current = selected.canonicalPath
-              setRepoId(null)
               setPath(selected.canonicalPath)
-              registerMutation.mutate({ path: selected.canonicalPath })
+              // The user chose another repository, so a reference still waiting for the last one no longer applies.
+              sendLocate({ type: 'cancel' })
+              sendRegistration({ type: 'register', path: selected.canonicalPath })
             }}
             projects={props.projects}
             recentFolders={repoHistory}
@@ -2445,7 +2465,9 @@ interface RevisionRowProps {
   readonly menu: ReactNode
   readonly bookmarkMenu: (name: string, local: boolean) => ReactNode
   readonly workspaceMenu: (name: string, commitId: string) => ReactNode
-  readonly onToggle: () => void
+  readonly onToggle: (event: MouseEvent) => void
+  readonly reviewable: boolean
+  readonly reviewSelected: boolean
   readonly onDescribe: () => void
   readonly onDragStart: (origin: DragOrigin) => void
   readonly onDragEnter: (event: DragEvent) => void
@@ -2600,8 +2622,10 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
         revision.empty && 'dshx:bg-muted/50',
         props.dimmed && 'dshx:opacity-40',
         props.highlighted && 'dshx:bg-primary/10',
+        props.reviewSelected && 'dshx:bg-info/10',
       )}
       data-commit-id={revision.commitId}
+      data-review-selected={props.reviewSelected || undefined}
       data-connection-dimmed={props.connectionDimmed || undefined}
       data-highlighted={props.highlighted || undefined}
       onDragEnter={props.onDragEnter}
@@ -2641,6 +2665,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 )}
                 onClick={props.onToggle}
               />
+              {props.reviewSelected && <CheckIcon aria-hidden className="dshx:size-3 dshx:flex-none dshx:text-info" />}
               {labels}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2651,6 +2676,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                     onClick={props.onToggle}
                     type="button"
                   >
+                    {props.reviewSelected && <span className="dshx:sr-only">Selected for review:</span>}
                     {revision.conflict && <span className="dshx:sr-only">Conflict:</span>}
                     {revision.empty && <span className="dshx:flex-none dshx:text-muted-foreground dshx:italic">(empty)</span>}
                     {described ? (
@@ -2670,6 +2696,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
                   {draggable ? 'Drag onto another revision to rebase · right-click for actions' : 'Right-click for actions'}
+                  {props.reviewable ? ' · Cmd/Ctrl-click or Shift-click to select for review' : ''}
                 </TooltipContent>
               </Tooltip>
               {!described && !revision.immutable && (

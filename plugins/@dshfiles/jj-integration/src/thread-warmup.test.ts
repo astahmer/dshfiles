@@ -1,5 +1,5 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ThreadPreparation, ThreadWarmup, type WarmPorts, type WarmScheduler } from './thread-warmup.js'
 import type { ToggleRequest } from './workspace-toggle-machine.js'
 
@@ -35,6 +35,7 @@ const fixture = (
     readonly composerFails?: boolean
     readonly isolateFails?: boolean
     readonly destinationFails?: boolean
+    readonly isolateDeferred?: Promise<string>
   } = {},
 ) => {
   const calls: WarmCalls = { destination: 0, isolate: 0, composer: 0, keepSpare: [] }
@@ -46,6 +47,7 @@ const fixture = (
     },
     isolate: async request => {
       calls.isolate += 1
+      if (options.isolateDeferred !== undefined) return { workspaceId: await options.isolateDeferred }
       if (options.isolateFails === true) throw new Error('provision failed')
       return { workspaceId: `${request.projectWorkspaceId}-thread` }
     },
@@ -185,6 +187,21 @@ describe('ThreadWarmup', () => {
     await expect(warmups.for(warm({ name: 'thread-new' }))?.target(new AbortController().signal)).resolves.toMatchObject({
       workspaceId: 'project-thread',
     })
+  })
+
+  it('keeps the workspace a provisioning step finished after the warm was abandoned', async () => {
+    let releaseIsolate!: (workspaceId: string) => void
+    const isolateDeferred = new Promise<string>(resolve => {
+      releaseIsolate = resolve
+    })
+    const { warmups, ports, calls, warm } = fixture({ isolateDeferred })
+    warmups.prepare(warm(), ports)
+    await vi.waitFor(() => expect(calls.isolate).toBe(1))
+    warmups.abandon('source')
+    expect(calls.keepSpare).toEqual([])
+    releaseIsolate('project-thread')
+    await vi.waitFor(() => expect(calls.keepSpare).toEqual([{ workspaceId: 'project-thread', name: 'thread-abc123', request: isolating() }]))
+    expect(warmups.state('source')).toBeUndefined()
   })
 
   it('stops working and keeps nothing once disposed', async () => {

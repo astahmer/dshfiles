@@ -118,8 +118,11 @@ test('a short prefix of several commits is refused as ambiguous, and one of dive
     [ambiguous.reason, ambiguous.message],
     ['ambiguous', `"${shared}" is a prefix of more than one revision. Use a longer prefix, or the full commit id from jj log.`],
   )
-  const only = [...byFirst.entries()].find(([, ids]) => ids.length === 1)
-  if (only !== undefined) assert.equal(await Effect.runPromise(RevisionReads.resolveCommitId(run, only[0])), only[1][0])
+  // A prefix unique in the whole repository resolves. One character is not enough to know that here: the scratch
+  // repo also holds the commits these twenty were built on, so ask with eight hex digits of a known commit.
+  const sample = commitIds[0]
+  assert.ok(sample !== undefined)
+  assert.equal(await Effect.runPromise(RevisionReads.resolveCommitId(run, sample.slice(0, 8))), sample)
 
   const change = jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@-', '--template', 'change_id']).trim()
   const before = jj(['op', 'log', '--no-graph', '--limit', '1', '--template', 'self.id()']).trim()
