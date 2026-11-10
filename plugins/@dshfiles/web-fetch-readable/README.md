@@ -1,5 +1,7 @@
 # @dshfiles/web-fetch-readable
 
+![Source chips under a web search and a fetched page](docs/screenshots/web-citations.png)
+
 A `web_fetch` backend for `ctx.web` that follows redirects across origins,
 decodes more text formats and returns the readable article of an HTML page.
 Select it through the profile's `web` row (`fetchProvider: readable`).
@@ -54,6 +56,19 @@ write them with `settings_set`). Every value is read per fetch, so a change appl
 | `timeoutMs`        | `30000`   | Whole-fetch timeout, redirects included                    |
 | `maxResponseBytes` | `5000000` | Bytes read; a larger declared length is refused            |
 | `maxBodyChars`     | `100000`  | Characters returned after extraction; the tool caps on top |
+| `citations`        | on        | Show source chips under `web_search` and `web_fetch` results |
+
+## Source chips
+
+A `web_search` or `web_fetch` result gains one chip per page it returned, under the tool card: the host, the page
+title (a search hit's title, or the fetched article's heading) and the URL in a tooltip. A click opens the page in the
+browser pane beside the thread when one takes it, otherwise in a new tab; Cmd/Ctrl/Shift-click and middle-click always
+open a new tab. A call that failed or has not settled shows no chips, a non-HTTP(S) or repeated URL never becomes one,
+and `citations` off leaves the native rows as they were.
+
+The chips are contributed through
+[tool-meta](../tool-meta/README.md#what-another-plugin-adds-under-a-tool-card)'s `tool.call.sections` registry, so the
+native tool row keeps its own view; with tool-meta not composed the seat is absent and only the native row shows.
 
 ## Telemetry
 
@@ -67,10 +82,13 @@ URL and the body are never recorded.
 `node --run test` drives the provider over a fake network that runs the real
 address validation: a cross-origin redirect resolved and pinned per hop, a
 redirect to a private, loopback, `file:` or credentialed URL refused, the hop
-cap, the widened types, binary refusal, article extraction and the span. A live
-fetch needs the bundle selected in a profile; the E2E journey
-(`web-fetch-readable.feature`) proves activation only, because scratch Hosts
-have no external network (see the Host egress guard in docs/e2e-testing.md).
+cap, the widened types, binary refusal, article extraction and the span. The
+citation tests cover the sources a settled web result shows and the calls it
+answers for. A live fetch needs the bundle selected in a profile; the E2E
+journeys (`web-fetch-readable.feature`) prove activation, and the citation
+chips on a seeded thread whose `web_search` and `web_fetch` results carry the
+recorded meta, because scratch Hosts have no external network (see the Host
+egress guard in docs/e2e-testing.md).
 
 ## Provenance
 

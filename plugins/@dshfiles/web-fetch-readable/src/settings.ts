@@ -24,6 +24,9 @@ export const readableFetchSettings = defineSettings({
       .max(1_000_000)
       .default(100_000)
       .description('Characters returned after decoding and extraction; web_fetch keeps its own output bound on top.'),
+    citations: Schema.boolean()
+      .default(true)
+      .description('Show a source chip under each web_search and web_fetch result in the transcript: host and title, opening the page in the browser pane or a new tab.'),
   }),
 })
 
