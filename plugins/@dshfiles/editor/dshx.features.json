@@ -2,6 +2,38 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "thread-artifacts",
+      "title": "Edit thread artifacts",
+      "summary": "Create and edit durable Markdown and HTML documents owned by a thread, with revision-checked saves shared with agent tools.",
+      "surfaces": ["client", "host", "integration"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "main-tabs: New tab › Editor: Artifacts",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"Collapse sidebar\"",
+        "click button \"New tab\"",
+        "click button \"Editor: Artifacts\"",
+        "click button \"New artifact\"",
+        "expect textbox \"Artifact title\""
+      ],
+      "configuration": [],
+      "states": ["empty", "editing", "saving", "conflict", "deleted"],
+      "failureModes": ["Stale revisions are refused; reload after copying unsaved edits.", "Storage errors leave the current draft available for retry."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "editor.thread-artifacts",
+          "featureFile": "tooling/dshx/e2e/features/editor.feature"
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ]
+    },
+    {
       "id": "workspace-editor",
       "title": "Browse and edit workspace files",
       "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, toggle a Markdown file's Preview, and save through Host file APIs.",
