@@ -115,6 +115,20 @@ Open in Secret Catalog and Re-check. A consumer only needs the attribute or the
 - No implicit fill on focus: revealing stays an explicit click in the Secret
   Catalog (with its timeout and blur rules).
 - No second vault: the `secret` CLI and Bitwarden remain the only store.
+- One alias per field; a field that needs several goes through a dedicated form.
+- The overlay decorates text-like inputs only (`input`/`textarea`); it never
+  observes or stores values, and it stops watching when its slot disposes.
+- Resolution failures surface as the consuming feature's own error, naming the
+  alias but never the value.
+
+## Why a reference, not the alternatives
+
+| Choice                                | Decision                          | Rationale                                                                                                                         |
+| ------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Store the plaintext in settings       | No                                | DSH redacts it, so the form cannot round-trip it; a second copy also drifts from the vault.                                       |
+| Store the plaintext in a backlog item | No                                | Rows sync to every browser and the Agent; a reference keeps the item shareable.                                                   |
+| Fill the revealed value into inputs   | Only on explicit per-field reveal | Same policy as Secret Catalog: reveal is a deliberate click, never an implicit fill on focus.                                     |
+| A separate secrets service            | No                                | secret-catalog already owns CLI access, scopes and redaction; the new parts are a grammar, a port method and a client affordance. |
 
 ## Adopted by
 
@@ -127,3 +141,28 @@ Open in Secret Catalog and Re-check. A consumer only needs the attribute or the
   (global aliases; a DSH credential name still works).
 - `@dshfiles/secret-catalog` itself — `request_secret` returns a reference to
   the agent that asked, after the user stored the value in the Catalog form.
+
+`@dshfiles/ai-accounts` deliberately does not carry the attribute. Its key
+field (`apiKeyEnv`) names a DSH credential (`^[A-Z][A-Z0-9_]*_API_KEY$`) that
+the setup dialog writes, usage reads, sign-out removes and every request
+resolves; a `secret:` value there would fail that grammar. The vault reaches
+it instead through the setup dialog's **Import from Secret Catalog**, which
+copies the value Host-side into that DSH credential. Binding accounts to
+`secret:` references directly would mean a second credential source across
+those paths, not a field attribute.
+
+## Verifying
+
+```sh
+pnpm --dir plugins/@dshfiles/credential-port test
+pnpm --dir plugins/@dshfiles/secret-catalog test
+pnpm --dir plugins/@dshfiles/backlog test
+pnpm run check:e2e secret-catalog   # reveal/copy journeys
+pnpm run check:e2e backlog          # secret-bound setting and inline secret-link reveal
+```
+
+Modal fields need the browser check: unit tests cannot catch an affordance
+portaled outside the dialog (its clicks are inert) or a panel hidden with the
+`hidden` attribute that a display class overrides (it must unmount on pick).
+`secret-input-placement.test.ts` pins the flip, height cap and key-button
+placement.
