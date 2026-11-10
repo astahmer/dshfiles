@@ -30,16 +30,68 @@ const stableBody = text => {
   }
 }
 
+const BATCH_PATH = '/api/dshx-batch'
+
+/** A batch envelope without its per-call `traceparent`, so two reads with the same input get the same digest. */
+const stablePayload = payload => {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) return JSON.stringify(payload ?? null)
+  const { traceparent: _traceparent, ...rest } = payload
+  return JSON.stringify(rest)
+}
+
+/**
+ * The calls one `/api/dshx-batch` POST carries: each one's endpoint (`dshx-<channel hash>/<method>`, no caller data), a
+ * digest of its envelope and its size. Undefined for any other body.
+ */
+export const batchCalls = text => {
+  try {
+    const { entries } = JSON.parse(text)
+    if (!Array.isArray(entries)) return undefined
+    return entries.flatMap(entry =>
+      typeof entry?.endpoint === 'string' && Number.isInteger(entry.id)
+        ? [{ id: entry.id, endpoint: entry.endpoint, digest: digest(stablePayload(entry.payload)), requestBytes: Buffer.byteLength(JSON.stringify(entry.payload ?? null)) }]
+        : [],
+    )
+  } catch {
+    return undefined
+  }
+}
+
+/** Bytes of each NDJSON answer line by call id: what each call of a batch weighed, never what it said. */
+export const batchAnswerBytes = text => {
+  const bytesById = {}
+  for (const line of text.split('\n')) {
+    if (line.trim() === '') continue
+    try {
+      const { id } = JSON.parse(line)
+      if (Number.isInteger(id)) bytesById[id] = Buffer.byteLength(line) + 1
+    } catch {
+      // A cut last line of an aborted stream counts as unanswered.
+    }
+  }
+  return bytesById
+}
+
+const responseText = content => {
+  if (typeof content?.text !== 'string') return ''
+  return content.encoding === 'base64' ? Buffer.from(content.text, 'base64').toString('utf8') : content.text
+}
+
 const redactUrl = raw => {
   const url = new URL(raw)
   const search = url.search === '' ? '' : `?q=${digest(url.search).slice(5, 17)}`
   return `${url.origin}${url.pathname}${search}`
 }
 
-/** Drop everything that can carry a credential or Session content; keep timings, sizes, statuses and digests. */
+/**
+ * Drop everything that can carry a credential or Session content; keep timings, sizes, statuses and digests. A batch
+ * POST keeps its calls' endpoints and digests (`_batch`), plus each call's answer size read off the recorded answer.
+ */
 export const redactHar = har => {
   const entries = (har.log?.entries ?? []).map(entry => {
     const text = entry.request.postData?.text
+    const calls = text !== undefined && new URL(entry.request.url).pathname === BATCH_PATH ? batchCalls(text) : undefined
+    const answers = calls === undefined ? undefined : batchAnswerBytes(responseText(entry.response.content))
     return {
       ...entry,
       request: {
@@ -53,7 +105,16 @@ export const redactHar = har => {
         bodySize: entry.request.bodySize,
         ...(text === undefined
           ? {}
-          : { postData: { mimeType: entry.request.postData.mimeType, text: digest(stableBody(text)), _bodyBytes: Buffer.byteLength(text) } }),
+          : {
+              postData: {
+                mimeType: entry.request.postData.mimeType,
+                text: digest(stableBody(text)),
+                _bodyBytes: Buffer.byteLength(text),
+                ...(calls === undefined
+                  ? {}
+                  : { _batch: calls.map(({ id, ...call }) => ({ ...call, responseBytes: answers?.[id] ?? null })) }),
+              },
+            }),
       },
       response: {
         status: entry.response.status,
@@ -89,7 +150,9 @@ const main = async () => {
 
   const browser = await chromium.launch({ headless: true })
   try {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, recordHar: { path: raw, content: 'omit' } })
+    // `embed`: with `omit` Playwright also drops request bodies. The raw file lives in a private temp directory and is
+    // deleted once redacted.
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, recordHar: { path: raw, content: 'embed' } })
     const pages = await Promise.all(Array.from({ length: tabs }, () => context.newPage()))
     await Promise.all(pages.map(page => page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })))
     await new Promise(resolve => setTimeout(resolve, seconds * 1000))

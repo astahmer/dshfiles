@@ -88,3 +88,32 @@ test('the CLI never prints headers, bodies, query strings or the page URL', asyn
   }
   fs.rmSync(directory, { recursive: true })
 })
+
+test('expands an annotated dshx-batch POST into its calls, with owner, size and repeat interval', async () => {
+  const channel = await previewChannel()
+  const batchEntry = at => ({
+    ...entry({ at, url: 'http://127.0.0.1:1/api/dshx-batch', body: { entries: [] }, size: 2000 }),
+    request: {
+      method: 'POST',
+      url: 'http://127.0.0.1:1/api/dshx-batch',
+      postData: {
+        text: 'sha1:x',
+        _batch: [
+          { endpoint: `${channel}/devServers`, digest: 'sha1:a', requestBytes: 30, responseBytes: 1800 },
+          { endpoint: 'dshx-00000000/state', digest: 'sha1:b', requestBytes: 30, responseBytes: 200 },
+        ],
+      },
+    },
+  })
+  const har = { log: { entries: [batchEntry(0), batchEntry(15_000), batchEntry(30_000)] } }
+  const summary = summarizeHar({ har, channelOwners: new Map([[channel, { packageName: '@dshfiles/preview', apiId: 'preview' }]]) })
+  assert.equal(summary.requests, 3)
+  assert.deepEqual(summary.batches, { posts: 3, calls: 6 })
+  const devServers = summary.topMethods.find(row => row.method === 'POST preview/devServers')
+  assert.deepEqual(
+    { owner: devServers?.owner, calls: devServers?.calls, viaBatch: devServers?.viaBatch, distinct: devServers?.distinct, every: devServers?.intervalP50S, maxKB: devServers?.maxResponseKB },
+    { owner: '@dshfiles/preview', calls: 3, viaBatch: 3, distinct: 1, every: 15, maxKB: 1.8 },
+  )
+  assert.deepEqual(summary.unmappedChannels, ['unmapped dshx-00000000'])
+  assert.equal(summary.topMethods.some(row => row.method.includes('dshx-batch')), false)
+})

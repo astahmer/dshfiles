@@ -62,10 +62,10 @@ const bodyKey = entry => {
   }
 }
 
-const describeRequest = (entry, channelOwners) => {
-  const segments = new URL(entry.request.url).pathname.split('/').filter(Boolean)
-  const channel = segments[1] ?? ''
-  const method = segments.slice(2).join('/')
+const describeEndpoint = (endpoint, channelOwners) => {
+  const segments = endpoint.split('/').filter(Boolean)
+  const channel = segments[0] ?? ''
+  const method = segments.slice(1).join('/')
   if (!channel.startsWith('dshx-')) {
     return { label: method === '' ? channel : `${channel}/${method}`, owner: 'core' }
   }
@@ -73,6 +73,30 @@ const describeRequest = (entry, channelOwners) => {
   if (resolved === undefined) return { label: `${channel}/${method}`, owner: `unmapped ${channel}` }
   return { label: `${resolved.apiId}/${method}`, owner: resolved.packageName }
 }
+
+const describeRequest = (entry, channelOwners) => describeEndpoint(new URL(entry.request.url).pathname.replace(/^\/api\//, ''), channelOwners)
+
+/**
+ * One row per call: a batch POST that har-capture.mjs annotated (`_batch`) becomes one row per call it carried, with the
+ * POST's timing and the call's own answer size when known. Other requests are one row each.
+ */
+const expandCalls = (requests, entriesByRequest, channelOwners) =>
+  requests.flatMap(request => {
+    const batch = entriesByRequest.get(request)?.request.postData?._batch
+    if (!Array.isArray(batch)) return [{ ...request, viaBatch: false }]
+    return batch.map(call => {
+      const { label, owner } = describeEndpoint(call.endpoint, channelOwners)
+      return {
+        ...request,
+        label,
+        owner,
+        viaBatch: true,
+        requestBytes: call.requestBytes ?? 0,
+        responseBytes: call.responseBytes ?? 0,
+        digest: crypto.createHash('sha1').update(`${request.httpMethod} ${label} ${call.digest}`).digest('hex'),
+      }
+    })
+  })
 
 const responseBytes = entry => {
   const contentSize = entry.response?.content?.size ?? 0
@@ -83,6 +107,7 @@ const responseBytes = entry => {
 export const summarizeHar = ({ har, channelOwners, top = 15 }) => {
   const allEntries = har.log?.entries ?? []
   const apiEntries = allEntries.filter(entry => new URL(entry.request.url).pathname.startsWith('/api/'))
+  const entriesByRequest = new Map()
   const requests = apiEntries
     .map(entry => {
       const start = Date.parse(entry.startedDateTime)
@@ -108,7 +133,8 @@ export const summarizeHar = ({ har, channelOwners, top = 15 }) => {
           .digest('hex'),
       }
     })
-    .sort((left, right) => left.start - right.start)
+  apiEntries.forEach((entry, index) => entriesByRequest.set(requests[index], entry))
+  requests.sort((left, right) => left.start - right.start)
   if (requests.length === 0) return { requests: 0, otherRequests: allEntries.length }
 
   const firstStart = requests[0].start
@@ -125,8 +151,9 @@ export const summarizeHar = ({ har, channelOwners, top = 15 }) => {
     previousStartByDigest.set(request.digest, request.start)
   }
 
+  const calls = expandCalls(requests, entriesByRequest, channelOwners)
   const byMethod = new Map()
-  for (const request of requests) {
+  for (const request of calls) {
     const key = `${request.httpMethod} ${request.label}`
     const group = byMethod.get(key) ?? []
     group.push(request)
@@ -137,7 +164,17 @@ export const summarizeHar = ({ har, channelOwners, top = 15 }) => {
       method,
       owner: group[0].owner,
       calls: group.length,
+      viaBatch: group.filter(request => request.viaBatch).length,
       distinct: new Set(group.map(request => request.digest)).size,
+      intervalP50S:
+        group.length < 3
+          ? null
+          : Math.round(
+              percentile(
+                group.slice(1).map((request, index) => request.start - group[index].start),
+                0.5,
+              ) / 100,
+            ) / 10,
       abortedInQueue: group.filter(request => request.abortedInQueue).length,
       statuses: Object.fromEntries(
         [...new Set(group.map(request => request.status))].sort().map(status => [status, group.filter(request => request.status === status).length]),
@@ -150,6 +187,7 @@ export const summarizeHar = ({ har, channelOwners, top = 15 }) => {
       ),
       waitMaxMs: Math.round(Math.max(...group.map(request => request.wait))),
       responseKB: Math.round(group.reduce((sum, request) => sum + request.responseBytes, 0) / 102.4) / 10,
+      maxResponseKB: Math.round(Math.max(...group.map(request => request.responseBytes)) / 102.4) / 10,
     }))
     .sort((left, right) => right.calls - left.calls || right.responseKB - left.responseKB)
 
@@ -214,7 +252,11 @@ export const summarizeHar = ({ har, channelOwners, top = 15 }) => {
       requestKB: Math.round(requests.reduce((sum, request) => sum + request.requestBytes, 0) / 1024),
       responseKB: Math.round(requests.reduce((sum, request) => sum + request.responseBytes, 0) / 1024),
     },
-    unmappedChannels: [...new Set(requests.filter(request => request.owner.startsWith('unmapped')).map(request => request.owner))],
+    batches: {
+      posts: requests.filter(request => Array.isArray(entriesByRequest.get(request)?.request.postData?._batch)).length,
+      calls: calls.filter(request => request.viaBatch).length,
+    },
+    unmappedChannels: [...new Set(calls.filter(request => request.owner.startsWith('unmapped')).map(request => request.owner))],
     topMethods: methods.slice(0, top),
   }
 }
@@ -234,14 +276,15 @@ const formatText = summary => {
     `non-2xx         ${summary.non2xx}`,
     `bytes           ${summary.bytes.requestKB} KB sent, ${summary.bytes.responseKB} KB received`,
   ]
+  if (summary.batches.posts > 0) lines.push(`batched         ${summary.batches.calls} calls in ${summary.batches.posts} /api/dshx-batch POSTs (expanded below)`)
   if (summary.unmappedChannels.length > 0) lines.push(`unmapped        ${summary.unmappedChannels.join(', ')}`)
-  lines.push('', 'calls distinct aborted  p50ms waitMax    KB  statuses        method · owner')
+  lines.push('', 'calls batched distinct aborted  p50ms waitMax every·s    KB maxKB  statuses        method · owner')
   for (const row of summary.topMethods) {
     const statuses = Object.entries(row.statuses)
       .map(([status, count]) => `${status}×${count}`)
       .join(' ')
     lines.push(
-      `${String(row.calls).padStart(5)} ${String(row.distinct).padStart(8)} ${String(row.abortedInQueue).padStart(7)} ${String(row.timeP50Ms).padStart(6)} ${String(row.waitMaxMs).padStart(7)} ${String(row.responseKB).padStart(5)}  ${statuses.padEnd(15)} ${row.method} · ${row.owner}`,
+      `${String(row.calls).padStart(5)} ${String(row.viaBatch).padStart(7)} ${String(row.distinct).padStart(8)} ${String(row.abortedInQueue).padStart(7)} ${String(row.timeP50Ms).padStart(6)} ${String(row.waitMaxMs).padStart(7)} ${String(row.intervalP50S ?? '-').padStart(7)} ${String(row.responseKB).padStart(5)} ${String(row.maxResponseKB).padStart(5)}  ${statuses.padEnd(15)} ${row.method} · ${row.owner}`,
     )
   }
   return lines.join('\n')
