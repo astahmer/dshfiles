@@ -44,3 +44,15 @@ Feature: Session undo
     When the undone turn is redone from the composer
     Then redo restored "rewind-2.txt" and "rewind-3.txt" in the project
     And the original thread shows its turns again
+
+  @scenario:session-undo.turn-checkpoint
+  Scenario: Each turn shows the jj revision its edits left, and Restore returns to it
+    Given the isolated plugin composition of "@dshfiles/session-undo,@dshfiles/jj-integration,@dshfiles/jujutsu,@dshfiles/ai-accounts,@dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread on the fake model is started in a scratch jj project
+    And the thread asks bash to write "checkpoint-1.txt"
+    Then the turn wrote "checkpoint-1.txt" in the project
+    When the thread asks bash to write "checkpoint-2.txt"
+    Then each turn names the jj revision its edits left
+    When the first turn is restored from its checkpoint
+    Then only "checkpoint-1.txt" of the two files remains

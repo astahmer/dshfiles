@@ -33,8 +33,18 @@ const methods = {
   }),
   snapshot: method({
     input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) }),
-    output: Schema.Struct({ snapshot: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)) }),
-    description: 'Record the files of the workspace at a path and return an opaque token restore accepts. Does not change any file.',
+    output: Schema.Struct({
+      snapshot: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+      /** The revision the recorded files are in, when the VCS names one a reader can open (jj: `@`, or `@-` past an empty one). */
+      revision: Schema.optional(
+        Schema.Struct({
+          commitId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+          changeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+        }),
+      ),
+    }),
+    description:
+      'Record the files of the workspace at a path and return an opaque token restore accepts, plus the revision holding them when the VCS names one. Does not change any file.',
   }),
   restore: method({
     input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)), snapshot: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)) }),

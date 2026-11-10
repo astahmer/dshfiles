@@ -25,19 +25,29 @@ export const sessionUndoApi = defineApi({
     history: method({
       input: Schema.Struct({ sessionId: sessionIdSchema }),
       output: Schema.Struct({
-        checkpoints: Schema.Array(Schema.Struct({ turn: intSchema, prompt: Schema.String, at: intSchema, files: Schema.Boolean })),
+        checkpoints: Schema.Array(
+          Schema.Struct({
+            turn: intSchema,
+            prompt: Schema.String,
+            at: intSchema,
+            files: Schema.Boolean,
+            /** The revision the turn's edits left, when the provider names one and the turn changed files. */
+            revision: Schema.optional(Schema.Struct({ commitId: Schema.String, changeId: Schema.String })),
+          }),
+        ),
         /** The thread a redo returns to; null when there is nothing to redo. */
         redoTo: Schema.NullOr(sessionIdSchema),
       }),
       description:
-        'The turns of a thread that can be undone or rewound to (session_rewind takes their turn number), newest last, each with its prompt and whether its files were snapshotted, and whether a redo is available. Read-only.',
+        'The turns of a thread that can be undone or rewound to (session_rewind takes their turn number), newest last, each with its prompt, whether its files were snapshotted and the jj revision its edits left, and whether a redo is available. Read-only.',
       tool: {
         name: 'session_undo_history',
         readOnly: true,
         render: output =>
           [
             ...output.checkpoints.map(
-              checkpoint => `turn ${String(checkpoint.turn)}${checkpoint.files ? ' (files)' : ''} · ${checkpoint.prompt || '(no text)'}`,
+              checkpoint =>
+                `turn ${String(checkpoint.turn)}${checkpoint.files ? ' (files)' : ''}${checkpoint.revision === undefined ? '' : ` → jj:${checkpoint.revision.commitId.slice(0, 12)}`} · ${checkpoint.prompt || '(no text)'}`,
             ),
             output.redoTo === null ? 'Nothing to redo.' : `Redo returns to ${output.redoTo}.`,
           ].join('\n'),

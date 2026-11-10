@@ -6,6 +6,11 @@ const nonEmptyString = Schema.String.check(Schema.isMinLength(1))
 const nonNegativeInt = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
 const snapshotRef = Schema.NullOr(Schema.String.check(Schema.isMaxLength(512)))
 
+const revisionSchema = Schema.Struct({
+  commitId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  changeId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+})
+
 const checkpointSchema = Schema.Struct({
   turn: nonNegativeInt,
   /** The last event before the turn started: the conversation an undo forks back to. */
@@ -16,6 +21,10 @@ const checkpointSchema = Schema.Struct({
   snapshot: snapshotRef,
   prompt: Schema.String.check(Schema.isMaxLength(200)),
   at: nonNegativeInt,
+  /** The revision holding the files at turn start, when the provider names one. */
+  before: Schema.optional(revisionSchema),
+  /** The revision holding the files at turn end, recorded only when it differs from `before`: what the turn produced. */
+  revision: Schema.optional(revisionSchema),
 })
 
 const redoSchema = Schema.Struct({
@@ -34,6 +43,7 @@ const historySchema = Schema.Struct({
 })
 
 export type Checkpoint = typeof checkpointSchema.Type
+export type CheckpointRevision = typeof revisionSchema.Type
 export type UndoHistoryRecord = typeof historySchema.Type
 
 const MAX_CHECKPOINTS = 20
@@ -41,6 +51,7 @@ const MAX_CHECKPOINTS = 20
 /** Per-thread turn checkpoints (conversation cut + file snapshot) and the redo an undo left behind. */
 export class UndoHistory {
   static readonly checkpointSchema = checkpointSchema
+  static readonly revisionSchema = revisionSchema
 
   static readonly domain = defineDomain({
     name: 'dshfiles_session_undo',
@@ -63,6 +74,14 @@ export class UndoHistory {
   /** A new turn is new work: it adds a checkpoint and drops the redo, as an editor does. */
   static withCheckpoint(record: UndoHistoryRecord, checkpoint: Checkpoint): UndoHistoryRecord {
     return { ...record, checkpoints: [...record.checkpoints, checkpoint].slice(-MAX_CHECKPOINTS), redo: null }
+  }
+
+  /** The turn's newest checkpoint learns the revision it produced; a turn that changed nothing keeps none. */
+  static withRevision(record: UndoHistoryRecord, turn: number, revision: CheckpointRevision): UndoHistoryRecord {
+    const index = UndoHistory.indexOf(record, turn)
+    const checkpoint = record.checkpoints[index]
+    if (checkpoint === undefined || checkpoint.before?.commitId === revision.commitId) return record
+    return { ...record, checkpoints: record.checkpoints.map((entry, position) => (position === index ? { ...entry, revision } : entry)) }
   }
 
   static withPrompt(record: UndoHistoryRecord, turn: number, prompt: string): UndoHistoryRecord {

@@ -26,6 +26,7 @@ thread has a recorded turn (its tooltip names the turn's prompt), **Rewind to an
   workspace; **Rewind anyway** (`allowSharedDirectory: true`) restores regardless. When the Host cannot list its live
   threads, the restore is refused the same way rather than guessed. A turn with no file snapshot rewinds only the
   conversation and is never refused.
+- **Every finished turn names its revision.** When a turn ends in a jj workspace, the files are snapshotted again and, when the revision moved, the turn's action row shows it as `jj:<commit>`: the reference opens the Jujutsu panel on that revision, and **Restore to after this turn** rewinds to the start of the next recorded turn, so the files and the conversation come back as this turn left them. The latest turn offers no Restore (nothing later to drop), a turn that changed no file names no revision, and a git workspace names none: a snapshot commit is not a revision a reader would open. `turnRevisions` off skips the turn-end snapshot and hides both.
 - **Redo** puts the files back as they were before the undo or rewind, brings the original thread back and archives the fork.
   A new turn in the fork drops its redo, as in an editor.
 - All three are refused while the thread runs, and a fork that fails after the files were restored puts them back.
@@ -38,11 +39,20 @@ both need `confirm: true`) and `session_redo`, to run only when the user asked. 
 `dshfiles_session_undo` storage domain; the running-turn guard reads Session events, so after a Host restart
 turns recorded before it can still be undone.
 
+## Settings
+
+| Field           | Default | Meaning                                                                                                        |
+| --------------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| `turnRevisions` | on      | Name the jj revision each finished turn produced and offer Restore beside it; off skips the turn-end snapshot. |
+
 ## Verify
 
 ```sh
-pnpm --dir plugins/@dshfiles/session-undo test     # undo/redo, rewind N, shared folders, refusals, fork failure, the snapshot gate
+pnpm --dir plugins/@dshfiles/session-undo test     # undo/redo, rewind N, shared folders, refusals, fork failure, the snapshot gate,
+                                                   # the turn-end revision (named only when the files changed, none for git)
 pnpm --dir plugins/@dshfiles/session-undo test:e2e # scratch DSH: undo and redo a turn's file in a jj project and in a git-only
-                                                   # repository; three turns write files, rewind past two, redo
+                                                   # repository; three turns write files, rewind past two, redo; each finished
+                                                   # turn names its revision and Restore returns past it
 dshx dev open session-undo/turn-undo-redo          # scratch DSH: undo a seeded turn, the Redo button appears
+dshx dev open session-undo/turn-checkpoint         # scratch DSH: a turn's jj revision with Restore beside it
 ```

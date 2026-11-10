@@ -26,6 +26,8 @@ const en = {
   anywayUndo: 'Undo anyway',
   anywayRewind: 'Rewind anyway',
   anywayRedo: 'Redo anyway',
+  turnRevision: 'Turn {turn} left its files in this revision',
+  restoreHere: 'Restore to after this turn',
 }
 
 const zh = {
@@ -52,6 +54,8 @@ const zh = {
   anywayUndo: '仍然撤销',
   anywayRewind: '仍然回退',
   anywayRedo: '仍然重做',
+  turnRevision: '第 {turn} 轮的文件保存在此修订中',
+  restoreHere: '恢复到这一轮之后',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -59,6 +63,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'dshfiles.sessionUndo': keyof typeof en
   }
 }
+
+export type SessionUndoKey = keyof typeof en
 
 export const sessionUndoLocale = defineLocale(SESSION_UNDO_LOCALE_NAMESPACE, { en, zh })
 export const SESSION_UNDO_LOCALE = SESSION_UNDO_LOCALE_NAMESPACE

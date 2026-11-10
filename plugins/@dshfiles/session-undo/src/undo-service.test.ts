@@ -33,8 +33,8 @@ const storageHost = Layer.effect(
 )
 
 /** A VCS provider is external to the plugin: this workspace's "files" are one string and snapshots are numbered copies. */
-const workspace = (initial: string, snapshot?: Effect.Effect<void>) => {
-  const state = { files: initial, snapshots: new Map<string, string>() }
+const workspace = (initial: string, snapshot?: Effect.Effect<void>, options?: { readonly namesRevisions: boolean }) => {
+  const state = { files: initial, snapshots: new Map<string, string>(), taken: 0 }
   const take = (): string => {
     const id = `snap-${String(state.snapshots.size + 1)}`
     state.snapshots.set(id, state.files)
@@ -44,7 +44,12 @@ const workspace = (initial: string, snapshot?: Effect.Effect<void>) => {
     snapshot: () =>
       Effect.andThen(
         snapshot ?? Effect.void,
-        Effect.sync(() => (snapshot === undefined ? Option.some({ provider: '@test/vcs', snapshot: take() }) : Option.none())),
+        Effect.sync(() => {
+          state.taken += 1
+          if (snapshot !== undefined) return Option.none()
+          const revision = options?.namesRevisions === true ? { commitId: `commit-${state.files}`, changeId: 'change' } : null
+          return Option.some({ provider: '@test/vcs', snapshot: take(), revision })
+        }),
       ),
     restore: input =>
       Effect.sync(() => {
@@ -132,6 +137,50 @@ describe('session undo', () => {
         expect(sessions.state.archived.has('s1')).toBe(false)
         expect(sessions.state.archived.has('fork-1')).toBe(true)
         expect((yield* Effect.flip(service.redo('fork-1'))).message).toMatch('nothing to redo')
+      }),
+    ),
+  )
+
+  it.effect('names the revision a turn produced at its end, only when its files changed', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const files = workspace('v0', undefined, { namesRevisions: true })
+        const sessions = sessionsFake()
+        const service = yield* undoWith({ files: files.files, sessions: sessions.sessions })
+        const turn = (number: number, forkAtSeq: number, after: string) =>
+          Effect.gen(function* () {
+            yield* service.turnStarted({ sessionId: 's1', turn: number, forkAtSeq, cwd: '/repo' })
+            yield* service.whenReady('s1')
+            files.state.files = after
+            yield* service.turnFinished({ sessionId: 's1', turn: number })
+            yield* service.whenReady('s1')
+          })
+        yield* turn(1, 4, 'v1')
+        yield* turn(2, 20, 'v1')
+        yield* turn(3, 30, 'v3')
+
+        expect((yield* service.history('s1')).checkpoints.map(checkpoint => [checkpoint.turn, checkpoint.revision?.commitId])).toEqual([
+          [1, 'commit-v1'],
+          [2, undefined],
+          [3, 'commit-v3'],
+        ])
+        const rewound = yield* service.undo('s1', { turn: 2 })
+        expect(files.state.files).toBe('v1')
+        expect((yield* service.history(rewound.sessionId)).checkpoints).toMatchObject([{ turn: 1, revision: { commitId: 'commit-v1' } }])
+      }),
+    ),
+  )
+
+  it.effect('takes no turn-end snapshot where the provider names no revision', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { files, service, turn } = yield* setup
+        yield* turn({ sessionId: 's1', turn: 1, forkAtSeq: 4 })
+        files.state.files = 'v1'
+        yield* service.turnFinished({ sessionId: 's1', turn: 1 })
+        yield* service.whenReady('s1')
+        expect(files.state.taken).toBe(1)
+        expect((yield* service.history('s1')).checkpoints[0]?.revision).toBeUndefined()
       }),
     ),
   )

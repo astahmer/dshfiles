@@ -143,3 +143,36 @@ Then('the original thread shows its turn again', async ({ page }: { page: Page }
   })
   await finishJourneyAssertions(page)
 })
+
+Then('each turn names the jj revision its edits left', async ({ page }: { page: Page }) => {
+  const checkpoints = page.locator('[data-session-undo-checkpoint]')
+  await recordAssertion(page, 'session-undo-turn-checkpoint-revisions', async () => {
+    await expect.poll(() => exists(join(projectFor(page), 'checkpoint-2.txt')), { timeout: 30_000 }).toBe(true)
+    await expect(checkpoints).toHaveCount(2, { timeout: 30_000 })
+    for (const checkpoint of await checkpoints.all()) await expect(checkpoint.locator('[data-session-undo-revision]')).toHaveText(/^jj:[0-9a-f]{12}$|Jujutsu revision/)
+    await expect(checkpoints.first().getByRole('button', { name: 'Restore to after this turn', exact: true })).toHaveCount(1)
+    await expect(checkpoints.last().getByRole('button', { name: 'Restore to after this turn', exact: true })).toHaveCount(0)
+  })
+  const shots = process.env.DSHX_E2E_SHOT_DIR
+  if (shots !== undefined) {
+    await checkpoints.first().hover()
+    await page.screenshot({ path: `${shots}/turn-checkpoint.png` })
+  }
+})
+
+When('the first turn is restored from its checkpoint', async ({ page }: { page: Page }) => {
+  const checkpoint = page.locator('[data-session-undo-checkpoint]').first()
+  await checkpoint.hover()
+  await checkpoint.getByRole('button', { name: 'Restore to after this turn', exact: true }).click()
+  const dialog = page.getByRole('alertdialog')
+  await recordAssertion(page, 'session-undo-turn-checkpoint-confirms', () => expect(dialog.locator('[data-session-undo="lost-turns"] li')).toHaveCount(1))
+  await dialog.getByRole('button', { name: 'Rewind', exact: true }).click()
+})
+
+Then('only {string} of the two files remains', async ({ page }: { page: Page }, kept: string) => {
+  await recordAssertion(page, 'session-undo-turn-checkpoint-restored', async () => {
+    await expect.poll(() => exists(join(projectFor(page), 'checkpoint-2.txt')), { timeout: 30_000 }).toBe(false)
+    await expect.poll(() => exists(join(projectFor(page), kept))).toBe(true)
+  })
+  await finishJourneyAssertions(page)
+})

@@ -3,7 +3,7 @@ import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { VcsProviderService } from '@dshfiles/vcs-provider-port/effect'
 import { Clock, Context, Deferred, Effect, FiberSet, Layer, Option, Ref, Schema } from 'effect'
-import { UndoHistory, type UndoHistoryRecord } from './undo-history.js'
+import { UndoHistory, type CheckpointRevision, type UndoHistoryRecord } from './undo-history.js'
 
 export const PACKAGE_ID = '@dshfiles/session-undo'
 
@@ -105,6 +105,8 @@ export class UndoHistoryUnavailable extends Schema.TaggedError<UndoHistoryUnavai
 export interface FileSnapshot {
   readonly provider: string
   readonly snapshot: string
+  /** The revision holding the files, when the provider names one (jj does, git does not). */
+  readonly revision: CheckpointRevision | null
 }
 
 /** Workspace file snapshots, taken and restored by the version-control provider that claims the folder. */
@@ -127,7 +129,7 @@ export class UndoFiles extends Context.Service<
           const provider = yield* vcs.resolve({ path: cwd, callerPackageId: PACKAGE_ID })
           if (Option.isNone(provider)) return Option.none()
           return yield* provider.value.client.snapshot({ path: cwd }).pipe(
-            Effect.map(taken => Option.some({ provider: provider.value.owner, snapshot: taken.snapshot })),
+            Effect.map(taken => Option.some({ provider: provider.value.owner, snapshot: taken.snapshot, revision: taken.revision ?? null })),
             Effect.catch(error => Effect.as(Effect.logWarning('session-undo: the turn snapshot failed; it is recorded without files', error), Option.none())),
           )
         }),
@@ -231,6 +233,11 @@ export class SessionUndo extends Context.Service<
       readonly forkAtSeq: number
       readonly cwd: string
     }) => Effect.Effect<void>
+    /**
+     * Start naming the revision a finished turn produced, after its start checkpoint is stored; only a turn whose start
+     * snapshot named a revision takes this second snapshot, so a git workspace pays nothing.
+     */
+    readonly turnFinished: (input: { readonly sessionId: string; readonly turn: number }) => Effect.Effect<void>
     /** Undo and redo refuse a thread between its turn start and turn end. */
     readonly turnRunning: (sessionId: string) => Effect.Effect<void>
     readonly turnEnded: (sessionId: string) => Effect.Effect<void>
@@ -239,7 +246,13 @@ export class SessionUndo extends Context.Service<
     readonly whenReady: (sessionId: string) => Effect.Effect<void>
     readonly history: (sessionId: string) => Effect.Effect<
       {
-        readonly checkpoints: Array<{ readonly turn: number; readonly prompt: string; readonly at: number; readonly files: boolean }>
+        readonly checkpoints: Array<{
+          readonly turn: number
+          readonly prompt: string
+          readonly at: number
+          readonly files: boolean
+          readonly revision?: CheckpointRevision
+        }>
         readonly redoTo: string | null
       },
       UndoHistoryUnavailable
@@ -315,6 +328,7 @@ export class SessionUndo extends Context.Service<
                   snapshot: Option.getOrNull(Option.map(taken, snapshot => snapshot.snapshot)),
                   prompt: prompt?.turn === input.turn ? prompt.text : '',
                   at,
+                  ...Option.match(Option.flatMapNullishOr(taken, snapshot => snapshot.revision), { onNone: () => ({}), onSome: before => ({ before }) }),
                 }),
               ),
             ),
@@ -325,6 +339,30 @@ export class SessionUndo extends Context.Service<
           Effect.withSpan('session undo checkpoint'),
         )
         yield* FiberSet.run(checkpoints, checkpoint)
+      })
+
+      /** Chained behind the thread's pending checkpoint like the next turn start, so `whenReady` also waits for it. */
+      const turnFinished = Effect.fn('session undo turn finish')(function* (input: { readonly sessionId: string; readonly turn: number }) {
+        const previous = (yield* Ref.get(ready)).get(input.sessionId)
+        const done = yield* Deferred.make<void>()
+        yield* Ref.update(ready, current => new Map(current).set(input.sessionId, done))
+        const name = Effect.gen(function* () {
+          if (previous !== undefined) yield* Deferred.await(previous)
+          const current = yield* record(input.sessionId)
+          const started = current.checkpoints[UndoHistory.indexOf(current, input.turn)]
+          if (started?.before === undefined) return
+          const taken = yield* files.snapshot(started.cwd)
+          const revision = Option.flatMapNullishOr(taken, snapshot => snapshot.revision)
+          if (Option.isNone(revision)) return
+          yield* domain.withWriteLock(
+            Effect.flatMap(record(input.sessionId), current => store(input.sessionId, UndoHistory.withRevision(current, input.turn, revision.value))),
+          )
+        }).pipe(
+          Effect.catchTag('UndoHistoryUnavailable', error => Effect.logWarning('session-undo: the turn revision was not stored', error)),
+          Effect.ensuring(Deferred.succeed(done, undefined)),
+          Effect.withSpan('session undo turn revision'),
+        )
+        yield* FiberSet.run(checkpoints, name)
       })
 
       const promptEntered = Effect.fn('session undo prompt record')(function* (input: {
@@ -357,6 +395,7 @@ export class SessionUndo extends Context.Service<
             prompt: checkpoint.prompt,
             at: checkpoint.at,
             files: checkpoint.snapshot !== null,
+            ...(checkpoint.revision === undefined ? {} : { revision: checkpoint.revision }),
           })),
           redoTo: current.redo?.sessionId ?? null,
         }
@@ -378,6 +417,7 @@ export class SessionUndo extends Context.Service<
       const undo = Effect.fn('session undo')(function* (sessionId: string, options?: RewindOptions) {
         const verb = options?.turn === undefined ? 'undo' : 'rewind'
         yield* refuseWhileRunning(sessionId, verb)
+        yield* whenReady(sessionId)
         const source = yield* record(sessionId)
         if (source.checkpoints.length === 0) return yield* new NothingToUndo({})
         const index = UndoHistory.indexOf(source, options?.turn)
@@ -424,6 +464,7 @@ export class SessionUndo extends Context.Service<
 
       return SessionUndo.of({
         turnStarted,
+        turnFinished,
         turnRunning: sessionId => Ref.update(running, current => new Set(current).add(sessionId)),
         turnEnded: sessionId =>
           Ref.update(running, current => {
