@@ -52,7 +52,7 @@ export class ThreadActions extends Context.Service<ThreadActions, ThreadActionSe
         sessionExists: sessionId =>
           Effect.suspend(() => {
             const persistence = ctx.get('sessionPersistence')
-            if (persistence === undefined) return Effect.fail(new ThreadHostCallFailed({ cause: new Error('Session persistence is not loaded.') }))
+            if (persistence === undefined) return Effect.fail(new ThreadHostCallFailed())
             return host(signal => persistence.stat(SessionId(sessionId), { signal })).pipe(Effect.map(stored => stored !== undefined))
           }),
         readTitles: sessionIds =>
