@@ -247,8 +247,6 @@ const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
 /** The cancelable cross-plugin event `@dshfiles/settings-shell` listens for; handled when dispatch returns false. */
 const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 const SETTINGS_COMMAND_ID = 'settings.open'
-/** `@dshfiles/workbench`'s right-pane toggle; on a phone that pane is the thread panel's bottom sheet. */
-const THREAD_PANEL_COMMAND_ID = 'workbench.toggleSidePanel'
 
 export const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
   if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
@@ -1326,8 +1324,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             toggleSidebar={toggleSidebar}
             record={recordNavigation}
             stageTitle={stageTitle}
-            // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
-            togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
           />
         )}
         <MovedToDialog

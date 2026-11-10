@@ -4,7 +4,7 @@
     {
       "id": "conversation-header",
       "title": "Keep the original conversation toolbar and child views inside each thread",
-      "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and thread actions, and native Chat/Trajectory/Traces/Requests navigation when those providers are present. The original header child has one declarer behind a reusable owned Factory, shared with native mode; no borrowed renderer or global-following duplicate is used. Native selected views drive the existing content/composer instead of a forced Chat view. The original right-sidebar opener uses the registered Workbench dock actions, not the hidden native carrier. Outer Workbench tab layout, original blank hero and independent view-only panels retain their owners.",
+      "summary": "Every fixed conversation hosts the original Rich Composer header inside its own retained SessionProvider: title/mode, contributed workspace utilities, Pin and thread actions, and native Chat/Trajectory/Traces/Requests navigation when those providers are present. The original header child has one declarer behind a reusable owned Factory, shared with native mode; no borrowed renderer or global-following duplicate is used. Native selected views drive the existing content/composer instead of a forced Chat view. The original right-sidebar opener uses the registered Workbench dock actions, not the hidden native carrier. Outer Workbench tab layout, original blank hero and independent view-only panels retain their owners. The optional producer-owned ConversationScope contract wraps this occurrence's resident header and composer together; without a provider both Factories render unchanged.",
       "reach": ["seed tool-call-thread", "expect button \"More thread actions\"", "expect tab \"Chat\"", "expect tab \"Trajectory\""],
       "surfaces": ["client", "integration"],
       "surface": "infrastructure",
@@ -31,6 +31,12 @@
           "kind": "gherkin",
           "id": "workbench.conversation-header",
           "featureFile": "tooling/dshx/e2e/features/workbench-chat-header.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.conversation-scope",
+          "file": "plugins/@dshfiles/workbench/src/thread-panel.test.tsx",
+          "testName": "shares an optional producer scope across the resident header and composer, and withdraws it on unload"
         }
       ],
       "telemetry": [
@@ -711,7 +717,7 @@
     {
       "id": "phone-thread-panel-sheet",
       "title": "Open the thread panel as a bottom sheet on a phone",
-      "summary": "Below 640px the frame gives the right column no width, so the Workbench dock (the thread panel: Changes, Cost, Jobs, Context and the other facets) rises as a bottom sheet above the tab bar instead of a cramped column: same surface, same facet tabs and Choose a view, with a grab handle, Close, a scrim and Escape to put it away. The phone top bar's Thread panels button and the existing toggle open it. On a phone the main region's tab rows are hidden (the stack, Back and the sheet navigate instead), the sheet's facet tabs get 40px rows, and Choose a view does not autofocus its search so the software keyboard stays down. The sheet's open state belongs to the page (every phone load starts closed) and the dock controls drive it on a phone, so the remembered desktop right pane is neither opened over a phone nor changed from one. Desktop keeps the right pane and tab rows.",
+      "summary": "Below 640px the frame gives the right column no width, so the Workbench dock (the thread panel: Changes, Cost, Jobs, Context and the other facets) rises as a bottom sheet above the tab bar instead of a cramped column: same surface, same facet tabs and Choose a view, with a grab handle, Close, a scrim and Escape to put it away. The phone top bar's Thread menu contains the Open right sidebar control; it and the existing toggle open the sheet. On a phone the main region's tab rows are hidden (the stack, Back and the sheet navigate instead), the sheet's facet tabs get 40px rows, and Choose a view does not autofocus its search so the software keyboard stays down. The sheet's open state belongs to the page (every phone load starts closed) and the dock controls drive it on a phone, so the remembered desktop right pane is neither opened over a phone nor changed from one. Desktop keeps the right pane and tab rows.",
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",

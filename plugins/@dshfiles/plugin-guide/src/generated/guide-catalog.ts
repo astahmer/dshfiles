@@ -1746,6 +1746,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "PhoneThreadMenu",
+      "importFrom": "@dshfiles/rich-composer/phone-thread-menu",
+      "owner": "@dshfiles/rich-composer",
+      "source": "plugins/@dshfiles/rich-composer/src/phone-thread-menu.tsx:38",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/rich-composer.phone-thread-menu",
+      "kind": "contract",
+      "title": "PhoneThreadMenu",
+      "summary": "Client service contract provided by @dshfiles/rich-composer.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(PhoneThreadMenu) to consume; only @dshfiles/rich-composer provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/rich-composer's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/rich-composer.phone-thread-menu"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/secret-catalog/setup",
       "kind": "module",
       "title": "@dshfiles/secret-catalog/setup",
@@ -2414,22 +2436,24 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
-      "key": "module:@dshfiles/workbench/conversation-header",
-      "kind": "module",
-      "title": "@dshfiles/workbench/conversation-header",
-      "summary": "Presentation contract implemented by the owned Conversation producer, not a second Session owner.",
-      "publicSymbol": "(side-effect module)",
+      "publicSymbol": "ConversationScope",
       "importFrom": "@dshfiles/workbench/conversation-header",
       "owner": "@dshfiles/workbench",
-      "scope": "client or host",
-      "mode": "shared types and helpers",
-      "registration": "import",
-      "risk": "additive",
-      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "source": "plugins/@dshfiles/workbench/src/conversation-header.ts:5",
       "occupancy": "unavailable",
       "occupants": [],
-      "details": [],
-      "source": "plugins/@dshfiles/workbench/src/conversation-header.ts",
+      "key": "contract:ConversationScope",
+      "kind": "contract",
+      "title": "ConversationScope",
+      "summary": "Client service contract provided by @dshfiles/workbench.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(ConversationScope) to consume; only @dshfiles/workbench provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/workbench's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: ConversationScope"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2810,7 +2834,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 27 catalog feature(s)",
+        "Used by 26 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2838,7 +2862,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agents › agent-mentions"
       ],
       "details": [
-        "Used by 60 catalog feature(s)",
+        "Used by 61 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

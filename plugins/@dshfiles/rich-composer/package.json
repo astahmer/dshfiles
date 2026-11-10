@@ -16,6 +16,10 @@
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
+    "./phone-thread-menu": {
+      "types": "./src/phone-thread-menu.tsx",
+      "default": "./dist/phone-thread-menu.js"
+    },
     "./conversation-contract": {
       "types": "./src/conversation-contract.ts",
       "default": "./dist/conversation-contract.js"

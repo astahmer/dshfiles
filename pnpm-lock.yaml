@@ -1553,6 +1553,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -2181,6 +2184,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -3879,6 +3885,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -3946,9 +3955,6 @@ importers:
       '@dshfiles/frame-layout':
         specifier: workspace:*
         version: link:../frame-layout
-      '@dshfiles/rich-composer':
-        specifier: workspace:*
-        version: link:../rich-composer
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.1.2(effect@4.1.2)(vitest@4.1.12)
@@ -5593,6 +5599,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -8048,6 +8057,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
       '@dshfiles/session-controller':
         specifier: workspace:*
         version: link:../session-controller
@@ -8187,9 +8199,6 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
-      '@dshfiles/rich-composer':
-        specifier: workspace:*
-        version: link:../rich-composer
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.1.2(effect@4.1.2)(vitest@4.1.12)

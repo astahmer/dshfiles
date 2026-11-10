@@ -30,6 +30,7 @@
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/rich-composer": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
     "@dshfiles/workspace-folder-picker": "workspace:*",
