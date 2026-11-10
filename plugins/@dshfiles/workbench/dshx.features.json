@@ -1076,7 +1076,13 @@
           "kind": "unit-test",
           "id": "workbench.bottom-panel-shortcut-unit-terminal-opt-out",
           "file": "plugins/@dshfiles/workbench/src/bottom-panel-shortcut.test.ts",
-          "testName": "keeps the terminal key for the shell it feeds"
+          "testName": "keeps the terminal key for the shell it feeds outside macOS"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.bottom-panel-shortcut-unit-macos-terminal",
+          "file": "plugins/@dshfiles/workbench/src/bottom-panel-shortcut.test.ts",
+          "testName": "keeps Cmd+J live in the terminal on macOS, where the shell never receives it"
         }
       ],
       "telemetry": [

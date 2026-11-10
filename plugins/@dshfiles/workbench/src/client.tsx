@@ -1465,7 +1465,7 @@ export default defineClient({
         'workbench: this Host provides no command registry, so the bottom panel shortcut and palette entry are unavailable. Open the bottom panel from Pane options instead.',
       )
     }
-    commands?.add(Command, bottomPanelCommand({ title: translate('toggleBottomPanel'), toggle: toggleBottomPanel }))
+    commands?.add(Command, bottomPanelCommand({ title: translate('toggleBottomPanel'), toggle: toggleBottomPanel, mac: navigator.platform.startsWith('Mac') }))
     if (isShortcutCommandId(TOGGLE_COMMAND_ID)) {
       // No default chord: listed under Settings › Shortcuts and in the command palette for the user to bind.
       ctx.effect(() => {

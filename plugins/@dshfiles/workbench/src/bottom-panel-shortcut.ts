@@ -15,13 +15,16 @@ export const BOTTOM_PANEL_COMMAND_ID = '@dshfiles/workbench.toggleBottomPanel'
 /** `Cmd+J` on macOS, `Ctrl+J` everywhere else. */
 export const BOTTOM_PANEL_CHORD = 'Mod+J'
 
-/** The terminal reads this chord as a line feed (`Ctrl+J`), so it keeps the key while xterm owns the keyboard. */
-export const bottomPanelCommand = (input: { readonly title: string; readonly toggle: () => void }): CommandItem => ({
+/**
+ * The terminal reads `Ctrl+J` as a line feed, so off macOS the chord leaves the key to the shell while xterm owns
+ * the keyboard. `Cmd+J` never reaches the shell, so on macOS it stays live from the terminal too.
+ */
+export const bottomPanelCommand = (input: { readonly title: string; readonly toggle: () => void; readonly mac: boolean }): CommandItem => ({
   id: BOTTOM_PANEL_COMMAND_ID,
   title: input.title,
   keywords: ['workbench', 'dock', 'panel', 'bottom panel', 'terminal'],
   keys: [BOTTOM_PANEL_CHORD],
   editable: true,
-  allowInTerminal: false,
+  allowInTerminal: input.mac,
   run: input.toggle,
 })
