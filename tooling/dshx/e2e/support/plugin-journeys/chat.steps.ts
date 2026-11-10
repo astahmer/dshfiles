@@ -186,8 +186,19 @@ Then('the latest transcript rows are visible and older rows appear when scrollin
     await expect(page.getByText('Transcript answer 1', { exact: true })).toHaveCount(0)
   })
   await scrollport.hover()
-  for (let attempt = 0; attempt < 12; attempt++) await page.mouse.wheel(0, -600)
-  await expect(page.getByText('Transcript answer 1', { exact: true })).toBeVisible({ timeout: 10_000 })
+  // One wheel per round, then the rows it mounts: a burst fired before older rows mount loses its distance at the top.
+  const oldest = page.getByText('Transcript answer 1', { exact: true })
+  const mountedRows = () => page.locator('[data-conversation-scroll] [data-chat-anchor-key]').count()
+  const deadline = Date.now() + 30_000
+  for (let round = 0; round < 40 && Date.now() < deadline && (await oldest.count()) === 0; round++) {
+    const before = await mountedRows()
+    await page.mouse.wheel(0, -600)
+    await expect
+      .poll(async () => (await oldest.count()) > 0 || (await mountedRows()) > before, { timeout: 750, intervals: [50, 100, 200] })
+      .toBe(true)
+      .catch(() => undefined)
+  }
+  await expect(oldest).toBeVisible({ timeout: 5_000 })
   await recordAssertion(
     page,
     'chat-windowed-transcript-mounts-older-rows-on-scroll',
