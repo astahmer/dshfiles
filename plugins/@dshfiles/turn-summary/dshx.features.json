@@ -104,29 +104,33 @@
     },
     {
       "id": "turn-walkthrough",
-      "title": "A walkthrough card after a turn that changed code",
-      "summary": "Under a finished turn that edited files, a compact card lists the changed files grouped by folder, each folder with a one-line summary (\"Edited 2 files · +40 −3\") and the turn's total lines added and removed. Review in Changes opens that turn's changed-files review in the right pane (the Changes facet when pulls-review is loaded, else the native review tab). The card's icon folds it to one button.",
+      "title": "A walkthrough under a turn that changed code",
+      "summary": "Under a finished turn that edited files, one row opens a walkthrough: the changed files grouped by folder, each folder with a one-line summary (\"Edited 2 files · +40 −3\"), and every file row opens that file in the editor. Review in Changes opens that turn's changed-files review in the right pane (the Changes facet when pulls-review is loaded, else the native review tab). It is a row in the turn footer, so a closed walkthrough never floats above the composer.",
       "reach": [
         "seed tool-call-thread",
         "expect text \"Tool finished.\"",
         "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
         "press Enter",
-        "expect text \"Changed 1 file\""
+        "expect text \"Walkthrough\"",
+        "click button \"Walkthrough\"",
+        "expect text \"walkthrough.md\"",
+        "click button \"Open walkthrough.md\"",
+        "expect tab \"walkthrough.md\""
       ],
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: turn walkthrough card",
+      "currentSurface": "transcript: turn walkthrough row",
       "configuration": [
         {
           "key": "walkthrough",
           "defaultValue": "true",
-          "constraints": "Boolean; show the walkthrough card after a turn that edited files.",
+          "constraints": "Boolean; show the walkthrough row after a turn that edited files.",
           "choices": ["true", "false"],
           "coveredBy": ["turn-summary.walkthrough-groups"]
         }
       ],
-      "states": ["no-edits", "edited", "changes-address-known", "folded", "disabled"],
+      "states": ["no-edits", "closed", "open", "changes-address-known", "disabled"],
       "failureModes": [
         "Review in Changes appears only once the Host has summarized the turn's changed files (its workspace/changes event); a turn from an older Host has no link.",
         "The link opens in the right pane of the thread on screen; in a split layout it follows the pane's mounted thread."

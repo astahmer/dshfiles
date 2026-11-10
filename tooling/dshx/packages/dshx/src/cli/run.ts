@@ -157,6 +157,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
   }
   if (argv[0] === 'checkout') return (await import('./checkout.js')).runCheckoutCli(argv.slice(1), io)
   if (argv[0] === 'scratch') return (await import('./scratch-sweep.js')).runScratchSweepCli(argv.slice(1), io)
+  if (argv[0] === 'registry') return (await import('./registry.js')).runRegistryCli(argv.slice(1), io)
   if (argv[0] === 'check' && argv[1] === 'repo') return (await import('./repository-check.js')).runRepositoryCheckCli(argv.slice(2), io)
   const addOperand = argv[0] === 'add' ? argv[1] : undefined
   if (addOperand !== undefined && !addOperand.startsWith('-') && !CliOptionMetadata.isAddTarget(addOperand))

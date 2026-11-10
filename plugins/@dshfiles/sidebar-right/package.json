@@ -31,8 +31,9 @@
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
-    "picomatch": "4.0.3",
-    "zod": "catalog:"
+    "@dshfiles/shared-runtime": "workspace:*",
+    "effect": "catalog:",
+    "picomatch": "4.0.7"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
@@ -60,7 +61,6 @@
     "@types/picomatch": "4.0.2",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "effect": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",
@@ -95,7 +95,8 @@
       ],
       "external": [
         "@deepseek-ai/dsh-client-store",
-        "@deepseek-ai/dsh-client-ui-dockkit"
+        "@deepseek-ai/dsh-client-ui-dockkit",
+        "@dshfiles/shared-runtime"
       ]
     }
   },

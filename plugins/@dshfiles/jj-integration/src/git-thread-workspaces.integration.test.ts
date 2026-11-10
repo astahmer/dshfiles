@@ -163,6 +163,37 @@ describe.skipIf(!gitAvailable)('thread workspaces in a git-only repository', () 
     expect(await threads.list(repo)).toEqual([])
   })
 
+  it('names a branch holding the thread, and removes it only when asked, keeping that branch', async () => {
+    const thread = await threads.provision(repo)
+    const tip = commit(thread.path, 'feature.txt', 'feature\n', 'feat: add feature')
+    expect(await threads.containingBookmarks({ repoRoot: repo, name: thread.name })).toEqual([])
+
+    git(repo, 'branch', 'release', tip)
+    expect(await threads.containingBookmarks({ repoRoot: repo, name: thread.name })).toEqual(['release'])
+
+    writeFileSync(join(thread.path, 'edit.txt'), 'uncommitted\n')
+    expect(await threads.containingBookmarks({ repoRoot: repo, name: thread.name })).toEqual([])
+    const dirty = await threads.discardMany({ repoRoot: repo, names: [thread.name], force: false, acceptBookmarkedWork: true })
+    expect(dirty.results.map(result => result.status)).toEqual(['has-work'])
+    rmSync(join(thread.path, 'edit.txt'))
+
+    const strict = await threads.discardMany({ repoRoot: repo, names: [thread.name], force: false })
+    expect(strict.results.map(result => result.status)).toEqual(['has-work'])
+
+    const accepted = await threads.discardMany({ repoRoot: repo, names: [thread.name], force: false, acceptBookmarkedWork: true })
+    expect(accepted.results.map(result => result.status)).toEqual(['discarded'])
+    expect(existsSync(thread.path)).toBe(false)
+    expect(git(repo, 'rev-parse', 'refs/heads/release')).toBe(tip)
+  })
+
+  it('does not count a thread branch as holding another thread', async () => {
+    const thread = await threads.provision(repo)
+    const tip = commit(thread.path, 'feature.txt', 'feature\n', 'feat: add feature')
+    git(repo, 'branch', 'dsh/thread-abc123', tip)
+    expect(await threads.containingBookmarks({ repoRoot: repo, name: thread.name })).toEqual([])
+    git(repo, 'branch', '-D', 'dsh/thread-abc123')
+  })
+
   it('checks a deleted thread folder out again on its branch, keeping its commits', async () => {
     const thread = await threads.provision(repo)
     const work = commit(thread.path, 'feature.txt', 'feature\n', 'feat: survives')

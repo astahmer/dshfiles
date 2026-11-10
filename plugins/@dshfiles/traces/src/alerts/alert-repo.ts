@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { SqliteStore } from '@dshfiles/sqlite-store'
+import { SqliteStore, type SqliteStoreMigrations } from '@dshfiles/sqlite-store'
 import { Clock, Context, Effect, Layer, Option, Schema } from 'effect'
 import { SqlClient, SqlSchema } from 'effect/sql'
 import { orDieOnStorage } from '../storage-failure.js'
@@ -45,10 +45,25 @@ const createAndSeed = Effect.gen(function* () {
   )
 })
 
+/**
+ * A long turn that ended successfully is expected here, so the seeded long-turn rule is corrected to off on a file that
+ * still carries it unedited (equal timestamps); an edited one is the user's choice and stays as it is.
+ */
+const disableSeededLongTurn = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  const correctedAt = yield* Clock.currentTimeMillis
+  yield* sql`UPDATE rules SET rule = json_set(rule, '$.enabled', json('false'), '$.updatedAt', ${correctedAt})
+    WHERE id = 'builtin-long-turn'
+      AND json_extract(rule, '$.enabled') = 1
+      AND json_extract(rule, '$.updatedAt') = json_extract(rule, '$.createdAt')`
+})
+
+export const ALERT_MIGRATIONS = { '1_rules': createAndSeed, '2_seeded_long_turn_off': disableSeededLongTurn } as const satisfies SqliteStoreMigrations
+
 /** Rules, their current state and a bounded event history, in their own file so alert changes never migrate the telemetry tables. */
 export class AlertDb extends Context.Service<AlertDb, SqlClient.SqlClient>()('@dshfiles/traces/AlertDb') {
   static readonly layerAt = (filename: string) =>
-    SqliteStore.layerAs(AlertDb, { filename, migrations: { '1_rules': createAndSeed }, legacyUserVersion: 1, pragmas: { synchronous: 'full' } })
+    SqliteStore.layerAs(AlertDb, { filename, migrations: ALERT_MIGRATIONS, legacyUserVersion: 1, pragmas: { synchronous: 'full' } })
 }
 
 export class AlertRuleNotFound extends Schema.TaggedError<AlertRuleNotFound>()('AlertRuleNotFound', { id: Schema.String }, { dshxWireCode: 'not-found' }) {

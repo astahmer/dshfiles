@@ -34,7 +34,9 @@ their next start.
   (`src/`, `*.yml`, `!test/`) as constraints, so a pattern containing one is sent
   as a non-capturing group and stays a pattern. Other patterns go bare: the
   group defeats fff's literal prefilter (3-10x slower). An invalid expression is
-  an error, not a literal search.
+  an error, not a literal search. A wildcard-only `include` (`*`, `**`, `**/*`)
+  filters nothing, so it is dropped instead of being sent as a leading `*`
+  constraint, which broke every regex pattern it accompanied.
 - `grep` returns up to 250 matches, most relevant files first (fff frecency),
   plus the total (counted up to 8 pages, then "more than N"). `glob` returns up
   to 100 paths plus the total.

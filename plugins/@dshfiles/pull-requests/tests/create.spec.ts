@@ -8,6 +8,7 @@ import { PullRequestCreator } from '../src/create.js'
 import { CreateModel } from '../src/create-model.js'
 import { GhCommandFailed, GitHubCli, type GitHubPullRequestCreate } from '../src/github-cli.js'
 import { PullRequestMonitor } from '../src/monitor.js'
+import { ProjectBase } from '../src/project-base.js'
 import type { PullRequestRecord } from '../src/pull-request-model.js'
 import { ThreadContext, type ThreadCompletion } from '../src/thread-context.js'
 
@@ -157,14 +158,22 @@ const fakeMonitor = (links: { kind: 'watch' | 'link'; url: string; sessionId: st
     }),
   )
 
-const harness = (options: { jj?: JjScript; gh?: GhScript; answer?: string } = {}) => {
+const harness = (options: { jj?: JjScript; gh?: GhScript; answer?: string; projectBase?: string } = {}) => {
   const jjCalls: string[][] = []
   const created: GitHubPullRequestCreate[] = []
   const completions: ThreadCompletion[] = []
   const links: { kind: 'watch' | 'link'; url: string; sessionId: string }[] = []
   const layer = PullRequestCreator.layer.pipe(
     Layer.provide(
-      Layer.mergeAll(fakeJj(options.jj ?? {}, jjCalls), fakeGh(options.gh ?? {}, created), fakeThread(completions, options.answer), fakeMonitor(links)),
+      Layer.mergeAll(
+        fakeJj(options.jj ?? {}, jjCalls),
+        fakeGh(options.gh ?? {}, created),
+        fakeThread(completions, options.answer),
+        fakeMonitor(links),
+        options.projectBase === undefined
+          ? ProjectBase.none
+          : Layer.succeed(ProjectBase, ProjectBase.of({ chosenFor: () => Effect.succeed(options.projectBase) })),
+      ),
     ),
   )
   return { layer, jjCalls, created, completions, links }
@@ -173,6 +182,15 @@ const harness = (options: { jj?: JjScript; gh?: GhScript; answer?: string } = {}
 const confirmed = { confirm: true as const, title: 'Add sprockets', body: 'Body', bookmark: 'dsh/widget-sprockets', base: 'main', headCommitId: HEAD }
 
 describe('pull request creation', () => {
+  it.effect('targets the project main branch when the project chose one, instead of the GitHub default branch', () => {
+    const run = harness({ projectBase: 'develop' })
+    return Effect.gen(function* () {
+      const preview = yield* PullRequestCreator.use(creator => creator.preview({}, caller))
+      expect(preview.base).toBe('develop')
+      expect(run.jjCalls.some(args => args.includes('present("develop"@"origin")'))).toBe(true)
+    }).pipe(Effect.provide(run.layer))
+  })
+
   it.effect('previews the commits, bookmark and a model-drafted title and body without writing', () => {
     const run = harness()
     return Effect.gen(function* () {

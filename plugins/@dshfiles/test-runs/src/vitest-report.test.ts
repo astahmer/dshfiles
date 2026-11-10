@@ -78,6 +78,23 @@ describe('VitestReport.parse', () => {
     expect(run && VitestReport.summaryLabel(run)).toBe('1 test file failed · 20 passed')
   })
 
+  it('matches every failing block of a long failing file to its own test', () => {
+    const count = 50
+    const lines = [' RUN  v4.1.11 /repo/shop', '']
+    for (let at = 0; at < count; at++) lines.push(` × src/mega.test.ts > suite > case ${at} ${at + 1}ms`)
+    lines.push('', `⎯⎯⎯⎯ Failed Tests ${count} ⎯⎯⎯⎯`, '')
+    for (let at = 0; at < count; at++) {
+      lines.push(` FAIL  src/mega.test.ts > suite > case ${at}`, `AssertionError: expected ${at} to equal 0`, '', '⎯⎯⎯⎯', '')
+    }
+    lines.push(' Test Files  1 failed (1)', `      Tests  ${count} failed (${count})`, '   Duration  4.32s')
+
+    const file = VitestReport.parse(lines.join('\n'))?.files[0]
+    expect(file?.tests).toHaveLength(count)
+    expect(file?.tests.map(test => [test.title, test.durationMs, test.failure?.message])).toEqual(
+      Array.from({ length: count }, (_unused, at) => [`case ${at}`, at + 1, `expected ${at} to equal 0`]),
+    )
+  })
+
   it('leaves output that carries no Vitest summary to the native card', () => {
     expect(VitestReport.parse('total 0\ndrwxr-xr-x  2 me  staff  64 Oct 19 .\n[exit code: 0]')).toBeUndefined()
   })

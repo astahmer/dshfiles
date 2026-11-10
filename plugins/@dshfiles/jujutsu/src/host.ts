@@ -56,7 +56,8 @@ const jujutsuHandlers = Api.handlers(jujutsuApi, {
     ),
   load: input => RevisionReader.use(reader => reader.load(input)).pipe(asReadFailure('Could not load this repository.')),
   graphPage: input => RevisionReader.use(reader => reader.graphPage(input)).pipe(asReadFailure('Could not read the next revision graph page.')),
-  graphNavigation: input => RevisionReader.use(reader => reader.graphNavigation(input.repoId)).pipe(asReadFailure('Could not resolve graph landmarks.')),
+  graphNavigation: input =>
+    RevisionReader.use(reader => reader.graphNavigation(input.repoId, input.bookmark)).pipe(asReadFailure('Could not resolve graph landmarks.')),
   revisionRelationship: input => RevisionReader.use(reader => reader.relationship(input)).pipe(asReadFailure('Could not compare revisions.')),
   graphSlice: input => RevisionReader.use(reader => reader.slice(input)).pipe(asReadFailure('Could not read revision history.')),
   referenceGraph: input => RevisionReader.use(reader => reader.referenceGraph(input)).pipe(asReadFailure('Could not read a graph around that reference.')),

@@ -33,6 +33,7 @@ import type { AccountStorePromise } from './account-store-promise.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
 import { ModelCurationModel } from './model-curation-model.js'
 import { readAccountUsage } from './account-usage.js'
+import { ProviderUsageModel } from './usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { createUsageHistoryService } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
@@ -447,9 +448,9 @@ const readQuotaResetAt = async (ctx: Context, store: AccountStorePromise, accoun
  * than the panel.
  */
 const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signal?: AbortSignal): Promise<AccountsUsage> => {
-  // Read the observed file so a Codex account uses the same shadow home the
-  // panel already shows, not a re-derived guess.
-  const file = await accountsFile(ctx, store)
+  // A usage read needs stored fields only, so the sweep skips the panel's observation pass, whose per-account
+  // home and credential reads fill in fields a card never shows.
+  const file = await store.readAccountFile()
   const resolveCredential = resolveKeyFromContext(ctx)
   const readCopilotCredential = createCopilotCredentialsService(ctx.get('credentials')).read
   const cards = await mapRolling({
@@ -457,10 +458,13 @@ const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signa
     concurrency: ACCOUNT_USAGE_READ_CONCURRENCY,
     map: async account => ({
       instanceId: account.instanceId,
-      displayName: account.displayName,
+      displayName: AccountProfilesModel.displayNameOf(account),
       kind: account.kind,
       enabled: account.enabled,
-      usage: await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential, readCopilotCredential, signal }),
+      usage: ProviderUsageModel.stamped(
+        await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential, readCopilotCredential, signal }),
+        Date.now(),
+      ),
     }),
   })
   return { readAt: Date.now(), hostName: hostname(), cards }

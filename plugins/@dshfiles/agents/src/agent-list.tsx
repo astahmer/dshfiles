@@ -13,7 +13,7 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { CopyIcon, EllipsisIcon, SendIcon, TrashIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState } from 'react'
+import { memo, useState } from 'react'
 
 import type { AgentTemplate } from './agent-editor.js'
 import type { Agent } from './agent.js'
@@ -50,7 +50,7 @@ const matches = (agent: Agent, query: string): boolean => {
 const plural = (count: number, word: string): string => `${String(count)} ${word}${count === 1 ? '' : 's'}`
 
 /** The registry as rows: glyph, name, handle, model and thread count, with the enable switch and a row menu. */
-export const AgentList = (props: {
+const AgentListRows = (props: {
   readonly agents: readonly Agent[]
   readonly selected: string | null
   readonly loading: boolean
@@ -120,6 +120,9 @@ export const AgentList = (props: {
     </div>
   )
 }
+
+/** Memoized: an editor keystroke changes the panel's state, not this list, so the rows skip the re-render. */
+export const AgentList = memo(AgentListRows)
 
 /** Starting points for a new agent, as one list; picking one opens an unsaved draft. */
 export const AgentTemplates = (props: { readonly templates: readonly AgentTemplate[]; readonly onPick: (template: AgentTemplate) => void }): JSX.Element => (

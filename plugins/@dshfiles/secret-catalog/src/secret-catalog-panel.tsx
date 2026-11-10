@@ -327,7 +327,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
         >
           <section aria-label={t('catalogFilters')} className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
             <Select disabled value={displayedMachineName}>
-              <SelectTrigger aria-label={t('machine')} className="dshx:w-56 dshx:@max-pane-narrow:w-full" title={t('machineSelectorHint')}>
+              <SelectTrigger aria-label={t('machineSelectorHint')} className="dshx:w-56 dshx:@max-pane-narrow:w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

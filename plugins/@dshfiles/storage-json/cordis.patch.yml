@@ -1,0 +1,14 @@
+# Replaces the stock JSON backend row with this fork: the backend gains
+# synchronous per-record reads so the owned storage-domain fork can hydrate one
+# record at a time instead of `loadAll` over the whole unit. The native row is
+# disabled, never patched in place — DSH core stays untouched.
+#
+# A patch replaces a row's whole `config`, so the inserted row restates the
+# value the base composition ships (`storage-json.root`). Keep the two in sync.
+- id: storage-json
+  disabled: true
+- insert:
+    - id: dshfiles-storage-json
+      name: '@dshfiles/storage-json'
+      config:
+        root: !!js dshHomePath('storages')

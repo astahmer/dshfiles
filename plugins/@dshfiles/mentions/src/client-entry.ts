@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type { InputTriggerCandidate, InputTriggerCrumb, InputTriggerSource } from '@dshfiles/input-trigger/client'
+import type { InputTriggerCandidate, InputTriggerCrumb, InputTriggerSource, RestoredReference } from '@dshfiles/input-trigger/client'
 import { EntityKinds, EntityRegistryModel } from '@dshfiles/input-trigger/entity-registry'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
@@ -296,6 +296,29 @@ export default defineClient({
       codec: {
         clipboardText: ref => ref,
         serialize: ref => Promise.resolve(ref),
+      },
+      restore(_session, text) {
+        const mentions: RestoredReference[] = [
+          ...SessionLinks.matches(text).map((match): RestoredReference => ({
+            source: SOURCE_NAME,
+            ref: match.mention,
+            label: match.label,
+            appearance: 'session' as const,
+            clipboardText: match.mention,
+            start: match.start,
+            end: match.end,
+          })),
+          ...FileMentions.matches(text).map((match): RestoredReference => ({
+            source: SOURCE_NAME,
+            ref: match.mention,
+            label: match.kind === 'directory' ? `${match.path}` : match.path,
+            appearance: match.kind === 'directory' ? 'folder' : 'file',
+            clipboardText: match.mention,
+            start: match.start,
+            end: match.end,
+          })),
+        ]
+        return mentions.sort((left, right) => left.start - right.start)
       },
     }
 

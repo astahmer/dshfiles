@@ -15,7 +15,7 @@ const scenarioIdSchema = Schema.String.check(Schema.isPattern(idPattern))
 export const DshxFeatureSurfaceSchema = Schema.Literals(['client', 'host', 'tool', 'command', 'api', 'settings', 'storage', 'integration'])
 
 /**
- * The presentation contract kind a feature contributes in the unified ADE shell (plans/ade-ux §5): where the shell
+ * The presentation contract kind a feature contributes in the unified ADE shell (docs/ade-ux §5): where the shell
  * puts it, independent of the runtime `surfaces` that implement it. `agentToolOnly` is a capability with no UI of
  * its own beyond the agent tool; `infrastructure` is plumbing the user never addresses directly.
  */
@@ -39,7 +39,7 @@ export const DshxPresentationSurfaceSchema = Schema.Literals(DSHX_PRESENTATION_S
 export type DshxPresentationSurface = (typeof DSHX_PRESENTATION_SURFACES)[number]
 
 /**
- * The shell region a feature lands in (plans/ade-ux §4.2 rail destinations, plus the thread panel, composer and
+ * The shell region a feature lands in (docs/ade-ux §4.2 rail destinations, plus the thread panel, composer and
  * transcript that belong to the active thread). `none` is for features with no place of their own: agent-tool-only
  * capabilities, infrastructure, palette-only commands and status-strip items.
  */

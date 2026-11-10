@@ -188,7 +188,7 @@ Given('the isolated AI Accounts profile with the status strip is booted', async 
 
 Given('the isolated AI Accounts and thread account controller profile is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
-    // Quota lives in frame-layout's status strip (plans/ade-ux §4.1 R5); without the frame there is no usage strip.
+    // Quota lives in frame-layout's status strip (docs/ade-ux §4.1 R5); without the frame there is no usage strip.
     packageIds: ['@dshfiles/ai-accounts', '@dshfiles/session-controller', '@dshfiles/frame-layout'],
     profileLabel: 'ai-accounts-thread-account-controller',
     seedHome: seedAiAccountsWorkspace,
@@ -1982,6 +1982,38 @@ Then('quota recovery and explicit hiding preserve saved account identity and ord
   })
   await finishJourneyAssertions(page)
 })
+
+Then('a failed quota refresh keeps the last reading, says why and its Retry recovers it', async ({ page }: { page: Page }) => {
+  await stripMeter(page).click()
+  const card = quotaAccountCard(page, 'Command Code 1')
+  await expect(card.getByRole('progressbar')).toHaveCount(2)
+  await expect(card).toContainText(/Updated (just now|\d+m ago)/u)
+  const failing = setFakeQuotaStatus(page, unavailableAccountKey, 503)
+  await usagePopover(page).getByRole('button', { name: 'Refresh usage', exact: true }).click()
+  await expect.poll(() => fakeQuotaReads(page, unavailableAccountKey)).toBeGreaterThan(failing)
+  await recordAssertion(page, 'ai-accounts-usage-refresh-failure-keeps-reading', async () => {
+    await expect(card).toContainText('Command Code returned 503 for billing.')
+    await expect(card).toContainText('Last good reading')
+    await expect(card.getByRole('progressbar')).toHaveCount(2)
+    await expect(quotaAccountCard(page, 'Command Code 2')).toContainText(/Updated (just now|\d+m ago)/u)
+  })
+  await usagePopover(page)
+    .locator('article header > span:last-of-type')
+    .evaluateAll(elements => {
+      for (const element of elements) element.textContent = 'scratch-host'
+    })
+  await page.screenshot({ path: test.info().outputPath('usage-refresh-failure.png') })
+  const recovering = setFakeQuotaStatus(page, unavailableAccountKey, 200)
+  await card.getByRole('button', { name: 'Retry', exact: true }).click()
+  await expect.poll(() => fakeQuotaReads(page, unavailableAccountKey)).toBeGreaterThan(recovering)
+  await recordAssertion(page, 'ai-accounts-usage-refresh-retry-recovers', async () => {
+    await expect(card).not.toContainText('Command Code returned 503 for billing.')
+    await expect(card).toContainText('Updated just now')
+    await expect(card.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 const usageCardTop = async (page: Page, name: string): Promise<number> =>
   (
     await usagePopover(page)

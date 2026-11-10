@@ -15,6 +15,7 @@ import {
   type GraphSliceMode,
   type GraphSliceRequest,
 } from './graph-navigation-machine.js'
+import { ProjectBookmarkRequest } from './project-bookmark-request.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME } from './repository-query-cache.js'
 
 interface GraphNavigationInput {
@@ -22,6 +23,8 @@ interface GraphNavigationInput {
   readonly root: string
   readonly refreshedAt: number
   readonly onScreen: boolean
+  /** The project's main branch (Settings › Projects), named by the main landmarks. */
+  readonly bookmark: string
   readonly selected: Pick<Revision, 'commitId' | 'changeId'> | undefined
   readonly comparison: Pick<Revision, 'commitId' | 'changeId'> | undefined
   readonly revisions: readonly Revision[]
@@ -58,8 +61,12 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
       repoId: input.repoId,
       refreshedAt: input.refreshedAt,
       onScreen: input.onScreen,
+      bookmark: input.bookmark,
       read: async (repoId, signal) => {
-        const result = await api.graphNavigation({ repoId }, { signal })
+        const result = await ProjectBookmarkRequest.withProjectBookmark({
+          bookmark: input.bookmark,
+          read: bookmark => api.graphNavigation(bookmark === undefined ? { repoId } : { repoId, bookmark }, { signal }),
+        })
         if ('failure' in result) throw new Error(result.failure.message)
         return result
       },

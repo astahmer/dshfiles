@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
-import { useApiQuery, useSettings } from '@dshfiles/dshx/client'
+import { useApiQuery, useResource, useSettings } from '@dshfiles/dshx/client'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { aiAccountsFastModeApi } from '@dshfiles/ai-accounts/model-fast-mode-api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -50,7 +50,9 @@ const nameWidthShortfall = (list: HTMLElement): number | undefined => {
 const MOD_KEY = typeof navigator !== 'undefined' && /mac|iphone|ipad/iu.test(navigator.userAgent) ? '⌘' : 'Ctrl'
 
 const FastModeIndicator = ({ sessionId, provider, model, enabledOverride }: FastModeRoute & { readonly enabledOverride: boolean | undefined }) => {
-  const state = useApiQuery(aiAccountsFastModeApi, 'status', { input: { sessionId, provider, model } })
+  // Every picker showing this Session mounts its indicator within the same landing; the page-wide resource reads the
+  // route once for all of them (5 s covers the later mounts, a toggle shows through `enabledOverride` meanwhile).
+  const state = useResource(aiAccountsFastModeApi, 'status', { sessionId, provider, model }, { staleTime: 5_000 })
   if (enabledOverride ?? state.data?.enabled ?? false)
     return <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-warning" data-model-fast-mode-enabled />
   return <SparklesIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
@@ -86,8 +88,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
         Number(left.group.id === state.current?.provider && left.model.id === state.current.model),
     )
   }, [filteredGroups, state.current])
-  const usage = useApiQuery(aiAccountsApi, 'usage')
-  const profiles = useApiQuery(aiAccountsApi, 'read')
+  // Only the open menu shows account labels and quotas; reading them on mount cost two requests per thread switch.
+  const usage = useApiQuery(aiAccountsApi, 'usage', { enabled: open })
+  const profiles = useApiQuery(aiAccountsApi, 'read', { enabled: open })
   const providerLabels = useMemo(
     () => new Map((profiles.data?.accounts ?? []).map(profile => [profile.instanceId, PROVIDER_LABEL[profile.kind]])),
     [profiles.data],
@@ -253,6 +256,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             align="start"
             className="dshx-root dshx:w-[min(50rem,calc(100vw-1rem))] dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:shadow-none"
             style={popoverWidth === null ? undefined : { width: popoverWidth }}
+            onOpenAutoFocus={event => {
+              event.preventDefault()
+              searchInputRef.current?.focus()
+            }}
             onEscapeKeyDown={(event: KeyboardEvent) => {
               if (!narrowDetails || !window.matchMedia('(max-width: 43rem)').matches) return
               event.preventDefault()
@@ -287,7 +294,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   <Input
                     aria-label="Search models and accounts"
                     autoComplete="off"
-                    autoFocus
                     className="dshx:h-7 dshx:rounded-lg dshx:border-border dshx:bg-muted/40 dshx:pl-7 dshx:pr-11 dshx:text-[11px] dshx:focus-visible:ring-1 dshx:focus-visible:ring-info/60"
                     onChange={event => setQuery(event.currentTarget.value)}
                     onKeyDown={event => {

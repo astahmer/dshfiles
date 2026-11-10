@@ -24,6 +24,10 @@ The rules that keep the list honest:
   lightbox, a draft composer) is not agent-actionable; it is listed under
   _Presentation-only_ rather than proposed as a tool.
 
+## Combined revision review
+
+Selecting revisions in the graph and choosing **Review together** is presentation state over one read, so the capability is `pulls_review_revisions` (pulls-review, read-only): each revision with its own files, ancestors first, with gaps and unresolved ids named. The selection itself and which panel opens are not tools. `jj_details` reads one revision's patch, and `changes_mark_viewed` writes a combined review's marks with the range `<commit>-` to `<commit>`.
+
 ## Thread-local account handoff (DSH0.2.1-rc.2)
 
 The sidebar **Use this account for this thread** action shares its Host implementation with `ai_accounts_preview_thread_switch` (read-only) and `ai_accounts_switch_thread` (user-requested write). The preview names the exact supported target and selection revision; switch does not send a message, resume stopped work, compact history, save global defaults or reorder accounts. Agents can act only on their own thread. Reopening the menu and choosing another account reverses the account choice after a new review.
@@ -37,7 +41,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 
 | Owner                                                                                                       | Capabilities audited | Agent tools today                                                                                                                                                                                                                                                                                                                                                    | Missing tools | Host gaps                                |
 | ----------------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ---------------------------------------- |
-| thread-sidebar                                                                                              | 44                   | 23 (new)                                                                                                                                                                                                                                                                                                                                                             | 12            | 5                                        |
+| thread-sidebar                                                                                              | 44                   | 26 (23 thread/project actions, plus `thread_subscribe`, `thread_unsubscribe`, `thread_subscriptions`)                                                                                                                                                                                                                                                                | 12            | 5                                        |
 | main-tabs                                                                                                   | 8                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 2             | 2                                        |
 | command-palette                                                                                             | 11                   | 0                                                                                                                                                                                                                                                                                                                                                                    | 5             | 3                                        |
 | mentions                                                                                                    | 8                    | 1 (`skill`)                                                                                                                                                                                                                                                                                                                                                          | 1             | 0                                        |
@@ -46,7 +50,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | jj-integration                                                                                              | 23                   | 10                                                                                                                                                                                                                                                                                                                                                                   | 5             | 3                                        |
 | jujutsu                                                                                                     | 30                   | 13                                                                                                                                                                                                                                                                                                                                                                   | 0             | 3                                        |
 | project-checks                                                                                              | 8                    | 4                                                                                                                                                                                                                                                                                                                                                                    | 1             | 2                                        |
-| workspace-folder-picker (incl. its picker component)                                                             | 9                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 4             | 2                                        |
+| workspace-folder-picker (incl. its picker component)                                                        | 9                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 4             | 2                                        |
 | workbench                                                                                                   | 8                    | 0                                                                                                                                                                                                                                                                                                                                                                    | 2             | 6                                        |
 | agent-communication                                                                                         | 10                   | 14                                                                                                                                                                                                                                                                                                                                                                   | 0             | 0                                        |
 | agent-questions                                                                                             | 12                   | 11                                                                                                                                                                                                                                                                                                                                                                   | 0             | 1                                        |
@@ -174,6 +178,9 @@ takes an explicit `apply` (false previews) and never forces a discard.
 `jj_thread_cleanup_jobs` reads the background trail the dialog's confirmation
 now starts (state, phase, counts, the workspace in flight, the newest result),
 so the agent can follow the same asynchronous pass the user watches.
+Settings › Projects › **Main branch** pairs `jj_project_bookmark` (read-only:
+the branch and the layer that chose it) with `jj_set_project_bookmark` (write;
+`bookmark: null` reverses it to Automatic).
 
 Deliberately not bound, because an existing tool already covers the decision or
 there is no model decision to make: `land` and `threadAt` (both accept an
@@ -284,8 +291,9 @@ fnm, checkout, install, build, CLI, profile and headless runtime; `dryRun` plans
 `confirm: 'next'` runs one step per call and `confirm: 'all'` runs the named
 steps), `multi_host_runtime_status`, `multi_host_runtime_control` (start/stop; a
 stop refuses a pid whose command is not that machine's DSH web),
-`multi_host_runtime_logs` and `multi_host_checkout_sync` (`apply: false` only
-reports the fetch and rebase commands). Provisioning never installs fnm itself:
+`multi_host_runtime_logs` and `multi_host_checkout_sync` (the Hosts page's Sync
+checkout; `apply: false` fetches and reports without changing files, and it never
+pushes). Provisioning never installs fnm itself:
 that is the machine's own setup, reported as a blocked step.
 
 The remote inventory adds no user verb: it renders the `sessions` that
@@ -299,7 +307,7 @@ Deliberately untooled, pinned by a test:
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `runtimeCall`                          | Speaks native RPC on the remote Host; an Agent uses the specific verbs instead                       |
 | `runtimePluginCall`                    | Reaches arbitrary allowlisted remote plugin methods — the same escape hatch                          |
-| `runtimePeerRead`                      | Plugin-to-plugin transport for the backlog's peer reads; `backlog_peer_*` tools are the agent verbs |
+| `runtimePeerRead`                      | Plugin-to-plugin transport for the backlog's peer reads; `backlog_peer_*` tools are the agent verbs  |
 | `runtimePing`                          | `multi_host_status` already reports connection state; ping is the chip menu's latency probe          |
 | `runtimeOpenView` / `runtimeCloseView` | Client presentation: a launch URL and its lease                                                      |
 | `listDirectory` / `createDirectory`    | The local runtime's own folder verbs; `multi_host_browse` / `multi_host_mkdir` cover the remote case |
@@ -564,23 +572,23 @@ lists waiting requests, and `secret_remove_alias` (explicit `confirm: true`) is
 its reverse path. Answering a request stays user-only: the value must not pass
 through the model.
 
-| Proposed tool                                                  | Owner                                                                                                    | Backing verb                                                                                                                                                                            |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `settings_document_path` / `settings_open_document`            | settings-shell                                                                                           | `settings.openSettingsDocument`, `settings-shell.documentPath`, `session.openWorkspacePath`                                                                                             |
-| `settings_shell_upstream`                                      | settings-shell                                                                                           | `settings-shell.upstream`                                                                                                                                                               |
-| `marketplace_search_plugins`                                   | plugin-marketplace                                                                                       | `plugin-marketplace.list`                                                                                                                                                               |
-| ~~`mcp_list_servers` / `mcp_refresh_servers`~~                 | mcp-servers                                                                                              | Bound: `mcp-servers.list`, `mcp-servers.refresh`                                                                                                                                        |
-| ~~`mcp_search_registry`~~                                      | mcp-servers                                                                                              | Bound: `mcp-servers.searchRegistry`                                                                                                                                                     |
-| ~~`mcp_save_server` / `mcp_remove_server`~~                    | mcp-servers                                                                                              | Bound: `mcp-servers.save`, `mcp-servers.remove`                                                                                                                                         |
-| ~~`mcp_set_server_enabled` / `mcp_set_connection`~~            | mcp-servers                                                                                              | Bound: `mcp-servers.setEnabled`, `mcp-servers.setConnection`                                                                                                                            |
-| `mcp_authorize_server`                                         | mcp-servers                                                                                              | `mcp-servers.authorize` — deliberately unbound: it needs the browser origin for its redirect and a human consent step                                                                   |
-| ~~`mcp_sign_out_server`~~                                      | mcp-servers                                                                                              | Bound: `mcp-servers.signOut`                                                                                                                                                            |
-| ~~`mcp_set_preferences`~~                                      | mcp-servers                                                                                              | Bound: `mcp-servers.setPreferences`                                                                                                                                                     |
-| `secret_copy` / `secret_create`                                | secret-catalog                                                                                           | `secret-catalog.copy`, `create` (a written plaintext must stay on the Host)                                                                                                             |
-| `secret_update` / ~~`secret_remove_alias`~~ / `secret_delete_item` | secret-catalog                                                                                       | `secret-catalog.update`, `deleteItem` (vault deletion is irreversible); `secret_remove_alias` bound with `confirm: true`                                                               |
-| `secret_machine`                                               | secret-catalog                                                                                           | `secret-catalog.machine`                                                                                                                                                                |
-| `secret_import_credential`                                     | secret-catalog                                                                                           | `secretCatalogCredentials.listKeys/importKey` + `credentials.set`                                                                                                                       |
-| ~~`settings_update` (per-plugin namespaces)~~                  | plugin-marketplace, secret-catalog, privacy-controls, ai-accounts, home, main-tabs, tool-meta, workbench | Retired: `settings_set` / `settings_unset` write any namespace (`dshx-plugin-marketplace`, `secret-catalog`, `ai-accounts`, `dshfiles-home`, `dshfiles-main-tabs`, `thread-sidebar`, …) |
+| Proposed tool                                                      | Owner                                                                                                    | Backing verb                                                                                                                                                                            |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings_document_path` / `settings_open_document`                | settings-shell                                                                                           | `settings.openSettingsDocument`, `settings-shell.documentPath`, `session.openWorkspacePath`                                                                                             |
+| `settings_shell_upstream`                                          | settings-shell                                                                                           | `settings-shell.upstream`                                                                                                                                                               |
+| `marketplace_search_plugins`                                       | plugin-marketplace                                                                                       | `plugin-marketplace.list`                                                                                                                                                               |
+| ~~`mcp_list_servers` / `mcp_refresh_servers`~~                     | mcp-servers                                                                                              | Bound: `mcp-servers.list`, `mcp-servers.refresh`                                                                                                                                        |
+| ~~`mcp_search_registry`~~                                          | mcp-servers                                                                                              | Bound: `mcp-servers.searchRegistry`                                                                                                                                                     |
+| ~~`mcp_save_server` / `mcp_remove_server`~~                        | mcp-servers                                                                                              | Bound: `mcp-servers.save`, `mcp-servers.remove`                                                                                                                                         |
+| ~~`mcp_set_server_enabled` / `mcp_set_connection`~~                | mcp-servers                                                                                              | Bound: `mcp-servers.setEnabled`, `mcp-servers.setConnection`                                                                                                                            |
+| `mcp_authorize_server`                                             | mcp-servers                                                                                              | `mcp-servers.authorize` — deliberately unbound: it needs the browser origin for its redirect and a human consent step                                                                   |
+| ~~`mcp_sign_out_server`~~                                          | mcp-servers                                                                                              | Bound: `mcp-servers.signOut`                                                                                                                                                            |
+| ~~`mcp_set_preferences`~~                                          | mcp-servers                                                                                              | Bound: `mcp-servers.setPreferences`                                                                                                                                                     |
+| `secret_copy` / `secret_create`                                    | secret-catalog                                                                                           | `secret-catalog.copy`, `create` (a written plaintext must stay on the Host)                                                                                                             |
+| `secret_update` / ~~`secret_remove_alias`~~ / `secret_delete_item` | secret-catalog                                                                                           | `secret-catalog.update`, `deleteItem` (vault deletion is irreversible); `secret_remove_alias` bound with `confirm: true`                                                                |
+| `secret_machine`                                                   | secret-catalog                                                                                           | `secret-catalog.machine`                                                                                                                                                                |
+| `secret_import_credential`                                         | secret-catalog                                                                                           | `secretCatalogCredentials.listKeys/importKey` + `credentials.set`                                                                                                                       |
+| ~~`settings_update` (per-plugin namespaces)~~                      | plugin-marketplace, secret-catalog, privacy-controls, ai-accounts, home, main-tabs, tool-meta, workbench | Retired: `settings_set` / `settings_unset` write any namespace (`dshx-plugin-marketplace`, `secret-catalog`, `ai-accounts`, `dshfiles-home`, `dshfiles-main-tabs`, `thread-sidebar`, …) |
 
 Already callable here: `secret_list`, `secret_get`, and a connected server's own
 `mcp__<serverName>__*` tools.
@@ -689,7 +697,7 @@ packages enforce them:
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Depth                  | A root is depth 0; its children are depth 1. With `maxDepth: 1` (the default) a child cannot call `subagent` or `subagent_fork`: the call fails with `subagent depth 2 exceeds maxDepth 1`. The runtime context states the current and maximum depth each turn.             | `subagents` service `maxDepth`; per tool row `maxDepth` or `provider-managed` |
 | Active children        | At most `maxActiveSubagents` (default 8) running children per parent. The next start fails with `ACTIVATION_LIMIT_REACHED`; wait for a child to finish, or do the work yourself.                                                                                            | `subagents` service `maxActiveSubagents`                                      |
-| `send_message` target  | Only your direct, continuable child, or your direct parent when you are a resident child. Your own id, a sibling, a grandchild or an unrelated thread is refused; `interrupt_agent` alone reaches deeper descendants.                                                       | Native `dsh-tool-subagent-control`                                            |
+| `send_message` target  | Only your direct, continuable child, or your direct parent when you are a resident child. Your own id, a sibling, a grandchild, a thread you started with `thread_create` / `thread_fork`, or an unrelated thread is refused with `subagent "<id>" belongs to another parent session`; that text names no alternative (host-gap row 100), and `interrupt_agent` alone reaches deeper descendants. | Native `dsh-tool-subagent-control`                                            |
 | Parent questions       | `ask_parent_question` goes to the direct parent only, and only that parent may answer it (`answer_parent_question`): another Session gets "Only the direct parent can answer this question." A parent that needs a human asks with `ask_user_question` first, then answers. | `@dshfiles/agent-questions`                                                   |
 | Agent delegation rules | A configured Agent's `delegation.messaging` (`any`, `listed`, `none`) limits whom `dshx_comm_send` and topic posts may reach; `delegation.subagents: false` refuses its `subagent` calls.                                                                                   | `@dshfiles/agents` contract, enforced in `@dshfiles/agent-communication`      |
 
@@ -698,11 +706,19 @@ Pick the channel by relationship, not by habit:
 - **Your parent or your child**: native `send_message`, and the child's final
   result. The child is woken or steered by it; the parent is notified when a
   child finishes, so it never needs to poll `list_agents`.
+- **A thread you started with `thread_create` or `thread_fork`**: it is a root
+  thread, not your child, so `send_message` refuses it. Use `thread_prompt`
+  (`mode: 'queue'` for its next turn, `mode: 'steer'` into a live one) — the
+  plugin tool whose description names it as the follow-up verb — or
+  `dshx_comm_send` for a passive note. To end your turn and still be told when
+  it finishes, `thread_subscribe { sessionId }` first; nothing wakes you
+  otherwise, and `thread_unsubscribe` stops it.
 - **Any other live thread**: `dshx_comm_agents` once to find its Session id,
   then `dshx_comm_send`. Delivery is passive: the recipient sees an unread count
   at its next prompt and reads it with `dshx_comm_inbox`; nothing starts or
   resumes its turn. Do not expect an answer within your turn; end it, or ask the
-  user to relay.
+  user to relay. `thread_prompt` fits the same case when the thread should run
+  rather than merely be told.
 - **A decision you cannot make**: `ask_parent_question` as a child,
   `ask_user_question` as a root.
 
@@ -722,7 +738,7 @@ whose methods carry `tool:` bindings:
 `thread_unsettle`, `thread_pin`, `thread_unpin`, `thread_rename`, `thread_fork`,
 `thread_create`, `thread_stop`, `thread_select_model`, `project_list`,
 `project_register`, `project_rename`, `project_delete`, `project_reorder`,
-`thread_move`.
+`thread_move`, `thread_subscribe`, `thread_unsubscribe`, `thread_subscriptions`.
 
 Semantics worth knowing:
 
@@ -736,6 +752,20 @@ Semantics worth knowing:
   refused with the active families (turn, job, subagent, schedule) named; only
   `stopActivity: true`, which the description ties to an explicit user request,
   stops that work first — the sidebar's own stop-and-archive confirmation.
+- `thread_subscribe` is the only thing that wakes a thread on another thread's
+  completion (b:eqtb). The subscription defaults the subscriber to the calling
+  thread, is durable Host state in the `thread_subscriptions` domain, and makes
+  the target's `turn/end` queue ONE compact notice into the subscriber — status
+  (`finished`, `failed`, `blocked`, `stopped`, `truncated`, or
+  `waiting-on-question`) plus a 320-character answer preview, never the
+  transcript — through session-controller's `sessions.message` with
+  `wake: true`. Without an edge nothing is delivered, so a thread started with
+  `thread_create`/`thread_fork` stays silent. A thread cannot watch itself, a
+  pair cannot watch itself in both directions (they would wake each other), and
+  an archived subscriber or target ends the edge. `thread_subscriptions` is the
+  read tool, defaulted to the calling thread's edges; the same state is the
+  **Notify “…” when this thread finishes** checkbox in a row's context menu and
+  the `N notified` badge on a row that has subscribers.
 - Every write tool's description ends with "call only when the user asked".
 - These are Host-side tools: the running DSH keeps the old Host until the user
   restarts, so they appear only after a restart.

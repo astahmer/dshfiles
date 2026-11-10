@@ -1,7 +1,7 @@
 import { Context, Effect, FileSystem, Layer, Option, Path, type PlatformError } from 'effect'
 import { GitFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
 import { Git, type GitCommandFailed, type GitRunFailed } from '@dshfiles/git-cli'
-import { JjSettings } from './jj-settings.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepoLocks } from './repo-locks.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadMetadata, type RebaseMetadataEntry } from './thread-metadata.js'
@@ -96,7 +96,7 @@ const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const locks = yield* RepoLocks
-  const settings = yield* JjSettings
+  const projectBookmarks = yield* ProjectBookmarks
   const metadata = yield* ThreadMetadata
 
   /** The path with symlinks resolved, as git reports worktree paths; a missing tail keeps its resolved parent. */
@@ -109,7 +109,15 @@ const make = Effect.gen(function* () {
     )
   // Compared with git's worktree paths, which git always reports with symlinks resolved.
   const threadsDirectory = (repoRoot: string) => Effect.flatMap(metadata.threadsDirectory(repoRoot), canonical)
-  const bookmark = Effect.map(settings.get, current => current.bookmark)
+  /** The main branch of the repository owning `target`, which may be one of its thread worktrees. */
+  const bookmarkAt = (target: string) =>
+    Effect.flatMap(
+      locate(target).pipe(
+        Effect.map(location => location.repoRoot),
+        Effect.orElseSucceed(() => target),
+      ),
+      projectBookmarks.bookmarkFor,
+    )
   const exists = (target: string) => fileSystem.exists(target).pipe(Effect.orElseSucceed(() => false))
   const filesFailed = (detail: string) => (cause: PlatformError.PlatformError) => new WorkspaceFilesFailed({ detail, cause })
   const gitFailed = (detail: string) => new GitFailed({ detail })
@@ -149,9 +157,9 @@ const make = Effect.gen(function* () {
 
   /** The ref the target bookmark names: the local branch, else `origin/<name>`, else the name as written. */
   const targetRef = Effect.fnUntraced(function* (cwd: string, name?: string) {
-    const target = name ?? (yield* bookmark)
+    const target = name ?? (yield* bookmarkAt(cwd))
     if (isObjectId(target)) return target
-    const recovery = 'Set the bookmark in Settings › Workspaces to an existing branch, or fetch it, then retry.'
+    const recovery = 'Choose an existing branch as the project’s main branch in Settings › Projects, or fetch it, then retry.'
     if (target.length === 0 || target.startsWith('-') || (yield* run(['check-ref-format', '--branch', target], cwd)).exitCode !== 0)
       return yield* gitFailed(`"${target}" is not a valid branch name. ${recovery}`)
     const local = yield* run(['rev-parse', '--verify', '--quiet', `refs/heads/${target}^{commit}`], cwd)
@@ -165,7 +173,7 @@ const make = Effect.gen(function* () {
     const commit = (yield* git(['rev-parse', '--verify', `${ref}^{commit}`], cwd)).trim()
     if (!isObjectId(commit))
       return yield* gitFailed(
-        `Could not resolve ${ref} to a commit in ${cwd}. Check that the branch exists (\`git branch --list\`), fetch it, or set the bookmark in Settings › Workspaces, then retry.`,
+        `Could not resolve ${ref} to a commit in ${cwd}. Check that the branch exists (\`git branch --list\`), fetch it, or choose another main branch in Settings › Projects, then retry.`,
       )
     return commit
   })
@@ -210,6 +218,24 @@ const make = Effect.gen(function* () {
 
   const branchExists = (repoRoot: string, name: string) =>
     Effect.map(run(['rev-parse', '--verify', '--quiet', `refs/heads/${threadBranch(name)}`], repoRoot), output => output.exitCode === 0)
+
+  /**
+   * Thread branches never count: one is the thread itself, and another thread's branch is unlanded work too. A dirty
+   * worktree holds edits no branch has, so it answers none.
+   */
+  const containingBookmarks = Effect.fn('git thread workspaces containing bookmarks')(function* (input: { readonly repoRoot: string; readonly name: string }) {
+    const workspacePath = path.join(yield* threadsDirectory(input.repoRoot), input.name)
+    const present = yield* exists(path.join(workspacePath, '.git'))
+    if (present ? yield* isDirty(workspacePath) : !(yield* branchExists(input.repoRoot, input.name))) return []
+    const target = yield* targetRef(input.repoRoot)
+    const tip = present ? 'HEAD' : threadBranch(input.name)
+    const cwd = present ? workspacePath : input.repoRoot
+    if ((yield* revisions(`${target}..${tip}`, cwd, 1)).length === 0) return []
+    const branches = lines(yield* git(['for-each-ref', `--contains=${tip}`, '--format=%(refname)', 'refs/heads/'], cwd))
+      .map(ref => ref.slice('refs/heads/'.length))
+      .filter(branch => branch !== target && !(branch.startsWith('dsh/') && THREAD_WORKSPACE_NAME.test(branch.slice('dsh/'.length))))
+    return branches.toSorted()
+  })
 
   const statusOf = Effect.fnUntraced(function* (input: {
     readonly repoRoot: string
@@ -419,7 +445,7 @@ const make = Effect.gen(function* () {
           yield* progress('validating')
           if (input.validate !== undefined) yield* input.validate
           const cwd = thread.workspaceRoot
-          const name = input.bookmark ?? (yield* bookmark)
+          const name = input.bookmark ?? (yield* projectBookmarks.bookmarkFor(thread.repoRoot))
           for (let attempt = 1; ; attempt++) {
             yield* progress('rebasing')
             // Before the dirty check: a rebase stopped on a conflict leaves edits, and committing them is not the fix.
@@ -481,7 +507,7 @@ const make = Effect.gen(function* () {
         const authorized = input.authorize(thread)
         if (!(yield* authorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
         const cwd = thread.workspaceRoot
-        const name = input.bookmark ?? (yield* bookmark)
+        const name = input.bookmark ?? (yield* projectBookmarks.bookmarkFor(thread.repoRoot))
         if ((yield* headOf(cwd)) !== input.expectedSourceRevision)
           return stale('The thread changed after its completion checks passed. Stop for Project Checks again; automatic integration did not rebase it.')
 
@@ -571,6 +597,7 @@ const make = Effect.gen(function* () {
     readonly name: string
     readonly force: boolean
     readonly target: string
+    readonly acceptBookmarkedWork?: boolean | undefined
   }) {
     yield* ensureSafeName(input.name, 'discard workspace')
     if (!THREAD_WORKSPACE_NAME.test(input.name)) return yield* new UnsafePath({ detail: `Refusing to discard ${input.name}: it is not a managed thread name.` })
@@ -584,7 +611,9 @@ const make = Effect.gen(function* () {
       : hasBranch
         ? yield* revisions(`${input.target}..${threadBranch(input.name)}`, input.repoRoot, MAX_UNLANDED_REVISIONS)
         : []
-    if (work.length > 0 && !input.force) return { status: 'has-work', revisions: work } satisfies DiscardOutcome
+    const kept = work.length > 0 && !input.force
+    if (kept && (input.acceptBookmarkedWork !== true || (yield* containingBookmarks({ repoRoot: input.repoRoot, name: input.name })).length === 0))
+      return { status: 'has-work', revisions: work } satisfies DiscardOutcome
     if (present) yield* git(['worktree', 'remove', '--force', workspaceRoot], input.repoRoot)
     yield* removeTree(workspaceRoot)
     yield* git(['worktree', 'prune'], input.repoRoot)
@@ -600,13 +629,14 @@ const make = Effect.gen(function* () {
     readonly repoRoot: string
     readonly names: readonly string[]
     readonly force: boolean
+    readonly acceptBookmarkedWork?: boolean
   }) {
     return yield* locks.withRepo(input.repoRoot)(
       Effect.gen(function* () {
         const target = yield* targetRef(input.repoRoot)
         // Each removal prunes the same worktree registry, so they run one at a time.
         const results = yield* Effect.forEach([...new Set(input.names)], name =>
-          discardOne({ repoRoot: input.repoRoot, name, force: input.force, target }).pipe(
+          discardOne({ repoRoot: input.repoRoot, name, force: input.force, target, acceptBookmarkedWork: input.acceptBookmarkedWork }).pipe(
             Effect.map((outcome): ThreadDiscardResult =>
               outcome.status === 'has-work'
                 ? { name, status: 'has-work', revisions: outcome.revisions, error: null }
@@ -772,7 +802,7 @@ const make = Effect.gen(function* () {
         lines(output).filter(name => !name.startsWith('dsh/')),
       )
     const [listed, nearest] = yield* Effect.all([branchNames([]), branchNames(['--merged', 'HEAD', '--sort=-committerdate'])], { concurrency: 'unbounded' })
-    const preferred = yield* bookmark
+    const preferred = yield* bookmarkAt(target)
     return { current: nearest.includes(preferred) ? preferred : (nearest[0] ?? null), names: [...new Set(listed)] }
   })
 
@@ -875,6 +905,7 @@ const make = Effect.gen(function* () {
     landVerified,
     discard,
     discardMany,
+    containingBookmarks,
     secondaryWorkspaces,
     discardSecondaryMany,
     workingCopyChangedAt,

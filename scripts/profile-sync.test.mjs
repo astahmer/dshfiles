@@ -177,3 +177,17 @@ test('adds only the named bundle with --bundle', () => {
   const output = execFileSync(process.execPath, [script, '--profile', 'web', '--home', home, '--bundle', '@dshfiles/memory', '--dry-run'], { encoding: 'utf8' })
   assert.match(output, /^ {2}\+ @dshfiles\/memory$/m)
 })
+
+test('refuses to push every owned bundle into a dsh-superagent profile, but allows one named bundle', () => {
+  const superagentHome = join(root, 'superagent-home')
+  const manifestPath = join(superagentHome, 'profiles/superagent/package.json')
+  writeJson(manifestPath, { dependencies: { 'dsh-superagent': 'link:/opt/dsh-superagent' }, dsh: { profile: { bundles: ['dsh-superagent'] } } })
+  const run = (...args) =>
+    spawnSync(process.execPath, [script, '--profile', 'superagent', '--home', superagentHome, '--dry-run', ...args], { encoding: 'utf8' })
+  const refused = run()
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /runs dsh-superagent, which keeps a stock DSH profile/)
+  const named = run('--bundle', '@dshfiles/memory')
+  assert.equal(named.status, 0, named.stderr)
+  assert.match(named.stdout, /^ {2}\+ @dshfiles\/memory$/m)
+})

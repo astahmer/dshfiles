@@ -6,9 +6,14 @@
 
 ![New thread destination and workspace isolation](docs/screenshots/thread-destination.png)
 
+![Integrate from the end of a turn](docs/screenshots/turn-end-integrate.png)
+
+![Choose a project's main branch](docs/screenshots/project-main-branch.png)
+
 Lets many agents work on one jj repository at once: a thread can run in its own
 jj workspace beside the repository, and **Integrate** moves its finished work
-into `main` by default. The integration page lets each ready workspace choose
+into the project's [main branch](#main-branch-per-project) (`main` unless the
+project names another). The integration page lets each ready workspace choose
 another local bookmark before integrating. Internally, jj rebases the thread
 revisions onto that bookmark's current tip, then advances it; existing ancestry
 stays intact.
@@ -31,13 +36,16 @@ A blank thread shows a destination bar above its composer:
 - **Folder**: a registered project, **No folder** (a scratch directory,
   `~/.dsh/no-folder`), or **Open folder…**.
 - **Bookmark** (jj repositories): the bookmark the thread starts from. With
-  default isolation enabled, this is the configured `bookmark` (`main` by default),
+  default isolation enabled, this is the project's [main branch](#main-branch-per-project),
   independently of the project checkout's current bookmark. Picking another
   starts the thread in its own workspace at that bookmark. Existing isolated
   destinations keep their selected bookmark; with isolation off the chip describes
   the shared checkout instead.
 - **workspace** toggle: run the thread in its own jj workspace,
   `<repository>-threads/thread-<id>`, created with `jj workspace add -r <bookmark>`.
+  The bookmark must name one revision: an unknown name, an ambiguous prefix or a
+  conflicted bookmark is refused before anything is created, so a retry cannot
+  leave a second workspace.
 
 A Session's directory is fixed once created, so each change opens a blank
 thread at the new destination. Leaving an unused thread workspace keeps it as
@@ -133,7 +141,10 @@ turn ends and the thread workspace is ready (described, conflict-free revisions,
 no Session writing, no question waiting), an inline row beside the answer names
 the pending revisions and offers **Integrate into the configured bookmark**. It runs the header
 control's own land action; the header stays the permanent entry point, and the
-row disappears as soon as the work lands.
+row disappears as soon as the work lands. The count toggles open the exact
+revisions that click will land — change id, description and any conflict — so
+landing is never blind; a long list scrolls inside the row instead of growing
+the transcript entry.
 
 - Only the newest turn offers it: older turns keep their dated notices, so a
   long thread never grows a column of stale buttons.
@@ -220,6 +231,35 @@ same coordinator, reporting queued, validating and rebasing phases as they
 happen. A queue line names what is active, queued or failed. Behind-only work and
 revisions already integrated are never offered again, and a failed row keeps its
 **Retry** action.
+
+## Main branch per project
+
+Every project has one main branch: the bookmark (git: branch) its thread
+workspaces start from, **Integrate** advances, and the Jujutsu panel, Changes
+and pull requests compare against. The first of these decides it:
+
+1. The choice in **Settings › Projects › Main branch** (`repositoryBookmarks`),
+   kept in your profile, never in the repository.
+2. `bookmark` in the repository's `dsh.project.json`.
+3. Origin's default branch, when a local branch of that name exists: git's
+   `origin/HEAD`, or the `trunk()` alias `jj git clone` records (read only from a
+   jj repository with an `origin` remote, cached for two minutes).
+4. The global `bookmark` setting (`main`).
+
+`jj_project_bookmark` (API `projectBookmark`) reports the result and the layer
+that chose it; `jj_set_project_bookmark` (API `setProjectBookmark`) makes or
+removes (`bookmark: null`) the Settings › Projects choice. The Host writes it
+against the settings revision it read and retries a conflict, so two windows or
+an agent saving at once keep both projects' choices. Other plugins read it through the `@dshfiles/jj-integration/project-bookmark`
+client module: Jujutsu names its main landmarks, chat reference previews, trunk
+lane and **Rebase onto** item after it, and its composer bar's default
+**Main branch** base compares against it; pulls-review (panel, `/pulls` and
+`pulls_review`) starts a review without a base from it; pull-requests targets it
+when it is chosen or declared (otherwise the GitHub default branch); backlog's
+`Closes b:…` and revision gates count what reached it.
+
+Changing the choice drops the Host's cached repository and thread views at once,
+and Settings tells every open Jujutsu and Changes view to read the branch again.
 
 ## Integrating into main
 
@@ -331,6 +371,14 @@ with revisions to rebase is never removed automatically; its row's More menu
 offers **Remove workspace and work to rebase…** behind a confirmation that names
 how many revisions will be abandoned.
 
+The same sweep clears the `node_modules` of an archived thread kept for its
+unlanded work with the project's cleanup script. When either removal fails, the
+activity timeline records `workspace.cleanup-failed` (attention) on the owning
+project's path, with the reason and the next step: remove the workspace from its
+row once the cause is fixed, or rerun the cleanup script with the exact command
+it names. Each sweep retries, so a failure is reported once per workspace and
+reason, and again only after a success or a new reason.
+
 Manual removal forgets the jj workspace, removes its DSH workspace registration,
 and permanently deletes its folder. It does **not** archive or delete the
 conversation sessions; they remain in DSH with their original archive state.
@@ -341,7 +389,8 @@ The confirmation dialog explains these effects before removal.
 The Jujutsu panel's repository menu (⋮) offers **Clean up thread workspaces…**.
 Pick how long a workspace must have been unused (1h, 6h or 24h) and which kinds
 to remove: **Empty** (never landed anything) and/or **Already integrated**
-(landed, nothing left above the bookmark). The dialog previews the list before
+(landed, nothing left above the bookmark, or all of its work is already on
+another bookmark). The dialog previews the list before
 anything is removed. One confirmation then discards every match exactly as the
 row's own Remove does (never forced) and abandons the empty, undescribed
 revisions nothing builds on: no working copy, bookmark, tag or revision with
@@ -358,12 +407,38 @@ click on the same scope attaches to the job already running instead of queuing
 it twice. A Host restart drops the trail with the job; what it had already
 removed stays removed.
 
+Every job records the repository that owns the folder it was asked from
+(`repoRoot`), so a cleanup started from an isolated thread workspace, which
+sits in the sibling `-threads` directory, belongs to its project. The owner
+comes from the cached repository scan, then `jj root`, then the trail itself,
+which keeps a half-removed thread workspace (forgotten by jj, folder left
+behind) linked to its project. Each panel shows only its project's jobs
+(`cleanupJobs { path }`; the newest job of each repository keeps its rows), so
+a run in another project never hides this one's failure. A job that failed, or
+finished with a workspace or folder it could not remove, carries a `recovery`:
+fix what the reason names (the file-system cause, such as `PermissionDenied`,
+stays in the message), then run the guarded preview again; it never suggests a
+forced removal. The panel keeps that failure, with a **Review cleanup…** button
+that reopens the dialog, until it is dismissed or a later cleanup of the project
+replaces it, and the activity timeline records it as `workspace.cleanup-failed`
+(attention) on the project's path. `jj_thread_cleanup_jobs` takes the same
+`path` and prints each job's repository and recovery.
+
 **Untracked folders** also deletes threads-directory folders and files no jj
 workspace owns (forgotten workspaces, stray logs, recovery copies) that were not
 modified for the chosen time, never under an hour. Dotfiles (the plugin's own
 metadata) stay. An entry counts as owned when its name matches a workspace, it
 is jj's recorded root, or a working `.jj` sits inside it: a renamed workspace
 folder leaves jj's recorded root stale.
+
+A workspace whose revisions are not on the target bookmark is still offered when
+one other local bookmark (git: branch) holds all of them. Its preview row names
+that bookmark, and removal rechecks it under the repository lock and leaves the
+bookmark and its revisions alone. Uncommitted edits, work spread across several
+bookmarks, a conflicted bookmark, a remote-only bookmark and another thread's
+`dsh/` branch do not count. A workspace with revisions on no bookmark is never
+offered, and automatic and settle cleanup have no preview, so they keep these
+workspaces.
 
 A workspace is kept when it holds unlanded revisions, a non-archived Session in
 it is working, waiting for an answer or its activity cannot be read, or an
@@ -391,7 +466,8 @@ Session, or a queued integration is always kept. Each run lands in the cleanup
 trail (`jj_thread_cleanup_jobs` marks it `automatic`) and in the activity
 timeline as `workspace.cleaned` — routine when nothing was removed, with the
 skip counts (`Skipped 41: 29 activity-unknown, 12 has-work.`) as its detail — or
-`workspace.cleanup-failed` when the job failed. An empty `kinds` list or
+`workspace.cleanup-failed` on the repository's path when the job failed or left
+a workspace behind, as for a manual run. An empty `kinds` list or
 `enabled: false` turns it off; settings are read at each run.
 
 A run is scoped to the projects in use: only repositories whose checkout or one
@@ -518,7 +594,9 @@ the subagent is idle), or any rebase that keeps the revisions' ancestry — the 
 `jj workspace forget` leaves its folder for the opt-in `untracked` kind.
 [`agent-workspace-cleanup.integration.test.ts`](src/agent-workspace-cleanup.integration.test.ts) pins the flow.
 
-- `jj_thread_status`: this thread's revisions not yet on the target bookmark and whether it moved.
+- `jj_project_bookmark`: the main branch of the project holding a path, and which layer chose it.
+- `jj_set_project_bookmark`: choose that main branch, or `null` to go back to Automatic.
+- `jj_thread_status`: this thread's revisions not yet on the project's main branch and whether it moved.
 - `jj_thread_rebase`: rebase this thread's work onto the target bookmark.
 
 ## Settings (`jj-integration`)
@@ -528,7 +606,8 @@ the subagent is idle), or any rebase that keeps the revisions' ancestry — the 
 | `autoIntegrationScope`                | `none`    | `none` is manual; `isolated` auto-integrates uniquely owned thread workspaces; `all` also isolates new threads by default.                 |
 | `autoIntegrationExcludedRepositories` | empty     | Absolute repository paths that automatic integration never touches; manual Integrate still works.                                          |
 | `isolateByDefault`                    | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                                              |
-| `bookmark`                            | `main`    | Exact bookmark threads start from and Rebase advances.                                                                                     |
+| `bookmark`                            | `main`    | Fallback main branch for a project without its own; see [Main branch per project](#main-branch-per-project).                               |
+| `repositoryBookmarks`                 | empty     | `{ repository, bookmark }` per project, set in Settings › Projects; wins over `dsh.project.json` and origin's default branch.              |
 | `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                                           |
 | `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                                           |
 | `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                                |

@@ -6,10 +6,12 @@ import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { Jj } from '@dshfiles/jj-cli'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Duration, Effect, Layer, Schedule } from 'effect'
+import { MergedPullRequests } from '@dshfiles/jj-integration/merged-pull-requests'
 import { pullRequestApi } from './api.js'
 import { PullRequestCreator } from './create.js'
 import { GitHubCli } from './github-cli.js'
 import { PullRequestMonitor } from './monitor.js'
+import { ProjectBase } from './project-base.js'
 import { PullRequestStore } from './store.js'
 import { ThreadContext } from './thread-context.js'
 import type { PullRequestLinkView, PullRequestRecord } from './pull-request-model.js'
@@ -31,7 +33,7 @@ const monitor = PullRequestMonitor.layer.pipe(Layer.provideMerge(storeAndGitHub)
 const jjAndThread = Layer.mergeAll(Jj.layer, ThreadContext.layer).pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, DshChildProcessSpawner.layer)),
 )
-const creator = PullRequestCreator.layer.pipe(Layer.provideMerge(Layer.mergeAll(monitor, jjAndThread)))
+const creator = PullRequestCreator.layer.pipe(Layer.provideMerge(Layer.mergeAll(monitor, jjAndThread, ProjectBase.layer.pipe(Layer.provide(HostApis.layer)))))
 
 const pollWorker = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -66,6 +68,20 @@ export default DshxPlugin.make({
       create: (input, call) => PullRequestCreator.use(creator => creator.create(input, call.caller)),
       unwatch: (input, call) =>
         PullRequestMonitor.use(monitor => monitor.unwatch(input, call.caller).pipe(Effect.map(link => ({ link: pullRequestLinkViewOf(link) })))),
+    }),
+    // Jujutsu integration owns the cleanup that wants this state and cannot import this API without closing a cycle,
+    // so it declares the contract and this plugin provides it.
+    Api.bind(MergedPullRequests.contract('@dshfiles/pull-requests'), {
+      merged: (input, call) =>
+        PullRequestMonitor.use(monitor =>
+          monitor.list({ all: true }, call.caller).pipe(
+            Effect.map(result => ({
+              merged: result.links
+                .filter(link => input.sessionIds.includes(link.sessionId) && link.lastKnownState?.state === 'MERGED')
+                .map(link => ({ sessionId: link.sessionId, label: `${link.repo}#${String(link.number)}` })),
+            })),
+          ),
+        ),
     }),
   ],
 })

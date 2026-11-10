@@ -5,7 +5,7 @@
     {
       "id": "codex-at-tokens",
       "title": "Codex-style @ token targeting",
-      "summary": "The shared tokenizer resolves the whitespace-delimited @ token the caret touches the way Codex's composer does, sends its whole span to registered @ sources and closes on whitespace; a quoted @\"… phrase still searches titles and paths with spaces. Slash-command behavior is unchanged.",
+      "summary": "The shared tokenizer resolves the whitespace-delimited @ token the caret touches the way Codex's composer does, sends its whole span to registered @ sources and closes on whitespace; a quoted @\"\u2026 phrase still searches titles and paths with spaces. Slash-command behavior is unchanged.",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"deploy\"",
@@ -29,7 +29,7 @@
       "configuration": [],
       "states": ["caret-token", "separator-closes", "quoted-multiword", "email-boundary", "slash-command"],
       "failureModes": [
-        "An unquoted @ query never spans whitespace: a title with spaces is found by one of its words or by a quoted @\"… phrase.",
+        "An unquoted @ query never spans whitespace: a title with spaces is found by one of its words or by a quoted @\"\u2026 phrase.",
         "The change does not reduce the separate Host session-search latency."
       ],
       "externalDependencies": [],
@@ -164,6 +164,12 @@
           "kind": "gherkin",
           "id": "input-trigger.entity-registry",
           "featureFile": "tooling/dshx/e2e/features/input-trigger.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "input-trigger.entity-restore-ordering",
+          "file": "plugins/@dshfiles/input-trigger/tests/restore-references.test.ts",
+          "testName": "collects spans from every source, ordered, and drops overlaps"
         }
       ],
       "telemetry": [
@@ -171,6 +177,18 @@
           "kind": "not-applicable",
           "reason": "Client-only: the registry and the shared preview card render browser state; each card body calls its provider API, which carries its own api-dispatch span."
         }
+      ],
+      "reach": [
+        "seed tool-call-thread",
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Shared reference card demo\"",
+        "press Enter",
+        "click tab \"Fake thread title\"",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Working on b:#1\"",
+        "press Enter",
+        "hover button \"Preview backlog item b:#1\"",
+        "expect text \"Backlog \u00b7 b:#1\""
       ]
     }
   ]

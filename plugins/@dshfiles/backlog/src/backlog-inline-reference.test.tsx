@@ -46,6 +46,13 @@ const renderRun = (text: string, surface: InlineReferenceContext['surface'] = 'p
 const links = (container: Element): readonly string[] =>
   [...container.querySelectorAll('[data-dshfiles-backlog-reference]')].map(element => element.textContent ?? '')
 
+const chipOf = (container: Element, ref?: string): HTMLButtonElement => {
+  const wrapper = container.querySelector(ref === undefined ? '[data-dshfiles-backlog-reference]' : `[data-dshfiles-backlog-reference="${ref}"]`)
+  const chip = wrapper?.querySelector('button')
+  if (!(chip instanceof HTMLButtonElement)) throw new Error('no chip')
+  return chip
+}
+
 const previews = (): { readonly requests: { readonly id: string; readonly anchorId: number }[]; readonly stop: () => void } => {
   const requests: { readonly id: string; readonly anchorId: number }[] = []
   const onRequest = (event: Event): void => {
@@ -61,9 +68,8 @@ describe('backlog inline references', () => {
   it('links an item number in prose and in inline code', () => {
     const { container } = renderRun('Next: b:12, then b:13.')
     expect(links(container)).toEqual(['b:12', 'b:13'])
-    const first = container.querySelector('[data-dshfiles-backlog-reference="12"]')
-    expect(first?.getAttribute('role')).toBe('link')
-    expect(first?.getAttribute('aria-label')).toBe('Preview backlog item b:12')
+    expect(container.querySelectorAll('[data-ref-chip="backlog"]')).toHaveLength(2)
+    expect(chipOf(container, '12').getAttribute('aria-label')).toBe('Preview backlog item b:12')
     cleanup()
     expect(links(renderRun('b:13', 'code').container)).toEqual(['b:13'])
   })
@@ -72,25 +78,46 @@ describe('backlog inline references', () => {
     expect(links(renderRun('a/b:12 and rb:12 stay text, b:0 too').container)).toEqual([])
   })
 
-  it('asks for a preview anchored on the link when it is clicked or activated by keyboard', () => {
+  it('asks for a preview anchored on the chip when it is clicked', () => {
     const { requests, stop } = previews()
     const { container } = renderRun('Working on b:12.')
-    const link = container.querySelector('[data-dshfiles-backlog-reference]')
-    if (link === null) throw new Error('no link')
-    fireEvent.click(link, { button: 0 })
-    fireEvent.keyDown(link, { key: 'Enter' })
-    expect(requests.map(request => request.id)).toEqual(['12', '12'])
+    const chip = chipOf(container)
+    fireEvent.click(chip, { button: 0 })
+    expect(requests.map(request => request.id)).toEqual(['12'])
     // The request carries the anchor the card re-measures when the page scrolls.
-    expect(container.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
+    expect(container.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(chip)
     stop()
+  })
+
+  it('offers the same card on hover after a short dwell', () => {
+    vi.useFakeTimers()
+    try {
+      const { requests, stop } = previews()
+      const { container } = renderRun('Working on b:12.')
+      const anchor = container.querySelector('[data-dshfiles-reference-anchor="backlog"]')
+      const chip = chipOf(container)
+      if (anchor === null) throw new Error('no anchor')
+      act(() => void chip.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })))
+      expect(requests).toEqual([])
+      act(() => vi.advanceTimersByTime(160))
+      expect(requests.map(request => request.id)).toEqual(['12'])
+      expect(container.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(anchor)
+      const dismissed = vi.fn()
+      window.addEventListener(EntityPreview.dismissEvent, dismissed)
+      act(() => void anchor.dispatchEvent(new MouseEvent('pointerout', { bubbles: true })))
+      expect(dismissed).toHaveBeenCalledTimes(1)
+      window.removeEventListener(EntityPreview.dismissEvent, dismissed)
+      stop()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('does not open a preview when the click extends a text selection', () => {
     const { requests, stop } = previews()
     const { container } = renderRun('Working on b:12.')
     document.getSelection()?.selectAllChildren(container)
-    const link = container.querySelector('[data-dshfiles-backlog-reference]')
-    if (link !== null) fireEvent.click(link, { button: 0 })
+    fireEvent.click(chipOf(container), { button: 0 })
     expect(requests).toEqual([])
     stop()
   })
@@ -107,12 +134,9 @@ describe('duplicate references in an item peek', () => {
     )
     expect(container.textContent).toBe('triage suggested kind bug, duplicate of b:k3f9')
     expect(links(container)).toEqual(['b:k3f9'])
-    const link = container.querySelector('[data-dshfiles-backlog-reference="k3f9"]')
-    if (link === null) throw new Error('no link')
-    fireEvent.click(link, { button: 0 })
-    fireEvent.keyDown(link, { key: 'Enter' })
-    expect(requests.map(request => request.id)).toEqual(['k3f9', 'k3f9'])
-    expect(container.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(link)
+    fireEvent.click(chipOf(container, 'k3f9'), { button: 0 })
+    expect(requests.map(request => request.id)).toEqual(['k3f9'])
+    expect(container.querySelector(`[data-dshfiles-entity-anchor="${String(requests[0]?.anchorId)}"]`)).toBe(chipOf(container, 'k3f9'))
     stop()
   })
 
@@ -125,9 +149,7 @@ describe('duplicate references in an item peek', () => {
     )
     expect(container.textContent).toBe('kind bug, duplicate of b:k3f9')
     expect(links(container)).toEqual(['b:k3f9'])
-    const link = container.querySelector('[data-dshfiles-backlog-reference="k3f9"]')
-    if (link === null) throw new Error('no link')
-    fireEvent.click(link, { button: 0 })
+    fireEvent.click(chipOf(container, 'k3f9'), { button: 0 })
     expect(requests.map(request => request.id)).toEqual(['k3f9'])
     stop()
   })

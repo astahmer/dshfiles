@@ -39,3 +39,9 @@ const backlogRepoLayer = (rows: BacklogTestRows = memoryRows()) =>
 /** A real BacklogStore over an in-memory SQLite file, or the given rows, and default settings. */
 export const backlogStoreLayer = (input: { readonly rows?: BacklogTestRows | undefined; readonly settings?: Partial<BacklogSettings> | undefined } = {}) =>
   BacklogStore.layer.pipe(Layer.provideMerge(backlogRepoLayer(input.rows)), Layer.provideMerge(backlogSettingsTestLayer(input.settings)))
+
+/** The backlog's SQLite file alone, for services that keep their own table and need no item fold. */
+export const backlogDbLayer = (rows: BacklogTestRows = memoryRows()) =>
+  BacklogDb.layer.pipe(
+    Layer.provideMerge(Layer.mergeAll(BacklogStorePaths.layer({ database: rows.database, files: rows.files }), NodeFileSystem.layer, NodePath.layer)),
+  )

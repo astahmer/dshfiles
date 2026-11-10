@@ -19,6 +19,7 @@ import { IntegrationRequests, IsolatedSessions } from './integration-requests.js
 import { JjSettingsLive } from './jj-settings.js'
 import { Landing } from './landing.js'
 import { MaintenanceLive } from './maintenance.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepoLocks } from './repo-locks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
@@ -26,6 +27,7 @@ import { jjIntegrationSettings } from './settings.js'
 import { ThreadLifecycle } from './thread-lifecycle.js'
 import { ThreadWorkspaces } from './thread-workspaces.js'
 import { WorkspaceSync } from './workspace-sync.js'
+import { WorkspaceSetupService } from './workspace-setup.js'
 
 const JJ_TIMEOUT = Duration.minutes(2)
 const JJ_PROVIDER_PRIORITY = 100
@@ -46,11 +48,12 @@ const BaseLive = Layer.mergeAll(
 )
 
 const JjIntegrationLive = Layer.mergeAll(MaintenanceLive, HostHooksLive, IntegrationQueue.layer).pipe(
-  Layer.provideMerge(Layer.mergeAll(AutoIntegration.layer, Cleanup.layer, ThreadLifecycle.layer, LandAttention.layer)),
+  Layer.provideMerge(Layer.mergeAll(AutoIntegration.layer, Cleanup.layer, ThreadLifecycle.layer, LandAttention.layer, WorkspaceSetupService.layer)),
   Layer.provideMerge(Landing.layer),
   Layer.provideMerge(Layer.mergeAll(RepositoryViews.layer, WorkspaceSync.layer)),
   Layer.provideMerge(SessionActivity.layer),
   Layer.provideMerge(ThreadWorkspaces.layer),
+  Layer.provideMerge(ProjectBookmarks.layer),
   Layer.provideMerge(JjViewReads.layer),
   Layer.provideMerge(Jj.layerWith({ timeout: JJ_TIMEOUT, maxStdoutBytes: MAX_JJ_STDOUT_BYTES, maxStderrBytes: MAX_JJ_STDERR_BYTES })),
   // Automatic fetch runs git in a git-only repository; thread workspaces get their own Git through ThreadWorkspaces.layer.
@@ -81,15 +84,19 @@ const handlers = Api.handlers(jjIntegrationApi, {
   integrationProgress: input => IntegrationRequests.use(requests => Effect.map(requests.progress(input.path), progress => ({ progress }))),
   reviewHistory: input => ThreadLifecycle.use(lifecycle => lifecycle.reviewHistory(input)),
   threadStatus: (input, call) => ThreadLifecycle.use(lifecycle => lifecycle.threadStatus(input, call.caller)),
+  projectBookmark: input => ThreadLifecycle.use(lifecycle => lifecycle.projectBookmark(input)),
+  setProjectBookmark: input => ThreadLifecycle.use(lifecycle => lifecycle.setProjectBookmark(input)),
   landThread: (input, call) => ThreadLifecycle.use(lifecycle => lifecycle.landThread(input, call.caller)),
   workspaceSync: () => WorkspaceSync.use(sync => Effect.map(sync.current, current => ({ sync: current }))),
+  workspaceSetup: input => WorkspaceSetupService.use(setup => setup.ensure(input)),
+  cancelWorkspaceSetup: input => WorkspaceSetupService.use(setup => setup.cancel(input)),
   discard: input => ThreadLifecycle.use(lifecycle => lifecycle.discard(input)),
   discardMany: input => ThreadLifecycle.use(lifecycle => lifecycle.discardMany(input)),
   cleanupWorkspaces: input =>
     Cleanup.use(cleanup => (input.apply ? Effect.flatMap(cleanup.startManual(input), started => started.done) : cleanup.preview(input))),
   // The job owns the removal once queued; its failure is reported on the trail, not to a request that already returned.
   startCleanup: input => Cleanup.use(cleanup => Effect.map(cleanup.startManual(input), started => ({ job: started.job }))),
-  cleanupJobs: () => Cleanup.use(cleanup => Effect.map(cleanup.jobs, jobs => ({ jobs: [...jobs] }))),
+  cleanupJobs: input => Cleanup.use(cleanup => Effect.map(cleanup.jobs(input.path), scoped => ({ repoRoot: scoped.repoRoot, jobs: [...scoped.jobs] }))),
 })
 
 /** jj-integration as a `@dshfiles/vcs-provider-port` provider: the port's callers isolate and snapshot without naming jj. */

@@ -2,7 +2,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { ThreadAttentionLabel } from './attention-presentation.js'
 
 /**
- * `state` is the ADE status grouping (Pinned, Needs you, Working, Ready, Idle, Done; plan `plans/ade-ux` §4.3) and the
+ * `state` is the ADE status grouping (Pinned, Needs you, Working, Ready, Idle, Done; plan `docs/ade-ux` §4.3) and the
  * default. `status` is the older drag-to-arrange sections (Pinned, Active, Parked, Inactive, Settled, Archived), kept as
  * "Arrange manually" because status sorting makes rows move.
  */
@@ -116,6 +116,8 @@ export interface ThreadViewGroup<Thread> {
   readonly showHeader: boolean
   /** Creation target only for a registered local project; never inferred from the label or group key. */
   readonly projectId: string | undefined
+  /** Checkouts of this repository this machine holds: more than one means the row stands for the project, not a path. */
+  readonly checkoutCount: number
   readonly threads: readonly Thread[]
 }
 
@@ -273,18 +275,25 @@ const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(op
   readonly entries: readonly ThreadViewEntry<Thread>[]
   readonly workspaceTitles: ReadonlyMap<string, string>
   readonly localProjectIds: ReadonlySet<string>
+  /** Repository identity per workspace id: two checkouts of one origin share it and group as one project. */
+  readonly projectKeys?: ReadonlyMap<string, string>
   readonly unassignedTitle: string
   readonly dateTitles: Readonly<Record<ThreadDateGroup, string>>
   readonly now: number
 }): readonly ThreadViewGroup<Thread>[] => {
-  const groups = new Map<string, { label: string; showHeader: boolean; projectId: string | undefined; entries: { thread: Thread; activityAt: number }[] }>()
+  const groups = new Map<
+    string,
+    { label: string; showHeader: boolean; projectId: string | undefined; workspaceIds: Set<string>; entries: { thread: Thread; activityAt: number }[] }
+  >()
   for (const entry of options.entries) {
     let key = 'none'
     let label = ''
     let showHeader = false
     let projectId: string | undefined
     if (options.groupBy === 'project') {
-      key = `project:${entry.workspaceId ?? ''}`
+      // Two checkouts of one repository are one project: the row says which repository, not which path.
+      const projectKey = entry.workspaceId === undefined ? '' : (options.projectKeys?.get(entry.workspaceId) ?? entry.workspaceId)
+      key = `project:${projectKey}`
       label = entry.workspaceId === undefined ? options.unassignedTitle : (options.workspaceTitles.get(entry.workspaceId) ?? entry.workspaceId)
       showHeader = true
       if (entry.workspaceId !== undefined && options.localProjectIds.has(entry.workspaceId)) projectId = entry.workspaceId
@@ -295,7 +304,8 @@ const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(op
       label = options.dateTitles[dateGroup]
       showHeader = true
     }
-    const group = groups.get(key) ?? { label, showHeader, projectId, entries: [] }
+    const group = groups.get(key) ?? { label, showHeader, projectId, workspaceIds: new Set<string>(), entries: [] }
+    if (entry.workspaceId !== undefined) group.workspaceIds.add(entry.workspaceId)
     group.entries.push({ thread: entry.thread, activityAt: entry.activityAt ?? entry.thread.updatedAt })
     groups.set(key, group)
   }
@@ -312,6 +322,7 @@ const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(op
     label: group.label,
     showHeader: group.showHeader,
     projectId: group.projectId,
+    checkoutCount: Math.max(1, group.workspaceIds.size),
     threads: group.entries.sort((left, right) => right.activityAt - left.activityAt).map(entry => entry.thread),
   }))
 }

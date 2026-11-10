@@ -7,7 +7,7 @@
 ![Usage distribution and daily calendar](docs/screenshots/usage-charts.png)
 ![Jev API usage card](docs/screenshots/usage-jev-card.png)
 
-**Observe › Usage** is the one usage page (plans/ade-ux §6): four tabs, **Cost** (charts),
+**Observe › Usage** is the one usage page (docs/ade-ux §6): four tabs, **Cost** (charts),
 **Quota**, **Requests** (the request log) and **Tools** (tool and Jev activity), built from
 DSH session logs and bounded Host-side call observations. Observation only.
 

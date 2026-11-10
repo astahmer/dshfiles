@@ -218,7 +218,11 @@ export function ModelSelect(
       let y = rect.top - 8 - lh
       if (lw > 0) x = Math.min(Math.max(x, MARGIN), window.innerWidth - lw - MARGIN)
       if (lh > 0) y = Math.min(Math.max(y, MARGIN), window.innerHeight - lh - MARGIN)
-      setMenuPos({ left: x, top: y })
+      // This effect re-runs on every directory snapshot and query keystroke; a
+      // fresh position object for an unmoved card re-renders the whole list.
+      setMenuPos(previous => previous !== null && previous.left === x && previous.top === y
+        ? previous
+        : { left: x, top: y })
     }
     place()
     window.addEventListener('scroll', place, true)

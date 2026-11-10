@@ -188,7 +188,13 @@ export const makeGithubProvider = Effect.fn('backlog github provider')(function*
     (connection.baseUrl.trim() === '' ? (input.apiUrl ?? GITHUB_API) : connection.baseUrl.trim()).replace(/\/+$/u, '')
 
   const tokenOf = (connection: ProviderConnection) =>
-    credentials.resolve({ provider: LABEL, connection, environmentVariables: descriptor.environmentVariables, fallback: probes.githubCliToken })
+    credentials.resolve({
+      provider: LABEL,
+      connection,
+      environmentVariables: descriptor.environmentVariables,
+      fallback: probes.githubCliToken,
+      fallbackHint: 'the `gh` CLI login',
+    })
 
   /** One REST call; `notModified` answers a 304 for a conditional GET. */
   const exchange = (connection: ProviderConnection, operation: string, request: HttpClientRequest.HttpClientRequest, reference: string) =>

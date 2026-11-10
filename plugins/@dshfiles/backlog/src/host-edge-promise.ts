@@ -7,6 +7,7 @@ import type {
   SessionPromptRequest,
   SessionRenameRequest,
   SessionSelectModelRequest,
+  SessionSummary,
 } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-client-file-upload'
 import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
@@ -55,6 +56,8 @@ export class HostSessions extends Context.Service<
   HostSessions,
   {
     readonly list: Effect.Effect<SessionListValue, SessionsUnavailable>
+    /** One Session's row from the same list, or null when it no longer exists: what a resumed start checks before prompting. */
+    readonly summary: (sessionId: string) => Effect.Effect<SessionSummary | null, SessionsUnavailable>
     readonly create: (request: Omit<SessionCreateRequest, 'sessionId'>) => Effect.Effect<{ readonly sessionId: string }, SessionsUnavailable>
     readonly selectModel: (request: Omit<SessionSelectModelRequest, 'sessionId'> & { readonly sessionId: string }) => Effect.Effect<void, SessionsUnavailable>
     readonly rename: (request: Omit<SessionRenameRequest, 'sessionId'> & { readonly sessionId: string }) => Effect.Effect<void, SessionsUnavailable>
@@ -70,12 +73,15 @@ export class HostSessions extends Context.Service<
       const unavailable = (cause: unknown) => new SessionsUnavailable({ cause })
       const missing = () => new SessionsUnavailable({})
 
+      const listSessions = Effect.gen(function* () {
+        const sessions = controller()
+        if (sessions === undefined) return yield* missing()
+        return yield* Effect.tryPromise(signal => sessions.list({}, signal)).pipe(Effect.timeout(SESSION_LIST_TIMEOUT), Effect.mapError(unavailable))
+      })
+
       return HostSessions.of({
-        list: Effect.gen(function* () {
-          const sessions = controller()
-          if (sessions === undefined) return yield* missing()
-          return yield* Effect.tryPromise(signal => sessions.list({}, signal)).pipe(Effect.timeout(SESSION_LIST_TIMEOUT), Effect.mapError(unavailable))
-        }),
+        list: listSessions,
+        summary: sessionId => Effect.map(listSessions, listed => listed.items.find(item => String(item.sessionId) === sessionId) ?? null),
         create: request =>
           Effect.gen(function* () {
             const sessions = controller()

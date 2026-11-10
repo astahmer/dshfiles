@@ -12,7 +12,6 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
 import { Changes, createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -28,6 +27,7 @@ import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { IntegrationTimeline, type IntegrationRecord } from './integration-timeline.js'
 import { InlineIntegrateOffer } from './inline-integrate.js'
+import { LandPreview } from './land-preview.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
@@ -37,7 +37,10 @@ import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionL
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadNotices, ThreadNoticeToast } from './thread-notices.js'
 import { ThreadPreparation, ThreadWarmup } from './thread-warmup.js'
+import { awaitWorkspaceSetup, SETUP_WAIT_TIMEOUT_MS, setupWaitsForRun } from './workspace-setup-wait.js'
+import { WorkspaceSetupDock } from './workspace-setup-dock.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
+import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
@@ -47,6 +50,9 @@ import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSet
 import { requestThreadSettle } from './settle-request.js'
 import { requestReplaceThreadTab } from './main-tab-replacement.js'
 import { TurnEndStatusRefreshModel, type TurnEndStatusRefresh } from './turn-end-status-refresh.js'
+import { useProjectBookmark } from './project-bookmark-query.js'
+import { ProjectMainBranchPanel } from './project-main-branch-panel.js'
+import { ProjectSettingsPanels, type ProjectSettingsPanelProps } from '@dshfiles/workspace-folder-picker/project-settings-panels'
 import { NativeAsideOwners } from '@dshfiles/workbench/registry'
 
 const PANEL_ID = 'jj-integration'
@@ -123,6 +129,16 @@ export default defineClient({
       return changes?.status === 'active' ? changes.value.review(input) : false
     }
     const changesAvailable = (): boolean => metadata?.plugin?.use(Changes).get()?.status === 'active'
+    // Settings › Projects (workspace-folder-picker) shows each project's main branch, chosen here.
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      const MainBranch = (props: ProjectSettingsPanelProps): JSX.Element => (
+        <PluginQueryProvider>
+          <ProjectMainBranchPanel {...props} />
+        </PluginQueryProvider>
+      )
+      plugin.add(ProjectSettingsPanels, { id: 'main-branch', order: 0, Panel: plugin.bind(MainBranch) })
+    }
     ctx.effect(() => {
       const sheet = document.createElement('style')
       sheet.dataset.dshfilesRemoteDestination = ''
@@ -358,7 +374,7 @@ export default defineClient({
         }
       }, [newestTurnHasEnded, props.turn.end?.time, queryClient, status.dataUpdatedAt, statusQueryKey, statusRefresh])
       const turnEndRefreshIsPending = TurnEndStatusRefreshModel.turnEndRefreshPending(statusRefresh)
-      const bookmark = useBookmark()
+      const bookmark = useProjectBookmark(path, useBookmark())
       const thread = status.data?.thread
       const [previousThread, setPreviousThread] = useState(thread)
       useEffect(() => {
@@ -386,20 +402,13 @@ export default defineClient({
       // The workspace's activity, not just this Session's: a sibling thread writing in the same workspace blocks
       // integration here exactly as it blocks the header control.
       const readWorkspaceRunning = useCallback(
-        (): boolean =>
-          Object.values(ctx.sessions.list.getSnapshot().byId).some(
-            session => session.running && (threadSessionIds.includes(String(session.id)) || (threadPath !== undefined && session.cwd === threadPath)),
-          ),
+        (): boolean => WorkspaceActivityIndex.isRunning({ byId: ctx.sessions.list.getSnapshot().byId, sessionIds: threadSessionIds, path: threadPath }),
         [threadSessionIds, threadPath],
       )
-      const readWorkspaceQuestion = useCallback((): boolean => {
-        const sessions = ctx.sessions.list.getSnapshot().byId
-        const asks = (session: SessionSummary | undefined): boolean => ThreadRebaseEligibilityModel.hasPendingUserQuestion(session?.projectionValues) === true
-        return (
-          threadSessionIds.some(sessionId => asks(sessions[SessionId(sessionId)])) ||
-          (threadPath !== undefined && Object.values(sessions).some(session => session.cwd === threadPath && asks(session)))
-        )
-      }, [threadSessionIds, threadPath])
+      const readWorkspaceQuestion = useCallback(
+        (): boolean => WorkspaceActivityIndex.hasQuestion({ byId: ctx.sessions.list.getSnapshot().byId, sessionIds: threadSessionIds, path: threadPath }),
+        [threadSessionIds, threadPath],
+      )
       const readClientCanRebase = useCallback(
         (): boolean | undefined =>
           ThreadRebaseEligibilityModel.canRebase(threadSessionIds, sessionId => {
@@ -572,31 +581,14 @@ export default defineClient({
           {offered ? (
             // The header control stays the permanent entry point; this is the same land action one click from the
             // answer the user just read, and it disappears as soon as the work is integrated.
-            <div
-              className="dshx-root dshx:my-3 dshx:flex dshx:w-full dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-2"
-              data-testid="jj-inline-integrate-offer"
-            >
-              <GitMergeIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-              <p className="dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:text-muted-foreground">
-                {translate('inlineIntegrateHint', { count: thread.unlanded.length, bookmark })}
-              </p>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label={translate('rebaseOnto', { bookmark })}
-                    className="dshx-root dshx:shrink"
-                    disabled={landing}
-                    onClick={() => land.mutate(thread.path)}
-                    size="sm"
-                    type="button"
-                  >
-                    {land.isPending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5" />}
-                    {land.isPending ? translate('rebasing') : translate('rebaseOnto', { bookmark })}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{translate('rebaseThread', { bookmark })}</TooltipContent>
-              </Tooltip>
-            </div>
+            <LandPreview
+              bookmark={bookmark}
+              landing={landing}
+              onLand={() => land.mutate(thread.path)}
+              pending={land.isPending}
+              revisions={thread.unlanded}
+              t={translate}
+            />
           ) : null}
           {noticeToast.element}
         </TooltipProvider>
@@ -773,7 +765,7 @@ export default defineClient({
     const sharedWorkspaceMoves = new Map<string, DeferredMove>()
     const sharedThreadWorkspaceMove = (sessionId: SessionSummary['id'], workspaceId: string): DeferredMove | undefined => {
       const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)
-      if (workspace === undefined || !Schema.is(threadWorkspaceNameEffect)(workspace.path.split('/').at(-1))) return undefined
+      if (workspace === undefined || !Schema.is(threadWorkspaceNameEffect)(workspace.path.split(/[\\/]/u).at(-1))) return undefined
       if (!workspaceHasOtherSession({ sessionId, workspaceSessionIds: workspace.sessionIds })) return undefined
       const key = `${sessionId}\u0000${workspaceId}`
       const cached = sharedWorkspaceMoves.get(key)
@@ -803,6 +795,35 @@ export default defineClient({
         if (ctx.sessions.list.getSnapshot().byId[sessionId]?.blank === false) done()
       })
     }
+    /** Sleep that a cancelled send cuts short, so waiting for a setup never outlives the send. */
+    const sleepAbortable = (milliseconds: number, signal: AbortSignal): Promise<void> =>
+      new Promise((resolve, reject) => {
+        if (signal.aborted) return reject(new Error('The send was cancelled.'))
+        const timer = setTimeout(() => {
+          signal.removeEventListener('abort', cancel)
+          resolve()
+        }, milliseconds)
+        const cancel = (): void => {
+          clearTimeout(timer)
+          reject(new Error('The send was cancelled.'))
+        }
+        signal.addEventListener('abort', cancel, { once: true })
+      })
+    /**
+     * Dispatch the trusted setup actions this project flags for a fresh thread workspace, and hold the first turn only
+     * when one of them asked for it. A Host without the read, or a project that flags nothing, costs one request and
+     * changes nothing; a failure never blocks a send.
+     */
+    const prepareWorkspaceSetup = async (input: { readonly sessionId: SessionId; readonly workspaceId: string; readonly signal: AbortSignal }) => {
+      const path = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === input.workspaceId)?.path
+      if (path === undefined) return
+      const read = () => jjThreads.workspaceSetup({ sessionId: input.sessionId, path }, { signal: input.signal })
+      const first = await read()
+      if (!setupWaitsForRun(first)) return
+      const outcome = await awaitWorkspaceSetup({ read, signal: input.signal, now: () => Date.now(), wait: sleepAbortable })
+      if (outcome === 'timed-out')
+        ThreadNotices.show({ text: translate('setupTimedOut', { seconds: String(Math.round(SETUP_WAIT_TIMEOUT_MS / 1000)) }), sessionId: input.sessionId })
+    }
     /** The blank Session of a thread workspace, created or reused without changing what the main view shows. */
     const threadComposerIn = async (workspaceId: string, signal: AbortSignal) => {
       // SAFETY: the id names a workspace the Host's registry just provisioned or listed.
@@ -813,6 +834,10 @@ export default defineClient({
       releaseOnceSent(sessionId, () => held.release())
       const scoped = ctx.sessions.scope(sessionId)
       if (scoped === undefined) throw new Error('This thread is not available. Refresh the thread list and try again.')
+      // A setup the project flagged for new workspaces starts here, with a Session whose cwd the queue can trust.
+      await prepareWorkspaceSetup({ sessionId, workspaceId, signal }).catch(error => {
+        console.warn('jj-integration: workspace setup was not prepared', error)
+      })
       return { sessionId, workspaceId, blank: true, input: ctx.conversation.input.for(scoped) }
     }
     const warmups = new ThreadWarmup<Awaited<ReturnType<typeof threadComposerIn>>>()
@@ -839,7 +864,7 @@ export default defineClient({
         if (input.request.base === undefined) return
         // Reusing a client spare skips the Host rename, so the requested name is not always the folder's: read it back.
         const listed = ctx.workspaces.list.getSnapshot().items.find(item => item.workspaceId === input.workspaceId)
-        const name = listed?.path.split('/').at(-1) ?? input.name
+        const name = listed?.path.split(/[\\/]/u).at(-1) ?? input.name
         workspaceToggle.getSnapshot().context.client.keepSpare(WorkspaceToggle.spareKey(input.request.projectWorkspaceId, input.request.base), {
           workspaceId: input.workspaceId,
           name,
@@ -1176,6 +1201,21 @@ export default defineClient({
             />
           </PluginQueryProvider>
         )),
+      ),
+    )
+    // The composer card for a workspace setup: it sits above the composer of the Session whose workspace is prepared,
+    // and disappears once nothing is left to show.
+    ctx.slots.inject('conversation.input.dock', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.dock', id: 'dshfiles-jj-integration-workspace-setup', order: 4, inject: sessionId => ({ sessionId }) },
+        decorate((props: { readonly sessionId: SessionId }) => {
+          const path = ctx.sessions.list.getSnapshot().byId[props.sessionId]?.cwd
+          return (
+            <PluginQueryProvider>
+              <WorkspaceSetupDock sessionId={props.sessionId} path={path} t={translate} />
+            </PluginQueryProvider>
+          )
+        }),
       ),
     )
     ctx.slots.inject('shell.overlay', () =>

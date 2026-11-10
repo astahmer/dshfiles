@@ -1,5 +1,5 @@
 /**
- * The thread list's read of the inbox (plan `plans/ade-ux` §4.8): row emphasis is a projection of inbox state, never a
+ * The thread list's read of the inbox (plan `docs/ade-ux` §4.8): row emphasis is a projection of inbox state, never a
  * counter of its own. Every open inbox item whose subject is a thread (`kind: 'session'`) becomes that thread's signal;
  * the most urgent one wins (blocking, then failed, then ready). An inline verb on the row runs the item's provider verb
  * through the inbox's own `act`, so the row and the Inbox page always do the same thing.

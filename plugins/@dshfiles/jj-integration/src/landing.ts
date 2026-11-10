@@ -6,6 +6,7 @@ import { ActivityLog, SessionPrompt, WorkspaceRegistry } from './host-edges-prom
 import { IntegrationRecovery } from './integration-recovery.js'
 import { IntegrationRequests } from './integration-requests.js'
 import { JjSettings } from './jj-settings.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
 import { ThreadRebaseEligibilityModel, type ThreadActivityBlocker } from './thread-rebase-eligibility.js'
@@ -64,6 +65,7 @@ const make = Effect.gen(function* () {
   const activity = yield* SessionActivity
   const requests = yield* IntegrationRequests
   const settings = yield* JjSettings
+  const projectBookmarks = yield* ProjectBookmarks
   const sync = yield* WorkspaceSync
   const log = yield* ActivityLog
   const prompt = yield* SessionPrompt
@@ -112,9 +114,9 @@ const make = Effect.gen(function* () {
 
   const land = Effect.fn('jj-integration land')(function* (input: LandInput) {
     yield* requests.recordProgress({ path: input.path, phase: 'queued' })
-    const bookmark = input.bookmark ?? (yield* settings.get).bookmark
     const correlationId = randomUUID()
     const location = yield* threads.locate(input.path)
+    const bookmark = input.bookmark ?? (yield* projectBookmarks.bookmarkFor(location.repoRoot))
     const threadName = location.threadName
     if (threadName === undefined) return yield* notAThread
     const validate = Effect.gen(function* () {

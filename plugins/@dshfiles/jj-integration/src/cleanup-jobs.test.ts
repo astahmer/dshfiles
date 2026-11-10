@@ -150,6 +150,94 @@ describe('createCleanupJobTrail', () => {
   })
 })
 
+const failedRow = (repoRoot: string, name: string): CleanupResult['workspaces'][number] => ({
+  repoRoot,
+  name,
+  path: `${repoRoot}-threads/${name}`,
+  kind: 'integrated',
+  lastUsedAt: 1,
+  missing: false,
+  outcome: 'failed',
+  message: 'EACCES: permission denied, rmdir',
+})
+
+describe('cleanup jobs tied to their project', () => {
+  it('records the owning repository at start, and the scan never replaces one already known', () => {
+    const trail = createCleanupJobTrail({ now: clock().now })
+    const known = trail.start({ ...request, path: '/work/sample-threads/thread-aaaaaa' }, '/work/sample')
+    const traced = trail.start(request)
+
+    expect(trail.scoped(known.id, '/elsewhere').repoRoot).toBe('/work/sample')
+    expect(traced.repoRoot).toBeNull()
+    expect(trail.scoped(traced.id, '/work/sample').repoRoot).toBe('/work/sample')
+  })
+
+  it('gives a failed job a recovery that names its project and never suggests forcing', () => {
+    const trail = createCleanupJobTrail({ now: clock().now })
+    const job = trail.start(request, '/work/sample')
+
+    const failed = trail.failed(job.id, 'jj workspace forget exited 1')
+
+    expect(failed.recovery).toContain('Clean up thread workspaces… again from the sample Jujutsu panel')
+    expect(failed.recovery).toContain('never forces unlanded work')
+    expect(failed.recovery).not.toMatch(/force: ?true|--force/u)
+  })
+
+  it('gives a done job a recovery only when a workspace it tried stayed in place', () => {
+    const trail = createCleanupJobTrail({ now: clock().now })
+    const clean = trail.done(trail.start(request, '/work/sample').id, result({ workspaces: 2 }))
+    const partial = trail.done(trail.start(request, '/work/sample').id, {
+      ...result({ workspaces: 1 }),
+      workspaces: [failedRow('/work/sample', 'thread-bbbbbb'), failedRow('/work/sample', 'thread-cccccc')],
+    })
+
+    expect(clean.recovery).toBeNull()
+    expect(partial.recovery).toContain('thread-bbbbbb and 1 more stayed in place')
+    expect(partial.recovery).toContain('again from the sample Jujutsu panel')
+    expect(partial.recovery).toContain('Untracked folders')
+  })
+
+  it('keeps the rows of each project’s newest job, so a run elsewhere does not hide this project’s failure', () => {
+    const trail = createCleanupJobTrail({ now: clock().now })
+    const sample = trail.done(trail.start(request, '/work/sample').id, { ...result({ workspaces: 0 }), workspaces: [failedRow('/work/sample', 'thread-a')] })
+    const other = trail.done(trail.start({ ...request, path: '/work/other' }, '/work/other').id, result({ workspaces: 1 }))
+
+    const views = trail.trail()
+
+    expect(views.map(view => [view.id, view.result === null])).toEqual([
+      [other.id, false],
+      [sample.id, false],
+    ])
+    expect(views.filter(view => CleanupJobModel.belongsTo(view, '/work/sample')).map(view => view.id)).toEqual([sample.id])
+  })
+
+  it('shows a run over every repository in a project only while it runs, failed, or touched that project', () => {
+    const trail = createCleanupJobTrail({ now: clock().now })
+    const everywhere = { ...request, path: null }
+    const running = trail.start(everywhere)
+    expect(CleanupJobModel.belongsTo(running, '/work/sample')).toBe(true)
+    const failed = trail.failed(running.id, 'Session list unreadable')
+    expect(CleanupJobModel.belongsTo(failed, '/work/sample')).toBe(true)
+    const elsewhere = trail.done(trail.start(everywhere).id, { ...result({ workspaces: 0 }), workspaces: [failedRow('/work/other', 'thread-a')] })
+    expect(CleanupJobModel.belongsTo(elsewhere, '/work/sample')).toBe(false)
+    expect(CleanupJobModel.belongsTo(elsewhere, '/work/other')).toBe(true)
+  })
+
+  it('never lets a run over every repository that named nothing of this project replace its last failure', () => {
+    const trail = createCleanupJobTrail({ now: clock().now })
+    const everywhere = { ...request, path: null }
+    const failure = trail.done(trail.start(request, '/work/sample').id, { ...result({ workspaces: 0 }), workspaces: [failedRow('/work/sample', 'thread-a')] })
+    const empty = trail.done(trail.start(everywhere).id, result({ workspaces: 0 }))
+    const newer = trail.done(trail.start(everywhere).id, result({ workspaces: 0 }))
+    const dropped = trail.trail().find(view => view.id === empty.id)
+
+    expect(CleanupJobModel.belongsTo(newer, '/work/sample')).toBe(false)
+    expect(dropped?.result).toBeNull()
+    expect(dropped === undefined ? true : CleanupJobModel.belongsTo(dropped, '/work/sample')).toBe(false)
+    expect(trail.trail().filter(view => CleanupJobModel.belongsTo(view, '/work/sample'))[0]?.id).toBe(failure.id)
+  })
+})
+
 describe('CleanupJobModel.sameRequest', () => {
   it('matches the same scope regardless of kind order or trigger', () => {
     expect(CleanupJobModel.sameRequest(request, { path: '/work/sample', olderThanHours: 6, kinds: ['integrated', 'empty'], trigger: 'automatic' })).toBe(true)

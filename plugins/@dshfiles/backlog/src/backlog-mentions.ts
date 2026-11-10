@@ -1,7 +1,8 @@
-import type { InputTriggerCandidate, InputTriggerSource } from '@dshfiles/input-trigger/client'
+import type { InputTriggerCandidate, InputTriggerSource, RestoredReference } from '@dshfiles/input-trigger/client'
 import { Option, Schema } from 'effect'
 
 import type { BacklogSummaryView } from './api.js'
+import { nextBacklogMention } from './backlog-mention-text.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogItems } from './item.js'
 import { formatBacklogMention } from './backlog-mention-text.js'
@@ -85,6 +86,24 @@ const createSource = (options: {
       if (value === null) throw new Error('Backlog reference is invalid.')
       return formatBacklogMention(value)
     },
+  },
+  restore(_session, text) {
+    const spans: RestoredReference[] = []
+    let cursor = 0
+    for (let mention = nextBacklogMention(text, cursor); mention !== undefined; mention = nextBacklogMention(text, cursor)) {
+      cursor = mention.end
+      // A bare `b:x` written in prose carries no item title; only the composer's own serialization restores a chip.
+      if (mention.title === null) continue
+      spans.push({
+        source: 'backlog',
+        ref: JSON.stringify({ ref: mention.ref, title: mention.title }),
+        label: `${BacklogReference.label(mention.ref)} ${mention.title}`,
+        clipboardText: text.slice(mention.start, mention.end),
+        start: mention.start,
+        end: mention.end,
+      })
+    }
+    return spans
   },
 })
 

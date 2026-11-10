@@ -21,6 +21,10 @@ DSH already folds them into the blocks it hands every tool view: a dispatched ca
 
 `tool.call.toolview` is keyed per tool, so a registration replaces a card instead of adding to it. One level up, `@deepseek-ai/dsh-client-ui-tool` renders each tool call through its `conversation.chat.node` `tool-call` entry (`ToolCallTree`), which dispatches every atomic call through its `renderSlot('tool.call.toolview', owner)`. This plugin swaps that ledger entry's component (read through the public `ctx.slots.entriesOfSlot`) for a wrapper that renders the original tree with a `renderSlot` framing each dispatch with the timing line. The tree keeps its slot authorization, keys and memoization, and every card renders exactly as before. It re-wraps when the entry is re-registered (HMR, a plugin taking the key) and puts the original back on dispose. A shadowing registration cannot do this: the tree's `tool.call.toolview` child slot is declared by the native entry, so a shadow could not render the cards.
 
+### Sections under a card
+
+Other plugins add to the same frame through the `@dshfiles/tool-meta/tool-call-sections` dshx module: `plugin.add(ToolCallSections, { id, Section })` renders `Section` under every tool card, whichever view owns the card. `@dshfiles/background-jobs` uses it for the live job preview. A `Section` returns null for calls it has nothing to say about, and it subscribes to its own live data so the transcript above it does not re-render.
+
 ### Self-detection
 
 The seam depends on three things DSH could change. Each logs one `@dshfiles/tool-meta:` console warning and leaves the cards untouched:

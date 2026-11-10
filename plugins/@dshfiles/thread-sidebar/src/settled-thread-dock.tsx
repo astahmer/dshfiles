@@ -18,8 +18,8 @@ import { threadDelayMs } from './thread-delays.js'
 /**
  * Above a settled thread's composer: a "This thread is settled." notice, while the composer itself is blocked. The Host
  * refuses the model step a settled Session proposes, so the click that lifts the status has to be here rather than a
- * message that would end as `blocked`. It reads like the jj rebase notice beside it: one centred status card with the
- * settle age and the archive deadline, then the actions.
+ * message that would end as `blocked`. One narrow status strip: "Settled 2h" as the heading, the archive deadline
+ * beside it, then Archive and the primary Unsettle action that takes the block away.
  *
  * It reads the sidebar's own preference source: the same Host settings when the Client has them, and the same browser
  * copy when a Host without the Settings namespace is serving the panel.
@@ -61,23 +61,19 @@ export const SettledThreadDock = (props: {
     mutationFn: () => SidebarOrganization.archiveWithoutStopping((targetId, options) => workspaces.archiveSession(targetId, options), sessionId),
   })
   const settledAge = settledAt === undefined ? undefined : settledAgeLabel(formatAge(settledAt, now))
+  const title = settledAge === undefined ? t('threadSidebarSettled') : t('threadSidebarSettledAt', { when: settledAge })
   const meta =
-    settledAge === undefined && archiveAt === undefined ? undefined : (
-      <>
-        {settledAt === undefined || settledAge === undefined ? null : (
-          <time dateTime={new Date(settledAt).toISOString()}>{t('threadSidebarSettledAt', { when: settledAge })}</time>
-        )}
-        {archiveAt === undefined ? null : (
-          <time dateTime={new Date(archiveAt).toISOString()}>{t('threadSidebarSettledArchiveAt', { when: formatRemaining(archiveAt, now) })}</time>
-        )}
-      </>
+    archiveAt === undefined ? undefined : (
+      <time dateTime={new Date(archiveAt).toISOString()}>{t('threadSidebarSettledArchiveAt', { when: formatRemaining(archiveAt, now) })}</time>
     )
   if (!settled) return null
   return (
     <DockNotice
       label={t('threadSidebarSettledBanner')}
-      icon={<CheckCircleIcon className="dshx:size-4 dshx:shrink-0" aria-hidden />}
+      heading={title}
+      icon={<CheckCircleIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden />}
       meta={meta}
+      actionLabel={t('threadSidebarThreadActions')}
       actions={
         <>
           <Button size="sm" variant="ghost" disabled={archive.isPending} onClick={() => archive.mutate()}>
@@ -86,14 +82,14 @@ export const SettledThreadDock = (props: {
           </Button>
           <Button
             size="sm"
-            variant="outline"
+            variant="default"
             onClick={() =>
               updatePreferences(
                 SettledThreadsModel.unsettle({ settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }, [sessionId]),
               )
             }
           >
-            {t('threadSidebarUnsettleToReply')}
+            {t('threadSidebarUnsettle')}
           </Button>
         </>
       }

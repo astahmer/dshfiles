@@ -343,7 +343,7 @@ const ListPane = (
 ): JSX.Element =>
   props.destination.id === 'threads' ? (
     <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-destination-index="threads">
-      {props.searchThreads === null && props.customizeThreads === undefined ? null : (
+      {props.searchThreads === null && props.customizeThreads === undefined && props.destination.sections.length === 0 ? null : (
         <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-2">
           {props.searchThreads === null ? null : (
             <Button
@@ -355,6 +355,31 @@ const ListPane = (
               <SearchIcon className="dshx:size-3.5" aria-hidden="true" />
               {props.labels.searchThreads}
             </Button>
+          )}
+          {props.destination.sections.length === 0 ? null : (
+            <nav aria-label="Threads pages" className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
+              {props.destination.sections.map(section => {
+                const active = props.activePanelId === section.panelId
+                return (
+                  <Tooltip key={section.panelId}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        data-section={section.panelId}
+                        size="icon-sm"
+                        variant={active ? 'secondary' : 'ghost'}
+                        className="dshx:shrink-0 dshx:text-muted-foreground"
+                        aria-label={section.label}
+                        aria-current={active ? 'page' : undefined}
+                        onClick={() => props.openSection(section.panelId)}
+                      >
+                        {props.renderPanelIcon(section.panelId, 16, active)}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{section.label}</TooltipContent>
+                  </Tooltip>
+                )
+              })}
+            </nav>
           )}
           {props.customizeThreads === undefined ? null : (
             <Button
@@ -369,23 +394,6 @@ const ListPane = (
             </Button>
           )}
         </div>
-      )}
-      {props.destination.sections.length === 0 ? null : (
-        <nav aria-label="Threads pages" className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:gap-1 dshx:px-2 dshx:pb-1">
-          {props.destination.sections.map(section => (
-            <Button
-              key={section.panelId}
-              data-section={section.panelId}
-              size="xs"
-              variant={props.activePanelId === section.panelId ? 'secondary' : 'ghost'}
-              aria-current={props.activePanelId === section.panelId ? 'page' : undefined}
-              className="dshx:font-normal"
-              onClick={() => props.openSection(section.panelId)}
-            >
-              {section.label}
-            </Button>
-          ))}
-        </nav>
       )}
       <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-hidden dshx:*:w-full dshx:*:min-w-0">{props.threadList}</div>
     </div>

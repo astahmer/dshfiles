@@ -107,6 +107,8 @@ const offlineChecks = {
 describe('CLI argument parser', () => {
   it('parses commands and command-specific options', () => {
     expect(parseCliArgs(['build', '--cwd', '/tmp/project', '--verbose'])).toMatchObject({ command: 'build', cwd: '/tmp/project', verbose: true })
+    expect(parseCliArgs(['build', '--no-typecheck'])).toMatchObject({ command: 'build', typecheck: false })
+    expect(() => parseCliArgs(['check', '--no-typecheck'])).toThrow('--no-typecheck is only valid with build')
     expect(parseCliArgs(['check', '--json'])).toMatchObject({ command: 'check', json: true })
     expect(parseCliArgs(['dev', '--open', '--port', '0'])).toMatchObject({ command: 'dev', open: true, port: 0 })
     expect(parseCliArgs(['add', 'hook', '--event', 'agent.ready', '--file', 'src/ready.ts', '--dry-run', '--json'])).toMatchInlineSnapshot(`
@@ -123,6 +125,7 @@ describe('CLI argument parser', () => {
         "json": true,
         "open": false,
         "runtime": false,
+        "typecheck": true,
         "verbose": false,
         "version": false,
       }

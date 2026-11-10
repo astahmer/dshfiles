@@ -30,6 +30,15 @@ Its directory is mode `0700`; socket and token metadata are mode `0600`. The
 token is generated for each Host lifetime. The bridge accepts only external
 principals; DSH Agent identities are taken from the Host tool execution.
 
+Windows has no Unix domain socket files, so there the bridge listens on a named
+pipe, `\\.\pipe\dshx-comm-<digest>-<random>`. Pipe names are machine-wide, so
+the random part is new for each Host run and no other local user can claim the
+name first; clients read it from the metadata file. Windows reports no POSIX
+mode bits, so the directory and metadata stay private through the user
+profile's ACL instead of the `0700`/`0600` checks. The Inspect bridge
+(`DSHX_INSPECT_BRIDGE=1`) uses the same endpoint rules
+(`src/bridge/local-endpoint.ts`).
+
 ## Delivery behavior
 
 - On Host startup, the plugin enumerates existing live Agents and subscribes

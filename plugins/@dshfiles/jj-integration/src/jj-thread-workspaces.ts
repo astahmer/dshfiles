@@ -1,11 +1,11 @@
 import { JjViewReads, type JjRunError } from '@dshfiles/jj-cli'
 import { KeyedMutex } from '@dshfiles/dshx/effect/keyed-mutex'
 import { commandAttributes } from '@dshfiles/dshx/tracing'
-import { Context, Effect, FiberMap, FileSystem, Layer, Option, Path, type PlatformError, Ref, Schema } from 'effect'
+import { Context, Effect, Fiber, FiberMap, FileSystem, Layer, Option, Path, type PlatformError, Ref, Schema } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
-import { JjFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
+import { DestinationRejected, JjFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
 import { Executables } from './executables-promise.js'
-import { JjSettings } from './jj-settings.js'
+import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepoLocks } from './repo-locks.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadMetadata, type RebaseMetadataEntry } from './thread-metadata.js'
@@ -32,6 +32,11 @@ import { LAND_ATTEMPTS, runVerifiedLand, type LandSettlement, type LandStepResul
  * New thread screen and the sidebar are open: 45 thread workspaces measured 2.1s at 4 and 1.0s at 8, with no gain above.
  */
 const STATUS_READ_CONCURRENCY = 8
+/**
+ * Workspaces answered by one `jj log` in a repository scan. Each adds about 300 bytes to the revset and template
+ * arguments, so this stays well under Linux's 128 KiB limit for a single argument.
+ */
+const MAX_WORKSPACES_PER_READ = 128
 
 const REVISION_TEMPLATE = 'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
 const LAND_REVISION_TEMPLATE =
@@ -51,6 +56,7 @@ const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 const HEX_ID = /^[0-9a-f]+$/u
 const OPERATION_ID = /^[0-9a-f]{12,128}$/u
 const isCommitId = (value: string): boolean => value.length >= 40 && HEX_ID.test(value)
+const RESOLVED_BOOKMARKS_TEMPLATE = 'local_bookmarks.filter(|bookmark| !bookmark.conflict()).map(|bookmark| bookmark.name() ++ "\\n").join("")'
 const exactBookmarkNamePattern = (bookmark: string): string => `exact:${JSON.stringify(bookmark)}`
 const bookmarkRevset = (bookmark: string): string => `bookmarks(${exactBookmarkNamePattern(bookmark)})`
 const isUnsupportedRevsetPath = (path: string): boolean =>
@@ -129,9 +135,47 @@ const knownCommitRevset = (commitId: string): string => `commit_id(${JSON.string
 
 const lines = (stdout: string): readonly string[] => stdout.split('\n').filter(line => line.length > 0)
 
-const parseRevisions = (stdout: string): Effect.Effect<readonly ThreadRevision[], JjFailed> => {
+/**
+ * Split the marked output of the merged workspace read back into its two halves, or undefined when a line carries
+ * neither mark. Pure, so the surrounding Effect program never branches inside a loop.
+ */
+const classifyMarkedRevisions = (marked: readonly string[]): { readonly unlanded: string[]; readonly behind: string[] } | undefined => {
+  const unlanded: string[] = []
+  const behind: string[] = []
+  for (const line of marked) {
+    if (line.startsWith('U\t')) unlanded.push(line.slice(2))
+    else if (line.startsWith('B\t')) behind.push(line.slice(2))
+    else return undefined
+  }
+  return { unlanded, behind }
+}
+
+/**
+ * Split the output of the read shared by several workspaces into each workspace's two halves, or undefined when a line
+ * names no workspace or an unknown one. A line is `<index><U|B>[,…]\t<revision>`.
+ */
+const classifyWorkspaceRevisions = (
+  marked: readonly string[],
+  workspaceCount: number,
+): readonly { readonly unlanded: string[]; readonly behind: string[] }[] | undefined => {
+  const halves = Array.from({ length: workspaceCount }, () => ({ unlanded: new Array<string>(), behind: new Array<string>() }))
+  for (const line of marked) {
+    const separator = line.indexOf('\t')
+    if (separator <= 0) return undefined
+    for (const owner of line.slice(0, separator).split(',')) {
+      const entry = halves[Number(owner.slice(0, -1))]
+      const half = owner.at(-1)
+      if (entry === undefined || (half !== 'U' && half !== 'B')) return undefined
+      const revisionLines = half === 'U' ? entry.unlanded : entry.behind
+      revisionLines.push(line.slice(separator + 1))
+    }
+  }
+  return halves
+}
+
+const parseRevisionLines = (revisionLines: readonly string[]): Effect.Effect<readonly ThreadRevision[], JjFailed> => {
   const revisions: ThreadRevision[] = []
-  for (const line of lines(stdout)) {
+  for (const line of revisionLines) {
     const [changeId = '', commitId = '', conflict = '', ...description] = line.split('\t')
     if (changeId.length === 0 || !isCommitId(commitId) || (conflict !== 'true' && conflict !== 'false'))
       return Effect.fail(jjFailed('JJ returned incomplete revision metadata; refusing to continue.'))
@@ -139,6 +183,8 @@ const parseRevisions = (stdout: string): Effect.Effect<readonly ThreadRevision[]
   }
   return Effect.succeed(revisions)
 }
+
+const parseRevisions = (stdout: string): Effect.Effect<readonly ThreadRevision[], JjFailed> => parseRevisionLines(lines(stdout))
 
 interface LandRevision {
   readonly revision: ThreadRevision
@@ -250,6 +296,18 @@ const conflictFiles = (stdout: string): readonly string[] =>
     return file !== undefined && file.length > 0 ? [file] : []
   })
 
+const destinationRecovery = 'Pick another bookmark in the destination bar, or choose the project’s main branch in Settings › Projects, then retry.'
+const unknownDestination = (target: string) =>
+  new DestinationRejected({ detail: `"${target}" is not a bookmark or revision in this repository, so no workspace was created. ${destinationRecovery}` })
+const ambiguousDestination = (target: string) =>
+  new DestinationRejected({
+    detail: `"${target}" points at more than one revision, so no workspace was created. ${destinationRecovery} To keep it, move a bookmark onto one revision with \`jj bookmark set <name> -r <revision>\`.`,
+  })
+
+/** jj's own words for a name or prefix with several targets, and for text that names nothing. */
+const AMBIGUOUS_REVISION = /is ambiguous|is conflicted|is divergent/iu
+const UNKNOWN_REVISION = /doesn't exist|failed to parse/iu
+
 const jjRunFailed =
   (args: readonly string[]) =>
   (error: JjRunError): JjFailed => {
@@ -264,7 +322,7 @@ const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const locks = yield* RepoLocks
-  const settings = yield* JjSettings
+  const projectBookmarks = yield* ProjectBookmarks
   const metadata = yield* ThreadMetadata
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const executables = yield* Executables
@@ -273,7 +331,7 @@ const make = Effect.gen(function* () {
   // A spare exists in `jj workspace list` before its record is written; until then it is still not a thread.
   const sparesBeingAdded = yield* Ref.make<ReadonlySet<string>>(new Set())
 
-  const bookmark = Effect.map(settings.get, current => current.bookmark)
+  const bookmarkFor = projectBookmarks.bookmarkFor
 
   const threadsDirectory = metadata.threadsDirectory
 
@@ -321,6 +379,63 @@ const make = Effect.gen(function* () {
       ],
       cwd,
     ).pipe(Effect.flatMap(parseRevisions))
+
+  /**
+   * Both halves of a workspace's state from one `jj log`: the two revsets are disjoint, so the template marks each line
+   * with the half it came from. `latest(...)` keeps the behind count capped the way `-n` did without truncating the
+   * unlanded list, and one jj process per workspace instead of two, which halves the cost of a cold repository scan.
+   */
+  const threadRevisions = Effect.fnUntraced(function* (input: { readonly unlanded: string; readonly behind: string; readonly cwd: string }) {
+    const asTemplateString = (revset: string) => revset.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
+    const output = yield* jj(
+      [
+        '--ignore-working-copy',
+        'log',
+        '--no-graph',
+        '-r',
+        `(${input.unlanded}) | latest(${input.behind}, ${MAX_BEHIND_REVISIONS + 1})`,
+        '-T',
+        `if(self.contained_in("${asTemplateString(input.unlanded)}"), "U\\t", "B\\t") ++ ${REVISION_TEMPLATE}`,
+      ],
+      input.cwd,
+    )
+    const classified = classifyMarkedRevisions(lines(output))
+    if (classified === undefined) return yield* jjFailed('JJ returned incomplete revision metadata; refusing to continue.')
+    return { unlanded: yield* parseRevisionLines(classified.unlanded), behind: yield* parseRevisionLines(classified.behind) }
+  })
+
+  /**
+   * Every workspace's halves from one `jj log` per chunk: each jj spawn loads the repository view, which is most of its
+   * cost on a store with dozens of workspaces. A revision can belong to several workspaces, so each line lists the
+   * `<index><half>` marks of every workspace that has it. `--no-graph` prints the union in index order, the order each
+   * workspace's own read printed its subset in.
+   */
+  const workspacesRevisions = Effect.fnUntraced(function* (input: { readonly names: readonly string[]; readonly target: string; readonly cwd: string }) {
+    const asTemplateString = (revset: string) => revset.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
+    const halves = input.names.map(name => ({
+      unlanded: unlandedRevset(name, input.target),
+      behind: `latest(${behindRevset(`${name}@`, input.target)}, ${MAX_BEHIND_REVISIONS + 1})`,
+    }))
+    const marks = halves.map(
+      (half, index) =>
+        `if(self.contained_in("${asTemplateString(half.unlanded)}"), "${index}U", if(self.contained_in("${asTemplateString(half.behind)}"), "${index}B"))`,
+    )
+    const output = yield* jj(
+      [
+        '--ignore-working-copy',
+        'log',
+        '--no-graph',
+        '-r',
+        halves.map(half => `(${half.unlanded}) | ${half.behind}`).join(' | '),
+        '-T',
+        `separate(",", ${marks.join(', ')}) ++ "\\t" ++ ${REVISION_TEMPLATE}`,
+      ],
+      input.cwd,
+    )
+    const marked = classifyWorkspaceRevisions(lines(output), input.names.length)
+    if (marked === undefined) return yield* jjFailed('JJ returned incomplete revision metadata; refusing to continue.')
+    return yield* Effect.forEach(marked, entry => Effect.all({ unlanded: parseRevisionLines(entry.unlanded), behind: parseRevisionLines(entry.behind) }))
+  })
 
   const readAtOperation = (args: readonly string[], cwd: string, operationId: string) => jj(['--at-operation', operationId, ...args], cwd)
 
@@ -549,7 +664,7 @@ const make = Effect.gen(function* () {
   })
 
   const targetRevset = Effect.fnUntraced(function* (repoRoot: string, target?: string) {
-    const name = target ?? (yield* bookmark)
+    const name = target ?? (yield* bookmarkFor(repoRoot))
     const local = yield* revisions(bookmarkRevset(name), repoRoot, { observe: true })
     if (local.length > 0) return bookmarkRevset(name)
     const remoteRevset = `remote_bookmarks(${exactBookmarkNamePattern(name)}, remote=${exactBookmarkNamePattern('origin')})`
@@ -560,6 +675,11 @@ const make = Effect.gen(function* () {
     return bookmarkRevset(name)
   })
   const unlandedRevset = (name: string, target: string): string => `(::${name}@ ~ ::${target}) ~ empty()`
+  /**
+   * What removing a workspace abandons. Revisions a bookmark reaches stay: `jj abandon` deletes a bookmark that points at
+   * an abandoned revision, which would destroy the very branch that keeps the work.
+   */
+  const ownedRevset = (name: string, target: string): string => `(::${name}@ ~ ::${target}) ~ ::(working_copies() ~ ${name}@) ~ ::bookmarks()`
   /**
    * Commits the bookmark has that this working copy lacks. Comparing the other way round counts the workspace's own
    * commits — including its always-present empty working copy — so a workspace that merely predates the bookmark's
@@ -634,31 +754,33 @@ const make = Effect.gen(function* () {
     const names = listedNames.filter(name => name.length > 0 && !spares.has(name) && !inFlightSpares.has(name))
     const rebaseMetadata = yield* readRebaseMetadata(repoRoot)
     const target = yield* targetRevset(repoRoot)
-    const statuses = yield* Effect.forEach(
+    const workspaces = (yield* Effect.forEach(
       names,
-      name =>
-        Effect.gen(function* () {
-          const workspacePath = path.join(directory, name)
-          const present = yield* exists(path.join(workspacePath, '.jj'))
-          if (!present && !name.startsWith('thread-')) return undefined
-          const unlanded = yield* revisions(unlandedRevset(name, target), repoRoot, { observe: true })
-          const behind = yield* revisions(behindRevset(`${name}@`, target), repoRoot, { observe: true, maxRevisions: MAX_BEHIND_REVISIONS + 1 })
-          return withRebaseMetadata(
-            {
-              name,
-              path: workspacePath,
-              repoRoot,
-              missing: !present,
-              unlanded,
-              behind: behind.length > 0,
-              behindCount: Math.min(behind.length, MAX_BEHIND_REVISIONS),
-            },
-            rebaseMetadata[name],
-          )
-        }),
+      name => Effect.map(exists(path.join(directory, name, '.jj')), present => (present || name.startsWith('thread-') ? [{ name, present }] : [])),
       { concurrency: STATUS_READ_CONCURRENCY },
+    )).flat()
+    const chunks = Array.from({ length: Math.ceil(workspaces.length / MAX_WORKSPACES_PER_READ) }, (_, index) =>
+      workspaces.slice(index * MAX_WORKSPACES_PER_READ, (index + 1) * MAX_WORKSPACES_PER_READ),
     )
-    return statuses.filter((status): status is ThreadStatus => status !== undefined)
+    const states = (yield* Effect.forEach(chunks, chunk => workspacesRevisions({ names: chunk.map(workspace => workspace.name), target, cwd: repoRoot }), {
+      concurrency: STATUS_READ_CONCURRENCY,
+    })).flat()
+    const statuses = workspaces.map((workspace, index) => {
+      const state = states[index] ?? { unlanded: [], behind: [] }
+      return withRebaseMetadata(
+        {
+          name: workspace.name,
+          path: path.join(directory, workspace.name),
+          repoRoot,
+          missing: !workspace.present,
+          unlanded: state.unlanded,
+          behind: state.behind.length > 0,
+          behindCount: Math.min(state.behind.length, MAX_BEHIND_REVISIONS),
+        },
+        rebaseMetadata[workspace.name],
+      )
+    })
+    return statuses
   })
 
   const reviewHistory = Effect.fn('thread workspaces review history')(function* (input: { readonly repoRoot: string; readonly name: string }) {
@@ -674,12 +796,8 @@ const make = Effect.gen(function* () {
   const status = Effect.fn('thread workspaces status')(function* (repoRoot: string, name: string) {
     const workspacePath = path.join(yield* threadsDirectory(repoRoot), name)
     const target = yield* targetRevset(workspacePath)
-    const [unlanded, behind, rebaseMetadata] = yield* Effect.all(
-      [
-        revisions(`(::@ ~ ::${target}) ~ empty()`, workspacePath, { observe: true }),
-        revisions(behindRevset('@', target), workspacePath, { observe: true, maxRevisions: MAX_BEHIND_REVISIONS + 1 }),
-        readRebaseMetadata(repoRoot),
-      ],
+    const [state, rebaseMetadata] = yield* Effect.all(
+      [threadRevisions({ unlanded: `(::@ ~ ::${target}) ~ empty()`, behind: behindRevset('@', target), cwd: workspacePath }), readRebaseMetadata(repoRoot)],
       { concurrency: 'unbounded' },
     )
     return withRebaseMetadata(
@@ -688,9 +806,9 @@ const make = Effect.gen(function* () {
         path: workspacePath,
         repoRoot,
         missing: !(yield* exists(path.join(workspacePath, '.jj'))),
-        unlanded,
-        behind: behind.length > 0,
-        behindCount: Math.min(behind.length, MAX_BEHIND_REVISIONS),
+        unlanded: state.unlanded,
+        behind: state.behind.length > 0,
+        behindCount: Math.min(state.behind.length, MAX_BEHIND_REVISIONS),
       },
       rebaseMetadata[name],
     )
@@ -721,6 +839,45 @@ const make = Effect.gen(function* () {
     )
 
   /**
+   * The one commit a thread would start from. jj 0.46 registers a workspace and creates its folder before it resolves
+   * `-r`, so a bad destination must be refused here: `workspace add` would exit 1 and leave both behind. The commit id
+   * is what jj then gets, so what was checked is what is used. Reads through `run`, not `jj`, to tell a destination
+   * that names nothing or several revisions from jj itself failing.
+   */
+  const resolveDestination = Effect.fnUntraced(function* (repoRoot: string, target: string) {
+    if (target.startsWith('-')) return yield* unknownDestination(target)
+    const output = yield* run(['--ignore-working-copy', 'log', '--no-graph', '-n', '2', '-r', target, '-T', 'commit_id ++ "\\n"'], repoRoot)
+    if (output.exitCode !== 0) {
+      if (AMBIGUOUS_REVISION.test(output.stderr)) return yield* ambiguousDestination(target)
+      if (UNKNOWN_REVISION.test(output.stderr)) return yield* unknownDestination(target)
+      return yield* jjFailed(`Could not resolve "${target}" in ${repoRoot}: ${output.stderr.trim().slice(0, 400)}`)
+    }
+    const [commitId, ...others] = lines(output.stdout)
+    if (commitId === undefined) return yield* unknownDestination(target)
+    if (others.length > 0) return yield* ambiguousDestination(target)
+    if (!isCommitId(commitId)) return yield* jjFailed('JJ returned an invalid commit ID; refusing revision selection.')
+    return commitId
+  })
+
+  /** Only for a workspace this call made or an unclaimed spare: it deletes the folder and nothing can be unlanded there. */
+  const removeUnclaimedWorkspace = (repoRoot: string, name: string, workspacePath: string) =>
+    Effect.gen(function* () {
+      yield* jj(['--ignore-working-copy', 'workspace', 'forget', name], repoRoot).pipe(Effect.ignore)
+      yield* fileSystem.remove(workspacePath, { recursive: true, force: true }).pipe(Effect.ignore)
+      yield* gitWorktrees(repoRoot, ['prune'])
+    })
+
+  /**
+   * `name` must be free. A failure after jj registered the workspace is undone: the leftover would hold the name, so
+   * the next attempt would take a fresh one and make a second workspace.
+   */
+  const addWorkspace = (repoRoot: string, name: string, workspacePath: string, commitId: string) =>
+    // Plain `workspace add`: with --ignore-working-copy jj registers the workspace but never checks its files out.
+    jj(['workspace', 'add', workspacePath, '--name', name, '-r', knownCommitRevset(commitId)], repoRoot).pipe(
+      Effect.onError(() => removeUnclaimedWorkspace(repoRoot, name, workspacePath)),
+    )
+
+  /**
    * One checked-out, unclaimed workspace per repository and base, made ahead of the first send that isolates a thread:
    * `jj workspace add` checks the whole tree out (1.6–2.8 s on a 2 700-file repo with 70 workspaces), while moving a
    * spare onto the base as it is now takes 0.15–0.35 s. The record survives a Host restart; a spare deleted from disk
@@ -728,21 +885,38 @@ const make = Effect.gen(function* () {
    */
   const warmSpare = Effect.fnUntraced(function* (repoRoot: string, target: string) {
     if ((yield* usableSpare(repoRoot, (yield* readSpares(repoRoot))[target])) !== undefined) return
-    const name = `thread-${yield* ThreadMetadata.randomHex(3)}`
+    const commitId = yield* resolveDestination(repoRoot, target)
+    const name = yield* freeThreadName(repoRoot, undefined)
     const directory = yield* threadsDirectory(repoRoot)
     yield* Ref.update(sparesBeingAdded, current => new Set([...current, name]))
     yield* Effect.gen(function* () {
       yield* fileSystem.makeDirectory(directory, { recursive: true })
-      yield* jj(['workspace', 'add', path.join(directory, name), '--name', name, '-r', target], repoRoot)
+      yield* addWorkspace(repoRoot, name, path.join(directory, name), commitId)
       yield* updateSpares(repoRoot, spares => ({ ...spares, [target]: name }))
     }).pipe(Effect.ensuring(Ref.update(sparesBeingAdded, current => new Set([...current].filter(entry => entry !== name)))))
   })
 
-  /** Make the spare for `base` in the background; outside the repo lock, since adding a workspace moves no bookmark. */
+  /**
+   * Make the spare for `base` in the background; outside the repo lock, since adding a workspace moves no bookmark. A
+   * failure stays silent because nobody asked for this spare: the send that needs the workspace reports it from `provision`.
+   */
+  const warmingKey = (repoRoot: string, target: string): string => `${repoRoot}\0${target}`
+
   const prewarm = Effect.fn('thread workspaces prewarm')(function* (repoRoot: string, base?: string) {
-    const target = base ?? (yield* bookmark)
-    yield* FiberMap.run(warming, `${repoRoot}\0${target}`, warmSpare(repoRoot, target).pipe(Effect.ignore), { onlyIfMissing: true })
+    const target = base ?? (yield* bookmarkFor(repoRoot))
+    yield* FiberMap.run(warming, warmingKey(repoRoot, target), warmSpare(repoRoot, target).pipe(Effect.ignore), { onlyIfMissing: true })
   })
+
+  /**
+   * A spare still being added for this base finishes first: its `jj workspace add` and a second one from `provision`
+   * both export refs, and in a colocated repository git refuses the later packed-refs transaction (“Could not commit
+   * packed-ref transaction”). Waiting also lets `provision` claim that spare instead of checking the tree out again.
+   * The spare takes only its own spare-record lock, never the repository lock `provision` holds.
+   */
+  const awaitWarming = (repoRoot: string, target: string) =>
+    FiberMap.get(warming, warmingKey(repoRoot, target)).pipe(
+      Effect.flatMap(fiber => (Option.isSome(fiber) ? Effect.asVoid(Fiber.await(fiber.value)) : Effect.void)),
+    )
 
   /** Neither a folder nor a jj workspace may already carry the name: reusing either would put two threads in one checkout. */
   const isFreeThreadName = Effect.fnUntraced(function* (repoRoot: string, name: string) {
@@ -759,35 +933,65 @@ const make = Effect.gen(function* () {
       return (yield* isFreeThreadName(repoRoot, name)) ? name : yield* freeThreadName(repoRoot, undefined)
     })
 
+  /**
+   * Hand the spare over on `commitId`. The record goes first, so a Host dying midway can never give one checkout to two
+   * threads; a spare that then cannot be moved is removed, because it holds nothing and would fail the same way next time.
+   */
+  const claimSpare = Effect.fnUntraced(function* (
+    repoRoot: string,
+    spare: string,
+    claim: { readonly target: string; readonly commitId: string; readonly requestedName: string | undefined },
+  ) {
+    const directory = yield* threadsDirectory(repoRoot)
+    yield* updateSpares(repoRoot, ({ [claim.target]: _claimed, ...rest }) => rest)
+    // The thread keeps the name the client already shows: the spare's folder moves within the same directory, so
+    // its relative pointer to the store still holds, and jj renames the workspace to match.
+    // Windows refuses to rename a fresh checkout while antivirus or the indexer holds a file in it, and a failed move
+    // discards the spare, so there the thread keeps the spare's own name; the caller already accepts a different name.
+    const name =
+      path.sep !== '\\' && claim.requestedName !== undefined && (yield* isFreeThreadName(repoRoot, claim.requestedName)) ? claim.requestedName : spare
+    const sparePath = path.join(directory, spare)
+    const workspacePath = path.join(directory, name)
+    return yield* Effect.gen(function* () {
+      if (name !== spare) {
+        yield* fileSystem.rename(sparePath, workspacePath)
+        yield* gitWorktrees(repoRoot, ['repair', workspacePath])
+        yield* jj(['workspace', 'rename', name], workspacePath)
+      }
+      yield* jj(['new', knownCommitRevset(claim.commitId)], workspacePath)
+      return { name, path: workspacePath }
+    }).pipe(
+      Effect.onError(() =>
+        Effect.andThen(
+          removeUnclaimedWorkspace(repoRoot, spare, sparePath),
+          name === spare ? Effect.void : removeUnclaimedWorkspace(repoRoot, name, workspacePath),
+        ),
+      ),
+    )
+  })
+
   const provision = Effect.fn('thread workspaces provision')(function* (repoRoot: string, base?: string, requestedName?: string) {
     return yield* locks.withRepo(repoRoot)(
       Effect.gen(function* () {
-        const target = base ?? (yield* bookmark)
-        const directory = yield* threadsDirectory(repoRoot)
+        const target = base ?? (yield* bookmarkFor(repoRoot))
+        yield* awaitWarming(repoRoot, target)
+        const commitId = yield* resolveDestination(repoRoot, target)
         const spare = yield* usableSpare(repoRoot, (yield* readSpares(repoRoot))[target])
-        if (spare !== undefined) {
-          yield* updateSpares(repoRoot, ({ [target]: _claimed, ...rest }) => rest)
-          // The thread keeps the name the client already shows: the spare's folder moves within the same directory, so
-          // its relative pointer to the store still holds, and jj renames the workspace to match.
-          const name = requestedName !== undefined && (yield* isFreeThreadName(repoRoot, requestedName)) ? requestedName : spare
-          const workspacePath = path.join(directory, name)
-          if (name !== spare) {
-            yield* fileSystem.rename(path.join(directory, spare), workspacePath)
-            yield* gitWorktrees(repoRoot, ['repair', workspacePath])
-            yield* jj(['workspace', 'rename', name], workspacePath)
-          }
-          yield* jj(['new', target], workspacePath)
-          if (!isCommitId(target)) yield* prewarm(repoRoot, target)
-          return { name, path: workspacePath }
-        }
-        const name = yield* freeThreadName(repoRoot, requestedName)
-        const workspacePath = path.join(directory, name)
-        yield* fileSystem.makeDirectory(directory, { recursive: true })
-        // Plain `workspace add`: with --ignore-working-copy jj registers the workspace but never checks its files out.
-        yield* jj(['workspace', 'add', workspacePath, '--name', name, '-r', target], repoRoot)
+        const claimed =
+          spare === undefined ? undefined : yield* claimSpare(repoRoot, spare, { target, commitId, requestedName }).pipe(Effect.orElseSucceed(() => undefined))
+        const thread =
+          claimed ??
+          (yield* Effect.gen(function* () {
+            const directory = yield* threadsDirectory(repoRoot)
+            const name = yield* freeThreadName(repoRoot, requestedName)
+            const workspacePath = path.join(directory, name)
+            yield* fileSystem.makeDirectory(directory, { recursive: true })
+            yield* addWorkspace(repoRoot, name, workspacePath, commitId)
+            return { name, path: workspacePath }
+          }))
         // A spare waits for the next thread from a bookmark; a thread branched from one exact revision gets none.
         if (!isCommitId(target)) yield* prewarm(repoRoot, target)
-        return { name, path: workspacePath }
+        return thread
       }).pipe(
         Effect.mapError(error =>
           error._tag === 'PlatformError' ? new WorkspaceFilesFailed({ detail: `Could not create a thread workspace in ${repoRoot}.`, cause: error }) : error,
@@ -838,7 +1042,8 @@ const make = Effect.gen(function* () {
           .pipe(Effect.mapError(filesFailed(`Could not create ${path.dirname(workspacePath)}.`)))
         yield* gitWorktrees(repoRoot, ['prune'])
         if (workingCopy === undefined) {
-          yield* jj(['workspace', 'add', workspacePath, '--name', name, '-r', yield* bookmark], repoRoot)
+          const commitId = yield* resolveDestination(repoRoot, yield* bookmarkFor(repoRoot))
+          yield* jj(['workspace', 'add', workspacePath, '--name', name, '-r', knownCommitRevset(commitId)], repoRoot)
           return
         }
         if (!isCommitId(workingCopy.commitId) || workingCopy.parentIds.length === 0)
@@ -881,7 +1086,7 @@ const make = Effect.gen(function* () {
         if (!(yield* ensureAuthorized)) return { status: 'not-eligible' } satisfies VerifiedLandOutcome
         const repoRoot = thread.repoRoot
         const cwd = thread.workspaceRoot
-        const target = input.bookmark ?? (yield* bookmark)
+        const target = input.bookmark ?? (yield* bookmarkFor(repoRoot))
         const sourceRevision = yield* workingCopyCommitId(cwd)
         if (sourceRevision !== input.expectedSourceRevision) return stale(staleSourceMessage)
 
@@ -1161,7 +1366,7 @@ const make = Effect.gen(function* () {
           yield* progress('validating')
           if (input.validate !== undefined) yield* input.validate
           const cwd = thread.workspaceRoot
-          const target = input.bookmark ?? (yield* bookmark)
+          const target = input.bookmark ?? (yield* bookmarkFor(thread.repoRoot))
           for (let attempt = 1; ; attempt++) {
             yield* progress('rebasing')
             const baseChangeId = yield* changeIdOf(target, cwd).pipe(Effect.option, Effect.map(Option.getOrUndefined))
@@ -1226,7 +1431,7 @@ const make = Effect.gen(function* () {
         const target = yield* targetRevset(input.repoRoot)
         const work = yield* revisions(unlandedRevset(input.name, target), input.repoRoot, { observe: true })
         if (work.length > 0 && !input.force) return { status: 'has-work', revisions: work } satisfies DiscardOutcome
-        const owned = yield* revisions(`(::${input.name}@ ~ ::${target}) ~ ::(working_copies() ~ ${input.name}@)`, input.repoRoot, { observe: true })
+        const owned = yield* revisions(ownedRevset(input.name, target), input.repoRoot, { observe: true })
         yield* jj(['--ignore-working-copy', 'workspace', 'forget', input.name], input.repoRoot)
         if (owned.length > 0) yield* jj(['--ignore-working-copy', 'abandon', ...owned.map(revision => revision.commitId)], input.repoRoot)
         yield* removeTree(workspaceRoot)
@@ -1235,10 +1440,28 @@ const make = Effect.gen(function* () {
     )
   })
 
+  /** A bookmark counts only when it alone reaches every unlanded revision; a conflicted one could still lose them. */
+  const containingBookmarks = Effect.fn('thread workspaces containing bookmarks')(function* (input: { readonly repoRoot: string; readonly name: string }) {
+    const work = unlandedRevset(input.name, yield* targetRevset(input.repoRoot))
+    const target = yield* bookmarkFor(input.repoRoot)
+    const listed = yield* jj(
+      ['--ignore-working-copy', 'log', '--no-graph', '-r', `heads(${work}):: & bookmarks()`, '-T', RESOLVED_BOOKMARKS_TEMPLATE],
+      input.repoRoot,
+    )
+    const candidates = [...new Set(lines(listed))].filter(name => name !== target).sort()
+    return yield* Effect.filter(
+      candidates,
+      name =>
+        Effect.map(revisions(`(${work}) ~ ::${bookmarkRevset(name)}`, input.repoRoot, { observe: true, maxRevisions: 1 }), outside => outside.length === 0),
+      { concurrency: STATUS_READ_CONCURRENCY },
+    )
+  })
+
   const discardMany = Effect.fn('thread workspaces discard many')(function* (input: {
     readonly repoRoot: string
     readonly names: readonly string[]
     readonly force: boolean
+    readonly acceptBookmarkedWork?: boolean
   }) {
     return yield* locks.withRepo(input.repoRoot)(
       Effect.gen(function* () {
@@ -1253,8 +1476,10 @@ const make = Effect.gen(function* () {
             const workspaceRoot = path.join(directory, name)
             if (yield* exists(path.join(workspaceRoot, '.jj'))) yield* jj(['status'], workspaceRoot)
             const work = yield* revisions(unlandedRevset(name, target), input.repoRoot, { observe: true })
-            if (work.length > 0 && !input.force) return { name, status: 'has-work', revisions: work, error: null } satisfies ThreadDiscardResult
-            const owned = yield* revisions(`(::${name}@ ~ ::${target}) ~ ::(working_copies() ~ ${name}@)`, input.repoRoot, { observe: true })
+            const kept = work.length > 0 && !input.force
+            if (kept && (input.acceptBookmarkedWork !== true || (yield* containingBookmarks({ repoRoot: input.repoRoot, name })).length === 0))
+              return { name, status: 'has-work', revisions: work, error: null } satisfies ThreadDiscardResult
+            const owned = yield* revisions(ownedRevset(name, target), input.repoRoot, { observe: true })
             candidates.push({ name, workspaceRoot, owned })
             return undefined
           }).pipe(Effect.catch(error => Effect.succeed<ThreadDiscardResult>({ name, status: 'error', revisions: [], error: error.message })))
@@ -1318,7 +1543,9 @@ const make = Effect.gen(function* () {
       )
         continue
       if (!(yield* exists(reportedRoot))) {
-        const unlanded = yield* revisions(`(::${record.name}@ ~ ::${bookmarkRevset(yield* bookmark)}) ~ empty()`, realRepoRoot, { observe: true })
+        const unlanded = yield* revisions(`(::${record.name}@ ~ ::${bookmarkRevset(yield* bookmarkFor(realRepoRoot))}) ~ empty()`, realRepoRoot, {
+          observe: true,
+        })
         out.push({ name: record.name, path: reportedRoot, repoRoot: realRepoRoot, missing: true, unlanded, workingCopyState: 'missing' })
         continue
       }
@@ -1507,7 +1734,7 @@ const make = Effect.gen(function* () {
       ],
       { concurrency: 'unbounded' },
     )
-    const preferred = yield* bookmark
+    const preferred = yield* bookmarkFor((yield* storeRootOf(target).pipe(Effect.orElseSucceed(() => undefined))) ?? target)
     const candidates = lines(nearest)
     return { current: candidates.includes(preferred) ? preferred : (candidates[0] ?? null), names: [...new Set(lines(listed))] }
   })
@@ -1525,7 +1752,7 @@ const make = Effect.gen(function* () {
       defaultCommitId = candidate
     }
     const defaultWorkspaceLabel = defaultCommitId === undefined ? '""' : `if(commit_id.short(64) == "${defaultCommitId}", "default@", "")`
-    const bookmarkName = yield* bookmark
+    const bookmarkName = yield* bookmarkFor(thread.repoRoot)
     const bookmarkLiteral = JSON.stringify(bookmarkName)
     const threadRevisionLimit = 16
     const threadRevisionLines = lines(
@@ -1565,6 +1792,7 @@ const make = Effect.gen(function* () {
     landVerified,
     discard,
     discardMany,
+    containingBookmarks,
     secondaryWorkspaces,
     discardSecondaryMany,
     workingCopyChangedAt,

@@ -47,6 +47,7 @@ const manifestSchema = Schema.Struct({
   dependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   devDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   dsh: Schema.optional(Schema.Struct({ client: Schema.optional(Schema.Unknown) })),
+  exports: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 })
 const sourceMapSchema = Schema.Struct({ sources: Schema.Array(Schema.String) })
 const dependencyManifestSchema = Schema.Struct({ version: Schema.Literal(1), sources: Schema.Array(Schema.String) })
@@ -60,6 +61,8 @@ interface PluginPackage {
   readonly clientSources: () => ReadonlySet<string>
   readonly missingHostBundle: boolean
   readonly missingClientBundle: boolean
+  readonly missingLibraryOutput: boolean
+  readonly library: boolean
 }
 
 /** Tests, docs and catalogs never reach a build's output. */
@@ -105,6 +108,13 @@ const readPluginPackages = (root: string): readonly PluginPackage[] => {
       const manifestValue = manifest.value
       const distDirectory = join(root, directory, 'dist')
       const hasClientBundle = manifestValue.dsh?.client !== undefined
+      const library = manifestValue.dsh === undefined && manifestValue.scripts?.build?.startsWith('tsc ') === true
+      const runtimeExport = Schema.Struct({ default: Schema.optional(Schema.String) })
+      const libraryOutputs = Object.values(manifestValue.exports ?? {}).flatMap(value => {
+        const decoded = Schema.decodeUnknownOption(runtimeExport)(value)
+        const path = typeof value === 'string' ? value : Option.isSome(decoded) ? decoded.value.default : undefined
+        return path?.startsWith('./dist/') === true ? [path] : []
+      })
       packages.push({
         name: manifestValue.name,
         directory,
@@ -113,8 +123,10 @@ const readPluginPackages = (root: string): readonly PluginPackage[] => {
           .map(([name]) => name),
         hostSources: memoizedSources(() => bundledSources(root, directory, 'index')),
         clientSources: memoizedSources(() => bundledSources(root, directory, 'client')),
-        missingHostBundle: !existsSync(join(distDirectory, 'index.js')),
+        missingHostBundle: !library && !existsSync(join(distDirectory, 'index.js')),
         missingClientBundle: hasClientBundle && !existsSync(join(distDirectory, 'client.js')),
+        missingLibraryOutput: library && libraryOutputs.some(path => !existsSync(join(root, directory, path))),
+        library,
       })
     }
   }
@@ -159,7 +171,9 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
   }
   const selected = new Set([
     ...dependencyAffected,
-    ...packages.filter(pluginPackage => pluginPackage.missingHostBundle || pluginPackage.missingClientBundle).map(pluginPackage => pluginPackage.name),
+    ...packages
+      .filter(pluginPackage => pluginPackage.missingHostBundle || pluginPackage.missingClientBundle || pluginPackage.missingLibraryOutput)
+      .map(pluginPackage => pluginPackage.name),
   ])
 
   const changedSet = new Set(changed)
@@ -168,6 +182,7 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
   const plugins = packages
     .filter(pluginPackage => selected.has(pluginPackage.name))
     .map(pluginPackage => {
+      if (pluginPackage.library) return { name: pluginPackage.name, host: false, client: false }
       const own = changed.filter(path => owns(pluginPackage, path))
       const manifestChanged = own.some(path => /\/(package\.json|cordis\.patch\.yml)$/.test(path))
       const unmapped = own.some(path => /\.[cm]?[jt]sx?$/.test(path) && !pluginPackage.hostSources().has(path) && !pluginPackage.clientSources().has(path))
@@ -250,7 +265,8 @@ const runRebuild = async (input: {
   }
   if (input.plan.plugins.length === 0) return { installed, dshx: input.plan.dshx, plugins: [], failure: null }
 
-  const directories = new Map(readPluginPackages(input.root).map(pluginPackage => [pluginPackage.name, pluginPackage.directory] as const))
+  const packages = new Map(readPluginPackages(input.root).map(pluginPackage => [pluginPackage.name, pluginPackage] as const))
+  const directories = new Map([...packages].map(([name, pluginPackage]) => [name, pluginPackage.directory] as const))
   const bundleFingerprints = (name: string) => {
     const dist = join(input.root, directories.get(name) ?? '', 'dist')
     return { host: fingerprint(join(dist, 'index.js')), client: fingerprint(join(dist, 'client.js')) }
@@ -264,7 +280,11 @@ const runRebuild = async (input: {
     const previous = before.get(plugin.name)
     const after = bundleFingerprints(plugin.name)
     const manifestChanged = changed.has(`${directory}/package.json`) || changed.has(`${directory}/cordis.patch.yml`)
-    const effect = { name: plugin.name, host: manifestChanged || previous?.host !== after.host, client: previous?.client !== after.client }
+    const effect = {
+      name: plugin.name,
+      host: packages.get(plugin.name)?.library !== true && (manifestChanged || previous?.host !== after.host),
+      client: previous?.client !== after.client,
+    }
     return plugin.missing === true ? { ...effect, missing: true as const } : effect
   })
   return { installed, dshx: input.plan.dshx, plugins, failure }

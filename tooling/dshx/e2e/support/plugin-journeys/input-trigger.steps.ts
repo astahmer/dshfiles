@@ -41,20 +41,25 @@ When('the composer sends {string}', async ({ page, $testInfo }: { page: Page; $t
   await materializeNonblankThread(page, 'Reference card thread', $testInfo)
   await page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/u }).fill(text)
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
-  await expect(page.getByRole('button', { name: /^Backlog item b:[0-9a-z]+$/u }).last()).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('button', { name: /^Preview backlog item b:[0-9a-z]+$/u }).last()).toBeVisible({ timeout: 60_000 })
 })
 
 const sharedCard = (page: Page, kind: string) => page.locator(`[data-dshfiles-entity-preview="${kind}"]`)
 
 When('the agent mention {string} is previewed', async ({ page }: { page: Page }, handle: string) => {
-  // A sent message renders `@handle` as the native mention chip (titled `@handle`); agents opens the shared card from it.
-  await page.locator(`[data-conversation-session] [data-ref-chip="file"][title="@${handle}"]`).last().click()
+  // A picked agent submits `@{handle}` and renders the agent chip; a typed legacy `@handle` stays the native file
+  // chip titled `@handle`, which agents decorates with the same card.
+  await page
+    .locator('[data-conversation-session]')
+    .locator(`[data-ref-chip="agent"], [data-ref-chip="file"][title="@${handle}"]`)
+    .last()
+    .click()
 })
 
 When('the backlog reference {string} is previewed', async ({ page }: { page: Page }, label: string) => {
   await page.keyboard.press('Escape')
   await page
-    .getByRole('button', { name: `Backlog item ${label}`, exact: true })
+    .getByRole('button', { name: `Preview backlog item ${label}`, exact: true })
     .last()
     .click()
 })

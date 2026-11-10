@@ -26,7 +26,14 @@ beforeEach(() => {
   vi.spyOn(executable, 'resolveDshExecutable').mockResolvedValue(process.execPath)
   // Provisioning is the seam: exercise actual seed storage, prewarming and owned process lifecycle without installing each profile.
   vi.spyOn(LocalBundleModel, 'listLocalBootBundles').mockResolvedValue(
-    packageIds.map(packageId => ({ packageId, projectRoot: '/unused', hasClient: false, clientExternalPackages: [], usesPluginUi: false })),
+    packageIds.map(packageId => ({
+      packageId,
+      projectRoot: '/unused',
+      hasClient: false,
+      clientExternalPackages: [],
+      usesPluginUi: false,
+      composesLoaderRows: true,
+    })),
   )
   vi.spyOn(preparation, 'prepareComposedBootProfile').mockImplementation(async bundles => {
     const homeRoot = await mkdtemp(join(tmpdir(), 'dshx-boot-seed-'))

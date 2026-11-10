@@ -367,7 +367,14 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
       const cwd = member === undefined ? null : sessionCwd(member.id)
       if (cwd === null) return `${props.t('workspace')} · ${topic.slice('workspace/'.length, 'workspace/'.length + 8)}`
       const project = projectLabel({ path: cwd })
-      return EntityLabels.isThreadWorkspace(cwd) ? `${project} · ${cwd.replace(/\/+$/u, '').split('/').at(-1) ?? ''}` : project
+      return EntityLabels.isThreadWorkspace(cwd)
+        ? `${project} · ${
+            cwd
+              .replace(/[\\/]+$/u, '')
+              .split(/[\\/]/u)
+              .at(-1) ?? ''
+          }`
+        : project
     },
   }
   const navigationQuery = useQuery({
@@ -585,14 +592,14 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
               </Alert>
             ) : null}
             {tab === 'messages' ? (
-              <div className="dshx:grid dshx:gap-3 dshx:@min-[72rem]:grid-cols-[15rem_minmax(0,1fr)_18rem]">
+              <div className="dshx:grid dshx:items-start dshx:gap-3 dshx:@min-[60rem]:grid-cols-[15rem_minmax(0,1fr)_18rem]">
                 <Card className="dshx:min-w-0">
                   <CardHeader className="dshx:pb-3">
                     <CardTitle className="dshx:flex dshx:items-center dshx:gap-2">
                       <HashIcon aria-hidden /> {t('channels')}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="dshx:flex dshx:flex-col dshx:gap-4 dshx:p-3 dshx:pt-0">
+                  <CardContent className="dshx:flex dshx:max-h-[60vh] dshx:flex-col dshx:gap-4 dshx:overflow-y-auto dshx:p-3 dshx:pt-0">
                     <Button
                       variant={selection.kind === 'all' ? 'secondary' : 'ghost'}
                       disabled={sendMutation.isPending}

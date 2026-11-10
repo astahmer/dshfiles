@@ -152,7 +152,14 @@ export interface ThreadWorkspacesBackend {
     readonly repoRoot: string
     readonly names: readonly string[]
     readonly force: boolean
+    /** Also remove a workspace whose work another bookmark holds, rechecked under the repository lock. */
+    readonly acceptBookmarkedWork?: boolean
   }) => Effect.Effect<{ readonly results: readonly ThreadDiscardResult[] }, ThreadWorkspaceError>
+  /**
+   * Bookmarks (git: branches) other than the target that each hold all of the thread's unlanded work, sorted; empty when
+   * nothing is unlanded or no single one holds it. Uncommitted edits count as work no bookmark holds.
+   */
+  readonly containingBookmarks: (input: { readonly repoRoot: string; readonly name: string }) => Effect.Effect<readonly string[], ThreadWorkspaceError>
   readonly secondaryWorkspaces: (repoRoot: string) => Effect.Effect<readonly SecondaryWorkspaceStatus[], ThreadWorkspaceError>
   readonly discardSecondaryMany: (input: {
     readonly repoRoot: string

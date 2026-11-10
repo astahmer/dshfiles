@@ -37,8 +37,11 @@ export class ListSelectionModel {
     return stateOf(ids, ids[0])
   }
 
+  /** A set keeps this linear: a list header computes it on every render with the whole list selected. */
   static isComplete<Id>(input: { readonly state: ListSelection<Id>; readonly orderedIds: readonly Id[] }): boolean {
-    return input.orderedIds.length > 0 && input.orderedIds.every(id => input.state.ids.includes(id))
+    if (input.orderedIds.length === 0) return false
+    const selected = new Set(input.state.ids)
+    return input.orderedIds.every(id => selected.has(id))
   }
 
   static toggleAllVisible<Id>(input: { readonly state: ListSelection<Id>; readonly orderedIds: readonly Id[] }): ListSelection<Id> {

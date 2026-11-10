@@ -3,7 +3,7 @@ import { AccountNotFound } from './errors.js'
 import { pluginAttributes, withSpan } from '@dshfiles/dshx/tracing'
 import { constants, type Stats } from 'node:fs'
 import { access, lstat, realpath, writeFile } from 'node:fs/promises'
-import { delimiter, dirname, join } from 'node:path'
+import { delimiter, dirname, isAbsolute, join } from 'node:path'
 import { AccountCredentialHomeWork } from './account-credential-home-work.js'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
@@ -32,6 +32,20 @@ const ENVIRONMENT_KEYS = [
   'SSL_CERT_FILE',
   'SSL_CERT_DIR',
   'NODE_EXTRA_CA_CERTS',
+] as const
+/** Windows locations a CLI needs to find its home, temp and system directories (no secrets); passed on Windows only. */
+const WINDOWS_ENVIRONMENT_KEYS = [
+  'USERPROFILE',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'TMP',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'SYSTEMDRIVE',
+  'WINDIR',
+  'PROGRAMDATA',
+  'PATHEXT',
+  'COMSPEC',
 ] as const
 
 type SessionCredentials = Pick<CredentialProvider, 'describe' | 'unset' | 'describeRecord'>
@@ -79,11 +93,12 @@ export class AccountLogoutProcess {
 
   static readonly environment = (environment: NodeJS.ProcessEnv, kind: 'codex' | 'claude', home: string): NodeJS.ProcessEnv => {
     const env: NodeJS.ProcessEnv = { NO_COLOR: '1', TERM: 'dumb' }
-    for (const key of ENVIRONMENT_KEYS) if (environment[key] !== undefined) env[key] = environment[key]
+    const keys = process.platform === 'win32' ? [...ENVIRONMENT_KEYS, ...WINDOWS_ENVIRONMENT_KEYS] : ENVIRONMENT_KEYS
+    for (const key of keys) if (environment[key] !== undefined) env[key] = environment[key]
     // Never resolve a CLI from the selected credential directory through an empty/relative PATH segment.
     env.PATH = (environment.PATH ?? '')
       .split(delimiter)
-      .filter(path => path.startsWith('/'))
+      .filter(path => isAbsolute(path))
       .join(delimiter)
     if (kind === 'claude') return ClaudeAccountModel.cliEnvironment({ environment: env, configDir: home })
     env['CODEX_HOME'] = home
@@ -101,6 +116,8 @@ export interface AccountSessionFiles {
 export class AccountSessionFilePolicy {
   /** File ownership is Host-derived, never caller-provided. Readable directories are allowed; other-user writes are not. */
   static readonly assertOwned = (stat: Pick<Stats, 'uid' | 'mode'>): void => {
+    // Windows has no POSIX uid or mode bits (Node reports uid 0 and synthetic modes); the user profile's ACLs govern.
+    if (process.platform === 'win32') return
     const uid = process.getuid?.()
     if (uid === undefined || stat.uid !== uid || (stat.mode & 0o022) !== 0) throw new Error(FAILURE)
   }
@@ -109,6 +126,7 @@ const assertRealDirectory = async (path: string): Promise<void> => {
   const stat = await lstat(path)
   if ((await realpath(path)) !== path || !stat.isDirectory()) throw new Error(FAILURE)
   AccountSessionFilePolicy.assertOwned(stat)
+  if (process.platform === 'win32') return
   // An attacker-writable ancestor can replace even a private selected directory. Root-owned sticky /tmp is safe for owned children.
   for (let parent = dirname(path); ; parent = dirname(parent)) {
     const ancestor = await lstat(parent)
@@ -162,9 +180,11 @@ export const createAccountSessionFiles = (): AccountSessionFiles => {
 }
 
 const executableAvailable = async (executable: string, environment: NodeJS.ProcessEnv): Promise<boolean> => {
-  for (const directory of (environment.PATH ?? '').split(delimiter).filter(path => path.startsWith('/'))) {
+  // spawn without a shell runs only real executables, which on Windows carry the .exe suffix.
+  const file = process.platform === 'win32' ? `${executable}.exe` : executable
+  for (const directory of (environment.PATH ?? '').split(delimiter).filter(path => isAbsolute(path))) {
     try {
-      await access(join(directory, executable), constants.X_OK)
+      await access(join(directory, file), constants.X_OK)
       return true
     } catch {
       /* Try the next trusted PATH entry. */

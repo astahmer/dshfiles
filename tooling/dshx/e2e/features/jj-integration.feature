@@ -11,6 +11,30 @@ Feature: jj thread workspaces
     When a disposable jj repository is chosen as the New thread project
     Then the destination bar offers the main bookmark in the shared checkout
 
+  @scenario:jj-integration.project-main-branch-browser-journey
+  Scenario: A project's main branch chosen in Settings › Projects is where its New thread workspaces start
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/settings-shell" is booted
+    When a disposable jj repository with a "develop" bookmark is chosen as the New thread project
+    And "develop" is chosen as the project's main branch in Settings › Projects
+    Then Settings › Projects shows the project using "develop", chosen here
+    When Settings › Projects is closed
+    And the New thread workspace toggle is turned on
+    Then the New thread workspace starts from the project's main branch "develop"
+
+  @scenario:jj-integration.project-icon-browser-journey
+  Scenario: A project shows the icon its repository ships
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/multi-host, @dshfiles/settings-shell" is booted
+    When a disposable jj repository with an asset icon is chosen as the New thread project
+    Then the project row shows the icon the repository ships
+
+  @scenario:jj-integration.not-a-repository-browser-journey
+  Scenario: A project that is not a Jujutsu repository offers to create one
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a plain folder is chosen as the New thread project
+    Then the destination bar offers Initialize repository instead of a workspace toggle
+    When Initialize repository is clicked in the destination bar
+    Then the opened project becomes a Jujutsu repository
+
   @scenario:jj-integration.git-destination-browser-journey
   Scenario: A git-only repository gets the same destination bar and its own git worktree
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
@@ -18,6 +42,16 @@ Feature: jj thread workspaces
     Then the destination bar offers the main branch in the shared git checkout
     When the New thread workspace toggle is turned on
     Then the New thread runs in its own git worktree on main
+
+  @scenario:jj-integration.ambiguous-destination-browser-journey
+  Scenario: A conflicted bookmark is refused every time and only a real destination creates one workspace
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository with a conflicted "forked" bookmark is chosen as the New thread project
+    And the "forked" bookmark is picked in the destination bar and refused
+    And the "forked" bookmark is picked in the destination bar and refused
+    Then the refusal names how to recover and left no thread workspace
+    When the "main" bookmark is picked in the destination bar
+    Then exactly one thread workspace exists on "main"
 
   @scenario:jj-integration.configured-base-browser-journey
   Scenario: New chat uses configured main instead of the project checkout feature bookmark

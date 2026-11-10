@@ -1,5 +1,5 @@
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
-import { Cause, Context, Effect, Exit, Layer, Schema, Scope } from 'effect'
+import { Cause, Context, Effect, Exit, Fiber, Layer, Schema, Scope } from 'effect'
 import { redactConfigSchema } from '../host/config-schema.js'
 import type { HostDefinition } from '../host/types.js'
 import { SdkSetupRuntime } from '../sdk/setup.js'
@@ -49,6 +49,14 @@ export interface PluginDefinition<ROut, E, Config extends ConfigSchema | undefin
   readonly main?: Effect.Effect<void, never, NoInfer<PluginServices<ROut>> | Scope.Scope>
   readonly apis?: ReadonlyArray<ApiBinding<NoInfer<PluginServices<ROut>>>>
   readonly tools?: ReadonlyArray<AnyEffectTool<NoInfer<PluginServices<ROut>>>>
+  /**
+   * Build `layer` and start `main` on the first API or tool call instead of at activation; opt-in, default off.
+   * Only for a plugin whose boot-time side effects are optional: until that first call it subscribes to nothing,
+   * indexes nothing and provides no Cordis service another row needs, because a layer that never builds cannot.
+   * `Config` and the static registrations (tools, APIs, settings, prompt contributions) stay eager, so a bad row
+   * config still fails the row at boot; the first call pays the build and reports its failure.
+   */
+  readonly lazy?: boolean
 }
 
 const decodeConfig = <Config extends ConfigSchema | undefined>(schema: Config, rowConfig: unknown) =>
@@ -71,26 +79,23 @@ export const make = <ROut, E = never, const Config extends ConfigSchema | undefi
   const activate = async (ctx: CordisContext, rowConfig: unknown, packageId: string): Promise<() => Promise<void>> => {
     slot.begin()
     const scope = Scope.makeUnsafe()
-    const build = Effect.gen(function* () {
-      const config = yield* decodeConfig(definition.Config, rowConfig)
-      // SAFETY: decodeConfig returns the decoded type of `definition.Config`, or undefined when there is none.
-      const layer = pluginLayer(definition.layer, config as ConfigOf<Config>)
-      const host = HostContext.layer({ ctx, packageId })
-      const base = Layer.mergeAll(host, tracerLayer, processEnvConfig, Layer.provide(hostLoggerLayer, host))
-      const services = yield* Layer.buildWithScope(Layer.provideMerge(layer, base), scope)
-      return Context.add(services, Scope.Scope, scope)
-    }).pipe(Effect.withSpan('plugin activate', { attributes: { 'dshx.plugin.package': packageId } }), Effect.provide(tracerLayer))
-    const built = await Effect.runPromiseExit(build)
-    if (Exit.isFailure(built)) {
-      await Effect.runPromise(Scope.close(scope, built))
-      cordisLogger(ctx, 'dshx:plugin').error(`${definition.name} failed to activate:\n${causeReport(built.cause)}`)
-      const error = new PluginActivationError({ plugin: definition.name, cause: built.cause })
-      slot.fail(error)
-      throw error
-    }
-    const runtime: PluginRuntime<PluginServices<ROut> | Scope.Scope> = runtimeOf({ services: built.value, ctx })
-    slot.activate(runtime)
-    if (definition.main !== undefined) {
+
+    const layerBuild = (config: ConfigOf<Config>) =>
+      Effect.gen(function* () {
+        const layer = pluginLayer(definition.layer, config)
+        const host = HostContext.layer({ ctx, packageId })
+        const base = Layer.mergeAll(host, tracerLayer, processEnvConfig, Layer.provide(hostLoggerLayer, host))
+        const services = yield* Layer.buildWithScope(Layer.provideMerge(layer, base), scope)
+        return Context.add(services, Scope.Scope, scope)
+      })
+
+    const activationSpan = (lazy: boolean) =>
+      Effect.withSpan('plugin activate', {
+        attributes: { 'dshx.plugin.package': packageId, ...(lazy ? { 'dshx.plugin.lazy': true } : {}) },
+      })
+
+    const forkMain = (services: Context.Context<PluginServices<ROut> | Scope.Scope>, runtime: PluginRuntime<PluginServices<ROut> | Scope.Scope>) => {
+      if (definition.main === undefined) return
       const main = definition.main.pipe(
         Effect.catchCause(cause =>
           Cause.hasInterruptsOnly(cause)
@@ -98,10 +103,56 @@ export const make = <ROut, E = never, const Config extends ConfigSchema | undefi
             : Effect.sync(() => runtime.log({ topic: 'plugin', level: 'error', message: `${definition.name} main failed:\n${causeReport(cause)}` })),
         ),
       )
-      Effect.runForkWith(built.value)(Effect.forkIn(main, scope))
+      Effect.runForkWith(services)(Effect.forkIn(main, scope))
     }
+
+    const deactivate = async (cause: Cause.Cause<unknown>): Promise<PluginActivationError> => {
+      await Effect.runPromise(Scope.close(scope, Exit.failCause(cause)))
+      cordisLogger(ctx, 'dshx:plugin').error(`${definition.name} failed to activate:\n${causeReport(cause)}`)
+      const error = new PluginActivationError({ plugin: definition.name, cause })
+      slot.fail(error)
+      return error
+    }
+
+    if (definition.lazy !== true) {
+      const built = await Effect.runPromiseExit(
+        Effect.gen(function* () {
+          const config = yield* decodeConfig(definition.Config, rowConfig)
+          return yield* layerBuild(config as ConfigOf<Config>)
+        }).pipe(activationSpan(false), Effect.provide(tracerLayer)),
+      )
+      if (Exit.isFailure(built)) throw await deactivate(built.cause)
+      const runtime: PluginRuntime<PluginServices<ROut> | Scope.Scope> = runtimeOf({ services: built.value, ctx })
+      slot.activate(runtime)
+      forkMain(built.value, runtime)
+      return async () => {
+        slot.stop()
+        await Effect.runPromise(Scope.close(scope, Exit.void))
+      }
+    }
+
+    // A lazy row still decodes its config here: a bad row config fails the row at boot instead of hiding behind a panel
+    // nobody opened. Only the layer build and `main` wait for the first call.
+    const decoded = await Effect.runPromiseExit(decodeConfig(definition.Config, rowConfig))
+    if (Exit.isFailure(decoded)) throw await deactivate(decoded.cause)
+    const config = decoded.value as ConfigOf<Config>
+    let building: Fiber.Fiber<Context.Context<PluginServices<ROut> | Scope.Scope>, E> | undefined
+    slot.defer(async () => {
+      const fiber = Effect.runFork(layerBuild(config).pipe(activationSpan(true), Effect.provide(tracerLayer)))
+      building = fiber
+      const built = await Effect.runPromise(Fiber.await(fiber))
+      if (Exit.isFailure(built)) {
+        // An unload interrupts the build: the slot is already stopped and its callers were refused, so nothing is logged.
+        if (!Cause.hasInterruptsOnly(built.cause)) throw await deactivate(built.cause)
+        return
+      }
+      const runtime: PluginRuntime<PluginServices<ROut> | Scope.Scope> = runtimeOf({ services: built.value, ctx })
+      slot.activate(runtime)
+      forkMain(built.value, runtime)
+    })
     return async () => {
       slot.stop()
+      if (building !== undefined) await Effect.runPromise(Fiber.interrupt(building))
       await Effect.runPromise(Scope.close(scope, Exit.void))
     }
   }

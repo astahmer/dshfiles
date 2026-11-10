@@ -34,6 +34,8 @@ export interface RemoteFacts {
     readonly commitId: string | undefined
     readonly description: string | undefined
     readonly conflicts: number
+    /** Bookmarks with several local targets, which a sync refuses to move past. */
+    readonly conflictedBookmarks: readonly string[]
     readonly mainOrigin: string | undefined
   }
 }
@@ -85,6 +87,7 @@ const probeScript = ({ profile, checkoutPath }: { readonly profile: string; read
     '  if [ -f "$checkout/tooling/dshx/packages/dshx/dist/cli/bin.js" ]; then v checkout_built 1; fi',
     `  v checkout_head "$(jj -R "$checkout" --ignore-working-copy log -r @ --no-graph -T 'change_id.short() ++ "|" ++ commit_id.short() ++ "|" ++ description.first_line()' 2>/dev/null | head -1)"`,
     `  v checkout_conflicts "$(jj -R "$checkout" --ignore-working-copy log -r 'conflicts()' --no-graph -T 'commit_id ++ "\\n"' 2>/dev/null | wc -l | tr -d ' ')"`,
+    `  v checkout_conflicted_bookmarks "$(jj -R "$checkout" --ignore-working-copy bookmark list --conflicted -T 'if(!remote, name ++ ",")' 2>/dev/null)"`,
     `  v checkout_main_origin "$(jj -R "$checkout" --ignore-working-copy log -r 'main@origin' --no-graph -T 'commit_id.short()' 2>/dev/null | head -1)"`,
     'fi',
     'v disk_available "$(df -h "$HOME" 2>/dev/null | tail -1 | tr -s " " | cut -d " " -f4)"',
@@ -166,6 +169,7 @@ const parseRemoteFacts = ({
       commitId: head?.[1],
       description: head?.[2],
       conflicts: numberOrUndefined(valueOf(values, 'checkout_conflicts')) ?? 0,
+      conflictedBookmarks: (valueOf(values, 'checkout_conflicted_bookmarks') ?? '').split(',').filter(name => name.length > 0),
       mainOrigin: valueOf(values, 'checkout_main_origin') || undefined,
     },
   }
@@ -262,6 +266,13 @@ const diagnoseRemote = ({
   } else {
     if (facts.checkout.conflicts > 0) {
       diagnostics.push({ code: 'checkout-conflicts', severity: 'warning', message: `The checkout has ${facts.checkout.conflicts} conflicted revision(s).` })
+    }
+    if (facts.checkout.conflictedBookmarks.length > 0) {
+      diagnostics.push({
+        code: 'checkout-bookmark-conflict',
+        severity: 'warning',
+        message: `Conflicted bookmarks in the checkout: ${facts.checkout.conflictedBookmarks.join(', ')}. Run multi_host_checkout_sync for that bookmark to see both sides and how to keep each.`,
+      })
     }
     if (facts.checkout.mainOrigin !== undefined && facts.checkout.commitId !== undefined && facts.checkout.commitId !== facts.checkout.mainOrigin) {
       diagnostics.push({

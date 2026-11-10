@@ -320,7 +320,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stageTitle = props.useSessions(state =>
     stageThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === stageThread)?.displayTitle,
   )
-  // Fixed (default): the rail and one list; the Workbench left panes render only in free docking (plans/ade-ux §4.1).
+  // Fixed (default): the rail and one list; the Workbench left panes render only in free docking (docs/ade-ux §4.1).
   const docking = preferences.layoutMode === 'docking'
   const contentOverridden = props.contentOverridden && docking
   const contributedSections = useRegistry(DestinationSections)
@@ -613,6 +613,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stepNavigation = (direction: -1 | 1): void => goToHistoryEntry(history.index + direction)
   const latestStepNavigation = useRef(stepNavigation)
   latestStepNavigation.current = stepNavigation
+  // The palette reads availability when it opens; a ref keeps every thread switch from re-registering its actions.
+  const latestHistory = useRef(history)
+  latestHistory.current = history
 
   useEffect(() => {
     const onNavigate = (event: Event): void => {
@@ -928,7 +931,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         label: text(props.t, 'threadSidebarBack'),
         aliases: ['history', 'previous'],
         icon: <ArrowLeftIcon className="dshx:size-4" />,
-        isAvailable: () => ThreadNavigationHistoryModel.canStep(history, -1),
+        isAvailable: () => ThreadNavigationHistoryModel.canStep(latestHistory.current, -1),
         run: () => latestStepNavigation.current(-1),
       },
       {
@@ -937,7 +940,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         label: text(props.t, 'threadSidebarForward'),
         aliases: ['history', 'next'],
         icon: <ArrowRightIcon className="dshx:size-4" />,
-        isAvailable: () => ThreadNavigationHistoryModel.canStep(history, 1),
+        isAvailable: () => ThreadNavigationHistoryModel.canStep(latestHistory.current, 1),
         run: () => latestStepNavigation.current(1),
       },
       ...(restartAvailable
@@ -989,7 +992,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       pendingUpdatesLabel,
       hostShortcuts,
       runCommand,
-      history,
       headerIconFor,
       activateHeaderEntry,
       openCustomize,
@@ -1624,7 +1626,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 </PopoverContent>
               </Popover>
             )}
-            {/* The fixed layout's status strip carries the account preview (plans/ade-ux §4.1 R5); free docking keeps the
+            {/* The fixed layout's status strip carries the account preview (docs/ade-ux §4.1 R5); free docking keeps the
                 footer preview seat, which Workbench also offers as a movable view. */}
             {docking ? <SidebarPreviewFallback renderSlot={props.renderSlot} contentOverridden={contentOverridden} /> : null}
           </div>

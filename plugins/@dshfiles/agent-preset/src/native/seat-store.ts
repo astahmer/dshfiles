@@ -19,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
-import { presetOptions, readRoster } from './settings-store.ts'
+import { presetOptions, readSharedRoster } from './settings-store.ts'
 import type { AgentPresetOption } from './settings-store.ts'
 
 /** A selection the Host refused, kept with its preset so the chip can name what failed. */
@@ -48,6 +48,17 @@ export interface AgentPresetSeatState {
 const INITIAL: AgentPresetSeatState = {
   options: [], current: '', error: null, busy: false, introduce: false,
 }
+
+/** Chip fields carry values, not a version: a write that changes none of them is a subscriber pass and a chip render.
+ * @param previous - snapshot the store holds.
+ * @param next - snapshot the controller just derived.
+ * @returns true when the two render the same chip.
+ */
+const sameSeat = (previous: AgentPresetSeatState, next: AgentPresetSeatState): boolean => previous.options === next.options
+  && previous.current === next.current
+  && previous.error === next.error
+  && previous.busy === next.busy
+  && previous.introduce === next.introduce
 
 /**
  * The next session's pick, as one value every seat reads.
@@ -148,13 +159,16 @@ export class AgentPresetSeatController {
   private publish(input: { readonly current?: string } = {}): void {
     const stage = this.stages.read()
     const phase = this.phase
-    this.store.set({
+    const next: AgentPresetSeatState = {
       options: this.options,
       current: input.current ?? (stage.kind === 'staged' ? stage.preset : this.presetFor(this.currentSession())),
       error: phase.kind === 'refused' ? phase.refusal : phase.kind === 'idle' ? phase.error : null,
       busy: phase.kind === 'applying',
       introduce: this.cue,
-    })
+    }
+    // A draft's preview moves on every keystroke while the chip's own fields do not.
+    if (sameSeat(this.store.getSnapshot(), next)) return
+    this.store.set(next)
   }
 
   private presetFor(session: ReturnType<AgentPresetSeatController['currentSession']>): string {
@@ -171,7 +185,7 @@ export class AgentPresetSeatController {
   async load(): Promise<void> {
     const token = {}
     this.loadToken = token
-    const roster = await readRoster(this.ctx)
+    const roster = await readSharedRoster(this.ctx)
     if (this.loadToken !== token) return
     if (!roster.ok) {
       // A roster refresh can finish after a selection; leave its announcement for the chip.

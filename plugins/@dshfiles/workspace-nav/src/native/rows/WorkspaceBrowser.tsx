@@ -35,7 +35,7 @@ import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
+  deriveFlat, deriveGroups, deriveSearchResults, indexRowState, orderByRecency, owningGroupKey, owningParentFolder,
   pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
@@ -991,12 +991,12 @@ function WorkspaceBrowserBody({
     return list.ids.filter(id => list.byId[id] !== undefined && !accounted.has(id))
   }, [list, workspaces])
   const orderState = useMemo(
-    () => ({ pinnedSessionIds, archivedSessionIds }),
+    () => indexRowState({ pinnedSessionIds, archivedSessionIds }),
     [archivedSessionIds, pinnedSessionIds],
   )
   const rowState = useMemo<SessionRowState>(
-    () => ({ ...orderState, archivedFilter }),
-    [orderState, archivedFilter],
+    () => ({ pinnedSessionIds, archivedSessionIds, archivedFilter }),
+    [archivedSessionIds, archivedFilter, pinnedSessionIds],
   )
   const flatMemberIds = useMemo(() => sessionMemberIds(list), [list])
   const orderedWorkspaces = useMemo(() => workspaces.map((workspace) => {

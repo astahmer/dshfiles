@@ -12,6 +12,7 @@ import { GitPullRequest } from '@dshfiles/plugin-ui/icons'
 import { createWorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useSyncExternalStore } from 'react'
+import { MAX_REVIEW_REVISIONS } from './api.js'
 import { ChangesFacet } from './changes-facet.js'
 import { ChangesScopeModel, type ChangesRequest } from './changes-scope.js'
 import { PullsReviewPanel, type OpenInThread } from './panel.js'
@@ -101,6 +102,14 @@ export default defineClientPlugin({
       review: input => {
         if (input.sessionId !== undefined) return openInThread(input.sessionId)
         PageReviewContextModel.set({ workspacePath: input.workspacePath, sessionId: input.sessionId })
+        return api.layout.openPanel(PANEL_ID)
+      },
+      reviewRevisions: input => {
+        if (input.revisions.length === 0 || input.revisions.length > MAX_REVIEW_REVISIONS) return false
+        if (input.sessionId !== undefined) {
+          return openInThread(input.sessionId, { scope: 'revisions', workspacePath: input.workspacePath, revisions: input.revisions })
+        }
+        PageReviewContextModel.set({ workspacePath: input.workspacePath, revisions: input.revisions })
         return api.layout.openPanel(PANEL_ID)
       },
     })

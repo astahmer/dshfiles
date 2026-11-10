@@ -341,11 +341,11 @@
     {
       "id": "inbox-panel",
       "title": "Inbox page with one Needs you badge",
-      "summary": "An Inbox entry in the left navigation opens one page with Needs you and Other tabs (plus Snoozed, Done and Muted when they hold items). Each row shows a severity glyph, the reason, the source, a link to the thread and its verbs inline: answer choices, Open, Done, Snooze and Mute source, with Reopen and Unmute on the history tabs. The nav glyph carries the only badge, the Needs you count, and can raise opt-in browser alerts for blocking items. Option-J (Jump to next waiting, listed in Settings › Key bindings and the palette) opens the next Needs you item's thread, cycling; with nothing waiting it opens the Inbox.",
+      "summary": "An Inbox entry in the left navigation opens one page with Needs you and Other tabs (plus Snoozed, Done and Muted when they hold items). Each row shows a severity glyph, the reason, the source, a link to the thread and its verbs inline: answer choices, Open, Done, Snooze and Mute source, with Reopen and Unmute on the history tabs. Needs you leads with one Resume all for every open item whose provider marks it resumable. The nav glyph carries the only badge, the Needs you count, and can raise opt-in browser alerts for blocking items. Option-J (Jump to next waiting, listed in Settings › Key bindings and the palette) opens the next Needs you item's thread, cycling; with nothing waiting it opens the Inbox.",
       "surface": "destinationSection",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox",
-      "reach": ["click tab \"Inbox\"", "expect tab \"Needs you\""],
+      "reach": ["click tab \"Inbox\"", "click button \"Needs you\"", "expect heading \"Inbox\"", "expect tab \"Needs you*\""],
       "surfaces": ["client"],
       "configuration": [],
       "states": ["empty", "needs-you", "other", "snoozed", "closed", "muted", "answered-in-place", "action-refused", "alerts-opt-in", "compact"],

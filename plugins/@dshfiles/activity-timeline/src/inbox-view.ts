@@ -55,10 +55,15 @@ const undoOf = (item: AttentionItem, view: AttentionView): 'reopen' | 'unsnooze'
   return null
 }
 
+/** Ids of the open items whose provider offers Resume: one action resumes every one of them. */
+const resumableIds = (items: readonly AttentionItem[]): readonly string[] =>
+  items.filter(item => item.doneAt === null && item.resolvedAt === null && item.verbs.includes('Resume')).map(item => item.id)
+
 export class InboxView {
   static readonly sourceLabel = sourceLabel
   static readonly snoozeTarget = snoozeTarget
   static readonly severityGlyph = severityGlyph
   static readonly relativeAge = relativeAge
   static readonly undoOf = undoOf
+  static readonly resumableIds = resumableIds
 }

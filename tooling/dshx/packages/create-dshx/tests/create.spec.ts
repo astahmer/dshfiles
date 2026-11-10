@@ -145,7 +145,7 @@ describe('create-dshx', () => {
 
     const config = await readFile(resolve(result.root, 'dshx.config.ts'), 'utf8')
     expect(config).toContain("import { defineConfig } from '@dshfiles/dshx'")
-    expect(config).toContain("host: { entry: 'src/host.ts' }")
+    expect(config).toContain("host: { entry: 'src/host.ts', bundleDependencies: ['effect', 'zod'] }")
     expect(config).toContain("entry: 'src/client.tsx'")
     expect(config).toContain('declarations: true')
     expect(config.includes("import tailwindcss from '@tailwindcss/vite'")).toBe(style === 'tailwind')

@@ -131,7 +131,7 @@ export const diffViewedApi = defineApi({
         viewed: Schema.Boolean,
       }),
       output: Schema.Struct({ revision: rangeMarksSchema.fields.revision, changed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)) }),
-      description: 'Mark files of one turn or one revision range viewed, or not viewed, in one write.',
+      description: 'Mark files of one turn or one revision range viewed, or not viewed, in one request.',
       tool: {
         name: 'changes_mark_viewed',
         description:

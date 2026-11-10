@@ -50,10 +50,11 @@ describe.skipIf(!jjAvailable)('jj-integration inbox provider', () => {
     harness.host.ctx.emit('dshfiles/attention/ready', { version: 1 })
   }
 
-  const until = async (view: 'needs-you' | 'other' | 'closed', done: (list: AttentionList) => boolean): Promise<AttentionList> => {
+  const until = async (view: 'needs-you' | 'other' | 'closed', done: (list: AttentionList) => boolean, poke?: () => Promise<void>): Promise<AttentionList> => {
     for (let attempt = 0; attempt < 400; attempt += 1) {
       const list = await inbox.list({ view })
       if (done(list)) return list
+      if (attempt % 40 === 39) await poke?.()
       await new Promise(resolvePromise => setTimeout(resolvePromise, 50))
     }
     throw new Error(`inbox view ${view} never reached the expected state`)
@@ -66,8 +67,11 @@ describe.skipIf(!jjAvailable)('jj-integration inbox provider', () => {
     const path = await harness.provisionThread(repo, { sessionIds: ['session-ready'] })
     await rescan()
 
-    const listed = await until('other', list => list.items.some(item => item.source === READY_TO_LAND_SOURCE))
-    const item = listed.items.find(entry => entry.source === READY_TO_LAND_SOURCE)
+    // provision starts a scan before the harness attaches the Session, so a reconcile may still name the workspace until
+    // the next one, which only a rescan or the slow safety pass brings.
+    const owned = (entry: AttentionList['items'][number]) => entry.source === READY_TO_LAND_SOURCE && entry.subject.kind === 'session'
+    const listed = await until('other', list => list.items.some(owned), rescan)
+    const item = listed.items.find(owned)
     expect(item).toMatchObject({
       dedupeKey: `${path}:ready`,
       subject: { kind: 'session', id: 'session-ready' },

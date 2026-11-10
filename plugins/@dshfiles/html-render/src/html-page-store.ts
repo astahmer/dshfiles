@@ -1,4 +1,3 @@
-import { HostEvents } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer } from 'effect'
 import type { HtmlPage } from './html-page.js'
 
@@ -35,10 +34,6 @@ export class HtmlPageStore {
     return found === undefined ? undefined : { callId: found.callId, page: found.page }
   }
 
-  forgetThread(sessionId: string): void {
-    this.#remove(stored => stored.sessionId === sessionId)
-  }
-
   #remove(matches: (stored: StoredPage) => boolean): void {
     for (let index = this.#pages.length - 1; index >= 0; index -= 1) {
       const stored = this.#pages[index]
@@ -49,26 +44,23 @@ export class HtmlPageStore {
   }
 }
 
-/** The pages of this Host run as a plugin service; a disposed thread's pages are dropped with it. */
+/**
+ * The pages of this Host run as a plugin service. They outlive a disposed Session: the Session controller disposes an
+ * idle thread to free its log, and the thread's next turn may still screenshot an earlier page; the store's own bounds
+ * evict them.
+ */
 export class HtmlPages extends Context.Service<
   HtmlPages,
   {
     readonly remember: (input: StoredPage) => Effect.Effect<void>
     readonly find: (input: { readonly sessionId: string; readonly callId?: string | undefined }) => Effect.Effect<ReturnType<HtmlPageStore['find']>>
-    readonly forgetThread: (sessionId: string) => Effect.Effect<void>
   }
 >()('@dshfiles/html-render/HtmlPages') {
-  static readonly layer = Layer.effect(
-    HtmlPages,
-    Effect.gen(function* () {
-      const store = new HtmlPageStore()
-      const forgetThread = (sessionId: string) => Effect.sync(() => store.forgetThread(sessionId))
-      yield* HostEvents.on('session/disposed', session => forgetThread(session.id))
-      return HtmlPages.of({
-        remember: input => Effect.sync(() => store.remember(input)),
-        find: input => Effect.sync(() => store.find(input)),
-        forgetThread,
-      })
-    }),
-  )
+  static readonly layer = Layer.sync(HtmlPages, () => {
+    const store = new HtmlPageStore()
+    return HtmlPages.of({
+      remember: input => Effect.sync(() => store.remember(input)),
+      find: input => Effect.sync(() => store.find(input)),
+    })
+  })
 }

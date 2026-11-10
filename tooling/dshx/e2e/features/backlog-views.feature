@@ -24,6 +24,7 @@ Feature: Backlog views
     And backlog item b:1 is marked "Needs you" from its feed context menu
     And backlog item b:2 is marked "Blocked" from its feed context menu
     And the Backlog Inbox is opened
+    And the Inbox filters stay on one line
     Then the Inbox "All" filter lists b:1 and b:2 but not b:3
     And the Inbox "Needs you" filter lists only b:1
     And the Inbox "Blocked" filter lists only b:2

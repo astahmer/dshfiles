@@ -278,6 +278,8 @@ export interface DockFileChange {
   readonly path: string
   readonly added: number
   readonly removed: number
+  /** Opens this file; without it the row is plain text. */
+  readonly onOpen?: () => void
 }
 
 export interface DockChangeGroup {
@@ -321,26 +323,52 @@ export function DockChanges({ groups, className }: { readonly groups: readonly D
           ) : null}
           <ul className="dshx:mt-1 dshx:flex dshx:flex-col dshx:gap-1">
             {group.files.map(file => (
-              <li key={file.path} className="dshx:flex dshx:items-center dshx:gap-2">
-                <span
-                  aria-hidden
-                  className="dshx:grid dshx:h-4 dshx:shrink-0 dshx:place-items-center dshx:rounded-[3px] dshx:bg-info/15 dshx:px-0.5 dshx:font-mono dshx:text-[9px] dshx:font-semibold dshx:text-info"
-                >
-                  {extension(file.path)}
-                </span>
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-foreground">{file.path}</span>
-                <span className="dshx:shrink-0 dshx:font-mono dshx:text-xs dshx:tabular-nums">
-                  {file.added > 0 ? <span className="dshx:text-success">+{file.added}</span> : null}
-                  {file.added > 0 && file.removed > 0 ? ' ' : null}
-                  {file.removed > 0 ? <span className="dshx:text-destructive">−{file.removed}</span> : null}
-                </span>
-              </li>
+              <ChangeFileRow file={file} key={file.path} />
             ))}
             {group.more ? <li className="dshx:pl-6 dshx:text-xs dshx:text-muted-foreground">+{group.more} more in this source</li> : null}
           </ul>
         </div>
       ))}
     </div>
+  )
+}
+
+const ChangeFileRow = ({ file }: { readonly file: DockFileChange }) => {
+  const row = (
+    <>
+      <span
+        aria-hidden
+        className="dshx:grid dshx:h-4 dshx:shrink-0 dshx:place-items-center dshx:rounded-[3px] dshx:bg-info/15 dshx:px-0.5 dshx:font-mono dshx:text-[9px] dshx:font-semibold dshx:text-info"
+      >
+        {extension(file.path)}
+      </span>
+      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-foreground">{file.path}</span>
+      <span className="dshx:shrink-0 dshx:font-mono dshx:text-xs dshx:tabular-nums">
+        {file.added > 0 ? <span className="dshx:text-success">+{file.added}</span> : null}
+        {file.added > 0 && file.removed > 0 ? ' ' : null}
+        {file.removed > 0 ? <span className="dshx:text-destructive">−{file.removed}</span> : null}
+      </span>
+    </>
+  )
+  const className = 'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2'
+  return (
+    <li className="dshx:flex dshx:min-w-0">
+      {file.onOpen === undefined ? (
+        <div className={className}>{row}</div>
+      ) : (
+        <button
+          aria-label={`Open ${file.path}`}
+          className={cn(
+            className,
+            'dshx:rounded-sm dshx:text-left dshx:outline-none dshx:hover:bg-muted/50 dshx:hover:[&>span:nth-child(2)]:underline dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+          )}
+          onClick={file.onOpen}
+          type="button"
+        >
+          {row}
+        </button>
+      )}
+    </li>
   )
 }
 

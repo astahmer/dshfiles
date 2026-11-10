@@ -3,8 +3,26 @@ import { ComposerContextModel, composerBaseFromSetting } from './composer-contex
 import { decodePreferences } from './preferences.js'
 
 describe('composer base setting', () => {
+  it('reads the project base, and no choice at all, as the project main branch', () => {
+    expect(ComposerContextModel.composerBaseForProject('project', 'develop')).toEqual({ kind: 'bookmark', name: 'develop' })
+    expect(ComposerContextModel.composerBaseForProject(undefined, 'develop')).toEqual({ kind: 'bookmark', name: 'develop' })
+    expect(ComposerContextModel.composerBaseForProject('', 'develop')).toEqual({ kind: 'bookmark', name: 'develop' })
+    expect(ComposerContextModel.composerBaseForProject('project', undefined)).toEqual({ kind: 'bookmark', name: 'main' })
+    expect(ComposerContextModel.composerBaseForProject('project', 'x") | all()')).toEqual({ kind: 'bookmark', name: 'main' })
+  })
+
+  it('keeps every explicit choice, a literal main included, whatever the project main branch is', () => {
+    expect(ComposerContextModel.composerBaseForProject('main', 'develop')).toEqual({ kind: 'bookmark', name: 'main' })
+    expect(ComposerContextModel.composerBaseForProject('release', 'develop')).toEqual({ kind: 'bookmark', name: 'release' })
+    expect(ComposerContextModel.composerBaseForProject('trunk', 'develop')).toEqual({ kind: 'trunk' })
+    expect(ComposerContextModel.composerBaseChoice('main')).toBe('main')
+    expect(ComposerContextModel.composerBaseChoice(undefined)).toBe('project')
+    expect(ComposerContextModel.composerBaseChoice('project')).toBe('project')
+    expect(ComposerContextModel.composerBaseChoice('parent')).toBe('parent')
+  })
+
   it('defaults composer preferences to main while preserving configured bases', () => {
-    expect(decodePreferences({}).composerBarBase).toBe('main')
+    expect(decodePreferences({}).composerBarBase).toBe('project')
     expect(decodePreferences({ composerBarBase: 'release' }).composerBarBase).toBe('release')
   })
 

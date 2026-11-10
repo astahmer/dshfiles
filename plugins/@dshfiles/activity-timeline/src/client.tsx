@@ -17,7 +17,7 @@ import { InboxPanel, openThread } from './inbox-panel.js'
 import { ACTIVITY_TIMELINE_LOCALE_NAMESPACE, activityTimelineLocale } from './locales.js'
 
 const PANEL_ID = 'activity-timeline'
-/** Temporary left-nav placement until the Phase 3 rail (plans/ade-ux §4.2). */
+/** Temporary left-nav placement until the Phase 3 rail (docs/ade-ux §4.2). */
 const INBOX_PANEL_ID = 'attention-inbox'
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
@@ -56,7 +56,7 @@ export default defineClient({
         )),
       ),
     )
-    // Jump to next waiting (plans/ade-ux §4.8): ⌥J opens the next Needs you item's thread, cycling; with nothing waiting,
+    // Jump to next waiting (docs/ade-ux §4.8): ⌥J opens the next Needs you item's thread, cycling; with nothing waiting,
     // or an item that is not about a thread, it opens the Inbox. The Web shortcut registry admits no ⌥-letter default,
     // so the registry row lists the command in Settings › Key bindings and the palette (a user binding there runs it
     // too) while a capture-phase listener claims ⌥J itself, as @dshfiles/shortcuts does for chords the registry cannot.

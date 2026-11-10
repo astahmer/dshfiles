@@ -15,16 +15,17 @@ import { JobsBoard } from './service.js'
 import { backgroundJobsSettings } from './settings.js'
 import { type HistoryJob, jobBoardSchema } from './types.js'
 
+const recentBase = Date.now() - 60_000
 const historyJob = (overrides: Partial<HistoryJob> & { readonly id: string }): HistoryJob => ({
   kind: 'bash',
   label: 'pnpm test',
   owner: 'session-aaaa',
-  startedAt: 1_000,
+  startedAt: recentBase + 1_000,
   settled: true,
   status: 'completed',
   cause: 'producer',
   detail: 'exit code: 0',
-  finishedAt: 2_000,
+  finishedAt: recentBase + 2_000,
   ...overrides,
 })
 
@@ -55,7 +56,7 @@ const liveView = (overrides: Partial<JobView> & { readonly id: JobId }): JobView
   label: 'pnpm check:e2e',
   owner: SessionId('session-bbbb'),
   status: 'running',
-  startedAt: 3_000,
+  startedAt: recentBase + 3_000,
   output: { total: 0, earliest: 0 },
   ...overrides,
 })
@@ -145,14 +146,65 @@ const makeBoard = Effect.fn(function* (input: {
 
 describe('background jobs board', () => {
   it.layer(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))(it => {
+    it.effect('refreshes every row when one job changes between two reads', () =>
+      Effect.gen(function* () {
+        const registry = registryStub()
+        const fixture = yield* makeBoard({ jobs: [historyJob({ id: 'bash-history', label: 'cd /x && jj log' })], registry })
+        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-a') }) })
+        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-b') }) })
+
+        const snapshot = (board: { readonly rows: readonly { id: string; status: string; outputTotal: number }[] }) =>
+          board.rows.map(row => [row.id, row.status, row.outputTotal])
+
+        expect(snapshot(yield* fixture.board.board({ scope: 'all' }))).toEqual([
+          ['bash-a', 'running', 0],
+          ['bash-b', 'running', 0],
+          ['bash-history', 'completed', 0],
+        ])
+
+        yield* fixture.emit(registry, { type: 'output', id: JobId('bash-a'), owner: SessionId('session-bbbb'), total: 7 })
+        expect(snapshot(yield* fixture.board.board({ scope: 'all' }))).toEqual([
+          ['bash-a', 'running', 7],
+          ['bash-b', 'running', 0],
+          ['bash-history', 'completed', 0],
+        ])
+
+        yield* fixture.emit(registry, {
+          type: 'settled',
+          job: liveView({ id: JobId('bash-b'), status: 'completed', finishedAt: recentBase + 4_000 }),
+          cause: 'producer',
+          awaited: false,
+        })
+        const settled = yield* fixture.board.board({ scope: 'all' })
+        expect(snapshot(settled)).toEqual([
+          ['bash-a', 'running', 7],
+          ['bash-b', 'completed', 0],
+          ['bash-history', 'completed', 0],
+        ])
+        expect(settled.rows.map(row => row.category)).toEqual(['tests', 'tests', 'vcs'])
+
+        yield* fixture.board.refresh
+        expect(snapshot(yield* fixture.board.board({ scope: 'all' }))).toEqual(snapshot(settled))
+
+        yield* fixture.emit(registry, { type: 'removed', job: liveView({ id: JobId('bash-a') }) })
+        expect(snapshot(yield* fixture.board.board({ scope: 'all' }))).toEqual([
+          ['bash-b', 'completed', 0],
+          ['bash-history', 'completed', 0],
+        ])
+      }),
+    )
+
     it.effect('lists running jobs before finished ones and pages with a cursor', () =>
       Effect.gen(function* () {
         const registry = registryStub()
         const fixture = yield* makeBoard({
-          jobs: [historyJob({ id: 'bash-1', startedAt: 5_000, finishedAt: 6_000 }), historyJob({ id: 'bash-2', startedAt: 4_000, finishedAt: 5_000 })],
+          jobs: [
+            historyJob({ id: 'bash-1', startedAt: recentBase + 5_000, finishedAt: recentBase + 6_000 }),
+            historyJob({ id: 'bash-2', startedAt: recentBase + 4_000, finishedAt: recentBase + 5_000 }),
+          ],
           registry,
         })
-        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-live'), startedAt: 9_000 }) })
+        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-live'), startedAt: recentBase + 9_000 }) })
 
         const first = yield* fixture.board.board({ scope: 'all', limit: 2 })
         expect(first.rows.map(row => row.id)).toEqual(['bash-live', 'bash-1'])
@@ -222,12 +274,12 @@ describe('background jobs board', () => {
 
         const registry = registryStub()
         yield* fixture.attach(registry)
-        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-open'), startedAt: 1_000 }) })
+        yield* fixture.emit(registry, { type: 'registered', job: liveView({ id: JobId('bash-open'), startedAt: recentBase + 1_000 }) })
         expect((yield* fixture.board.board({ scope: 'running' })).rows[0]).toMatchObject({ status: 'running', live: true })
 
         yield* fixture.emit(registry, {
           type: 'settled',
-          job: liveView({ id: JobId('bash-open'), startedAt: 1_000, status: 'killed', finishedAt: 4_000 }),
+          job: liveView({ id: JobId('bash-open'), startedAt: recentBase + 1_000, status: 'killed', finishedAt: recentBase + 4_000 }),
           cause: 'kill',
           awaited: false,
         })
@@ -335,7 +387,7 @@ describe('background jobs board', () => {
         yield* TestClock.adjust('1 second')
         yield* fixture.emit(registry, {
           type: 'settled',
-          job: liveView({ id: JobId('bash-wait'), status: 'completed', finishedAt: 4_000 }),
+          job: liveView({ id: JobId('bash-wait'), status: 'completed', finishedAt: recentBase + 4_000 }),
           cause: 'producer',
           awaited: false,
         })

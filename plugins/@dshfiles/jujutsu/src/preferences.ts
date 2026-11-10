@@ -59,7 +59,7 @@ const DEFAULT_PREFERENCES: JujutsuPreferences = {
   headerToggle: false,
   chatReferenceLinks: true,
   chatReferenceClickBehavior: 'focus',
-  composerBarBase: 'main',
+  composerBarBase: 'project',
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)

@@ -1,9 +1,10 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { createServer, type Server, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import {
   createAssistantMessageEventStream,
@@ -52,6 +53,10 @@ const tools = JSON.parse(readFileSync(toolsFile, 'utf8'))
 const send = message => process.stdout.write(JSON.stringify(message) + '\\n')
 const socket = createConnection(socketPath)
 socket.setEncoding('utf8')
+// The bridge lives only as long as its claude process (stdin) and the Host (the pipe): either ending stops it, so a
+// cancelled turn never leaves it running in, and locking, its working directory.
+socket.on('close', () => process.exit(0))
+socket.on('error', () => process.exit(0))
 let buffer = ''
 socket.on('data', chunk => {
   buffer += chunk
@@ -70,7 +75,7 @@ createInterface({ input: process.stdin }).on('line', line => {
   if (request.method === 'tools/list') return send({ jsonrpc: '2.0', id: request.id, result: { tools } })
   if (request.method === 'tools/call') return socket.write(JSON.stringify({ id: request.id, name: request.params.name, arguments: request.params.arguments ?? {} }) + '\\n')
   if (request.id !== undefined) send({ jsonrpc: '2.0', id: request.id, result: {} })
-})
+}).on('close', () => process.exit(0))
 `
 
 /** One line the CLI or the bridge wrote, decoded; a non-JSON line (a warning, a stray log) fails like a malformed one. */
@@ -163,6 +168,8 @@ interface Session {
   readonly signature: string
   readonly child: ChildProcessWithoutNullStreams
   readonly server: Server
+  /** Bridge connections the server accepted; `server.close()` leaves these open, which keeps the bridge alive. */
+  readonly connections: Set<Socket>
   readonly directory: string
   /** Transcript messages this process has seen, and the fingerprint of the last one. */
   synced: number
@@ -457,7 +464,10 @@ export class ClaudeCliSessions {
   }): Session {
     // An empty working directory keeps project CLAUDE.md files and settings out of DSH's conversation.
     const directory = mkdtempSync(join(tmpdir(), 'dsh-claude-cli-'))
-    const socketPath = join(directory, 'bridge.sock')
+    // Windows has no Unix domain socket files; Node serves the same stream API on a named pipe.
+    // Pipe names are machine-wide, so the name is random: another local user cannot claim it first.
+    const socketPath =
+      process.platform === 'win32' ? `\\\\.\\pipe\\${basename(directory)}-${randomBytes(12).toString('hex')}-bridge` : join(directory, 'bridge.sock')
     writeFileSync(join(directory, 'tools.json'), JSON.stringify(input.tools.map(toMcpTool)))
     writeFileSync(join(directory, 'system.md'), input.system)
     writeFileSync(
@@ -509,6 +519,7 @@ export class ClaudeCliSessions {
       signature: input.signature,
       child,
       server: createServer(),
+      connections: new Set(),
       directory,
       synced: 0,
       lastFingerprint: '',
@@ -520,6 +531,8 @@ export class ClaudeCliSessions {
       phase: { kind: 'starting' },
     }
     session.server.on('connection', socket => {
+      session.connections.add(socket)
+      socket.once('close', () => session.connections.delete(socket))
       socket.on('error', () => undefined)
       socket.setEncoding('utf8')
       let buffer = ''
@@ -597,6 +610,11 @@ export class ClaudeCliSessions {
     const open = new Map<number, { readonly kind: 'text' | 'thinking' | 'toolCall'; readonly contentIndex: number; json: string }>()
     let started = false
     let finished = false
+    // Tool uses of the current CLI message: DSH runs only the ones the CLI exposed (mcp__dsh__*). A bare name is one
+    // the CLI rejects itself ("No such tool available") without calling the bridge; running it here too executed the
+    // tool while the model saw an error, so its retry ran it a second time (duplicate threads).
+    let runnableUses = 0
+    let rejectedUses = 0
     const finish = (): void => {
       finished = true
       input.signal?.removeEventListener('abort', onAbort)
@@ -631,6 +649,8 @@ export class ClaudeCliSessions {
       switch (event.type) {
         case 'message_start':
           begin()
+          runnableUses = 0
+          rejectedUses = 0
           return
         case 'content_block_start': {
           begin()
@@ -646,7 +666,12 @@ export class ClaudeCliSessions {
             stream.push({ type: 'thinking_start', contentIndex, partial: output })
           }
           if (block.type === 'tool_use') {
-            const name = block.name.startsWith(MCP_TOOL_PREFIX) ? block.name.slice(MCP_TOOL_PREFIX.length) : block.name
+            if (!block.name.startsWith(MCP_TOOL_PREFIX)) {
+              rejectedUses += 1
+              return
+            }
+            runnableUses += 1
+            const name = block.name.slice(MCP_TOOL_PREFIX.length)
             const contentIndex = output.content.push({ type: 'toolCall', id: block.id, name, arguments: {} }) - 1
             open.set(event.index, { kind: 'toolCall', contentIndex, json: '' })
             stream.push({ type: 'toolcall_start', contentIndex, partial: output })
@@ -712,6 +737,13 @@ export class ClaudeCliSessions {
           return
         }
         case 'message_stop':
+          // Every tool use of this message was rejected by the CLI, which answers them and asks the model again: the
+          // step continues with that next message instead of ending on calls DSH must not run.
+          if (rejectedUses > 0 && runnableUses === 0) {
+            output.stopReason = 'stop'
+            delete output.rawStopReason
+            return
+          }
           finish()
           session.produced += 1
           stream.push({
@@ -744,8 +776,19 @@ export class ClaudeCliSessions {
 
   private cleanup(session: Session): void {
     session.server.close()
-    rmSync(session.directory, { recursive: true, force: true })
+    // Ending the accepted connections lets the bridge helper exit instead of outliving its claude process.
+    for (const socket of session.connections) socket.destroy()
+    session.connections.clear()
     if (this.sessions.get(session.key) === session) this.sessions.delete(session.key)
+    if (process.platform !== 'win32') {
+      rmSync(session.directory, { recursive: true, force: true })
+      return
+    }
+    // Cleanup runs synchronously in abort and exit handlers, right after kill(). On Windows the folder stays locked
+    // until claude and its bridge (whose working directory it is) have exited, and a synchronous retry would block the
+    // Host for seconds, so the removal retries in the background; it runs again on exit, and a temp folder that still
+    // cannot go is left to the OS instead of throwing out of an abort handler, which would end the Host.
+    void rm(session.directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => undefined)
   }
 }
 

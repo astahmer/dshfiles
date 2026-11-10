@@ -19,7 +19,9 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type R
 import { pullsReviewApi } from './api.js'
 import { FacetSessionStateModel, type FacetSessionPatch } from './changes-facet-state.js'
 import { ChangesScopeModel, changesScopeSchema, type ChangesRequest, type ChangesScope } from './changes-scope.js'
+import { CombinedReview } from './combined-review.js'
 import { LandCard } from './land-card.js'
+import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
 import { TurnChangesModel, TurnChangesReadError, type TurnChangesEvent } from './turn-changes.js'
 import { useRangeViewedMarks, useTurnViewedMarks, type ViewedMarksView } from './viewed-marks.js'
 import { Schema } from 'effect'
@@ -127,9 +129,10 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
     ...FacetSessionStateModel.initial(sessionId),
     scope: props.request?.scope,
     seq: props.request?.seq,
+    revisions: ChangesScopeModel.selectionOf(props.request),
   }))
   // Scope, turn, selection and comment draft belong to one thread: switching threads starts them over together.
-  const { scope, seq, focusPath, selection, comment, commentNotice } = FacetSessionStateModel.forSession(stored, sessionId)
+  const { scope, seq, revisions, selectionRevision, focusPath, selection, comment, commentNotice } = FacetSessionStateModel.forSession(stored, sessionId)
   const patchFacet = useCallback(
     (patch: FacetSessionPatch): void => setStored(current => FacetSessionStateModel.update(current, { sessionId, patch })),
     [sessionId],
@@ -137,7 +140,9 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
 
   useEffect(() => {
     if (props.request === undefined) return
-    patchFacet(props.request.seq === undefined ? { scope: props.request.scope } : { scope: props.request.scope, seq: props.request.seq })
+    const selected = ChangesScopeModel.selectionOf(props.request)
+    if (selected !== undefined) patchFacet({ scope: 'revisions', revisions: selected, selection: null, focusPath: null })
+    else patchFacet(props.request.seq === undefined ? { scope: props.request.scope } : { scope: props.request.scope, seq: props.request.seq })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the opener's request applies when it changes, never again just because the thread did.
   }, [props.request, props.requestRevision])
 
@@ -161,13 +166,15 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
   })
   const turnList: readonly TurnChangesEvent[] = turns.data ?? []
   const latestTurn = turnList.at(-1)
-  const activeScope: ChangesScope = scope ?? ChangesScopeModel.defaultScope({ isolated, hasTurn: latestTurn !== undefined })
+  const defaultScope = ChangesScopeModel.defaultScope({ isolated, hasTurn: latestTurn !== undefined })
+  // A `revisions` request without its selection has nothing to show, so it reads as no request.
+  const activeScope: ChangesScope = (scope === 'revisions' && revisions === undefined ? undefined : scope) ?? defaultScope
   const activeSeq = seq ?? latestTurn?.seq
   const base = ChangesScopeModel.base(activeScope, bookmark)
 
   const rangeDiff = useQuery({
     queryKey: ['pulls-review', 'facet', cwd ?? '', base ?? ''],
-    enabled: activeScope !== 'turn' && base !== undefined && cwd !== undefined && cwd.length > 0 && status.data !== undefined,
+    enabled: base !== undefined && cwd !== undefined && cwd.length > 0 && status.data !== undefined,
     queryFn: ({ signal }) =>
       runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => review.review({ path: cwd ?? '', base }, { signal: hostSignal }) }),
   })
@@ -181,9 +188,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
 
   const rangeResult = rangeDiff.data
   const range =
-    activeScope !== 'turn' && rangeResult?.status === 'ok' && cwd !== undefined
-      ? { workspacePath: cwd, base: rangeResult.base, head: rangeResult.head }
-      : undefined
+    base !== undefined && rangeResult?.status === 'ok' && cwd !== undefined ? { workspacePath: cwd, base: rangeResult.base, head: rangeResult.head } : undefined
   const rangeMarks = useRangeViewedMarks(range)
   const turnMarks = useTurnViewedMarks(
     activeScope === 'turn' && props.sessionId !== undefined && activeSeq !== undefined ? { sessionId: props.sessionId, seq: activeSeq } : undefined,
@@ -202,6 +207,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
     }
   }, [activeScope, rangeResult, turnData])
   const parsedFiles = useMemo(() => (diff === undefined || diff.patch.length === 0 ? [] : parsePatchFiles(diff.patch).flatMap(file => file.files)), [diff])
+  const packageJson = usePackageJsonTables(diff?.patch ?? '', parsedFiles)
   const paths = useMemo(() => (diff?.files ?? []).map(file => file.path), [diff])
   const viewedCount = paths.filter(path => marks.viewed.has(path)).length
   const additions = (diff?.files ?? []).reduce((total, file) => total + file.added, 0)
@@ -209,6 +215,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
 
   const refreshDiff = (): void => {
     void queryClient.invalidateQueries({ queryKey: ['pulls-review', 'facet'] })
+    void queryClient.invalidateQueries({ queryKey: ['pulls-review', 'combined'] })
     void queryClient.invalidateQueries({ queryKey: ['pulls-review', 'turns', props.sessionId] })
     void status.refetch()
   }
@@ -219,7 +226,9 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
       patchFacet({ commentNotice: 'The composer is not loaded, so the comment cannot be queued. Copy it into your next message instead.' })
       return
     }
-    const text = selection.side === 'deletions' ? `(on removed lines) ${comment.trim()}` : comment.trim()
+    const onRemovedLines = selection.side === 'deletions' ? `(on removed lines) ${comment.trim()}` : comment.trim()
+    // Line numbers are that revision's: without it a reader would look for them in the working copy.
+    const text = activeScope === 'revisions' && selectionRevision !== undefined ? `(in revision ${selectionRevision}) ${onRemovedLines}` : onRemovedLines
     const path = selection.file.name
     // A one-line comment names no end line.
     const added = composer.value.attach({
@@ -254,7 +263,8 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
   }
   const failure = readFailure()
   /** Which one body the facet shows under its scope picker, in priority order. */
-  const readView = (): 'no-turn' | 'loading' | 'failure' | 'none' | 'empty' | 'files' => {
+  const readView = (): 'combined' | 'no-turn' | 'loading' | 'failure' | 'none' | 'empty' | 'files' => {
+    if (activeScope === 'revisions') return 'combined'
     if (activeScope === 'turn' && latestTurn === undefined && !turns.isPending) return 'no-turn'
     if (loading) return 'loading'
     if (failure !== undefined) return 'failure'
@@ -262,6 +272,45 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
     return diff.files.length === 0 ? 'empty' : 'files'
   }
   const view = readView()
+  const scopeChoices: readonly ChangesScope[] = revisions === undefined ? ChangesScopeModel.scopes : [...ChangesScopeModel.scopes, 'revisions']
+
+  const commentBox =
+    selection === null ? (
+      <p className={HINT}>Select line numbers in a diff to comment on them; comments wait in your next message.</p>
+    ) : (
+      <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:p-2" data-testid="changes-comment">
+        <div className="dshx:flex dshx:items-center dshx:gap-2">
+          <MessageSquarePlus aria-hidden className="dshx:size-3.5 dshx:text-muted-foreground" />
+          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs">
+            {selection.file.name}:{selection.start}
+            {selection.end === selection.start ? '' : `–${String(selection.end)}`}
+            {selection.side === 'deletions' ? ' (removed)' : ''}
+          </span>
+          <Button aria-label="Discard comment" onClick={() => patchFacet({ selection: null })} size="icon-xs" type="button" variant="ghost">
+            <X aria-hidden className="dshx:size-3.5" />
+          </Button>
+        </div>
+        <Textarea
+          aria-label="Comment on the selected lines"
+          className="dshx:min-h-16 dshx:text-xs"
+          onChange={event => patchFacet({ comment: event.target.value })}
+          onKeyDown={event => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) addComment()
+          }}
+          placeholder="What should change here?"
+          value={comment}
+        />
+        <Button className="dshx:self-end" disabled={comment.trim().length === 0} onClick={addComment} size="xs" type="button">
+          Add to next message
+        </Button>
+      </div>
+    )
+  const commentStatus =
+    commentNotice === null ? null : (
+      <p className={HINT} role="status">
+        {commentNotice}
+      </p>
+    )
 
   return (
     <div
@@ -285,7 +334,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
           value={activeScope}
           variant="outline"
         >
-          {ChangesScopeModel.scopes.map(option => (
+          {scopeChoices.map(option => (
             <ToggleGroupItem aria-label={ChangesScopeModel.label(option, bookmark)} className="dshx:px-2 dshx:text-xs" key={option} value={option}>
               {ChangesScopeModel.label(option, bookmark)}
             </ToggleGroupItem>
@@ -312,6 +361,20 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
       </div>
       <p className={HINT}>{ChangesScopeModel.hint(activeScope, bookmark)}</p>
 
+      {view === 'combined' && revisions !== undefined ? (
+        <CombinedReview
+          comments={
+            <>
+              {commentBox}
+              {commentStatus}
+            </>
+          }
+          key={revisions.revisions.join(' ')}
+          onLineSelection={(next, revision) => patchFacet({ selection: next, selectionRevision: revision.shortChangeId, commentNotice: null })}
+          revisions={revisions.revisions}
+          workspacePath={revisions.workspacePath}
+        />
+      ) : null}
       {view === 'no-turn' ? <EmptyState>No turn of this thread changed files yet.</EmptyState> : null}
       {view === 'loading' ? (
         <p className={cn(HINT, 'dshx:flex dshx:items-center dshx:gap-2')}>
@@ -375,7 +438,10 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
                       'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:font-mono dshx:text-xs dshx:hover:underline',
                       viewed && 'dshx:text-muted-foreground',
                     )}
-                    onClick={() => patchFacet({ focusPath: file.path })}
+                    onClick={() => {
+                      if (packageJson.isTextHidden(file.path)) packageJson.showText(file.path)
+                      patchFacet({ focusPath: file.path })
+                    }}
                     type="button"
                   >
                     {file.display}
@@ -386,70 +452,40 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
               )
             })}
           </ul>
-          {selection === null ? (
-            <p className={HINT}>Select line numbers in a diff to comment on them; comments wait in your next message.</p>
-          ) : (
-            <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:p-2" data-testid="changes-comment">
-              <div className="dshx:flex dshx:items-center dshx:gap-2">
-                <MessageSquarePlus aria-hidden className="dshx:size-3.5 dshx:text-muted-foreground" />
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs">
-                  {selection.file.name}:{selection.start}
-                  {selection.end === selection.start ? '' : `–${String(selection.end)}`}
-                  {selection.side === 'deletions' ? ' (removed)' : ''}
-                </span>
-                <Button aria-label="Discard comment" onClick={() => patchFacet({ selection: null })} size="icon-xs" type="button" variant="ghost">
-                  <X aria-hidden className="dshx:size-3.5" />
-                </Button>
-              </div>
-              <Textarea
-                aria-label="Comment on the selected lines"
-                className="dshx:min-h-16 dshx:text-xs"
-                onChange={event => patchFacet({ comment: event.target.value })}
-                onKeyDown={event => {
-                  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) addComment()
+          <PackageJsonTables onShowText={path => patchFacet({ focusPath: path })} view={packageJson} />
+          {commentBox}
+          {commentStatus}
+          {packageJson.textFiles.length === 0 && parsedFiles.length > 0 ? null : (
+            <div
+              className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
+              data-testid="changes-diffs"
+            >
+              <PatchView
+                className="dshx:flex-1"
+                empty={<p className={cn(HINT, 'dshx:p-3')}>No diff lines to display (binary or oversized files).</p>}
+                files={packageJson.textFiles}
+                focusPath={focusPath}
+                onLineSelection={next => {
+                  patchFacet({ selection: next, commentNotice: null })
                 }}
-                placeholder="What should change here?"
-                value={comment}
+                renderHeaderMetadata={file => {
+                  const viewed = marks.viewed.has(file.name)
+                  return (
+                    <Button
+                      aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.name}`}
+                      className="dshx:gap-1 dshx:text-[11px]"
+                      disabled={!marks.ready}
+                      onClick={() => marks.set([file.name], !viewed)}
+                      size="sm"
+                      variant={viewed ? 'secondary' : 'ghost'}
+                    >
+                      {viewed ? 'Viewed' : 'Mark viewed'}
+                    </Button>
+                  )
+                }}
               />
-              <Button className="dshx:self-end" disabled={comment.trim().length === 0} onClick={addComment} size="xs" type="button">
-                Add to next message
-              </Button>
             </div>
           )}
-          {commentNotice === null ? null : (
-            <p className={HINT} role="status">
-              {commentNotice}
-            </p>
-          )}
-          <div
-            className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
-            data-testid="changes-diffs"
-          >
-            <PatchView
-              className="dshx:flex-1"
-              empty={<p className={cn(HINT, 'dshx:p-3')}>No diff lines to display (binary or oversized files).</p>}
-              files={parsedFiles}
-              focusPath={focusPath}
-              onLineSelection={next => {
-                patchFacet({ selection: next, commentNotice: null })
-              }}
-              renderHeaderMetadata={file => {
-                const viewed = marks.viewed.has(file.name)
-                return (
-                  <Button
-                    aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.name}`}
-                    className="dshx:gap-1 dshx:text-[11px]"
-                    disabled={!marks.ready}
-                    onClick={() => marks.set([file.name], !viewed)}
-                    size="sm"
-                    variant={viewed ? 'secondary' : 'ghost'}
-                  >
-                    {viewed ? 'Viewed' : 'Mark viewed'}
-                  </Button>
-                )
-              }}
-            />
-          </div>
         </>
       ) : null}
     </div>

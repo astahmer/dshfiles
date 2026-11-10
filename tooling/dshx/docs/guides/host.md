@@ -224,6 +224,11 @@ while (page.cursor !== null) page = await storage.list({ prefix: 'runs/', cursor
 
 - `list` returns keys in code-unit order, at most `limit` (default 100, max 500), and a `cursor` (the last key) while
   more match; pass it back to read the next page. Keys may contain `/`, so a prefix works as a folder.
+- `listAll({ prefix })` returns every entry under one prefix, in the same code-unit order, from a single snapshot.
+  `keys()` is unsorted, so a complete prefix read costs one scan and one sort however it is asked for, and paging a
+  large prefix at 500 keys repeats both per page. Host-only — the browser API keeps its page cap — and the Effect
+  service (`@dshfiles/dshx/effect/plugin-storage`) exposes the same method. Call it from a Host caller that needs the
+  whole prefix; keep `list` for pages a browser renders.
 - Without the storage-domain row every call rejects with `PluginApiError` code `storage-unavailable`, whose message
   says which row to add.
 - The first loaded dshx Host with an API (the registry leader) serves the `storage` API (owner `@dshfiles/dshx`) to browsers and publishes its `changed` event (`{ namespace, key, deleted }`) for every write, from the

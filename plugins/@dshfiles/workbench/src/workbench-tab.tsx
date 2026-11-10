@@ -1,5 +1,5 @@
 import type { IDockviewPanelHeaderProps } from 'dockview-react'
-import { useState, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { PinIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
@@ -11,6 +11,7 @@ import { NewViewTabs } from './new-view.js'
 import { closeWorkbenchPanel, type WorkbenchPanelIdentity } from './panel-close.js'
 import { TabRows } from './tab-row-visibility.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { TabReveal } from './tab-reveal.js'
 
 /** The main seat's compact action drives the existing tab provider, never a second tab actor. */
 export const WorkbenchNewTabButton = (props: { readonly label: string }): JSX.Element | null => {
@@ -65,6 +66,18 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
     const tab = snapshot.tabs.find(candidate => candidate.id === definition?.tabId)
     const closeButtonPosition = snapshot.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
     const title = definition?.newView ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : (definition?.title ?? tab?.title ?? props.api.title)
+    const active = useSyncExternalStore(
+      listener => {
+        const disposable = props.api.onDidActiveChange(listener)
+        return () => disposable.dispose()
+      },
+      () => props.api.isActive,
+    )
+    // Dockview scrolls a tab while the strip still holds its placeholder width; the real title lays out afterwards.
+    useLayoutEffect(() => {
+      if (!active) return
+      TabReveal.reveal(props.api.group)
+    }, [active, props.api.group, snapshot.activeTabId, title])
     const [renaming, setRenaming] = useState(false)
     const [notice, setNotice] = useState('')
     const closePanel = (panel: WorkbenchPanelIdentity): void => {
