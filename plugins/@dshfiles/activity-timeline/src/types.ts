@@ -5,7 +5,10 @@ const revisionEvidenceSchema = Schema.NullOr(Schema.String.check(Schema.isPatter
 const labelSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(80), Schema.isPattern(/^[^\p{Cc}]+$/u))
 const actionIdSchema = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,31}$/))
 
-const verificationReceiptSummarySchema = Schema.Struct({
+const remoteFailureCodeSchema = Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,63}$/))
+const verificationStageSchema = Schema.Literals(['manual', 'completion', 'rebase'])
+
+const receiptSummaryFields = {
   receiptId: Schema.String.check(Schema.isUUID()),
   sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
   actionId: actionIdSchema,
@@ -13,26 +16,6 @@ const verificationReceiptSummarySchema = Schema.Struct({
   status: Schema.Literals(['passed', 'failed', 'cancelled', 'timed-out']),
   failure: Schema.NullOr(
     Schema.Literals(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed', 'remote-unavailable', 'remote-failed']),
-  ),
-  executor: Schema.optional(
-    Schema.Union([
-      Schema.Struct({ kind: Schema.Literal('local') }),
-      Schema.Struct({
-        kind: Schema.Literal('remote'),
-        remoteId: actionIdSchema,
-        sshTarget: Schema.String.check(Schema.isMaxLength(255)),
-        workspace: Schema.String.check(Schema.isMaxLength(2048)),
-      }),
-    ]),
-  ),
-  remoteFailure: Schema.optional(
-    Schema.NullOr(
-      Schema.Struct({
-        remoteId: actionIdSchema,
-        code: Schema.String.check(Schema.isPattern(/^[a-z][a-z0-9-]{0,63}$/)),
-        message: Schema.String.check(Schema.isMaxLength(240)),
-      }),
-    ),
   ),
   startedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   finishedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
@@ -43,14 +26,79 @@ const verificationReceiptSummarySchema = Schema.Struct({
   attempt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(2)),
   sourceRevisionBefore: revisionEvidenceSchema,
   sourceRevisionAfter: revisionEvidenceSchema,
-})
-export type VerificationReceiptSummary = typeof verificationReceiptSummarySchema.Type
+}
 
-export const verificationReceiptEventSchema = Schema.Struct({
+const localExecutorSchema = Schema.Struct({ kind: Schema.Literal('local') })
+
+/** v1 still requires peer keys on a remote executor and a free-text failure message; both are dropped on decode. */
+const verificationReceiptV1Schema = Schema.Struct({
   kind: Schema.Literal('verification-receipt'),
   version: Schema.Literal(1),
-  value: verificationReceiptSummarySchema,
+  value: Schema.Struct({
+    ...receiptSummaryFields,
+    executor: Schema.optional(
+      Schema.Union([
+        localExecutorSchema,
+        Schema.Struct({
+          kind: Schema.Literal('remote'),
+          remoteId: actionIdSchema,
+          sshTarget: Schema.String.check(Schema.isMaxLength(255)),
+          workspace: Schema.String.check(Schema.isMaxLength(2048)),
+        }),
+      ]),
+    ),
+    remoteFailure: Schema.optional(
+      Schema.NullOr(Schema.Struct({ remoteId: actionIdSchema, code: remoteFailureCodeSchema, message: Schema.String.check(Schema.isMaxLength(240)) })),
+    ),
+  }),
 })
+
+/** v2 carries no peer target, workspace or failure text, and adds the recorded verification stage. */
+const verificationReceiptV2Schema = Schema.Struct({
+  kind: Schema.Literal('verification-receipt'),
+  version: Schema.Literal(2),
+  value: Schema.Struct({
+    ...receiptSummaryFields,
+    verificationStage: Schema.optionalKey(verificationStageSchema),
+    executor: Schema.optionalKey(Schema.Union([localExecutorSchema, Schema.Struct({ kind: Schema.Literal('remote'), remoteId: actionIdSchema })])),
+    remoteFailure: Schema.optionalKey(Schema.NullOr(Schema.Struct({ remoteId: actionIdSchema, code: remoteFailureCodeSchema }))),
+  }),
+})
+
+export const verificationReceiptEventSchema = Schema.Union([verificationReceiptV1Schema, verificationReceiptV2Schema])
+type VerificationReceiptEvent = typeof verificationReceiptEventSchema.Type
+
+export interface VerificationReceiptSummary extends Schema.Struct.Type<typeof receiptSummaryFields> {
+  readonly verificationStage: typeof verificationStageSchema.Type | 'not-recorded'
+  readonly executor: { readonly kind: 'local' } | { readonly kind: 'remote'; readonly remoteId: string } | null
+  readonly remoteFailure: { readonly remoteId: string; readonly code: string } | null
+}
+
+/** One receipt summary for either version: peer keys and failure text never reach the timeline. */
+export const verificationReceiptSummaryOf = (event: VerificationReceiptEvent): VerificationReceiptSummary => {
+  const value = event.value
+  const executor = value.executor
+  return {
+    receiptId: value.receiptId,
+    sessionId: value.sessionId,
+    actionId: value.actionId,
+    label: value.label,
+    status: value.status,
+    failure: value.failure,
+    startedAt: value.startedAt,
+    finishedAt: value.finishedAt,
+    durationMs: value.durationMs,
+    exitCode: value.exitCode,
+    automatic: value.automatic,
+    verificationTurn: value.verificationTurn,
+    attempt: value.attempt,
+    sourceRevisionBefore: value.sourceRevisionBefore,
+    sourceRevisionAfter: value.sourceRevisionAfter,
+    verificationStage: (event.version === 2 ? event.value.verificationStage : undefined) ?? 'not-recorded',
+    executor: executor === undefined ? null : executor.kind === 'local' ? { kind: 'local' } : { kind: 'remote', remoteId: executor.remoteId },
+    remoteFailure: value.remoteFailure == null ? null : { remoteId: value.remoteFailure.remoteId, code: value.remoteFailure.code },
+  }
+}
 
 export const activitySourceSchema = Schema.Literals(['session', 'communication', 'integration', 'workspace', 'system'])
 export type ActivitySource = typeof activitySourceSchema.Type
