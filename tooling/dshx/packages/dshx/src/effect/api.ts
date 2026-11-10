@@ -11,7 +11,6 @@ import type {
   ApiEventHostPayload,
   ApiHostRegistration,
 } from '../api/types.js'
-import { ApiProtocolModel } from '../api/common.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import { HostContext } from './host-context.js'
 import { inactiveError, PluginInactive, type PluginRuntime } from './plugin-runtime.js'
