@@ -35,9 +35,16 @@ describe('whiteboard panel project preferences', () => {
     expect(projectPreferences('second').get()).toBe('/second')
   })
 
-  it('preserves the legacy selection for the original panel', () => {
+  it('migrates the legacy selection into the original Workbench occurrence only', () => {
     projectPreferences(undefined).set('/legacy')
     expect(projectPreferences('dshfiles-whiteboard').get()).toBe('/legacy')
-    expect(projectPreferences('new').get()).toBe(null)
+    expect(projectPreferences('main/dshfiles-whiteboard').get()).toBe('/legacy')
+    localStorage.clear()
+    projectPreferences(undefined).set('/saved')
+    expect(projectPreferences('tab/alpha').get()).toBe('/saved')
+    projectPreferences('tab/alpha').set('/alpha')
+    expect(projectPreferences('tab/beta').get()).toBe('/saved')
+    expect(projectPreferences('tab/beta').get()).not.toBe('/alpha')
+    expect(projectPreferences(undefined).get()).toBe('/saved')
   })
 })
