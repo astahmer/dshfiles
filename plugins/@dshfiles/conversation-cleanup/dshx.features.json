@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "conversation-cleanup",
+      "title": "Permanently clean up settled or archived conversations",
+      "summary": "Preview cold local settled OR archived conversations, confirm the exact snapshot, and permanently delete their JSONL generations under native exclusive write leases. Loaded sessions and historical formats needing migration are protected. No automatic cleanup, restart or remote deletion.",
+      "reach": [
+        "click button \"Account menu\"",
+        "click menuitem \"Settings\"",
+        "click button \"Conversation cleanup\"",
+        "click button \"Preview cleanup\"",
+        "expect text \"Conversations to delete\""
+      ],
+      "surfaces": ["client", "host", "settings", "api", "tool"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "Settings: Conversation cleanup",
+      "configuration": [],
+      "states": ["preview", "confirmation", "deleted", "skipped", "failed"],
+      "failureModes": [
+        "Loaded sessions are protected even if idle; restart DSH yourself after finishing work, then preview again.",
+        "Stale or consumed previews require a new preview.",
+        "Only stock DSH 0.2.1-rc.2 JSONL persistence is supported; other backends must leave this plugin disabled.",
+        "Deletion is intentionally irreversible. Shared attachments, workspaces, backups and derived indexes are not erased."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "conversation-cleanup.confirmed-deletion",
+          "featureFile": "tooling/dshx/e2e/features/conversation-cleanup.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "conversation-cleanup.native-persistence",
+          "file": "plugins/@dshfiles/conversation-cleanup/src/host.test.ts",
+          "testName": "deletes the settled OR archived cold logs and native reads stop finding them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "conversation-cleanup.files",
+          "file": "plugins/@dshfiles/conversation-cleanup/src/jsonl-files.test.ts",
+          "testName": "removes all canonical generations and encodings, retaining lock inode and sidecars"
+        }
+      ]
+    }
+  ]
+}

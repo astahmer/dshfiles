@@ -227,6 +227,18 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/conversation-cleanup": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 1,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/credential-port": {
     "layerEmpty": 0,
     "promiseAdapters": 1,

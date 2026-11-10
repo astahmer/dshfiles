@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Conversation cleanup",
+    "description": "Preview and permanently delete cold settled or archived local conversation logs, with explicit confirmation and writer protection."
+  }
+}
