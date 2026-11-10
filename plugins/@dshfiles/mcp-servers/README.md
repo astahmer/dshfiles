@@ -73,6 +73,35 @@ the native client's scoped Cordis logger.
 
 Open the reusable **MCP Servers: Servers** view from navigation or the Workbench chooser.
 
+## MCP protocol 2026-07-28 (stateless HTTP)
+
+Before starting a Streamable HTTP server, the manager sends one
+[`server/discover`](https://modelcontextprotocol.io/specification/2026-07-28/server/discover)
+request with the 2026-07-28 per-request metadata (`params._meta` protocol
+version, client info and capabilities, mirrored into `MCP-Protocol-Version`,
+`Mcp-Method` and `Mcp-Name` headers). The answer picks the client:
+
+| Probe answer | Client |
+| --- | --- |
+| A discovery result that lists `2026-07-28` | This bundle's stateless client (`src/stateless-*.ts`) |
+| HTTP error, network error, or a body that is not a modern JSON-RPC error | Native `dsh-mcp-client` (`initialize` handshake) |
+| Modern error (`-32020`/`-32021`/`-32022`) or a discovery result without `2026-07-28` | Native client, with a warning naming the server's versions |
+
+The stateless client registers tools under the same `mcp__<serverName>__<tool>`
+names through the native `createMcpToolDefinition`, so image results, counts
+and mentions behave the same. Each request is its own POST with a JSON or SSE
+answer; tools with an invalid `x-mcp-header` annotation are skipped with a
+warning, and valid ones are mirrored into `Mcp-Param-*` headers. It tolerates
+results without the `ttlMs`/`cacheScope` caching hints (the spec says a client
+treats a missing `ttlMs` as 0), which the `@modelcontextprotocol/client` 2.2.0
+SDK inside `dsh-mcp-client` rejects on `tools/list`.
+
+Not supported yet: `input_required` results (sampling, elicitation, roots),
+`subscriptions/listen` change notifications, and resources/prompts. A server
+whose tool list changes needs **Refresh**, or a disconnect and reconnect; a
+refreshed OAuth token re-attaches the server, which probes again. There is no
+setting: the probe costs one request per attach.
+
 ## OAuth sign-in
 
 `dsh-mcp-client@0.2.0-rc.2` accepts only static headers, so this bundle runs

@@ -3,6 +3,7 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer, Option } from 'effect'
+import { FetchHttpClient } from 'effect/http'
 import { McpHost } from './host-promise.js'
 
 // `secret:ALIAS[@env]` bindings resolve through the Secret Catalog's Host port; other names stay DSH credentials.
@@ -44,7 +45,9 @@ const mcpHost = (input: { readonly catalog: boolean }) =>
         importKey: async () => undefined,
       })
     }
-    const services = yield* Layer.build(McpHost.layer.pipe(Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/mcp-servers' }))))
+    const services = yield* Layer.build(
+      McpHost.layer.pipe(Layer.provide(Layer.mergeAll(HostContext.layer({ ctx, packageId: '@dshfiles/mcp-servers' }), FetchHttpClient.layer))),
+    )
     return { mcp: Context.get(services, McpHost), resolved }
   })
 

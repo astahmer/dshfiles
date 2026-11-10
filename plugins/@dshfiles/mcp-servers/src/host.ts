@@ -51,7 +51,8 @@ const pluginLayer = (config: ManagerConfig) =>
   workers.pipe(
     Layer.provideMerge(McpManager.layer(config)),
     Layer.provideMerge(Layer.mergeAll(McpOAuth.layer, LocalCommands.layer, RegistrySearch.layer, PendingAuthorizations.layer)),
-    Layer.provideMerge(Layer.mergeAll(McpHost.layer, McpExecutables.layer, DshChildProcessSpawner.layer, FetchHttpClient.layer)),
+    Layer.provideMerge(Layer.mergeAll(McpHost.layer, McpExecutables.layer, DshChildProcessSpawner.layer)),
+    Layer.provideMerge(FetchHttpClient.layer),
   )
 
 const handlers = Api.handlers(mcpServersApi, {
