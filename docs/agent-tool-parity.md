@@ -539,8 +539,8 @@ the latest stopped turn offers.
 | `secret_set` / `secret_unset`                             | Set or clear a credential reference            | `credentials.describe                              | set                       | unset`           |
 | `account_status` / `account_sign_in`                      | Account state, sign-in, balance                | `account.getState                                  | startSignIn               | signOut          | …`      |
 | `model_provider_list`                                     | Providers and model discovery                  | `llm.listProviders                                 | listConfigurableProviders | discoverModels`  |
-| `plugin_install` / `plugin_set_enabled` / `plugin_remove` | Manage bundles and entries                     | `pluginManager.installBundle                       | setPluginEnabled          | removeBundle     | …`      |
-| `plugin_inventory`                                        | Runtime inventory (Loader entries, presets)    | `pluginInventory.list`                             |
+| `plugin_install` / ~~`plugin_set_enabled`~~ / `plugin_remove` | Manage bundles and entries (`plugin_set_enabled` bound by settings-shell) | `pluginManager.installBundle                       | setPluginEnabled          | removeBundle     | …`      |
+| ~~`plugin_inventory`~~                                    | Runtime inventory (bound by settings-shell over `pluginManager.listPlugins`; presets still open) | `pluginInventory.list`                             |
 | `plugin_version_exemption`                                | Exact-version exemptions                       | `pluginManager.listVersionExemptions               | setVersionExemption`      |
 | `attach_file`                                             | Upload and attach a file to a Session          | `fileUploads.upload`, `session.attachment`         |
 | `export_session_log`                                      | Download the Session log                       | `/export` command, `SESSION_LOG_EXPORT_PATH` route |
@@ -567,6 +567,13 @@ retires the one-off `*_settings_update` proposals below: a namespace write is
 now `settings_set` with that namespace, not a tool per plugin. The Settings shell
 also binds `dsh_release_status` to its fixed, read-only GitHub release check; the
 same validated version comparison and concise release highlights power the UI.
+`settings_inspect` (read-only) reports one namespace field by field: schema
+default, user override (also when it equals the default), inherited value,
+effective value and source, the model the Settings rows draw. `plugin_inventory`
+(read-only) and `plugin_set_enabled` bind the plugin manager's `listPlugins` and
+`setPluginEnabled`, the verbs of the native Plugins page; the write relays the
+manager's verdict (applied, restart-required with its reason, overridden) and is
+reversed with the opposite value.
 
 Secret Catalog binds `secret_reference_status` (read-only) to the
 `secret-catalog-setup.referenceStatus` verb its reference repair card uses: why

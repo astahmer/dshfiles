@@ -8,6 +8,8 @@
 
 ![Settings grouped by task, with deep links](docs/screenshots/settings-task-groups.png)
 
+![Edit plugin settings as JSON](docs/screenshots/settings-json-editor.png)
+
 DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the native shell has no seat for.
 
 ## Use
@@ -58,7 +60,9 @@ accounts") and key bindings, by command name or keys ("open settings", "⌘,"). 
 word must match; accents and case are ignored; hidden and secret fields never match. Results replace the section as a
 flat list grouped by page, with matches highlighted, editable in place, and a count ("6 Settings Found"). The tree
 stays visible with a match count per entry; picking an entry with matches scrolls to its results. `Escape` clears the
-query. Leaving the Settings tab for another tab keeps the query, so returning to the tab
+query. **Modified** beside the field toggles VS Code's `@modified` filter in the query: only fields the user layer
+sets are listed (alone, or narrowed by the other words); sections, published entries and key bindings carry no user
+layer, so the filter leaves them out. Leaving the Settings tab for another tab keeps the query, so returning to the tab
 restores its results and the text in the field. Native sections draw their own rows, so a match on a section's name
 offers to open it; the namespaces behind native rows (theme, language, …) stay searchable, and a match opens the
 section that draws them.
@@ -106,6 +110,68 @@ row.
 equal to the default still counts, as natively). Hovering or focusing the row shows **Reset to default**, which unsets
 the override so the field re-inherits the composition default. A deep link to a field scrolls it into view and
 highlights it for two seconds.
+
+**Where a value comes from.** Under its key path each row names its source in words, never only by colour:
+
+| Label                        | Meaning                                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| Override · inherits _v_      | The user layer sets the field; Reset re-inherits _v_.                                        |
+| Override · same as inherited | An override equal to what it would inherit: still modified, still reset by Reset.            |
+| Profile composition          | No override; the merged composition base differs from the schema default.                    |
+| Default                      | No override; the value is the schema default.                                                |
+| Source unknown               | No override and the schema declares no default to compare with, so the Host view cannot say. |
+
+The Host's settings view gives each namespace three layers: `value` (resolved), `base` (schema defaults plus every
+composition layer, merged) and `user` (the profile's raw override section). Everything above is derived from them
+(`src/schema-form/setting-provenance.ts`); which composition file or bundle set a `base` value is not in the view, so
+"Profile composition" never names a file ([Host gap 103](../../../plans/dsh-host-gaps.md)).
+
+### JSON view
+
+Each plugin page has **Form | JSON** beside its title. JSON shows three tabs:
+
+- **Overrides**, editable: the namespace's user layer as JSON. **Insert setting** lists the fields not yet in the
+  document, with their descriptions, and inserts one with the value it inherits (a default becomes an override only
+  when you pick it). Every problem is listed under the text with its line: invalid JSON, a document that is not one
+  object, a key the schema does not show (a typo, a hidden or secret field), or a value of the wrong type. Any of them
+  blocks **Save**.
+- **Defaults** and **Effective**, read-only: what every field inherits without an override, and the resolved value.
+  Neither is ever written back.
+
+Clean, the text follows the stored overrides. The first keystroke pins the revision and the overrides it started from,
+and **Unsaved changes** shows until it is saved or discarded. **Save** sends one `mutate` with only the fields the draft
+changed (`set` for added or changed, `unset` for removed), fenced by that revision, through the same `ConfigForm` the
+form uses, so redacted secrets and fields the view does not draw are never restated or dropped. If the settings change
+elsewhere first, the draft stays, Save is blocked and the warning offers **Load latest** (drops the draft) or **Save my
+changes over them** (the same changed fields, fenced by the current revision). A refusal keeps the draft and points to
+the Form view and the configuration file. Switching back to Form keeps the draft; leaving the page drops it. Writes go
+through the profile patch exactly as form edits do; **Open configuration file** remains the way to edit the YAML itself,
+comments included.
+
+The editor is the kit's `Textarea`, `Tabs` and `Command`, not `@dshfiles/editor`'s Monaco. Monaco has JSON schema
+completion, but using it here would need a new cross-plugin contract (Settings may not import the editor), a
+schemastery-to-JSON-Schema converter and a multi-megabyte bundle in Settings, and Monaco is poor with a soft keyboard.
+The kit version needs none of that and works on a phone; schema-aware completion is the Insert setting picker and the
+diagnostics come from the same field model the form draws (`src/schema-form/settings-document.ts`). Type expectations
+in diagnostics ("true or false", "a number ≥ 2") are English in every locale.
+
+### Agent tools
+
+| Tool                 | Reads or writes                                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `settings_list`      | Namespaces with revision and secret-field count; one namespace's redacted value; published section entries. |
+| `settings_inspect`   | One namespace field by field: schema default, override, inherited, effective value, source. Read-only.      |
+| `settings_set`       | Merge a patch into one namespace (user asked).                                                              |
+| `settings_unset`     | Reset one field path (user asked).                                                                          |
+| `plugin_inventory`   | The profile's Loader entries: module, enabled, runtime phase, and why one cannot be changed. Read-only.     |
+| `plugin_set_enabled` | Enable or disable one entry through the plugin manager (user asked); reversed with the opposite value.      |
+| `dsh_release_status` | The DSH release check below. Read-only.                                                                     |
+
+`plugin_set_enabled` is the plugin manager's `setPluginEnabled`, the verb behind the native Plugins page. The manager
+writes the profile patch and reports, separately, how the running Host took it; the tool relays that verdict and claims
+nothing else: `applied`, `restart-required` (with `no-hmr`, `host-module`, … as the reason; the user restarts), or
+`overridden` (a higher-priority profile layer keeps the old value; edit that layer). It never restarts DSH. Entries the
+patch cannot address (`management-required`, `unaddressable`) are listed with that reason.
 
 ### Configuration file
 
