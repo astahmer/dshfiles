@@ -5,6 +5,8 @@ import { SessionId } from '@dshfiles/dshx/ids'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Context, Effect, Layer, Option, Schema } from 'effect'
 import { editorApi, type editorWriteInputSchema, MAX_SAVE_BYTES } from './api.js'
+import { editorArtifactsApi } from './artifacts-api.js'
+import { ArtifactStore } from './artifact-store.js'
 import { SessionLookupFailed, storedSessionRoot, type StoredSessions } from './session-store-promise.js'
 import { editorSettings } from './settings.js'
 import { WorkspaceWrite } from './workspace-write.js'
@@ -97,6 +99,39 @@ export default DshxPlugin.make({
   name: '@dshfiles/editor',
   inject: ['sessions', 'sessionPersistence'],
   settings: [editorSettings],
-  layer: Layer.mergeAll(SessionWorkspaces.layer, WorkspaceWrite.layer.pipe(Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)))),
-  apis: [Api.bind(editorApi, { write: (input, call) => editorWrite(input, call.caller) })],
+  layer: Layer.mergeAll(
+    SessionWorkspaces.layer,
+    ArtifactStore.layer,
+    WorkspaceWrite.layer.pipe(Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))),
+  ),
+  apis: [
+    Api.bind(editorApi, { write: (input, call) => editorWrite(input, call.caller) }),
+    Api.bind(editorArtifactsApi, {
+      list: (input, call) =>
+        Effect.gen(function* () {
+          const session = yield* targetSessionId(input.sessionId, call.caller)
+          return yield* ArtifactStore.use(store => store.list(session))
+        }),
+      read: (input, call) =>
+        Effect.gen(function* () {
+          const session = yield* targetSessionId(input.sessionId, call.caller)
+          return yield* ArtifactStore.use(store => store.read(session, input.id))
+        }),
+      create: (input, call) =>
+        Effect.gen(function* () {
+          const session = yield* targetSessionId(input.sessionId, call.caller)
+          return yield* ArtifactStore.use(store => store.create(session, input))
+        }),
+      update: (input, call) =>
+        Effect.gen(function* () {
+          const session = yield* targetSessionId(input.sessionId, call.caller)
+          return yield* ArtifactStore.use(store => store.update(session, input))
+        }),
+      delete: (input, call) =>
+        Effect.gen(function* () {
+          const session = yield* targetSessionId(input.sessionId, call.caller)
+          return yield* ArtifactStore.use(store => store.delete(session, input))
+        }),
+    }),
+  ],
 })

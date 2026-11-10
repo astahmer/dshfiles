@@ -5,6 +5,7 @@ import { monacoSingleChunk } from './monaco-vite.ts'
 export default defineConfig({
   name: '@dshfiles/editor',
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
+  modules: { 'artifacts-api': 'src/artifacts-api.ts' },
   client: {
     entry: 'src/client-entry.tsx',
     dshxRuntime: 'shared',
