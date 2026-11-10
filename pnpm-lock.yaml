@@ -3687,9 +3687,6 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
-      '@dshfiles/rich-composer':
-        specifier: workspace:*
-        version: link:../rich-composer
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -3757,6 +3754,9 @@ importers:
       '@dshfiles/frame-layout':
         specifier: workspace:*
         version: link:../frame-layout
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.1.0(effect@4.1.0)(vitest@4.1.11)

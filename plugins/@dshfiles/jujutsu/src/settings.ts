@@ -38,7 +38,7 @@ export const jujutsuSettings = defineSettings({
     refreshIntervalSeconds: Schema.natural().min(10).default(60).description('Seconds between automatic refreshes while the panel is visible.'),
     refreshOnVisible: Schema.boolean().default(true).description('Refresh when the panel or window becomes visible again.'),
     composerBar: Schema.boolean().default(true).description('Show the changed-files bar above the composer when the Session folder is a JJ workspace.'),
-    composerChips: Schema.boolean().default(true).description('Show workspace, folder and working-copy chips below the composer.'),
+    composerChips: Schema.boolean().default(true).description('Show the JJ workspace and bookmark in the composer run summary chip; needs Rich Composer.'),
     headerToggle: Schema.boolean()
       .default(false)
       .description(

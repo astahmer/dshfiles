@@ -315,7 +315,7 @@
     },
     {
       "id": "composer-context",
-      "title": "See project and Jujutsu workspace context in the composer",
+      "title": "See the Jujutsu workspace and bookmark in the composer run summary",
       "summary": "The change bar labels the net file diff as changes since branching from the selected base, reports revisions present only on @ or only on that base, and lets the base be a local or remote bookmark.",
       "reach": ["seed rebase-ready-thread", "click button \"Changes since branching from main*\"", "expect text \"seeded-work.md\""],
       "surfaces": ["client", "host", "settings", "integration"],
@@ -333,7 +333,7 @@
         {
           "key": "composerChips",
           "defaultValue": "true",
-          "constraints": "Boolean; show the JJ workspace and bookmark inside the composer run summary chip (project · host · workspace / bookmark).",
+          "constraints": "Boolean; show the JJ workspace and bookmark in the composer run summary chip; needs Rich Composer.",
           "choices": ["true", "false"],
           "coveredBy": ["jujutsu.composer-context"]
         },
@@ -346,7 +346,6 @@
         }
       ],
       "states": [
-        "project-name",
         "default-workspace",
         "thread-workspace",
         "bookmark-ancestry",
@@ -358,7 +357,8 @@
         "count-unavailable"
       ],
       "failureModes": [
-        "Isolated JJ thread workspaces retain the owning DSH project's name.",
+        "Isolated JJ thread workspaces hide their thread name from the location reading, because the run summary already shows it.",
+        "Without Rich Composer, or on a thread with no workspace title (a bare JJ folder), the workspace and bookmark reading is not shown.",
         "An unavailable JJ integration falls back to the registered workspace title; the repository path remains in the tooltip.",
         "A missing base, failed bounded count or older Host never displays a false zero revision count."
       ],

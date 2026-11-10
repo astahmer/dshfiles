@@ -642,7 +642,7 @@ button.crumbEditable {
 }
 
 .runSummary:hover,
-.runSummary:focus-within {
+.runSummary:has(:focus-visible) {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
 }

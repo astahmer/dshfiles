@@ -172,7 +172,10 @@ export function ConversationContent(props: ConversationContentProps) {
   const summaryHost = remoteWorkspaceCwd === undefined ? t('runRow.summaryLocal') : t('runRow.summaryRemote')
   // An occupant of conversation.composer.location (the jj workspace and bookmark) continues the same chip, so the
   // meter line names where the thread runs once.
-  const runLocation = sessionId === undefined ? null : renderSlot('conversation.composer.location', {})
+  const runLocation = useMemo(
+    () => sessionId === undefined ? null : renderSlot('conversation.composer.location', {}),
+    [renderSlot, sessionId],
+  )
   const runSummary = useMemo(() => chipTitle === undefined ? undefined : (
     <span className={css.runSummary} data-run-summary="">
       <Tooltip label={t('runRow.summary', { project: chipTitle, host: summaryHost })} side="top" delayMs={400}>
