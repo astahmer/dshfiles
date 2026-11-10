@@ -88,6 +88,13 @@ export interface CommandItem {
   readonly editable?: boolean
   /** `page` turns its keys off while a text field has focus; `global` (the default) keeps them on. */
   readonly scope?: 'global' | 'page'
+  /**
+   * Whether its keys still apply while a terminal owns the keyboard.
+   *
+   * The default, `true`, keeps them on: only the chords the terminal itself reads
+   * (`Ctrl+J` is a line feed) need the shell to receive the key instead.
+   */
+  readonly allowInTerminal?: boolean
   /** Name of a `/` menu entry in the composer that runs it, without the slash. */
   readonly slash?: string
   /** Shown in the palette before anything is typed. */
@@ -101,11 +108,17 @@ export interface ComposerTarget {
   readonly sessionId?: string
 }
 
-/** A chip in the composer: a workspace file, text sent as a quote or a note, or a comment on file lines. */
+/** A chip in the composer: a workspace file, text sent as a quote or a note, or a comment on file lines; an annotation joins the draft's annotation pill instead. */
 export type ComposerAttachment =
   | { readonly kind: 'file'; readonly path: string }
   | { readonly kind: 'quote' | 'note'; readonly text: string; readonly label?: string }
   | { readonly kind: 'comment'; readonly path: string; readonly line: number; readonly endLine?: number; readonly text: string }
+  | {
+      readonly kind: 'annotation'
+      readonly text: string
+      /** Opaque locator of the quoted message, handed back when the user asks to see it. */
+      readonly source?: string
+    }
 
 export interface ComposerModelSelection {
   readonly provider: string

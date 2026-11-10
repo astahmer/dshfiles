@@ -18,6 +18,7 @@ import type { ImageGalleryNode } from './image-gallery.ts'
 import { collectChatGalleryImages, selectChatImageGallery } from './image-gallery.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
+import { AnnotateSelection } from './AnnotateSelection.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
 import { ConversationViewOpenerContext, useChatFocus } from '../../chat-focus-reveal.ts'
 import { InlineReferenceScope } from '../../inline-references.tsx'
@@ -321,6 +322,7 @@ export function ChatView({
 
   return (
     <div className={css.frame}>
+      <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t} />
       {scroll.initialized && (
         <TurnNavigator
           items={railItems}

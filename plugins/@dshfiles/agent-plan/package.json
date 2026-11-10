@@ -25,9 +25,11 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/context-compaction": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
-    "@dshfiles/shared-runtime": "workspace:*"
+    "@dshfiles/shared-runtime": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
@@ -62,7 +64,8 @@
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-tool": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
-    "@deepseek-ai/schemastery": "~3.18.4"
+    "@deepseek-ai/schemastery": "~3.18.4",
+    "@dshfiles/context-compaction": ">=0.1.0"
   },
   "dsh": {
     "bundle": {

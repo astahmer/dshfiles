@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/com
 import { CopyIcon, EyeIcon, PencilIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { DataTable, createColumnHelper, createSortedRowModel, rowSortingFeature, sortFn_alphanumeric, tableFeatures, useTable } from '@dshfiles/plugin-ui/table'
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { createContext, memo, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
 
@@ -39,7 +39,7 @@ const useSecretRowActions = (): SecretRowActions => {
   return actions
 }
 
-const NameCell = (props: { readonly row: SecretMetadata }): JSX.Element => (
+const NameCell = memo((props: { readonly row: SecretMetadata }): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
     <span className="dshx:truncate dshx:font-mono dshx:text-[13px] dshx:font-semibold" title={props.row.variableName}>
       {props.row.variableName}
@@ -49,9 +49,9 @@ const NameCell = (props: { readonly row: SecretMetadata }): JSX.Element => (
       {props.row.field.length > 0 ? ` · ${props.row.field}` : ''}
     </span>
   </div>
-)
+))
 
-const DescriptionCell = (props: { readonly row: SecretMetadata }): JSX.Element => (
+const DescriptionCell = memo((props: { readonly row: SecretMetadata }): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
     <span className="dshx:truncate">{props.row.description || props.row.service || props.row.item || props.row.alias}</span>
     <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
@@ -59,7 +59,7 @@ const DescriptionCell = (props: { readonly row: SecretMetadata }): JSX.Element =
       {props.row.item && props.row.service !== props.row.item ? ` · ${props.row.item}` : ''}
     </span>
   </div>
-)
+))
 
 const MASK = '••••••••••••'
 
@@ -84,7 +84,7 @@ const RevealedValue = (props: { readonly row: SecretMetadata; readonly value: st
   )
 }
 
-const ValueCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
+const ValueCell = memo((props: { readonly row: SecretMetadata }): JSX.Element => {
   const actions = useSecretRowActions()
   const t = actions.t
   const row = props.row
@@ -135,7 +135,7 @@ const ValueCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
       </span>
     </button>
   )
-}
+})
 
 const RowActionButton = (props: {
   readonly label: string
@@ -165,7 +165,7 @@ const RowActionButton = (props: {
   </Tooltip>
 )
 
-const ActionsCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
+const ActionsCell = memo((props: { readonly row: SecretMetadata }): JSX.Element => {
   const actions = useSecretRowActions()
   const row = props.row
   const t = actions.t
@@ -190,7 +190,7 @@ const ActionsCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
       </RowActionButton>
     </div>
   )
-}
+})
 
 const features = tableFeatures({ rowSortingFeature, sortedRowModel: createSortedRowModel(), sortFns: { alphanumeric: sortFn_alphanumeric } })
 const column = createColumnHelper<typeof features, SecretMetadata>()

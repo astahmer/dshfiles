@@ -83,30 +83,6 @@
           "id": "main-tabs.bridge-selection-attention-unavailable",
           "file": "plugins/@dshfiles/main-tabs/src/tab-attention.test.ts",
           "testName": "leaves the displayed record intact if the Host refuses the acknowledgement"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.bridge-native-replaced-column",
-          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
-          "testName": "leaves a detached column and follows the replacement native outlet"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.bridge-native-fallback",
-          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
-          "testName": "keeps the native fallback without a frame seat"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.bridge-strip-retirement",
-          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
-          "testName": "removes only the native strip in workbench mode and restores it when native returns"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.bridge-no-mount-warning",
-          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
-          "testName": "does not mount or warn when workbench has no native main outlet"
         }
       ],
       "telemetry": [
@@ -328,21 +304,9 @@
         },
         {
           "kind": "unit-test",
-          "id": "main-tabs.mount-unit-anchor",
-          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
-          "testName": "puts the strip host right before the main outlet and removes it on dispose"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.mount-unit-remount",
-          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
-          "testName": "follows the outlet when the frame replaces the main column"
-        },
-        {
-          "kind": "unit-test",
-          "id": "main-tabs.mount-unit-self-check",
-          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
-          "testName": "warns once when no main outlet shows up, and still mounts when one appears later"
+          "id": "main-tabs.mount-unit-start-hold",
+          "file": "plugins/@dshfiles/frame-layout/src/main-surface.test.ts",
+          "testName": "hides the main surface for a shell.beforeMain hold until every hold is released once"
         },
         {
           "kind": "unit-test",

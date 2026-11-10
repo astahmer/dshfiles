@@ -10,7 +10,7 @@ path is excluded.
 
 ## Where it stands
 
-`pnpm lint` is green. Measured with `node scripts/lint-ratchet.ts oxlint` and
+`pnpm lint` was green when these were measured with `node scripts/lint-ratchet.ts oxlint` and
 `node scripts/lint-ratchet.ts ast-grep` (2026-10-29):
 
 | Checker  | Start | Now |
@@ -33,6 +33,11 @@ other site goes through `src/json.ts` with its owning schema or `jsonValueSchema
 `no-direct-json-parse` measured 171 → 151; cap lowered 184 → 151.
 
 ## Remaining work, in order
+
+Re-measure first: a 2026-11-10 run in a shared thread workspace (with other agents' code edits in it) counted
+oxlint 1154 and ast-grep 173 with several rules over their caps (`error`, `no-conditional-empty-object-spread`,
+`no-index-import`, `require-safety-comment-for-type-assertion`), so main may have drifted past the ratchet.
+
 
 1. **dshx** — `src` done (2026-11-04). Remaining: about 76
    `no-direct-json-parse` sites in `tooling/dshx/packages/dshx/tests`, then the
@@ -75,8 +80,7 @@ other site goes through `src/json.ts` with its owning schema or `jsonValueSchema
   any plugin build or typecheck that resolves `@dshfiles/dshx/*`.
 - Screens are due a refresh after the Tooltip conversions: jj-integration Thread
   Workspaces panel / destination bar / thread-control popover / notices /
-  log-download row; traces panel, span detail, logs, metrics; plugin-marketplace
-  cards + toolbar; agent-communication activity and compose rows;
+  log-download row; traces panel, span detail, logs, metrics; agent-communication activity and compose rows;
   agent-toolkit tables; agents reference preview; ai-accounts accounts page,
   usage strip/popover, models page, settings, edge widget, API-key picker;
   memory header, notes tab, analytics tab, reference preview. `pnpm screenshots`

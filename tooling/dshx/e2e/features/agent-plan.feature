@@ -32,3 +32,10 @@ Feature: Agent plan, live activity and failure cards
     And the fake provider rejects the next request in a fresh workspace
     Then the failed turn offers Retry and Ask to fix
     And Ask to fix puts the failure into the composer
+
+  @scenario:agent-plan.compaction-meter
+  Scenario: The meter line counts the tokens left before automatic compaction
+    Given the isolated plugin composition of "@dshfiles/agent-plan, @dshfiles/context-compaction, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model answers once in a fresh workspace
+    Then the meter line says how many tokens are left before compaction

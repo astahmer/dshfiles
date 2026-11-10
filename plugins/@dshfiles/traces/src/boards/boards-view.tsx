@@ -8,20 +8,16 @@ import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, queryOptions, useQuery } from '@dshfiles/plugin-ui/query'
-import * as Schema from 'effect/Schema'
 import type { TracesAlertsKey, TracesAlertsTranslate } from '../alerts/alerts-locale.js'
 import { alertsOwnerMissing } from '../alerts/alerts-queries.js'
 import { TraceFormat } from '../format.js'
 import { BUILTIN_BOARDS, SLOW_TOOLS_BOARD, type BoardColumn, type BuiltinBoard } from './board-definitions.js'
-import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { storedBoardId } from '../panel-stores.js'
 import { tracesBoardsApi, type BreakdownRow } from './boards-api.js'
 
 type BoardsClient = typeof tracesBoardsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
 
 const BOARD_IDS = BUILTIN_BOARDS.map(board => board.id)
-
-/** The open board, kept across reloads like the rest of the panel's view. */
-export const storedBoardId = createStoredValue({ key: 'dshfiles.traces.board.v1', schema: Schema.String.check(Schema.isMaxLength(64)), fallback: 'slow-tools' })
 
 const boardOf = (id: string): BuiltinBoard => BUILTIN_BOARDS.find(board => board.id === id) ?? SLOW_TOOLS_BOARD
 
@@ -78,12 +74,14 @@ const drillDownOf = (board: BuiltinBoard, row: BreakdownRow): BoardDrillDown | n
 /** Built-in breakdowns, one table each; a row opens the trace list narrowed to its spans. */
 export const BoardsView = (props: {
   readonly windowMinutes: number
+  readonly store?: typeof storedBoardId
   readonly onDrillDown: (drillDown: BoardDrillDown) => void
   readonly t: TracesAlertsTranslate
 }): JSX.Element => {
   const t = props.t
   const client = useApi(tracesBoardsApi)
-  const boardId = storedBoardId.useValue()
+  const store = props.store ?? storedBoardId
+  const boardId = store.useValue()
   const board = boardOf(boardId)
   const breakdown = useQuery({ ...breakdownQuery(client, board, props.windowMinutes), placeholderData: keepPreviousData })
   return (
@@ -95,7 +93,7 @@ export const BoardsView = (props: {
         aria-label={t('board')}
         value={board.id}
         onValueChange={value => {
-          if (BOARD_IDS.includes(value)) storedBoardId.set(value)
+          if (BOARD_IDS.includes(value)) store.set(value)
         }}
         className="dshx:flex-wrap dshx:justify-start"
       >

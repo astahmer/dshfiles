@@ -4,6 +4,8 @@ type ConnectionTestOutcome =
   | { readonly kind: 'passed'; readonly steps: readonly ConnectionTestStep[]; readonly dshVersion: string; readonly profile: string }
   | { readonly kind: 'failed'; readonly steps: readonly ConnectionTestStep[]; readonly message: string }
 
+export const connectionStepLabels: Record<ConnectionTestStep['step'], string> = { ssh: 'SSH login', runtime: 'DSH runtime', identity: 'multi-host identity' }
+
 const stepLine = (step: ConnectionTestStep): string =>
   `- ${step.step}: ${step.ok ? 'ok' : 'failed'} in ${step.ms} ms${step.message === undefined ? '' : ` — ${step.message}`}${step.code === undefined ? '' : ` (${step.code})`}`
 
@@ -13,6 +15,16 @@ export class ConnectionDiagnostics {
     if (step === 'runtime') return 'Start DSH on the remote home with @dshfiles/multi-host installed, then diagnose again.'
     if (step === 'identity') return 'Check the remote profile and multi-host identity, then diagnose again.'
     return 'Edit the SSH target or remote DSH home, then diagnose again.'
+  }
+
+  /** The first hop that failed, phrased for a one-line status such as the Run on picker's host row. */
+  static readonly failedHop = (
+    steps: readonly ConnectionTestStep[] | undefined,
+  ): { readonly step: ConnectionTestStep['step']; readonly label: string; readonly recovery: string } | undefined => {
+    const step = steps?.find(item => !item.ok)
+    if (step === undefined) return undefined
+    const label = `${connectionStepLabels[step.step]} failed${step.message === undefined ? '' : ` · ${step.message}`}`
+    return { step: step.step, label, recovery: ConnectionDiagnostics.recovery(step.step) }
   }
 
   static readonly createReport = (input: {

@@ -1,6 +1,7 @@
 /** Editor-facing ranges, reference projections, and the composer keyboard interface. */
 import type { LexicalEditor } from 'lexical'
 import type { InputState } from './input.ts'
+import type { DraftAnnotations } from '../input/draft-annotations.ts'
 import type { InputSubmitMode } from './composer-submission.ts'
 
 /** Pick-time draft span guarded by the input revision. */
@@ -66,6 +67,8 @@ export interface ComposerKeyboard {
   readonly snapshot: InputState
   /** The shell-owned Lexical editor the composer binds its contenteditable to. */
   readonly editor: LexicalEditor
+  /** Conversation passages quoted into the draft, sent ahead of its text. */
+  readonly annotations: DraftAnnotations
   /** Submit with an explicit delivery mode resolved by the submission policy (Enter gestures and the primary Send button). */
   submit(mode: InputSubmitMode, source?: 'click' | 'enter'): void
   /**

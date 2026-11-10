@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, Command, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
 import type {} from '@dshfiles/frame-layout/regions'
@@ -26,6 +26,7 @@ import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
 import {
   workbenchPanels,
   NativeAsideOwners,
+  WorkbenchMainNavigation,
   panelTabTitle,
   type WORKBENCH_MAIN_PANEL_ID,
   type ThreadFacetObservable,
@@ -33,12 +34,14 @@ import {
 } from './registry.js'
 import { PanelTitles } from './panel-titles.js'
 import { createDockPaneActions, migrateDockVisibility, rightPaneVisibility } from './right-panel-mode.js'
+import { createRightPaneContents } from './right-pane-contents.js'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { createMainPanelSources } from './panel-sources.js'
 import { panelMainTarget } from './panel-main-target.js'
 import { createTabPanelAdapter } from './tab-panels.js'
 import { KeptThreadViews } from './kept-thread-views.js'
 import { createSemanticPanelOpener } from './semantic-panel-opener.js'
+import { createMainNavigation } from './main-navigation.js'
 import { createResettableAsidePlacement, WorkbenchReset } from './reset-layout.js'
 import { ConversationPanels } from './conversation-panels.js'
 import { semanticLayouts } from './semantic-layouts.js'
@@ -55,6 +58,7 @@ import { FacetFollowing } from './facet-following.js'
 import { threadOnScreen } from './thread-on-screen.js'
 import { captureLayoutArrangement, restoreLayoutArrangement } from './layout-arrangements.js'
 import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
+import { bottomPanelCommand } from './bottom-panel-shortcut.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView, type WorkbenchPanelDrop } from './workbench-view.js'
 import { NewViewTabs, type NewViewSelection } from './new-view.js'
@@ -95,7 +99,7 @@ export default defineClient({
   name: '@dshfiles/workbench',
   locales: [workbenchLocale],
   inject: ['slots', 'layout', 'sidebarRightTabs', 'sidebarRight', 'shortcuts', 'sessions', 'mainSurface', 'rightPanel', 'frameBottom'],
-  setup(ctx, decorate) {
+  setup(ctx, decorate, metadata) {
     const translate = ctx.locale.bind(WORKBENCH_LOCALE_NAMESPACE)
     const registry = workbenchPanels()
     const terminalSource = createWorkbenchTerminalSource(sidebarResourcePanels(), registry)
@@ -151,7 +155,7 @@ export default defineClient({
     let syncMainTabs: (() => void) | undefined
     let resettingLayout = false
     // On a phone the same controls open the thread panel sheet instead of the remembered desktop right pane.
-    const dockActions = phoneAwareDockActions(createDockPaneActions())
+    const dockActions = phoneAwareDockActions(createDockPaneActions(rightPaneVisibility, createRightPaneContents(registry)))
     ctx.effect(() => {
       // Legacy settings are decode-only compatibility data, never renderer choices.
       ctx.get('mainSurface')?.setMode('workbench')
@@ -265,11 +269,13 @@ export default defineClient({
                 const key = entry.options.key
                 if (key === undefined) return []
                 const nav = navigation.find(candidate => candidate.options.id === key)
+                const discoveryTitle = providedTitles.findLast(title => title.panelId === key)?.discoveryTitle
                 return [
                   {
                     key,
                     title:
                       panelTabTitle(key, resolveSlotLabel((nav ?? entry).options.label), providedTitles) ?? key.replace(/^dshfiles-/u, '').replaceAll('-', ' '),
+                    ...(discoveryTitle === undefined ? {} : { discoveryTitle }),
                     hiddenFromAdd: nav === undefined,
                   },
                 ]
@@ -314,11 +320,11 @@ export default defineClient({
                 const contributor = registry.list().find(panel => panel.mainPanelId === panelId && !panel.hiddenFromAdd)
                 if (scope !== undefined && contributor?.scopedComponent !== undefined) {
                   const Panel = contributor.scopedComponent
-                  return panelProps => <Panel {...panelProps} panelId={contributor.id} scope={scope} />
+                  return panelProps => <Panel {...panelProps} scope={scope} />
                 }
                 if (scope === undefined && contributor !== undefined) {
                   const Panel = contributor.component
-                  return panelProps => <Panel {...panelProps} panelId={contributor.id} />
+                  return panelProps => <Panel {...panelProps} />
                 }
                 if (scope !== undefined)
                   return () => (
@@ -674,6 +680,25 @@ export default defineClient({
         openInRegion,
       })
     let semanticPanelOpener = newSemanticPanelOpener()
+    ctx.effect(() => {
+      const navigation = createMainNavigation({
+        isWorkbench: () => ctx.get('mainSurface')?.mode() === 'workbench',
+        definition: id => registry.list().find(panel => panel.mainPanelId === id && !panel.hiddenFromAdd),
+        definitionForTab: id => registry.list().find(panel => panel.tabId === id),
+        tabs: workbenchTabs,
+        subscribeRegistry: registry.subscribe,
+        requestSemantic: (id, title) => semanticPanelOpener.request('main', id, title),
+        reveal: id => {
+          const owner = regions.entries().find(([, api]) => api.getPanel(id) !== undefined)
+          openInRegion(owner?.[0] ?? 'main', id)
+        },
+      })
+      const unregister = WorkbenchMainNavigation.register(navigation.open)
+      return () => {
+        unregister()
+        navigation.dispose()
+      }
+    }, 'workbench: targeted main navigation')
 
     let revealLeftPanel: (() => void) | undefined
     const movePanelTo = (from: WorkbenchRegionId, api: DockviewApi, to: WorkbenchRegionId, panelId: string): void => {
@@ -1389,6 +1414,11 @@ export default defineClient({
     // only while the row is open, so the component that opens it must be mounted
     // regardless. `set` is what the header action and the command call.
     let switchBottomPanel: ((shown: boolean) => void) | undefined
+    // One toggle for the header action and the keyboard: the row's own height says
+    // whether it is open, so a chord pressed from any surface agrees with it.
+    const toggleBottomPanel = (): void => {
+      switchBottomPanel?.(ctx.get('frameBottom')?.height() === 0)
+    }
     const BottomPanelPresence = decorate(() => {
       const settings = useSettings(workbenchSettings)
       const shown = settings.value?.bottomPanel === 'shown'
@@ -1421,7 +1451,6 @@ export default defineClient({
 
     const toggleRightPanel = dockActions.toggle
 
-    const BOTTOM_COMMAND_ID = 'workbench.toggleBottomPanel'
     const RESET_COMMAND_ID = 'workbench.resetLayout'
     const SHOW_TAB_ROWS_COMMAND_ID = 'workbench.showTabRows'
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
@@ -1462,24 +1491,16 @@ export default defineClient({
         'workbench: global layout recovery command',
       )
     }
-    if (isShortcutCommandId(BOTTOM_COMMAND_ID)) {
-      ctx.effect(() => {
-        try {
-          return ctx.shortcuts.register({
-            id: BOTTOM_COMMAND_ID,
-            label: () => translate('toggleBottomPanel'),
-            aliases: ['workbench', 'dock', 'panel', 'bottom panel'],
-            defaults: {},
-            regions: ['page', 'editable'],
-            modals: [],
-            resolve: () => ({ status: 'handled', run: () => switchBottomPanel?.(ctx.get('frameBottom')?.height() === 0) }),
-          })
-        } catch (error) {
-          console.warn('workbench: the bottom panel toggle command could not be registered', error)
-          return () => undefined
-        }
-      }, 'workbench: bottom panel toggle command')
+    // The bottom-panel toggle arrives as a command, not as a Host shortcut row:
+    // the browser owns `primary+J`, so `@dshfiles/shortcuts` binds the chord in its
+    // capture listener and Settings › Shortcuts rebinds it there.
+    const commands = metadata?.plugin
+    if (commands === undefined) {
+      console.warn(
+        'workbench: this Host provides no command registry, so the bottom panel shortcut and palette entry are unavailable. Open the bottom panel from Pane options instead.',
+      )
     }
+    commands?.add(Command, bottomPanelCommand({ title: translate('toggleBottomPanel'), toggle: toggleBottomPanel, mac: navigator.platform.startsWith('Mac') }))
     if (isShortcutCommandId(TOGGLE_COMMAND_ID)) {
       // No default chord: listed under Settings › Shortcuts and in the command palette for the user to bind.
       ctx.effect(() => {

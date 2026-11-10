@@ -19,7 +19,7 @@ const snippetSchema = Schema.Union([
 
 type Snippet = typeof snippetSchema.Type
 
-type SnippetAttachment = Exclude<ComposerAttachment, { kind: 'file' }>
+type SnippetAttachment = Exclude<ComposerAttachment, { kind: 'file' | 'annotation' }>
 
 /** The slice of `@dshfiles/input-trigger`'s source contract this chip needs; its client types re-declare the upstream conversation package this fork replaces. */
 interface SnippetSource {

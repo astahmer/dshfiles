@@ -72,6 +72,14 @@ To bump a fork: copy the upstream files listed under `copy`, merge the ones unde
 `upstream.version` and `upstream.ref` in `native-fork.json` and the README, run the first form until it is clean, then
 build, type-check, test and run the plugin's boot check and journeys.
 
+A Client fork that redeclares a shared registry — `SlotMap`, `SlotFactoryMap`, the locale namespace map, the Cordis
+`Context` service — holds one contract identity only while its own program resolves the upstream module to the vendored
+entry. The installed native package stays reachable for every plugin, so its declarations merge into the same
+interfaces, and a delta reaching one of those shapes fails as a duplicate declaration whose two types print alike
+(`TS2717`, then mismatched service props downstream). `@dshfiles/rich-composer` therefore maps
+`@deepseek-ai/dsh-client-ui-conversation/client` to `src/native/index.ts` in its `tsconfig.json`; add the same `paths`
+alias as soon as a fork's delta touches a merged shape.
+
 ## A new fork joins the lint gate too
 
 A vendored fork mirrors the core package's untyped internals, so it trips the antislop rules that police our own

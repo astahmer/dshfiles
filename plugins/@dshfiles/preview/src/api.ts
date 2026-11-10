@@ -4,10 +4,10 @@ import * as Schema from 'effect/Schema'
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
 const sessionIdField = Schema.optionalKey(
-  Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)).annotate({ description: 'Thread to act on. Agents omit it: their own thread is used.' }),
+  Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)).annotate({ description: 'Thread id; agents omit it for their own thread.' }),
 )
 const pageIdField = Schema.String.check(Schema.isPattern(/^p\d{1,4}$/)).annotate({
-  description: 'Preview page id from preview_open or preview_list, e.g. "p1".',
+  description: 'Page id from preview_open or preview_list ("p1").',
 })
 const refField = Schema.optionalKey(
   Schema.String.check(Schema.isPattern(/^[a-z]{0,2}\d{1,6}(?:e\d{1,6})?$/)).annotate({

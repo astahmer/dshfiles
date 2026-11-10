@@ -101,4 +101,6 @@ export interface ChatTurnTailExtras {
 /** Turn identity and view opener shared by controls in the completed-Turn action row. */
 export interface ChatTurnActionExtras extends ChatTurnTailExtras {
   readonly turn?: TurnLocation | undefined
+  /** The finished reply's text, for an action that copies or quotes it. */
+  readonly text?: string | undefined
 }

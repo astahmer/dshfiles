@@ -19,6 +19,7 @@
   ],
   "delta": [
     "src/native/contract/slots.ts",
+    "src/native/contract/draft-editor.ts",
     "src/native/apply.ts",
     "src/native/locales.ts",
     "src/native/skeleton/InputBar.tsx",
@@ -56,13 +57,17 @@
     "src/native/image-attachment-references.ts",
     "src/native/input/detached-sends.test.ts",
     "src/native/input/detached-sends.ts",
+    "src/native/input/draft-annotations.ts",
     "src/native/input/editor/keymap.test.ts",
     "src/native/input/editor/reference-activation.test.ts",
     "src/native/input/editor/restore-draft-references.test.ts",
     "src/native/input/machine.test.ts",
     "src/native/input/retained-send.test.ts",
     "src/native/input/retained-send.ts",
+    "src/native/skeleton/AnnotationsPill.module.css",
+    "src/native/skeleton/AnnotationsPill.tsx",
     "src/native/skeleton/control-row-layout.test.ts",
-    "src/native/skeleton/run-row-placement.ts"
+    "src/native/skeleton/run-row-placement.ts",
+    "src/native/skeleton/phone-thread-tools.ts"
   ]
 }

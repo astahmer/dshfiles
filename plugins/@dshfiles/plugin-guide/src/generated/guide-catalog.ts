@@ -849,6 +849,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/chat/session-usage-cost",
+      "kind": "module",
+      "title": "@dshfiles/chat/session-usage-cost",
+      "summary": "Token buckets the session usage dialog lists, in its row order.",
+      "publicSymbol": "SessionUsageBucket, SessionUsageCostPlacement, SessionUsageCostOwnerProps",
+      "importFrom": "@dshfiles/chat/session-usage-cost",
+      "owner": "@dshfiles/chat",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/chat/src/session-usage-cost.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "PinnedToolCalls",
       "importFrom": "@dshfiles/chat/pinned-tool-calls",
       "owner": "@dshfiles/chat",
@@ -1019,6 +1039,29 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "compactionApi",
+      "importFrom": "@dshfiles/context-compaction/compaction-api",
+      "owner": "@dshfiles/context-compaction",
+      "source": "plugins/@dshfiles/context-compaction/src/compaction-api.ts:20",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/context-compaction:context-compaction",
+      "kind": "api",
+      "title": "compactionApi (context-compaction)",
+      "summary": "Host API served by @dshfiles/context-compaction.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(compactionApi) in a Client slot, or createHostApiClient(ctx, compactionApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/context-compaction owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: threshold",
+        "Agent tools: compaction_threshold (read-only)"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
       "publicSymbol": "diffViewedApi",
       "importFrom": "@dshfiles/diff-viewed/marks-api",
       "owner": "@dshfiles/diff-viewed",
@@ -1066,7 +1109,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/frame-layout/regions",
       "summary": "The frame's panel seats: observable centre ownership and its authorized keyed-main renderer (`shell.main`), the right column's global dock (`shell.dock`), and the bottom row a panel surface registers into (`shell.bottom`, declared by the layout contract) whose height the frame owns and reports through `ctx.frameBottom…",
-      "publicSymbol": "MainSurfaceMode, MainSurfaceSeat, MainSurfaceOwnerProps, RightPanelMode, DockPaneActions, DockPaneOwnerProps",
+      "publicSymbol": "MainSurfaceMode, MainSurfaceSeat, MainSurfaceOwnerProps, BeforeMainOwnerProps, RightPanelMode, DockPaneActions",
       "importFrom": "@dshfiles/frame-layout/regions",
       "owner": "@dshfiles/frame-layout",
       "scope": "client or host",
@@ -1077,7 +1120,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: RightPanelSeat, FrameSidebarSeat, FrameBottomSeat"
+        "Also exports: DockPaneOwnerProps, RightPanelSeat, FrameSidebarSeat, FrameBottomSeat"
       ],
       "source": "plugins/@dshfiles/frame-layout/src/regions.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -1293,6 +1336,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "RevisionSections",
+      "importFrom": "@dshfiles/jj-integration/revision-sections",
+      "owner": "@dshfiles/jj-integration",
+      "source": "plugins/@dshfiles/jj-integration/src/revision-sections.ts:24",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/jj-integration.revision-section",
+      "kind": "registry",
+      "title": "RevisionSections",
+      "summary": "Contribution registry owned by @dshfiles/jj-integration.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(RevisionSections, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/jj-integration renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/jj-integration.revision-section"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/loopback-access/startup",
       "kind": "module",
       "title": "@dshfiles/loopback-access/startup",
@@ -1447,7 +1512,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/multi-host/api",
       "summary": "Public module of @dshfiles/multi-host.",
-      "publicSymbol": "JsonValue, LocalProjectFileCandidate, jsonValueSchema, resourceSnapshotSchema, fileUploadValueSchema, remotePeerReadCalls",
+      "publicSymbol": "JsonValue, LocalProjectFileCandidate, jsonValueSchema, resourceSnapshotSchema, fileUploadValueSchema, sessionRepositoryReads",
       "importFrom": "@dshfiles/multi-host/api",
       "owner": "@dshfiles/multi-host",
       "scope": "client or host",
@@ -1458,9 +1523,51 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: jjRevisionEffectSchema, jjThreadEffectSchema, jjRepositoryEffectSchema, jjRepositoriesEffectSchema, jjRevisionSchema, jjThreadSchema, jjRepositorySchema, jjRepositoriesSchema, JjRevisionView, JjThreadView, JjRepositoryView, nativeRpcSchema, nativeRpcResultSchema, ProjectOriginsInput, cloneProjectInputEffectSchema, EffectMultiHostApi, multiHostApi, HostSummary"
+        "Also exports: sessionRepositoryWrites, remotePeerReadCalls, jjRevisionEffectSchema, jjThreadEffectSchema, jjRepositoryEffectSchema, jjRepositoriesEffectSchema, jjRevisionSchema, jjThreadSchema, jjRepositorySchema, jjRepositoriesSchema, JjRevisionView, JjThreadView, JjRepositoryView, nativeRpcSchema, nativeRpcResultSchema, ProjectOriginsInput, cloneProjectInputEffectSchema, remoteQuestionWireSchema"
       ],
       "source": "plugins/@dshfiles/multi-host/src/api.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/multi-host/interaction-feed",
+      "kind": "module",
+      "title": "@dshfiles/multi-host/interaction-feed",
+      "summary": "A connected event stream announces every change; this only covers a missed frame.",
+      "publicSymbol": "watchRemoteInteractions",
+      "importFrom": "@dshfiles/multi-host/interaction-feed",
+      "owner": "@dshfiles/multi-host",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/multi-host/src/interaction-feed.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "PhonePairingQr",
+      "importFrom": "@dshfiles/phone-pairing/contract",
+      "owner": "@dshfiles/phone-pairing",
+      "source": "plugins/@dshfiles/phone-pairing/src/contract.ts:8",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/phone-pairing.qr",
+      "kind": "contract",
+      "title": "PhonePairingQr",
+      "summary": "The pairing QR, rendered by the plugin that owns phone access where the sidebar footer shows its actions. The sidebar renders nothing while phone-pairing is absent, so copying the launch URL keeps working without it.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(PhonePairingQr) to consume; only @dshfiles/phone-pairing provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/phone-pairing's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/phone-pairing.qr"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -1704,6 +1811,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "PhoneThreadMenu",
+      "importFrom": "@dshfiles/rich-composer/phone-thread-menu",
+      "owner": "@dshfiles/rich-composer",
+      "source": "plugins/@dshfiles/rich-composer/src/phone-thread-menu.tsx:38",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/rich-composer.phone-thread-menu",
+      "kind": "contract",
+      "title": "PhoneThreadMenu",
+      "summary": "Client service contract provided by @dshfiles/rich-composer.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(PhoneThreadMenu) to consume; only @dshfiles/rich-composer provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/rich-composer's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/rich-composer.phone-thread-menu"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/secret-catalog/setup",
       "kind": "module",
       "title": "@dshfiles/secret-catalog/setup",
@@ -1943,7 +2072,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadActionsApi",
       "importFrom": "@dshfiles/thread-sidebar/thread-actions-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:71",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:66",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-actions",
@@ -2301,7 +2430,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: WorkbenchPanelRegistry, createWorkbenchPanelRegistry, NativeAsideOwners, workbenchPanels, PanelTitle, withoutPluginPrefix, panelTabTitle"
+        "Also exports: WorkbenchPanelRegistry, createWorkbenchPanelRegistry, MainNavigationResult, WorkbenchMainNavigation, NativeAsideOwners, workbenchPanels, PanelTitle, withoutPluginPrefix, panelTabTitle"
       ],
       "source": "plugins/@dshfiles/workbench/src/registry.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -2372,22 +2501,24 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
-      "key": "module:@dshfiles/workbench/conversation-header",
-      "kind": "module",
-      "title": "@dshfiles/workbench/conversation-header",
-      "summary": "Presentation contract implemented by the owned Conversation producer, not a second Session owner.",
-      "publicSymbol": "(side-effect module)",
+      "publicSymbol": "ConversationScope",
       "importFrom": "@dshfiles/workbench/conversation-header",
       "owner": "@dshfiles/workbench",
-      "scope": "client or host",
-      "mode": "shared types and helpers",
-      "registration": "import",
-      "risk": "additive",
-      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "source": "plugins/@dshfiles/workbench/src/conversation-header.ts:5",
       "occupancy": "unavailable",
       "occupants": [],
-      "details": [],
-      "source": "plugins/@dshfiles/workbench/src/conversation-header.ts",
+      "key": "contract:ConversationScope",
+      "kind": "contract",
+      "title": "ConversationScope",
+      "summary": "Client service contract provided by @dshfiles/workbench.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(ConversationScope) to consume; only @dshfiles/workbench provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/workbench's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: ConversationScope"
+      ],
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2681,12 +2812,12 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "static",
       "occupants": [
         "@dshfiles/backlog › board-links-and-history",
+        "@dshfiles/backlog › backlinks",
         "@dshfiles/backlog › rich-item-text",
-        "@dshfiles/backlog › secret-link-reveal",
-        "@dshfiles/backlog › revert-field-change"
+        "@dshfiles/backlog › secret-link-reveal"
       ],
       "details": [
-        "Used by 10 catalog feature(s)",
+        "Used by 11 catalog feature(s)",
         "Destinations in use: land, observe, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2740,7 +2871,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › inline-title-edit"
       ],
       "details": [
-        "Used by 31 catalog feature(s)",
+        "Used by 34 catalog feature(s)",
         "Destinations in use: inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2792,11 +2923,11 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [
         "@dshfiles/agent-plan › pinned-step",
         "@dshfiles/agent-plan › live-activity-strip",
-        "@dshfiles/agent-preset › draft-preset-selection",
-        "@dshfiles/agents › agent-mentions"
+        "@dshfiles/agent-plan › compaction-meter",
+        "@dshfiles/agent-preset › draft-preset-selection"
       ],
       "details": [
-        "Used by 59 catalog feature(s)",
+        "Used by 62 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2964,7 +3095,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › subagent-traces"
       ],
       "details": [
-        "Used by 107 catalog feature(s)",
+        "Used by 109 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

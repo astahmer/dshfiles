@@ -8,16 +8,15 @@ import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
-import type { MainSurfaceSeat } from '@dshfiles/frame-layout/regions'
+import type { BeforeMainOwnerProps } from '@dshfiles/frame-layout/regions'
 import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { DestinationSections, KNOWN_SECTIONS } from '@dshfiles/thread-sidebar/destinations'
 import { PanelTitles } from '@dshfiles/workbench/panel-titles'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
-import { createPortal } from 'react-dom'
 import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
@@ -31,7 +30,6 @@ import { installThreadLinkClicks } from './thread-link-click.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
 import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type TabPreferences, type TabsEvent } from './tabs-machine.js'
 import { DEFAULT_CLOSE_BUTTON_POSITION, type HostTarget } from '@dshfiles/workbench/tabs'
-import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, StripMount } from './strip-mount.js'
 import { connectWorkbenchTabs, WorkbenchTabDocking, type WorkbenchTab } from './workbench-tabs.js'
 import { createWorkbenchTabsActions } from './workbench-tab-actions.js'
 import { createWorkbenchTabsPublication } from './workbench-tabs-publication.js'
@@ -55,6 +53,8 @@ const panelTitleFallback = (panelId: string): string => {
 }
 
 const STRIP_MISSING_AFTER_MS = 3_000
+const STRIP_MISSING_WARNING =
+  'main-tabs: the tab strip cannot mount: the frame did not render its shell.beforeMain seat within 3 s. Tabs still follow the main view and the tab shortcuts still work. Enable @dshfiles/frame-layout (or update it) in the profile, then reload.'
 
 /**
  * Settings is a Host modal. Its command (`settings.open`) runs through the
@@ -66,40 +66,8 @@ const SETTINGS_TRIGGER_SELECTOR = '[data-slot="settings.launcher"] button[aria-h
 const SETTINGS_COMMAND_ID = 'settings.open'
 
 /** While the new-tab page shows, the main panel under it stays mounted but hidden, keeping a thread's scroll and state. */
-const useHiddenMainPanel = (host: HTMLElement | null, hidden: boolean): void => {
-  useLayoutEffect(() => {
-    const outlet = host?.nextElementSibling
-    if (!hidden || !(outlet instanceof HTMLElement) || !outlet.matches('[data-slot="main"]')) return
-    const display = outlet.style.display
-    outlet.style.display = 'none'
-    return () => {
-      outlet.style.display = display
-    }
-  })
-}
-
-/** The strip's host node before the `main` outlet, with the startup self-check warning when it cannot mount. */
-const useStripHost = (seat: MainSurfaceSeat | undefined): HTMLElement | null => {
-  const [host, setHost] = useState<HTMLElement | null>(null)
-  useEffect(
-    () =>
-      StripMount.nativeHost({ document, onHost: setHost, onMissing: () => console.warn(STRIP_MISSING_WARNING), missingAfterMs: STRIP_MISSING_AFTER_MS }, seat),
-    [seat],
-  )
-  return host
-}
-
-/** Warn once per host when the rendered strip does not sit on top of the main panel. */
-const usePlacementCheck = (host: HTMLElement | null, rendered: boolean): void => {
-  const checked = useRef<HTMLElement | null>(null)
-  useEffect(() => {
-    if (host === null || !rendered || checked.current === host) return
-    const frame = requestAnimationFrame(() => {
-      checked.current = host
-      if (!StripMount.sitsAbovePanel(host)) console.warn(STRIP_MISPLACED_WARNING)
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [host, rendered])
+const useHiddenMainPanel = (holdMainHidden: BeforeMainOwnerProps['holdMainHidden'], hidden: boolean): void => {
+  useLayoutEffect(() => (hidden ? holdMainHidden() : undefined), [hidden, holdMainHidden])
 }
 
 /**
@@ -339,7 +307,7 @@ export default defineClient({
 
     // Free-docking tabs (the workbench) get the same page names as the strip: the destination section labels.
     ctx.effect(() => {
-      const releases = KNOWN_SECTIONS.map(section => metadata?.plugin?.add(PanelTitles, { panelId: section.panelId, title: section.label }) ?? (() => {}))
+      const releases = PanelTitlesModel.destinationTitles([]).map(title => metadata?.plugin?.add(PanelTitles, title) ?? (() => {}))
       return () => releases.forEach(release => release())
     }, 'main-tabs: destination tab titles for the workbench')
 
@@ -357,10 +325,22 @@ export default defineClient({
     const subscribeCatalog = (listener: () => void): (() => void) => ctx.shortcuts.catalog.subscribe(listener)
     const catalogSnapshot = () => ctx.shortcuts.catalog.getSnapshot()
 
-    ctx.slots.inject('shell.overlay', () =>
+    // Startup self-check: an older or stock frame has no seat above the main panel, so the strip would never render.
+    let stripSeatRendered = false
+    ctx.effect(() => {
+      const timer = setTimeout(() => {
+        if (!stripSeatRendered) console.warn(STRIP_MISSING_WARNING)
+      }, STRIP_MISSING_AFTER_MS)
+      return () => clearTimeout(timer)
+    }, 'main-tabs: strip seat self-check')
+
+    ctx.slots.inject('shell.beforeMain', () =>
       ctx.slots.register(
-        { name: 'shell.overlay', id: 'dshfiles-main-tabs', order: 10, locale: MAIN_TABS_LOCALE_NAMESPACE },
+        { name: 'shell.beforeMain', id: 'dshfiles-main-tabs', order: 10, locale: MAIN_TABS_LOCALE_NAMESPACE },
         decorate(props => {
+          useEffect(() => {
+            stripSeatRendered = true
+          }, [])
           const settings = useSettings(mainTabsSettings)
           const closeButtonPosition = settings.value?.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
           const savedPreferences: TabPreferences | null =
@@ -381,6 +361,11 @@ export default defineClient({
           const registeredPanels = new Set(ctx.slots.entriesOfSlot('main').flatMap(entry => entry.options.key ?? []))
           const contributedSections = useRegistry(DestinationSections)
           const titles = useMemo(() => PanelTitlesModel.destinationTitles(contributedSections), [contributedSections])
+          useEffect(() => {
+            const contributed = PanelTitlesModel.destinationTitles(contributedSections).slice(KNOWN_SECTIONS.length)
+            const releases = contributed.map(title => metadata?.plugin?.add(PanelTitles, title) ?? (() => {}))
+            return () => releases.forEach(release => release())
+          }, [contributedSections])
           // Tab titles name the page, not the plugin: a destination section's label, else the label without "Plugin: ".
           const panelLabels = new Map(
             ctx.slots.entriesOfSlot('sidebar.panellist').flatMap(entry => {
@@ -413,7 +398,6 @@ export default defineClient({
           const attentionSessionIds = useMemo(() => new Set(attention.views.map(record => record.sessionId)), [attention.views])
           const catalog = useSyncExternalStore(subscribeCatalog, catalogSnapshot)
           const startContentVersion = useMemo(() => ({ byId, statuses, catalog, panelVersion }), [byId, statuses, catalog, panelVersion])
-          const host = useStripHost(mainSurface)
 
           const set = snapshot.context.sets[snapshot.context.scopeKey]
           const tabs = (set?.tabs ?? []).map((tab): WorkbenchTab => {
@@ -456,10 +440,10 @@ export default defineClient({
             actor.send({ type: 'tabs.busy', tabIds: busyTabIds === '' ? [] : busyTabIds.split('\n') })
           }, [busyTabIds])
 
-          const showStrip = host !== null && snapshot.matches('on')
+          // Workbench draws its own tab chrome; the strip is the native surface's.
+          const showStrip = props.mode === 'native' && snapshot.matches('on')
           const startShown = showStrip && set?.activeTabId === START_TAB_ID
-          usePlacementCheck(host, showStrip && !startShown)
-          useHiddenMainPanel(host, startShown)
+          useHiddenMainPanel(props.holdMainHidden, startShown)
 
           const shortcutOf = (commandId: string) => catalog.find(entry => entry.id === commandId)
           const pick = (target: HostTarget | null): void => actor.send({ type: 'start.pick', target })
@@ -559,10 +543,10 @@ export default defineClient({
               startContentVersion,
             )
           })
-          if (host === null || !showStrip) return null
+          if (!showStrip) return null
 
-          return createPortal(
-            <>
+          return (
+            <div data-dshfiles-main-tabs="" style={{ display: 'contents' }}>
               <TabStrip
                 tabs={tabs}
                 send={sendStripEvent}
@@ -572,8 +556,7 @@ export default defineClient({
                 closeButtonPosition={closeButtonPosition}
               />
               {startShown ? <StartPage sections={startSections()} t={props.t} /> : null}
-            </>,
-            host,
+            </div>
           )
         }),
       ),

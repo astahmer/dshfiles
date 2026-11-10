@@ -1,9 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { createDockview, LocalSelectionTransfer, Orientation, PanelTransfer, type DockviewApi } from 'dockview-react'
 import { useEffect, useState } from 'react'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createLayoutStore, WORKBENCH_COMPONENT } from './layout-store.js'
-import type { WorkbenchTranslate } from './locales.js'
+import { memoryStorage, t } from './test-support.js'
 import { createWorkbenchPanelRegistry, type WorkbenchPanelProps, type WorkbenchPanelRegistry } from './registry.js'
 import { WorkbenchView } from './workbench-view.js'
 import { connectWorkbenchTabs, type WorkbenchTabsSnapshot } from './tabs.js'
@@ -13,30 +13,11 @@ import { canMovePanelToRegion, nestedPanelId, nestedSurfacePath } from './nested
 import { NewThreadSource } from './new-thread-source.js'
 import { createWorkbenchTerminalSource } from './terminal-source.js'
 
-beforeAll(() => {
-  globalThis.ResizeObserver ??= class {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-  }
-})
-
 const semanticDisposers: Array<() => void> = []
 afterEach(() => {
   cleanup()
   for (const dispose of semanticDisposers.splice(0).reverse()) dispose()
 })
-
-const t: WorkbenchTranslate = (key, params) => (params === undefined ? key : `${key}:${JSON.stringify(params)}`)
-
-const memoryStorage = () => {
-  const values = new Map<string, string>()
-  return () => ({
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => void values.set(key, value),
-    removeItem: (key: string) => void values.delete(key),
-  })
-}
 
 const mounts = new Map<string, number>()
 

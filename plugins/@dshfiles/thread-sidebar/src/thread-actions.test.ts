@@ -1,5 +1,6 @@
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { Effect } from 'effect'
+import * as Schema from 'effect/Schema'
 import { describe, expect, test } from 'vitest'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { createThreadActions as createEffectActions, type HostEffect, type ProjectRow, type ThreadActionDeps, type ThreadSummary } from './thread-actions.js'
@@ -331,7 +332,6 @@ describe('thread actions: settle', () => {
 
     expect(await actions.settle({ input: { sessionId: 'session-b' }, caller: agent('session-a'), signal })).toEqual({
       sessionId: 'session-b',
-      settledSessionIds: ['session-b'],
     })
   })
 
@@ -349,7 +349,6 @@ describe('thread actions: settle', () => {
     await actions.settle({ input: {}, caller: agent('session-self'), signal })
     expect(await actions.unsettle({ input: { sessionId: 'session-self' }, caller: agent('session-a'), signal })).toEqual({
       sessionId: 'session-self',
-      settledSessionIds: [],
     })
     expect(writes).toEqual([
       { sessionId: 'session-self', settled: true },
@@ -390,7 +389,6 @@ describe('thread actions: archive', () => {
     expect(result).toEqual({
       status: 'archived',
       sessionId: 'session-self',
-      archivedSessionIds: ['session-self'],
       activity: [],
     })
   })
@@ -414,7 +412,6 @@ describe('thread actions: archive', () => {
     expect(await actions.archive({ input: { sessionId: 'session-b' }, caller: agent('session-a'), signal })).toEqual({
       status: 'refused-active',
       sessionId: 'session-b',
-      archivedSessionIds: [],
       activity: ['turn', 'job'],
     })
     expect(calls).toEqual([{ sessionId: 'session-b', stopActivity: false }])
@@ -422,9 +419,51 @@ describe('thread actions: archive', () => {
     expect(await actions.archive({ input: { sessionId: 'session-b', stopActivity: true }, caller: agent('session-a'), signal })).toEqual({
       status: 'archived',
       sessionId: 'session-b',
-      archivedSessionIds: ['session-b'],
       activity: [],
     })
+  })
+
+  test('archive and unarchive stay valid at the API boundary when the registry holds more than 2000 archived threads', async () => {
+    const archived = Array.from({ length: 2500 }, (_, index) => `session-archived-${index}`)
+    const actions = createThreadActions(
+      createDeps({
+        archivedSessionIds: () => archived,
+        archive: async sessionId => [...archived, sessionId],
+        unarchive: async () => archived,
+      }),
+    )
+    const validate = (output: unknown, schema: Schema.Codec<unknown, unknown> | undefined) => {
+      if (schema === undefined) throw new Error('method declares no output schema')
+      return Schema.toStandardSchemaV1(schema, { parseOptions: { onExcessProperty: 'error' } })['~standard'].validate(output)
+    }
+
+    const archivedResult = await actions.archive({ input: { sessionId: 'session-b', stopActivity: true }, caller: agent('session-a'), signal })
+    expect(validate(archivedResult, threadActionsApi.methods.archive.output)).toHaveProperty('value')
+    const restored = await actions.unarchive({ input: { sessionId: 'session-archived-0' }, caller: agent('session-a'), signal })
+    expect(validate(restored, threadActionsApi.methods.unarchive.output)).toHaveProperty('value')
+  })
+
+  test('pin, unpin, settle and unsettle stay valid at the API boundary with more than 2000 pinned or settled threads', async () => {
+    const many = Array.from({ length: 2500 }, (_, index) => `session-many-${index}`)
+    const actions = createThreadActions(
+      createDeps({
+        pinnedSessionIds: () => many,
+        settledSessionIds: () => many,
+        pin: async () => many,
+        unpin: async () => many,
+        setSettled: async () => many,
+      }),
+    )
+    const validate = (output: unknown, schema: Schema.Codec<unknown, unknown> | undefined) => {
+      if (schema === undefined) throw new Error('method declares no output schema')
+      return Schema.toStandardSchemaV1(schema, { parseOptions: { onExcessProperty: 'error' } })['~standard'].validate(output)
+    }
+    const context = { input: { sessionId: 'session-b' }, caller: agent('session-a'), signal }
+
+    expect(validate(await actions.pin(context), threadActionsApi.methods.pin.output)).toHaveProperty('value')
+    expect(validate(await actions.unpin(context), threadActionsApi.methods.unpin.output)).toHaveProperty('value')
+    expect(validate(await actions.settle(context), threadActionsApi.methods.settle.output)).toHaveProperty('value')
+    expect(validate(await actions.unsettle(context), threadActionsApi.methods.unsettle.output)).toHaveProperty('value')
   })
 
   test('refuses an unknown target and maps a missing thread', async () => {

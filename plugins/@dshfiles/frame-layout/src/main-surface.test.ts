@@ -89,4 +89,19 @@ describe('main surface seat', () => {
       ['main', {}, { entryKey: 'dshfiles-backlog' }],
     ])
   })
+
+  it('hides the main surface for a shell.beforeMain hold until every hold is released once', () => {
+    let holds = 0
+    const adjust = (delta: 1 | -1): void => {
+      holds += delta
+    }
+    const startPage = MainSurfaceRendering.hold(adjust)
+    const other = MainSurfaceRendering.hold(adjust)
+    expect(holds).toBe(2)
+    startPage()
+    startPage()
+    expect(holds).toBe(1)
+    other()
+    expect(holds).toBe(0)
+  })
 })

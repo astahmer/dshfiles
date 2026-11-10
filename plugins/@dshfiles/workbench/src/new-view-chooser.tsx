@@ -40,7 +40,8 @@ export const NewViewChooser = (props: {
   const available = props.definitions.filter(
     definition => !definition.hiddenFromAdd && definition.tabId === undefined && definition.id !== 'conversation' && definition.id !== 'current-conversation',
   )
-  const matches = (definition: WorkbenchPanelDefinition): boolean => definition.title.toLocaleLowerCase().includes(query)
+  const matches = (definition: WorkbenchPanelDefinition): boolean =>
+    [definition.title, definition.discoveryTitle ?? ''].some(title => title.toLocaleLowerCase().includes(query))
   const facetDefinitions = available.flatMap(definition => (definition.threadFacet === undefined ? [] : [{ definition, facet: definition.threadFacet }]))
   const threadOnScreen = useThreadOnScreen(facetDefinitions.map(entry => entry.facet))
   const facets = facetDefinitions
@@ -54,7 +55,7 @@ export const NewViewChooser = (props: {
         const index = [NewThreadSource.id, 'dshfiles-settings', 'dshfiles-thread-sidebar.workbench-navigation'].indexOf(definition.id)
         return index === -1 ? 3 : index
       }
-      return priority(left) - priority(right) || left.title.localeCompare(right.title)
+      return priority(left) - priority(right) || (left.discoveryTitle ?? left.title).localeCompare(right.discoveryTitle ?? right.title)
     })
   const actions = menuRows
     .filter(row => row.menu === NEW_VIEW_MENU && [row.title, ...(row.keywords ?? [])].some(text => text.toLocaleLowerCase().includes(query)))
@@ -114,7 +115,7 @@ export const NewViewChooser = (props: {
                 className="dshx:h-auto dshx:min-h-10 dshx:w-full dshx:justify-start dshx:gap-2 dshx:py-2"
                 onClick={() => props.onSelect(definition)}
               >
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{definition.title}</span>
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{definition.discoveryTitle ?? definition.title}</span>
                 <ArrowUpRightIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
               </Button>
             ))}

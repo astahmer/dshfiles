@@ -14,7 +14,8 @@ import {
   IconSettingsOutlineRegular,
   IconUnarchiveOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useApi, useApiQuery, useRegistry } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
+import { PhonePairingQr } from '@dshfiles/phone-pairing/contract'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -84,6 +85,8 @@ import {
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
+import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { registerWorkbenchPaletteActions } from './workbench-palette.js'
 import { threadActionsApi } from './thread-actions-api.js'
 import { KeyboardShortcutModel, parseChord } from './keyboard-shortcuts.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
@@ -246,8 +249,6 @@ const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
 /** The cancelable cross-plugin event `@dshfiles/settings-shell` listens for; handled when dispatch returns false. */
 const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 const SETTINGS_COMMAND_ID = 'settings.open'
-/** `@dshfiles/workbench`'s right-pane toggle; on a phone that pane is the thread panel's bottom sheet. */
-const THREAD_PANEL_COMMAND_ID = 'workbench.toggleSidePanel'
 
 export const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
   if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
@@ -413,6 +414,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const refetchClientUpdates = clientUpdates.refetch
   const [reloadPopoverOpen, setReloadPopoverOpen] = useState(false)
   const launchUrlCopy = useCopyFeedback()
+  const pairingQr = useContract(PhonePairingQr)
   const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
   const [splitBounds, setSplitBounds] = useState<SidebarSplitBounds>({
     value: SIDEBAR_HEADER_MIN_HEIGHT,
@@ -1005,6 +1007,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   )
 
   useEffect(() => PaletteBridge.addActions(paletteActions), [paletteActions])
+  useEffect(() => {
+    const registry = workbenchPanels()
+    const existingMainPanelIds = new Set(orderedHeaderEntries.flatMap(entry => (entry.kind === 'panel' && entry.panelId !== undefined ? [entry.panelId] : [])))
+    return registerWorkbenchPaletteActions({ registry, existingMainPanelIds, addActions: PaletteBridge.addActions })
+  }, [orderedHeaderEntries])
 
   const renderCustomizeRow = (options: {
     entry: { id: string; label: string }
@@ -1324,8 +1331,6 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             toggleSidebar={toggleSidebar}
             record={recordNavigation}
             stageTitle={stageTitle}
-            // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
-            togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
           />
         )}
         <MovedToDialog
@@ -1686,6 +1691,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               <TooltipContent side="top">{text(props.t, 'threadSidebarCopyLaunchUrl')}</TooltipContent>
             </Tooltip>
           )}
+          {pairingQr.status === 'active' ? <pairingQr.value.Button /> : null}
           {visibleFooterEntries.map((entry, index) => {
             const concealed = !footerEntryInline(entry, index)
             const item = (

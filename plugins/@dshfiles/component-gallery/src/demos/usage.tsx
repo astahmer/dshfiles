@@ -9,8 +9,6 @@ import {
   ClockIcon,
   CodeIcon,
   DatabaseIcon,
-  DiffIcon,
-  ExternalLinkIcon,
   FlaskConicalIcon,
   FolderGit2Icon,
   FolderIcon,
@@ -22,7 +20,6 @@ import {
   KeyRoundIcon,
   KeyIcon,
   LayersIcon,
-  ListTodoIcon,
   MessageSquareIcon,
   NetworkIcon,
   RefreshCwIcon,
@@ -33,12 +30,11 @@ import {
   CircleDollarSignIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { PipelineRun, type PipelineLogLine, type PipelineRunStatus, type PipelineStep } from '@dshfiles/plugin-ui/components/motion/pipeline-run'
-import { ActivityDock, DockChanges, DockChecklist, type DockChecklistItem } from '@dshfiles/plugin-ui/components/motion/activity-dock'
+import { DockChanges } from '@dshfiles/plugin-ui/components/motion/activity-dock'
 import { ActivityFeed, type ActivityFeedEvent } from '@dshfiles/plugin-ui/components/motion/activity-feed'
 import { CreditsUsage, type CreditCategory } from '@dshfiles/plugin-ui/components/motion/credits-usage'
 import { SpendMap, type SpendDimension } from '@dshfiles/plugin-ui/components/motion/spend-map'
 import { AccessMap, type AccessLevel, type AccessRule } from '@dshfiles/plugin-ui/components/motion/access-map'
-import { ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
 import type { GalleryDemo } from './types.js'
 
 /** Run `effect` after `ms`, cleared on change/unmount. */
@@ -253,141 +249,28 @@ function PipelineRunDemo() {
   )
 }
 
-// ─── ActivityDock ───────────────────────────────────────────────────────────
+// ─── DockChanges ────────────────────────────────────────────────────────────
 
-const planLabels = ['Read the checkout totals flow', 'Round line items before tax', 'Cover the edge cases with tests', 'Land the revision']
-const tour: readonly (string | null)[] = [null, 'plan', 'plan', 'changes', 'agents', 'plan', null]
-
-function ActivityDockDemo() {
-  const [value, setValue] = React.useState<string | null>(null)
-  const [touring, setTouring] = React.useState(true)
-  const [stop, setStop] = React.useState(0)
-  const [progress, setProgress] = React.useState(1)
-
-  useInterval(() => setStop(index => (index + 1) % tour.length), 2600, touring)
-  React.useEffect(() => {
-    if (touring) setValue(tour[stop] ?? null)
-  }, [stop, touring])
-  useInterval(() => setProgress(step => (step + 1) % (planLabels.length + 1)), 1900)
-
-  const items: DockChecklistItem[] = planLabels.map((label, index) => ({
-    id: String(index),
-    label,
-    state: index < progress ? 'done' : index === progress ? 'active' : 'pending',
-  }))
-  const remaining = planLabels.length - progress
-
+function DockChangesDemo() {
   return (
-    <div className="dshx:relative dshx:h-[380px] dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-background">
-      <div aria-hidden className="dshx:flex dshx:flex-col dshx:gap-5 dshx:p-6 dshx:pt-16">
-        {[0.9, 0.7, 0.8, 0.55].map((width, index) => (
-          <div key={index} className="dshx:flex dshx:gap-3">
-            <span className="dshx:size-5 dshx:shrink-0 dshx:rounded-full dshx:bg-muted" />
-            <div className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-2">
-              <span className="dshx:h-2.5 dshx:w-24 dshx:rounded-full dshx:bg-muted" />
-              <span className="dshx:h-2 dshx:rounded-full dshx:bg-muted/70" style={{ width: `${width * 100}%` }} />
-              <span className="dshx:h-2 dshx:rounded-full dshx:bg-muted/70" style={{ width: `${width * 70}%` }} />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="dshx:absolute dshx:top-3 dshx:right-3 dshx:left-3 dshx:flex dshx:justify-end">
-        <ActivityDock
-          aria-label="Thread activity"
-          value={value}
-          onValueChange={next => {
-            setTouring(false)
-            setValue(next)
-          }}
-          tabs={[
-            {
-              id: 'plan',
-              label: 'Plan',
-              icon: <ListTodoIcon />,
-              badge: remaining,
-              meta: `${Math.min(progress, planLabels.length)} of ${planLabels.length}`,
-              content: <DockChecklist items={items} />,
-            },
-            {
-              id: 'changes',
-              label: 'Changes',
-              title: 'Changes by destination',
-              icon: <DiffIcon />,
-              meta: (
-                <>
-                  3 files <span className="dshx:text-success">+91</span> <span className="dshx:text-destructive">−9</span>
-                </>
-              ),
-              content: (
-                <DockChanges
-                  groups={[
-                    {
-                      id: 'repo',
-                      label: 'Workspace',
-                      icon: <FolderGit2Icon />,
-                      hint: 'Lands on main through a rebase.',
-                      name: 'dshfiles',
-                      branch: 'thread-025a80',
-                      files: [
-                        { path: 'tax.ts', added: 9, removed: 3 },
-                        { path: 'totals.test.ts', added: 64, removed: 0 },
-                      ],
-                      more: 1,
-                    },
-                  ]}
-                />
-              ),
-              footer: (
-                <button
-                  type="button"
-                  className="dshx:flex dshx:w-full dshx:items-center dshx:justify-between dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground"
-                >
-                  See all changes <ExternalLinkIcon className="dshx:size-3.5" />
-                </button>
-              ),
-            },
-            {
-              id: 'agents',
-              label: 'Subagents',
-              icon: <BotIcon />,
-              badge: 1,
-              meta: '2 running',
-              content: (
-                <ul className="dshx:flex dshx:flex-col dshx:gap-2 dshx:text-sm">
-                  <li className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-                    <ShimmerText className="dshx:min-w-0 dshx:truncate">Explorer · reading tax rules</ShimmerText>
-                    <span className="dshx:text-xs dshx:text-muted-foreground">0:42</span>
-                  </li>
-                  <li className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-                    <ShimmerText className="dshx:min-w-0 dshx:truncate">Reviewer · checking rounding</ShimmerText>
-                    <span className="dshx:text-xs dshx:text-muted-foreground">0:18</span>
-                  </li>
-                  <li className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:text-muted-foreground">
-                    <span className="dshx:min-w-0 dshx:truncate">Tester · finished</span>
-                    <span className="dshx:text-xs">1:05</span>
-                  </li>
-                </ul>
-              ),
-            },
-            {
-              id: 'workspace',
-              label: 'Workspace',
-              icon: <GitBranchIcon />,
-              meta: 'jj',
-              content: (
-                <dl className="dshx:grid dshx:grid-cols-[auto_1fr] dshx:gap-x-3 dshx:gap-y-1.5 dshx:text-sm">
-                  <dt className="dshx:text-muted-foreground">Revision</dt>
-                  <dd className="dshx:font-mono dshx:text-xs dshx:leading-5">94526da8</dd>
-                  <dt className="dshx:text-muted-foreground">Above main</dt>
-                  <dd>3 revisions</dd>
-                  <dt className="dshx:text-muted-foreground">Conflicts</dt>
-                  <dd className="dshx:text-success">None</dd>
-                </dl>
-              ),
-            },
-          ]}
-        />
-      </div>
+    <div className="dshx:max-w-sm dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-4">
+      <DockChanges
+        groups={[
+          {
+            id: 'repo',
+            label: 'Workspace',
+            icon: <FolderGit2Icon />,
+            hint: 'Lands on main through a rebase.',
+            name: 'dshfiles',
+            branch: 'thread-025a80',
+            files: [
+              { path: 'tax.ts', added: 9, removed: 3 },
+              { path: 'totals.test.ts', added: 64, removed: 0 },
+            ],
+            more: 1,
+          },
+        ]}
+      />
     </div>
   )
 }
@@ -815,11 +698,11 @@ export const usageDemos: readonly GalleryDemo[] = [
     render: () => <ActivityFeedDemo />,
   },
   {
-    id: 'usage-activity-dock',
-    title: 'ActivityDock',
-    description: "A thread's corner dock: plan, changes, subagents and workspace as icons that spring open into a panel.",
-    source: "import { ActivityDock, DockChecklist, DockChanges } from '@dshfiles/plugin-ui/components/motion/activity-dock'",
-    render: () => <ActivityDockDemo />,
+    id: 'usage-dock-changes',
+    title: 'DockChanges',
+    description: 'Changed files grouped by destination, rows rising in with a stagger.',
+    source: "import { DockChanges } from '@dshfiles/plugin-ui/components/motion/activity-dock'",
+    render: () => <DockChangesDemo />,
   },
   {
     id: 'usage-access-map',

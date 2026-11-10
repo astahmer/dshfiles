@@ -56,7 +56,7 @@ import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settin
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
-import { createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, type SettingsOpenRequest, settingsWorkbenchPanelId } from './workbench-panels.js'
+import { createSettingsHubRouter, createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, settingsWorkbenchPanelId } from './workbench-panels.js'
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
@@ -156,8 +156,7 @@ export default defineClient({
     const settingsOpen: ObservableSnapshot<boolean> = { getSnapshot: () => !actor.getSnapshot().matches('closed'), subscribe: subscribeActor }
     const activeSection: ObservableSnapshot<string | undefined> = { getSnapshot: () => actor.getSnapshot().context.sectionId, subscribe: subscribeActor }
     const inStage: ObservableSnapshot<boolean> = { getSnapshot: () => actor.getSnapshot().matches('tab'), subscribe: subscribeActor }
-    /** The latest section or field asked for; the Settings pane keeps its own navigation, so it follows these too. */
-    const openRequests = createSnapshotStore<SettingsOpenRequest | undefined>(undefined)
+    const hubRouter = createSettingsHubRouter()
 
     // Settings follows the main view: a Settings tab picked in the strip, or a reload landing on it, opens it there.
     ctx.effect(() => {
@@ -190,8 +189,8 @@ export default defineClient({
      * are gone, and a request that still names one opens the page.
      */
     const openSettings = (sectionId?: string): void => {
+      if (hubRouter.open(sectionId === undefined ? {} : { sectionId })) return
       actor.send(sectionId === undefined ? { type: 'open' } : { type: 'open', sectionId })
-      openRequests.set(sectionId === undefined ? undefined : { sectionId })
     }
     /** Opens another plugin's page in the stage: Settings links AI accounts, MCP servers, Secrets and Hosts. */
     const openPanel = (panelId: string): void => {
@@ -280,8 +279,8 @@ export default defineClient({
       void describe.ensure()
       const field = fieldTargetFor(target)
       if (field === undefined) return false
+      if (hubRouter.open({ sectionId: field.sectionId, field })) return true
       actor.send({ type: 'open', field })
-      openRequests.set({ sectionId: field.sectionId, field })
       return true
     }
 
@@ -546,7 +545,16 @@ export default defineClient({
             title: t('title'),
             component: createSettingsWorkbenchHub({
               groups,
-              openRequests,
+              router: hubRouter,
+              initial: () => {
+                const state = actor.getSnapshot().context
+                return {
+                  ...(state.sectionId === undefined ? {} : { sectionId: state.sectionId }),
+                  ...(state.field === undefined ? {} : { field: state.field }),
+                  ...(state.target === undefined ? {} : { target: state.target }),
+                  query: state.query,
+                }
+              },
               closeSettings: deps.closeSettings,
               view: input =>
                 settingsViewProps({
@@ -663,11 +671,12 @@ export default defineClient({
     // A request that still names the retired dialog surface opens the page: there is no other place left.
     const openRequest = (request: OpenSettingsRequest): void => {
       if (request.setting !== undefined && openSettingsTarget(request.setting)) return
-      const openEvent: { type: 'open'; sectionId?: string; target?: string } = { type: 'open' }
+      const openEvent: { type: 'open'; sectionId?: string; target?: string; query?: string } = { type: 'open' }
       if (request.section !== undefined) openEvent.sectionId = request.section
       if (request.target !== undefined) openEvent.target = request.target
+      if (request.query !== undefined) openEvent.query = request.query
+      if (hubRouter.open(openEvent)) return
       actor.send(openEvent)
-      openRequests.set(request.section === undefined ? undefined : { sectionId: request.section })
       if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
     }
 

@@ -10,6 +10,7 @@ import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import type { ComposerBarProps } from './native/contract/slots.ts'
 import type { InputState } from './native/contract/input.ts'
 import { InputBar } from './native/skeleton/InputBar.tsx'
+import { DraftAnnotations } from './native/input/draft-annotations.ts'
 
 // The run row is plain composition inside the real InputBar: the presentation kit is not under test.
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
@@ -81,6 +82,7 @@ const barProps = (overrides: Partial<ComposerBarProps>, queue: InputState['queue
     keyboard: {
       editor,
       snapshot: input,
+      annotations: new DraftAnnotations(),
       submit: vi.fn(),
       steerQueue: vi.fn(),
       paste: vi.fn(),

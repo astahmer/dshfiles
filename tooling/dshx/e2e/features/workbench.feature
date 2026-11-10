@@ -75,6 +75,20 @@ Feature: Workbench layouts
     Then the bottom panel shows the Jujutsu panel and the dock no longer does
     When the bottom panel is hidden again from Pane options
 
+  @scenario:workbench.bottom-panel-shortcut
+  Scenario: The bottom panel toggles from the keyboard unless the terminal owns the key
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/shortcuts, @dshfiles/jujutsu, @dshfiles/editor" is booted
+    When the unified Workbench is ready
+    Then the bottom panel is closed
+    When the platform primary+J chord is pressed outside every text field
+    Then the keyboard shortcut opens the bottom panel
+    When a terminal owns the keyboard and the platform primary+J chord is pressed
+    Then the keyboard shortcut leaves the bottom panel open and reaches the terminal
+    When the terminal fragment is removed and the platform primary+J chord is pressed
+    Then the keyboard shortcut closes the bottom panel
+    When the bottom-panel shortcut is rebound to primary+Shift+J in Keyboard shortcuts
+    Then the rebound chord toggles the bottom panel and the default chord no longer does
+
   @scenario:workbench.drag-between-regions
   Scenario: A panel dragged by its tab lands in another region
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/editor" is booted

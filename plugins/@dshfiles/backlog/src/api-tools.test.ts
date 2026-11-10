@@ -203,7 +203,7 @@ describe('backlog tool exposure', () => {
       'saveSyncConnection',
       'saveSyncBinding',
     ] as const) {
-      expect(backlogApi.methods[name].description ?? '').toMatch(/Use it when the user asked/u)
+      expect(backlogApi.methods[name].description ?? '').toMatch(/user (?:explicitly )?asked|the user's request/u)
     }
   })
 

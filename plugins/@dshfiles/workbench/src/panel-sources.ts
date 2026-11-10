@@ -12,6 +12,7 @@ const nativeViewOwners = new Map([
 export interface MainPanelSource {
   readonly key: string
   readonly title: string
+  readonly discoveryTitle?: string
   /** Runtime ledger occurrences remain restorable, but are not reusable plugin views. */
   readonly hiddenFromAdd?: boolean
 }
@@ -40,10 +41,16 @@ export const createMainPanelSources = (registry: WorkbenchPanelRegistry) => {
         }
         const owner = nativeViewOwners.get(key)
         const title = owner === undefined || entry.title.includes(':') ? entry.title : `${owner}: ${entry.title}`
-        if (previous?.definition.title === title && previous.definition.hiddenFromAdd === (entry.hiddenFromAdd ?? false)) continue
+        if (
+          previous?.definition.title === title &&
+          previous.definition.discoveryTitle === entry.discoveryTitle &&
+          previous.definition.hiddenFromAdd === (entry.hiddenFromAdd ?? false)
+        )
+          continue
         const definition: WorkbenchPanelDefinition = {
           id: `main/${key}`,
           title,
+          ...(entry.discoveryTitle === undefined ? {} : { discoveryTitle: entry.discoveryTitle }),
           mainPanelId: key,
           hiddenFromAdd: entry.hiddenFromAdd ?? false,
           component: previous?.definition.component ?? (() => renderMain(key)),

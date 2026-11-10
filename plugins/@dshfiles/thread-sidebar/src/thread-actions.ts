@@ -410,13 +410,12 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     const sessionId = yield* targetSessionId(input.sessionId, caller)
     const stopActivity = input.stopActivity === true
     return yield* deps.archive(sessionId, stopActivity).pipe(
-      Effect.map(archivedSessionIds => ({ status: 'archived' as const, sessionId, archivedSessionIds: [...archivedSessionIds], activity: [] as string[] })),
+      Effect.as({ status: 'archived' as const, sessionId, activity: [] as string[] }),
       Effect.catch(error =>
         errorCode(error) === 'workspace/session-active'
           ? Effect.succeed({
               status: 'refused-active' as const,
               sessionId,
-              archivedSessionIds: [...deps.archivedSessionIds()],
               activity: activityKinds(error),
             })
           : Effect.fail(failure(error, `Could not archive thread ${sessionId}.`)),
@@ -425,28 +424,29 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
   }),
 
   unarchive: Effect.fn('thread actions unarchive')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
-    const archivedSessionIds = yield* attempt(deps.unarchive(input.sessionId), `Could not restore thread ${input.sessionId}.`)
-    return { sessionId: input.sessionId, archivedSessionIds: [...archivedSessionIds] }
+    yield* attempt(deps.unarchive(input.sessionId), `Could not restore thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId }
   }),
 
   settle: Effect.fn('thread actions settle')(function* ({ input, caller }: ThreadActionContext<ThreadArchiveInput>) {
     const sessionId = yield* targetSessionId(input.sessionId, caller)
-    return { sessionId, settledSessionIds: [...(yield* attempt(deps.setSettled(sessionId, true), `Could not settle thread ${sessionId}.`))] }
+    yield* attempt(deps.setSettled(sessionId, true), `Could not settle thread ${sessionId}.`)
+    return { sessionId }
   }),
 
   unsettle: Effect.fn('thread actions unsettle')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
-    const settledSessionIds = yield* attempt(deps.setSettled(input.sessionId, false), `Could not unsettle thread ${input.sessionId}.`)
-    return { sessionId: input.sessionId, settledSessionIds: [...settledSessionIds] }
+    yield* attempt(deps.setSettled(input.sessionId, false), `Could not unsettle thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId }
   }),
 
   pin: Effect.fn('thread actions pin')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
-    const pinnedSessionIds = yield* attempt(deps.pin(input.sessionId), `Could not pin thread ${input.sessionId}.`)
-    return { sessionId: input.sessionId, pinnedSessionIds: [...pinnedSessionIds] }
+    yield* attempt(deps.pin(input.sessionId), `Could not pin thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId }
   }),
 
   unpin: Effect.fn('thread actions unpin')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {
-    const pinnedSessionIds = yield* attempt(deps.unpin(input.sessionId), `Could not unpin thread ${input.sessionId}.`)
-    return { sessionId: input.sessionId, pinnedSessionIds: [...pinnedSessionIds] }
+    yield* attempt(deps.unpin(input.sessionId), `Could not unpin thread ${input.sessionId}.`)
+    return { sessionId: input.sessionId }
   }),
 
   rename: Effect.fn('thread actions rename')(function* ({ input, caller }: ThreadActionContext<ThreadRenameInput>) {

@@ -20,6 +20,8 @@
 
 ![Preview a referenced item from a conversation](docs/screenshots/reference-preview.png)
 
+![See the backlog items that link to a thread or revision](docs/screenshots/backlinks.png)
+
 ![A chat-sized capture box with files, properties and references](docs/screenshots/rich-capture.png)
 
 ![Capture an attached image as an atomic blue reference chip](docs/screenshots/capture-and-triage.png)
@@ -40,7 +42,7 @@ One capture feed for notes, tasks, bugs, ideas and questions, shared by the user
 replaces a "TODO" chat channel: adding something costs one line, the feed stays ordered by activity so
 idle things sink, and the tracker parts (status, actors, links, search, board) come for free.
 
-Plan and open steps: [plans/backlog](../../../plans/backlog/README.md). Shipped design: [docs/redesign.md](docs/redesign.md).
+Open work: [plans/backlog](../../../plans/backlog/README.md). Shipped design: [docs/redesign.md](docs/redesign.md).
 
 Open the reusable **Backlog** view from navigation or the Workbench chooser. Items, Board, Projects, Shipped, Ready and Inbox remain the page’s own view controls.
 
@@ -294,6 +296,27 @@ opens the shared card with the item's title, kind, status, project and body. Ima
 thumbnails; clicking one opens the shared, keyboard-navigable gallery above the card. **Open in Backlog**
 selects that item in the panel. An item that no longer exists says so in the card instead of failing the
 conversation.
+
+## Backlinks on threads and revisions
+
+A thread that backlog items link to shows their count in its header (a clipboard and a number, beside the other
+header utilities); clicking it lists each item as its reference chip, with the same card on hover. A revision's
+details in the jj panel list the items that link to it under **Backlog**. Both read `backlog_referencing`, the
+agent tool, which matches a revision link written as a prefix of the change id (`jj:mounnnvz`) or the commit id
+(`jj:3f32cd26`), four characters or more and in either direction, so a short `jj:` in a note reaches the full id the
+panel shows; bookmarks and every other link type match exactly. Nothing renders when no item links there. A mounted
+count refreshes once a minute and stops when the backlog Host API is absent.
+
+The thread count fills the native `conversation.session.header.utilities` slot. The revision list fills
+`RevisionSections`, a registry `@dshfiles/jj-integration/revision-sections` declares and the jj panel
+(`@dshfiles/jujutsu`) renders, so neither jj plugin depends on this one.
+
+## Quote a reply into an item
+
+A finished reply's action row has **Add to backlog**: it opens the Backlog capture with the reply's first line as the
+title, the whole reply as a Markdown quote and `From session-…`, which capture turns into a link to the thread. Edit it
+and press Enter as with any capture. The Chat fork hands the reply text to `conversation.chat.assistant-actions`
+entries (`ChatTurnActionExtras.text`); without it (the stock Chat row) the action does not render.
 
 ## Retrieve tweet context
 

@@ -167,6 +167,20 @@ Then('its RAM tab shows the process memory that was its own page', async ({ page
     await page.getByRole('tab', { name: 'RAM', exact: true }).click()
     await expect(page.locator('[data-ram-view="embedded"]')).toBeVisible()
     await expect(page.locator('[data-node-process-summary]')).toBeVisible({ timeout: 30_000 })
+    const processesPage = page.locator('[data-slot="page"]').filter({ has: page.getByRole('heading', { name: 'Processes', exact: true }) })
+    await processesPage.locator('[data-ram-view="embedded"]').evaluate(element => {
+      const overflow = document.createElement('div')
+      overflow.style.height = '2000px'
+      element.append(overflow)
+    })
+    await expect
+      .poll(() =>
+        processesPage.evaluate(element => {
+          element.scrollTop = element.scrollHeight
+          return element.scrollTop
+        }),
+      )
+      .toBeGreaterThan(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -216,7 +230,10 @@ Then('the composer dock previews the running job and streams its output', async 
     const earlier = (await output.textContent()) ?? ''
     await expect.poll(async () => ((await output.textContent()) ?? '').length, { timeout: 30_000 }).toBeGreaterThan(earlier.length)
     // The same job also keeps its card under the tool call, inside the folded turn.
-    await page.getByText(/^Completed in /).last().click()
+    await page
+      .getByText(/^Completed in /)
+      .last()
+      .click()
     await page.getByText('Ran commands', { exact: true }).last().click()
     await expect(page.locator('[data-dshfiles-live-preview-seat="tool-card"]')).toHaveAttribute('data-state', 'running')
     const desktop = page.viewportSize()

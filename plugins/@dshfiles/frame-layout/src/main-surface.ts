@@ -37,6 +37,17 @@ export class MainSurfaceRendering {
     return mode === 'workbench' ? renderSlot('shell.main', { renderMain }, { fallback: native }) : native
   }
 
+  /** One `holdMainHidden` hold: counts once up, and once down however many times its release runs. */
+  static hold(adjust: (delta: 1 | -1) => void): () => void {
+    let held = true
+    adjust(1)
+    return () => {
+      if (!held) return
+      held = false
+      adjust(-1)
+    }
+  }
+
   /** Narrow the frame-authorized renderer without exposing another slot domain. */
   static createRenderer(renderSlot: PropsRenderSlots<'main'>['renderSlot']): MainSurfaceOwnerProps['renderMain'] {
     return entryKey => (entryKey === 'dshfiles-workbench' ? null : renderSlot('main', {}, { entryKey }))

@@ -29,7 +29,8 @@
  {
   "name": "02b-panels-sheet",
   "steps": [
-   "tap css \"[data-phone-panels]\"",
+   "tap css \"[data-phone-thread-menu-toggle]\"",
+   "tap css \"[data-phone-thread-menu] button[aria-label='Open right sidebar']\"",
    "wait 1500"
   ]
  },

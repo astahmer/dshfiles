@@ -8,9 +8,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { InlineReferences } from '@dshfiles/chat/inline-references'
 import { Changes, createApiClient, defineClient, useApi } from '@dshfiles/dshx/client'
+import { multiHostApi } from '@dshfiles/multi-host/api'
 // Type-only: `ctx.rightPanel`, the frame's right-column seat.
 import type {} from '@dshfiles/frame-layout/regions'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
@@ -27,11 +28,14 @@ import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { ChatReferenceTitleStore } from './chat-reference-titles.js'
 import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
-import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
-import { DEFAULT_PANEL_SCOPE, DOCK_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
+import type {} from '@dshfiles/rich-composer/conversation-contract'
+import { ComposerChangesBar, ComposerLocation, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
+import { DEFAULT_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { SurfaceVisibility } from './surface-visibility.js'
+import { JujutsuPanelSession } from './use-jujutsu-api.js'
+import { OwnerRouting, type OwnerPort } from './owner-routed-api.js'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-jujutsu'
@@ -61,9 +65,21 @@ export default defineClient({
         return { root: opened.root, initialized: 'initialized' in opened ? opened.initialized : false }
       },
     })
+    const multiHost = createApiClient(ctx, multiHostApi, '@dshfiles/multi-host')
     ChatReferenceLinks.setTitles(
       new ChatReferenceTitleStore({
-        load: input => jujutsu.referenceTitles({ paths: input.paths, references: input.references }),
+        load: input =>
+          // SAFETY: the two shapes differ only in that the port leaves `method` to the Host, which validates it.
+          OwnerRouting.api({
+            local: jujutsu,
+            api: 'jujutsu',
+            methods: jujutsuApi.methods,
+            owner: multiHost as never as OwnerPort,
+            sessionId: SessionId(input.sessionId),
+          }).referenceTitles({
+            paths: input.paths,
+            references: input.references,
+          }),
         projectPathForSession: sessionId => sessionProjectPath(sessionId, ctx.sessions.list.getSnapshot().byId, ctx.workspaces.list.getSnapshot().items),
       }),
     )
@@ -102,25 +118,36 @@ export default defineClient({
     }
     const panel = (options: SurfacePanelOptions): JSX.Element => (
       <PluginQueryProvider>
-        <ProjectsBoundPanel
-          workspaces={ctx.workspaces}
-          // Remounting per scope is what gives each tab, thread or the dock its own state; the scope's state outlives it.
-          key={options.scope}
-          scope={options.scope}
-          defaultPath={options.defaultPath ?? null}
-          surface={options.surface}
-          visible={options.visible ?? true}
-          {...(options.view === undefined ? {} : { view: options.view })}
-          directoryPicker={directoryPicker}
-          registerWorkspace={registerWorkspace}
-          reviewRevisions={metadata?.plugin?.use(Changes).get()?.status === 'active' ? reviewRevisions : undefined}
-          // A Session whose folder is not a registered workspace lands in "Ungrouped" with its composer locked, so
-          // the new JJ workspace is registered and opened the way the native folder picker opens one.
-          launchSession={async cwd => {
-            const workspace = await ctx.workspaces.create({ path: cwd })
-            await ctx.uiWorkspace.openWorkspace(workspace.workspaceId)
-          }}
-        />
+        <JujutsuPanelSession sessionId={options.sessionId ?? null}>
+          <ProjectsBoundPanel
+            workspaces={ctx.workspaces}
+            // Remounting per scope is what gives each tab, thread or the dock its own state; the scope's state outlives it.
+            key={options.scope}
+            scope={options.scope}
+            defaultPath={options.defaultPath ?? null}
+            surface={options.surface}
+            visible={options.visible ?? true}
+            {...(options.view === undefined ? {} : { view: options.view })}
+            directoryPicker={directoryPicker}
+            registerWorkspace={registerWorkspace}
+            reviewRevisions={metadata?.plugin?.use(Changes).get()?.status === 'active' ? reviewRevisions : undefined}
+            // A Session whose folder is not a registered workspace lands in "Ungrouped" with its composer locked, so
+            // the new JJ workspace is registered and opened the way the native folder picker opens one.
+            launchSession={async cwd => {
+              // A folder on the thread's own host opens as a thread there; this Host has no such folder.
+              const runtimeId = options.sessionId == null ? null : await OwnerRouting.ownerOf(multiHost, options.sessionId)
+              if (runtimeId !== null) {
+                const created = await multiHost.threadCreate({ runtimeId, cwd })
+                if (!created.ok) throw new Error(created.message)
+                await ctx.sessions.refresh()
+                ctx.uiWorkspace.openSession(SessionId(created.sessionId))
+                return
+              }
+              const workspace = await ctx.workspaces.create({ path: cwd })
+              await ctx.uiWorkspace.openWorkspace(workspace.workspaceId)
+            }}
+          />
+        </JujutsuPanelSession>
       </PluginQueryProvider>
     )
     const useMountedSession = (): MountedPanelScope => {
@@ -147,6 +174,7 @@ export default defineClient({
       const defaultPath = sessionId === undefined ? undefined : sessionProjectPath(sessionId, sessionsById, workspaces)
       return {
         scope: sessionId === undefined ? DEFAULT_PANEL_SCOPE : PanelScopes.thread(sessionId),
+        sessionId: sessionId ?? null,
         defaultPath: defaultPath === undefined || defaultPath.length === 0 ? null : defaultPath,
       }
     }
@@ -162,13 +190,13 @@ export default defineClient({
     const SideSurfacePanel = decorate((props: PropsRuntime<'sidebar.right.pane.tab'>) => {
       const target = useMountedSession()
       const visible = SurfaceVisibility.useSideTabVisible(props.useTabInfo)
-      return panel({ surface: 'side-panel', scope: target.scope, defaultPath: target.defaultPath, visible })
+      return panel({ surface: 'side-panel', scope: target.scope, sessionId: target.sessionId, defaultPath: target.defaultPath, visible })
     })
     const DockSurfacePanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: DOCK_PANEL_SCOPE, visible: props.visible, view: 'graph' }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'graph' }),
     )
     const DockSourceControlPanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: DOCK_PANEL_SCOPE, visible: props.visible, view: 'source' }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'source' }),
     )
     const ScopedWorkbenchPanel = decorate((props: WorkbenchPanelProps & { readonly scope: string }) =>
       panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph' }),
@@ -244,10 +272,10 @@ export default defineClient({
         composerSlot(ComposerChangesBar),
       ),
     )
-    ctx.slots.inject('conversation.composer.dock', () =>
+    ctx.slots.inject('conversation.composer.location', () =>
       ctx.slots.register(
-        { name: 'conversation.composer.dock', id: 'dshfiles-jujutsu-chips', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
-        composerSlot(ComposerChips),
+        { name: 'conversation.composer.location', id: 'dshfiles-jujutsu-chips', order: 40, inject: sessionId => ({ sessionId, jujutsu: composerServices }) },
+        composerSlot(ComposerLocation),
       ),
     )
     ctx.slots.inject('conversation.session.header.utilities', () =>
@@ -390,6 +418,7 @@ export default defineClient({
 })
 
 interface SurfacePanelOptions {
+  readonly sessionId?: SessionId | null
   readonly surface: 'main' | 'side-panel' | 'dock'
   readonly scope: string
   readonly defaultPath?: string | null
@@ -399,6 +428,7 @@ interface SurfacePanelOptions {
 }
 
 interface MountedPanelScope {
+  readonly sessionId: SessionId | null
   readonly scope: string
   readonly defaultPath: string | null
 }

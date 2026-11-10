@@ -510,6 +510,11 @@ before removing, so settling never forces work away. Each settle leaves a
 `jj-integration settle cleanup` span with the settled, targeted and removed
 counts.
 
+Restoring such a thread (Unsettle, Unarchive) needs no extra step: before its
+next turn builds its prompt, the Host checks the Session's folder out again from
+its repository when it is gone, registers it again and logs
+`workspace.restored` (`thread lifecycle restore missing` span).
+
 The activity read is the same Session list a Rebase guard uses (15 s per
 attempt, all waiting on the same read). When the Host's Session list stays
 unreadable, every Session reads as `activity-unknown` and the run removes
@@ -579,6 +584,14 @@ For jj: `provision` is the same verb as `jj-threads.provision`, and
 `snapshot`/`restore` record a workspace's files as the jj operation that snapshotted them and put them back with
 `jj restore --from 'at_operation(<op>, @)' --into @`. A restore touches only that workspace's working-copy files:
 history, bookmarks and other workspaces stay where they are.
+
+## Revision sections
+
+`@dshfiles/jj-integration/revision-sections` declares `RevisionSections`, a registry of components the jj panel
+(`@dshfiles/jujutsu`) renders under a selected revision's details with its repository root, change id (reverse hex, as
+`jj log` prints it) and commit id. A plugin adds one with `plugin.add(RevisionSections, { id, order, Component })`
+and returns `null` when it has nothing for that revision; the panel renders nothing when no plugin adds one.
+`@dshfiles/backlog` lists the items linking to the revision there.
 
 ## Agent tools
 

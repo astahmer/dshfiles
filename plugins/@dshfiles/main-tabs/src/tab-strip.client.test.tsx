@@ -311,24 +311,19 @@ describe('TabStrip thread actions', () => {
 })
 
 describe('TabStrip thread mentions', () => {
-  it('mentions a thread from its tab menu into the main composer', async () => {
+  it('mentions a thread from its tab menu into the stage composer', async () => {
     const requests: unknown[] = []
     const onMention = (event: Event): void => {
       requests.push(event instanceof CustomEvent ? event.detail : undefined)
     }
     window.addEventListener(THREAD_MENTION_INSERT_EVENT, onMention)
-    const host = document.createElement('div')
-    host.setAttribute('data-conversation-session', 'thread-9')
-    const seat = document.createElement('div')
-    seat.setAttribute('data-composer-seat', '')
-    host.append(seat)
-    document.body.append(host)
     mount()
 
     openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: '@Mention thread' }))
 
-    expect(requests).toEqual([{ sessionId: 'thread-1', hostSessionId: 'thread-9' }])
+    // Unaddressed: the composer of the Session the stage shows takes it (thread-sidebar's composerTakesInsert).
+    expect(requests).toEqual([{ sessionId: 'thread-1' }])
     window.removeEventListener(THREAD_MENTION_INSERT_EVENT, onMention)
   })
 

@@ -9,7 +9,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { agentsApi } from '@dshfiles/agents/contract'
 import { AttentionSubjectOpeners } from '@dshfiles/activity-timeline/attention-openers'
+import type { ChatTurnActionExtras } from '@dshfiles/chat/chat-focus'
 import { InlineReferences } from '@dshfiles/chat/inline-references'
+import { RevisionSections, type RevisionSectionTarget } from '@dshfiles/jj-integration/revision-sections'
 import { createApiClient, defineClient, LinkHandler } from '@dshfiles/dshx/client'
 import type {} from '@dshfiles/input-trigger/client'
 import { EntityKinds, type EntityPreviewProps } from '@dshfiles/input-trigger/entity-registry'
@@ -29,6 +31,9 @@ import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
 import { BACKLOG_PANEL_ID } from './panel-draft.js'
 import { backlogInlineReference } from './backlog-inline-reference.js'
+import { RevisionBacklinks, ThreadBacklinks } from './backlinks-chips.js'
+import { MessageQuote } from './message-quote.js'
+import { QuoteReplyButton } from './quote-reply-button.js'
 import { BacklogReferencePreview } from './backlog-reference-preview.jsx'
 import { BacklogNotices, BacklogNoticeToast } from './notices.js'
 import { defaultTargetFor, StartThreadForm, type StartThreadCatalog, type StartThreadOutcome, type StartThreadRequest } from './start-thread.js'
@@ -44,15 +49,18 @@ export default defineClient({
     metadata?.plugin?.add(InlineReferences, backlogInlineReference)
     ctx.effect(() => ctx.uiConversation.userText.register(backlogUserTextRule), 'backlog: sent mentions render as chips')
     const api = createApiClient(ctx, backlogApi)
+    const openCaptureWith = (text: string): void => {
+      BacklogFocusModel.requestCapture(text)
+      // SAFETY: this entry registers PANEL_ID as a main-slot key below.
+      ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+    }
     ctx.effect(() => {
       const openCapture = (event: Event): void => {
         if (!(event instanceof CustomEvent)) return
         const capture = Option.getOrNull(Schema.decodeUnknownOption(backlogCaptureEventSchema)(event.detail))
         if (capture === null) return
         event.preventDefault()
-        BacklogFocusModel.requestCapture(capture.text)
-        // SAFETY: this entry registers PANEL_ID as a main-slot key below.
-        ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+        openCaptureWith(capture.text)
       }
       window.addEventListener('dshfiles:backlog-capture', openCapture)
       return () => window.removeEventListener('dshfiles:backlog-capture', openCapture)
@@ -361,6 +369,34 @@ export default defineClient({
     ctx.slots.inject('conversation.user.text.node', () =>
       ctx.slots.register({ name: 'conversation.user.text.node', key: 'backlog', priority: 100 }, BacklogMentionChip),
     )
+    ctx.slots.inject('conversation.session.header.utilities', () =>
+      ctx.slots.register(
+        { name: 'conversation.session.header.utilities', id: 'dshfiles-backlog-backlinks', order: 40, inject: sessionId => ({ sessionId }) },
+        decorate((props: { readonly sessionId: SessionId }) => (
+          <PluginQueryProvider>
+            <ThreadBacklinks sessionId={props.sessionId} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('conversation.chat.assistant-actions', () =>
+      ctx.slots.register(
+        { name: 'conversation.chat.assistant-actions', id: 'dshfiles-backlog-quote-reply', order: 80, inject: sessionId => ({ sessionId }) },
+        (props: ChatTurnActionExtras & { readonly sessionId: SessionId }) => {
+          const text = props.text?.trim() ?? ''
+          return text === '' ? null : <QuoteReplyButton onQuote={() => openCaptureWith(MessageQuote.captureText({ text, sessionId: props.sessionId }))} />
+        },
+      ),
+    )
+    const plugin = metadata?.plugin
+    if (plugin !== undefined) {
+      const Backlinks = (props: RevisionSectionTarget): JSX.Element => (
+        <PluginQueryProvider>
+          <RevisionBacklinks {...props} />
+        </PluginQueryProvider>
+      )
+      plugin.add(RevisionSections, { id: '@dshfiles/backlog/backlinks', order: 10, Component: plugin.bind(Backlinks) })
+    }
   },
 })
 

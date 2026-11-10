@@ -1,10 +1,14 @@
 import { Composer, createApiClient, defineClient } from '@dshfiles/dshx/client'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
+import { ConversationScope } from '@dshfiles/workbench/conversation-header'
+import { PhoneMenuScope } from './phone-menu-scope.tsx'
 import { agentWarmupApi } from './agent-warmup-api.ts'
 import type {} from './agent-warmup.ts'
 import { composerControlsSettings } from './composer-controls-settings.ts'
 import { createComposerService } from './composer-service.ts'
 import { ComposerSnippets } from './composer-snippets.ts'
+import { PhoneThreadMenu } from './phone-thread-menu.tsx'
+import { createPhoneThreadMenu } from './phone-thread-menu-service.ts'
 import { apply, inject } from './native/index.js'
 
 type ComposerControls = SettingsValue<typeof composerControlsSettings.schema>
@@ -15,6 +19,8 @@ export default defineClient({
   name: '@dshfiles/rich-composer',
   inject: [...inject, 'sessionDrafts'],
   setup(ctx, _decorate, metadata) {
+    metadata?.plugin?.provide(PhoneThreadMenu, createPhoneThreadMenu())
+    metadata?.plugin?.provide(ConversationScope, { Scope: PhoneMenuScope })
     apply(ctx)
     metadata?.plugin?.provide(Composer, createComposerService(ctx))
     ctx.inject(['inputTriggers'], scope => {

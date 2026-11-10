@@ -11,6 +11,7 @@
  *   node scripts/ci/plugin-shard.mjs <index> <count> unit       # build+test slice    (units matrix)
  *   node scripts/ci/plugin-shard.mjs <index> <count> boot       # plugin boot slice   (boot matrix)
  *   node scripts/ci/plugin-shard.mjs <index> <count> smoke      # smoke journeys      (e2e-smoke matrix)
+ *   node scripts/ci/plugin-shard.mjs <index> <count> journeys   # every journey       (scheduled journeys matrix)
  *
  * Packages are listed by directory name and assigned round-robin (`index % count`), so the slice is identical on every
  * run and on every machine: a shard index never means a different package because of timing or hash order. A boot shard
@@ -51,6 +52,7 @@ const listPluginPackages = async () => {
       directory: `plugins/@dshfiles/${entry.name}`,
       isBundle: manifest.dsh !== undefined,
       hasSmoke: typeof manifest.scripts?.['test:e2e:smoke'] === 'string',
+      hasJourneys: typeof manifest.scripts?.['test:e2e'] === 'string',
     })
   }
   return packages.sort((left, right) => left.name.localeCompare(right.name))
@@ -60,7 +62,7 @@ const parseShard = argv => {
   const index = Number.parseInt(argv[0] ?? '', 10)
   const count = Number.parseInt(argv[1] ?? '', 10)
   if (!Number.isInteger(index) || !Number.isInteger(count) || count < 1 || index < 0 || index >= count) {
-    console.error('usage: node scripts/ci/plugin-shard.mjs <index> <count> [boot]')
+    console.error('usage: node scripts/ci/plugin-shard.mjs <index> <count> [test|unit|boot|smoke|journeys]')
     process.exit(2)
   }
   return { index, count, mode: argv[2] ?? 'test' }
@@ -119,5 +121,17 @@ if (mode === 'smoke') {
   process.exit(await run('node', ['scripts/check-browser.mjs', 'smoke', ...slice]))
 }
 
-console.error(`unknown shard mode "${mode}" (expected test, boot or smoke)`)
+if (mode === 'journeys') {
+  // Whole owners again, so a journey never depends on another shard's order; a named selection keeps check-browser's
+  // refusal of an unscoped run out of the way, and CI already keeps going past a red owner.
+  const slice = sliceOf(packages.filter(item => item.hasJourneys)).map(item => item.name.replace('@dshfiles/', ''))
+  if (slice.length === 0) {
+    console.log(`e2e journeys shard ${String(index)}/${String(count)}: no owner (nothing to run)`)
+    process.exit(0)
+  }
+  console.log(`e2e journeys shard ${String(index)}/${String(count)}: ${slice.join(', ')}`)
+  process.exit(await run('node', ['scripts/check-browser.mjs', 'e2e', ...slice]))
+}
+
+console.error(`unknown shard mode "${mode}" (expected test, unit, boot, smoke or journeys)`)
 process.exit(2)

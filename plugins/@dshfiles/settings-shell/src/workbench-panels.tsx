@@ -1,7 +1,7 @@
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { WorkbenchPanelDefinition, WorkbenchPanelProps, WorkbenchPanelRegistry } from '@dshfiles/workbench/registry'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
@@ -20,8 +20,54 @@ interface SettingsWorkbenchHubInput {
 
 /** A section or field another surface asked Settings to show (`dshfiles:open-settings`, the palette, a section link). */
 export interface SettingsOpenRequest {
-  readonly sectionId: string
+  readonly sectionId?: string
   readonly field?: FieldTarget
+  readonly target?: string
+  readonly query?: string
+}
+
+interface SettingsHubRegistration {
+  readonly visible: () => boolean
+  readonly open: (request: SettingsOpenRequest) => void
+}
+
+/**
+ * One Settings page, several presentations. A request goes to the visible hub; when every hub is hidden, the request
+ * waits for the occurrence the shell is about to reveal, so reopening a background Settings tab shows what was asked
+ * for instead of the section it happened to hold.
+ */
+export const createSettingsHubRouter = () => {
+  const hubs = new Set<SettingsHubRegistration>()
+  let pending: SettingsOpenRequest | undefined
+  const deliver = (hub: SettingsHubRegistration): void => {
+    const request = pending
+    if (request === undefined) return
+    pending = undefined
+    hub.open(request)
+  }
+  return {
+    register: (hub: SettingsHubRegistration) => {
+      hubs.add(hub)
+      return () => {
+        hubs.delete(hub)
+      }
+    },
+    /** True when a visible hub took it; false leaves it pending for the hub that becomes visible next. */
+    open: (request: SettingsOpenRequest): boolean => {
+      const hub = [...hubs].find(candidate => candidate.visible())
+      if (hub === undefined) {
+        pending = request
+        return false
+      }
+      pending = undefined
+      hub.open(request)
+      return true
+    },
+    /** The hub just became the Settings surface: hand it the request that could not be delivered earlier. */
+    activate: (hub: SettingsHubRegistration): void => {
+      if (hubs.has(hub)) deliver(hub)
+    },
+  }
 }
 
 /**
@@ -30,28 +76,42 @@ export interface SettingsOpenRequest {
  */
 export const createSettingsWorkbenchHub = (sources: {
   readonly groups: ObservableSnapshot<readonly GroupedEntries[]>
-  readonly openRequests: ObservableSnapshot<SettingsOpenRequest | undefined>
+  readonly router: ReturnType<typeof createSettingsHubRouter>
+  readonly initial?: () => SettingsOpenRequest
   readonly view: (input: SettingsWorkbenchHubInput) => Omit<SettingsViewProps, 'onClose'>
   readonly closeSettings: () => void
 }): WorkbenchPanelDefinition['component'] =>
   function SettingsWorkbenchHub(props) {
     const groups = useObservable(sources.groups)
-    const request = useObservable(sources.openRequests)
-    const [activeId, setActiveId] = useState(request?.sectionId)
-    const [field, setField] = useState(request?.field)
-    const [query, setQuery] = useState('')
+    const [initial] = useState(() => sources.initial?.())
+    const [activeId, setActiveId] = useState(initial?.sectionId)
+    const [field, setField] = useState(initial?.field)
+    const [target, setTarget] = useState(initial?.target)
+    const [query, setQuery] = useState(initial?.query ?? '')
+    const visible = useRef(props.visible !== false)
+    visible.current = props.visible !== false
     const [host, setHost] = useState<HTMLDivElement | null>(null)
     const select = (id: string): void => {
       setActiveId(id)
       setField(undefined)
+      setTarget(undefined)
       setQuery('')
     }
+    const [hub] = useState<SettingsHubRegistration>(() => ({
+      visible: () => visible.current,
+      open: request => {
+        if (request.field !== undefined) setActiveId(request.field.sectionId)
+        else if (request.sectionId !== undefined) setActiveId(request.sectionId)
+        setField(request.field)
+        setTarget(request.field === undefined ? request.target : undefined)
+        setQuery(previous => request.query ?? (request.field === undefined && request.sectionId === undefined ? previous : ''))
+      },
+    }))
+    useEffect(() => sources.router.register(hub), [hub])
+    const shown = props.visible !== false
     useEffect(() => {
-      if (request === undefined) return
-      setActiveId(request.sectionId)
-      setField(request.field)
-      setQuery('')
-    }, [request])
+      if (shown) sources.router.activate(hub)
+    }, [shown, hub])
     const close = props.onClose ?? sources.closeSettings
     const view = sources.view({ groups, activeId, field, query })
     const owner: SettingsSectionOwnerProps & {
@@ -73,7 +133,21 @@ export const createSettingsWorkbenchHub = (sources: {
     }
     return (
       <div className="dshx-root dshx:h-full dshx:min-h-0 dshx:w-full" data-settings-workbench-hub="" ref={setHost}>
-        {host !== null && <SettingsTab {...view} host={host} sectionOwner={owner} onClose={close} onSelect={select} onSearch={setQuery} />}
+        {host !== null && (
+          <SettingsTab
+            {...view}
+            host={host}
+            sectionOwner={owner}
+            sectionTarget={target}
+            onReveal={entry => {
+              select(entry.sectionId)
+              setTarget(entry.target)
+            }}
+            onClose={close}
+            onSelect={select}
+            onSearch={setQuery}
+          />
+        )}
       </div>
     )
   }

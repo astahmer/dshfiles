@@ -35,6 +35,7 @@ export interface WorkbenchPanelDefinition {
   /** Stable across reloads: saved layouts refer to panels by this id. Prefix it with the owning plugin. */
   readonly id: string
   readonly title: string
+  readonly discoveryTitle?: string
   readonly component: ComponentType<WorkbenchPanelProps>
   /** An owned contributor may expose independent scoped occurrences (e.g. two repositories). */
   readonly scopedComponent?: ComponentType<WorkbenchPanelProps & { readonly scope: string }>
@@ -219,6 +220,24 @@ declare global {
   var dshfilesWorkbenchPanelsV1: WorkbenchPanelRegistry | undefined
   /** Native-aside capabilities remain available even before Workbench itself activates. */
   var dshfilesWorkbenchNativeAsideOwnersV1: Map<string, () => boolean> | undefined
+  var dshfilesWorkbenchMainNavigationV1: { open: (mainPanelId: string) => Promise<MainNavigationResult> } | undefined
+}
+
+export type MainNavigationResult = { readonly kind: 'native' } | { readonly kind: 'workbench'; readonly panelId: string }
+
+/** The frame owns the occurrence chosen for cross-plugin navigation. */
+export class WorkbenchMainNavigation {
+  static register(open: (mainPanelId: string) => Promise<MainNavigationResult>): () => void {
+    const owner = { open }
+    globalThis.dshfilesWorkbenchMainNavigationV1 = owner
+    return () => {
+      if (globalThis.dshfilesWorkbenchMainNavigationV1 === owner) globalThis.dshfilesWorkbenchMainNavigationV1 = undefined
+    }
+  }
+
+  static open(mainPanelId: string): Promise<MainNavigationResult> {
+    return globalThis.dshfilesWorkbenchMainNavigationV1?.open(mainPanelId) ?? Promise.resolve({ kind: 'native' })
+  }
 }
 
 const nativeAsideOwners = (): Map<string, () => boolean> => (globalThis.dshfilesWorkbenchNativeAsideOwnersV1 ??= new Map())
@@ -255,6 +274,7 @@ export const workbenchPanels = (): WorkbenchPanelRegistry => (globalThis.dshfile
 export interface PanelTitle {
   readonly panelId: string
   readonly title: string
+  readonly discoveryTitle?: string
 }
 
 /** "Usage: Analytics" → "Analytics"; a label without a prefix is kept. */

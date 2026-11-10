@@ -20,7 +20,7 @@ owning package.
 | `pnpm check:screenshots`                          | `plugin-screenshots.mjs --check`     | Every UI plugin ships a screenshot its README embeds ([rule](../docs/plugin-screenshots.md)).            |
 | `pnpm typecheck:scripts`                          | `tsc -p scripts/tsconfig.json`       | Typecheck the repository's TypeScript scripts.                                                           |
 | `pnpm bench:selection`                            | `test-selection-bench.mjs`           | Mutation benchmark: do related tests catch what a package's full suite catches?                          |
-| `node scripts/ci/plugin-shard.mjs <i> <n> [boot]` | `ci/plugin-shard.mjs`                | One deterministic slice of the owned plugins for the parallel CI matrices (test or boot).                |
+| `node scripts/ci/plugin-shard.mjs <i> <n> [mode]` | `ci/plugin-shard.mjs`                | One deterministic slice of the owned plugins for the parallel CI matrices (unit, boot, smoke, journeys). |
 
 ## Other scripts
 

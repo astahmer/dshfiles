@@ -6,6 +6,7 @@ export default defineConfig({
     'turn-error-action': 'src/turn-error-action.ts',
     'chat-focus': 'src/chat-focus.ts',
     'turn-usage-cost': 'src/turn-usage-cost.ts',
+    'session-usage-cost': 'src/session-usage-cost.ts',
     'pinned-tool-calls': 'src/pinned-tool-calls.ts',
     'message-images': 'src/message-images.ts',
     'inline-references': 'src/inline-references.tsx',
@@ -14,6 +15,7 @@ export default defineConfig({
     'fenced-markdown': 'src/fenced-markdown.tsx',
   },
   client: {
+    dshxRuntime: 'shared',
     shared: '@dshfiles/shared-runtime',
     entry: 'src/client-entry.tsx',
     // Not browser-roster packages, so the native plugin's build inlines them too.

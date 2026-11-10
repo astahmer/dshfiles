@@ -75,14 +75,16 @@
 
 /* A stable main-tabs portal anchor above either surface, never a panel's own
    keyed main outlet. Flex sizing keeps nested workbenches and conversation
-   scroll containers bounded by the centre's available height. */
+   scroll containers bounded by the centre's available height. `clip`, not
+   `hidden`: a hidden box is still a scroll container, so a jump inside a
+   conversation scroller could scroll the whole surface off its top edge. */
 .mainSurface {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 
 /* macOS desktop: the frame goes transparent so window vibrancy reaches the

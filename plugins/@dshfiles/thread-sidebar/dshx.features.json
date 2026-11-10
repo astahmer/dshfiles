@@ -45,7 +45,7 @@
           "kind": "custom",
           "span": "notification history record",
           "file": "plugins/@dshfiles/thread-sidebar/src/notification-history-host.test.ts",
-          "testName": "records a tracing span without adding request content"
+          "testName": "records a tracing span for each history write"
         }
       ]
     },
@@ -2550,8 +2550,8 @@
         {
           "kind": "unit-test",
           "id": "thread-sidebar.thread-reference-mention-unit-main-composer",
-          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention-dom.test.ts",
-          "testName": "the main composer session ignores an aside conversation on screen beside it"
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "an unaddressed mention goes to the stage composer, never an aside composer"
         }
       ],
       "telemetry": [
@@ -3245,7 +3245,7 @@
     {
       "id": "phone-stack-navigation",
       "title": "Navigate the phone as a stack",
-      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers Thread panels, which opens the thread panel as a bottom sheet. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
+      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux \u00a78 phase 6): a top bar names the screen and Back pops one level \u2014 a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers a Thread menu button: it calls the typed Rich Composer menu contract, only while the stage has its own mounted reader, to show the thread's view tabs, header controls and thread-panel opener (the bottom sheet) under the bar; it closes when the stage stops showing a thread. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3253,7 +3253,7 @@
       "configuration": [],
       "states": ["list", "stage-thread", "stage-page", "stage-draft", "keyboard-open"],
       "failureModes": [
-        "Without the Workbench's toggle command the bar offers no Thread panels button instead of a dead control.",
+        "Without a matching menu reader the Thread menu button is absent, never a dead control; draft controls remain visible whenever no matching top-bar launcher is attached.",
         "An older Host that rejects the new 'back' navigation surface only loses that count; navigation never waits on it."
       ],
       "externalDependencies": [],
@@ -3262,7 +3262,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.phone-stack-thread",
           "file": "plugins/@dshfiles/thread-sidebar/src/phone-shell.test.ts",
-          "testName": "names a thread on the stage and goes back to Threads, offering its panels"
+          "testName": "names a thread stage and goes back to Threads"
         },
         {
           "kind": "unit-test",

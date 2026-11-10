@@ -39,6 +39,17 @@ export interface MainSurfaceOwnerProps {
   readonly renderMain: (entryKey: string) => ReactNode
 }
 
+/** Owner share supplied by the frame to `shell.beforeMain` entries. */
+export interface BeforeMainOwnerProps {
+  /** The centre's requested surface; Workbench draws its own chrome, so a native strip renders nothing there. */
+  readonly mode: MainSurfaceMode
+  /**
+   * Hide the main panel below the seat while it stays mounted (scroll and state survive), until the returned release
+   * runs. The panel shows again once every hold is released.
+   */
+  readonly holdMainHidden: () => () => void
+}
+
 /** Compatibility ownership for frames deployed without Workbench; not a user preference. */
 export type RightPanelMode = 'native' | 'dock'
 
@@ -123,6 +134,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       kind: 'single'
       scope: 'root'
       owner: MainSurfaceOwnerProps
+    }
+    /**
+     * Full-width rows at the top of the centre column, directly above the main panel in both surface modes, mounted
+     * for the frame's lifetime across panel and thread changes. Additive: entries order among themselves. The tab
+     * strip of `@dshfiles/main-tabs` lives here.
+     */
+    'shell.beforeMain': {
+      kind: 'list'
+      scope: 'root'
+      owner: BeforeMainOwnerProps
     }
     /**
      * The frame's right column. In Workbench mode the dock stays mounted while

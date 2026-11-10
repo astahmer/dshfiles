@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Nightly full journey run; PRs only get the @smoke subset from the Required checks e2e-smoke job.
+    - cron: '17 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -82,3 +85,41 @@ jobs:
             ${{ runner.temp }}/plugin-browser-tests.txt
           if-no-files-found: warn
           retention-days: 14
+
+  journeys:
+    # Every journey, not the @smoke subset: a whole suite measured 30-50 minutes serial, too slow to gate each PR, so it
+    # runs nightly and on demand. Shards own whole plugins round-robin (`scripts/ci/plugin-shard.mjs journeys`), like the
+    # smoke shards, so a journey never depends on another shard.
+    name: journeys (${{ matrix.shard }}/6)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    env:
+      TURBO_CONCURRENCY: '2'
+      # A baseline must run every scenario: neither a restored Turbo task nor a per-scenario receipt may replay a pass.
+      TURBO_FORCE: '1'
+      DSHX_E2E_SCENARIO_CACHE: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          jj: 'true'
+          ffmpeg: 'true'
+          browsers: 'true'
+          systemd-scope: 'true'
+      - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 6 journeys
+      - name: Upload journey evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-journeys-${{ github.run_id }}-${{ matrix.shard }}
+          path: |
+            tooling/dshx/test-results
+            tooling/dshx/playwright-report
+            .dsh-e2e-evidence
+          if-no-files-found: warn
+          retention-days: 7
