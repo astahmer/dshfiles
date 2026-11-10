@@ -84,13 +84,82 @@ Description copy only: no tool was removed, renamed or merged, and every argumen
 "After" is the same live request with the rebuilt plugins' descriptions substituted, tool by tool, measured with the
 same script; the live Host keeps serving the old copy until the user restarts it.
 
+## tool-search in a scratch profile, 2026-11-10
+
+[tool-search](../plugins/@dshfiles/tool-search/README.md) restricts each agent to its `alwaysVisible` tools plus one
+`tool_search` tool; a search adds its top `maxResults` (5) BM25 matches to that agent's allow list for the rest of the
+Session. Measured in a scratch DSH (`dshx dev up --name toolsearch`, isolated home and port) with every owned bundle
+`profiles/web` depends on, once without and once with `--plugin @dshfiles/tool-search`, driven by the loopback fake
+provider (`[[call TOOL {json}]]` directives) and read with `node scripts/tool-schema-cost.ts` on the scratch Session
+logs. The baseline request carries the same 468 tools as the live `web` request above.
+
+| Configuration (same 97 owned bundles)                                      | Tools in first request | Tool chars | Tool tokens |
+| -------------------------------------------------------------------------- | ---------------------: | ---------: | ----------: |
+| Without tool-search                                                        |                    468 |    274,965 |      68,742 |
+| tool-search, defaults (`alwaysVisible: []`)                                |                      4 |      3,085 |         772 |
+| tool-search, `alwaysVisible` = the 31 native core tools                    |                     12 |      8,650 |       2,163 |
+| Projected: the 31 native core tools + `tool_search`, once the bug is fixed |                     32 |     26,930 |       6,733 |
+
+The projection sums the baseline schemas of `read`, `write`, `edit`, `apply_patch`, `bash`, `glob`, `grep`,
+`todo_write`, `skill`, `ask_user_question`, `job_*`, `subagent*`, `send_message`, `list_agents`, `interrupt_agent`,
+`web_search`, `web_fetch`, `present`, `read_image`, the goal tools, `exit_plan_mode`, `workflow`, `working_directory`
+and `compaction_threshold`, plus the 519-char `tool_search` schema.
+
+### Round trips
+
+Three scripted tasks in one thread, each one discovery then one call (`tool_search "list backlog items"` →
+`backlog_list`, `"jj thread workspace status"` → `jj_thread_status`, `"open a page in the preview browser"` →
+`preview_open`):
+
+| Task               | Requests without | Requests with | Loaded by the search                                                           | Tool tokens after |
+| ------------------ | ---------------: | ------------: | ------------------------------------------------------------------------------ | ----------------: |
+| `backlog_list`     |                2 |             3 | `backlog_list`, `_projects`, `_get`, `_sync_binding_remove`, `_referencing`    |             1,847 |
+| `jj_thread_status` |                2 |             3 | `jj_thread_status`, `_workspace_sync`, `_discard`, `_destination`, `_refresh…` |             2,327 |
+| `preview_open`     |                2 |             3 | `preview_open`, `_reveal`, `_screenshot`, `_close`, `_navigate`                |             3,042 |
+
+Each discovery costs one extra model request and grows the tool list by 5 schemas (about 500 to 1,200 tokens) for the
+rest of the Session; nothing is ever unloaded. Ten searches in one thread reached 43 tools and 8,932 tokens. Every
+target ranked first and was then called successfully; calling a deferred tool before searching fails with
+`ToolNotFoundError` (`unknown tool "backlog_list"`), which the model must recover from with another request.
+
+Retrieval on the real catalog: the plugin's own ranker (`ToolSearchModel.rank`) over the 468 live schemas puts the
+target in the top 5 for 14 of 20 natural-language queries. It misses paraphrases that share no words with the
+description: "show my open tasks" (`backlog_list`, rank 11), "create a new todo item in the task tracker"
+(`backlog_capture`, 117), "what revisions does this thread have that are not on main" (`jj_thread_status`, 42), "land
+this thread onto main" (`jj_thread_rebase`, 43), "which secrets are configured" (`secret_list`, 19), "remind me in an
+hour" (`schedule_create`, 116). The earlier Codex benchmark in the plugin README saw the same pattern with a real
+model: 9/12 tasks against 12/12 direct.
+
+### Failure modes
+
+1. **The core tools disappear and cannot be found.** With either configuration the agent loses `bash`, `read`,
+   `write`, `edit`, `todo_write`, `skill`, `ask_user_question`, `job_*`, `send_message`, `subagent_fork`,
+   `list_agents`, `interrupt_agent`, `web_search`, `web_fetch`, `present`, `read_image`, `exit_plan_mode` and
+   `workflow`: they are agent-scoped registrations, absent from the global catalog `tool_search` ranks
+   (`tool_search "bash"` returns `thread_dev_servers`, `"read"` returns `backlog_read_file`…), and the plugin's
+   `tools.restrict({ allow })` list is built from global names only, so `alwaysVisible` cannot admit them either. The
+   seeded `bash` call failed with `unknown tool "bash"` in every tool-search run. Only `glob`, `grep` and `subagent`
+   survived. Fixing this means building the allow list from `ctx.tools.schemas(agent)` names that are not global, in
+   `refreshRestriction` (`plugins/@dshfiles/tool-search/src/host.ts`).
+2. **Prompt-cache churn.** The tool list changes after every search, so the cached prefix the provider keeps for an
+   unchanged header is lost each time; the Codex benchmark recorded almost no cached input in progressive mode
+   against 72 % cached direct.
+3. **Paraphrase misses**, above: BM25 over names and descriptions only.
+4. **Code Mode** calls nested through `run_code` are rejected by design.
+
+### Recommendation
+
+Do not adopt in `web` yet. The default configuration removes the file and shell tools outright, so an agent cannot
+work. After the allow-list fix, adopt only with an always-visible core set: the projected 6.7k tokens per request is
+about a tenth of today's 68.7k, at one extra request per tool family a task needs and a cache miss after each
+discovery. Before switching, re-run this measurement with a real model on long multi-turn Sessions, where the direct
+mode's cached schema prefix amortizes best.
+
 ## Next levers, by size
 
-1. **Fewer schemas per request.** [tool-search](../plugins/@dshfiles/tool-search/README.md) hides all but the
-   `alwaysVisible` tools behind one `tool_search` tool. On a 603-schema synthetic catalog it cut tool tokens 99 % at
-   the cost of one extra request per discovery; the real 335-schema catalog is in its provider benchmark. It is not
-   in `web`: adding it changes every agent's first step, rejects calls nested in Code Mode, and needs a restart, so
-   it is the user's call. Try it in a `probe` profile with `alwaysVisible` covering the core file and shell tools.
+1. **Fewer schemas per request.** tool-search, measured above: about 90 % fewer tool tokens with a core set, but it
+   currently hides the agent-scoped core tools and needs that fix first. Not in `web`: adding it changes every
+   agent's first step and needs a restart, so it is the user's call.
 2. **Gate rarely used families behind a setting.** No owned plugin has such a pattern, and dshx's `ApiToolExposure`
    (`tooling/dshx/packages/dshx/src/api/types.ts`) has no condition, so this needs a dshx feature (a settings
    predicate on `tool:`) first. The
