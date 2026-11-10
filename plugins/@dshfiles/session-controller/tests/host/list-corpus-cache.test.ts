@@ -144,6 +144,21 @@ it('lists and announces a Session another process stored after the corpus was re
   })
 })
 
+it('lists the first Session another process stores in a home whose store root did not exist yet', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  const ctx = await hostContext()
+  const store = await storeFixture(ctx)
+  await rm(store.root, { recursive: true })
+  // SAFETY: list() reads only listSessions from the query service.
+  ctx.provide('sessionQuery', { listSessions: async () => [] } as never)
+  const list = new ApiSessionList(ctx, 8)
+  expect(await listedIds(list)).toEqual([])
+
+  await store.store('project-a', 'seeded')
+  vi.setSystemTime(Date.now() + 2_000)
+  expect(await listedIds(list)).toEqual(['seeded'])
+})
+
 it('probes the store at most once a second and reads only unknown Session directories', async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   const ctx = await hostContext()

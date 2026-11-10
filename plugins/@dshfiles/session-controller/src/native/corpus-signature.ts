@@ -16,14 +16,21 @@ export const corpusRootOf = (persistence: unknown): string | undefined =>
     ? persistence.root
     : undefined
 
-/** The project directories under `root` with their modification times; `undefined` when the root cannot be read. */
+const isMissing = (error: unknown): boolean => error instanceof Error && 'code' in error && error.code === 'ENOENT'
+
+/**
+ * The project directories under `root` with their modification times. A root not created yet (a new home) has none;
+ * `undefined` when it cannot be read.
+ */
 export const readProjectStamps = async (root: string): Promise<ProjectStamps | undefined> => {
   try {
     const entries = await readdir(root, { withFileTypes: true })
     const projects = entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
-    return new Map(await Promise.all(projects.map(async name => [name, (await stat(join(root, name))).mtimeMs] as const)))
-  } catch {
-    return undefined
+    // A project removed between the two reads is simply absent.
+    const stamps = await Promise.all(projects.map(name => stat(join(root, name)).then(stats => [[name, stats.mtimeMs] as const], () => [])))
+    return new Map(stamps.flat())
+  } catch (error) {
+    return isMissing(error) ? new Map() : undefined
   }
 }
 
