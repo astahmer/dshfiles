@@ -19,7 +19,7 @@ const refTextSchema = Schema.String.check(
 )
 /** An item a caller names: its `b:<ref>` (`b:k3f9`, `k3f9`, a legacy `b:12` or `12`), or the number an older caller sends. */
 const itemKeySchema = Schema.Union([idSchema, refTextSchema]).annotate({
-  description: 'The item: its reference as written (`b:k3f9`, `k3f9`, or a legacy `b:12`), or its number.',
+  description: 'Item ref (`b:k3f9`, `k3f9`, legacy `b:12`) or number.',
 })
 /** The `b:<ref>` an item shows; a Host older than short aliases answers without it, and `BacklogReference.refOf` falls back to the id. */
 const refOutputSchema = Schema.optionalKey(Schema.String)
@@ -571,7 +571,7 @@ const renderClaim = (result: typeof detailResultSchema.Type): string =>
     ? `${renderItemPreview(result.value.item)}\n${result.value.lease === null ? 'No claim held.' : `Claimed by ${result.value.lease.holder} until ${new Date(result.value.lease.expiresAt).toISOString()}; any write by it renews the claim.`}`
     : 'No backlog item found.'
 
-const writeNote = 'Use it when the user asked, or to record and progress work this thread is doing; never to rewrite items unrelated to the task.'
+const writeNote = "Only for the user's request or this thread's own task."
 
 /** No default: a bare agent request cannot run a guarded write. */
 const confirmSchema = Schema.Boolean.pipe(Schema.optional).annotate({ description: AgentConfirmation.confirmDescription })
@@ -749,7 +749,7 @@ export const backlogApi = defineApi({
       }),
       output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true) }), Schema.Struct({ ok: Schema.Literal(false), reason: Schema.Literal('not-found') })]),
       description:
-        'Permanently delete a backlog item, its attachments and its remote-issue link (the remote issue itself stays). This cannot be undone; use it only when the user explicitly asked for deletion and pass confirm: true. Use it when the user asked, never to rewrite items unrelated to the task.',
+        'Permanently delete a backlog item, its attachments and its remote-issue link (the remote issue itself stays). This cannot be undone; use it only when the user explicitly asked for deletion and pass confirm: true.',
       tool: { name: 'backlog_delete', readOnly: false },
     }),
     speechStatus: method({
@@ -874,7 +874,7 @@ export const backlogApi = defineApi({
     claim: method({
       input: Schema.Struct({ id: itemKeySchema }),
       output: detailResultSchema,
-      description: `Claim one item for this thread before working on it: you become its delegate, it moves to \`doing\`, this thread is linked and a lease starts. Refused while another agent holds a live claim (the error names it) and for closed items. Any write you make to the item renews the lease; it ends after the idle time in Backlog settings, when this thread is archived or settled, when the item is done, or with backlog_release. ${writeNote}`,
+      description: `Claim one item before working on it: you become its delegate, it moves to \`doing\`, this thread is linked and a lease starts. Refused for closed items or another agent's live claim. Your writes renew the lease; it ends on idle timeout, archive/settle, done, or backlog_release. ${writeNote}`,
       tool: { name: 'backlog_claim', readOnly: false, render: renderClaim },
     }),
     release: method({
@@ -933,7 +933,7 @@ export const backlogApi = defineApi({
         }),
       }),
       output: Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1)), linked: Schema.Array(idSchema), missing: Schema.Array(itemKeySchema) }),
-      description: `Start one thread for these items: it runs in its own jj workspace of their project, is named after the first item, receives every selected item's full description, all current replies in order, and every item- and reply-level attachment, and links to every item. Missing or unreadable items/files and upload or prompt failures reject the start instead of silently omitting context. ${writeNote}`,
+      description: `Start one thread for these items in its own jj workspace of their project, named after the first item, given every item's description, replies and attachments, and linked to every item. Any missing item, file or upload rejects the start. ${writeNote}`,
       tool: { name: 'backlog_start_thread', readOnly: false },
     }),
     syncStatus: method({
@@ -960,7 +960,7 @@ export const backlogApi = defineApi({
         confirm: confirmSchema,
       }),
       output: Schema.Struct({ results: Schema.Array(syncResultSchema), passes: Schema.optionalKey(Schema.Array(syncPassSchema)) }),
-      description: `Sync linked backlog items with their remote items now: each binding's field map decides which fields flow which way (a field both sides changed is settled by the binding's conflict policy, with a conflict note on the item), and new comments are carried over once. Run only when the user asked. Without \`id\` it syncs every linked item or a whole binding, which an agent may run only with \`confirm: true\`. ${writeNote}`,
+      description: `Sync linked backlog items with their remote items now, per each binding's field map and conflict policy; new comments carry over once. Run only when the user asked. Without \`id\` it syncs every linked item or a whole binding, which an agent may run only with \`confirm: true\`.`,
       tool: { name: 'backlog_sync_now', readOnly: false, render: renderSyncResults },
     }),
     linkRemote: method({
@@ -985,7 +985,7 @@ export const backlogApi = defineApi({
         ),
       ),
       output: Schema.Struct({ item: Schema.NullOr(syncItemSchema), result: Schema.NullOr(syncResultSchema) }),
-      description: `Link one backlog item to a remote item through a binding (adopting its fields on the first sync, tags merged), create a new remote item from it, or unlink it with \`remove: true\`. An item may be linked through several bindings, one remote item each. The remote URL is added to the item's links. Run only when the user asked; it writes to the remote tracker. ${writeNote}`,
+      description: `Link one backlog item to a remote item through a binding (fields adopted on first sync, tags merged), create a new remote item from it, or unlink it with \`remove: true\`. One remote item per binding. Run only when the user asked; it writes to the remote tracker.`,
       tool: { name: 'backlog_link_remote', readOnly: false },
     }),
     syncSources: method({
@@ -1001,7 +1001,7 @@ export const backlogApi = defineApi({
         previousInstanceId: slugInputSchema.pipe(Schema.optional).annotate({ description: 'The id the connection had, to rename it; its bindings follow.' }),
       }),
       output: syncConnectionViewSchema,
-      description: `Add or change one sync connection (an account of a provider). The key is stored only as a secret:ALIAS reference. Run only when the user asked for this change. ${writeNote}`,
+      description: `Add or change one sync connection (an account of a provider). The key is stored only as a secret:ALIAS reference. Run only when the user asked for this change.`,
       tool: { name: 'backlog_sync_connection_save', readOnly: false },
     }),
     removeSyncConnection: method({
@@ -1020,7 +1020,7 @@ export const backlogApi = defineApi({
     saveSyncBinding: method({
       input: Schema.Struct({ binding: bindingInputSchema }),
       output: syncBindingViewSchema,
-      description: `Add or change one sync binding: which container of which connection syncs with which projects, in which direction, which fields (with value maps), under which conflict policy (lww, local-wins, remote-wins, flag), how often, and whether a pull imports new remote items. A new binding needs \`connectionId\`; fields left out of a change keep their value. Run only when the user asked for this change. ${writeNote}`,
+      description: `Add or change one sync binding: which container of which connection syncs with which projects, in which direction, which fields (with value maps), under which conflict policy (lww, local-wins, remote-wins, flag), how often, and whether a pull imports new remote items. A new binding needs \`connectionId\`; fields left out of a change keep their value. Run only when the user asked for this change.`,
       tool: { name: 'backlog_sync_binding_save', readOnly: false },
     }),
     removeSyncBinding: method({
@@ -1064,13 +1064,13 @@ export const backlogApi = defineApi({
           .annotate({ description: 'Project the new item belongs to; defaults to the binding’s project.' }),
       }),
       output: Schema.Struct({ detail: detailSchema, created: Schema.Boolean }),
-      description: `Import one existing remote item as a new backlog item linked to it, with its title, description, status, labels, priority and comments; a remote item already linked through that binding returns its item. Run only when the user asked. ${writeNote}`,
+      description: `Import one existing remote item as a new backlog item linked to it, with its title, description, status, labels, priority and comments; a remote item already linked through that binding returns its item. Run only when the user asked.`,
       tool: { name: 'backlog_import_remote', readOnly: false, render: output => renderItemPreview(output.detail.item) },
     }),
     importAllRemote: method({
       input: Schema.Struct({ binding: slugInputSchema, confirm: confirmSchema }),
       output: syncPassSchema,
-      description: `Import every open remote item of a binding that no backlog item mirrors yet, idempotently (already linked ones only sync). Comments come on each item's next sync. Run only when the user asked; an agent must pass \`confirm: true\`. ${writeNote}`,
+      description: `Import every open remote item of a binding that no backlog item mirrors yet, idempotently (already linked ones only sync). Comments come on each item's next sync. Run only when the user asked; an agent must pass \`confirm: true\`.`,
       tool: { name: 'backlog_sync_import_all', readOnly: false, render: renderSyncPass },
     }),
     acknowledge: method({
@@ -1096,7 +1096,7 @@ export const backlogApi = defineApi({
         confirm: confirmSchema,
       }),
       output: backfillOutputSchema,
-      description: `Start a background triage backfill for inbox/todo tasks only (Jev and the configured cheap model). Returns a job id immediately; check backlog_triage_backfill_status to follow progress. A confident answer applies; a hesitant one waits on the item as a suggestion. Run only when the user asked: an agent run over more than ${String(AgentConfirmation.bulkLimit)} items (the default is ${String(BacklogBackfill.defaultLimit)}) needs \`confirm: true\`. ${writeNote}`,
+      description: `Start a background triage backfill for inbox/todo tasks only (Jev and the configured cheap model). Returns a job id immediately; check backlog_triage_backfill_status to follow progress. A confident answer applies; a hesitant one waits on the item as a suggestion. Run only when the user asked: an agent run over more than ${String(AgentConfirmation.bulkLimit)} items (the default is ${String(BacklogBackfill.defaultLimit)}) needs \`confirm: true\`.`,
       tool: { name: 'backlog_triage_backfill', readOnly: false },
     }),
     backfillTriageStatus: method({
