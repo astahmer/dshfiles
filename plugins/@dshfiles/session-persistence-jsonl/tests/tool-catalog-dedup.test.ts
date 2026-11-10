@@ -1,4 +1,5 @@
-import { stat, readFile, mkdtemp, rm } from 'node:fs/promises'
+import { appendFile, stat, readFile, mkdtemp, rm } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -13,7 +14,7 @@ import * as ForkedJsonl from '../src/host.ts'
 import { logPath, TOOL_CATALOG_REFERENCE } from '../src/native/format.ts'
 import { verifyJsonlCurrentGeneration } from '../src/native/generation.ts'
 import type { JsonlCompression } from '../src/native/format.ts'
-import { decompressZstdFrame, scanZstdFrames } from '../src/native/zstd.ts'
+import { compressZstdFrame, decompressZstdFrame, scanZstdFrames } from '../src/native/zstd.ts'
 
 /** One assembled tool catalog, at the size the 455-tool web preset produces. */
 const TOOL_COUNT = 455
@@ -127,6 +128,12 @@ const readSession = async (persistence: SessionPersistence, id: string): Promise
 }
 
 const diskText = async (path: string): Promise<string> => readFile(path, 'utf8')
+
+const zstdText = async (path: string): Promise<string> => {
+  const bytes = await readFile(path)
+  const frames = scanZstdFrames(bytes).frames
+  return Buffer.concat(await Promise.all(frames.map(frame => decompressZstdFrame(bytes.subarray(frame.start, frame.end))))).toString('utf8')
+}
 
 const fullCatalogRows = (text: string): number => text.split('"tools":[').length - 1
 const catalogReferences = (text: string): number => text.split(`{"${TOOL_CATALOG_REFERENCE}":`).length - 1
@@ -256,8 +263,7 @@ describe('request-header tool catalog dedupe', () => {
     const fork = await mount(ForkedJsonl, forkRoot, 'zstd')
     const first = await writeSeries(fork.persistence, 'session-fork-zstd', tools, 2)
     await first.close()
-    // A reopened writer does not know the previous process's catalogs, so it pays one full catalog and
-    // references its own later series — never a reference to bytes it did not write.
+    // A resumed Session (Host restart) reopens the writer: it resumes from the catalogs the artifact holds.
     await fork.dispose()
     const reopened = await mount(ForkedJsonl, forkRoot, 'zstd')
     const second = await writeSeries(reopened.persistence, 'session-fork-zstd', tools, 2, 3, true)
@@ -272,16 +278,15 @@ describe('request-header tool catalog dedupe', () => {
     expect(toolsOf(forkRead)).toHaveLength(TOOL_COUNT)
     expect(forkRead).toHaveLength(12)
 
-    // Two writer processes wrote this artifact: one full catalog each, one reference each.
-    const bytes = await readFile(forkPath)
-    const frames = scanZstdFrames(bytes).frames
-    const plaintext = Buffer.concat(await Promise.all(frames.map(frame => decompressZstdFrame(bytes.subarray(frame.start, frame.end))))).toString('utf8')
-    expect(fullCatalogRows(plaintext)).toBe(2)
-    expect(catalogReferences(plaintext)).toBe(2)
+    // Two writer processes wrote this artifact; the catalog is on disk once.
+    const plaintext = await zstdText(forkPath)
+    expect(fullCatalogRows(plaintext)).toBe(1)
+    expect(catalogReferences(plaintext)).toBe(3)
 
     console.info(
       JSON.stringify({
         container: 'zstd',
+        reopened: true,
         series: 4,
         catalogBytes: JSON.stringify(tools).length,
         stockBytes,
@@ -292,5 +297,53 @@ describe('request-header tool catalog dedupe', () => {
         catalogReferences: catalogReferences(plaintext),
       }),
     )
+  })
+
+  it('writes no reference into a pre-fork log it resumes, so a pre-fork harness still reads it', async () => {
+    const tools = catalog()
+    const root = await makeRoot()
+    const stock = await mount(StockJsonl, root, 'none')
+    await (await writeSeries(stock.persistence, 'session-legacy-resume', tools, 2)).close()
+    await stock.dispose()
+
+    const fork = await mount(ForkedJsonl, root, 'none')
+    await (await writeSeries(fork.persistence, 'session-legacy-resume', tools, 2, 3, true)).close()
+    await fork.dispose()
+
+    const text = await diskText(artifactPath(root, 'session-legacy-resume', 'none'))
+    expect(catalogReferences(text)).toBe(0)
+    expect(fullCatalogRows(text)).toBe(4)
+    const stockAgain = await mount(StockJsonl, root, 'none')
+    expect(toolsOf(await readSession(stockAgain.persistence, 'session-legacy-resume'))).toHaveLength(TOOL_COUNT)
+    await stockAgain.dispose()
+  })
+
+  it('never references a catalog that only a torn final frame held', async () => {
+    const tools = catalog()
+    const root = await makeRoot()
+    const fork = await mount(ForkedJsonl, root, 'zstd')
+    const id = 'session-torn'
+    await (await writeSeries(fork.persistence, id, tools.slice(0, 10), 1)).close()
+    await fork.dispose()
+
+    // A crash mid-append leaves a final frame whose complete records hold a new catalog: the write path
+    // truncates that frame and rewrites the records, so the rewrite must carry the catalog in full.
+    const path = artifactPath(root, id, 'zstd')
+    const recovered = seriesBatch(tools, 2, 3).map(event => JSON.stringify(event)).join('\n') + '\n'
+    const frame = await compressZstdFrame(recovered + randomBytes(262_144).toString('base64'))
+    await appendFile(path, frame.subarray(0, frame.length - 8))
+
+    const reopened = await mount(ForkedJsonl, root, 'zstd')
+    const resumed = await reopened.persistence.open(SessionId(id), 'write')
+    await resumed.append(seriesBatch(tools, 3, 6))
+    await resumed.close()
+    const read = await readSession(reopened.persistence, id)
+    await reopened.dispose()
+
+    expect(read).toHaveLength(9)
+    expect(toolsOf(read)).toHaveLength(TOOL_COUNT)
+    const text = await zstdText(path)
+    expect(fullCatalogRows(text)).toBe(2)
+    expect(catalogReferences(text)).toBe(1)
   })
 })

@@ -73,6 +73,26 @@ export class ToolCatalogCatalogs {
 const isJsonObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
+/** The full catalog a parsed `request/header` row holds, or `undefined` for any other row or a reference. */
+const heldToolCatalog = (row: unknown): readonly unknown[] | undefined => {
+  if (!isJsonObject(row) || row['type'] !== 'request/header') return undefined
+  const data = row['data']
+  if (!isJsonObject(data)) return undefined
+  const header = data['header']
+  if (!isJsonObject(header)) return undefined
+  const tools = header['tools']
+  return Array.isArray(tools) ? tools : undefined
+}
+
+/**
+ * The catalogs one artifact's committed rows hold in full, and whether its header line carries the dedupe marker.
+ * A reopened writer resumes from it, so a resumed Session references the catalog already on disk.
+ */
+export interface ToolCatalogSeed {
+  readonly marked: boolean
+  readonly catalogs: readonly (readonly unknown[])[]
+}
+
 /** The digest a row's `tools` slot references, or `undefined` when it holds a real catalog. */
 const toolCatalogReference = (value: unknown): string | undefined => {
   if (!isJsonObject(value)) return undefined
@@ -139,7 +159,18 @@ export function rehydrateToolCatalog(row: unknown, catalogs: ToolCatalogCatalogs
  */
 export class ToolCatalogWriter {
   private readonly committed = new Set<string>()
+  private unindexed: readonly (readonly unknown[])[]
+  private readonly enabled: boolean
   private staged: string[] | undefined
+
+  /**
+   * @param seed - the catalogs the artifact already holds in full. An artifact without the marker gets no
+   *   references: a harness without this fork would read it.
+   */
+  constructor(seed: ToolCatalogSeed = { marked: true, catalogs: [] }) {
+    this.enabled = seed.marked
+    this.unindexed = seed.catalogs
+  }
 
   /** Start staging one batch of rows. */
   begin(): void {
@@ -163,6 +194,11 @@ export class ToolCatalogWriter {
    * @returns `true` when this artifact already holds that catalog.
    */
   claim(key: string): boolean {
+    if (!this.enabled) return false
+    if (this.unindexed.length > 0) {
+      for (const tools of this.unindexed) this.committed.add(toolCatalogKey(tools))
+      this.unindexed = []
+    }
     if (this.committed.has(key) || this.staged?.includes(key) === true) return true
     this.staged?.push(key)
     return false
@@ -491,6 +527,7 @@ interface SessionLogScan {
   inheritedEventCount: SessionLogOffsetType
   events: SessionEvent[]
   committedBytes: number
+  toolCatalogs: ToolCatalogSeed
 }
 
 /**
@@ -509,7 +546,11 @@ function refuseForeignFormatVersion(parsed: object): void {
 }
 
 /** Parse one complete header record supplied independently from event rows. */
-function parseHeaderRecord(record: Buffer): { readonly meta: SessionHeader; readonly restore: SessionFormatRestore } {
+function parseHeaderRecord(record: Buffer): {
+  readonly meta: SessionHeader
+  readonly restore: SessionFormatRestore
+  readonly marked: boolean
+} {
   if (record.length === 0 || record.at(-1) !== 0x0A || record.indexOf(0x0A) !== record.length - 1) {
     throw new Error('empty or header-less session log')
   }
@@ -537,7 +578,7 @@ function parseHeaderRecord(record: Buffer): { readonly meta: SessionHeader; read
     /* v8 ignore next -- isHeaderLine matches the current codec; this preserves classification if it tightens. */
     throw new Error('corrupt session log: first line is not a session header')
   }
-  return { meta: fromHeaderLine(parsed).meta, restore }
+  return { meta: fromHeaderLine(parsed).meta, restore, marked: Object.hasOwn(parsed, TOOL_CATALOG_MARKER) }
 }
 
 /**
@@ -558,6 +599,8 @@ export class SessionLogScanner {
   private issue: Error | undefined
   private finished = false
   private readonly toolCatalogs = new ToolCatalogCatalogs()
+  private readonly marked: boolean
+  private readonly committedCatalogs: (readonly unknown[])[] = []
 
   /**
    * Create an event scanner from exactly one newline-terminated header record.
@@ -570,6 +613,7 @@ export class SessionLogScanner {
     const parsed = parseHeaderRecord(headerRecord)
     this.meta = parsed.meta
     this.restore = parsed.restore
+    this.marked = parsed.marked
     this.inputBytes = headerRecord.length
     this.committedBytes = headerRecord.length
   }
@@ -635,7 +679,17 @@ export class SessionLogScanner {
       inheritedEventCount: SessionLogOffset(artifact.inheritedEventCount),
       events: artifact.events as unknown as SessionEvent[],
       committedBytes: this.committedBytes,
+      toolCatalogs: this.committedToolCatalogs(),
     }
+  }
+
+  /**
+   * The full catalogs of the rows committed so far. Read it before a torn frame's recovered rows: the write
+   * path truncates and rewrites those, so their catalogs are not on disk for a later reference.
+   * @returns the marker state and the catalogs, in file order.
+   */
+  committedToolCatalogs(): ToolCatalogSeed {
+    return { marked: this.marked, catalogs: [...this.committedCatalogs] }
   }
 
   /** Decode one complete event row and update the contiguous prefix. */
@@ -651,6 +705,7 @@ export class SessionLogScanner {
       return
     }
 
+    const catalog = heldToolCatalog(decoded)
     try {
       decoded = rehydrateToolCatalog(decoded, this.toolCatalogs)
     } catch (error: unknown) {
@@ -693,6 +748,7 @@ export class SessionLogScanner {
     }
     this.eventCount += 1
     this.committedBytes = endByte
+    if (catalog !== undefined) this.committedCatalogs.push(catalog)
   }
 }
 

@@ -39,7 +39,7 @@ import type { SessionEvent, SessionId, SessionHeader, SessionLogOffset as Sessio
 import {
   assertNoRetiredHeaderFields, encodeSegment, eventLines, generationLogFilename, generationLogPath, logPath, logSuffix,
   markToolCatalogHeaderLine, parseGenerationLogFilename, projectDir, scanLog, sessionDir, SessionLogScanner,
-  stripToolCatalogMarker, toHeaderLine, ToolCatalogWriter,
+  stripToolCatalogMarker, toHeaderLine, ToolCatalogWriter, type ToolCatalogSeed,
   type JsonlCompression,
 } from './format.ts'
 import {
@@ -194,6 +194,8 @@ interface StoredLogBase extends FrozenStoredEvents {
 /** A decoded current generation that is already durable. */
 interface CurrentStoredLog extends StoredLogBase {
   readonly status: 'current'
+  /** Catalogs the artifact's committed bytes hold in full; absent after a migration publish. */
+  readonly toolCatalogs?: ToolCatalogSeed
 }
 
 /** A migrated historical generation retained until an explicit write open publishes it. */
@@ -520,6 +522,7 @@ class JsonlSessionPersistence extends SessionPersistence {
         stored = prepared
       }
       options?.signal?.throwIfAborted()
+      if (stored.toolCatalogs !== undefined) this.toolCatalogWriters.set(id, new ToolCatalogWriter(stored.toolCatalogs))
       return this.tracker.adopt(new JsonlSessionHandle(this, id, stored.meta, 'write', {
         cursor: stored.events.length,
         materialized: true,
@@ -882,13 +885,14 @@ class JsonlSessionPersistence extends SessionPersistence {
       events: SessionEvent[]
       tornTruncateTo: number | undefined
       recoveredTail: SessionEvent[]
+      toolCatalogs: ToolCatalogSeed
     }
     try {
       if (this.compression === 'zstd') {
         parsed = await this.readZstdPrefix(buffer, signal)
       } else {
         signal?.throwIfAborted()
-        const { meta, inheritedEventCount, events, committedBytes } = scanLog(buffer)
+        const { meta, inheritedEventCount, events, committedBytes, toolCatalogs } = scanLog(buffer)
         signal?.throwIfAborted()
         parsed = {
           meta,
@@ -898,6 +902,7 @@ class JsonlSessionPersistence extends SessionPersistence {
           // A torn raw tail is one incomplete JSONL line; it holds no complete
           // record to recover.
           recoveredTail: [],
+          toolCatalogs,
         }
       }
     } catch (error: unknown) {
@@ -1048,6 +1053,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     events: SessionEvent[]
     tornTruncateTo: number | undefined
     recoveredTail: SessionEvent[]
+    toolCatalogs: ToolCatalogSeed
   }> {
     signal?.throwIfAborted()
     const { frames, tornStart } = scanZstdFrames(buffer)
@@ -1090,6 +1096,7 @@ class JsonlSessionPersistence extends SessionPersistence {
           events: prefix.events,
           tornTruncateTo: undefined,
           recoveredTail: [],
+          toolCatalogs: prefix.toolCatalogs,
         }
       }
       // A torn final frame's append never resolved, but complete JSONL records
@@ -1106,6 +1113,7 @@ class JsonlSessionPersistence extends SessionPersistence {
         // can emit any plaintext; the complete prior frames remain recoverable.
       }
       signal?.throwIfAborted()
+      const toolCatalogs = scanner.committedToolCatalogs()
       scanner.write(recoveredPlaintext)
       const prefix = scanner.finish()
       return {
@@ -1114,6 +1122,7 @@ class JsonlSessionPersistence extends SessionPersistence {
         events: prefix.events,
         tornTruncateTo: tornStart,
         recoveredTail: prefix.events.slice(complete.eventCount),
+        toolCatalogs,
       }
     } catch (error) {
       /* v8 ignore next -- decoder failure plus concurrent abort is timing-dependent */
