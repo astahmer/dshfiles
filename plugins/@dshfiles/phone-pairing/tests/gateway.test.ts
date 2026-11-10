@@ -4,6 +4,7 @@ import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { JsonValue } from '@dshfiles/dshx/json'
 import { describe, expect, it, vi } from 'vitest'
 import { createPairingGateway, mintNativeCookie, type GatewayOptions } from '../src/gateway.ts'
 import { createPairingStore } from '../src/store.ts'
@@ -16,7 +17,7 @@ const listen = async (server: http.Server): Promise<number> => {
   return address.port
 }
 
-const post = (port: number, path: string, body: unknown, cookie?: string) =>
+const post = (port: number, path: string, body: JsonValue, cookie?: string) =>
   new Promise<{ status: number; cookie?: string }>((resolve, reject) => {
     const request = http.request(
       { hostname: '127.0.0.1', port, path, method: 'POST', headers: cookie ? { 'content-type': 'application/json', cookie } : { 'content-type': 'application/json' } },

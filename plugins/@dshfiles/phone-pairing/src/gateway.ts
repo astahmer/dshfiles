@@ -1,6 +1,6 @@
 import http from 'node:http'
 import type { Duplex } from 'node:stream'
-import { decodeJson, type JsonValue, jsonValueSchema } from '@dshfiles/dshx/json'
+import { decodeJson, type JsonObject, type JsonValue, jsonValueSchema } from '@dshfiles/dshx/json'
 
 const COOKIE = '__Host-dsh_phone'
 
@@ -125,13 +125,16 @@ export const createPairingGateway = (options: GatewayOptions) => {
     return length === undefined || Number(length) <= 1024
   }
 
+  const isJsonObject = (value: JsonValue): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
+
   const readBody = async (request: http.IncomingMessage): Promise<JsonValue> => {
     const chunks: Buffer[] = []
     let size = 0
     for await (const chunk of request) {
-      size += (chunk as Buffer).byteLength
+      if (!Buffer.isBuffer(chunk)) throw new Error('body is not binary')
+      size += chunk.byteLength
       if (size > 1024) throw new Error('body too large')
-      chunks.push(chunk as Buffer)
+      chunks.push(chunk)
     }
     return decodeJson(jsonValueSchema, Buffer.concat(chunks).toString('utf8'))
   }
@@ -178,10 +181,16 @@ export const createPairingGateway = (options: GatewayOptions) => {
       if (request.method !== 'POST' || !limited(request)) return respond(response, 405)
       void readBody(request)
         .then(async body => {
-          if (typeof body !== 'object' || body === null) return respond(response, 400)
+          if (!isJsonObject(body)) return respond(response, 400)
           const fields = Object.keys(body).sort().join(',')
-          if (fields !== 'code' && fields !== 'id,secret') return respond(response, 400)
-          const input = body as { id?: string; secret?: string; code?: string }
+          const { id, secret, code } = body
+          const input =
+            fields === 'code' && typeof code === 'string'
+              ? { code }
+              : fields === 'id,secret' && typeof id === 'string' && typeof secret === 'string'
+                ? { id, secret }
+                : undefined
+          if (input === undefined) return respond(response, 400)
           const paired = await options.store.redeem(input)
           if (paired === undefined) return respond(response, 403)
           const maxAge = 365 * 24 * 3600

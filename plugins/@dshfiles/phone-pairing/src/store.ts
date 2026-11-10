@@ -86,8 +86,8 @@ export const createPairingStore = async (options: PairingStoreOptions) => {
       if (typeof parsed !== 'object' || parsed === null || !('version' in parsed) || parsed.version !== 1) throw new Error('Invalid pairing state')
       if (!('devices' in parsed) || !Array.isArray(parsed.devices)) throw new Error('Invalid pairing state')
       return parsed.devices.map(entry => {
-        if (typeof entry !== 'object' || entry === null) throw new Error('Invalid pairing state')
-        const { id, name, tokenDigest, createdAt, expiresAt, lastUsedAt } = entry as Record<string, unknown>
+        if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) throw new Error('Invalid pairing state')
+        const { id, name, tokenDigest, createdAt, expiresAt, lastUsedAt } = entry
         if (
           typeof id !== 'string' ||
           typeof name !== 'string' ||
