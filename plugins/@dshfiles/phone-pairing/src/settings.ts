@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 
 export type Provider = 'tailscale-funnel' | 'tailscale-serve' | 'cloudflared' | 'manual'
 
@@ -22,7 +23,7 @@ export class PhoneAccessSettings {
   static async load(path: string): Promise<{ settings: PhoneSettings; store: PhoneAccessSettings }> {
     let settings = DEFAULT
     try {
-      const parsed: unknown = JSON.parse(await readFile(path, 'utf8'))
+      const parsed = decodeJson(jsonValueSchema, await readFile(path, 'utf8'))
       if (
         typeof parsed === 'object' &&
         parsed !== null &&

@@ -1,5 +1,6 @@
 import http from 'node:http'
 import type { Duplex } from 'node:stream'
+import { decodeJson, type JsonValue, jsonValueSchema } from '@dshfiles/dshx/json'
 
 const COOKIE = '__Host-dsh_phone'
 
@@ -124,7 +125,7 @@ export const createPairingGateway = (options: GatewayOptions) => {
     return length === undefined || Number(length) <= 1024
   }
 
-  const readBody = async (request: http.IncomingMessage): Promise<unknown> => {
+  const readBody = async (request: http.IncomingMessage): Promise<JsonValue> => {
     const chunks: Buffer[] = []
     let size = 0
     for await (const chunk of request) {
@@ -132,7 +133,7 @@ export const createPairingGateway = (options: GatewayOptions) => {
       if (size > 1024) throw new Error('body too large')
       chunks.push(chunk as Buffer)
     }
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    return decodeJson(jsonValueSchema, Buffer.concat(chunks).toString('utf8'))
   }
 
   const respond = (response: http.ServerResponse, status: number, headers: http.OutgoingHttpHeaders = {}): void => {

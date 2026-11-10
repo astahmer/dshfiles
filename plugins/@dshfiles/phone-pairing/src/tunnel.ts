@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import type { Provider } from './providers.ts'
 
@@ -26,7 +27,7 @@ const has = (command: string): Promise<boolean> =>
 
 const tailnetNameOf = (raw: string): string | undefined => {
   try {
-    const status: unknown = JSON.parse(raw)
+    const status = decodeJson(jsonValueSchema, raw)
     if (typeof status !== 'object' || status === null || !('Self' in status)) return undefined
     const self = status.Self
     if (typeof self !== 'object' || self === null || !('DNSName' in self)) return undefined

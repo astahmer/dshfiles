@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { withSpan } from '@dshfiles/dshx/tracing'
 
 const TAILSCALE_TIMEOUT_MS = 3_000
@@ -7,7 +8,7 @@ const TAILSCALE_TIMEOUT_MS = 3_000
 export class Tailnet {
   /** The tailnet DNS name Tailscale reports for this machine, or undefined when it is not running. */
   static parseName(raw: string): string | undefined {
-    const status: unknown = JSON.parse(raw)
+    const status = decodeJson(jsonValueSchema, raw)
     if (typeof status !== 'object' || status === null || !('Self' in status)) return undefined
     const self = status.Self
     if (typeof self !== 'object' || self === null || !('DNSName' in self)) return undefined

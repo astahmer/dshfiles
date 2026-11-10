@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
 const CODE_PATTERN = /^\d{6}$/
@@ -81,7 +82,7 @@ export const createPairingStore = async (options: PairingStoreOptions) => {
   const readDevices = async (): Promise<DeviceRecord[]> => {
     const { readFile } = await import('node:fs/promises')
     try {
-      const parsed: unknown = JSON.parse(await readFile(options.path, 'utf8'))
+      const parsed = decodeJson(jsonValueSchema, await readFile(options.path, 'utf8'))
       if (typeof parsed !== 'object' || parsed === null || !('version' in parsed) || parsed.version !== 1) throw new Error('Invalid pairing state')
       if (!('devices' in parsed) || !Array.isArray(parsed.devices)) throw new Error('Invalid pairing state')
       return parsed.devices.map(entry => {
