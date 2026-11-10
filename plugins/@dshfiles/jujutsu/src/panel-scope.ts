@@ -63,6 +63,10 @@ const scopeMemory = new Map<string, Map<string, unknown>>()
 
 /** The window events, persistence and defaults behind one scope per tab, thread and dock. */
 export class PanelScopes {
+  static dock(panelId: string): string {
+    return panelId === 'dshfiles-jujutsu.dock' ? DOCK_PANEL_SCOPE : `${DOCK_PANEL_SCOPE}:${panelId}`
+  }
+
   static thread(sessionId: string): string {
     return `${THREAD_SCOPE_PREFIX}${sessionId}`
   }

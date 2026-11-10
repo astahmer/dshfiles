@@ -30,7 +30,7 @@ import { sessionProjectPath } from './session-project-path.js'
 import { JujutsuPanel } from './client.js'
 import type {} from '@dshfiles/rich-composer/conversation-contract'
 import { ComposerChangesBar, ComposerLocation, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
-import { DEFAULT_PANEL_SCOPE, DOCK_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
+import { DEFAULT_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { SurfaceVisibility } from './surface-visibility.js'
@@ -193,10 +193,10 @@ export default defineClient({
       return panel({ surface: 'side-panel', scope: target.scope, sessionId: target.sessionId, defaultPath: target.defaultPath, visible })
     })
     const DockSurfacePanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: DOCK_PANEL_SCOPE, visible: props.visible, view: 'graph' }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'graph' }),
     )
     const DockSourceControlPanel = decorate((props: WorkbenchPanelProps) =>
-      panel({ surface: 'dock', scope: DOCK_PANEL_SCOPE, visible: props.visible, view: 'source' }),
+      panel({ surface: 'dock', scope: PanelScopes.dock(props.panelId), visible: props.visible, view: 'source' }),
     )
     const ScopedWorkbenchPanel = decorate((props: WorkbenchPanelProps & { readonly scope: string }) =>
       panel({ surface: 'main', scope: props.scope, visible: props.visible, view: 'graph' }),
