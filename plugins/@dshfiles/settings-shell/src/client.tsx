@@ -30,6 +30,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import type * as Types from 'effect/Types'
 import type { ConfigForm, SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 
@@ -56,7 +57,7 @@ import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settin
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
-import { createSettingsHubRouter, createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, settingsWorkbenchPanelId } from './workbench-panels.js'
+import { createSettingsHubRouter, createSettingsWorkbenchHub, registerSettingsWorkbenchPanels, settingsWorkbenchPanelId, type SettingsOpenRequest } from './workbench-panels.js'
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
@@ -548,12 +549,11 @@ export default defineClient({
               router: hubRouter,
               initial: () => {
                 const state = actor.getSnapshot().context
-                return {
-                  ...(state.sectionId === undefined ? {} : { sectionId: state.sectionId }),
-                  ...(state.field === undefined ? {} : { field: state.field }),
-                  ...(state.target === undefined ? {} : { target: state.target }),
-                  query: state.query,
-                }
+                const request: Types.Mutable<SettingsOpenRequest> = { query: state.query }
+                if (state.sectionId !== undefined) request.sectionId = state.sectionId
+                if (state.field !== undefined) request.field = state.field
+                if (state.target !== undefined) request.target = state.target
+                return request
               },
               closeSettings: deps.closeSettings,
               view: input =>
