@@ -18,6 +18,7 @@ export default defineConfig({
     'entity-registry': 'src/entity-registry.ts',
     'entity-reference': 'src/entity-reference.tsx',
     'image-attachment-contract': 'src/image-attachment-contract.ts',
+    types: 'src/types.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },
 })

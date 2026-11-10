@@ -95,7 +95,7 @@ export interface RestoredDraftReference extends ReferenceInsert {
 
 /** Trigger hit used to open one source programmatically. */
 export interface InputTriggerHit {
-  readonly trigger: '/' | '@'
+  readonly trigger: '/' | '@' | '#'
   readonly query: string
   readonly quoted: boolean
   readonly position: 'leading' | 'inline'
@@ -105,7 +105,7 @@ export interface InputTriggerHit {
 /** Structural per-Session trigger provider consumed by the input shell. */
 export interface InputTriggerController {
   readonly launcher: ObservableSnapshot<string | null>
-  readonly lexicon: ObservableSnapshot<ReadonlyMap<'/' | '@', readonly string[]>>
+  readonly lexicon: ObservableSnapshot<ReadonlyMap<'/' | '@' | '#', readonly string[]>>
   /** @param draft - current draft. @param caret - caret offset. @param guard - availability tier. @param draftRev - input revision. */
   track(
     draft: string,

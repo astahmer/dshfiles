@@ -77,7 +77,7 @@ export class TextRefNode extends TextNode {
  */
 export function registerTextRefDecoration(
   editor: LexicalEditor,
-  lexiconOf: () => ReadonlyMap<'/' | '@', readonly string[]>,
+  lexiconOf: () => ReadonlyMap<'/' | '@' | '#', readonly string[]>,
 ): () => void {
   const getMatch = (text: string): { start: number; end: number } | null => {
     const range = scanTextRefs(text, lexiconOf())[0]

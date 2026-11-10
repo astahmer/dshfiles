@@ -41,7 +41,7 @@ const SLASH_TOKEN_END_RE = /^(?:\s|$)/
  * @returns matched ranges in draft order.
  */
 export function scanTextRefs(
-  draft: string, lexicon: ReadonlyMap<'/' | '@', readonly string[]>,
+  draft: string, lexicon: ReadonlyMap<'/' | '@' | '#', readonly string[]>,
 ): TextRefRange[] {
   if (draft === '') return []
   const out: TextRefRange[] = []

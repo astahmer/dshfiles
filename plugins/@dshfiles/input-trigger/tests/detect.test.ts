@@ -67,6 +67,15 @@ describe('shared input trigger detection', () => {
     expect(detect('Contact user@example.com')).toBeNull()
   })
 
+  it('detects a hash reference at the caret without matching URL fragments', () => {
+    expect(detect('Review #123')).toMatchObject({
+      trigger: '#', query: '123', position: 'inline', span: { start: 7, end: 11 },
+    })
+    expect(detect('#123 later', 2)).toMatchObject({ trigger: '#', query: '123', span: { start: 0, end: 4 } })
+    expect(detect('https://example.com/path#anchor')).toBeNull()
+    expect(detect('#123', 4, { tier: 'frozen' })).toBeNull()
+  })
+
   it('preserves slash-command detection and guard behavior', () => {
     expect(detect('/deploy')).toMatchObject({ trigger: '/', query: 'deploy', quoted: false })
     expect(detect('/deploy', '/deploy'.length, { tier: 'claimed' })).toBeNull()

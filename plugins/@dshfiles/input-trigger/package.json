@@ -31,6 +31,10 @@
       "types": "./src/image-attachment-contract.ts",
       "default": "./dist/image-attachment-contract.js"
     },
+    "./types": {
+      "types": "./src/types.ts",
+      "default": "./dist/types.js"
+    },
     "./entity-registry": {
       "types": "./src/entity-registry.ts",
       "default": "./dist/entity-registry.js"

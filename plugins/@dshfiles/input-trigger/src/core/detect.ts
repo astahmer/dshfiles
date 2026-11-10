@@ -71,6 +71,16 @@ export const detectTrigger: DetectTrigger = (draft, caret, guard) => {
       span: { start: token.start, end: token.end, draftRev: 0 },
     }
   }
+  const hashToken = prefixedTokenAt({ text: draft, caret, prefix: '#' })
+  if (hashToken !== null) {
+    return {
+      trigger: '#',
+      query: hashToken.query,
+      quoted: false,
+      position: draft.search(/\S/) === hashToken.start ? 'leading' : 'inline',
+      span: { start: hashToken.start, end: hashToken.end, draftRev: 0 },
+    }
+  }
   for (let i = caret - 1; i >= 0; i--) {
     const ch = draft.charAt(i)
     if (WHITESPACE.test(ch)) return null
