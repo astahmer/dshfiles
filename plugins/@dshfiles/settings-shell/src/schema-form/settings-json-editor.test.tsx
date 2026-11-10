@@ -1,5 +1,6 @@
 import Schemastery from '@deepseek-ai/schemastery'
 import type { ConfigForm, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import { decodeJson } from '@dshfiles/dshx/json'
 import type { SettingsPathOpView } from '@deepseek-ai/dsh-settings/types'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
@@ -133,12 +134,12 @@ describe('SettingsJsonEditor', () => {
   it('saves only the changed fields, fenced by the revision the draft started from, then follows the store', async () => {
     const store = createForm({ user: { dense: true }, revision: 3 })
     await render(store.form)
-    expect(JSON.parse(editor().value)).toEqual({ dense: true })
+    expect(decodeJson(jsonValueSchema, editor().value)).toEqual({ dense: true })
     await type('{ "dense": true, "maxTabs": 30 }')
     expect(container.textContent).toContain('json.unsaved')
     await click('json.save')
     expect(store.calls).toEqual([{ ops: [{ op: 'set', path: ['maxTabs'], value: 30 }], expectedRevision: 3 }])
-    expect(JSON.parse(editor().value)).toEqual({ dense: true, maxTabs: 30 })
+    expect(decodeJson(jsonValueSchema, editor().value)).toEqual({ dense: true, maxTabs: 30 })
     expect(container.textContent).not.toContain('json.unsaved')
   })
 
@@ -149,10 +150,10 @@ describe('SettingsJsonEditor', () => {
     await act(async () => store.changeElsewhere({ dense: false }))
     expect(container.textContent).toContain('json.conflict')
     expect(button('json.save').disabled).toBe(true)
-    expect(JSON.parse(editor().value)).toEqual({ dense: true, maxTabs: 30 })
+    expect(decodeJson(jsonValueSchema, editor().value)).toEqual({ dense: true, maxTabs: 30 })
     await click('json.saveOver')
     expect(store.calls.at(-1)).toEqual({ ops: [{ op: 'set', path: ['maxTabs'], value: 30 }], expectedRevision: 4 })
-    expect(JSON.parse(editor().value)).toEqual({ dense: false, maxTabs: 30 })
+    expect(decodeJson(jsonValueSchema, editor().value)).toEqual({ dense: false, maxTabs: 30 })
   })
 
   it('drops the draft for the latest values on request', async () => {
@@ -161,7 +162,7 @@ describe('SettingsJsonEditor', () => {
     await type('{ "maxTabs": 30 }')
     await act(async () => store.changeElsewhere({ dense: true }))
     await click('json.reload')
-    expect(JSON.parse(editor().value)).toEqual({ dense: true })
+    expect(decodeJson(jsonValueSchema, editor().value)).toEqual({ dense: true })
     expect(store.calls).toEqual([])
   })
 
@@ -172,11 +173,11 @@ describe('SettingsJsonEditor', () => {
     store.refuseOnce()
     await click('json.save')
     expect(container.textContent).toContain('json.refused')
-    expect(JSON.parse(editor().value)).toEqual({ maxTabs: 30 })
+    expect(decodeJson(jsonValueSchema, editor().value)).toEqual({ maxTabs: 30 })
     await type('{ "maxTabs": "many", "typo": 1 }')
     expect([...container.querySelectorAll('[data-diagnostic]')].map(item => item.getAttribute('data-diagnostic'))).toEqual(['type', 'unknown-key'])
     expect(button('json.save').disabled).toBe(true)
     await click('json.discard')
-    expect(JSON.parse(editor().value)).toEqual({})
+    expect(decodeJson(jsonValueSchema, editor().value)).toEqual({})
   })
 })
