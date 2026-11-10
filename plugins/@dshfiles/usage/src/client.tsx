@@ -108,6 +108,14 @@ export default defineClient({
       // SAFETY: Only ids registered as main panels reach this (the Usage page here, Traces by @dshfiles/traces).
       if (ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)) ctx.layout.selectPanel(id as MainPanelId)
     }
+    /** Show a main panel where it actually lives: a Workbench occurrence first, the native panel otherwise. */
+    const reveal = (id: string): void => {
+      void WorkbenchMainNavigation.open(id)
+        .then(result => {
+          if (result.kind === 'native') openPanel(id)
+        })
+        .catch((error: unknown) => console.error(`Could not open ${id}; open it from the sidebar.`, error))
+    }
     const threadTitle = (sessionId: string): string => {
       const summary = Object.values(ctx.sessions.list.getSnapshot().byId).find(entry => entry?.id === sessionId)
       return summary?.displayTitle ?? 'This thread'
@@ -140,7 +148,7 @@ export default defineClient({
               onShowRequests={sessionId => {
                 navigate(panelId => UsageTabs.showRequestsFor({ sessionId, label: threadTitle(sessionId) }, panelId))
               }}
-              onOpenTraces={() => openPanel(TRACES_PANEL_ID)}
+              onOpenTraces={() => reveal(TRACES_PANEL_ID)}
               onOpenAccount={accountId => {
                 navigate(panelId => {
                   UsageQuota.go({ view: 'accounts', accountId }, panelId)
