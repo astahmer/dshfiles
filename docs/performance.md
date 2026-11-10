@@ -1129,3 +1129,31 @@ Two storage costs measured during the plugin sweep shipped with their callers:
 
 Both were benchmarked in scratch stores at landing (not the live GUI). They were not re-measured on 2026-11-10: the
 machine's load average was 33 on 10 cores, which makes millisecond numbers noise.
+
+## Memory system prompt sections per model request (2026-11-10)
+
+Every model request runs `system-prompt/assemble`, and memory's hook adds its start block and the project's
+workspace-scripts section. The live traces (240 min, 786 calls) put `memory system prompt sections` at p50 41 ms,
+p95 2.4 s, max 12.8 s. Its children named the owner: `memory start block` p50 0.2 ms (the block is frozen per agent
+and its rendering cached per project, scope and memory version), but `memory project path` p95 1.6 s (max 11 s) and
+`memory ensure project scripts` p95 522 ms. The workspace-scripts lookup called the uncached `projectPathFor` and
+`ensureProjectScripts` each time: about nine `realpath`/`stat`/`exists`/`mkdir` calls per request. No process spawn
+and no SQL; the seconds were those calls queued behind the Host's libuv pool on a machine at load 30–38.
+
+The fix in [`workspace-scripts.ts`](../plugins/@dshfiles/memory/src/workspace-scripts.ts) resolves the project through
+the shared `ProjectPaths` cache (now with a 10-minute time to live, so a folder that later gains `.jj` is refiled) and
+caches each project's scripts for 5 minutes. A hit touches no file; the section's text is byte-identical across turns,
+so the prompt prefix stays cache-stable.
+
+| Per request (scratch bench, 200 calls, load 28–35)     | Before (p50 / p95 / max)    | After (p50 / p95 / max)                |
+| ------------------------------------------------------ | --------------------------- | -------------------------------------- |
+| workspace-scripts lookup, thread workspace of dshfiles | 1.4–1.9 / 12–19 / 90–121 ms | 0.001–0.003 / 0.005–0.011 / 1.7–2.5 ms |
+| file-system calls                                      | ~9                          | 0                                      |
+
+The live after-numbers need the canonical build and a user restart of the Host; they are not measured yet. Re-check
+with `traces_breakdown` on `memory *` grouped by operation: `memory project path` and `memory ensure project scripts`
+should drop to one call per project per TTL.
+
+```sh
+pnpm --dir plugins/@dshfiles/memory exec vitest run src/workspace-scripts.test.ts
+```

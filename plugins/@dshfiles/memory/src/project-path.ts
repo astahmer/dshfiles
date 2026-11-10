@@ -1,5 +1,5 @@
 import { DshxPlugin } from '@dshfiles/dshx/effect'
-import { Cache, Context, Deferred, Effect, FileSystem, Layer, Path } from 'effect'
+import { Cache, Context, Deferred, Duration, Effect, FileSystem, Layer, Path } from 'effect'
 
 import { MemoryRepo } from './memory-repo.ts'
 
@@ -52,8 +52,11 @@ const normalizeStoredProjects = Effect.fn('memory normalize project paths')(func
     yield* Effect.logWarning(`memory: left ${result.conflicts.length} JJ workspace path(s) separate due to duplicate note or digest hashes`)
 })
 
+/** A directory that gains or loses its `.jj` after a first lookup is filed under its real project again after this. */
+export const projectPathTtl = Duration.minutes(10)
+
 /**
- * The project of each working directory, resolved once per directory. Reads wait for the activation's one pass that
+ * The project of each working directory, resolved once per directory and `projectPathTtl`. Reads wait for the activation's one pass that
  * rekeys stored workspace paths, so a lookup never files new rows under a path that pass is about to move.
  */
 export class ProjectPaths extends Context.Service<
@@ -67,7 +70,7 @@ export class ProjectPaths extends Context.Service<
   static readonly layer = Layer.effect(
     ProjectPaths,
     Effect.gen(function* () {
-      const resolved = yield* Cache.make({ capacity: 4_096, lookup: projectPathFor })
+      const resolved = yield* Cache.make({ capacity: 4_096, timeToLive: projectPathTtl, lookup: projectPathFor })
       const normalized = yield* Deferred.make<void>()
       yield* DshxPlugin.worker(
         normalizeStoredProjects(cwd => Cache.get(resolved, cwd)).pipe(
