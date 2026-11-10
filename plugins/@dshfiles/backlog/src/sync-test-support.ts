@@ -10,7 +10,7 @@ import { BacklogSyncEngine } from './sync-engine.js'
 import { SyncLocalProbes } from './sync-local-probes.js'
 import { BacklogSync } from './sync-service.js'
 import { SyncSources } from './sync-sources.js'
-import { backlogStoreLayer, type BacklogTestRows } from './test-support.js'
+import { BacklogTestStore, type BacklogTestRows } from './test-support.js'
 
 export type LegacySyncRow = BacklogSettings['syncBackends'][number]
 
@@ -53,7 +53,7 @@ export const syncTestLayer = (input: {
     Layer.provideMerge(Layer.mergeAll(ProviderCredentials.layer, ExternalProviderEndpoints.layerTest(input.external ?? []))),
     Layer.provideMerge(
       Layer.mergeAll(
-        backlogStoreLayer({ rows: input.storage, settings: { syncBackends: [...(input.rows ?? [])] } }),
+        BacklogTestStore.layer({ rows: input.storage, settings: { syncBackends: [...(input.rows ?? [])] } }),
         Layer.succeed(HttpClient.HttpClient, input.client),
         SecretReferenceResolver.layerTest({
           resolve: async request =>
