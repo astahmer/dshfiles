@@ -26,7 +26,8 @@ const editTimeRowSchema = Schema.Struct({
   changeId: Schema.String.check(Schema.isPattern(/^[a-f0-9]{20,64}$/)),
   edited: Schema.Boolean,
   predecessors: Schema.Array(Schema.String.check(Schema.isPattern(/^[a-f0-9]{40,64}$/))),
-  time: Schema.String.check(Schema.isMaxLength(64)),
+  // A commit jj did not create (a git import) has no operation, so its version reports no time.
+  time: Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))),
 })
 
 const EDIT_TIME_CACHE_LIMIT = 50_000

@@ -367,6 +367,57 @@ test('the detail cache evicts the least recently used content past its byte budg
   assert.equal(cache.content('huge'), undefined, 'one patch never takes over a quarter of the budget')
 })
 
+test('edit times of a commit imported from git leave the rest of the batch readable', { timeout: 60_000 }, async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-git-import-'))
+  const repo = join(home, 'repo')
+  await mkdir(repo)
+  onTestFinished(() => rm(home, { recursive: true, force: true }))
+  const git = (argv: readonly string[]): string => {
+    const result = spawnSync('git', argv, {
+      cwd: repo,
+      env: {
+        PATH: process.env.PATH ?? '',
+        HOME: home,
+        GIT_AUTHOR_NAME: 'Git Import',
+        GIT_AUTHOR_EMAIL: 'git-import@example.invalid',
+        GIT_COMMITTER_NAME: 'Git Import',
+        GIT_COMMITTER_EMAIL: 'git-import@example.invalid',
+      },
+      encoding: 'utf8',
+      shell: false,
+      timeout: 20_000,
+    })
+    if (result.error !== undefined) throw result.error
+    assert.equal(result.status, 0, 'git ' + argv.join(' ') + '\n' + result.stderr)
+    return result.stdout
+  }
+  git(['init', '--quiet'])
+  await writeFile(join(repo, 'imported.txt'), 'from git\n')
+  git(['add', 'imported.txt'])
+  git(['commit', '--quiet', '--message', 'imported from git'])
+
+  const jj = jjAt(repo, home)
+  jj(['git', 'init', '--colocate'])
+  jj(['config', 'set', '--repo', 'user.name', 'Reads Test'])
+  jj(['config', 'set', '--repo', 'user.email', 'reads@example.invalid'])
+  const run: JjRun = args =>
+    Effect.try({ try: () => ({ stdout: jj(args), truncated: false }), catch: cause => new JujutsuCommandFailed({ exitCode: 1, cause }) })
+  const commitIdOf = (revision: string): string => jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', revision, '--template', 'commit_id']).trim()
+  const imported = commitIdOf('@-')
+
+  await writeFile(join(repo, 'by-jj.txt'), 'from jj\n')
+  jj(['describe', '--message', 'edited by jj'])
+  const byJj = commitIdOf('@')
+
+  const [importedRow, byJjRow] = await Effect.runPromise(
+    RevisionReads.editTimes(run, { repositoryRoot: repo, commitIds: [imported, byJj], cache: makeEditTimeCache() }),
+  )
+  assert.equal(importedRow?.commitId, imported)
+  assert.equal(importedRow?.editedAt, null, 'a git-imported commit has no jj operation, so it reports no edit time')
+  assert.equal(byJjRow?.commitId, byJj)
+  assert.ok(byJjRow?.editedAt, 'the commit jj edited keeps its time in the same batch')
+})
+
 test('details read content and evolution concurrently after validation', async () => {
   const { repo, jj, run } = await scratchRepo()
   await writeFile(join(repo, 'parallel.txt'), 'one\n')
