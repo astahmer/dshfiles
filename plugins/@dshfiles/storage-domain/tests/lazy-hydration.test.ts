@@ -11,13 +11,16 @@ import { CountingMediaPool, CountingStorageBackend } from './helpers/counting-ba
 const itemSchema = z.object({ label: z.string(), count: z.number().int() })
 type Item = z.infer<typeof itemSchema>
 
+/** `invalidRecords: null` drops the disposable policy, making the domain authoritative. */
+type SpecOverrides = Omit<Partial<DomainSpec>, 'invalidRecords'> & { readonly invalidRecords?: DomainSpec['invalidRecords'] | null }
+
 /** A disposable per-record domain: lazy by default because its records are backed up and skipped. */
-const disposableSpec = (overrides: Partial<DomainSpec> = {}): DomainSpec =>
+const disposableSpec = ({ invalidRecords = 'backup-and-skip', ...overrides }: SpecOverrides = {}): DomainSpec =>
   defineDomain({
     name: 'demo',
     version: 1,
     layout: 'per-record',
-    invalidRecords: 'backup-and-skip',
+    ...(invalidRecords === null ? {} : { invalidRecords }),
     ...overrides,
     tables: { items: domainTable<string, Item>(itemSchema) },
   })
@@ -215,7 +218,7 @@ describe('lazy hydration', () => {
   it('throws invalid-record at the read when the spec opts in but cannot skip', async () => {
     const pool = seed(new CountingMediaPool(), [['bad', { label: 'missing count' }]], { name: 'strict' })
     const { facility } = await harness({ pool })
-    const domain = await facility.open(disposableSpec({ name: 'strict', invalidRecords: undefined, hydration: 'lazy' }))
+    const domain = await facility.open(disposableSpec({ name: 'strict', invalidRecords: null, hydration: 'lazy' }))
     const table = domain.table('items')
 
     expect(() => table.get('bad')).toThrow(/does not match its schema/)
@@ -227,7 +230,7 @@ describe('lazy hydration', () => {
     const pool = seed(new CountingMediaPool(), [['bad', { label: 'missing count' }]], { name: 'strict' })
     const { facility } = await harness({ pool })
 
-    await expect(facility.open(disposableSpec({ name: 'strict', invalidRecords: undefined }))).rejects.toMatchObject({ code: 'invalid-record' })
+    await expect(facility.open(disposableSpec({ name: 'strict', invalidRecords: null }))).rejects.toMatchObject({ code: 'invalid-record' })
     expect(pool.counts.loadAll).toBe(1)
     expect(pool.counts.getRecord).toBe(0)
   })
