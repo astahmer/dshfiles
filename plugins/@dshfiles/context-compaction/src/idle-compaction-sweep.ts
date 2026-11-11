@@ -27,7 +27,7 @@ export const sweepIdleCompaction = (input: {
   readonly onFailure?: (input: { readonly sessionId: SessionId; readonly error: unknown }) => void
 }): Promise<readonly SessionId[]> =>
   withSpan('context compaction idle sweep', { attributes: { candidates: input.candidates.length } }, async () => {
-    if (!input.policy.enabled) return []
+    if (input.policy.strategy === 'off') return []
     const compacted: SessionId[] = []
     for (const candidate of input.candidates) {
       const due = IdleCompactionModel.due({

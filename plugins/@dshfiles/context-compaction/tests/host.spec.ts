@@ -8,6 +8,7 @@ const mount = (
   config:
     | {
         readonly maxTokens?: number
+        readonly idleCacheStrategy?: 'off' | 'compact'
         readonly idle?: { readonly enabled?: boolean; readonly minTokens?: number; readonly lifetimeMinutes?: number; readonly leadMinutes?: number }
       }
     | undefined,
@@ -39,8 +40,26 @@ describe('the context-compaction Host', () => {
 
   it.effect('refuses an idle token floor above the sessions API cap', () =>
     Effect.gen(function* () {
-      const refused = yield* mount({ idle: { enabled: true, minTokens: 10_000_001 } }).pipe(Effect.exit)
+      const refused = yield* mount({ idleCacheStrategy: 'compact', idle: { minTokens: 10_000_001 } }).pipe(Effect.exit)
       expect(refused._tag).toBe('Failure')
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('accepts the compact strategy and refuses the warm one it cannot bill', () =>
+    Effect.gen(function* () {
+      const compact = yield* mount({ idleCacheStrategy: 'compact' })
+      expect(compact.fiber.state).toBe(2)
+      yield* Effect.promise(() => compact.dispose())
+      const warm = yield* mount({ idleCacheStrategy: 'warm' as 'off' }).pipe(Effect.exit)
+      expect(warm._tag).toBe('Failure')
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('treats a legacy idle.enabled row as the compact strategy', () =>
+    Effect.gen(function* () {
+      const legacy = yield* mount({ idle: { enabled: true } })
+      expect(legacy.fiber.state).toBe(2)
+      yield* Effect.promise(() => legacy.dispose())
     }).pipe(Effect.scoped),
   )
 })

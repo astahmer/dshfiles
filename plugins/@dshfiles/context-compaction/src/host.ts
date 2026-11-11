@@ -14,7 +14,7 @@ import { compactionThresholdTokens } from './compaction-threshold.js'
 import { compactionRequestBudget, MIN_REQUEST_BUDGET_BYTES } from './budget.js'
 import { serializedMessageBytes, summarizeInChunks, SummaryRequestFailed } from './chunked-summary.js'
 import { observedIdleCandidate } from './idle-candidate.js'
-import { DEFAULT_IDLE_COMPACTION } from './idle-compaction.js'
+import { DEFAULT_IDLE_COMPACTION, type IdleCompactionPolicy } from './idle-compaction.js'
 import { idleGenerationStart } from './idle-generation.js'
 import { sweepIdleCompaction, type IdleCompactionCandidate } from './idle-compaction-sweep.js'
 
@@ -23,7 +23,8 @@ const SWEEP_INTERVAL_MS = 60_000
 const IDLE_MIN_TOKENS_MAX = 10_000_000
 
 const IdleCompactionConfig = Schema.Struct({
-  enabled: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_IDLE_COMPACTION.enabled))),
+  /** Deprecated: `true` maps to the `compact` strategy when `idleCacheStrategy` is unset. */
+  enabled: Schema.optional(Schema.Boolean),
   minTokens: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(IDLE_MIN_TOKENS_MAX)).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_IDLE_COMPACTION.minTokens)),
   ),
@@ -37,8 +38,16 @@ const IdleCompactionConfig = Schema.Struct({
 
 const CompactionConfig = Schema.Struct({
   maxTokens: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(8_192))),
-  // Off by default: a compaction is a billed request per idle thread, so it only runs where a measurement showed it pays.
-  idle: IdleCompactionConfig.pipe(Schema.withDecodingDefaultKey(Effect.succeed({ enabled: false }))),
+  /** `warm` is not available yet: a prefix-identical ping cannot reach the Session's cost total. See the README. */
+  idleCacheStrategy: Schema.Literals(['off', 'compact']).pipe(Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_IDLE_COMPACTION.strategy))),
+  idle: IdleCompactionConfig.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
+})
+
+const idlePolicyOf = (config: typeof CompactionConfig.Type): IdleCompactionPolicy => ({
+  strategy: config.idleCacheStrategy !== 'off' ? config.idleCacheStrategy : config.idle.enabled === true ? 'compact' : 'off',
+  minTokens: config.idle.minTokens,
+  lifetimeMinutes: config.idle.lifetimeMinutes,
+  leadMinutes: config.idle.leadMinutes,
 })
 
 type SummarizeInput = Parameters<BasicCompactionEngine['summarize']>[0]
@@ -195,7 +204,8 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
             { global: true },
           )
           const timer = setInterval(() => {
-            if (!config.idle.enabled || sweeping) return
+            const idlePolicy = idlePolicyOf(config)
+            if (idlePolicy.strategy === 'off' || sweeping) return
             runOutsideReload(host.ctx, () => {
               if (!isApiServed(host.ctx, sessionsApi)) return
               sweeping = true
@@ -231,7 +241,7 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
                   now,
                   candidates,
                   attemptedAt,
-                  policy: config.idle,
+                  policy: idlePolicy,
                   onAttempt: ({ sessionId, lastActivityAt }) => attemptedAt.set(sessionId, lastActivityAt),
                   onFailure: ({ sessionId, error }) => logger.warn(`context-compaction: idle compaction of "${sessionId}" skipped: ${String(error)}`),
                 })

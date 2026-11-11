@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_IDLE_COMPACTION, IdleCompactionModel } from '../src/idle-compaction.js'
 
 const MINUTE = 60_000
-const policy = { ...DEFAULT_IDLE_COMPACTION, enabled: true, lifetimeMinutes: 60, leadMinutes: 5, minTokens: 100_000 }
+const policy = { ...DEFAULT_IDLE_COMPACTION, strategy: 'compact' as const, lifetimeMinutes: 60, leadMinutes: 5, minTokens: 100_000 }
 
 const due = (overrides: Partial<Parameters<typeof IdleCompactionModel.due>[0]>) =>
   IdleCompactionModel.due({ now: 1_055 * MINUTE, lastActivityAt: 1_000 * MINUTE, attemptedAt: null, tokens: 200_000, policy, ...overrides })
@@ -39,6 +39,6 @@ describe('IdleCompactionModel', () => {
   })
 
   it('keeps the documented fallback at the Host defaults', () => {
-    expect(DEFAULT_IDLE_COMPACTION).toEqual({ enabled: false, minTokens: 100_000, lifetimeMinutes: 5, leadMinutes: 1 })
+    expect(DEFAULT_IDLE_COMPACTION).toEqual({ strategy: 'off', minTokens: 100_000, lifetimeMinutes: 5, leadMinutes: 1 })
   })
 })

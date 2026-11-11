@@ -26,14 +26,20 @@ Settings live on the Loader row config, next to `maxTokens`:
 
 ```yaml
 config:
+  idleCacheStrategy: compact
   idle:
-    enabled: true
     minTokens: 100000
     lifetimeMinutes: 60
     leadMinutes: 5
 ```
 
+`idleCacheStrategy` is `off` (default) or `compact`; the older `idle.enabled: true` still selects `compact` when the strategy is unset. A compaction is one billed request per idle thread, so turn it on only after a measurement shows it pays.
+
 Set `lifetimeMinutes` to the cache lifetime the route actually asks for: 5 for an Anthropic route on the default `short` retention, 60 with `cacheRetention: long` (ai-accounts › Idle prompt cache › Cache retention). `minTokens` is capped at 10,000,000, the Sessions API's own limit.
+
+## Warm strategy is not available
+
+OpenCode's `warm` alternative sends a minimal ping before the lifetime ends so the prefix stays cached. A plugin can replay the exact agent-loop request (same system, messages, tools, route and model) with `maxTokens: 1`, but that call cannot be counted in the Session's own cost total: `llm/stream` observers ignore requests carrying `toolHistory` (that is what marks an agent-loop call), and `appendPluginRecord` is restricted to `packages/experimental/`, so no plugin-owned usage record reaches the shared projection. Shipping warm without that accounting would spend tokens invisibly. The Host needs an auxiliary-request usage event (tracked in [Host gap 17](../../../plans/dsh-host-gaps.md#17-title-and-side-call-usage-in-history)) or a plugin-owned projection seam before `warm` can be exposed.
 
 **Limits:** the sweep reads the newest 200 visible threads (`sessions.list`), so a very large history leaves older threads alone. A running thread is skipped. A thread this Host never observed active, including every thread at startup, is skipped until it emits a new request, turn end, or idle status. A failed command is logged and not retried for the same idle stretch, and a compaction is never attempted after the cache lifetime has expired.
 

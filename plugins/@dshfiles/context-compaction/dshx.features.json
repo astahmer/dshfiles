@@ -53,10 +53,10 @@
       "currentSurface": "host: timer, no UI",
       "configuration": [
         {
-          "key": "idle.enabled",
-          "defaultValue": "false",
-          "constraints": "A compaction is one billed request per idle thread; turn it on only after a measurement.",
-          "choices": ["true", "false"],
+          "key": "idleCacheStrategy",
+          "defaultValue": "off",
+          "constraints": "`off` or `compact`; warm is unavailable until a prefix-identical ping can be charged to the Session (Host gap 108).",
+          "choices": ["off", "compact"],
           "coveredBy": ["context-compaction.idle-timing", "context-compaction.idle-sweep"]
         },
         {
@@ -85,7 +85,8 @@
         "A failed compaction is logged and not retried for the same idle stretch, so a provider failure cannot bill that thread again.",
         "A compaction's own checkpoint message is not treated as new activity, so it cannot arm the next sweep.",
         "No compaction runs after the cache lifetime has expired: the next prompt is already uncached, so it would save nothing.",
-        "A thread this Host never observed active, including every thread at startup, is skipped until it emits new activity. The thread list's last-prompt time is never used as an idle start."
+        "A thread this Host never observed active, including every thread at startup, is skipped until it emits new activity. The thread list's last-prompt time is never used as an idle start.",
+        "A warm ping is unavailable: a prefix-identical replay cannot be charged to the Session's cost total without a Host side-call usage event (Host gap 108), so only off and compact are accepted."
       ],
       "externalDependencies": [],
       "verification": [

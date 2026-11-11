@@ -6,7 +6,7 @@ import { DEFAULT_IDLE_COMPACTION } from '../src/idle-compaction.js'
 import { sweepIdleCompaction, type IdleCompactionCandidate } from '../src/idle-compaction-sweep.js'
 
 const MINUTE = 60_000
-const policy = { ...DEFAULT_IDLE_COMPACTION, enabled: true, lifetimeMinutes: 60, leadMinutes: 5, minTokens: 100_000 }
+const policy = { ...DEFAULT_IDLE_COMPACTION, strategy: 'compact' as const, lifetimeMinutes: 60, leadMinutes: 5, minTokens: 100_000 }
 
 const id = (value: string): SessionId => Schema.decodeSync(SessionId)(value)
 

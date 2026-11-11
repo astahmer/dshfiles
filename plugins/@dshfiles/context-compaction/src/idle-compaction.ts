@@ -7,8 +7,10 @@
  * enough, untouched for long enough, and not already compacted at this idle stretch?
  */
 
+export type IdleCompactionStrategy = 'off' | 'compact'
+
 export interface IdleCompactionPolicy {
-  readonly enabled: boolean
+  readonly strategy: IdleCompactionStrategy
   /** Prompt tokens below which a thread is left alone: compacting a small thread costs more than the re-send. */
   readonly minTokens: number
   /** How long the provider keeps a prompt prefix cached, counted from the last request that used it. */
@@ -18,7 +20,7 @@ export interface IdleCompactionPolicy {
 }
 
 export const DEFAULT_IDLE_COMPACTION: IdleCompactionPolicy = {
-  enabled: false,
+  strategy: 'off',
   minTokens: 100_000,
   lifetimeMinutes: 5,
   leadMinutes: 1,
@@ -47,7 +49,7 @@ export class IdleCompactionModel {
     readonly tokens: number | null
     readonly policy: IdleCompactionPolicy
   }): boolean => {
-    if (!input.policy.enabled || input.policy.lifetimeMinutes <= input.policy.leadMinutes) return false
+    if (input.policy.strategy === 'off' || input.policy.lifetimeMinutes <= input.policy.leadMinutes) return false
     if (input.lastActivityAt === null) return false
     if (input.tokens !== null && input.tokens < input.policy.minTokens) return false
     if (input.attemptedAt !== null && input.attemptedAt >= input.lastActivityAt) return false
