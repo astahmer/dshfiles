@@ -1,10 +1,11 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import type { QueueAction } from '@deepseek-ai/dsh-api-session-controller/types'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { type DockProps, DraggableQueueDock } from './client.js'
+import { type DockProps, DraggableQueueDock, QUEUE_DOCK_STYLE } from './client.js'
+import { ScheduledSendsDock, SendLaterAction, type LoadModels } from './scheduled-sends-ui.js'
 import { SessionQueueEditorModel } from './session-queue-editor.js'
 import { QUEUE_REORDER_LOCALE_NAMESPACE, queueReorderLocale } from './locales.js'
 
@@ -45,8 +46,33 @@ export default defineClient({
   locales: [queueReorderLocale],
   // setup(ctx) reads ctx.slots and ctx.sessions; declaring them here is what
   // activates those services. Without this the plugin loads but never mounts.
-  inject: ['slots', 'sessions', 'uiWorkspace'],
+  inject: ['slots', 'sessions', 'uiWorkspace', 'modelDirectories'],
   setup(ctx, decorate) {
+    // The native picker's catalog for one thread; absent while the model-selection plugin is not loaded.
+    const modelsFor =
+      (sessionId: Parameters<typeof ctx.modelDirectories.directoryFor>[0]): LoadModels =>
+      async () =>
+        (await ctx.modelDirectories.directoryFor(sessionId).load()).groups
+    ctx.slots.inject('conversation.input.right', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.right', id: 'queue-reorder-send-later', order: 90 },
+        decorate(props => (
+          <PluginQueryProvider>
+            <SendLaterAction sessionId={props.sessionId} useInput={props.useInput} inputActions={props.inputActions} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('conversation.input.dock', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.dock', id: 'scheduled-sends', order: 19, inject: sessionId => ({ loadModels: modelsFor(sessionId) }) },
+        decorate((props: ComposedProps<'conversation.input.dock', string, never, undefined, { readonly loadModels: LoadModels }, never, undefined>) => (
+          <PluginQueryProvider>
+            <ScheduledSendsDock sessionId={props.sessionId} loadModels={props.loadModels} style={QUEUE_DOCK_STYLE} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         {

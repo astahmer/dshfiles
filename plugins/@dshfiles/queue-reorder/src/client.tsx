@@ -27,7 +27,7 @@ const editProgressText = {
 } as const
 
 // Inline instead of client.css so this plugin's sheet stays byte-identical to the shared plugin-ui sheet.
-const QUEUE_DOCK_STYLE: CSSProperties = {
+export const QUEUE_DOCK_STYLE: CSSProperties = {
   boxSizing: 'border-box',
   width:
     'calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset))',

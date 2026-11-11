@@ -6,6 +6,11 @@ export const queueReorderSettings = defineSettings({
   schema: Schema.object({
     expandByDefault: Schema.boolean().default(true).description('Show the queued messages expanded when the queue grows past one message.'),
     attachmentPreviews: Schema.boolean().default(true).description('Show a thumbnail for each queued image and a chip for each queued file.'),
+    sendLater: Schema.boolean()
+      .default(true)
+      .description(
+        'Show Send later beside the composer’s Send button and the scheduled messages above the composer. Scheduled messages still go out while it is off.',
+      ),
     previewLength: Schema.natural().min(40).max(1000).default(200).description('Characters of each queued message shown before it is truncated.'),
   }),
   applies: 'live',

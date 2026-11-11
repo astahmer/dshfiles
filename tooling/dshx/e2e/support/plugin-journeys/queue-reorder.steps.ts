@@ -268,3 +268,70 @@ Then('the queued messages show no attachment previews', async ({ page }: { page:
   })
   await finishJourneyAssertions(page)
 })
+
+const scheduledDock = (page: Page) => page.getByRole('region', { name: 'Scheduled messages', exact: true })
+
+When('a thread on the fake model answers its first message', async ({ page }: { page: Page }) => {
+  await startThreadWithModel(page, { project: 'Default workspace', model: 'commandcode_work/gpt-6-luna' })
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill('send later journey')
+  await composer.press('Enter')
+  await expect.poll(() => fakeCommandCodeFor(page).requests.filter(request => request.kind === 'turn').length).toBe(1)
+  await expect(page.getByRole('button', { name: 'Send later', exact: true })).toBeVisible()
+})
+
+When('{string} is scheduled from Send later for {string} at phone width', async ({ page }: { page: Page }, text: string, preset: string) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await composerInput(page).fill(text)
+  await page.getByRole('button', { name: 'Send later', exact: true }).click()
+  const presets = page.getByRole('group', { name: 'Send at', exact: true })
+  await expect(presets).toBeVisible()
+  const box = await presets.boundingBox()
+  expect(box === null ? Number.POSITIVE_INFINITY : box.x + box.width).toBeLessThanOrEqual(390)
+  await presets.getByRole('button', { name: new RegExp(`^${preset}`, 'u') }).click()
+})
+
+Then('the composer is empty and the scheduled row reads {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'queue-reorder-send-later-schedules-and-clears-composer', async () => {
+    await expect(composerInput(page)).toHaveText('')
+    await expect(scheduledDock(page).getByRole('listitem')).toHaveCount(1)
+    await expect(scheduledDock(page).getByRole('listitem')).toContainText(text)
+    await expect(scheduledDock(page).getByRole('listitem')).toContainText(/Today|Tomorrow/u)
+  })
+  expect(fakeCommandCodeFor(page).requests.filter(request => request.kind === 'turn').length).toBe(1)
+})
+
+When('the scheduled message is edited to {string}', async ({ page }: { page: Page }, text: string) => {
+  await scheduledDock(page).getByRole('button', { name: 'Edit scheduled message', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Edit scheduled message', exact: true })
+  await dialog.getByLabel('Message', { exact: true }).fill(text)
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+})
+
+Then('the scheduled row reads {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'queue-reorder-send-later-edit', async () => {
+    await expect(scheduledDock(page).getByRole('listitem')).toContainText(text)
+  })
+})
+
+When('the scheduled message is sent now', async ({ page }: { page: Page }) => {
+  await scheduledDock(page).getByRole('button', { name: 'Send now', exact: true }).click()
+})
+
+Then('the provider receives {string} once and no scheduled row is left', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'queue-reorder-send-later-sends-once', async () => {
+    await expect
+      .poll(
+        () =>
+          fakeCommandCodeFor(page)
+            .requests.filter(request => request.kind === 'turn')
+            .map(latestUserText),
+        { timeout: 30_000 },
+      )
+      .toContain(text)
+    await expect(scheduledDock(page)).toHaveCount(0, { timeout: 30_000 })
+    expect(fakeCommandCodeFor(page).requests.filter(request => request.kind === 'turn' && latestUserText(request) === text)).toHaveLength(1)
+  })
+  await finishJourneyAssertions(page)
+})

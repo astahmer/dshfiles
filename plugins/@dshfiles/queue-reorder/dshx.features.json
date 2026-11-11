@@ -76,7 +76,7 @@
       "surfaces": ["client", "host"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: queued messages \u203a edit",
+      "currentSurface": "composer: queued messages › edit",
       "configuration": [],
       "states": ["viewing", "loading", "editing", "submitting", "restoring", "failed"],
       "failureModes": [
@@ -180,7 +180,7 @@
       "surfaces": ["client"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: queued messages \u203a preview",
+      "currentSurface": "composer: queued messages › preview",
       "configuration": [
         {
           "key": "previewLength",
@@ -227,7 +227,7 @@
     {
       "id": "queue-message-transfer",
       "title": "Move a queued message to another thread",
-      "summary": "Move to thread\u2026 opens a thread picker; the queued message, with its images and files, leaves this queue and lands in the chosen thread's queue when that thread is busy, or in its composer (and the thread opens) when it is idle.",
+      "summary": "Move to thread… opens a thread picker; the queued message, with its images and files, leaves this queue and lands in the chosen thread's queue when that thread is busy, or in its composer (and the thread opens) when it is idle.",
       "reach": [
         "click text \"Queue source\"",
         "click button \"Move queued message to another thread\"",
@@ -245,7 +245,7 @@
       "surfaces": ["client", "host", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: queued messages \u203a Move to thread",
+      "currentSurface": "composer: queued messages › Move to thread",
       "configuration": [],
       "states": ["idle", "picking", "loading", "removing", "delivering", "restoring", "settled"],
       "failureModes": [
@@ -326,7 +326,7 @@
       "surfaces": ["client", "settings"],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: queued messages \u203a attachment previews",
+      "currentSurface": "composer: queued messages › attachment previews",
       "configuration": [
         {
           "key": "attachmentPreviews",
@@ -356,6 +356,88 @@
         {
           "kind": "not-applicable",
           "reason": "Client-only: Preview queued attachments renders browser state and starts no Host work of its own."
+        }
+      ]
+    },
+    {
+      "id": "send-later",
+      "title": "Send a message later",
+      "summary": "Schedule the composer's message from Send later (presets or a picked time); it waits above the composer with its time and optional model and effort, can be edited, sent now or cancelled back into the composer, survives a Host restart in plugin storage, and is sent once through the session controller under its own request id. Agent tools scheduled_send_list/create/update/cancel/now call the same Host methods.",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Send later demo\"",
+        "press Enter",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Ship the weekly report\"",
+        "click button \"Send later\"",
+        "expect group \"Send at\""
+      ],
+      "surfaces": ["client", "host", "storage", "api", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Send later; dock: Scheduled messages",
+      "configuration": [
+        {
+          "key": "sendLater",
+          "defaultValue": "true",
+          "constraints": "Boolean; shows Send later and the scheduled dock. Scheduled messages still go out while it is off.",
+          "choices": ["true", "false"],
+          "coveredBy": ["queue-reorder.send-later"]
+        }
+      ],
+      "states": ["scheduled", "waiting", "sending", "failed", "sent"],
+      "failureModes": [
+        "A time in the past or more than a year ahead is refused with what to pick instead.",
+        "A model switch waits while the thread still has queued input, then retries every 30 seconds.",
+        "A thread that cannot be reached is retried five times, then the row shows Not sent with an Edit to try again.",
+        "Attachments cannot be scheduled; the menu says to send now or remove them."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "queue-reorder.send-later",
+          "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.send-later-once",
+          "file": "plugins/@dshfiles/queue-reorder/src/scheduled-sends.test.ts",
+          "testName": "sends a scheduled message once at its time, and only then"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.send-later-restart",
+          "file": "plugins/@dshfiles/queue-reorder/src/scheduled-sends.test.ts",
+          "testName": "keeps a send across a Host restart and delivers it exactly once after a crash mid-send"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.send-later-edit",
+          "file": "plugins/@dshfiles/queue-reorder/src/scheduled-sends.test.ts",
+          "testName": "edits the time, text, model and effort, waits for a busy queue before switching model, and cancels"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.send-later-failed",
+          "file": "plugins/@dshfiles/queue-reorder/src/scheduled-sends.test.ts",
+          "testName": "sends now on request, and turns a send that cannot be delivered into a failed row the user can edit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.send-later-tools",
+          "file": "plugins/@dshfiles/queue-reorder/src/api-tools.test.ts",
+          "testName": "every scheduled-send verb has an agent tool; only the list is read-only and every write waits for the user"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

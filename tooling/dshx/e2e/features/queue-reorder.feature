@@ -64,3 +64,15 @@ Feature: Queued message dock
     When queued attachment previews are turned off
     And the thread "Fake thread title" is opened again
     Then the queued messages show no attachment previews
+
+  @scenario:queue-reorder.send-later
+  Scenario: Schedule a message for later from the composer, edit it, then send it now
+    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/session-controller, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread on the fake model answers its first message
+    And "Ship the weekly report" is scheduled from Send later for "In 1 hour" at phone width
+    Then the composer is empty and the scheduled row reads "Ship the weekly report"
+    When the scheduled message is edited to "Ship the weekly report v2"
+    Then the scheduled row reads "Ship the weekly report v2"
+    When the scheduled message is sent now
+    Then the provider receives "Ship the weekly report v2" once and no scheduled row is left
