@@ -1,15 +1,16 @@
 import * as React from 'react'
 import { cn } from '../../lib/utils.js'
 
-function Card({ className, ...props }: React.ComponentProps<'div'>) {
+const Card = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(function Card({ className, ...props }, ref) {
   return (
     <div
+      ref={ref}
       data-slot="card"
       className={cn('dshx:flex dshx:flex-col dshx:gap-4 dshx:rounded-lg dshx:border dshx:bg-card dshx:py-5 dshx:text-card-foreground', className)}
       {...props}
     />
   )
-}
+})
 
 function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (

@@ -24,6 +24,30 @@ describe('PhoneSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(3)
   })
 
+  it('is modal while shown: focus moves in, Tab stays inside, and focus returns to the trigger on close', () => {
+    const Page = (props: { readonly shown: boolean }): JSX.Element => (
+      <>
+        <button type="button">Open panel</button>
+        <PhoneSheet shown={props.shown} heading="Thread panel" onClose={() => {}}>
+          <button type="button">Facet</button>
+        </PhoneSheet>
+      </>
+    )
+    const view = render(<Page shown={false} />)
+    const trigger = screen.getByRole('button', { name: 'Open panel' })
+    trigger.focus()
+    view.rerender(<Page shown />)
+    const sheet = screen.getByRole('dialog', { name: 'Thread panel' })
+    expect(sheet.getAttribute('aria-modal')).toBe('true')
+    expect(sheet.contains(document.activeElement)).toBe(true)
+    const facet = screen.getByRole('button', { name: 'Facet' })
+    facet.focus()
+    fireEvent.keyDown(facet, { key: 'Tab' })
+    expect(sheet.contains(document.activeElement)).toBe(true)
+    view.rerender(<Page shown={false} />)
+    expect(document.activeElement).toBe(trigger)
+  })
+
   it('keeps the surface mounted but hidden, with no scrim, while closed', () => {
     const onClose = vi.fn()
     const { container } = render(

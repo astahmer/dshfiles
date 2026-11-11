@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useApi } from '@dshfiles/dshx/client'
-import { useSyncExternalStore } from 'react'
+import { useRef, useSyncExternalStore } from 'react'
 import { projectChecksApi, type ProjectActionView, type ProjectCheckReceipt } from './api.js'
 import {
   ClockIcon,
@@ -22,6 +22,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@dshfiles/plugin-ui/components/ui/item'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { useDialogFocus } from '@dshfiles/plugin-ui/hooks/dialog-focus'
 import { PluginQueryProvider, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 
 type Listener = () => void
@@ -182,6 +183,8 @@ const receiptRows = (receipt: ProjectCheckReceipt): PipelineSummaryRow[] => [
 function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel: SessionPanel }): JSX.Element | null {
   const api = useApi(projectChecksApi)
   const open = useSyncExternalStore(props.panel.subscribe, props.panel.getSnapshot)
+  const panelRef = useRef<HTMLDivElement>(null)
+  useDialogFocus({ open, container: panelRef })
   const queryClient = useQueryClient()
   const sessionKey = ['project-checks', props.sessionId] as const
   const receiptsKey = [...sessionKey, 'receipts'] as const
@@ -227,6 +230,10 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
       className="dshx-root dshx:absolute dshx:inset-x-0 dshx:bottom-[calc(100%+8px)] dshx:z-40 dshx:max-h-[min(72vh,680px)] dshx:w-[min(620px,calc(100vw-24px))] dshx:gap-0 dshx:overflow-y-auto dshx:py-0 dshx:shadow-lg"
       role="dialog"
       aria-label="Project checks"
+      ref={panelRef}
+      onKeyDown={event => {
+        if (event.key === 'Escape') props.panel.close()
+      }}
     >
       <CardHeader className="dshx:gap-1 dshx:border-b dshx:px-4 dshx:py-3 dshx:[.border-b]:pb-3">
         <CardTitle className="dshx:text-sm">

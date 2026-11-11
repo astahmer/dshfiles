@@ -4,6 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { useDialogFocus } from '@dshfiles/plugin-ui/hooks/dialog-focus'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ServerView } from './api.js'
 import { CatalogBrowser, SignInNotice } from './catalog-browser.js'
@@ -92,6 +93,8 @@ interface QuickPanelContentProps {
 const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JSX.Element => {
   const snapshot = useServerSnapshot({ reconcile: true })
   const sectionRef = useRef<HTMLElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  useDialogFocus({ open: true, container: sectionRef, initialFocus: searchRef })
   const [search, setSearch] = useState('')
   const onClose = props.onClose
 
@@ -140,6 +143,7 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
             aria-label={t('quickPanelSearch')}
             onChange={event => setSearch(event.currentTarget.value)}
             placeholder={t('quickPanelSearch')}
+            ref={searchRef}
             value={search}
           />
         </InputGroup>

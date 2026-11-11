@@ -1,6 +1,7 @@
 import type { DockPaneActions } from '@dshfiles/frame-layout/regions'
+import { useDialogFocus } from '@dshfiles/plugin-ui/hooks/dialog-focus'
 import { XIcon } from '@dshfiles/plugin-ui/icons'
-import { useEffect, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 
 /** The frame's phone rule (`@dshfiles/frame-layout` AppFrame.module.css): below it the right column has no width. */
 const PHONE_QUERY = '(max-width: 639.98px)'
@@ -69,6 +70,8 @@ export const PhoneSheet = (props: {
   readonly children: ReactNode
 }): JSX.Element => {
   const { shown, onClose } = props
+  const sheetRef = useRef<HTMLElement>(null)
+  useDialogFocus({ open: shown, container: sheetRef, trap: true })
   useEffect(() => {
     if (!shown) return
     const onKey = (event: KeyboardEvent): void => {
@@ -90,7 +93,9 @@ export const PhoneSheet = (props: {
         />
       ) : null}
       <section
+        ref={sheetRef}
         role="dialog"
+        aria-modal={shown}
         aria-label={props.heading}
         data-phone-sheet=""
         hidden={!shown}
