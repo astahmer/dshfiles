@@ -13,6 +13,8 @@
     "plugins/@dshfiles/rich-composer/src/native/skeleton/safari.ts",
     "plugins/@dshfiles/chat/src/native/model/steering-history.ts",
     "plugins/@dshfiles/chat/src/native/model/tool-call-tree.ts",
+    // The vendored no-op Host body of ui-sidebar-right, kept byte-identical; the fork's Host entry is src/host.ts.
+    "plugins/@dshfiles/sidebar-right/src/native/index.ts",
     "plugins/@dshfiles/annotations/extension/**",
     "plugins/@dshfiles/project-checks/src/test-fixtures/**",
     "tooling/antislop/repo-rules/fixtures/**",
@@ -59,6 +61,23 @@
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       // dshx.config.ts names shared-runtime as a string (`client.shared`); dsh is the runtime the bundles load into.
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+    "plugins/@dshfiles/agent-loop": {
+      // The built Host bundle imports @oxc-project/runtime helpers (usingCtx for `using`) that no source file names.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@oxc-project/runtime"],
+    },
+    "plugins/@dshfiles/cordis-cards": {
+      // No source imports util-values, but it satisfies a peer of the other DSH devDependencies: removing it re-resolves
+      // the @deepseek-ai/dsh peer variants across the whole lockfile.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-util-values"],
+    },
+    "plugins/@dshfiles/storage-domain": {
+      // No source imports storage-json, but it satisfies a peer of the other DSH devDependencies: removing it re-resolves
+      // the @deepseek-ai/dsh peer variants across the whole lockfile.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-storage-json"],
     },
     "plugins/@dshfiles/frame-layout": {
       // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
