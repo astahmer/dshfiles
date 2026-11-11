@@ -1,7 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { mkdtempSync, promises as fsPromises, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
@@ -788,7 +787,7 @@ export class ClaudeCliSessions {
     // until claude and its bridge (whose working directory it is) have exited, and a synchronous retry would block the
     // Host for seconds, so the removal retries in the background; it runs again on exit, and a temp folder that still
     // cannot go is left to the OS instead of throwing out of an abort handler, which would end the Host.
-    void rm(session.directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => undefined)
+    void fsPromises.rm(session.directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => undefined)
   }
 }
 
