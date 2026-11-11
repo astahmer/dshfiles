@@ -1,4 +1,4 @@
-import { createAssistantMessage, createSystemMessage, createToolResultMessage, createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, createSystemMessage, createToolResultMessage, createUserMessage, ToolCallId, type Message } from '@deepseek-ai/dsh-llm'
 import { DshxEffect } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
@@ -128,7 +128,71 @@ describe('chunked compaction summaries', () => {
         'dshx.context-compaction.input_messages': 2,
         'dshx.context-compaction.initial_chunks': 1,
         'dshx.context-compaction.summary_requests': 1,
+        'dshx.context-compaction.shortened_messages': 0,
       })
+    }),
+  )
+
+  it.effect('answers a provider overflow by shortening older tool outputs and keeping the newest exchange intact', () =>
+    Effect.gen(function* () {
+      const callId = ToolCallId('old-call')
+      const oldCall = createAssistantMessage({
+        content: [{ type: 'tool-call', id: callId, name: 'read_file', arguments: '{"path":"big.log"}' }],
+        source: { provider: 'test-provider', model: 'test-model' },
+      })
+      const oldResult = createToolResultMessage({ callId, content: [{ type: 'text', text: 'old log line\n'.repeat(2_000) }], isError: false })
+      const newest = createUserMessage({ content: [{ type: 'text', text: 'Newest request '.repeat(400) }], source: { kind: 'user' } })
+      const input = { messages: [createSystemMessage('Keep session facts.'), oldCall, oldResult, newest] }
+      const fullBytes = input.messages.reduce((sum, message) => sum + serializedMessageBytes(message), 0)
+      const candidates: (readonly Message[])[] = []
+
+      const result = yield* summarizeInChunks({
+        input,
+        maxInputBytes: fullBytes * 2,
+        messageBytes: serializedMessageBytes,
+        summarize: candidate =>
+          Effect.suspend(() => {
+            candidates.push([...candidate.messages])
+            const bytes = candidate.messages.reduce((sum, message) => sum + serializedMessageBytes(message), 0)
+            // The provider's real limit is tighter than the byte estimate.
+            if (bytes > fullBytes * 0.7) return Effect.fail(new SummaryRequestFailed({ contextOverflow: true }))
+            return Effect.succeed(summary(`summary-${candidates.length}`))
+          }),
+      })
+
+      // One shortened retry instead of a split into halves plus a merge request.
+      expect(candidates).toHaveLength(2)
+      expect(result.summary).toEqual([{ type: 'text', text: 'summary-2' }])
+      const retried = candidates[1] ?? []
+      expect(retried.map(message => message.id)).toEqual(input.messages.map(message => message.id))
+      expect(retried.at(-1)).toBe(newest)
+      const shortenedResult = retried[2]
+      const text = shortenedResult?.role === 'tool' && shortenedResult.content[0]?.type === 'text' ? shortenedResult.content[0].text : ''
+      expect(text).toContain('characters omitted to fit the compaction request')
+      expect(text.startsWith('old log line')).toBe(true)
+    }),
+  )
+
+  it.effect('shortens one oversized tool transaction to fit instead of refusing it', () =>
+    Effect.gen(function* () {
+      const callId = ToolCallId('huge-call')
+      const systemMessage = createSystemMessage('Keep session facts.')
+      const toolCall = createAssistantMessage({
+        content: [{ type: 'tool-call', id: callId, name: 'read_file', arguments: '{"path":"huge.log"}' }],
+        source: { provider: 'test-provider', model: 'test-model' },
+      })
+      const toolResult = createToolResultMessage({ callId, content: [{ type: 'text', text: 'x'.repeat(50_000) }], isError: false })
+
+      const chunks = yield* splitSummarizationInput({
+        input: { messages: [systemMessage, toolCall, toolResult] },
+        maxInputBytes: 8_000,
+        messageBytes: serializedMessageBytes,
+      })
+
+      expect(chunks).toHaveLength(1)
+      expect(chunks[0]?.messages.map(message => message.id)).toEqual([systemMessage.id, toolCall.id, toolResult.id])
+      expect(chunks[0]?.messages[1]).toBe(toolCall)
+      expect(chunks[0]?.messages.reduce((sum, message) => sum + serializedMessageBytes(message), 0)).toBeLessThanOrEqual(8_000)
     }),
   )
 

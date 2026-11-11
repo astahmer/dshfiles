@@ -86,6 +86,81 @@ const withMessages = (input: SummarizeInput, messages: readonly Message[]): Summ
 const inputBytes = (input: SummarizeInput, messageBytes: (message: Message) => number) =>
   input.messages.reduce((sum, message) => sum + messageBytes(message), 0) + serializedBytes(input.tools ?? [])
 
+/** Text blocks shorter than this stay whole: shortening them saves too little to be worth the lost detail. */
+const SHORTEN_MIN_CHARS = 2_048
+const SHORTEN_HEAD_CHARS = 1_024
+const SHORTEN_TAIL_CHARS = 512
+/** On a provider-confirmed overflow, the shortened request aims at this share of the rejected one. */
+const OVERFLOW_SHORTEN_RATIO = 0.6
+
+const shortenText = (text: string) => {
+  if (text.length <= SHORTEN_MIN_CHARS) return text
+  const omitted = text.length - SHORTEN_HEAD_CHARS - SHORTEN_TAIL_CHARS
+  return `${text.slice(0, SHORTEN_HEAD_CHARS)}\n[… ${String(omitted)} characters omitted to fit the compaction request …]\n${text.slice(-SHORTEN_TAIL_CHARS)}`
+}
+
+const shortenMessage = (message: Message): Message => {
+  if (message.role === 'system') return message
+  if (message.role === 'tool')
+    return { ...message, content: message.content.map(block => (block.type === 'text' ? { ...block, text: shortenText(block.text) } : block)) }
+  if (message.role === 'assistant')
+    return { ...message, content: message.content.map(block => (block.type === 'text' ? { ...block, text: shortenText(block.text) } : block)) }
+  return { ...message, content: message.content.map(block => (block.type === 'text' ? { ...block, text: shortenText(block.text) } : block)) }
+}
+
+/**
+ * Shorten long text in `messages`, oldest first, until they fit `targetBytes`: tool outputs first, then the text of
+ * older exchanges. Each shortened block keeps its head and tail. The last `protectedCount` messages stay intact.
+ * Returns the messages unchanged when nothing long enough was found.
+ */
+const shortenOldest = (options: {
+  readonly messages: readonly Message[]
+  readonly protectedCount: number
+  readonly targetBytes: number
+  readonly messageBytes: (message: Message) => number
+}): { readonly messages: readonly Message[]; readonly shortened: number } => {
+  const messages = [...options.messages]
+  const shortenable = messages.length - options.protectedCount
+  let total = messages.reduce((sum, message) => sum + options.messageBytes(message), 0)
+  let shortened = 0
+  for (const pass of [(message: Message) => message.role === 'tool', (message: Message) => message.role === 'user' || message.role === 'assistant']) {
+    for (let index = 0; index < shortenable && total > options.targetBytes; index += 1) {
+      const message = messages[index]
+      if (message === undefined || !pass(message)) continue
+      const replacement = shortenMessage(message)
+      const saved = options.messageBytes(message) - options.messageBytes(replacement)
+      if (saved <= 0) continue
+      messages[index] = replacement
+      total -= saved
+      shortened += 1
+    }
+  }
+  return { messages, shortened }
+}
+
+/**
+ * The rejected request with its older tool outputs and exchanges shortened, its newest transaction intact; undefined
+ * when nothing could be shortened.
+ */
+const shortenOlderContent = Effect.fnUntraced(function* (options: {
+  readonly input: SummarizeInput
+  readonly targetBytes: number
+  readonly messageBytes: (message: Message) => number
+}) {
+  const prefix = systemPrefix(options.input.messages)
+  const units = yield* transactionUnits(options.input.messages.slice(prefix.length))
+  const newest = units.at(-1) ?? []
+  const prefixBytes = inputBytes(withMessages(options.input, prefix), options.messageBytes)
+  const result = shortenOldest({
+    messages: units.flat(),
+    protectedCount: newest.length,
+    targetBytes: options.targetBytes - prefixBytes,
+    messageBytes: options.messageBytes,
+  })
+  if (result.shortened === 0) return undefined
+  return { input: withMessages(options.input, [...prefix, ...result.messages]), shortened: result.shortened }
+})
+
 const chunksFromUnits = Effect.fnUntraced(function* (options: {
   readonly input: SummarizeInput
   readonly units: readonly Message[][]
@@ -96,7 +171,17 @@ const chunksFromUnits = Effect.fnUntraced(function* (options: {
   const prefixBytes = inputBytes(withMessages(options.input, prefix), options.messageBytes)
   if (prefixBytes > options.maxInputBytes) return yield* new CompactionBudgetExceeded({ reason: 'prefix-too-large' })
 
-  const sized = options.units.map(unit => ({ unit, bytes: unit.reduce((sum, message) => sum + options.messageBytes(message), 0) }))
+  const unitBytes = (unit: readonly Message[]) => unit.reduce((sum, message) => sum + options.messageBytes(message), 0)
+  // A single transaction larger than one request keeps its structure and loses only the middle of its long outputs.
+  const fitted = options.units.map(unit =>
+    prefixBytes + unitBytes(unit) <= options.maxInputBytes
+      ? unit
+      : [
+          ...shortenOldest({ messages: unit, protectedCount: 0, targetBytes: options.maxInputBytes - prefixBytes, messageBytes: options.messageBytes })
+            .messages,
+        ],
+  )
+  const sized = fitted.map(unit => ({ unit, bytes: unitBytes(unit) }))
   if (sized.some(entry => prefixBytes + entry.bytes > options.maxInputBytes)) return yield* new CompactionBudgetExceeded({ reason: 'unit-too-large' })
 
   const chunks: SummarizeInput[] = []
@@ -161,12 +246,30 @@ export const summarizeInChunks = Effect.fn('context compaction summarize')(funct
   const initialChunkCount = yield* Ref.make(0)
   const summaryRequestCount = yield* Ref.make(0)
 
-  const summarizeOrSplit = (candidate: SummarizeInput, overflowDepth = 0): Effect.Effect<SummaryProjection, SummaryRequestFailed | CompactionBudgetExceeded> =>
+  const shortenedMessages = yield* Ref.make(0)
+
+  const summarizeOrSplit = (
+    candidate: SummarizeInput,
+    overflowDepth = 0,
+    shortened = false,
+  ): Effect.Effect<SummaryProjection, SummaryRequestFailed | CompactionBudgetExceeded> =>
     Ref.update(summaryRequestCount, count => count + 1).pipe(
       Effect.andThen(options.summarize(candidate)),
       Effect.catchTag('SummaryRequestFailed', failure =>
         Effect.gen(function* () {
           if (!failure.contextOverflow || overflowDepth > 0) return yield* failure
+          // Shortening older outputs keeps every exchange in one request; splitting is the fallback when it is not enough.
+          if (!shortened) {
+            const shorter = yield* shortenOlderContent({
+              input: candidate,
+              targetBytes: Math.floor(inputBytes(candidate, options.messageBytes) * OVERFLOW_SHORTEN_RATIO),
+              messageBytes: options.messageBytes,
+            })
+            if (shorter !== undefined) {
+              yield* Ref.update(shortenedMessages, count => count + shorter.shortened)
+              return yield* summarizeOrSplit(shorter.input, overflowDepth, true)
+            }
+          }
           const halves = yield* splitInHalf(candidate)
           if (halves === undefined) return yield* failure
           yield* Ref.set(madeMultipleCalls, true)
@@ -207,6 +310,7 @@ export const summarizeInChunks = Effect.fn('context compaction summarize')(funct
               input_messages: options.input.messages.length,
               initial_chunks: yield* Ref.get(initialChunkCount),
               summary_requests: yield* Ref.get(summaryRequestCount),
+              shortened_messages: yield* Ref.get(shortenedMessages),
             },
           }),
         )
