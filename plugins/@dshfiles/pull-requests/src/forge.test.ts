@@ -89,8 +89,12 @@ describe('GitLab merge-request normalization', () => {
   })
 
   it('prioritizes draft over blocked and blocked over an unstable pipeline', () => {
-    expect(normalizeMergeRequest({ ...base, detailed_merge_status: 'draft', blocking_discussions_resolved: false })).toMatchObject({ mergeStateStatus: 'DRAFT' })
-    expect(normalizeMergeRequest({ ...base, detailed_merge_status: 'ci_still_running', blocking_discussions_resolved: false })).toMatchObject({ mergeStateStatus: 'BLOCKED' })
+    expect(normalizeMergeRequest({ ...base, detailed_merge_status: 'draft', blocking_discussions_resolved: false })).toMatchObject({
+      mergeStateStatus: 'DRAFT',
+    })
+    expect(normalizeMergeRequest({ ...base, detailed_merge_status: 'ci_still_running', blocking_discussions_resolved: false })).toMatchObject({
+      mergeStateStatus: 'BLOCKED',
+    })
     expect(normalizeMergeRequest({ ...base, detailed_merge_status: 'ci_still_running' })).toMatchObject({ mergeStateStatus: 'UNSTABLE' })
   })
 
