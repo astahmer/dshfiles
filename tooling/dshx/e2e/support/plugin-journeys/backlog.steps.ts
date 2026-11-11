@@ -162,7 +162,9 @@ When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
 
 When('the Backlog settings are opened', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Backlog settings', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Jev triage', exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Backlog settings' }).getByRole('heading', { name: 'Jev triage', exact: true })).toBeVisible()
+  // Settings open over the backlog instead of replacing it: the feed stays mounted behind the sheet.
+  await expect(page.getByRole('feed', { name: 'Backlog feed', includeHidden: true })).toHaveCount(1)
 })
 
 Then('the Jev settings controls are available', async ({ page }: { page: Page }) => {
@@ -242,7 +244,8 @@ Then('the files binding is listed under its connection', async ({ page }: { page
 })
 
 When('the Backlog views are shown again', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Backlog views', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Backlog settings' }).getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Backlog settings' })).toHaveCount(0)
   await expect(feed(page)).toBeVisible()
 })
 

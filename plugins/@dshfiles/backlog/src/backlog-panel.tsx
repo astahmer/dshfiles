@@ -15,6 +15,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { BacklogSettingsSheet } from './backlog-settings-sheet.js'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import {
@@ -487,7 +488,7 @@ export const BacklogPanel = (props: {
   const setOpenId = useCallback((id: number | null): void => setOpenIds(selection => setBacklogViewSelection(selection, view, id)), [view])
   const setCursorId = useCallback((id: number | null): void => setCursorIds(selection => setBacklogViewSelection(selection, view, id)), [view])
   const [expanded, setExpanded] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set(['dropped']))
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
@@ -903,53 +904,49 @@ export const BacklogPanel = (props: {
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  aria-label={showSettings ? 'Backlog views' : 'Backlog settings'}
-                  onClick={() => setShowSettings(value => !value)}
-                  aria-pressed={showSettings}
+                  aria-label="Backlog settings"
+                  aria-haspopup="dialog"
+                  onClick={() => setSettingsOpen(true)}
                   className={cn(
                     'dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent',
-                    showSettings ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
+                    settingsOpen ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
                   )}
                 >
                   <Settings2Icon aria-hidden className="dshx:size-3.5" />
-                  <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">{showSettings ? 'Backlog' : 'Settings'}</span>
+                  <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Settings</span>
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{showSettings ? 'Back to backlog' : 'Backlog settings'}</TooltipContent>
+              <TooltipContent>Backlog settings</TooltipContent>
             </Tooltip>
-            {showSettings ? null : (
-              <>
-                <span
-                  role={aiWorking ? 'status' : undefined}
-                  aria-label={aiWorking ? 'AI is working' : undefined}
-                  aria-hidden={aiWorking ? undefined : true}
-                  className={cn(
-                    'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground dshx:transition-opacity',
-                    aiWorking ? 'dshx:opacity-70' : 'dshx:opacity-0',
-                  )}
+            <span
+              role={aiWorking ? 'status' : undefined}
+              aria-label={aiWorking ? 'AI is working' : undefined}
+              aria-hidden={aiWorking ? undefined : true}
+              className={cn(
+                'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground dshx:transition-opacity',
+                aiWorking ? 'dshx:opacity-70' : 'dshx:opacity-0',
+              )}
+            >
+              <LoaderCircleIcon aria-hidden className={cn('dshx:size-3.5', aiWorking && 'dshx:animate-spin')} />
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Backfill triage"
+                  onClick={() => setBackfillOpen(true)}
+                  className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
                 >
-                  <LoaderCircleIcon aria-hidden className={cn('dshx:size-3.5', aiWorking && 'dshx:animate-spin')} />
-                </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Backfill triage"
-                      onClick={() => setBackfillOpen(true)}
-                      className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
-                    >
-                      <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
-                      <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Backfill</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Triage items captured before triage was set up</TooltipContent>
-                </Tooltip>
-                <Button type="button" size="sm" onClick={() => startCapture(null)}>
-                  <PlusIcon className="dshx:size-3.5" />
-                  <span className="dshx:@max-pane-narrow:sr-only">New</span>
-                </Button>
-              </>
-            )}
+                  <WandSparklesIcon aria-hidden className="dshx:size-3.5" />
+                  <span className="dshx:whitespace-nowrap dshx:@max-[80rem]:sr-only">Backfill</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Triage items captured before triage was set up</TooltipContent>
+            </Tooltip>
+            <Button type="button" size="sm" onClick={() => startCapture(null)}>
+              <PlusIcon className="dshx:size-3.5" />
+              <span className="dshx:@max-pane-narrow:sr-only">New</span>
+            </Button>
           </div>
         </header>
         {list.isError ? (
@@ -961,175 +958,172 @@ export const BacklogPanel = (props: {
           </p>
         ) : null}
         <div data-backlog-content-region className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:@max-pane-compact:flex-col">
-          {showSettings ? (
-            <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:overflow-y-auto">
-              <BacklogSettingsPanel />
-              <BacklogSyncControls.Settings projectPaths={projectPaths} />
-              <BacklogHostsSettings />
-              <BacklogExportSettings />
-            </div>
-          ) : null}
-          {!showSettings &&
-            (showsResults ? (
-              <>
-                <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-                  <SearchResults
-                    items={all}
-                    total={list.data?.total ?? 0}
-                    counts={searchStatusCounts.data ?? FeedStatus.counts(all)}
+          {showsResults ? (
+            <>
+              <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
+                <SearchResults
+                  items={all}
+                  total={list.data?.total ?? 0}
+                  counts={searchStatusCounts.data ?? FeedStatus.counts(all)}
+                  statuses={stored.statuses}
+                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                  clearStatuses={() => setPreference({ statuses: [] })}
+                  query={debounced}
+                  triageOff={triageOff}
+                  openId={openId}
+                  cursorId={cursorId}
+                  select={select}
+                  hover={setCursorId}
+                  loaded={list.isSuccess}
+                  startThread={openStartThread}
+                  projectPaths={projectPaths}
+                />
+              </div>
+              {inspector}
+            </>
+          ) : view === 'inbox' ? (
+            <InboxView
+              triageOff={triageOff}
+              items={inboxItems}
+              cursorId={cursorId}
+              threads={inboxThreads}
+              openId={openId}
+              select={select}
+              openThread={props.openThread}
+              threadTitle={sessionId => threads.find(thread => thread.id === sessionId)?.title}
+              openInbox={props.openInbox}
+              acknowledgeThread={thread =>
+                void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
+              }
+              inspector={inspector}
+              loaded={inbox.isSuccess}
+              sort={stored.sort.inbox}
+              startThread={openStartThread}
+              projectPaths={projectPaths}
+            />
+          ) : (
+            <>
+              <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
+                {view === 'feed' && (
+                  <FeedView
+                    cursorId={cursorId}
+                    triageOff={triageOff}
+                    items={filteredItems}
+                    sort={stored.sort.feed}
+                    counts={statusTotals}
                     statuses={stored.statuses}
                     toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
                     clearStatuses={() => setPreference({ statuses: [] })}
-                    query={debounced}
-                    triageOff={triageOff}
+                    openId={openId}
+                    select={select}
+                    loaded={list.isSuccess}
+                    now={now}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                    openThread={props.openThread}
+                  />
+                )}
+                {view === 'ready' && (
+                  <ItemsView
+                    ready
+                    items={readyItems}
+                    sort="priority"
+                    counts={readyTotals}
+                    statuses={stored.statuses}
+                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                    clearStatuses={() => setPreference({ statuses: [] })}
                     openId={openId}
                     cursorId={cursorId}
                     select={select}
                     hover={setCursorId}
-                    loaded={list.isSuccess}
+                    groupBy="priority"
+                    triageOff={triageOff}
+                    setGroupBy={() => undefined}
+                    collapsed={collapsed}
+                    setCollapsed={next => withViewTransition(() => setCollapsed(next))}
+                    captureInto={startCapture}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                  />
+                )}
+                {view === 'items' && (
+                  <ItemsView
+                    items={filteredItems}
+                    sort={stored.sort.items}
+                    counts={statusTotals}
+                    statuses={stored.statuses}
+                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                    clearStatuses={() => setPreference({ statuses: [] })}
+                    openId={openId}
+                    cursorId={cursorId}
+                    select={select}
+                    hover={setCursorId}
+                    groupBy={stored.groupBy}
+                    triageOff={triageOff}
+                    setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
+                    collapsed={collapsed}
+                    setCollapsed={next => withViewTransition(() => setCollapsed(next))}
+                    captureInto={startCapture}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                  />
+                )}
+                {view === 'board' && (
+                  <BoardView
+                    panelId={props.panelId}
+                    triageOff={triageOff}
+                    items={items}
+                    openId={openId}
+                    cursorId={cursorId}
+                    open={select}
+                    captureInto={startCapture}
+                    projectPaths={projectPaths}
+                    startThread={openStartThread}
+                  />
+                )}
+                {view === 'shipped' && (
+                  <ShippedView
+                    period={stored.shippedPeriod}
+                    setPeriod={shippedPeriod => setPreference({ shippedPeriod })}
+                    projects={projectFilters}
+                    openId={openId}
+                    cursorId={cursorId}
+                    select={select}
+                    hover={setCursorId}
+                    openSettings={() => setSettingsOpen(true)}
+                  />
+                )}
+                {view === 'projects' && (
+                  <ProjectsView
+                    query={debounced}
+                    hideAgentItems={hideAgentItems}
+                    matchingProjects={
+                      debounced === ''
+                        ? projectFilters.length === 0
+                          ? null
+                          : new Set(projectFilters.map(project => project ?? ''))
+                        : SearchScopes.matchingProjects(items)
+                    }
+                    triageOff={triageOff}
+                    selectedProject={selectedProject}
+                    setSelectedProject={setSelectedProject}
+                    select={select}
+                    now={now}
                     startThread={openStartThread}
                     projectPaths={projectPaths}
                   />
-                </div>
-                {inspector}
-              </>
-            ) : view === 'inbox' ? (
-              <InboxView
-                triageOff={triageOff}
-                items={inboxItems}
-                cursorId={cursorId}
-                threads={inboxThreads}
-                openId={openId}
-                select={select}
-                openThread={props.openThread}
-                threadTitle={sessionId => threads.find(thread => thread.id === sessionId)?.title}
-                openInbox={props.openInbox}
-                acknowledgeThread={thread =>
-                  void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
-                }
-                inspector={inspector}
-                loaded={inbox.isSuccess}
-                sort={stored.sort.inbox}
-                startThread={openStartThread}
-                projectPaths={projectPaths}
-              />
-            ) : (
-              <>
-                <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-                  {view === 'feed' && (
-                    <FeedView
-                      cursorId={cursorId}
-                      triageOff={triageOff}
-                      items={filteredItems}
-                      sort={stored.sort.feed}
-                      counts={statusTotals}
-                      statuses={stored.statuses}
-                      toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                      clearStatuses={() => setPreference({ statuses: [] })}
-                      openId={openId}
-                      select={select}
-                      loaded={list.isSuccess}
-                      now={now}
-                      projectPaths={projectPaths}
-                      startThread={openStartThread}
-                      openThread={props.openThread}
-                    />
-                  )}
-                  {view === 'ready' && (
-                    <ItemsView
-                      ready
-                      items={readyItems}
-                      sort="priority"
-                      counts={readyTotals}
-                      statuses={stored.statuses}
-                      toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                      clearStatuses={() => setPreference({ statuses: [] })}
-                      openId={openId}
-                      cursorId={cursorId}
-                      select={select}
-                      hover={setCursorId}
-                      groupBy="priority"
-                      triageOff={triageOff}
-                      setGroupBy={() => undefined}
-                      collapsed={collapsed}
-                      setCollapsed={next => withViewTransition(() => setCollapsed(next))}
-                      captureInto={startCapture}
-                      projectPaths={projectPaths}
-                      startThread={openStartThread}
-                    />
-                  )}
-                  {view === 'items' && (
-                    <ItemsView
-                      items={filteredItems}
-                      sort={stored.sort.items}
-                      counts={statusTotals}
-                      statuses={stored.statuses}
-                      toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                      clearStatuses={() => setPreference({ statuses: [] })}
-                      openId={openId}
-                      cursorId={cursorId}
-                      select={select}
-                      hover={setCursorId}
-                      groupBy={stored.groupBy}
-                      triageOff={triageOff}
-                      setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
-                      collapsed={collapsed}
-                      setCollapsed={next => withViewTransition(() => setCollapsed(next))}
-                      captureInto={startCapture}
-                      projectPaths={projectPaths}
-                      startThread={openStartThread}
-                    />
-                  )}
-                  {view === 'board' && (
-                    <BoardView
-                      panelId={props.panelId}
-                      triageOff={triageOff}
-                      items={items}
-                      openId={openId}
-                      cursorId={cursorId}
-                      open={select}
-                      captureInto={startCapture}
-                      projectPaths={projectPaths}
-                      startThread={openStartThread}
-                    />
-                  )}
-                  {view === 'shipped' && (
-                    <ShippedView
-                      period={stored.shippedPeriod}
-                      setPeriod={shippedPeriod => setPreference({ shippedPeriod })}
-                      projects={projectFilters}
-                      openId={openId}
-                      cursorId={cursorId}
-                      select={select}
-                      hover={setCursorId}
-                      openSettings={() => setShowSettings(true)}
-                    />
-                  )}
-                  {view === 'projects' && (
-                    <ProjectsView
-                      query={debounced}
-                      hideAgentItems={hideAgentItems}
-                      matchingProjects={
-                        debounced === ''
-                          ? projectFilters.length === 0
-                            ? null
-                            : new Set(projectFilters.map(project => project ?? ''))
-                          : SearchScopes.matchingProjects(items)
-                      }
-                      triageOff={triageOff}
-                      selectedProject={selectedProject}
-                      setSelectedProject={setSelectedProject}
-                      select={select}
-                      now={now}
-                      startThread={openStartThread}
-                      projectPaths={projectPaths}
-                    />
-                  )}
-                </div>
-                {inspector}
-              </>
-            ))}
+                )}
+              </div>
+              {inspector}
+            </>
+          )}
         </div>
+        <BacklogSettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <BacklogSettingsPanel />
+          <BacklogSyncControls.Settings projectPaths={projectPaths} />
+          <BacklogHostsSettings />
+          <BacklogExportSettings />
+        </BacklogSettingsSheet>
         {startThreadItems === null ? null : (
           <StartThreadDialog
             key={startThreadItems.map(item => item.id).join('-')}
@@ -1170,29 +1164,27 @@ export const BacklogPanel = (props: {
             Backfill running: {backfillJob.completed}/{backfillJob.total}
           </button>
         ) : null}
-        {showSettings ? null : (
-          <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
-            <div className="dshx:mx-auto dshx:max-w-4xl">
-              <Composer
-                key={draftKey}
-                variant="chat"
-                draftKey={draftKey}
-                placeholder="Capture a thought, a task, a bug… like sending a message"
-                tags={tags}
-                threads={threads}
-                projects={projectPaths}
-                projectFilter={projectFilters.length === 0 ? null : projectFilters.length === 1 ? (projectFilters[0] ?? null) : null}
-                reuseProject={settings.value?.reuseCaptureProject ?? true}
-                templates={(settings.value?.templates ?? []).map(entry => entry.name)}
-                status={captureStatus}
-                onClearStatus={() => setCaptureStatus(null)}
-                inputRef={captureComposer}
-                onNavigateUp={navigateToNearestItem}
-                {...(captureRequest === undefined ? {} : { captureRequest })}
-              />
-            </div>
+        <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
+          <div className="dshx:mx-auto dshx:max-w-4xl">
+            <Composer
+              key={draftKey}
+              variant="chat"
+              draftKey={draftKey}
+              placeholder="Capture a thought, a task, a bug… like sending a message"
+              tags={tags}
+              threads={threads}
+              projects={projectPaths}
+              projectFilter={projectFilters.length === 0 ? null : projectFilters.length === 1 ? (projectFilters[0] ?? null) : null}
+              reuseProject={settings.value?.reuseCaptureProject ?? true}
+              templates={(settings.value?.templates ?? []).map(entry => entry.name)}
+              status={captureStatus}
+              onClearStatus={() => setCaptureStatus(null)}
+              inputRef={captureComposer}
+              onNavigateUp={navigateToNearestItem}
+              {...(captureRequest === undefined ? {} : { captureRequest })}
+            />
           </div>
-        )}
+        </div>
       </main>
     </PanelProviders>
   )

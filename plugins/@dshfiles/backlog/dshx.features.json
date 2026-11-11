@@ -2317,7 +2317,7 @@
         "click button \"Add binding\"",
         "fill textbox \"Folder\" \"/tmp/dshx-backlog-reach\"",
         "click button \"Save binding\"",
-        "click button \"Backlog views\"",
+        "click button \"Close\"",
         "fill textbox \"Capture\" \"Mirror this item in files\"",
         "press Enter",
         "rightclick article \"Item b:#1\"",
