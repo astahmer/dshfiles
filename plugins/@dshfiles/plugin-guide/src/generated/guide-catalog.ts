@@ -48,7 +48,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:94",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:95",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -68,7 +68,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/client/index.ts:93",
+      "source": "tooling/dshx/packages/dshx/src/client/index.ts:94",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -597,7 +597,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/ai-accounts/codex-credential",
       "kind": "module",
       "title": "@dshfiles/ai-accounts/codex-credential",
-      "summary": "Public module of @dshfiles/ai-accounts.",
+      "summary": "pi-ai credential plumbing for one Codex account. pi-ai's codex protocol lives behind an OAuth-only provider, so the token this plugin resolved for the request has to arrive as a stored OAuth credential rather than as an api-key override. The account's own `auth.json` is the datum already materialized for CODEX_HOME, s…",
       "publicSymbol": "readCodexOAuthCredential, persistCodexOAuthCredential, CodexCredentialStore",
       "importFrom": "@dshfiles/ai-accounts/codex-credential",
       "owner": "@dshfiles/ai-accounts",
@@ -1080,6 +1080,29 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "details": [
         "Methods: state, rangeState, set, toggle",
         "Agent tools: changes_viewed_files (read-only), changes_mark_viewed"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
+      "publicSymbol": "editorArtifactsApi",
+      "importFrom": "@dshfiles/editor/artifacts-api",
+      "owner": "@dshfiles/editor",
+      "source": "plugins/@dshfiles/editor/src/artifacts-api.ts:29",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/editor:editor-artifacts",
+      "kind": "api",
+      "title": "editorArtifactsApi (editor-artifacts)",
+      "summary": "Host API served by @dshfiles/editor.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(editorArtifactsApi) in a Client slot, or createHostApiClient(ctx, editorArtifactsApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/editor owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: list, read, create, update, delete",
+        "Agent tools: artifact_list (read-only), artifact_read (read-only), artifact_create, artifact_update, artifact_delete"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -1983,6 +2006,29 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "sessionSearchApi",
+      "importFrom": "@dshfiles/session-search/search-api",
+      "owner": "@dshfiles/session-search",
+      "source": "plugins/@dshfiles/session-search/src/api.ts:33",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/session-search:session-search",
+      "kind": "api",
+      "title": "sessionSearchApi (session-search)",
+      "summary": "What this plugin adds on top of `sessionQuery` search: the state of its own derived index, and a find over one whole thread in transcript order (the Chat find bar). Every method is a read, and each carries the matching agent tool.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(sessionSearchApi) in a Client slot, or createHostApiClient(ctx, sessionSearchApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/session-search owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: health, findInThread",
+        "Agent tools: session_search_health (read-only), thread_find (read-only)"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/settings-shell/settings",
       "kind": "module",
       "title": "@dshfiles/settings-shell/settings",
@@ -2026,7 +2072,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadSidebarAttentionApi",
       "importFrom": "@dshfiles/thread-sidebar/attention-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/attention-api.ts:50",
+      "source": "plugins/@dshfiles/thread-sidebar/src/attention-api.ts:112",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-attention",
@@ -2039,8 +2085,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/thread-sidebar owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: state, acknowledge, clearUnread, clearUnreadMany, markUnread, markUnreadMany, migrate",
-        "Agent tools: thread_attention_state (read-only)"
+        "Methods: state, changesSince, acknowledge, clearUnread, clearUnreadMany, markUnread, markUnreadMany, migrate, writeDelta, writeCapabilities",
+        "Agent tools: thread_attention_state (read-only), thread_attention_write_capabilities (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2789,7 +2835,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/background-jobs › thread-jobs-facet"
       ],
       "details": [
-        "Used by 30 catalog feature(s)",
+        "Used by 31 catalog feature(s)",
         "Destinations in use: thread-panel"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2899,7 +2945,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 26 catalog feature(s)",
+        "Used by 33 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2927,7 +2973,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-preset › draft-preset-selection"
       ],
       "details": [
-        "Used by 62 catalog feature(s)",
+        "Used by 64 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2951,11 +2997,11 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [
         "@dshfiles/ai-accounts › disabled-account-preview",
         "@dshfiles/ai-accounts › active-chat-account",
-        "@dshfiles/frame-layout › status-item-open",
-        "@dshfiles/hmr-gate › plugins-row"
+        "@dshfiles/ai-accounts › extra-usage-guard",
+        "@dshfiles/frame-layout › status-item-open"
       ],
       "details": [
-        "Used by 9 catalog feature(s)",
+        "Used by 10 catalog feature(s)",
         "Destinations in use: none, observe"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -2983,7 +3029,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 54 catalog feature(s)",
+        "Used by 57 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3067,7 +3113,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › bounded-batch-resolution"
       ],
       "details": [
-        "Used by 22 catalog feature(s)",
+        "Used by 23 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3095,7 +3141,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › subagent-traces"
       ],
       "details": [
-        "Used by 109 catalog feature(s)",
+        "Used by 111 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
