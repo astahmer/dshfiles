@@ -102,8 +102,10 @@ answerable, and a late answer is steered in as a `user-question-reply` message.
 [agent-questions-timed.feature](../../../tooling/dshx/e2e/features/agent-questions-timed.feature)
 boots the web seed's own timed row and proves the ticking countdown and
 Recommended badge, the pending result while the Agent continues, a late Submit
-arriving as a user message tagged `answer_to_pending_question` with the call id,
-Stop withdrawing the form, and the pending card shown again after a Host
+arriving as a user message tagged `answer_to_pending_question` with the call id.
+It also opens the Inbox, answers a continued single-select native question there,
+and verifies that the item resolves and the Agent receives the reply. The journey
+covers Stop withdrawing the form and the pending card shown again after a Host
 restart. An answer submitted after that restart does not reach the Agent: the
 root Session is stopped then ([Host gap 16](../../../plans/dsh-host-gaps.md)).
 

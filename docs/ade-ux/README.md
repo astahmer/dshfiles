@@ -39,13 +39,12 @@ owner.
 - [x] ~~Browser push for blocking items~~: no Host gap. A plugin can serve its own service worker and subscribe route
       through `ctx.webServer.register`, add the manifest link with `webserver/index-inject`, keep the VAPID key as a
       `secret:ALIAS` reference and send from the Host; the iOS install and Electron `file://` limits are listed in
-      [the attention model](../docs/ade-ux/README.md#48-the-attention-model). Shipping it is a new plugin, not a
+      [the attention model](#48-the-attention-model). Shipping it is a new plugin, not a
       core change.
-- [ ] Native `ask_user_question` forms stay unproven in scratch: the Inbox provider and its answer path are covered
-      Host-side (`native-question-attention.test.ts`, `attention-inbox.integration.test.ts`), but the composed
-      scratch profile never reaches the New thread composer — after the fake account is added, `New session` leaves
-      the AI Accounts page open, and the same failure hits the untouched timed-question journeys. Not a regression of
-      the Inbox provider; fix the composition first, then add the journey.
+- [x] ~~Native `ask_user_question` forms reach the Inbox~~: a fake-provider browser journey opens a continued
+      single-select question, answers it in the Inbox, and verifies the Agent receives the reply and the item
+      resolves. Details and limits:
+      [Agent Questions](../../plugins/@dshfiles/agent-questions/README.md#root-questions-use-the-native-timed-mode).
 
 **Thread list and shell (Phase 3)**
 

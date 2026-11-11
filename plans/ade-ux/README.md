@@ -12,12 +12,6 @@ Done / Restore releasing and recreating the workspace is shipped (settle cleanup
 [jj-integration](../../plugins/@dshfiles/jj-integration/README.md#settle-cleanup)). The re-run items below were not
 re-run after that restart.
 
-- [ ] Native `ask_user_question` forms stay unproven in scratch: the Inbox provider and its answer path are covered
-      Host-side (`native-question-attention.test.ts`, `attention-inbox.integration.test.ts`), but the composed scratch
-      profile never reaches the New thread composer — after the fake account is added, `New session` leaves the
-      AI Accounts page open, and the untouched timed-question journeys fail the same way. Fix the composition, then
-      add the journey; the catalog records the same reason.
-
 - [ ] git-worktree workspaces get only the This-turn Changes scope (the VCS port has no diff verb); no
       rebase-without-land verb (History's previewed rebase stands in).
 
