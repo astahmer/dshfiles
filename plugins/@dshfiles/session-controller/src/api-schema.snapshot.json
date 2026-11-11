@@ -645,7 +645,7 @@
         },
         {
           "name": "prompt",
-          "description": "Send a user prompt: queue it for the next turn, or steer the running turn.",
+          "description": "Send a user prompt: queue it for the next turn, or steer the running turn. A caller that may retry passes the same requestId (a UUID): a prompt the thread already holds under that id is not sent again.",
           "input": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
@@ -666,6 +666,18 @@
                       "queue",
                       "steer"
                     ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requestId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|[fF]{8}-[fF]{4}-[fF]{4}-[fF]{4}-[fF]{12})$",
+                    "format": "uuid"
                   },
                   {
                     "type": "null"

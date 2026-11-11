@@ -56,6 +56,7 @@ class ScriptedModel extends LlmAdapter {
 /** Real Agent, loop, inbox, commands, prompts and storage; the Session controller is the fork's own command owner. */
 const fixture = async (replies: readonly string[] = []) => {
   const root = await mkdtemp(join(tmpdir(), 'sessions-api-'))
+  const promptRequestIds: string[] = []
   const host = await createTestHost()
   cleanups.push(async () => {
     await host.dispose()
@@ -93,6 +94,7 @@ const fixture = async (replies: readonly string[] = []) => {
     }),
     // Native admission also needs the attachment and upload services; a text prompt enters the inbox the same way.
     prompt: async (request: Parameters<SessionCommandController['prompt']>[0]) => {
+      promptRequestIds.push(request.requestId)
       const resolved = await owner.resolveAgent(request.sessionId)
       if ('error' in resolved) throw resolved.error
       const content = request.content.flatMap(part => (part.type === 'text' ? [{ type: 'text' as const, text: part.text }] : []))
@@ -119,7 +121,7 @@ const fixture = async (replies: readonly string[] = []) => {
     { packageId: '@dshfiles/session-controller' },
   )
   const sessions = createHostApiClient(ctx, sessionsApi, '@acme/driver')
-  return { ctx, agent: handle.agent, handle, model, sessions }
+  return { ctx, agent: handle.agent, handle, model, sessions, promptRequestIds }
 }
 
 /** Core's read engine without a search backend: these tests read Sessions, they never search them. */
@@ -155,6 +157,16 @@ it('prompts a thread, waits for its turn, and carries keyed instructions in ever
   await sessions.prompt({ sessionId: agent.id, text: 'Again' })
   await sessions.wait({ sessionId: agent.id, timeoutMs: 10_000 })
   expect(textOf(model.requests.at(-1))).not.toContain('Answer in French.')
+})
+
+it('hands a caller-chosen request id to native admission so a retried prompt is not sent twice', async () => {
+  const { agent, sessions, promptRequestIds } = await fixture()
+  const requestId = '0f8a1c2e-3b4d-4e5f-8a6b-7c8d9e0f1a2b'
+  await sessions.prompt({ sessionId: agent.id, text: 'Scheduled hello', requestId })
+  await sessions.prompt({ sessionId: agent.id, text: 'Unkeyed hello' })
+  expect(promptRequestIds[0]).toBe(requestId)
+  expect(promptRequestIds[1]).not.toBe(requestId)
+  await expect(sessions.prompt({ sessionId: agent.id, text: 'Bad id', requestId: 'not-a-uuid' })).rejects.toBeDefined()
 })
 
 it('adds a plugin message that waits for the next turn unless asked to wake the thread', async () => {

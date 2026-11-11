@@ -86,11 +86,13 @@ export const sessionsApi = defineApi({
       output: Schema.Struct({ sessionId: Schema.String }),
     }),
     prompt: method({
-      description: 'Send a user prompt: queue it for the next turn, or steer the running turn.',
+      description:
+        'Send a user prompt: queue it for the next turn, or steer the running turn. A caller that may retry passes the same requestId (a UUID): a prompt the thread already holds under that id is not sent again.',
       input: Schema.Struct({
         sessionId,
         text,
         mode: Schema.Literals(['queue', 'steer']).pipe(Schema.withDecodingDefault(Effect.succeed('queue'))),
+        requestId: Schema.optional(Schema.String.check(Schema.isUUID())),
       }),
       output: Schema.Struct({ accepted: Schema.Literal(true) }),
     }),

@@ -143,9 +143,10 @@ const sendPrompt = async (
   text: string,
   mode: 'queue' | 'steer',
   signal: AbortSignal,
+  callerRequestId?: string,
 ): Promise<void> => {
   // SAFETY: SessionRequestId is a type-only brand over a caller-minted unique id.
-  const requestId = randomUUID() as SessionRequestId
+  const requestId = (callerRequestId ?? randomUUID()) as SessionRequestId
   await native(() => controllerOf(runtime).prompt({ requestId, sessionId, mode, content: [{ type: 'text', text }] }, signal))
 }
 
@@ -302,7 +303,7 @@ export const sessionsHost = sessionControllerHostApi(sessionsApi, {
   prompt: Effect.fn('sessions prompt')(({ input, signal }) =>
     SessionControllerHostRuntime.use(runtime =>
       trySessionControllerOperation('sessions API operation', async () => {
-        await sendPrompt(runtime, allowed(runtime, input.sessionId), input.text, input.mode, signal)
+        await sendPrompt(runtime, allowed(runtime, input.sessionId), input.text, input.mode, signal, input.requestId)
         return { accepted: true as const }
       }),
     ),
