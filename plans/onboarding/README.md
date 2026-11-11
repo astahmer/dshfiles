@@ -4,7 +4,7 @@
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
-**Status:** P0–P3 landed on `main` (2026-11-11): What's new (`jj:tspprznw`, `jj:yvnrmxpv`) and opt-in usage suggestions (`jj:qkyvwznv`, off by default). Phone `reach` paths (follow-up 7) in progress; P4 next.
+**Status:** P0–P3 landed on `main` (2026-11-11). P4: `dshx init` and the generated pack docs landed (`jj:vlltwsss`, `jj:uynuvtky`); the Try it demo and the phone `reach` paths (follow-up 7) are in progress; P5 last.
 
 | Phase | Work                                                                                                                                                                | Status      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
@@ -50,6 +50,8 @@
 9. The wizard's "No composer is open" message is unreachable: without a composer on screen it opens a new thread draft with the prompt, which always succeeds.
 10. Usage suggestions read Usage's 100 most-used tools; a tool used outside that set reads as unused and may be suggested (Dismiss hides it). The "repeated prompts → prompt stash" rule is omitted: Usage never exposes prompt text, by design. The populated list is proven by a DOM test only (the scratch profile has too little usage to cross a threshold).
 11. Effect `Cache` lookups run under the services captured at layer build, so a span opened inside a lookup never reaches the request's tracer. Onboarding uses its own keyed `TtlCell` instead; other plugins that open spans inside `Cache.makeWith` lookups may have the same blind spot.
+12. `scripts/pack-docs.ts` restates overview-model's "curated" rule, because plain `node` cannot load `overview-model.ts`. Move the rule into a module with type-only imports (`curation.ts`) that both read, after P4a lands.
+13. `dshx init` reads `onboarding/src/packs.ts` from the checkout at run time (a dshx module would close a workspace cycle: onboarding depends on dshx). Its interactive terminal picker and booting a composed profile are unverified; `--yes`, `--dry-run` and `--json` ran in a temp home.
 
 ### Landing checks
 
