@@ -41,6 +41,11 @@
           "id": "tool-fs.surrogate-safe",
           "file": "plugins/@dshfiles/tool-fs/src/read.test.ts",
           "testName": "never cuts a multi-byte character when it shortens a long line"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "tool-fs.no-browser-surface",
+          "reason": "Agent tool text only: the native tool cards render it unchanged, and the real-tool unit tests assert the model-facing text."
         }
       ],
       "telemetry": [
