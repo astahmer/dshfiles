@@ -24,6 +24,21 @@ describe('the project on screen', () => {
     expect(OnScreenProjects.of({ sessions: sessions('session-isolated'), workspaces })).toEqual({ projectId: 'workspace-dshfiles', title: 'dshfiles' })
   })
 
+  it('reads a thread workspace in a custom threads directory as the project its VCS provider reported', () => {
+    const custom = [
+      { workspaceId: 'workspace-dshfiles', title: 'dshfiles', path: '/dev/dshfiles', sessionIds: ['session-main'] },
+      { workspaceId: 'workspace-thread', title: 'thread-b08206', path: '/elsewhere/dshfiles/thread-b08206', sessionIds: ['session-isolated'] },
+    ]
+    expect(OnScreenProjects.of({ sessions: sessions('session-isolated'), workspaces: custom })).toBeNull()
+    expect(
+      OnScreenProjects.of({
+        sessions: sessions('session-isolated'),
+        workspaces: custom,
+        threadDirectories: new Map([['/elsewhere/dshfiles', '/dev/dshfiles']]),
+      }),
+    ).toEqual({ projectId: 'workspace-dshfiles', title: 'dshfiles' })
+  })
+
   it('follows a subagent to its parent thread', () => {
     expect(OnScreenProjects.of({ sessions: sessions('session-child', { 'session-child': 'session-main' }), workspaces })).toEqual({
       projectId: 'workspace-dshfiles',

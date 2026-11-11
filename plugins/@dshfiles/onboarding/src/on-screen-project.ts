@@ -1,4 +1,4 @@
-import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import { EntityLabels, type ThreadDirectories } from '@dshfiles/plugin-ui/hooks/entity-labels'
 
 interface SessionRow {
   readonly parentId?: string | undefined
@@ -28,6 +28,8 @@ const trimSeparators = (path: string): string => path.replace(/[\\/]+$/u, '')
 const of = (input: {
   readonly sessions: { readonly ids: readonly string[]; readonly byId: Readonly<Record<string, SessionRow | undefined>> }
   readonly workspaces: readonly WorkspaceRow[]
+  /** The VCS providers' thread folders, so a thread in a custom threads directory reads as its project. */
+  readonly threadDirectories?: ThreadDirectories | undefined
 }): OnScreenProject | null => {
   const workspaceBySession = new Map(input.workspaces.flatMap(workspace => workspace.sessionIds.map(id => [id, workspace] as const)))
   const visited = new Set<string>()
@@ -36,8 +38,8 @@ const of = (input: {
     visited.add(cursor)
     const workspace = workspaceBySession.get(cursor)
     if (workspace !== undefined) {
-      const repository = trimSeparators(EntityLabels.repositoryPath(workspace.path))
-      const project = EntityLabels.projectsOf(input.workspaces).find(candidate => trimSeparators(candidate.path) === repository)
+      const repository = trimSeparators(EntityLabels.repositoryPath(workspace.path, input.threadDirectories))
+      const project = EntityLabels.projectsOf(input.workspaces, input.threadDirectories).find(candidate => trimSeparators(candidate.path) === repository)
       return project === undefined ? null : { projectId: project.workspaceId, title: project.title }
     }
     cursor = input.sessions.byId[cursor]?.parentId

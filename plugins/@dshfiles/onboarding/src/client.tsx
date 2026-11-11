@@ -7,6 +7,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { CompassIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { DestinationSections } from '@dshfiles/thread-sidebar/destinations'
+import { useThreadDirectories } from '@dshfiles/thread-sidebar/thread-directories'
 import { useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { onboardingApi } from './api.js'
 import { GettingStartedPage, type GettingStartedProps } from './getting-started-page.js'
@@ -126,7 +127,8 @@ export default defineClient({
     const useOnScreenProject = (): OnScreenProject | null => {
       const sessions = useSyncExternalStore(subscribeSessions, readSessions, readSessions)
       const workspaces = useSyncExternalStore(subscribeWorkspaces, readWorkspaces, readWorkspaces)
-      return useMemo(() => OnScreenProjects.of({ sessions, workspaces }), [sessions, workspaces])
+      const threadDirectories = useThreadDirectories(workspaces)
+      return useMemo(() => OnScreenProjects.of({ sessions, workspaces, threadDirectories }), [sessions, threadDirectories, workspaces])
     }
 
     /** Into the composer on screen, else a new thread draft; neither sends. */
