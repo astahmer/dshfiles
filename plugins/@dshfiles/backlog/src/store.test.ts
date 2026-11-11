@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
+import { BacklogDb } from './backlog-db.js'
 import { BacklogRepo } from './backlog-repo.js'
 import type { BacklogItem, BacklogLink } from './item.js'
 import { BacklogItems } from './item.js'
@@ -950,6 +951,35 @@ describe('attention and inbox', () => {
       const deleted = yield* store.deleteComment({ id: 1, commentId, actor: user })
       expect(deleted.ok && deleted.value.item.events.some(event => event.commentId === commentId)).toBe(false)
       expect(yield* store.readFile({ id: 1, attachmentId: 'comment-image-1' })).toEqual({ ok: false, reason: 'not-found' })
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('keeps a file the item still names when the write that drops it fails', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(1_000)
+      const context = yield* Layer.build(BacklogTestStore.layer({ rows: BacklogTestStore.rows() }))
+      const store = Context.get(context, BacklogStore)
+      const sql = Context.get(context, BacklogDb)
+      yield* store.capture({
+        text: 'item with files',
+        files: [{ id: 'item-image-1', kind: 'image', name: 'shot.png', mediaType: 'image/png', bytes: 3, data: 'aGk=' }],
+        actor: user,
+      })
+      const commented = yield* store.comment({
+        id: 1,
+        text: 'reply',
+        files: [{ id: 'comment-image-1', kind: 'image', name: 'reply.png', mediaType: 'image/png', bytes: 5, data: 'aGVsbG8=' }],
+        actor: user,
+      })
+      const commentId = commented.ok ? commented.value.item.events.find(event => event.kind === 'commented')?.commentId : undefined
+      if (commentId === undefined) throw new Error('the reply has no comment id')
+      yield* sql`CREATE TRIGGER refuse_ops BEFORE INSERT ON ops BEGIN SELECT RAISE(ABORT, 'disk full'); END`
+
+      expect((yield* Effect.flip(store.removeFile({ id: 1, attachmentId: 'item-image-1', actor: user })))._tag).toBe('BacklogWriteFailed')
+      expect((yield* Effect.flip(store.editComment({ id: 1, commentId, text: 'no image', files: [], actor: user })))._tag).toBe('BacklogWriteFailed')
+      expect((yield* Effect.flip(store.deleteComment({ id: 1, commentId, actor: user })))._tag).toBe('BacklogWriteFailed')
+      expect(yield* store.readFile({ id: 1, attachmentId: 'item-image-1' })).toEqual({ ok: true, value: { dataUrl: 'data:image/png;base64,aGk=' } })
+      expect(yield* store.readFile({ id: 1, attachmentId: 'comment-image-1' })).toEqual({ ok: true, value: { dataUrl: 'data:image/png;base64,aGVsbG8=' } })
     }).pipe(Effect.scoped),
   )
 

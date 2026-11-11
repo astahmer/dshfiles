@@ -1293,9 +1293,10 @@ export class BacklogStore extends Context.Service<
           Effect.gen(function* () {
             const attachment = item.attachments.find(candidate => candidate.id === input.attachmentId)
             if (attachment === undefined) return yield* unchanged(item)
-            yield* deleteFile(item, input.attachmentId)
             const attachments = item.attachments.filter(candidate => candidate.id !== input.attachmentId)
-            return found(yield* touch(item, input.actor, { kind: 'edited', detail: `removed ${attachment.name}` }, { attachments }))
+            const detail = yield* touch(item, input.actor, { kind: 'edited', detail: `removed ${attachment.name}` }, { attachments })
+            yield* deleteFile(item, input.attachmentId)
+            return found(detail)
           }),
         )
       })
@@ -1410,10 +1411,8 @@ export class BacklogStore extends Context.Service<
             if (existing === undefined) return notFound
             const replacements = input.files
             const attachments = replacements === undefined ? existing.attachments : yield* storeFiles(item, replacements, yield* Clock.currentTimeMillis)
-            if (replacements !== undefined) {
-              const dropped = (existing.attachments ?? []).filter(attachment => !replacements.some(file => file.id === attachment.id))
-              yield* Effect.forEach(dropped, attachment => deleteFile(item, attachment.id), { discard: true })
-            }
+            const dropped =
+              replacements === undefined ? [] : (existing.attachments ?? []).filter(attachment => !replacements.some(file => file.id === attachment.id))
             const events = item.events.map((event, index) =>
               index === commentIndex
                 ? {
@@ -1424,7 +1423,9 @@ export class BacklogStore extends Context.Service<
                   }
                 : event,
             )
-            return found(yield* touch({ ...item, events }, input.actor, { kind: 'edited', detail: 'edited a reply' }, {}))
+            const detail = yield* touch({ ...item, events }, input.actor, { kind: 'edited', detail: 'edited a reply' }, {})
+            yield* Effect.forEach(dropped, attachment => deleteFile(item, attachment.id), { discard: true })
+            return found(detail)
           }),
         )
       })
@@ -1440,9 +1441,10 @@ export class BacklogStore extends Context.Service<
             const commentIndex = userCommentIndex(item, input.commentId)
             const existing = item.events[commentIndex]
             if (existing === undefined) return notFound
-            yield* Effect.forEach(existing.attachments ?? [], attachment => deleteFile(item, attachment.id), { discard: true })
             const events = item.events.filter((_event, index) => index !== commentIndex)
-            return found(yield* touch({ ...item, events }, input.actor, { kind: 'edited', detail: 'deleted a reply' }, {}))
+            const detail = yield* touch({ ...item, events }, input.actor, { kind: 'edited', detail: 'deleted a reply' }, {})
+            yield* Effect.forEach(existing.attachments ?? [], attachment => deleteFile(item, attachment.id), { discard: true })
+            return found(detail)
           }),
         )
       })
