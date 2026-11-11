@@ -1,6 +1,7 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import * as Schema from 'effect/Schema'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { SubscriptionDeliveryMode, SubscriptionNoticeLevel } from './subscription-levels.js'
 import type { FinishedSubagentsMode } from './thread-children.js'
 import type { ThreadDelay } from './thread-delays.js'
 import type { ThreadMutes } from './thread-mute.js'
@@ -155,6 +156,10 @@ export interface SidebarPreferences {
   applyActionsToChildThreads: boolean
   /** Continue the threads a stopped Host cut off once it starts again. */
   resumeAfterRestart: boolean
+  /** The level of a thread subscription that sets none. */
+  subscriptionNoticeLevel: SubscriptionNoticeLevel
+  /** How a running subscriber hears a notice: steered into its live turn, or queued behind it. */
+  subscriptionDelivery: SubscriptionDeliveryMode
   /** Child threads listed under a parent before the "N more…" line. */
   maxChildren: number
   finishedSubagents: FinishedSubagentsMode
@@ -227,7 +232,9 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   notificationPlacement: 'bottom-center',
   notificationDurationSeconds: 5,
   applyActionsToChildThreads: true,
-  resumeAfterRestart: true,
+  resumeAfterRestart: false,
+  subscriptionNoticeLevel: 'all',
+  subscriptionDelivery: 'steer',
   maxChildren: 3,
   finishedSubagents: 'collapse',
   threadViews: DEFAULT_THREAD_VIEW_SETTINGS,

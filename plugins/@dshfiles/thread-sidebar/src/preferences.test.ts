@@ -22,6 +22,16 @@ test('the settings schema and the preference decoder agree on every field', () =
   assert.deepEqual(decoded.settledSessionIds, [])
   assert.equal(decoded.autoSettleEnabled, false)
   assert.equal(decoded.workspaceFilter, null)
+  assert.equal(decoded.subscriptionNoticeLevel, 'all')
+  assert.equal(decoded.subscriptionDelivery, 'steer')
+})
+
+test('older preferences without subscription notice fields follow every turn, steered', () => {
+  const { subscriptionNoticeLevel, subscriptionDelivery, ...older } = DEFAULT_PREFERENCES
+  assert.equal(subscriptionNoticeLevel, 'all')
+  assert.equal(subscriptionDelivery, 'steer')
+  assert.equal(SidebarPreferencesModel.decode(older)?.subscriptionNoticeLevel, 'all')
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, subscriptionDelivery: 'queue' })?.subscriptionDelivery, 'queue')
 })
 
 test('notification settings accept a no-timeout value in the Host schema', () => {
