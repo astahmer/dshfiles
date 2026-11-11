@@ -426,7 +426,13 @@
           "testName": "records a memory jev ask span per question without the key or the text"
         }
       ],
-      "reach": ["click tab \"Knowledge\"", "click button \"Memory\"", "expect tab \"Notes\""]
+      "reach": ["click tab \"Knowledge\"", "click button \"Memory\"", "expect tab \"Notes\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Knowledge Memory and reference material agents use.\"",
+        "click button \"Memory\"",
+        "expect tab \"Notes\""
+      ]
     },
     {
       "id": "memory-reference-preview",
@@ -531,7 +537,14 @@
           "reason": "Client-only: Show what memory costs and whether it holds up renders browser state and starts no Host work of its own."
         }
       ],
-      "reach": ["click tab \"Knowledge\"", "click button \"Memory\"", "click tab \"Analytics\"", "expect text \"Recall\""]
+      "reach": ["click tab \"Knowledge\"", "click button \"Memory\"", "click tab \"Analytics\"", "expect text \"Recall\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Knowledge Memory and reference material agents use.\"",
+        "click button \"Memory\"",
+        "click tab \"Analytics\"",
+        "expect text \"Recall\""
+      ]
     },
     {
       "id": "batch-forget-notes",

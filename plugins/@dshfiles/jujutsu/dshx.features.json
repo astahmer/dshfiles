@@ -21,6 +21,23 @@
         "click combobox \"Choose revision target\"",
         "expect combobox \"Search loaded revisions\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"History\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"Locate Current\"",
+        "click button \"Compare\"",
+        "expect region \"Revision comparison\"",
+        "click combobox \"Comparison target\"",
+        "click option \"Another revision…\"",
+        "expect combobox \"Choose revision target\"",
+        "click combobox \"Choose revision target\"",
+        "expect combobox \"Search loaded revisions\""
+      ],
       "surfaces": ["client", "host", "integration"],
       "surface": "destinationSection",
       "destination": "land",
@@ -218,6 +235,18 @@
         "click button \"Sample project*\"",
         "expect button \"Full diff\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"History\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"Sample project*\"",
+        "click button \"Sample project*\"",
+        "expect button \"Full diff\""
+      ],
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "detail",
       "destination": "land",
@@ -405,6 +434,19 @@
         "click menuitem \"New change here\"",
         "expect group \"Confirm new change\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"History\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"Sample project*\"",
+        "rightclick button \"Sample project*\"",
+        "click menuitem \"New change here\"",
+        "expect group \"Confirm new change\""
+      ],
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "rowAction",
       "destination": "land",
@@ -504,6 +546,19 @@
         "expect button \"Sample project*\"",
         "rightclick button \"Sample project*\"",
         "click menuitem \"New workspace here\u2026\"",
+        "expect group \"Create workspace at this revision\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"History\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"Sample project*\"",
+        "rightclick button \"Sample project*\"",
+        "click menuitem \"New workspace here…\"",
         "expect group \"Create workspace at this revision\""
       ],
       "surfaces": ["client", "host", "integration"],
@@ -690,6 +745,21 @@
         "expect text \"No workspace qualifies.\"",
         "expect text \"0 empty revisions will be abandoned.\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"History\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "click button \"Repository actions\"",
+        "click menuitem \"Clean up JJ workspaces…\"",
+        "expect text \"Clean up workspaces\"",
+        "expect checkbox \"Select all eligible items\"",
+        "expect text \"No workspace qualifies.\"",
+        "expect text \"0 empty revisions will be abandoned.\""
+      ],
       "surfaces": ["client", "host"],
       "surface": "command",
       "destination": "land",
@@ -805,6 +875,18 @@
       "summary": "Source control is its own panel in navigation, the main view and the Workbench: a describe box for @, then the working copy and @-1 \u2026 @-N groups with their changed files, under the same repository, Fetch, Push, refresh, view settings and repository actions toolbar as the revision graph.",
       "reach": [
         "click tab \"Land\"",
+        "click button \"Source control\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect textbox \"Working copy description\"",
+        "expect button \"Jujutsu view settings\"",
+        "expect button \"Repository actions\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Land Workspaces ready to land, and repository history.\"",
         "click button \"Source control\"",
         "click button \"Choose repository\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",

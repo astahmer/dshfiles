@@ -1201,6 +1201,13 @@
       "title": "Thread integration with no thread workspaces",
       "summary": "A registered project with no thread workspace shows one plain sentence instead of empty groups, banners or filter tabs: the page never fabricates work, and the counts only appear once a workspace exists.",
       "reach": ["click tab \"Land\"", "click button \"Workspaces\"", "expect heading \"Land\"", "expect text \"No thread workspaces.\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Land Workspaces ready to land, and repository history.\"",
+        "click button \"Workspaces\"",
+        "expect heading \"Land\"",
+        "expect text \"No thread workspaces.\""
+      ],
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "land",
@@ -1277,6 +1284,7 @@
       "title": "Blocked and ready-to-land workspaces in the Inbox",
       "summary": "A thread workspace whose revisions conflict, or whose queued land stopped, is a Failed Inbox item (Land blocked) with Retry; an idle workspace with described revisions not on the bookmark is a Ready item with Land. Land and Retry run the same guarded land as the Land view, only when the user chooses them; items resolve when the workspace lands, the conflict goes away or nothing is left to land. A land from a client view (the thread's Changes facet, the Land view) re-reads the workspaces at once, so its item resolves without waiting for the provider's safety tick.",
       "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
+      "reachNarrow": ["click button \"Inbox\"", "expect heading \"Inbox\""],
       "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",

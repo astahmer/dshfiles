@@ -7,6 +7,7 @@
       "title": "Native Settings shell, ported",
       "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"General\""],
+      "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "expect combobox \"Sections\""],
       "surfaces": ["client", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -91,6 +92,7 @@
       "title": "DSH release notice and TL;DR",
       "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, links both versions to their GitHub releases with how long ago each shipped and how many releases behind the install is, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"Check for DSH updates\""],
+      "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "expect button \"Check for DSH updates\""],
       "surfaces": ["client", "host", "api", "tool", "storage"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -203,6 +205,12 @@
         "click option \"Settings: General*\"",
         "expect group \"Models & accounts\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "expect group \"Models & accounts\""
+      ],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -275,6 +283,13 @@
         "click option \"Settings: General*\"",
         "fill searchbox \"Search settings\" \"max tabs\"",
         "expect text \"1 Setting Found\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "fill searchbox \"Search settings\" \"max tabs\"",
+        "expect text \"1 matching settings\"",
+        "expect spinbutton \"Max tabs\""
       ],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
@@ -389,6 +404,13 @@
         "click button \"Main tabs\"",
         "expect spinbutton \"Max tabs\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "click option \"Main tabs\"",
+        "expect spinbutton \"Max tabs\""
+      ],
       "surfaces": ["client", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -426,6 +448,15 @@
         "fill combobox \"Search the command palette\" \"Settings: General\"",
         "click option \"Settings: General*\"",
         "click button \"Main tabs\"",
+        "fill spinbutton \"Max tabs\" \"8\"",
+        "press Enter",
+        "expect button \"Reset to default\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "click option \"Main tabs\"",
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\""
@@ -477,6 +508,17 @@
         "click text \"More\"",
         "click menuitem \"Settings*\"",
         "click button \"Main tabs\"",
+        "fill spinbutton \"Max tabs\" \"8\"",
+        "press Enter",
+        "expect button \"Reset to default\"",
+        "click radio \"JSON\"",
+        "expect tab \"Overrides\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "click option \"Main tabs\"",
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\"",
@@ -603,6 +645,13 @@
       "title": "List and switch plugin entries, from Settings or an Agent",
       "summary": "Each plugin settings page shows its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the seed. plugin_inventory lists the same for every entry; plugin_set_enabled enables or disables one through the plugin manager and relays its verdict: applied live, waiting for a user restart (with the reason), or overridden by a higher-priority layer. It never restarts DSH; the opposite value reverses it.",
       "reach": ["click text \"More\"", "click menuitem \"Settings*\"", "click button \"Main tabs\"", "expect switch \"Plugin enabled\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "click option \"Main tabs\"",
+        "expect switch \"Plugin enabled\""
+      ],
       "surfaces": ["client", "settings", "tool", "host"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -668,6 +717,12 @@
         "click button \"More ways to open the configuration file\"",
         "expect menuitem \"Copy path\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click button \"More ways to open the configuration file\"",
+        "expect menuitem \"Copy path\""
+      ],
       "surfaces": ["client", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -698,6 +753,12 @@
       "title": "Set the Jev key once",
       "summary": "Settings › Tools & MCP › Jev leads with one Key: a secret:ALIAS reference (Secret Catalog picker) that Backlog triage and Memory's signal gates both resolve on the Host. Each plugin's earlier key stays stored but hidden as the fallback while the shared key is empty, and is copied into an empty shared key once, never over a set one. Backlog's Jev section and Memory's review link here.",
       "reach": ["click button \"Settings\"", "fill searchbox \"Search settings\" \"Jev\"", "expect text \"Key\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "fill searchbox \"Search settings\" \"Jev\"",
+        "expect text \"Key\""
+      ],
       "surfaces": ["client", "host"],
       "surface": "settingsSection",
       "destination": "settings",

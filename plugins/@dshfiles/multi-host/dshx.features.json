@@ -31,6 +31,14 @@
         "click button \"SSH destination\"",
         "expect text \"Enter a custom destination…\""
       ],
+      "reachNarrow": [
+        "click button \"New\"",
+        "click button \"Run on Local\"",
+        "click option \"Add host…\"",
+        "expect dialog \"Add host\"",
+        "click button \"SSH destination\"",
+        "expect text \"Enter a custom destination…\""
+      ],
       "verification": [
         {
           "kind": "gherkin",

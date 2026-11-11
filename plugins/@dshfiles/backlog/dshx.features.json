@@ -21,6 +21,23 @@
         "fill textbox \"Capture\" \"Inspect @Image 1\"",
         "expect textbox \"Capture\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "click button \"Items\"",
+        "expect textbox \"Capture\"",
+        "click button \"Board\"",
+        "expect textbox \"Capture\"",
+        "click button \"Projects\"",
+        "expect textbox \"Capture\"",
+        "click button \"Inbox\"",
+        "expect textbox \"Capture\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "fill textbox \"Capture\" \"Inspect @Image 1\"",
+        "expect textbox \"Capture\""
+      ],
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "destinationSection",
       "destination": "work",
@@ -164,6 +181,29 @@
       "summary": "The feed lists pinned items, then activity in chronological order with newest at bottom beside the composer. Each entry's activity line names the actor of its last change and links an Agent to the thread it worked in. Status chips narrow the feed and the Items list to one status or several at once. From an empty capture box, ArrowUp focuses the nearest visible item and arrow keys follow the list's visual order. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item. The open panel stays current from the Host's `changed` event (a write, delete or peer pull re-reads the revision at once); without the event it polls the revision every 5 s, and only while it is visible.",
       "reach": [
         "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Feed item to close\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"Feed item to drop\"",
+        "press Enter",
+        "click button \"Feed\"",
+        "expect feed \"Backlog feed\"",
+        "rightclick text \"Feed item to close\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Done\"",
+        "rightclick text \"Feed item to drop\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Dropped\"",
+        "click button \"Done, 1 item\"",
+        "click button \"Dropped, 1 item\"",
+        "expect text \"Feed item to close\"",
+        "click textbox \"Capture\"",
+        "press ArrowUp",
+        "expect article \"Item b:#2\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Feed item to close\"",
         "press Enter",
@@ -719,6 +759,14 @@
       "states": ["untriaged", "applied", "suggested", "unchanged", "remaining", "not-configured"],
       "reach": [
         "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "click button \"Backfill triage\"",
+        "expect text \"Runs Jev and the configured triage model*\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
         "click button \"Backlog\"",
         "expect textbox \"Capture\"",
         "click button \"Backfill triage\"",
@@ -1286,6 +1334,13 @@
         "Without the Inbox (activity-timeline) the link only fails to select a panel; the filter view itself is unchanged."
       ],
       "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Inbox\"", "expect text \"Needs you\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "click button \"Inbox\"",
+        "expect text \"Needs you\""
+      ],
       "externalDependencies": [
         {
           "id": "@dshfiles/thread-sidebar",
@@ -1630,6 +1685,24 @@
         "click option \"No project\"",
         "expect text \"2 projects\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "expect combobox \"Filter by project\"",
+        "expect combobox \"Project of the new item\"",
+        "click combobox \"Project of the new item\"",
+        "expect combobox \"Search projects\"",
+        "press Escape",
+        "click combobox \"Filter by project\"",
+        "expect option \"All projects\"",
+        "expect option \"No project\"",
+        "expect option \"sample*\"",
+        "click option \"sample*\"",
+        "click option \"No project\"",
+        "expect text \"2 projects\""
+      ],
       "surfaces": ["client", "host", "settings"],
       "surface": "destinationSection",
       "destination": "work",
@@ -1688,6 +1761,13 @@
       "title": "Hide items agents captured",
       "summary": "A toggle in the header of every view (Feed, Inbox, Items, Board, Projects and the search results), on by default and remembered per view, hides items an agent captured that the user never touched. An item the user edited, moved, commented on or pinned shows again, and so does one asking for attention or waiting on a triage suggestion. The toggle counts what the current view hides. The Host filters the list (`hideAgentItems`); `backlog_list` keeps listing every item unless an agent asks for the filter. The Projects cards count only what the view shows: `backlog_projects` takes the same optional `hideAgentItems`.",
       "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Hide agent items\"", "expect button \"Hide agent items\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "click button \"Hide agent items\"",
+        "expect button \"Hide agent items\""
+      ],
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",
       "destination": "work",
@@ -1813,6 +1893,41 @@
         "expect menuitem \"Copy item ID\"",
         "expect menuitem \"Copy item link\"",
         "click menuitem \"Start thread\u2026\"",
+        "expect dialog \"Start thread\"",
+        "click button \"Cancel\"",
+        "click button \"Board\"",
+        "expect article \"Card b:#1\"",
+        "click article \"Card b:#1\"",
+        "expect complementary \"Item detail\"",
+        "click button \"Start thread\"",
+        "expect dialog \"Start thread\"",
+        "click button \"Cancel\"",
+        "click button \"Start thread\"",
+        "click combobox \"Thread project\"",
+        "expect option \"sample*\"",
+        "expect checkbox \"Open the thread when it is created\"",
+        "click button \"Cancel\"",
+        "hover button \"Start thread\"",
+        "expect tooltip \"Start a thread for this item\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "click button \"Feed\"",
+        "click button \"All statuses*\"",
+        "fill textbox \"Capture\" \"Start a thread from b:1\"",
+        "press Enter",
+        "expect text \"Start a thread from b:1\"",
+        "click button \"Feed\"",
+        "rightclick article \"Item b:#1\"",
+        "expect menuitem \"Start thread…\"",
+        "expect menuitem \"Status\"",
+        "expect menuitem \"Project\"",
+        "expect menuitem \"Copy item ID\"",
+        "expect menuitem \"Copy item link\"",
+        "click menuitem \"Start thread…\"",
         "expect dialog \"Start thread\"",
         "click button \"Cancel\"",
         "click button \"Board\"",
@@ -2404,6 +2519,24 @@
         "click button \"Save connection\"",
         "expect button \"Remove Markdown files\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "click button \"Backlog settings\"",
+        "expect textbox \"Remote item to import\"",
+        "click button \"Add Linear connection\"",
+        "expect textbox \"Linear key reference\"",
+        "expect button \"Test connection\"",
+        "click button \"Save connection\"",
+        "click button \"Add binding\"",
+        "fill textbox \"Team\" \"ENG\"",
+        "click button \"Save binding\"",
+        "expect button \"Import all open\"",
+        "click button \"Add Markdown files connection\"",
+        "click button \"Save connection\"",
+        "expect button \"Remove Markdown files\""
+      ],
       "surfaces": ["client", "host", "settings", "storage", "tool", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -2851,6 +2984,14 @@
         "click button \"Export\u2026\"",
         "expect textbox \"Export file\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "click button \"Backlog settings\"",
+        "click button \"Export…\"",
+        "expect textbox \"Export file\""
+      ],
       "surfaces": ["client", "host", "storage", "tool", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -2922,6 +3063,27 @@
         "click radio \"Day\"",
         "expect listitem \"Today: 2 shipped\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Ship the shipped digest\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"Fix the period switcher\"",
+        "press Enter",
+        "click button \"Feed\"",
+        "expect feed \"Backlog feed\"",
+        "rightclick text \"Ship the shipped digest\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Done\"",
+        "rightclick text \"Fix the period switcher\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Done\"",
+        "click button \"Shipped\"",
+        "expect heading \"Shipped\"",
+        "click radio \"Day\"",
+        "expect listitem \"Today: 2 shipped\""
+      ],
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",
       "destination": "work",
@@ -2963,6 +3125,27 @@
       "summary": "Each period in the Shipped view with done items has Summarize: the triage model (Backlog settings \u203a Triage) writes a short overview, cached in the backlog database per period, bucket and project filter, so reopening the view never calls the model again. A summary whose items changed since shows Out of date; Regenerate calls the model again. Without a triage model the view says where to pick one. Agents call backlog_summarize_shipped only when the user asked.",
       "reach": [
         "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Ship the shipped digest\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"Fix the period switcher\"",
+        "press Enter",
+        "click button \"Feed\"",
+        "expect feed \"Backlog feed\"",
+        "rightclick text \"Ship the shipped digest\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Done\"",
+        "rightclick text \"Fix the period switcher\"",
+        "hover menuitem \"Status\"",
+        "click menuitemradio \"Done\"",
+        "click button \"Shipped\"",
+        "expect heading \"Shipped\"",
+        "click radio \"Day\"",
+        "expect listitem \"Today: 2 shipped\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Ship the shipped digest\"",
         "press Enter",
@@ -3060,6 +3243,15 @@
         "click button \"Items\"",
         "expect table \"Backlog items\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"!2 Priority demo\"",
+        "press Enter",
+        "click button \"Items\"",
+        "expect table \"Backlog items\""
+      ],
       "surfaces": ["client", "host", "storage", "tool"],
       "surface": "destinationSection",
       "destination": "work",
@@ -3100,6 +3292,17 @@
       "summary": "An item can sit under a parent as a sub-issue, three levels deep at most. The inspector lists sub-issues with a done/total progress bar, adds one with Sub-issue, and links back to the parent (Set parent takes a `b:<ref>`, the cross removes it). Rows and cards show the roll-up as 2/5. A loop, an item under itself or a fourth level is refused with the reason. Search with `parent:b:k3f9` and `has:children`; group the Items view by parent. In Shipped a parent counts only itself. Agents pass `parent` to backlog_capture and backlog_update.",
       "reach": [
         "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Sub-issue demo\"",
+        "press Enter",
+        "click text \"Sub-issue demo\"",
+        "expect complementary \"Item detail\"",
+        "click button \"Add sub-issue\"",
+        "expect textbox \"Sub-issue title\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Sub-issue demo\"",
         "press Enter",
@@ -3163,6 +3366,23 @@
         "click button \"Ready\"",
         "expect table \"Backlog items\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"!1 Fix the login outage\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"!2 Write the release notes\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"!2 Review the claim lease sweep\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"!4 Tidy the changelog\"",
+        "press Enter",
+        "fill textbox \"Capture\" \"Plan the team offsite\"",
+        "press Enter",
+        "click button \"Ready\"",
+        "expect table \"Backlog items\""
+      ],
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",
       "destination": "work",
@@ -3201,6 +3421,15 @@
       "summary": "backlog_claim hands an item to the calling agent thread in one write: it becomes the delegate (the owner stays whoever captured it), moves to In progress, links the thread and starts a lease. Another agent's claim is refused with the holder named. Every write by the holder renews the lease; it ends after the idle time in Backlog settings (30 minutes by default), when the holder's thread is archived, settled or gone, when the item is done or dropped, or with backlog_release; a lapsed or abandoned claim returns the item to Todo. The inspector shows Owner \u00b7 Delegate and the claim with a Release action; rows and cards show a lock chip. `is:claimed`, `is:delegated` and `delegate:agent` search them. Starting a thread from an item also makes that thread its delegate.",
       "reach": [
         "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Claim demo\"",
+        "press Enter",
+        "click text \"Claim demo\"",
+        "expect complementary \"Item detail\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Claim demo\"",
         "press Enter",
@@ -3268,6 +3497,15 @@
       "summary": "Open items worked on by an agent thread (its delegate, else its most recent linked thread) show the agent's run state on rows, cards and the inspector: Working while its turn runs, Awaiting input when the turn stopped on a question, Error when it failed, Stale after half an hour idle, Done otherwise. Shipped rows say who did the work for whom (done by an agent for You).",
       "reach": [
         "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Run state demo\"",
+        "press Enter",
+        "click button \"Items\"",
+        "expect table \"Backlog items\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Run state demo\"",
         "press Enter",
@@ -3344,6 +3582,25 @@
         "press Enter",
         "expect region \"Acceptance criteria\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Ship structured sections #backlog !2\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click text \"b:#1\"",
+        "fill textbox \"New criterion\" \"Stored as fields in the op log\"",
+        "press Enter",
+        "fill textbox \"New criterion\" \"Editable in the peek\"",
+        "press Enter",
+        "fill textbox \"New criterion\" \"Searchable with has:criteria\"",
+        "press Enter",
+        "click checkbox \"Stored as fields in the op log\"",
+        "fill textbox \"Pull request URL\" \"https://github.com/astahmer/dshfiles/pull/579\"",
+        "press Enter",
+        "expect region \"Acceptance criteria\""
+      ],
       "telemetry": [
         {
           "kind": "automatic",
@@ -3392,6 +3649,16 @@
       "externalDependencies": [],
       "reach": [
         "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Login fails on Safari /template Bug report\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click text \"b:#1\"",
+        "expect region \"Acceptance criteria\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Login fails on Safari /template Bug report\"",
         "press Enter",
@@ -3486,6 +3753,17 @@
       "externalDependencies": [],
       "reach": [
         "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Water the plants\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click text \"b:#1\"",
+        "click button \"Repeat b:#1\"",
+        "expect menuitem \"Weekly\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
         "click button \"Backlog\"",
         "fill textbox \"Capture\" \"Water the plants\"",
         "press Enter",
@@ -3637,6 +3915,16 @@
         "click text \"b:#1\"",
         "expect region \"Gates\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Ship after the PR\"",
+        "press Enter",
+        "click button \"Items\"",
+        "click text \"b:#1\"",
+        "expect region \"Gates\""
+      ],
       "telemetry": [
         {
           "kind": "automatic",
@@ -3718,6 +4006,16 @@
         "rightclick text \"Triage the inbox nightly\"",
         "expect menuitem \"Make recurring\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Triage the inbox nightly\"",
+        "press Enter",
+        "click button \"Items\"",
+        "rightclick text \"Triage the inbox nightly\"",
+        "expect menuitem \"Make recurring\""
+      ],
       "telemetry": [
         {
           "kind": "automatic",
@@ -3762,6 +4060,13 @@
       ],
       "externalDependencies": [],
       "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Projects\"", "expect heading \"Projects\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "click button \"Projects\"",
+        "expect heading \"Projects\""
+      ],
       "telemetry": [
         {
           "kind": "automatic",

@@ -172,6 +172,17 @@
         "click text \"Daily calendar\"",
         "expect text \"Cache savings (estimate)\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+        "click button \"Usage\"",
+        "click tab \"Cost\"",
+        "expect text \"Cost over time\"",
+        "click text \"1 y\"",
+        "expect text \"Usage distribution\"",
+        "click text \"Daily calendar\"",
+        "expect text \"Cache savings (estimate)\""
+      ],
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -227,6 +238,14 @@
       "summary": "The Cost tab shows DSH-origin Jev calls from Backlog and Memory grouped by configured secret-reference or environment-variable label, with provider-reported tokens, request counts, a TypeSafe list-price estimate and calendar month-to-date spend, requests and tokens per label. Bars compare each label's input-token volume with the busiest label this month; they do not represent quota remaining. Labels are local, not provider-verified identity, and usage excludes calls outside DSH.",
       "reach": [
         "click tab \"Observe\"",
+        "click button \"Usage\"",
+        "click tab \"Cost\"",
+        "expect text \"Jev API usage\"",
+        "expect text \"Usage by API key · calendar month to date\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
         "click button \"Usage\"",
         "click tab \"Cost\"",
         "expect text \"Jev API usage\"",
@@ -302,6 +321,16 @@
       "summary": "The Tools tab of Observe › Usage (formerly Tools & Jev): Tool charts over the selected range: calls over time stacked by source category, the ten most-used tools by calls, wall time or estimated returned tokens, a per-category share of returned tokens with success rates, tiles for calls, success rate, interruptions, wall time, returned tokens and the busiest category, plus the per-tool table with outcomes, latency and returned tokens, the top normalized command and test-runner wall-clock distributions, Jev request totals per calling plugin, and recent tool/Jev events. Returned tokens are a characters / 4 estimate of tool result text: only the text length is stored, never the text, and rows indexed before this measurement show as unmeasured. Grouping by category covers skills, plugin API, plugin, MCP, DSH and other tools. Command arguments, paths, outputs, prompts and secrets are never stored; compound or ambiguous shell commands are omitted.",
       "reach": [
         "click tab \"Observe\"",
+        "click button \"Usage\"",
+        "click tab \"Tools\"",
+        "expect text \"Tool calls over time\"",
+        "expect text \"Most-used tools\"",
+        "expect text \"Output by category\"",
+        "expect text \"Every tool\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
         "click button \"Usage\"",
         "click tab \"Tools\"",
         "expect text \"Tool calls over time\"",
@@ -424,6 +453,14 @@
       "title": "Usage › Quota: account quota, history and forecast in the Usage page",
       "summary": "Observe › Usage has four tabs, Cost · Quota · Requests · Tools (docs/ade-ux §6). Quota hosts ai-accounts' views through the `@dshfiles/ai-accounts/quota-views` contract: Accounts (one account's current limits and its recorded requests and cost), History (quota snapshots, pace, banked resets) and Forecast (forecast, pace, table, coverage, hand-off). Usage provides `UsageNavigation`, so the quota status item, the account Usage tab, saved tabs of the former Usage history and Quota forecast pages and the palette rows (by their old names too) land on the right view and account. Without ai-accounts the tab says to turn it on.",
       "reach": ["click tab \"Observe\"", "click button \"Usage\"", "click tab \"Quota\"", "click radio \"Forecast\"", "expect radio \"Accounts\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+        "click button \"Usage\"",
+        "click tab \"Quota\"",
+        "click radio \"Forecast\"",
+        "expect radio \"Accounts\""
+      ],
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "observe",

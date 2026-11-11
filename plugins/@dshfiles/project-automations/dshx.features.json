@@ -7,6 +7,12 @@
       "title": "Start threads in a project on a schedule",
       "summary": "Work › Automations lists per-project automations and creates, edits, pauses, resumes, runs now and deletes them. A schedule (cron, daily, weekly with an explicit IANA time zone, or every N minutes) starts a new thread in its project with its prompt, agent preset and model through the sessions API. Timing uses DSH's own Schedule domain, so DST gaps are skipped and repeated local times run once; a Host that was down catches up once, for the latest missed occurrence, and a resumed automation starts from its next target. Automations and the last 25 runs of each (trigger, outcome, thread, reason) live in plugin storage and survive Host restarts. Every verb is also an agent tool.",
       "reach": ["click tab \"Work\"", "click button \"Automations\"", "expect heading \"Automations\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Automations\"",
+        "expect heading \"Automations\""
+      ],
       "surfaces": ["client", "host", "api", "tool", "storage"],
       "surface": "destinationSection",
       "destination": "work",

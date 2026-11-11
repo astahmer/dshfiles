@@ -431,6 +431,13 @@
       "title": "Service and operation overview, error groups",
       "summary": "A service strip and an Operations tab summarize span volume, error rate and p50/p95/p99 latency per service and operation over a chosen window; an Errors tab groups error spans by service, operation, error type and message shape with counts, first and last seen and a sample trace.",
       "reach": ["click tab \"Observe\"", "click button \"Traces\"", "click tab \"Operations\"", "expect combobox \"Window\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+        "click button \"Traces\"",
+        "click tab \"Operations\"",
+        "expect combobox \"Window\""
+      ],
       "surfaces": ["client", "host", "tool"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -1042,6 +1049,7 @@
       "title": "Firing alerts in the Inbox",
       "summary": "Every enabled alert rule that is firing and not muted is a Failed Inbox item with its last value, threshold and window. Each incident is its own item, so a rule that fires again shows again after the user marked the last one done. Muting the rule, disabling it or the rule resolving closes the item.",
       "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
+      "reachNarrow": ["click button \"Inbox\"", "expect heading \"Inbox\""],
       "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",

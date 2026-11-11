@@ -115,6 +115,14 @@
         "click button \"Annotate an element\"",
         "expect text \"None yet in this draft\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "click button \"Annotate an element\"",
+        "expect text \"None yet in this draft\""
+      ],
       "verification": [
         {
           "kind": "gherkin",

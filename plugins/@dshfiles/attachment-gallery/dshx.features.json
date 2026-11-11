@@ -20,6 +20,21 @@
         "click button \"Image 1 of 2\"",
         "expect img \"red.png\""
       ],
+      "reachNarrow": [
+        "click button \"New\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "expect button \"Remove image red.png\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
+        "expect button \"Remove image blue.png\"",
+        "click button \"red.png, click to view original\"",
+        "expect dialog \"Image preview\"",
+        "expect img \"red.png\"",
+        "press ArrowRight",
+        "expect img \"blue.png\"",
+        "expect button \"Image 2 of 2\"",
+        "click button \"Image 1 of 2\"",
+        "expect img \"red.png\""
+      ],
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",

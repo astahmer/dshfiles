@@ -454,6 +454,14 @@
         "press Escape",
         "expect button \"Group: Status\""
       ],
+      "reachNarrow": [
+        "click button \"Threads\"",
+        "expect region \"Threads\"",
+        "click button \"Group: Status\"",
+        "expect text \"Arrange manually\"",
+        "press Escape",
+        "expect button \"Group: Status\""
+      ],
       "surfaces": ["client", "integration"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -1250,6 +1258,15 @@
         "click button \"Thread list settings\"",
         "expect region \"Thread list settings\""
       ],
+      "reachNarrow": [
+        "click button \"Threads\"",
+        "click button \"All threads\"",
+        "expect button \"All threads\"",
+        "click button \"All threads\"",
+        "expect region \"Threads\"",
+        "click button \"Thread list settings\"",
+        "expect region \"Thread list settings\""
+      ],
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -1571,6 +1588,23 @@
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
         "click button \"Thread notifications\"",
+        "expect group \"Thread notifications\"",
+        "expect button \"Approval needed: Off\"",
+        "expect button \"Turn stopped: Off\"",
+        "expect button \"Agent messages: In-app and system\"",
+        "expect button \"Snooze notifications\"",
+        "click button \"Snooze notifications\"",
+        "expect button \"Resume notifications\"",
+        "click button \"Resume notifications\"",
+        "expect button \"Snooze notifications\"",
+        "expect button \"In-app notification position\"",
+        "expect button \"In-app notification timeout\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "click option \"Thread notifications\"",
         "expect group \"Thread notifications\"",
         "expect button \"Approval needed: Off\"",
         "expect button \"Turn stopped: Off\"",
@@ -2043,6 +2077,12 @@
       "title": "Browse child sessions and share thread URLs",
       "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a “parent thread unavailable” header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
       "reach": ["click button \"Thread list settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
+      "reachNarrow": [
+        "click button \"Threads\"",
+        "click button \"Thread list settings\"",
+        "click button \"Finished subagents: Fold into “N finished”\"",
+        "expect menuitemradio \"Hide them\""
+      ],
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3401,6 +3441,15 @@
         "click tab \"Threads\"",
         "expect button \"Board\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+        "expect navigation \"Observe pages\"",
+        "click button \"Traces\"",
+        "expect heading \"Traces\"",
+        "click button \"Threads\"",
+        "expect button \"Board\""
+      ],
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3680,6 +3729,7 @@
       "title": "See the threads waiting on you in one page",
       "summary": "Inbox › Waiting threads lists one row per thread with an open inbox item about it: blocking and failed first, finished turns next, each with Open, its provider verb when it has one, and Done. The Inbox page next to it lists items across every source.",
       "reach": ["click tab \"Inbox\"", "click button \"Waiting threads\"", "expect heading \"Waiting threads\""],
+      "reachNarrow": ["click button \"Inbox\"", "click button \"Waiting threads\"", "expect heading \"Waiting threads\""],
       "surfaces": ["client", "integration"],
       "surface": "destinationSection",
       "destination": "inbox",

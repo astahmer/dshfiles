@@ -7,6 +7,12 @@
       "title": "Unified agent activity feed",
       "summary": "Normalizes session, communication, and jj integration events into one durable chronological feed with deduplication, bounded retention, cursor pagination, filtering, search, and provenance.",
       "reach": ["click tab \"Observe\"", "click button \"Activity\"", "expect textbox \"Search activity\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+        "click button \"Activity\"",
+        "expect textbox \"Search activity\""
+      ],
       "surfaces": ["host", "tool", "storage", "client", "integration"],
       "surface": "destinationSection",
       "destination": "observe",
@@ -372,6 +378,7 @@
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox",
       "reach": ["click tab \"Inbox\"", "click button \"Needs you\"", "expect heading \"Inbox\"", "expect tab \"Needs you*\""],
+      "reachNarrow": ["click button \"Inbox\"", "click button \"Needs you\"", "expect heading \"Inbox\"", "expect tab \"Needs you*\""],
       "surfaces": ["client"],
       "configuration": [],
       "states": ["empty", "needs-you", "other", "snoozed", "closed", "muted", "answered-in-place", "action-refused", "alerts-opt-in", "compact"],
@@ -419,6 +426,7 @@
       "title": "Open an Inbox item's source in one click",
       "summary": "Every Inbox row whose subject another page owns offers Open: a thread subject opens the thread (an archived one says so), a backlog item opens that item in the Backlog page, and any text naming a thread gets an Open thread link. The page that owns a subject kind registers an opener, so the inbox shows Open only where something can actually open it.",
       "reach": ["click tab \"Inbox\"", "expect text \"Needs you\""],
+      "reachNarrow": ["click button \"Inbox\"", "expect text \"Needs you\""],
       "surfaces": ["client", "integration"],
       "surface": "rowAction",
       "destination": "inbox",

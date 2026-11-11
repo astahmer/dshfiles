@@ -12,6 +12,14 @@
         "expect region \"Tools (*\"",
         "expect text \"ask_parent_question\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Agents Configured agents and their messages.\"",
+        "click button \"Capabilities\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "expect text \"ask_parent_question\""
+      ],
       "surfaces": ["tool", "host", "storage"],
       "surface": "attentionProvider",
       "destination": "inbox",
@@ -316,6 +324,14 @@
         "expect region \"Tools (*\"",
         "expect text \"list_thread_questions\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Agents Configured agents and their messages.\"",
+        "click button \"Capabilities\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "expect text \"list_thread_questions\""
+      ],
       "surfaces": ["tool", "host"],
       "surface": "attentionProvider",
       "destination": "inbox",
@@ -429,6 +445,7 @@
       "title": "Thread questions in the Inbox",
       "summary": "Every native ask_user_question form waiting in a live root thread is a blocking Inbox item about that thread. A continued form with one single-select question is answerable in place with its options, through the same native answer API as answer_thread_question; any other form says to answer it in the thread. The item resolves when the form settles or its thread stops.",
       "reach": ["click tab \"Inbox\"", "expect heading \"Inbox\""],
+      "reachNarrow": ["click button \"Inbox\"", "expect heading \"Inbox\""],
       "surfaces": ["host", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",

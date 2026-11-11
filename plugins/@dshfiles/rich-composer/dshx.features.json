@@ -147,6 +147,7 @@
       ],
       "externalDependencies": [],
       "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reachNarrow": ["click button \"New\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
       "verification": [
         {
           "kind": "gherkin",
@@ -190,6 +191,12 @@
       ],
       "reach": [
         "click button \"New session\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "expect text \"Image 1\""
+      ],
+      "reachNarrow": [
+        "click button \"New\"",
         "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "expect text \"Image 1\""
@@ -248,6 +255,12 @@
       ],
       "reach": [
         "click button \"New session\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "expect text \"Image 1\""
+      ],
+      "reachNarrow": [
+        "click button \"New\"",
         "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "expect text \"Image 1\""
@@ -359,6 +372,7 @@
       ],
       "externalDependencies": [],
       "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reachNarrow": ["click button \"New\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
       "verification": [
         {
           "kind": "gherkin",
@@ -425,6 +439,7 @@
       ],
       "externalDependencies": [],
       "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "reachNarrow": ["click button \"New\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
       "verification": [
         {
           "kind": "gherkin",
@@ -457,6 +472,13 @@
       "summary": "A new thread shows one run row above its input: project \u00b7 host \u00b7 workspace \u00b7 agent mode \u00b7 file access \u00b7 model and account. Each segment is the owner plugin\u2019s own control placed through the composer\u2019s slots, with its jargon explained in a tooltip; defaults come from each owner: host, agent mode and model from their last choice, the workspace from the project\u2019s isolate-by-default setting. Once the thread has started the row collapses to one summary chip that leads the meter line under the input (context % \u00b7 cost and activity readings \u00b7 N queued); model and file access stay changeable in the toolbar. At phone width the row is one sideways-scrolling line.",
       "reach": [
         "click button \"New session\"",
+        "expect group \"Run settings\"",
+        "expect button \"Choose workspace\"",
+        "expect button \"Run on Local\"",
+        "expect button \"Workspace: *\""
+      ],
+      "reachNarrow": [
+        "click button \"New\"",
         "expect group \"Run settings\"",
         "expect button \"Choose workspace\"",
         "expect button \"Run on Local\"",
