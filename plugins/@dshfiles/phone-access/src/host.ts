@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { renderTerminalQr } from './qr.ts'
 import { createRewriteProxy } from './rewrite-proxy.ts'
-import { tailnetCommands } from './tailnet.ts'
+import { tailnetCommands } from './tailnet-promise.ts'
 
 export const name = 'phone-access'
 

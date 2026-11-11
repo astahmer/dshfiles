@@ -1,8 +1,5 @@
-import type { Context } from '@deepseek-ai/cordis'
-import { HostContext, tracerLayer } from '@dshfiles/dshx/effect'
-import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
-import { Effect, Layer, ManagedRuntime, Schema, Stream } from 'effect'
+import { Effect, Schema, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 
 /** `tailscale` exited with a non-zero code. */
@@ -50,15 +47,3 @@ export const serveTailnet = Effect.fn('phone access serve')(function* (port: num
     Effect.orElseSucceed(() => false),
   )
 })
-
-/** The Promise edge `apply` calls: one runtime per activation, spawning through the Host's `subprocess` service. */
-export const tailnetCommands = (ctx: Context) => {
-  const runtime = ManagedRuntime.make(
-    Layer.mergeAll(DshChildProcessSpawner.layer, tracerLayer).pipe(Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/phone-access' }))),
-  )
-  return {
-    detect: () => runtime.runPromise(detectTailnet),
-    serve: (port: number) => runtime.runPromise(serveTailnet(port)),
-    dispose: () => runtime.dispose(),
-  }
-}
