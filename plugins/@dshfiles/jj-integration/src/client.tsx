@@ -31,7 +31,8 @@ import { LandPreview } from './land-preview.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
-import { ThreadWorkspacesPanel, threadQueryKeys, threadRebaseMutationKey } from './panel.js'
+import { ThreadWorkspacesPanel, threadQueryKeys } from './panel.js'
+import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionLogDownloadService } from './session-log-download.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -432,7 +433,7 @@ export default defineClient({
         thread === null || thread === undefined
           ? undefined
           : ThreadIntegrationModel.assess({ thread, running: workspaceRunning, waitingForInput: workspaceWaitingForInput, integrationAllowed: canRebase })
-      const landing = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
+      const landing = useIsMutating(ThreadRebaseMutation.at(threadPath ?? '')) > 0
       const subscribeToWorkspaces = useCallback((listener: () => void) => ctx.workspaces.list.subscribe(listener), [])
       const archived = useSyncExternalStore(
         subscribeToWorkspaces,
@@ -462,21 +463,21 @@ export default defineClient({
         onError: error => noticeToast.show({ text: errorMessage(error, translate('loadFailed')), success: false }),
       })
       const land = useMutation({
-        mutationKey: threadRebaseMutationKey,
-        mutationFn: (landedPath: string) =>
-          runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path: landedPath, sessionId: props.sessionId }, { signal }) }),
-        onError: (error, landedPath) => {
+        mutationKey: ThreadRebaseMutation.key,
+        mutationFn: (input: { readonly path: string }) =>
+          runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path: input.path, sessionId: props.sessionId }, { signal }) }),
+        onError: (error, input) => {
           if (IntegrationRecovery.isQueued(error)) {
             noticeToast.show({ text: translate('integrationQueuedHint', { bookmark }), success: true })
-            void pluginQueryClient().invalidateQueries({ queryKey: threadQueryKeys.threadAt(landedPath) })
+            void pluginQueryClient().invalidateQueries({ queryKey: threadQueryKeys.threadAt(input.path) })
             return
           }
           noticeToast.show({ text: errorMessage(error, translate('loadFailed')), success: false })
         },
-        onSettled: async (result, _error, landedPath) => {
+        onSettled: async (result, _error, input) => {
           announceRepositoryChange()
-          await pluginQueryClient().invalidateQueries({ queryKey: threadQueryKeys.threadAt(landedPath) })
-          await pluginQueryClient().invalidateQueries({ queryKey: revisionGraphQueryKey(landedPath) })
+          await pluginQueryClient().invalidateQueries({ queryKey: threadQueryKeys.threadAt(input.path) })
+          await pluginQueryClient().invalidateQueries({ queryKey: revisionGraphQueryKey(input.path) })
           if (result !== undefined && result !== null) noticeToast.show({ text: describeLandResult(translate, result), success: result.status === 'landed' })
         },
       })
@@ -585,7 +586,7 @@ export default defineClient({
             <LandPreview
               bookmark={bookmark}
               landing={landing}
-              onLand={() => land.mutate(thread.path)}
+              onLand={() => land.mutate({ path: thread.path })}
               pending={land.isPending}
               revisions={thread.unlanded}
               t={translate}

@@ -19,7 +19,8 @@ import { useSessionThreadApi } from './use-session-thread-api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
-import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
+import { threadQueryKeys } from './panel.js'
+import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { SessionLogDownloadRow, type SessionLogDownloadPort } from './session-log-download.js'
 import { WorkspaceActivityIndex } from './workspace-activity-index.js'
@@ -81,7 +82,6 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const api = useSessionThreadApi(props.sessionId)
   const queryClient = useQueryClient()
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
-  const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
   const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const read = useCallback(() => props.sessions.list.getSnapshot().byId[props.sessionId]?.cwd ?? null, [props.sessions, props.sessionId])
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
@@ -107,21 +107,22 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     },
   })
   const rebase = useMutation({
-    mutationKey: threadRebaseMutationKey,
-    mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path, sessionId: props.sessionId }, { signal }) }),
-    onError: (error, path) => {
+    mutationKey: ThreadRebaseMutation.key,
+    mutationFn: (input: { readonly path: string }) =>
+      runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path: input.path, sessionId: props.sessionId }, { signal }) }),
+    onError: (error, input) => {
       if (IntegrationRecovery.isQueued(error)) {
         toast.show({ text: props.t('integrationQueuedHint', { bookmark }), success: true })
         announceRepositoryChange()
-        void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(path) })
+        void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(input.path) })
         return
       }
       toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false })
     },
-    onSettled: async (result, _error, path) => {
+    onSettled: async (result, _error, input) => {
       announceRepositoryChange()
-      await queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(path) })
-      await queryClient.invalidateQueries({ queryKey: revisionGraphQueryKey(path) })
+      await queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(input.path) })
+      await queryClient.invalidateQueries({ queryKey: revisionGraphQueryKey(input.path) })
       if (result !== undefined && result !== null) toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' })
     },
   })
@@ -158,6 +159,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     if (open && cwd !== null && cwd.length > 0) void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(cwd, props.sessionId), exact: true })
   }
   const current = thread.data?.thread
+  const rebasesPending = useIsMutating(ThreadRebaseMutation.at(current?.path ?? cwd ?? '')) > 0
   const sessionIds = useMemo(() => current?.sessionIds ?? [props.sessionId], [current?.sessionIds, props.sessionId])
   const readSessionRunning = useCallback(
     () => WorkspaceActivityIndex.isRunning({ byId: props.sessions.list.getSnapshot().byId, sessionIds: [], path: current?.path }),
@@ -370,7 +372,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                         aria-label={label}
                         className="dshx-root dshx:w-full"
                         disabled={rebaseDisabled}
-                        onClick={() => rebase.mutate(current.path)}
+                        onClick={() => rebase.mutate({ path: current.path })}
                         size="sm"
                         type="button"
                         variant="outline"

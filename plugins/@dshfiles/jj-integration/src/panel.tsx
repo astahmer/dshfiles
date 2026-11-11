@@ -44,7 +44,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useMutation, useMutationState, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
@@ -71,6 +71,7 @@ import {
 import { useToast } from './toast.js'
 import { ProjectBookmarkQuery } from './project-bookmark-query.js'
 import { threadAtQueryKey } from './thread-query-keys.js'
+import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
@@ -82,7 +83,6 @@ export const threadQueryKeys = {
   threadAt: threadAtQueryKey,
   workspaceSync: ['jj-integration', 'workspace-sync'] as const,
 }
-export const threadRebaseMutationKey = ['jj-integration', 'thread-rebase'] as const
 
 /** Rows mounted per group before its boundary reveals the next batch. */
 const GROUP_LIMIT = 8
@@ -813,7 +813,8 @@ export const ThreadWorkspacesPanel = (props: {
   // SAFETY: multi-host's client has these two calls with wider inputs; the Host validates each one.
   const landApi = useMemo(() => landRepositoriesApi({ local: api as never as LocalLandApi, remote: multiHost as never as RemoteLandPort }), [api, multiHost])
   const queryClient = useQueryClient()
-  const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
+  const landingPaths = useMutationState({ filters: { mutationKey: ThreadRebaseMutation.key, status: 'pending' }, select: ThreadRebaseMutation.pathOf })
+  const rebasesPending = landingPaths.length > 0
   const toast = useToast()
   const settings = useSettings(jjIntegrationSettings)
   const autoIntegrationScope = settings.value?.autoIntegrationScope ?? defaultJjIntegrationSettings.autoIntegrationScope
@@ -851,7 +852,7 @@ export const ThreadWorkspacesPanel = (props: {
     announceRepositoryChange()
   }
   const rebase = useMutation({
-    mutationKey: threadRebaseMutationKey,
+    mutationKey: ThreadRebaseMutation.key,
     mutationFn: (input: { readonly path: string; readonly signal: AbortSignal; readonly bookmark?: string }) =>
       runHostRequest({
         signal: input.signal,
@@ -1360,7 +1361,7 @@ export const ThreadWorkspacesPanel = (props: {
                                 selected={selectedPaths.has(entry.thread.path)}
                                 selectable={entry.assessment.category === 'ready'}
                                 job={integrationJobs.get(entry.thread.path)}
-                                busy={queueBusy || rebasesPending}
+                                busy={queueBusy || landingPaths.includes(entry.thread.path)}
                                 now={now}
                                 onSelect={() => toggleSelectedPath(entry.thread.path)}
                                 onIntegrate={bookmark => rebase.mutate({ path: entry.thread.path, bookmark, signal: new AbortController().signal })}
