@@ -43,7 +43,7 @@ class TruncatingAdapter extends LlmAdapter {
   }
 }
 
-const run = async (input: { readonly install: (ctx: Context) => PromiseLike<unknown>; readonly cutReplies: number }) => {
+const run = async (input: { readonly install: (ctx: Context) => Promise<void>; readonly cutReplies: number }) => {
   const ctx = new Context()
   try {
     await ctx.plugin(SessionProjectionRegistry)
@@ -87,14 +87,24 @@ const run = async (input: { readonly install: (ctx: Context) => PromiseLike<unkn
 
 describe('output-limit continuation', () => {
   it('ends the turn at the limit by default, like upstream', async () => {
-    const forked = await run({ install: ctx => ctx.plugin(ForkedAgentLoop), cutReplies: 1 })
+    const forked = await run({
+      install: async ctx => {
+        await ctx.plugin(ForkedAgentLoop)
+      },
+      cutReplies: 1,
+    })
     expect(forked.adapter.requests).toHaveLength(1)
     expect(forked.turnEnd).toEqual({ kind: 'max-tokens' })
     expect(forked.notes).toEqual([])
   })
 
   it('continues a cut reply once, keeps the streamed text once, and names the cut tool call', async () => {
-    const forked = await run({ install: ctx => ctx.plugin(ForkedAgentLoop, { maxOutputLimitContinuations: 2 }), cutReplies: 1 })
+    const forked = await run({
+      install: async ctx => {
+        await ctx.plugin(ForkedAgentLoop, { maxOutputLimitContinuations: 2 })
+      },
+      cutReplies: 1,
+    })
     expect(forked.adapter.requests).toHaveLength(2)
     expect(forked.turnEnd).toEqual({ kind: 'completed' })
     expect(forked.assistantTexts).toEqual(['part 1 of a long answer', ' and the end.'])
@@ -112,13 +122,25 @@ describe('output-limit continuation', () => {
   })
 
   it('stops after the configured number of continuations and keeps the max-tokens outcome', async () => {
-    const forked = await run({ install: ctx => ctx.plugin(ForkedAgentLoop, { maxOutputLimitContinuations: 2 }), cutReplies: 5 })
+    const forked = await run({
+      install: async ctx => {
+        await ctx.plugin(ForkedAgentLoop, { maxOutputLimitContinuations: 2 })
+      },
+      cutReplies: 5,
+    })
     expect(forked.adapter.requests).toHaveLength(3)
     expect(forked.notes).toHaveLength(2)
     expect(forked.turnEnd).toEqual({ kind: 'max-tokens' })
   })
 
   it('refuses more than two continuations', async () => {
-    await expect(run({ install: ctx => ctx.plugin(ForkedAgentLoop, { maxOutputLimitContinuations: 3 }), cutReplies: 5 })).rejects.toThrow()
+    await expect(
+      run({
+        install: async ctx => {
+          await ctx.plugin(ForkedAgentLoop, { maxOutputLimitContinuations: 3 })
+        },
+        cutReplies: 5,
+      }),
+    ).rejects.toThrow()
   })
 })

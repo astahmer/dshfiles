@@ -178,24 +178,24 @@ export default DshxPlugin.make({
           Effect.gen(function* () {
             const entries = yield* recoveries.pending
             const autoResume = yield* recoveries.lastAutoResume
-            return {
+            const base = {
               sessionIds: entries.map(entry => entry.sessionId),
-              entries: entries.map(entry => ({
-                sessionId: entry.sessionId,
-                reason: entry.reason,
-                interruptedAt: entry.interruptedAt,
-                ...(entry.openTools === undefined ? {} : { openTools: [...entry.openTools] }),
-              })),
-              ...(Option.isSome(autoResume)
-                ? {
-                    autoResume: {
-                      at: autoResume.value.at,
-                      resumed: autoResume.value.resumed.map(entry => ({ sessionId: entry.sessionId, openTools: [...entry.openTools] })),
-                      skipped: autoResume.value.skipped.map(entry => ({ sessionId: entry.sessionId, reason: entry.reason })),
-                    },
-                  }
-                : {}),
+              entries: entries.map(entry => {
+                const row = { sessionId: entry.sessionId, reason: entry.reason, interruptedAt: entry.interruptedAt }
+                return entry.openTools === undefined ? row : { ...row, openTools: [...entry.openTools] }
+              }),
             }
+            return Option.match(autoResume, {
+              onNone: () => base,
+              onSome: outcome => ({
+                ...base,
+                autoResume: {
+                  at: outcome.at,
+                  resumed: outcome.resumed.map(entry => ({ sessionId: entry.sessionId, openTools: [...entry.openTools] })),
+                  skipped: outcome.skipped.map(entry => ({ sessionId: entry.sessionId, reason: entry.reason })),
+                },
+              }),
+            })
           }),
         ),
       resume: input => Recoveries.use(recoveries => Effect.map(recoveries.resume(input.sessionId), accepted => ({ accepted }))),

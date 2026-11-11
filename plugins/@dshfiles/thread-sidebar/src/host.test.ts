@@ -215,13 +215,10 @@ describe('thread-sidebar Host event wiring', () => {
   )
 })
 
-const restartRow = (sessionId: string, interruptedAt: number, requestId: string, openTools?: ReadonlyArray<string>) => ({
-  sessionId,
-  requestId,
-  interruptedAt,
-  reason: 'restart',
-  ...(openTools === undefined ? {} : { openTools }),
-})
+const restartRow = (sessionId: string, interruptedAt: number, requestId: string, openTools?: ReadonlyArray<string>) => {
+  const row = { sessionId, requestId, interruptedAt, reason: 'restart' }
+  return openTools === undefined ? row : { ...row, openTools }
+}
 
 const seedRestartRows = StateFiles.use(files =>
   files.write({

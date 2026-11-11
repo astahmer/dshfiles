@@ -137,16 +137,17 @@ export class AutoResumeReport extends Context.Service<AutoResumeReport, { readon
             ]
             yield* Effect.forEach(
               lines,
-              line =>
-                inbox.publish({
+              line => {
+                const item = {
                   source: 'thread-sidebar.auto-resume',
                   dedupeKey: `${line.sessionId}:${String(outcome.at)}`,
-                  subject: { kind: 'session', id: line.sessionId },
+                  subject: { kind: 'session' as const, id: line.sessionId },
                   reason: line.reason,
-                  ...(line.detail === undefined ? {} : { detail: line.detail }),
-                  severity: 'info',
-                  verbs: ['Open'],
-                }),
+                  severity: 'info' as const,
+                  verbs: ['Open' as const],
+                }
+                return inbox.publish(line.detail === undefined ? item : { ...item, detail: line.detail })
+              },
               { discard: true },
             )
           }).pipe(
