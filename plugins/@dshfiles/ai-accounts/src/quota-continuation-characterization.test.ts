@@ -174,7 +174,7 @@ describe('per-thread serialization', () => {
 })
 
 describe('capacity', () => {
-  it('refuses a new recovery at 500 active ones and frees room by evicting the oldest retired one', { timeout: 60_000 }, async () => {
+  it('refuses a new recovery at 500 active ones and still updates the one a thread already has', { timeout: 60_000 }, async () => {
     const { service } = await serviceIn({ readResetAt: async () => null })
     for (let index = 0; index < 500; index++) await service.recordFailure(failureAgent(`thread-${String(index)}`), 'codex_work', false)
     expect((await service.list()).continuations).toHaveLength(500)
@@ -184,13 +184,14 @@ describe('capacity', () => {
     expect(afterOverflow.continuations).toHaveLength(500)
     expect(afterOverflow.continuations.some(continuation => continuation.sessionId === 'overflow')).toBe(false)
 
-    const replacedBefore = afterOverflow.continuations.find(continuation => continuation.sessionId === 'thread-0')?.continuationId
+    const pendingBefore = afterOverflow.continuations.find(continuation => continuation.sessionId === 'thread-0')?.continuationId
     await service.recordFailure(failureAgent('thread-0', 99), 'codex_personal', false)
     const afterRetry = await service.list()
     expect(afterRetry.continuations).toHaveLength(500)
-    const replaced = afterRetry.continuations.find(continuation => continuation.sessionId === 'thread-0')
-    expect(replaced?.accountId).toBe('codex_personal')
-    expect(replaced?.continuationId).not.toBe(replacedBefore)
+    const updated = afterRetry.continuations.find(continuation => continuation.sessionId === 'thread-0')
+    expect(updated?.accountId).toBe('codex_personal')
+    // One recovery per thread: a repeat failure updates the pending one instead of replacing it.
+    expect(updated?.continuationId).toBe(pendingBefore)
   })
 })
 

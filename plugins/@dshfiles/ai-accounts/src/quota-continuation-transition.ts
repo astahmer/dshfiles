@@ -28,6 +28,7 @@ export const transition = (record: QuotaContinuationRecord, event: QuotaContinua
     case 'ranInHistory':
       return ended(record, 'completed')
     case 'newerWork':
+      return { ...ended(record, 'invalidated'), overtaken: true }
     case 'dropped':
       return ended(record, 'invalidated')
     case 'notReady':

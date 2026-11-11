@@ -34,6 +34,11 @@ export const quotaContinuationRecordSchema = Schema.Struct({
   scheduleId: Schema.NullOr(AiAccountsSchema.trimmedName(128)),
   queueSource: Schema.NullOr(Schema.Literals(['manual', 'schedule'])),
   state: quotaContinuationStateSchema,
+  /**
+   * Set when newer work retired this recovery: it is held, not dropped, so the thread's next quota failure takes it
+   * up again instead of opening another one, unless a turn completed in between.
+   */
+  overtaken: Schema.optional(Schema.Boolean),
 })
 
 export type QuotaContinuationRecord = typeof quotaContinuationRecordSchema.Type

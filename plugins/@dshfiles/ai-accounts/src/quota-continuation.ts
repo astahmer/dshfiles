@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import * as Schema from 'effect/Schema'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { ModelSelection, SessionController, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
@@ -12,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-schedule'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-workspace'
+import { AiAccountsSchema } from './effect-schema.js'
 import { quotaContinuationDomain, type QuotaContinuationTable } from './quota-continuation-store.js'
 import type { QuotaContinuationRecord, QuotaContinuationSummary } from './quota-continuation-model.js'
 import { QuotaContinuationMessage, type UserActivityIdentity } from './quota-continuation-message.js'
@@ -45,7 +47,11 @@ type SessionControllerPort = {
 type AgentUserMessage = Agent['inbox']['nextTurn'][number]
 type QuotaFailureAgent = {
   readonly id: Agent['id']
-  readonly session: { readonly seq: number; readonly header?: { readonly origin?: 'subagent' } }
+  readonly session: {
+    readonly seq: number
+    readonly header?: { readonly origin?: 'subagent' }
+    readonly ownEvents?: () => readonly { readonly type: string; readonly seq: number; readonly data?: unknown }[]
+  }
   readonly inbox: Pick<Agent['inbox'], 'nextTurn' | 'nextStep'>
 }
 type SessionUserActivity = {
@@ -104,6 +110,27 @@ const collectUserActivities = <Event extends { readonly seq: number }>(
 
 const hasNewerUserWork = (record: QuotaContinuationRecord, activities: readonly SessionUserActivity[]): boolean =>
   activities.some(activity => activity.seq >= record.failedSeq && activity.continuationId !== record.continuationId)
+
+const completedTurnEnd = Schema.Struct({ reason: Schema.Struct({ kind: Schema.Literal('completed') }) })
+
+/** Whether a turn finished normally after `seq`: then the work the recovery stood for is done and it is not taken up again. */
+const turnCompletedSince = (agent: Pick<QuotaFailureAgent, 'session'>, seq: number): boolean => {
+  const events = agent.session.ownEvents?.()
+  if (events === undefined) return true
+  return events.some(event => event.type === 'turn/end' && event.seq > seq && AiAccountsSchema.decodeResult(completedTurnEnd, event.data)._tag === 'Success')
+}
+
+/**
+ * The thread's one recovery a new failure takes up instead of opening another: the pending one, or the latest one
+ * newer work overtook while no turn has completed since. A dismissed, stopped or finished recovery is never reused.
+ */
+const reusableRecovery = (agent: Pick<QuotaFailureAgent, 'id' | 'session'>, records: readonly QuotaContinuationRecord[]): QuotaContinuationRecord | undefined => {
+  const latest = records.filter(record => record.sessionId === agent.id).sort((left, right) => right.failedAt - left.failedAt)[0]
+  if (latest === undefined) return undefined
+  if (isActive(latest)) return latest
+  if (latest.state === 'invalidated' && latest.overtaken === true && !turnCompletedSince(agent, latest.failedSeq)) return latest
+  return undefined
+}
 
 /** A subagent's stopped turn is not a recovery the user can resume: its parent thread is the one they continue. */
 const isSubagentSession = (agent: Pick<QuotaFailureAgent, 'session'>): boolean => agent.session.header?.origin === 'subagent'
@@ -459,8 +486,33 @@ const createQuotaContinuationService = ({
       const resetAt = (await readResetAt(accountId).catch(() => null)) ?? resetAtFromMessage(failureMessage ?? '', nowAtFailure)
       await serialize(agent.id, async () => {
         const storage = await table()
-        const oldRecords = [...storage.entries()].map(([, record]) => record).filter(record => record.sessionId === agent.id && isActive(record))
+        const reused = reusableRecovery(agent, await allRecords())
+        const oldRecords = [...storage.entries()]
+          .map(([, record]) => record)
+          .filter(record => record.sessionId === agent.id && isActive(record) && record.continuationId !== reused?.continuationId)
         for (const oldRecord of oldRecords) await invalidate(oldRecord)
+        const failedRouteFields = failedSelection === undefined ? {} : { failedProvider: failedSelection.provider, failedModel: failedSelection.model }
+
+        if (reused !== undefined) {
+          await cancelScheduled(reused)
+          const { overtaken: _overtaken, failedProvider: _failedProvider, failedModel: _failedModel, ...kept } = reused
+          const taken: QuotaContinuationRecord = {
+            ...kept,
+            ...failedRouteFields,
+            accountId,
+            failedSeq: agent.session.seq,
+            failedAt: nowAtFailure,
+            resetAt,
+            retryAt: resetAt === null ? quotaRetryAt({ failedAt: nowAtFailure, attempt: reused.retryAttempt }) : null,
+            scheduleId: null,
+            queueSource: null,
+            state: 'waiting',
+          }
+          const record = isQueuedExternalWork(agent) ? transition(taken, { kind: 'newerWork' }) : taken
+          await storage.put(record.continuationId, record)
+          if (record.state === 'waiting') await ensureScheduled(record)
+          return
+        }
 
         const records = await allRecords()
         // A thread keeps the choice someone made for its earlier recovery, so
@@ -481,7 +533,6 @@ const createQuotaContinuationService = ({
 
         const continuationId = randomUUID()
         const hasQueuedWork = isQueuedExternalWork(agent)
-        const failedRouteFields = failedSelection === undefined ? {} : { failedProvider: failedSelection.provider, failedModel: failedSelection.model }
         const waiting = quotaContinuationDomain.tables.continuations.valueSchema.parse({
           continuationId,
           sessionId: agent.id,

@@ -467,9 +467,16 @@ time and the Schedule service is loaded, the prompt is scheduled for that time.
 A provider that declares nothing still leaves a workable timer: the retry backs
 off 30 s, 1 min, 3 min, 5 min, then every 10 min, and a recovery that ran and hit
 the same wall again takes the next rung, so an unannounced reset is picked up
-without the user watching the thread. Any newer
-user message, other queued work, or stopping the Session invalidates the
-pending recovery, so an old continuation never runs over newer work. Records live
+without the user watching the thread. A thread keeps **one** recovery: when
+another message hits the same limit before it ran, that failure updates the
+pending recovery (account, reset, timer) instead of adding a second one, and a
+snooze or automatic-retry choice made on it stays. Any newer user message or
+other queued work holds the pending recovery: it disappears from the list and
+its timer is removed, so an old continuation never runs over newer work. If
+that newer work hits the limit too, the held recovery comes back; once a turn
+completes normally it is dropped. **Dismiss** and stopping the Session drop it
+for good. A recovery prompt never re-sends the stopped turn's input: it asks the
+model to review the request already in the conversation. Records live
 in Host storage, so they survive a restart; finished ones are pruned after 30
 days, and at most 500 are kept.
 

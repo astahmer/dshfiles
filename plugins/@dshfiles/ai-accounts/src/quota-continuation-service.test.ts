@@ -516,4 +516,102 @@ describe('quota continuation service', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('keeps one pending retry per thread when several messages hit the same limit', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-one-per-thread-'))
+    const sessionId = SessionId('quota-one-per-thread')
+    let clock = 9_000_000
+    const now = () => clock
+    const scheduler = createScheduleFixture(now)
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+    const failingAgent = (seq: number): QuotaFailureAgent => ({ ...createFailureAgent(sessionId, seq), session: { seq, ownEvents: () => [] } })
+
+    try {
+      context = await openContext(root)
+      service = createQuotaContinuationService({ context, readResetAt: async () => null, schedule: scheduler.schedule, now })
+      await service.recordFailure(failingAgent(10), 'codex_work', true)
+      const [first] = (await service.list()).continuations
+      if (first === undefined) throw new Error('Quota continuation was not stored.')
+      await expect(service.snooze(first.continuationId, 'one-hour')).resolves.toEqual({ updated: true })
+
+      // Two more messages reach the same spent plan before the retry ran.
+      clock += 5_000
+      await service.recordFailure(failingAgent(20), 'codex_work', true)
+      clock += 5_000
+      await service.recordFailure(failingAgent(30), 'codex_alt', true)
+
+      const { continuations } = await service.list()
+      expect(continuations).toHaveLength(1)
+      expect(continuations[0]).toMatchObject({ continuationId: first.continuationId, accountId: 'codex_alt', failedAt: clock, retryAttempt: 0 })
+      expect(continuations[0]?.snoozedUntil).toBe(first.failedAt + 60 * 60_000)
+      expect(scheduler.rows.get(sessionId)).toHaveLength(1)
+      await service.close()
+      service = undefined
+      const stored = await context.storageDomain.open(quotaContinuationDomain)
+      const records = [...(await stored.table('continuations')).entries()].filter(([, record]) => record.sessionId === sessionId)
+      await stored.close()
+      expect(records).toHaveLength(1)
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('holds a retry newer work overtook and takes it up again only while no turn has completed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-quota-overtaken-'))
+    const sessionId = SessionId('quota-overtaken')
+    const now = () => 11_000_000
+    const scheduler = createScheduleFixture(now)
+    let context: Context | undefined
+    let service: ReturnType<typeof createQuotaContinuationService> | undefined
+    const newerMessage = createUserMessage({ content: [{ type: 'text', text: 'a newer request' }], source: { kind: 'user' } })
+    let events: { readonly type: string; readonly seq: number; readonly data?: unknown }[] = []
+    const failingAgent = (seq: number, queued: boolean): QuotaFailureAgent => ({
+      id: sessionId,
+      session: { seq, ownEvents: () => events },
+      inbox: { nextTurn: queued ? [newerMessage] : [], nextStep: [] },
+    })
+
+    const openService = (opened: Context) => createQuotaContinuationService({ context: opened, readResetAt: async () => null, schedule: scheduler.schedule, now })
+    const storedIds = async (opened: Context): Promise<string[]> => {
+      await service?.close()
+      const stored = await opened.storageDomain.open(quotaContinuationDomain)
+      const ids = [...(await stored.table('continuations')).entries()].filter(([, record]) => record.sessionId === sessionId).map(([id]) => id)
+      await stored.close()
+      service = openService(opened)
+      return ids
+    }
+
+    try {
+      context = await openContext(root)
+      service = openService(context)
+      // A newer user message is already queued: the retry is held, not offered and not scheduled.
+      await service.recordFailure(failingAgent(10, true), 'codex_work', true)
+      expect((await service.list()).continuations).toHaveLength(0)
+      expect(scheduler.rows.get(sessionId) ?? []).toHaveLength(0)
+      const [held] = await storedIds(context)
+
+      // That message hit the same limit: the held retry comes back instead of a second one.
+      await service.recordFailure(failingAgent(20, false), 'codex_work', true)
+      const [taken] = (await service.list()).continuations
+      if (taken === undefined) throw new Error('The held recovery was not taken up again.')
+      expect(taken.continuationId).toBe(held)
+      expect(await storedIds(context)).toEqual([held])
+      expect(scheduler.rows.get(sessionId)).toHaveLength(1)
+
+      // Overtaken again, then a turn completes: the old retry is dropped and the next failure opens a new one.
+      await service.recordFailure(failingAgent(30, true), 'codex_work', true)
+      events = [{ type: 'turn/end', seq: 40, data: { turn: 3, reason: { kind: 'completed' } } }]
+      await service.recordFailure(failingAgent(50, false), 'codex_work', true)
+      const [fresh] = (await service.list()).continuations
+      expect(fresh?.continuationId).toBeDefined()
+      expect(fresh?.continuationId).not.toBe(taken.continuationId)
+    } finally {
+      await service?.close()
+      await context?.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
