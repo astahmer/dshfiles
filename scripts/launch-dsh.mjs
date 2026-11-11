@@ -3,6 +3,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statS
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LauncherConfig } from './launcher-config.mjs'
+import { activeSafeProfile } from './safe-mode.mjs'
 
 const run = (command, args, options) =>
   new Promise((resolveExit, reject) => {
@@ -71,9 +72,15 @@ export async function launchDsh(args, config = LauncherConfig.load(), inherited 
   if (!existsSync(supervisor) || !existsSync(join(config.sourceRoot, 'scripts/prepare-manuel-source.mjs')))
     throw new Error('Configured source checkout is missing; nothing started')
   // Check before any build/profile write. Preparation repeats this check under the launch lock.
-  const running = await run('pgrep', ['-u', String(process.getuid()), '-f', LauncherConfig.runningProfilePattern(config)], { env, stdio: 'ignore' })
-  if (running === 0) throw new Error('DSH is already running; no build or profile change performed')
-  if (running !== 1) throw new Error('Could not check running DSH processes; nothing started')
+  const safe = activeSafeProfile({ home: config.dshHome, profile: config.profile })
+  for (const profile of safe === undefined ? [config.profile] : [config.profile, safe]) {
+    const running = await run('pgrep', ['-u', String(process.getuid()), '-f', LauncherConfig.runningProfilePattern({ ...config, profile })], {
+      env,
+      stdio: 'ignore',
+    })
+    if (running === 0) throw new Error('DSH is already running; no build or profile change performed')
+    if (running !== 1) throw new Error('Could not check running DSH processes; nothing started')
+  }
   const runtime = join(config.dshHome, 'runtime')
   mkdirSync(runtime, { recursive: true, mode: 0o700 })
   const release = acquireLaunchLock(join(runtime, 'source-launch.lock'))

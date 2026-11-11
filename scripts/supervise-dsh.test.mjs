@@ -102,6 +102,30 @@ for (const mode of ['wrong-marker', 'no-marker', 'crash']) {
   })
 }
 
+test('each restart re-reads the launch plan, so safe mode on or off applies to the next Host', async t => {
+  const f = await fixture(t, 'native-request')
+  const plans = []
+  const warnings = []
+  const plan = () => {
+    const safe = plans.length === 0
+    plans.push(safe)
+    return safe
+      ? { args: [...f.options.args, 'safe'], preparation: [], notice: 'Safe mode: booting web-safe' }
+      : { args: f.options.args, preparation: [{ command: process.execPath, args: ['-e', 'require("node:fs").appendFileSync("prepared", "x")'] }] }
+  }
+  // spawn needs a real stream for the child's stderr, so record the supervisor's own warnings on it.
+  const write = process.stderr.write
+  process.stderr.write = (chunk, ...rest) => (warnings.push(String(chunk)), write.call(process.stderr, chunk, ...rest))
+  t.after(() => {
+    process.stderr.write = write
+  })
+  assert.equal(await superviseDsh({ ...f.options, args: undefined, stdout: process.stdout, plan }), 0)
+  assert.deepEqual(plans, [true, false])
+  assert.equal(await readFile(join(f.home, 'prepared'), 'utf8'), 'x')
+  assert.equal((await f.runs()).length, 2)
+  assert.ok(warnings.some(line => line.includes('Safe mode: booting web-safe')))
+})
+
 test('startup preparation failure never launches a Host', async t => {
   const f = await fixture(t, 'native-request')
   assert.equal(await superviseDsh({ ...f.options, stdout: process.stdout, preparation: [{ command: process.execPath, args: ['-e', 'process.exit(7)'] }] }), 7)

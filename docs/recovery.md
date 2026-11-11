@@ -32,7 +32,74 @@ different core/home. Keep startup diagnostics private; they may include paths or
 account metadata. A successful HTTP shell load is not proof that Session APIs
 or client plugin activation work.
 
-## 2. Optional last-known-good recovery
+## 2. Plugin safe mode
+
+When a plugin breaks boot (the GUI shows **Failed to load plugins**, stays
+blank, or the launcher refuses because a plugin build fails), boot the same
+home with only DSH core and the owned bundles that own a data format, then
+restore. Safe mode never writes your profile: it composes a sibling profile
+`<profile>-safe` and records what it left out.
+
+```sh
+# from the dshfiles checkout; --profile is the profile you normally boot
+node scripts/safe-mode.mjs start --profile web
+# stop the running DSH yourself (Ctrl-C in its terminal), then boot:
+scripts/dsh-launcher                 # configured launcher: boots web-safe while safe mode is on
+dsh --profile web-safe               # or the stock CLI
+# fix or remove the broken plugin, stop the safe-mode DSH, then:
+node scripts/safe-mode.mjs stop --profile web
+scripts/dsh-launcher                 # or: dsh --profile web
+```
+
+`start` prints the exact boot and restore commands for the home it used
+(`--home <DSH home>`, default `DSH_HOME`, the launcher's `dshHome`, then
+`~/.dsh`). `status` reports whether safe mode is on. Neither command stops or
+restarts a running DSH: that stays your call.
+
+What the safe profile loads:
+
+| Kept                                                                               | Why                                                                                    |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Every `@deepseek-ai/*` bundle the profile lists                                    | the stock GUI and Host                                                                 |
+| `@dshfiles/session-persistence-jsonl`, plus each `--keep <bundle>`                 | its Session logs store tool catalogs by reference; the stock reader cannot expand them |
+| Your `cordis.patch.yml` entries for rows that still exist (port, models, accounts) | the same URL and defaults as usual                                                     |
+
+It drops every other bundle (owned and third-party), your patch entries for rows
+that left with them, inserts of non-core modules, and your entries for native
+rows a dropped bundle replaces. For example, the seed disables the stock
+`session-query-sqlite` because session-search owns `sessionQuery`; with
+session-search off, the stock row must come back or the session controller
+never activates. The drop list is in
+`<home>/profiles/<profile>-safe/.dshfiles-safe-mode.json`.
+
+The same home means the same Sessions, credentials and plugin storage. A
+setting changed during safe mode lands in the safe profile and is discarded by
+`stop`. The configured launcher boots the safe profile without its usual
+`pnpm install`, plugin build and relink steps, so a failing build cannot block
+recovery; its **Restart when idle** re-reads safe mode on each restart.
+
+Crash safety: `start` composes in a hidden staging directory and marks the
+profile `active` only after a `--dump-config` of the final composition
+succeeds; the launcher ignores anything not `active`. `start` and `stop`
+remove leftovers of an interrupted run. Both are idempotent, and both refuse
+while a DSH runs the safe profile. `stop` reports whether your profile is
+byte-identical to when safe mode started.
+
+Limits: a bundle whose own `cordis.patch.yml` no longer parses, or a broken
+kept bundle, still breaks composition; `start` fails without activating, and
+`dsh-lkg` (below) is the next step. Turns use only native tools and providers
+in safe mode.
+
+Verified 2026-11-11 on a scratch home synced from the `web` seed (DSH
+0.2.1-rc.2): with `@dshfiles/session-controller`'s Host entry made to throw,
+the full profile showed **Failed to load plugins** (65 entries). `start` kept
+`@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app` and
+`@dshfiles/session-persistence-jsonl`, turned off 102 bundles and 8 patch
+entries; `web-safe` booted with no failed entries and the stock GUI resolved
+its boot in headless Chromium. `stop` left the source manifest and patch
+byte-identical, and the repaired full profile booted with no failure card.
+
+## 3. Optional last-known-good recovery
 
 The [LKG tooling](../scripts/dsh-lkg/README.md) can retain a self-contained runtime
 snapshot, including core, plugin artifacts, profile and interpreter identity.
@@ -64,7 +131,7 @@ its launch token. APFS clone support and macOS immutable flags are platform
 features, not cross-platform guarantees. Read the implementation's platform
 requirements before relying on them elsewhere.
 
-## 3. Diagnose the owner
+## 4. Diagnose the owner
 
 - **Waiting for service X / entries did not activate:** compare the selected
   live patch with the matching core and plugin service contracts. A seed change
@@ -104,7 +171,7 @@ its existence nor any machine-specific Nix configuration is guaranteed by this
 repository. Do not install or enable a restart policy while diagnosing without
 separate authorization.
 
-## 4. Snapshot and upgrade only with authorization
+## 5. Snapshot and upgrade only with authorization
 
 Operator commands can copy private data, run paid provider traffic when a turn
 check is selected, update installations or remove old snapshots. Inspect their

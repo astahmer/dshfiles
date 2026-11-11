@@ -4,12 +4,23 @@ import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { LauncherConfig } from './launcher-config.mjs'
+import { activeSafeProfile } from './safe-mode.mjs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const RESTART_EXIT_CODE = 75
 
-export async function superviseDsh({ home, command, args, cwd, env = process.env, preparation = [], stdout = process.stdout, stderr = process.stderr }) {
+export async function superviseDsh({
+  home,
+  command,
+  args,
+  cwd,
+  env = process.env,
+  preparation = [],
+  plan = () => ({ args, preparation }),
+  stdout = process.stdout,
+  stderr = process.stderr,
+}) {
   const runtime = join(resolve(home), 'runtime')
   await mkdir(runtime, { recursive: true, mode: 0o700 })
   const webUrlPath = join(runtime, 'web-url')
@@ -37,7 +48,9 @@ export async function superviseDsh({ home, command, args, cwd, env = process.env
   process.once('SIGTERM', onTerminate)
   try {
     for (;;) {
-      for (const step of preparation) {
+      const current = plan()
+      if (current.notice) warn(current.notice)
+      for (const step of current.preparation) {
         if (stopping) return stopCode
         const result = await new Promise((resolveStep, rejectStep) => {
           child = spawn(step.command, step.args, { cwd, env: { ...env, ...step.env }, detached: true, stdio: ['ignore', stdout, stderr] })
@@ -57,7 +70,7 @@ export async function superviseDsh({ home, command, args, cwd, env = process.env
       const requestPath = join(runtime, `dsh-web-restart-${runId}.request`)
       let urlWrites = Promise.resolve()
       const result = await new Promise((resolveRun, rejectRun) => {
-        child = spawn(command, args, {
+        child = spawn(command, current.args, {
           cwd,
           detached: true,
           env: { ...env, DSH_HOME: resolve(home), DSH_RESTART_REQUEST_PATH: requestPath, DSH_RESTART_RUN_ID: runId },
@@ -108,7 +121,7 @@ async function main() {
   const root = config.sourceRoot
   const home = config.dshHome
   const core = LauncherConfig.requireCoreEntry(config)
-  const preparation = [
+  const fullPreparation = [
     { command: 'pnpm', args: ['--dir', root, 'install', '--frozen-lockfile', '--prefer-offline'] },
     {
       command: 'pnpm',
@@ -116,13 +129,17 @@ async function main() {
     },
     { command: config.nodeBinary, args: [join(root, 'scripts/prepare-manuel-source.mjs')] },
   ]
-  process.exitCode = await superviseDsh({
-    home,
-    command: config.nodeBinary,
-    args: [core, '--profile', config.profile, '--no-open'],
-    cwd: root,
-    preparation,
-  })
+  // Safe mode boots its sibling profile without building or relinking: a broken plugin build must not block recovery.
+  const plan = () => {
+    const safe = activeSafeProfile({ home, profile: config.profile })
+    if (safe === undefined) return { args: [core, '--profile', config.profile, '--no-open'], preparation: fullPreparation }
+    return {
+      args: [core, '--profile', safe, '--no-open'],
+      preparation: [],
+      notice: `Safe mode: booting ${safe} with plugins off. Restore: node ${join(root, 'scripts/safe-mode.mjs')} stop --profile ${config.profile}`,
+    }
+  }
+  process.exitCode = await superviseDsh({ home, command: config.nodeBinary, cwd: root, plan })
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
