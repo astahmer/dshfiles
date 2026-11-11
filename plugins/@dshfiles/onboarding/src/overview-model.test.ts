@@ -4,7 +4,7 @@ import { FEATURE_CATALOG } from './generated/feature-catalog.js'
 import { OnboardingOverview, type ChecklistFacts } from './overview-model.js'
 
 const facts = (overrides: Partial<ChecklistFacts> = {}): ChecklistFacts => ({
-  providers: 1,
+  account: { source: 'ai-accounts', saved: 1, connected: 1 },
   projects: [{ path: '/work/app', vcs: 'jj' }],
   github: 'signed-in',
   ...overrides,
@@ -23,7 +23,9 @@ describe('setup checklist', () => {
   })
 
   it('leaves each item to do with a fix action, and unknown when the Host cannot tell', () => {
-    const todo = OnboardingOverview.checklist(facts({ providers: 0, projects: [{ path: '/work/notes', vcs: null }], github: 'signed-out' }))
+    const todo = OnboardingOverview.checklist(
+      facts({ account: { source: 'ai-accounts', saved: 0, connected: 0 }, projects: [{ path: '/work/notes', vcs: null }], github: 'signed-out' }),
+    )
     expect(states(todo)).toEqual([
       ['account', 'todo'],
       ['project', 'done'],
@@ -34,10 +36,43 @@ describe('setup checklist', () => {
     expect(todo.find(item => item.id === 'github')?.fix.shellCommand).toBe('gh auth login')
     expect(todo.find(item => item.id === 'repository')?.detail).toBe('No added project has a .jj or .git folder.')
 
-    const unknown = OnboardingOverview.checklist(facts({ providers: null, projects: null, github: 'failed' }))
+    const unknown = OnboardingOverview.checklist(facts({ account: null, projects: null, github: 'failed' }))
     expect(states(unknown).map(([, state]) => state)).toEqual(['unknown', 'unknown', 'unknown', 'unknown'])
     expect(OnboardingOverview.checklist(facts({ github: 'missing' })).find(item => item.id === 'github')?.fix.shellCommand).toBe('https://cli.github.com')
     expect(OnboardingOverview.checklist(facts({ github: 'off' })).find(item => item.id === 'github')?.state).toBe('off')
+  })
+
+  const account = (value: ChecklistFacts['account']) => OnboardingOverview.checklist(facts({ account: value })).find(item => item.id === 'account')
+
+  it('counts connected AI accounts when AI accounts answers, and says so', () => {
+    const file = OnboardingOverview.accountFacts([
+      { enabled: true, signedIn: true, state: 'healthy' },
+      { enabled: true, signedIn: true, state: 'exhausted' },
+      { enabled: false, signedIn: true, state: 'disabled' },
+      { enabled: true, signedIn: false, state: 'unconfigured' },
+    ])
+    expect(file).toEqual({ source: 'ai-accounts', saved: 4, connected: 2 })
+    expect(account(file)).toMatchObject({ state: 'done', detail: '2 connected accounts in AI accounts.' })
+    expect(account(OnboardingOverview.accountFacts([{ enabled: true, signedIn: false, state: 'unconfigured' }]))).toMatchObject({
+      state: 'todo',
+      detail: '1 saved account, none connected. Sign one in from AI accounts.',
+    })
+    expect(account({ source: 'unreadable' })).toMatchObject({ state: 'unknown' })
+  })
+
+  it('falls back to provider routes without AI accounts, never calling a route a signed-in account', () => {
+    const routes = account({ source: 'providers', routes: 2 })
+    expect(routes).toMatchObject({
+      state: 'done',
+      detail: '2 model providers configured (no account manager installed); whether each holds a working credential is not checked.',
+    })
+    expect(routes?.detail).not.toMatch(/signed in|connected/u)
+    expect(account({ source: 'providers', routes: 0 })).toMatchObject({ state: 'todo' })
+  })
+
+  it('reports an empty account file as nothing saved yet', () => {
+    expect(OnboardingOverview.accountFacts([])).toEqual({ source: 'ai-accounts', saved: 0, connected: 0 })
+    expect(account(OnboardingOverview.accountFacts([]))).toMatchObject({ state: 'todo', detail: 'No AI account is saved yet.' })
   })
 })
 
@@ -143,10 +178,10 @@ describe('feature search', () => {
   })
 
   it('renders a bounded agent summary with the checklist, packs and rows', () => {
-    const value = OnboardingOverview.overview({ catalog: FEATURE_CATALOG, facts: facts(), states: null, request: {}, curatedDefault: true })
+    const value = OnboardingOverview.overview({ catalog: FEATURE_CATALOG, facts: facts(), states: null, request: {}, curatedDefault: true, preview: null })
     const text = OnboardingOverview.render(value)
     expect(text.length).toBeLessThanOrEqual(6_000)
-    expect(text).toContain('- [x] A model provider is set up')
+    expect(text).toContain('- [x] An AI account is connected')
     expect(text).toContain('Versioning workflow')
   })
 })

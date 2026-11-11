@@ -15,10 +15,12 @@ import {
   SettingsIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useQuery } from '@dshfiles/plugin-ui/query'
+import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import type * as Types from 'effect/Types'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { DESTINATION_ORDER, type ChecklistItem, type FeatureRow, type Overview, type OverviewInput, type PackView, type PluginState } from './overview-model.js'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { DESTINATION_ORDER, type ChecklistItem, type FeatureRow, type Overview, type OverviewInput, type PackView } from './overview-model.js'
+import { PackChangeDialog, type PackChangeDialogProps, type PackTarget } from './pack-change-dialog.js'
+import type { PackAction, PluginState } from './pack-plan.js'
 import { Routes, type RouteServices } from './routes.js'
 import type { OnboardingSettings } from './settings.js'
 
@@ -60,6 +62,7 @@ export interface GettingStartedProps {
   readonly routes: RouteServices
   readonly copy: (text: string) => Promise<boolean>
   readonly startWizard: () => void
+  readonly applyPack: PackChangeDialogProps['applyPack']
 }
 
 const ChecklistRow = (props: {
@@ -119,7 +122,11 @@ const ChecklistRow = (props: {
   )
 }
 
-const PackCard = (props: { readonly pack: PackView; readonly routes: RouteServices }): ReactNode => {
+const PackCard = (props: {
+  readonly pack: PackView
+  readonly routes: RouteServices
+  readonly onChange: (action: PackAction, trigger: HTMLButtonElement) => void
+}): ReactNode => {
   const { pack } = props
   const enabled = pack.plugins.filter(plugin => plugin.state === 'enabled').length
   return (
@@ -168,6 +175,28 @@ const PackCard = (props: { readonly pack: PackView; readonly routes: RouteServic
               <SettingsIcon /> {setting.label}
             </Button>
           ))}
+        </div>
+      )}
+      {pack.core || pack.plugins.every(plugin => plugin.state === 'unknown') ? null : (
+        <div className="dshx:flex dshx:flex-wrap dshx:gap-2 dshx:border-t dshx:border-border dshx:pt-2">
+          <Button
+            aria-label={`Enable pack: ${pack.title}`}
+            className={TOUCH}
+            onClick={event => props.onChange('enable', event.currentTarget)}
+            size="sm"
+            variant="outline"
+          >
+            Enable pack
+          </Button>
+          <Button
+            aria-label={`Disable pack: ${pack.title}`}
+            className={TOUCH}
+            onClick={event => props.onChange('disable', event.currentTarget)}
+            size="sm"
+            variant="ghost"
+          >
+            Disable pack
+          </Button>
         </div>
       )}
     </li>
@@ -236,6 +265,19 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
   })
   const data = overview.data
   const checklist = data?.checklist ?? null
+  const queryClient = useQueryClient()
+  const [packTarget, setPackTarget] = useState<PackTarget | null>(null)
+  const trigger = useRef<HTMLButtonElement | null>(null)
+  const loadOverview = props.loadOverview
+  const loadPreview = useCallback(
+    async (target: PackTarget, signal: AbortSignal) => {
+      const value = await loadOverview({ preview: { pack: target.pack, action: target.action }, curatedOnly: true, limit: 1 }, signal)
+      if (value.preview === null) throw new Error('This Host returned no pack preview.')
+      return value.preview
+    },
+    [loadOverview],
+  )
+  const refresh = useCallback(() => void queryClient.invalidateQueries({ queryKey: ['onboarding', 'overview'] }), [queryClient])
   const done = checklist?.filter(item => item.state === 'done').length ?? 0
 
   return (
@@ -265,7 +307,15 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
             <PageSection heading="Packs" meta={String(data.packs.length)}>
               <ul className="dshx:grid dshx:grid-cols-2 dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">
                 {data.packs.map(pack => (
-                  <PackCard key={pack.id} pack={pack} routes={props.routes} />
+                  <PackCard
+                    key={pack.id}
+                    onChange={(action, button) => {
+                      trigger.current = button
+                      setPackTarget({ pack: pack.id, title: pack.title, action })
+                    }}
+                    pack={pack}
+                    routes={props.routes}
+                  />
                 ))}
               </ul>
             </PageSection>
@@ -327,6 +377,18 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
           </PageSection>
         </div>
       </Page>
+      <PackChangeDialog
+        applyPack={props.applyPack}
+        copy={props.copy}
+        loadPreview={loadPreview}
+        onClose={() => {
+          setPackTarget(null)
+          // Radix returns focus on its own only to a Dialog trigger; these buttons open it from page state.
+          requestAnimationFrame(() => trigger.current?.focus())
+        }}
+        onSettled={refresh}
+        target={packTarget}
+      />
     </main>
   )
 }

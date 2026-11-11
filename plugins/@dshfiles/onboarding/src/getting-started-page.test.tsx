@@ -5,17 +5,52 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FEATURE_CATALOG } from './generated/feature-catalog.js'
 import { GettingStartedPage } from './getting-started-page.js'
 import { OnboardingOverview, type OverviewInput } from './overview-model.js'
+import { PackPlan, type PluginEntryFact } from './pack-plan.js'
 import type { RouteServices } from './routes.js'
 import { ONBOARDING_DEFAULTS } from './settings.js'
 
 afterEach(cleanup)
 
-const facts = { providers: 0, projects: [{ path: '/work/app', vcs: 'git' as const }], github: 'signed-out' as const }
+const facts = { account: { source: 'providers' as const, routes: 0 }, projects: [{ path: '/work/app', vcs: 'git' as const }], github: 'signed-out' as const }
 
-/** The real overview over the generated catalog, as the Host computes it. */
+const entries: readonly PluginEntryFact[] = [
+  { entryId: 'include:dshfiles-backlog', plugin: 'backlog', moduleName: '@dshfiles/backlog', enabled: true, readOnlyReason: null },
+  { entryId: 'include:dshfiles-goal-tool', plugin: 'goal-tool', moduleName: '@dshfiles/goal-tool', enabled: false, readOnlyReason: null },
+]
+
+/** The real overview and pack preview over the generated catalog, as the Host computes them. */
 const loadOverview = vi.fn(async (request: OverviewInput) =>
-  OnboardingOverview.overview({ catalog: FEATURE_CATALOG, facts, states: new Map([['backlog', 'enabled' as const]]), request, curatedDefault: true }),
+  OnboardingOverview.overview({
+    catalog: FEATURE_CATALOG,
+    facts,
+    states: PackPlan.statesOf(entries),
+    request,
+    curatedDefault: true,
+    preview:
+      request.preview === undefined
+        ? null
+        : PackPlan.preview({
+            ...request.preview,
+            entries,
+            toolchain: { kind: 'manual', reason: 'Not linked from a checkout.' },
+            profile: 'scratch',
+            homeFromEnv: false,
+            prerequisites: new Map(),
+          }),
+  }),
 )
+
+/** Each plugin's Host answer: the row switch waits for a restart, the installs come back as commands to run. */
+const applyPack = vi.fn(async (input: { readonly pack: string; readonly action: 'enable' | 'disable'; readonly plugins: readonly string[] }) => {
+  const overview = await loadOverview({ preview: { pack: input.pack, action: input.action } })
+  if (overview.preview === null) throw new Error('no preview')
+  const results = input.plugins.map(plugin =>
+    plugin === 'goal-tool'
+      ? { plugin, step: input.action, status: 'restart-required' as const, restartReason: 'no-hmr', detail: null }
+      : { plugin, step: 'install' as const, status: 'manual' as const, restartReason: null, detail: 'Not linked from a checkout.' },
+  )
+  return { preview: overview.preview, results, summary: PackPlan.summarize({ preview: overview.preview, results }) }
+})
 
 const routes = (registered: readonly string[]): RouteServices & { readonly opened: string[] } => {
   const opened: string[] = []
@@ -43,6 +78,7 @@ const renderPage = (input: { readonly registered: readonly string[]; readonly pa
   render(
     <PluginQueryProvider>
       <GettingStartedPage
+        applyPack={applyPack}
         copy={copy}
         loadOverview={(request, _signal) => loadOverview(request)}
         routes={services}
@@ -67,6 +103,7 @@ describe('GettingStartedPage', () => {
     const packs = screen.getByRole('region', { name: /Packs/u })
     expect(within(packs).getByText('backlog · enabled')).toBeTruthy()
     expect(within(packs).getByText('backlog-jira · not installed')).toBeTruthy()
+    expect(within(packs).getByText('goal-tool · disabled')).toBeTruthy()
     fireEvent.click(within(packs).getByRole('button', { name: 'Isolate each new thread in its own workspace' }))
     expect(page.services.opened.at(-1)).toBe('settings:{"setting":{"entryId":"jj-integration","fieldPath":["isolateByDefault"]}}')
 
@@ -96,4 +133,57 @@ describe('GettingStartedPage', () => {
     fireEvent.change(screen.getByLabelText('Search features'), { target: { value: 'zzzz-no-such-feature' } })
     await screen.findByText('No feature matches every word.')
   }, 20_000)
+
+  it('previews a pack change, and Cancel changes nothing', async () => {
+    applyPack.mockClear()
+    renderPage({ registered: [] })
+    const planning = within(await screen.findByRole('region', { name: /Packs/u }))
+      .getAllByRole('listitem')
+      .find(item => item.dataset.pack === 'planning')
+    if (planning === undefined) throw new Error('no planning pack')
+    fireEvent.click(within(planning).getByRole('button', { name: 'Enable pack: Backlog & planning' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Enable Backlog & planning' })
+    await within(dialog).findByRole('region', { name: 'Install by hand' })
+    expect(within(dialog).getByRole('region', { name: 'Enable' }).textContent).toContain('goal-tool')
+    expect(
+      within(dialog).getByRole('button', {
+        name: /Copy node tooling\/dshx\/packages\/dshx\/dist\/cli\/bin\.js add @dshfiles\/backlog-jira --profile scratch/u,
+      }),
+    ).toBeTruthy()
+    expect(within(dialog).getByRole('region', { name: 'Restart' }).textContent).toMatch(/Restart when idle/u)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(applyPack).not.toHaveBeenCalled()
+  })
+
+  it('says Up to date and offers no confirm when nothing would change', async () => {
+    applyPack.mockClear()
+    renderPage({ registered: [] })
+    const observe = within(await screen.findByRole('region', { name: /Packs/u }))
+      .getAllByRole('listitem')
+      .find(item => item.dataset.pack === 'observe')
+    if (observe === undefined) throw new Error('no observe pack')
+    fireEvent.click(within(observe).getByRole('button', { name: 'Disable pack: Observe & perf' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Disable Observe & perf' })
+    await within(dialog).findByText(/^Up to date/u)
+    expect(within(dialog).queryByRole('button', { name: 'Disable pack' })).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    expect(applyPack).not.toHaveBeenCalled()
+  })
+
+  it('applies one plugin per Host call after confirm and reports a partial result as partial', async () => {
+    applyPack.mockClear()
+    renderPage({ registered: [] })
+    const planning = within(await screen.findByRole('region', { name: /Packs/u }))
+      .getAllByRole('listitem')
+      .find(item => item.dataset.pack === 'planning')
+    if (planning === undefined) throw new Error('no planning pack')
+    fireEvent.click(within(planning).getByRole('button', { name: 'Enable pack: Backlog & planning' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Enable Backlog & planning' })
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Enable pack' }))
+    const summary = await within(dialog).findByText('Partly done')
+    expect(summary.closest('[data-summary]')?.getAttribute('data-summary')).toBe('partial')
+    expect(applyPack.mock.calls.map(([call]) => call.plugins)).toEqual([['goal-tool'], ['backlog-jira'], ['backlog-notion'], ['schedule'], ['queue-reorder']])
+    expect(within(dialog).getByText(/restart reason|no-hmr/u)).toBeTruthy()
+  })
 })

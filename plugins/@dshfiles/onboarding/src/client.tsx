@@ -6,9 +6,9 @@ import { Command, Composer, defineClient, useApi, useContract, useSettings, type
 import { CompassIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { DestinationSections } from '@dshfiles/thread-sidebar/destinations'
-import { useEffect, type ReactNode } from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 import { onboardingApi } from './api.js'
-import { GettingStartedPage } from './getting-started-page.js'
+import { GettingStartedPage, type GettingStartedProps } from './getting-started-page.js'
 import type { Overview, OverviewInput } from './overview-model.js'
 import { Routes, type RouteServices } from './routes.js'
 import { ONBOARDING_DEFAULTS, onboardingSettings, type OnboardingSettings } from './settings.js'
@@ -28,7 +28,12 @@ const useOnboardingSettings = (): OnboardingSettings => {
 
 const useLoadOverview = (): ((input: OverviewInput, signal: AbortSignal) => Promise<Overview>) => {
   const api = useApi(onboardingApi)
-  return (input, signal) => api.overview(input, { signal })
+  return useCallback((input, signal) => api.overview(input, { signal }), [api])
+}
+
+const useApplyPack = (): GettingStartedProps['applyPack'] => {
+  const api = useApi(onboardingApi)
+  return useCallback(input => api.applyPack(input), [api])
 }
 
 export default defineClient({
@@ -92,6 +97,7 @@ export default defineClient({
         decorate(() => (
           <PluginQueryProvider>
             <GettingStartedPage
+              applyPack={useApplyPack()}
               copy={copy}
               loadOverview={useLoadOverview()}
               routes={routes}

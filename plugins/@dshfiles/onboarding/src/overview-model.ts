@@ -1,6 +1,7 @@
 import * as Schema from 'effect/Schema'
 import { PREREQUISITES, routeSchema, type CatalogFeature, type FeatureCatalog, type Route } from './catalog-model.js'
 import { CURATED_BUNDLES } from './curation.js'
+import { PACK_ACTIONS, PackPlan, packPreviewSchema, pluginStateSchema, type PackPreview, type PluginState } from './pack-plan.js'
 import { PACKS } from './packs.js'
 
 /** Rail destinations in rail order, then the active thread's regions; `none` sorts last. */
@@ -28,9 +29,6 @@ export const checklistItemSchema = Schema.Struct({
   fix: Schema.Struct({ label: Schema.String, route: Schema.NullOr(routeSchema), shellCommand: Schema.NullOr(Schema.String) }),
 })
 export type ChecklistItem = typeof checklistItemSchema.Type
-
-export const pluginStateSchema = Schema.Literals(['enabled', 'disabled', 'not-installed', 'unknown'])
-export type PluginState = typeof pluginStateSchema.Type
 
 export const packViewSchema = Schema.Struct({
   id: Schema.String,
@@ -64,6 +62,8 @@ export const overviewInputSchema = Schema.Struct({
   destination: Schema.optional(Schema.Literals(DESTINATION_ORDER)),
   curatedOnly: Schema.optional(Schema.Boolean),
   limit: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isBetween({ minimum: 1, maximum: 200 }))),
+  /** Also return exactly what enabling or disabling this pack would change; reading it changes nothing. */
+  preview: Schema.optional(Schema.Struct({ pack: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)), action: Schema.Literals(PACK_ACTIONS) })),
 })
 export type OverviewInput = typeof overviewInputSchema.Type
 
@@ -76,14 +76,49 @@ export const overviewSchema = Schema.Struct({
     destinations: Schema.Array(Schema.Struct({ id: Schema.String, count: Schema.Number })),
     rows: Schema.Array(featureRowSchema),
   }),
+  preview: Schema.NullOr(packPreviewSchema),
 })
 export type Overview = typeof overviewSchema.Type
 
 /** What the Host observed; `null` means it could not tell (the service is absent). */
 export interface ChecklistFacts {
-  readonly providers: number | null
+  readonly account: AccountFacts
   readonly projects: readonly { readonly path: string; readonly vcs: 'jj' | 'git' | null }[] | null
   readonly github: 'signed-in' | 'signed-out' | 'missing' | 'failed' | 'off'
+}
+
+/**
+ * How the Host knows whether a model can be reached: AI accounts' saved accounts when that plugin serves its API, the
+ * registered model provider routes otherwise, `unreadable` when AI accounts did not answer, `null` with no model service.
+ */
+export type AccountFacts =
+  | { readonly source: 'ai-accounts'; readonly saved: number; readonly connected: number }
+  | { readonly source: 'providers'; readonly routes: number }
+  | { readonly source: 'unreadable' }
+  | null
+
+/** What AI accounts' file says, offline: an account counts as connected when it is on, signed in and configured. */
+const accountFacts = (accounts: readonly { readonly enabled: boolean; readonly signedIn: boolean; readonly state: string }[]): AccountFacts => ({
+  source: 'ai-accounts',
+  saved: accounts.length,
+  connected: accounts.filter(account => account.enabled && account.signedIn && account.state !== 'disabled' && account.state !== 'unconfigured').length,
+})
+
+const plural = (count: number, word: string): string => `${String(count)} ${word}${count === 1 ? '' : 's'}`
+
+const accountItem = (facts: AccountFacts): Pick<ChecklistItem, 'state' | 'detail'> => {
+  if (facts === null) return { state: 'unknown', detail: 'This Host serves neither AI accounts nor a model service to ask.' }
+  if (facts.source === 'unreadable') return { state: 'unknown', detail: 'AI accounts did not answer. Open it to see each account.' }
+  if (facts.source === 'providers')
+    return facts.routes > 0
+      ? {
+          state: 'done',
+          detail: `${plural(facts.routes, 'model provider')} configured (no account manager installed); whether each holds a working credential is not checked.`,
+        }
+      : { state: 'todo', detail: 'No model provider is configured, and no account manager is installed.' }
+  if (facts.connected > 0) return { state: 'done', detail: `${plural(facts.connected, 'connected account')} in AI accounts.` }
+  if (facts.saved > 0) return { state: 'todo', detail: `${plural(facts.saved, 'saved account')}, none connected. Sign one in from AI accounts.` }
+  return { state: 'todo', detail: 'No AI account is saved yet.' }
 }
 
 const accountsRoute: Route = { panel: 'ai-accounts' }
@@ -96,14 +131,8 @@ const checklist = (facts: ChecklistFacts): readonly ChecklistItem[] => {
   return [
     {
       id: 'account',
-      title: 'A model provider is set up',
-      state: facts.providers === null ? 'unknown' : facts.providers > 0 ? 'done' : 'todo',
-      detail:
-        facts.providers === null
-          ? 'This Host serves no model service to ask.'
-          : facts.providers > 0
-            ? `${String(facts.providers)} model provider${facts.providers === 1 ? '' : 's'} registered. AI accounts shows whether each has a working credential.`
-            : 'No model provider is registered yet.',
+      title: 'An AI account is connected',
+      ...accountItem(facts.account),
       fix: { label: 'Open AI accounts', route: accountsRoute, shellCommand: null },
     },
     {
@@ -232,12 +261,14 @@ const overview = (input: {
   readonly states: ReadonlyMap<string, PluginState> | null
   readonly request: OverviewInput
   readonly curatedDefault: boolean
+  readonly preview: PackPreview | null
 }): Overview => {
   const items = input.facts === null ? null : checklist(input.facts)
   return {
     checklist: items,
     packs: packs({ catalog: input.catalog, states: input.states, checklist: items }),
     features: features(input.catalog, { ...input.request, curatedDefault: input.curatedDefault }),
+    preview: input.preview,
   }
 }
 
@@ -246,6 +277,7 @@ const MAX_RENDER = 6_000
 /** Compact text for the agent transcript; the structured value carries every row. */
 const render = (value: Overview): string => {
   const lines = [
+    ...(value.preview === null ? [] : PackPlan.renderPreview(value.preview)),
     '## Setup checklist',
     ...(value.checklist ?? []).map(item => `- [${item.state === 'done' ? 'x' : ' '}] ${item.title} — ${item.detail}`),
     ...(value.checklist === null ? ['(checklist off in Settings › Onboarding)'] : []),
@@ -260,6 +292,7 @@ const render = (value: Overview): string => {
 
 export class OnboardingOverview {
   static readonly checklist = checklist
+  static readonly accountFacts = accountFacts
   static readonly packs = packs
   static readonly features = features
   static readonly overview = overview

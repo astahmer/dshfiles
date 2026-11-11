@@ -60,11 +60,17 @@ describe('onboarding Host', () => {
     } as never)
     host.ctx.provide('subprocess', {} as never)
     host.ctx.provide('llm', { listProviders: () => [{ id: 'deepseek' }] } as never)
+    const writes: string[] = []
     host.ctx.provide('pluginManager', {
       listPlugins: async () => [
         { entryId: 'dshfiles-backlog', moduleName: '@dshfiles/backlog', enabled: true, fiberPhase: 'active' },
         { entryId: 'dshfiles-goal-tool', moduleName: '@dshfiles/goal-tool', enabled: false, fiberPhase: null },
       ],
+      setPluginEnabled: async (id: string, enabled: boolean) => {
+        writes.push(`${id}=${String(enabled)}`)
+        return { changed: true, application: 'restart-required', restartReason: 'no-hmr', stage: 'enable', target: id }
+      },
+      listBundles: async () => [],
     } as never)
     try {
       await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
@@ -97,6 +103,53 @@ describe('onboarding Host', () => {
         signal: new AbortController().signal,
       })
       expect(JSON.stringify(result)).toContain('## Setup checklist')
+
+      const preview = await client.overview({ preview: { pack: 'planning', action: 'enable' }, limit: 1 })
+      expect(preview.preview).toMatchObject({ change: [{ plugin: 'goal-tool', entryIds: ['dshfiles-goal-tool'] }], installMode: 'manual' })
+      expect(writes).toEqual([])
+    } finally {
+      await host.dispose()
+    }
+  })
+
+  it('refuses a bare onboarding_pack_apply request, and relays the plugin manager verdict once confirmed', async () => {
+    const host = await createTestHost()
+    host.ctx.provide('settings', {
+      configure: () => () => undefined,
+      describe: () => [{ ns: 'dshfiles-onboarding', value: { githubCheck: false, checklist: false } }],
+      update: async () => undefined,
+      replace: async () => undefined,
+    } as never)
+    host.ctx.provide('subprocess', {} as never)
+    const writes: string[] = []
+    host.ctx.provide('pluginManager', {
+      listPlugins: async () => [{ entryId: 'dshfiles-goal-tool', moduleName: '@dshfiles/goal-tool', enabled: false, fiberPhase: null }],
+      setPluginEnabled: async (id: string, enabled: boolean) => {
+        writes.push(`${id}=${String(enabled)}`)
+        return { changed: true, application: 'restart-required', restartReason: 'no-hmr', stage: 'enable', target: id }
+      },
+      listBundles: async () => [],
+    } as never)
+    try {
+      await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
+      const execute = (args: { readonly pack: string; readonly action: string; readonly confirm?: true; readonly plugins?: readonly string[] }) =>
+        host.tools.execute({
+          callId: ToolCallId(`call-${String(writes.length)}`),
+          name: 'onboarding_pack_apply',
+          arguments: args,
+          signal: new AbortController().signal,
+        })
+      const bare = await execute({ pack: 'planning', action: 'enable' }).then(
+        value => JSON.stringify(value),
+        (error: unknown) => String(error),
+      )
+      expect(bare).toMatch(/confirm/u)
+      expect(writes).toEqual([])
+
+      const applied = JSON.stringify(await execute({ pack: 'planning', action: 'enable', confirm: true, plugins: ['goal-tool'] }))
+      expect(writes).toEqual(['dshfiles-goal-tool=true'])
+      expect(applied).toContain('restart reason: no-hmr')
+      expect(applied).toContain('"results":[{"plugin":"goal-tool"')
     } finally {
       await host.dispose()
     }

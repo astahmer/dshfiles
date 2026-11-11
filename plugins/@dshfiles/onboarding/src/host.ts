@@ -1,35 +1,79 @@
-import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer } from 'effect'
 import { onboardingApi } from './api.js'
 import { FEATURE_CATALOG } from './generated/feature-catalog.js'
 import { OnboardingOverview } from './overview-model.js'
+import { PackControls } from './pack-controls.js'
+import { PackPlan } from './pack-plan.js'
 import { onboardingSettings } from './settings.js'
 import { SetupFacts } from './setup-facts.js'
 
-const facts = SetupFacts.layer({ githubExecutable: 'gh' }).pipe(
-  Layer.provide(Layer.mergeAll(Settings.layer(onboardingSettings), NodeFileSystem.layer, NodePath.layer)),
+const platform = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
+
+const facts = SetupFacts.layer({ githubExecutable: 'gh' }).pipe(Layer.provide(Layer.mergeAll(Settings.layer(onboardingSettings), platform, HostApis.layer)))
+
+const packs = Layer.unwrap(
+  Effect.map(HostContext, host =>
+    PackControls.layerFrom({
+      manager: () => host.ctx.get('pluginManager') ?? undefined,
+      profile: () => {
+        const profile = host.ctx.get('profileContext')
+        return profile === undefined || profile === null ? undefined : { name: profile.name, home: profile.home }
+      },
+      homeFromEnv: (process.env.DSH_HOME?.trim() ?? '') !== '',
+      nodeExecutable: process.execPath,
+    }),
+  ),
+).pipe(Layer.provide(Layer.mergeAll(platform, DshChildProcessSpawner.layer)))
+
+/** Prerequisite states for a pack plan, from the same checklist read the page shows. */
+const prerequisitesNow = SetupFacts.use(setup =>
+  Effect.gen(function* () {
+    const settings = yield* setup.settings
+    if (!settings.checklist) return new Map<string, 'done' | 'todo' | 'unknown' | 'off'>()
+    return new Map(OnboardingOverview.checklist(yield* setup.checklist).map(item => [item.id, item.state] as const))
+  }),
 )
 
-/** Serves the build-time feature catalog with the live setup facts; it changes nothing. */
+/** Serves the build-time feature catalog with the live setup facts, and switches packs only when asked to. */
 export default DshxPlugin.make({
   name: 'dshfiles-onboarding',
   inject: ['subprocess'],
   settings: [onboardingSettings],
-  layer: facts,
+  layer: Layer.mergeAll(facts, packs),
   apis: [
     Api.bind(onboardingApi, {
       overview: request =>
-        SetupFacts.use(setup =>
-          Effect.gen(function* () {
-            const settings = yield* setup.settings
-            const [checklist, states] = yield* Effect.all([settings.checklist ? setup.checklist : Effect.succeed(null), setup.pluginStates], {
-              concurrency: 'unbounded',
-            })
-            return OnboardingOverview.overview({ catalog: FEATURE_CATALOG, facts: checklist, states, request, curatedDefault: settings.curatedOnly })
-          }),
-        ),
+        Effect.gen(function* () {
+          const setup = yield* SetupFacts
+          const controls = yield* PackControls
+          const settings = yield* setup.settings
+          const [checklistFacts, entries] = yield* Effect.all([settings.checklist ? setup.checklist : Effect.succeed(null), controls.entries], {
+            concurrency: 'unbounded',
+          })
+          const items = checklistFacts === null ? [] : OnboardingOverview.checklist(checklistFacts)
+          const preview =
+            request.preview === undefined
+              ? null
+              : yield* controls.preview({ ...request.preview, prerequisites: new Map(items.map(item => [item.id, item.state] as const)) })
+          return OnboardingOverview.overview({
+            catalog: FEATURE_CATALOG,
+            facts: checklistFacts,
+            states: entries === null ? null : PackPlan.statesOf(entries),
+            request,
+            curatedDefault: settings.curatedOnly,
+            preview,
+          })
+        }),
+      applyPack: request =>
+        Effect.gen(function* () {
+          const controls = yield* PackControls
+          return yield* controls.apply({ pack: request.pack, action: request.action, plugins: request.plugins, prerequisites: yield* prerequisitesNow })
+        }),
     }),
   ],
 })

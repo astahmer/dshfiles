@@ -1,12 +1,14 @@
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-plugin-manager'
 import type {} from '@deepseek-ai/dsh-workspace'
+import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Settings } from '@dshfiles/dshx/effect/settings'
-import { Cache, Context, Duration, Effect, Exit, FileSystem, Layer, Path } from 'effect'
+import { Cache, Context, Duration, Effect, FileSystem, Layer, Path } from 'effect'
 import { checkGithubAuth } from './github-auth.js'
-import type { ChecklistFacts, PluginState } from './overview-model.js'
+import { OnboardingOverview, type AccountFacts, type ChecklistFacts } from './overview-model.js'
 import { onboardingSettings, type OnboardingSettings } from './settings.js'
 
 /** jj-integration cuts thread workspaces at `<repository>-threads/<name>`: those are work in progress, not projects. */
@@ -16,19 +18,17 @@ const isThreadWorkspace = (path: string): boolean => {
   return (parent.length > '-threads'.length && parent.endsWith('-threads')) || /^thread-[0-9a-f]{6}$/u.test(parts.at(-1) ?? '')
 }
 
-const OWNED_SCOPE = '@dshfiles/'
-
 /**
- * What the Host can observe about a setup, read on each request and never stored: configured model providers, registered
- * projects and whether each is a jj or git repository, the GitHub CLI sign-in (cached for a minute), and which owned
- * plugins the profile enables. An absent Host service is reported as unknown (`null`), never guessed.
+ * What the Host can observe about a setup, read on each request and never stored: AI accounts' connected accounts (or the
+ * model provider routes without it), registered projects and whether each is a jj or git repository, the GitHub CLI
+ * sign-in (cached for a minute). An absent Host service is reported as unknown (`null`), never guessed. Every read is
+ * local: no provider, quota or model request.
  */
 export class SetupFacts extends Context.Service<
   SetupFacts,
   {
     readonly settings: Effect.Effect<OnboardingSettings>
     readonly checklist: Effect.Effect<ChecklistFacts>
-    readonly pluginStates: Effect.Effect<ReadonlyMap<string, PluginState> | null>
   }
 >()('@dshfiles/onboarding/SetupFacts') {
   static readonly make = (input: { readonly githubExecutable: string }) =>
@@ -37,6 +37,7 @@ export class SetupFacts extends Context.Service<
       const settings = yield* Settings.Tag<OnboardingSettings>(onboardingSettings.namespace)
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
+      const apis = yield* HostApis
       // The DSH subprocess service is read per check, so a Host without one still serves every other item.
       const github = yield* Cache.make({
         capacity: 1,
@@ -66,35 +67,32 @@ export class SetupFacts extends Context.Service<
         return yield* Effect.forEach(roots, root => Effect.map(vcsOf(root), vcs => ({ path: root, vcs })), { concurrency: 8 })
       })
 
-      const providers = Effect.sync(() => {
+      const providerRoutes = Effect.sync((): AccountFacts => {
         const llm = host.ctx.get('llm')
-        return llm === undefined || llm === null ? null : llm.listProviders().length
+        return llm === undefined || llm === null ? null : { source: 'providers', routes: llm.listProviders().length }
+      })
+      // `read` returns the saved file with each account's signed-in flag; it never asks a provider or sweeps quota.
+      const account = Effect.gen(function* () {
+        if (!(yield* apis.isServed(aiAccountsApi))) return yield* providerRoutes
+        return yield* apis
+          .client(aiAccountsApi)
+          .read()
+          .pipe(
+            Effect.map(file => OnboardingOverview.accountFacts(file.accounts)),
+            Effect.orElseSucceed((): AccountFacts => ({ source: 'unreadable' })),
+          )
       })
 
       const checklist = Effect.gen(function* () {
         const current = yield* settings.get
-        const [providerCount, projectList, signIn] = yield* Effect.all(
-          [providers, projects, current.githubCheck ? Cache.get(github, input.githubExecutable) : Effect.succeed('off' as const)],
+        const [accountFacts, projectList, signIn] = yield* Effect.all(
+          [account, projects, current.githubCheck ? Cache.get(github, input.githubExecutable) : Effect.succeed('off' as const)],
           { concurrency: 'unbounded' },
         )
-        return { providers: providerCount, projects: projectList, github: signIn } satisfies ChecklistFacts
+        return { account: accountFacts, projects: projectList, github: signIn } satisfies ChecklistFacts
       })
 
-      const pluginStates = Effect.gen(function* () {
-        const manager = host.ctx.get('pluginManager')
-        if (manager === undefined || manager === null) return null
-        const listed = yield* Effect.exit(Effect.tryPromise(() => manager.listPlugins()))
-        if (Exit.isFailure(listed)) return null
-        const states = new Map<string, PluginState>()
-        for (const plugin of listed.value) {
-          if (!plugin.moduleName.startsWith(OWNED_SCOPE)) continue
-          const name = plugin.moduleName.slice(OWNED_SCOPE.length).split('/')[0] ?? ''
-          if (states.get(name) !== 'enabled') states.set(name, plugin.enabled ? 'enabled' : 'disabled')
-        }
-        return states
-      })
-
-      return SetupFacts.of({ settings: settings.get, checklist, pluginStates })
+      return SetupFacts.of({ settings: settings.get, checklist })
     })
 
   static readonly layer = (input: { readonly githubExecutable: string }) => Layer.effect(SetupFacts, SetupFacts.make(input))

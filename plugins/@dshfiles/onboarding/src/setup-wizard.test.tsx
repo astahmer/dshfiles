@@ -12,10 +12,11 @@ afterEach(cleanup)
 const loadOverview = async () =>
   OnboardingOverview.overview({
     catalog: FEATURE_CATALOG,
-    facts: { providers: 0, projects: [], github: 'off' },
+    facts: { account: { source: 'providers', routes: 0 }, projects: [], github: 'off' },
     states: null,
     request: {},
     curatedDefault: true,
+    preview: null,
   })
 
 const routes = (): RouteServices & { readonly opened: string[] } => {
