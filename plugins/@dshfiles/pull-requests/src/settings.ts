@@ -20,6 +20,12 @@ export const pullRequestSettings = defineSettings({
       .max(120)
       .default(10)
       .description('How often every watched pull request is polled anyway, for changes made outside DSH. Lower it when event refresh is off.'),
+    githubPointsFloor: Schema.natural()
+      .max(4_900)
+      .default(500)
+      .description(
+        'GitHub GraphQL points (5,000 an hour, shared with every gh call on this account) the watcher leaves for everything else: once a read reports fewer remaining, polling waits until GitHub resets the budget. 0 never waits.',
+      ),
   }),
   applies: 'live',
 })

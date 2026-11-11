@@ -3,11 +3,11 @@ import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { StorageDomainReadFailed, StorageDomainWriteFailed } from '@dshfiles/dshx/effect/storage-domain'
 import { threadActionsApi } from '@dshfiles/thread-sidebar/thread-actions-api'
 import { threadSidebarAutoSettleApi } from '@dshfiles/thread-sidebar/auto-settle-api'
-import { Clock, Context, Effect, Layer, Schema } from 'effect'
-import { GhCommandFailed, GhResponseInvalid } from './github-cli.js'
+import { Clock, Context, Effect, Layer, Ref, Schema } from 'effect'
+import { GhCommandFailed, GhResponseInvalid, type PullRequestRead } from './github-cli.js'
 import { GlabCommandFailed, GlabResponseInvalid } from './gitlab-cli.js'
 import { forgeTargetOf, parseForgePullRequestUrl, pullRequestUrlOf, repositoryKeyOf } from './forge.js'
-import { ForgePullRequests, UnsupportedRepository, type ForgeFailure } from './forge-port.js'
+import { ForgePullRequests, UnsupportedRepository } from './forge-port.js'
 import {
   summarizePullRequest,
   transitionPullRequest,
@@ -18,30 +18,30 @@ import {
   type PullRequestSnapshot,
   type PullRequestTargetInput,
   type PullRequestTransition,
-  type GitHubPullRequestView,
   type OwnedWatchRecord,
   type OwnedWatchView,
   type WatchOwner,
 } from './pull-request-model.js'
 import { PullRequestStore } from './store.js'
 
-type PullRequestPollResult = { readonly kind: 'success'; readonly value: GitHubPullRequestView } | { readonly kind: 'failure'; readonly error: ForgeFailure }
-
-const capturePullRequestResult = (effect: Effect.Effect<GitHubPullRequestView, ForgeFailure>) =>
-  effect.pipe(
-    Effect.map((value): PullRequestPollResult => ({ kind: 'success', value })),
-    Effect.catch((error): Effect.Effect<PullRequestPollResult> => Effect.succeed({ kind: 'failure', error })),
-  )
-
 const POLL_INTERVAL_MS = 2 * 60_000
 const MAX_BACKOFF_MS = 60 * 60_000
-/** Watched pull requests polled at once: one `gh` call each, kept modest for GitHub's API budget. */
-const POLL_CONCURRENCY = 6
+/**
+ * GitHub GraphQL points the watcher leaves for everything else (agents' own `gh` calls share the user's 5,000 an hour):
+ * once a read reports fewer remaining, GitHub reads wait until the budget resets. The Host sets it from settings.
+ */
+export const GitHubPointsFloor = Context.Reference<number>('@dshfiles/pull-requests/GitHubPointsFloor', { defaultValue: () => 500 })
 const SETTLE_SOURCE = '@dshfiles/pull-requests'
 /** An event-driven refresh skips a pull request checked this recently: a burst of thread events costs one `gh` call. */
 export const EVENT_REFRESH_MIN_AGE_MS = 20_000
 
-const pullRequestKey = (record: Pick<PullRequestRecord, 'repo' | 'number'>): string => `${record.repo.toLowerCase()}#${String(record.number)}`
+type Target = Pick<PullRequestRecord, 'repo' | 'number'>
+interface Watchers {
+  readonly links: PullRequestRecord[]
+  readonly owned: OwnedWatchRecord[]
+}
+
+const pullRequestKey = (record: Target): string => `${record.repo.toLowerCase()}#${String(record.number)}`
 
 export class PullRequestSessionRequired extends Schema.TaggedError<PullRequestSessionRequired>()('PullRequestSessionRequired', {
   reason: Schema.String,
@@ -278,6 +278,7 @@ export class PullRequestMonitor extends Context.Service<
           )
       })
 
+      /** Answers false only when thread-sidebar is loaded but refused the request: the thread still needs settling. */
       const settleThread = Effect.fn('pull-requests thread settle')(function* (link: PullRequestRecord, state: 'MERGED' | 'CLOSED') {
         const served = yield* hostApis.isServed(threadSidebarAutoSettleApi)
         if (!served) {
@@ -286,121 +287,153 @@ export class PullRequestMonitor extends Context.Service<
             repo: link.repo,
             number: link.number,
           })
-          return
+          return true
         }
         const reason = `pull request #${String(link.number)} ${state === 'MERGED' ? 'merged' : 'closed'}`
-        yield* autoSettle.requestSettle({ sessionIds: [link.sessionId], reason, source: SETTLE_SOURCE }).pipe(
+        return yield* autoSettle.requestSettle({ sessionIds: [link.sessionId], reason, source: SETTLE_SOURCE }).pipe(
+          Effect.as(true),
           Effect.catch(() =>
-            Effect.logWarning('pull-requests: could not ask thread-sidebar to settle the thread', {
-              sessionId: link.sessionId,
-              repo: link.repo,
-              number: link.number,
-            }),
+            Effect.as(
+              Effect.logWarning('pull-requests: could not ask thread-sidebar to settle the thread; the next poll retries', {
+                sessionId: link.sessionId,
+                repo: link.repo,
+                number: link.number,
+              }),
+              false,
+            ),
           ),
         )
       })
 
-      const watchersOf = (target: { readonly repo: string; readonly number: number }) =>
-        Effect.map(Effect.all([store.watched, store.owned]), ([links, owned]) => ({
-          links: links.filter(record => samePullRequest(record, target)),
-          owned: owned.filter(record => record.watching && samePullRequest(record, target)),
-        }))
+      /** Until when GitHub reads wait: the budget's reset after a low read, or the backoff after a rate limit. */
+      const githubPausedUntil = yield* Ref.make(0)
 
-      const pollPullRequest = Effect.fn('pull request poll')(function* (input: { readonly repo: string; readonly number: number; readonly force: boolean }) {
-        const now = yield* Clock.currentTimeMillis
-        const initial = yield* watchersOf(input)
-        const initialWatchers = [...initial.links, ...initial.owned]
-        if (initialWatchers.length === 0) return
-        const inBackoff = initialWatchers.every(record => {
-          const status = PullRequestWatcher.statusOf(record, now)
-          return status.kind === 'backoff'
-        })
-        if (!input.force && inBackoff) return
-
-        const firstWatcher = initialWatchers.find(record => record.cwd.length > 0) ?? initialWatchers[0]
-        if (firstWatcher === undefined) return
-        const result = yield* capturePullRequestResult(forge.pullRequest({ repo: firstWatcher.repo, number: firstWatcher.number, cwd: firstWatcher.cwd }))
-        if (result.kind === 'failure') {
-          const rateLimited = (result.error._tag === 'GhCommandFailed' || result.error._tag === 'GlabCommandFailed') && result.error.rateLimited
-          const errorTag = result.error._tag === 'GhResponseInvalid' || result.error._tag === 'GlabResponseInvalid' ? 'invalid-response' : 'gh-command-failed'
-          const current = yield* watchersOf(firstWatcher)
-          const count = rateLimited ? Math.max(...[...current.links, ...current.owned].map(record => record.consecutiveRateLimits), 0) + 1 : 0
-          const retryAfterAt = now + backoffDelay(count)
-          const outcome = rateLimited ? ({ kind: 'rate-limited', now, retryAfterAt, count } as const) : ({ kind: 'failed', now, error: errorTag } as const)
-          for (const watcher of current.links) yield* store.updateIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, outcome))
-          for (const watcher of current.owned) yield* store.updateOwnedIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, outcome))
-          if (rateLimited) {
-            yield* Effect.logWarning('pull-requests: GitHub rate limit detected; watcher backoff extended', {
-              repo: firstWatcher.repo,
-              number: firstWatcher.number,
-              consecutiveRateLimits: count,
-              retryAfterAt,
-            })
-          }
-          return
+      const watchersByKey = Effect.map(Effect.all([store.watched, store.owned]), ([links, owned]) => {
+        const byKey = new Map<string, Watchers>()
+        const groupOf = (record: Target): Watchers => {
+          const key = pullRequestKey(record)
+          const found = byKey.get(key)
+          if (found !== undefined) return found
+          const created: Watchers = { links: [], owned: [] }
+          byKey.set(key, created)
+          return created
         }
+        for (const record of links) groupOf(record).links.push(record)
+        for (const record of owned) if (record.watching) groupOf(record).owned.push(record)
+        return byKey
+      })
 
-        const snapshot = summarizePullRequest(result.value)
-        const current = yield* watchersOf(firstWatcher)
-        for (const watcher of current.links) {
+      const isGitHub = (repo: string): boolean => forgeTargetOf(repo)?.kind === 'github'
+
+      const snapshotOf = (read: Extract<PullRequestRead, { readonly kind: 'read' }>): PullRequestSnapshot =>
+        read.fingerprint === null ? summarizePullRequest(read.view) : { ...summarizePullRequest(read.view), fingerprint: read.fingerprint }
+
+      /** Store one pull request's read on every watch of it; answers the retry time when GitHub rate-limited it. */
+      const applyRead = Effect.fn('pull request poll')(function* (input: {
+        readonly read: PullRequestRead
+        readonly watchers: Watchers | undefined
+        readonly now: number
+      }) {
+        const links = input.watchers?.links ?? []
+        const owned = input.watchers?.owned ?? []
+        const read = input.read
+        const now = input.now
+        if (read.kind === 'deferred') return undefined
+        if (read.kind === 'rate-limited' || read.kind === 'failed') {
+          const count = read.kind === 'rate-limited' ? Math.max(...[...links, ...owned].map(record => record.consecutiveRateLimits), 0) + 1 : 0
+          const retryAfterAt = now + backoffDelay(count)
+          const outcome =
+            read.kind === 'rate-limited' ? ({ kind: 'rate-limited', now, retryAfterAt, count } as const) : ({ kind: 'failed', now, error: read.error } as const)
+          for (const watcher of links) yield* store.updateIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, outcome))
+          for (const watcher of owned) yield* store.updateOwnedIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, outcome))
+          return read.kind === 'rate-limited' ? retryAfterAt : undefined
+        }
+        const fresh = read.kind === 'read' ? snapshotOf(read) : undefined
+        for (const watcher of links) {
+          const snapshot = fresh ?? watcher.lastKnownState
+          if (snapshot === null) continue
           const transitions = transitionPullRequest(watcher.lastKnownState ?? undefined, snapshot)
           const updated = yield* store.updateIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, { kind: 'ok', snapshot, now }))
           if (updated === undefined) continue
           if (transitions.length > 0) yield* promptThread(updated, snapshot, transitions)
-          if (snapshot.state === 'MERGED' || snapshot.state === 'CLOSED') yield* settleThread(updated, snapshot.state)
+          if (snapshot.state === 'OPEN') continue
+          // A terminal pull request stops being polled, unless its thread still has to be settled.
+          const settled = yield* settleThread(updated, snapshot.state)
+          if (!settled) yield* store.setWatching(updated.id, true)
         }
-        for (const watcher of current.owned)
-          yield* store.updateOwnedIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, { kind: 'ok', snapshot, now }))
+        for (const watcher of owned) {
+          const snapshot = fresh ?? watcher.lastKnownState
+          if (snapshot !== null) yield* store.updateOwnedIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, { kind: 'ok', snapshot, now }))
+        }
+        return undefined
       })
 
-      const groupsOf = <Watch extends Pick<PullRequestRecord, 'repo' | 'number'>>(watchers: readonly Watch[]): readonly (readonly Watch[])[] => {
-        const groups = new Map<string, Watch[]>()
-        for (const watcher of watchers) {
-          const key = pullRequestKey(watcher)
-          const group = groups.get(key)
-          if (group === undefined) groups.set(key, [watcher])
-          else group.push(watcher)
+      /**
+       * Read these pull requests in one batched forge call and store each outcome. GitHub reads are skipped while the
+       * budget is paused, and a pull request whose every watch is in backoff waits, unless `force` (an explicit watch).
+       */
+      const pollTargets = Effect.fn('pull-requests poll targets')(function* (input: { readonly targets: readonly Target[]; readonly force: boolean }) {
+        const now = yield* Clock.currentTimeMillis
+        const floor = yield* GitHubPointsFloor
+        const paused = (yield* Ref.get(githubPausedUntil)) > now
+        const before = yield* watchersByKey
+        const unique = [...new Map(input.targets.map(target => [pullRequestKey(target), target])).values()]
+        const reads = unique.flatMap(target => {
+          const group = before.get(pullRequestKey(target))
+          const watchers = group === undefined ? [] : [...group.links, ...group.owned]
+          const first = watchers.find(record => record.cwd.length > 0) ?? watchers[0]
+          if (first === undefined) return []
+          if (!input.force && watchers.every(record => PullRequestWatcher.statusOf(record, now).kind === 'backoff')) return []
+          if (!input.force && paused && isGitHub(first.repo)) return []
+          const fingerprints = new Set(watchers.map(record => record.lastKnownState?.fingerprint ?? null))
+          const known = fingerprints.size === 1 ? (first.lastKnownState?.fingerprint ?? null) : null
+          return [{ repo: first.repo, number: first.number, cwd: first.cwd, known }]
+        })
+        if (reads.length === 0) return 0
+        const result = yield* forge.pullRequests({ targets: reads, minRemaining: floor })
+        const budget = result.rateLimit
+        if (budget !== null && budget.remaining < floor) {
+          yield* Ref.update(githubPausedUntil, until => Math.max(until, budget.resetAt))
+          yield* Effect.logWarning('pull-requests: GitHub API budget is low; GitHub reads wait until it resets', {
+            remaining: budget.remaining,
+            floor,
+            resetAt: budget.resetAt,
+          })
         }
-        return [...groups.values()]
-      }
-
-      const pollTargets = (targets: readonly { readonly repo: string; readonly number: number }[]) =>
-        Effect.forEach(
-          targets,
-          target =>
-            pollPullRequest({ ...target, force: false }).pipe(
-              Effect.catchCause(() =>
-                Effect.logWarning('pull-requests: pull request poll failed; the next poll will continue', {
-                  repo: target.repo,
-                  number: target.number,
-                }),
+        const after = yield* watchersByKey
+        const retries = yield* Effect.forEach(reads, (target, index) =>
+          applyRead({ read: result.reads[index] ?? { kind: 'deferred' }, watchers: after.get(pullRequestKey(target)), now }).pipe(
+            Effect.catchCause(() =>
+              Effect.as(
+                Effect.logWarning('pull-requests: storing a pull request poll failed; the next poll will retry', { repo: target.repo, number: target.number }),
+                undefined,
               ),
             ),
-          { concurrency: POLL_CONCURRENCY, discard: true },
+          ),
         )
+        const retryAfterAt = Math.max(0, ...retries.filter((retry): retry is number => retry !== undefined))
+        if (result.rateLimited) {
+          yield* Ref.update(githubPausedUntil, until => Math.max(until, retryAfterAt))
+          yield* Effect.logWarning('pull-requests: GitHub rate limit detected; watcher backoff extended', { retryAfterAt })
+        }
+        return reads.length
+      })
+
+      const targetsOf = (records: readonly Target[]): readonly Target[] => records.map(record => ({ repo: record.repo, number: record.number }))
 
       const refresh = Effect.fn('pull-requests refresh')(function* (input: { readonly sessionIds: readonly string[]; readonly minAgeMs: number }) {
         const sessionIds = new Set(input.sessionIds)
         const now = yield* Clock.currentTimeMillis
         const watched = yield* store.watched
         const linked = new Set(watched.filter(record => sessionIds.has(record.sessionId)).map(pullRequestKey))
-        const targets = groupsOf(watched.filter(record => linked.has(pullRequestKey(record)))).flatMap(group => {
-          const first = group[0]
-          if (first === undefined) return []
-          const fresh = group.some(record => record.lastCheckedAt !== null && now - record.lastCheckedAt < input.minAgeMs)
-          return fresh ? [] : [{ repo: first.repo, number: first.number }]
-        })
-        yield* pollTargets(targets)
-        return targets.length
+        const fresh = new Set(watched.filter(record => record.lastCheckedAt !== null && now - record.lastCheckedAt < input.minAgeMs).map(pullRequestKey))
+        const targets = targetsOf(watched.filter(record => linked.has(pullRequestKey(record)) && !fresh.has(pullRequestKey(record))))
+        return yield* pollTargets({ targets, force: false })
       })
 
       const pollAll = Effect.fn('pull-requests poll all')(function* () {
         const owned = (yield* store.owned).filter(record => record.watching)
-        const targets = groupsOf([...(yield* store.watched), ...owned]).flatMap(group => {
-          const first = group[0]
-          return first === undefined ? [] : [{ repo: first.repo, number: first.number }]
-        })
-        yield* pollTargets(targets)
+        yield* pollTargets({ targets: targetsOf([...(yield* store.watched), ...owned]), force: false })
       })
 
       const link = Effect.fn('pull-requests link')(function* (input: PullRequestLinkInput, caller: ApiCaller) {
@@ -432,7 +465,7 @@ export class PullRequestMonitor extends Context.Service<
       const watch = Effect.fn('pull-requests watch')(function* (input: PullRequestLinkInput, caller: ApiCaller) {
         const record = yield* resolveLinkInput(input, caller)
         const watching = yield* store.upsert({ ...record, watching: true })
-        yield* pollPullRequest({ repo: watching.repo, number: watching.number, force: true })
+        yield* pollTargets({ targets: [{ repo: watching.repo, number: watching.number }], force: true })
         return (yield* store.get(watching.id)) ?? watching
       })
 
@@ -473,7 +506,7 @@ export class PullRequestMonitor extends Context.Service<
         const now = yield* Clock.currentTimeMillis
         // A backfill of many items must not keep calling gh through a rate limit: the sweep picks them up after it.
         const limited = [...(yield* store.watched), ...(yield* store.owned)].some(record => record.retryAfterAt !== null && record.retryAfterAt > now)
-        if (!limited) yield* pollPullRequest({ repo: saved.repo, number: saved.number, force: false }).pipe(Effect.ignore)
+        if (!limited) yield* pollTargets({ targets: [{ repo: saved.repo, number: saved.number }], force: false }).pipe(Effect.ignore)
         return (yield* store.owned).find(record => record.id === id) ?? saved
       })
 

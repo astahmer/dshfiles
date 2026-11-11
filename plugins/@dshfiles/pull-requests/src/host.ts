@@ -13,7 +13,7 @@ import { PullRequestCreator } from './create.js'
 import { GitHubCli } from './github-cli.js'
 import { GitLabCli } from './gitlab-cli.js'
 import { ForgePullRequests } from './forge-port.js'
-import { PullRequestMonitor, ownedWatchViewOf } from './monitor.js'
+import { GitHubPointsFloor, PullRequestMonitor, ownedWatchViewOf } from './monitor.js'
 import { ProjectBase } from './project-base.js'
 import { PullRequestSettings, pullRequestSettings } from './settings.js'
 import { TRIGGER_EVENT_TYPES, refreshOnThreadEvents, sweepWatched, type ThreadEvent } from './refresh-triggers.js'
@@ -62,8 +62,14 @@ const pollWorker = Layer.effectDiscard(
       enabled: value.refreshOnThreadEvents,
       debounce: Duration.seconds(value.eventDebounceSeconds),
     }))
-    yield* DshxPlugin.worker(refreshOnThreadEvents({ monitor: pullRequests, events, config }))
-    yield* DshxPlugin.worker(sweepWatched({ monitor: pullRequests, every: Effect.map(settings.get, value => Duration.minutes(value.sweepMinutes)) }))
+    const withFloor = <A, E>(effect: Effect.Effect<A, E>) =>
+      Effect.flatMap(settings.get, value => effect.pipe(Effect.provideService(GitHubPointsFloor, value.githubPointsFloor)))
+    const monitor = {
+      refresh: (input: Parameters<typeof pullRequests.refresh>[0]) => withFloor(pullRequests.refresh(input)),
+      pollAll: withFloor(pullRequests.pollAll),
+    }
+    yield* DshxPlugin.worker(refreshOnThreadEvents({ monitor, events, config }))
+    yield* DshxPlugin.worker(sweepWatched({ monitor, every: Effect.map(settings.get, value => Duration.minutes(value.sweepMinutes)) }))
   }),
 ).pipe(Layer.provideMerge(creator), Layer.provideMerge(Settings.layer(pullRequestSettings)))
 

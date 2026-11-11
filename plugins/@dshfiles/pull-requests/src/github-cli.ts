@@ -1,16 +1,17 @@
+import { createHash } from 'node:crypto'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
-import { Context, Duration, Effect, Layer, Schema, Stream } from 'effect'
+import { Context, Duration, Effect, Layer, Option, Schema, Stream } from 'effect'
 import {
+  checkRollupSchema,
+  commentSchema,
   forgeSearchItemSchema,
+  reviewSchema,
   githubPullRequestViewSchema,
   type ForgeSearchItem,
   type GitHubPullRequestView,
   type IssueStatesOutput,
 } from './pull-request-model.js'
 
-const POLL_FIELDS = 'state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,comments,reviews,body'
-const PULL_REQUEST_PROJECTION =
-  '. | {state, mergeable, mergeStateStatus, reviewDecision, statusCheckRollup: (.statusCheckRollup // [] | map(if has("context") then {context, state} else {name, status, conclusion} end)), comments: (.comments | map({author, createdAt})), reviews: (.reviews | map({author, state, submittedAt})), body}'
 const collectText = <E>(stream: Stream.Stream<Uint8Array, E>) =>
   stream.pipe(
     Stream.decodeText(),
@@ -20,7 +21,7 @@ const collectText = <E>(stream: Stream.Stream<Uint8Array, E>) =>
     ),
   )
 
-const ghOperations = ['repo-view', 'pr-view', 'auth-status', 'repo-info', 'pr-list', 'pr-create', 'issue-states'] as const
+const ghOperations = ['repo-view', 'pr-view', 'auth-status', 'repo-info', 'pr-list', 'pr-create', 'issue-states', 'pr-batch'] as const
 type GhOperation = (typeof ghOperations)[number]
 
 const operationFailure = {
@@ -31,6 +32,7 @@ const operationFailure = {
   'pr-list': 'could not list pull requests for the branch',
   'pr-create': 'could not create the pull request',
   'issue-states': 'could not read issue states',
+  'pr-batch': 'could not read pull requests',
 } satisfies Record<GhOperation, string>
 
 export class GhCommandFailed extends Schema.TaggedError<GhCommandFailed>()('GhCommandFailed', {
@@ -106,6 +108,7 @@ export type GitHubCommandSpan =
   | 'pull request gh list'
   | 'pull request gh create'
   | 'pull request gh issues'
+  | 'pull request gh batch'
 
 export const withGitHubCommandSpan = <A, E, R>(input: {
   readonly name: GitHubCommandSpan
@@ -178,6 +181,138 @@ const issueQueryOf = (issues: readonly { readonly owner: string; readonly name: 
     )
     .join('')}}`
 
+/** Pull requests one aliased GraphQL read covers: at fifty a full read costs GitHub 2 points, a fingerprint read 1. */
+export const PULL_REQUEST_BATCH = 50
+const GITHUB_REPOSITORY = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/u
+const HEAD_CHECK_COUNTS = 'checkRunCountsByState{state count} statusContextCountsByState{state count}'
+const FINGERPRINT_FIELDS = `state updatedAt mergeable mergeStateStatus reviewDecision commits(last:1){nodes{commit{oid statusCheckRollup{state contexts(first:1){${HEAD_CHECK_COUNTS}}}}}}`
+const FULL_FIELDS = `state updatedAt mergeable mergeStateStatus reviewDecision body commits(last:1){nodes{commit{oid statusCheckRollup{state contexts(first:100){${HEAD_CHECK_COUNTS} nodes{__typename ...on CheckRun{name status conclusion} ...on StatusContext{context state}}}}}}} comments(last:20){totalCount nodes{author{login} createdAt}} reviews(last:20){totalCount nodes{author{login} state submittedAt}}`
+
+const stateCountsSchema = Schema.NullOr(Schema.Array(Schema.Struct({ state: Schema.String, count: Schema.Number })))
+const headCommitsSchema = Schema.Struct({
+  nodes: Schema.Array(
+    Schema.Struct({
+      commit: Schema.Struct({
+        oid: Schema.String,
+        statusCheckRollup: Schema.NullOr(
+          Schema.Struct({
+            state: Schema.String,
+            contexts: Schema.Struct({
+              checkRunCountsByState: stateCountsSchema,
+              statusContextCountsByState: stateCountsSchema,
+              nodes: Schema.optionalKey(Schema.Array(checkRollupSchema)),
+            }),
+          }),
+        ),
+      }),
+    }),
+  ),
+})
+const fingerprintNodeSchema = Schema.Struct({
+  state: githubPullRequestViewSchema.fields.state,
+  updatedAt: Schema.String,
+  mergeable: githubPullRequestViewSchema.fields.mergeable,
+  mergeStateStatus: githubPullRequestViewSchema.fields.mergeStateStatus,
+  reviewDecision: githubPullRequestViewSchema.fields.reviewDecision,
+  commits: headCommitsSchema,
+})
+const fullNodeSchema = Schema.Struct({
+  ...fingerprintNodeSchema.fields,
+  body: Schema.String,
+  comments: Schema.Struct({ totalCount: Schema.Number, nodes: Schema.Array(commentSchema) }),
+  reviews: Schema.Struct({ totalCount: Schema.Number, nodes: Schema.Array(reviewSchema) }),
+})
+const decodeFingerprintAlias = Schema.decodeUnknownOption(Schema.Struct({ pullRequest: Schema.NullOr(fingerprintNodeSchema) }))
+const decodeFullAlias = Schema.decodeUnknownOption(Schema.Struct({ pullRequest: Schema.NullOr(fullNodeSchema) }))
+const rateLimitSchema = Schema.Struct({ cost: Schema.Number, remaining: Schema.Number, resetAt: Schema.String })
+const pullRequestBatchSchema = Schema.Struct({
+  data: Schema.NullOr(Schema.Record(Schema.String, Schema.Unknown)),
+  errors: Schema.optionalKey(Schema.Array(Schema.Struct({ type: Schema.optionalKey(Schema.String) }))),
+})
+const decodeRateLimit = Schema.decodeUnknownOption(rateLimitSchema)
+
+type FingerprintNode = typeof fingerprintNodeSchema.Type
+type FullNode = typeof fullNodeSchema.Type
+
+/** The cheap-read fields of a pull request, digested: equal digests mean nothing a snapshot keeps has changed. */
+const fingerprintOf = (node: FingerprintNode): string => {
+  const head = node.commits.nodes[0]?.commit
+  const counts = (rows: typeof stateCountsSchema.Type) =>
+    (rows ?? [])
+      .map(row => `${row.state}=${String(row.count)}`)
+      .sort()
+      .join(',')
+  const contexts = head?.statusCheckRollup?.contexts
+  const parts = [
+    node.state,
+    node.updatedAt,
+    node.mergeable,
+    node.mergeStateStatus,
+    node.reviewDecision ?? '',
+    head?.oid ?? '',
+    head?.statusCheckRollup?.state ?? '',
+    counts(contexts?.checkRunCountsByState ?? null),
+    counts(contexts?.statusContextCountsByState ?? null),
+  ]
+  return createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 32)
+}
+
+const viewOf = (node: FullNode): GitHubPullRequestView => ({
+  state: node.state,
+  mergeable: node.mergeable,
+  mergeStateStatus: node.mergeStateStatus,
+  reviewDecision: node.reviewDecision,
+  statusCheckRollup: node.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? null,
+  comments: node.comments.nodes,
+  reviews: node.reviews.nodes,
+  body: node.body,
+  commentsCount: node.comments.totalCount,
+  reviewsCount: node.reviews.totalCount,
+})
+
+/** One aliased GraphQL read of pull requests, with GitHub's own budget report; owner, name and number are checked. */
+const pullRequestQueryOf = (input: {
+  readonly targets: readonly { readonly owner: string; readonly name: string; readonly number: number }[]
+  readonly full: boolean
+}): string =>
+  `query{rateLimit{cost remaining resetAt}${input.targets
+    .map(
+      (target, index) =>
+        `p${String(index)}:repository(owner:${JSON.stringify(target.owner)},name:${JSON.stringify(target.name)}){pullRequest(number:${String(target.number)}){${input.full ? FULL_FIELDS : FINGERPRINT_FIELDS}}}`,
+    )
+    .join('')}}`
+
+export interface GitHubPullRequestTarget {
+  /** `owner/name`. */
+  readonly repo: string
+  readonly number: number
+  /** The fingerprint of the last stored snapshot: when the cheap read still matches it, the full read is skipped. */
+  readonly known: string | null
+}
+
+/** What one batched read answered for one pull request. */
+export type PullRequestRead =
+  | { readonly kind: 'read'; readonly view: GitHubPullRequestView; readonly fingerprint: string | null }
+  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'failed'; readonly error: 'gh-command-failed' | 'invalid-response' }
+  | { readonly kind: 'rate-limited' }
+  /** Not read: GitHub's remaining budget fell under the floor before this batch. */
+  | { readonly kind: 'deferred' }
+
+/** GitHub's GraphQL budget as the last read reported it; `resetAt` is epoch milliseconds. */
+export interface GitHubRateLimit {
+  readonly cost: number
+  readonly remaining: number
+  readonly resetAt: number
+}
+
+export interface PullRequestBatchRead {
+  /** One entry per target, in order. */
+  readonly reads: readonly PullRequestRead[]
+  readonly rateLimit: GitHubRateLimit | null
+  readonly rateLimited: boolean
+}
+
 const PULL_REQUEST_URL = /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9]\d*/u
 
 export interface GitHubRepositoryInfo {
@@ -195,7 +330,7 @@ export interface GitHubPullRequestCreate {
   readonly draft: boolean
 }
 
-/** `gh pr view` output, decoded from its JSON text. */
+/** A normalized pull-request view, decoded from its JSON text. */
 export const githubPullRequestJsonSchema = Schema.fromJsonString(githubPullRequestViewSchema)
 
 const decodeGhJson =
@@ -207,11 +342,15 @@ export class GitHubCli extends Context.Service<
   GitHubCli,
   {
     readonly repositoryName: (input: { readonly cwd: string }) => Effect.Effect<string, GhCommandFailed | GhResponseInvalid>
-    readonly pullRequest: (input: {
-      readonly repo: string
-      readonly number: number
-      readonly cwd: string
-    }) => Effect.Effect<GitHubPullRequestView, GhCommandFailed | GhResponseInvalid>
+    /**
+     * Pull requests, fifty per `gh api graphql` call. Targets with a known fingerprint get a cheap read first and a full
+     * read only when it changed. Never fails: each target gets its own outcome, a rate limit stops the remaining batches,
+     * and a batch is deferred once GitHub reports fewer than `minRemaining` points left.
+     */
+    readonly pullRequests: (input: {
+      readonly targets: readonly GitHubPullRequestTarget[]
+      readonly minRemaining: number
+    }) => Effect.Effect<PullRequestBatchRead>
     /** Succeeds when gh is installed and signed in to github.com. */
     readonly authStatus: Effect.Effect<void, GhCommandFailed>
     readonly repositoryInfo: (input: { readonly cwd: string }) => Effect.Effect<GitHubRepositoryInfo, GhCommandFailed | GhResponseInvalid>
@@ -249,21 +388,6 @@ export class GitHubCli extends Context.Service<
           attributes: { 'dshx.plugin.package': '@dshfiles/pull-requests' },
         }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner))
         return (yield* decodeGhJson('repo-view', repositoryNameSchema)(output)).nameWithOwner
-      })
-
-      const pullRequest = Effect.fn('pull-requests gh view')(function* (input: { readonly repo: string; readonly number: number; readonly cwd: string }) {
-        const output = yield* runGh({
-          operation: 'pr-view',
-          args: ['pr', 'view', String(input.number), '--repo', input.repo, '--json', POLL_FIELDS, '--jq', PULL_REQUEST_PROJECTION],
-          cwd: input.cwd,
-          span: 'pull request gh view',
-          attributes: {
-            'dshx.plugin.package': '@dshfiles/pull-requests',
-            'github.repository': input.repo,
-            'github.pull_request.number': input.number,
-          },
-        }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner))
-        return yield* decodeGhJson('pr-view', githubPullRequestViewSchema)(output)
       })
 
       const pluginAttributes = { 'dshx.plugin.package': '@dshfiles/pull-requests' }
@@ -389,7 +513,120 @@ export class GitHubCli extends Context.Service<
         return { issues, failed, rateLimited }
       })
 
-      return GitHubCli.of({ repositoryName, pullRequest, authStatus, repositoryInfo, openPullRequestFor, searchIssues, issueStates, createPullRequest })
+      type Indexed = { readonly index: number; readonly owner: string; readonly name: string; readonly number: number; readonly known: string | null }
+      type BatchPass<Node> =
+        | { readonly kind: 'ok'; readonly nodes: readonly (Node | undefined)[]; readonly rateLimit: GitHubRateLimit | null }
+        | { readonly kind: 'failed'; readonly rateLimited: boolean; readonly error: 'gh-command-failed' | 'invalid-response' }
+
+      const readPass = <Node>(input: {
+        readonly targets: readonly Indexed[]
+        readonly full: boolean
+        readonly decodeAlias: (value: unknown) => Option.Option<{ readonly pullRequest: Node | null }>
+      }) =>
+        provide(
+          runGh({
+            operation: 'pr-batch',
+            args: ['api', 'graphql', '-f', `query=${pullRequestQueryOf(input)}`],
+            span: 'pull request gh batch',
+            attributes: { ...pluginAttributes, 'github.pull_requests': input.targets.length, 'github.read': input.full ? 'full' : 'fingerprint' },
+            keepPartialOutput: true,
+          }),
+        ).pipe(
+          Effect.flatMap(decodeGhJson('pr-batch', pullRequestBatchSchema)),
+          Effect.map((response): BatchPass<Node> => {
+            if (response.data === null)
+              return { kind: 'failed', rateLimited: (response.errors ?? []).some(error => error.type === 'RATE_LIMITED'), error: 'gh-command-failed' }
+            const data = response.data
+            const rateLimit = Option.match(decodeRateLimit(data['rateLimit']), {
+              onNone: () => null,
+              onSome: (value): GitHubRateLimit | null => {
+                const resetAt = Date.parse(value.resetAt)
+                return Number.isFinite(resetAt) ? { cost: value.cost, remaining: value.remaining, resetAt } : null
+              },
+            })
+            const nodes = input.targets.map((_, alias) => Option.getOrUndefined(input.decodeAlias(data[`p${String(alias)}`]))?.pullRequest ?? undefined)
+            return { kind: 'ok', nodes, rateLimit }
+          }),
+          Effect.catch((error): Effect.Effect<BatchPass<Node>> =>
+            Effect.succeed({
+              kind: 'failed',
+              rateLimited: error._tag === 'GhCommandFailed' && error.rateLimited,
+              error: error._tag === 'GhResponseInvalid' ? 'invalid-response' : 'gh-command-failed',
+            }),
+          ),
+        )
+      const pullRequests = Effect.fn('pull-requests gh pull requests')(function* (input: {
+        readonly targets: readonly GitHubPullRequestTarget[]
+        readonly minRemaining: number
+      }) {
+        const reads: PullRequestRead[] = input.targets.map(() => ({ kind: 'deferred' }))
+        const indexed: Indexed[] = input.targets.flatMap((target, index) => {
+          const match = GITHUB_REPOSITORY.exec(target.repo)
+          if (match === null) {
+            reads[index] = { kind: 'failed', error: 'invalid-response' }
+            return []
+          }
+          return [{ index, owner: match[1] ?? '', name: match[2] ?? '', number: target.number, known: target.known }]
+        })
+        let rateLimit: GitHubRateLimit | null = null
+        let rateLimited = false
+        const fail = (targets: readonly Indexed[], read: PullRequestRead) => {
+          for (const target of targets) reads[target.index] = read
+        }
+        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- batches run one at a time so a rate limit or a low budget stops the rest.
+        for (let start = 0; start < indexed.length; start += PULL_REQUEST_BATCH) {
+          if (rateLimited || (rateLimit !== null && rateLimit.remaining < input.minRemaining)) break
+          const batch = indexed.slice(start, start + PULL_REQUEST_BATCH)
+          const known = batch.filter(target => target.known !== null)
+          const toRead = batch.filter(target => target.known === null)
+          if (known.length > 0) {
+            const cheap = yield* readPass({ targets: known, full: false, decodeAlias: decodeFingerprintAlias })
+            if (cheap.kind === 'failed' && cheap.rateLimited) {
+              rateLimited = true
+              break
+            }
+            if (cheap.kind === 'failed') fail(known, { kind: 'failed', error: cheap.error })
+            if (cheap.kind === 'ok') {
+              rateLimit = cheap.rateLimit ?? rateLimit
+              known.forEach((target, alias) => {
+                const node = cheap.nodes[alias]
+                if (node === undefined) reads[target.index] = { kind: 'failed', error: 'gh-command-failed' }
+                if (node !== undefined && fingerprintOf(node) === target.known) reads[target.index] = { kind: 'unchanged' }
+                if (node !== undefined && fingerprintOf(node) !== target.known) toRead.push(target)
+              })
+            }
+          }
+          if (toRead.length === 0) continue
+          const full = yield* readPass({ targets: toRead, full: true, decodeAlias: decodeFullAlias })
+          if (full.kind === 'failed' && full.rateLimited) {
+            rateLimited = true
+            break
+          }
+          if (full.kind === 'failed') {
+            fail(toRead, { kind: 'failed', error: full.error })
+            continue
+          }
+          rateLimit = full.rateLimit ?? rateLimit
+          toRead.forEach((target, alias) => {
+            const node = full.nodes[alias]
+            reads[target.index] =
+              node === undefined ? { kind: 'failed', error: 'gh-command-failed' } : { kind: 'read', view: viewOf(node), fingerprint: fingerprintOf(node) }
+          })
+        }
+        if (rateLimited) for (const target of indexed) if (reads[target.index]?.kind === 'deferred') reads[target.index] = { kind: 'rate-limited' }
+        return { reads, rateLimit, rateLimited }
+      })
+
+      return GitHubCli.of({
+        repositoryName,
+        pullRequests,
+        authStatus,
+        repositoryInfo,
+        openPullRequestFor,
+        searchIssues,
+        issueStates,
+        createPullRequest,
+      })
     }),
   )
 }

@@ -38,14 +38,14 @@ const statusContextSchema = Schema.Struct({
   state: Schema.String,
 })
 
-const checkRollupSchema = Schema.Union([checkRunSchema, statusContextSchema])
+export const checkRollupSchema = Schema.Union([checkRunSchema, statusContextSchema])
 
-const commentSchema = Schema.Struct({
+export const commentSchema = Schema.Struct({
   author: actorSchema,
   createdAt: githubTimestampSchema,
 })
 
-const reviewSchema = Schema.Struct({
+export const reviewSchema = Schema.Struct({
   author: actorSchema,
   state: Schema.String,
   submittedAt: Schema.NullOr(githubTimestampSchema),
@@ -60,6 +60,9 @@ export const githubPullRequestViewSchema = Schema.Struct({
   comments: Schema.Array(commentSchema),
   reviews: Schema.Array(reviewSchema),
   body: Schema.String,
+  /** GitHub's total when the read returned only the latest comments; absent means `comments` is the whole list. */
+  commentsCount: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+  reviewsCount: Schema.optionalKey(Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
 })
 
 export type GitHubPullRequestView = Schema.Schema.Type<typeof githubPullRequestViewSchema>
@@ -102,6 +105,11 @@ export const pullRequestSnapshotSchema = Schema.Struct({
   latestReview: Schema.NullOr(pullRequestEventSchema),
   /** The description as polled, bounded; absent in records written before it was kept. */
   body: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_SNAPSHOT_BODY_CHARS))),
+  /**
+   * A digest of the fields a cheap GitHub read returns (state, update time, mergeability, head commit, check counts by
+   * state). The same digest on the next read means nothing this snapshot holds changed, so the full read is skipped.
+   */
+  fingerprint: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(64))),
 })
 
 export type PullRequestSnapshot = Schema.Schema.Type<typeof pullRequestSnapshotSchema>
@@ -332,9 +340,9 @@ export const summarizePullRequest = (view: GitHubPullRequestView): PullRequestSn
     mergeStateStatus: view.mergeStateStatus,
     reviewDecision: view.reviewDecision,
     checks,
-    commentsCount: view.comments.length,
+    commentsCount: view.commentsCount ?? view.comments.length,
     latestComment: newest(comments),
-    reviewsCount: view.reviews.length,
+    reviewsCount: view.reviewsCount ?? view.reviews.length,
     latestReview: newest(reviews),
     body: view.body.slice(0, MAX_SNAPSHOT_BODY_CHARS),
   }

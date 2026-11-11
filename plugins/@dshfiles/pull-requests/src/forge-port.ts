@@ -1,8 +1,7 @@
 import { Context, Effect, Layer, Schema } from 'effect'
 import { forgeTargetOf, pullRequestUrlOf, type ForgeKind, type ForgeTarget } from './forge.js'
-import { GhCommandFailed, GhResponseInvalid, GitHubCli } from './github-cli.js'
+import { GhCommandFailed, GhResponseInvalid, GitHubCli, type PullRequestBatchRead, type PullRequestRead } from './github-cli.js'
 import { GitLabCli, GlabCommandFailed, GlabResponseInvalid } from './gitlab-cli.js'
-import type { GitHubPullRequestView } from './pull-request-model.js'
 
 export class UnsupportedRepository extends Schema.TaggedError<UnsupportedRepository>()('UnsupportedRepository', { repo: Schema.String }) {
   override get message(): string {
@@ -31,6 +30,17 @@ export interface ResolvedForgeRepository {
 
 const repoKeyOf = (target: ForgeTarget, project: string): string => (target.kind === 'github' ? project : `${target.host}/${project}`)
 
+/** GitLab merge requests read at once: one `glab` call each. */
+const GITLAB_CONCURRENCY = 6
+
+export interface ForgePullRequestTarget {
+  readonly repo: string
+  readonly number: number
+  readonly cwd: string
+  /** The stored snapshot's fingerprint; GitHub skips the full read while it still matches. */
+  readonly known: string | null
+}
+
 /**
  * The forge port: one small surface the watcher and the creator use, with the GitHub and GitLab CLIs behind it.
  * The repository key names the forge (a bare `owner/name` is GitHub), so a stored record keeps resolving after a
@@ -40,11 +50,14 @@ export class ForgePullRequests extends Context.Service<
   ForgePullRequests,
   {
     readonly repositoryInfo: (input: { readonly cwd: string }) => Effect.Effect<ForgeRepositoryInfo, ForgeFailure>
-    readonly pullRequest: (input: {
-      readonly repo: string
-      readonly number: number
-      readonly cwd: string
-    }) => Effect.Effect<GitHubPullRequestView, ForgeFailure>
+    /**
+     * Read many pull requests: GitHub ones fifty per GraphQL call, GitLab ones one `glab` call each. Never fails; every
+     * target gets its own outcome, in order. `rateLimit` is GitHub's budget after the last GitHub read.
+     */
+    readonly pullRequests: (input: {
+      readonly targets: readonly ForgePullRequestTarget[]
+      readonly minRemaining: number
+    }) => Effect.Effect<PullRequestBatchRead>
     readonly authStatus: (input: { readonly repo: string }) => Effect.Effect<void, ForgeFailure>
     readonly openPullRequestFor: (input: { readonly repo: string; readonly cwd: string; readonly head: string }) => Effect.Effect<string | null, ForgeFailure>
     readonly createPullRequest: (input: {
@@ -85,11 +98,41 @@ export class ForgePullRequests extends Context.Service<
         return { repo: `${gl.host}/${gl.project}`, kind: 'gitlab' as const, host: gl.host, project: gl.project, defaultBranch: gl.defaultBranch }
       })
 
-      const pullRequest = Effect.fn('pull-requests forge view')(function* (input: { readonly repo: string; readonly number: number; readonly cwd: string }) {
-        const target = yield* targetOf(input.repo)
-        return target.kind === 'github'
-          ? yield* github.pullRequest({ repo: target.project, number: input.number, cwd: input.cwd })
-          : yield* gitlab.mergeRequest({ project: target.project, number: input.number, cwd: input.cwd })
+      const gitlabRead = (input: { readonly project: string; readonly number: number; readonly cwd: string }) =>
+        gitlab.mergeRequest(input).pipe(
+          Effect.map((view): PullRequestRead => ({ kind: 'read', view, fingerprint: null })),
+          Effect.catch((error): Effect.Effect<PullRequestRead> =>
+            Effect.succeed(
+              error._tag === 'GlabCommandFailed' && error.rateLimited
+                ? { kind: 'rate-limited' }
+                : { kind: 'failed', error: error._tag === 'GlabResponseInvalid' ? 'invalid-response' : 'gh-command-failed' },
+            ),
+          ),
+        )
+
+      const pullRequests = Effect.fn('pull-requests forge read')(function* (input: {
+        readonly targets: readonly ForgePullRequestTarget[]
+        readonly minRemaining: number
+      }) {
+        const resolved = input.targets.map(target => ({ target, forge: forgeTargetOf(target.repo) }))
+        const githubTargets = resolved.flatMap((entry, index) =>
+          entry.forge?.kind === 'github' ? [{ index, repo: entry.forge.project, number: entry.target.number, known: entry.target.known }] : [],
+        )
+        const githubRead = githubTargets.length === 0 ? undefined : yield* github.pullRequests({ targets: githubTargets, minRemaining: input.minRemaining })
+        const githubReadOf = new Map(githubTargets.map((target, position) => [target.index, githubRead?.reads[position]]))
+        const gitlabReads = yield* Effect.forEach(
+          resolved,
+          entry =>
+            entry.forge?.kind === 'gitlab'
+              ? gitlabRead({ project: entry.forge.project, number: entry.target.number, cwd: entry.target.cwd })
+              : Effect.succeed(undefined),
+          { concurrency: GITLAB_CONCURRENCY },
+        )
+        const reads = resolved.map((entry, index): PullRequestRead => {
+          if (githubReadOf.has(index)) return githubReadOf.get(index) ?? { kind: 'deferred' }
+          return gitlabReads[index] ?? { kind: 'failed', error: 'invalid-response' }
+        })
+        return { reads, rateLimit: githubRead?.rateLimit ?? null, rateLimited: githubRead?.rateLimited ?? false }
       })
 
       const authStatus = Effect.fn('pull-requests forge auth')(function* (input: { readonly repo: string }) {
@@ -139,7 +182,7 @@ export class ForgePullRequests extends Context.Service<
             })
       })
 
-      return ForgePullRequests.of({ repositoryInfo, pullRequest, authStatus, openPullRequestFor, createPullRequest })
+      return ForgePullRequests.of({ repositoryInfo, pullRequests, authStatus, openPullRequestFor, createPullRequest })
     }),
   )
 }

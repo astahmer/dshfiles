@@ -75,7 +75,7 @@ const fakeForge = (script: GhScript, created: GitHubPullRequestCreate[]) =>
   Layer.succeed(
     ForgePullRequests,
     ForgePullRequests.of({
-      pullRequest: () => Effect.die('pullRequest is not used here'),
+      pullRequests: () => Effect.die('pullRequests is not used here'),
       authStatus: () =>
         script.auth === 'missing'
           ? Effect.fail(new GhCommandFailed({ operation: 'auth-status', rateLimited: false, missing: true }))

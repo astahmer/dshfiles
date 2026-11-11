@@ -40,7 +40,7 @@
       "externalDependencies": [
         {
           "id": "github-cli",
-          "boundary": "Runs gh api graphql for batched issue states (state and stateReason only), gh repo view for number-plus-cwd links and gh pr view with state, mergeable, mergeStateStatus, reviewDecision, statusCheckRollup, comments, reviews and the description (first 16,384 characters); uses the CLI's configured login without reading or storing credentials. GitHub.com only.",
+          "boundary": "Runs gh api graphql for batched issue states (state and stateReason only), gh repo view for number-plus-cwd links and batched gh api graphql pull-request reads (fifty per call: a fingerprint pass of state, updatedAt, mergeability, head commit and check counts, then a full read of state, mergeability, review decision, checks, the latest comments and reviews and the description (first 16,384 characters) only for pull requests whose fingerprint changed), with GitHub's rateLimit read in the same query; uses the CLI's configured login without reading or storing credentials. GitHub.com only.",
           "deterministicFake": "tests/pull-request-model.spec.ts supplies fixed CLI-shaped JSON to the production Effect Schema decoder; tests/host.spec.ts uses a real test Host without invoking GitHub."
         }
       ],
@@ -119,6 +119,12 @@
           "span": "pull request gh view",
           "file": "plugins/@dshfiles/pull-requests/tests/telemetry.spec.ts",
           "testName": "records one span for repository discovery and pull-request polling"
+        },
+        {
+          "kind": "custom",
+          "span": "pull request gh batch",
+          "file": "plugins/@dshfiles/pull-requests/tests/gh-call-budget.spec.ts",
+          "testName": "records one gh batch span per GraphQL read with its size and pass"
         },
         {
           "kind": "custom",

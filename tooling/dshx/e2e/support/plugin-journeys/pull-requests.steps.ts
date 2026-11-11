@@ -19,7 +19,7 @@ case "$1 $2" in
   "repo view") echo '{"nameWithOwner":"acme/widget","defaultBranchRef":{"name":"main"}}' ;;
   "pr list") echo '[]' ;;
   "pr create") echo '${PULL_REQUEST_URL}' ;;
-  "pr view") echo '{"state":"OPEN","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","reviewDecision":null,"statusCheckRollup":[{"name":"unit","status":"COMPLETED","conclusion":"SUCCESS"}],"comments":[],"reviews":[],"body":""}' ;;
+  "api graphql") echo '{"data":{"rateLimit":{"cost":1,"remaining":4999,"resetAt":"2099-01-01T00:00:00Z"},"p0":{"pullRequest":{"state":"OPEN","updatedAt":"2026-11-11T10:00:00Z","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","reviewDecision":null,"body":"","commits":{"nodes":[{"commit":{"oid":"abc","statusCheckRollup":{"state":"SUCCESS","contexts":{"checkRunCountsByState":[{"state":"SUCCESS","count":1}],"statusContextCountsByState":[],"nodes":[{"__typename":"CheckRun","name":"unit","status":"COMPLETED","conclusion":"SUCCESS"}]}}}}]},"comments":{"totalCount":0,"nodes":[]},"reviews":{"totalCount":0,"nodes":[]}}}}}' ;;
   *) echo "stub gh: unexpected $*" >&2; exit 2 ;;
 esac
 `
@@ -132,8 +132,8 @@ Then('the bookmark is on the remote and the stub gh created and polled the pull 
     expect(branches).toMatch(/^dsh\//mu)
     const calls = (await readFile(fixture.ghLog, 'utf8')).split('\n')
     expect(calls.some(call => call.startsWith('pr create --repo acme/widget --head dsh/') && call.includes('--title Add sprockets to the widget'))).toBe(true)
-    // Watching polls once at link time, so the stored link already holds the OPEN state from gh pr view.
-    expect(calls.some(call => call.startsWith('pr view 7 --repo acme/widget'))).toBe(true)
+    // Watching polls once at link time, so the stored link already holds the OPEN state from the batched GraphQL read.
+    expect(calls.some(call => call.startsWith('api graphql') && call.includes('name:"widget"){pullRequest(number:7)'))).toBe(true)
   })
   await finishJourneyAssertions(page)
 })

@@ -9,9 +9,11 @@ import { HostContext } from '@dshfiles/dshx/effect/host-context'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
-import { Effect, Layer } from 'effect'
-import { GhCommandFailed } from '../src/github-cli.js'
-import { ForgePullRequests } from '../src/forge-port.js'
+import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import { threadSidebarAutoSettleApi } from '@dshfiles/thread-sidebar/auto-settle-api'
+import { Effect, Layer, Ref, Schema } from 'effect'
+import { GhCommandFailed, type PullRequestRead } from '../src/github-cli.js'
+import { ForgePullRequests, type ForgePullRequestTarget } from '../src/forge-port.js'
 import { PullRequestMonitor } from '../src/monitor.js'
 import type { GitHubPullRequestView, PullRequestRecord } from '../src/pull-request-model.js'
 import { PullRequestStore } from '../src/store.js'
@@ -47,13 +49,27 @@ const record = (input: { readonly repo: string; readonly number: number; readonl
   lastError: null,
 })
 
+/** A batch read built from a per-pull-request answer, as the GitHub adapter reports each target's own outcome. */
+const batchOf =
+  (readOne: (target: ForgePullRequestTarget) => Effect.Effect<GitHubPullRequestView, GhCommandFailed>) =>
+  (input: { readonly targets: readonly ForgePullRequestTarget[] }) =>
+    Effect.map(
+      Effect.forEach(input.targets, target =>
+        readOne(target).pipe(
+          Effect.map((value): PullRequestRead => ({ kind: 'read', view: value, fingerprint: null })),
+          Effect.catch((): Effect.Effect<PullRequestRead> => Effect.succeed({ kind: 'failed', error: 'gh-command-failed' })),
+        ),
+      ),
+      reads => ({ reads, rateLimit: null, rateLimited: false }),
+    )
+
 const fakeForge = (polls: string[]) =>
   Layer.succeed(
     ForgePullRequests,
     ForgePullRequests.of({
       repositoryInfo: () => Effect.die('repositoryInfo is not used here'),
       authStatus: () => Effect.die('authStatus is not used here'),
-      pullRequest: input =>
+      pullRequests: batchOf(input =>
         Effect.suspend(() => {
           const key = `${input.repo}#${String(input.number)}`
           polls.push(key)
@@ -61,6 +77,7 @@ const fakeForge = (polls: string[]) =>
             ? Effect.fail(new GhCommandFailed({ operation: 'pr-view', rateLimited: false, exitCode: 1, detail: 'boom' }))
             : Effect.succeed(view)
         }),
+      ),
       openPullRequestFor: () => Effect.die('openPullRequestFor is not used here'),
       createPullRequest: () => Effect.die('createPullRequest is not used here'),
     }),
@@ -84,7 +101,65 @@ const withStorageHost = <A, E, R>(use: (host: Awaited<ReturnType<typeof createTe
     }),
   )
 
+class SettleBusy extends Schema.TaggedError<SettleBusy>()('SettleBusy', {}) {}
+
 describe('pull-requests pollAll', () => {
+  it.effect('keeps polling a merged pull request only until its thread is settled', () =>
+    withStorageHost(host => {
+      const polls: string[] = []
+      const hostContext = HostContext.of({ ctx: host.ctx, packageId: PACKAGE_ID })
+      const merged = Layer.succeed(
+        ForgePullRequests,
+        ForgePullRequests.of({
+          repositoryInfo: () => Effect.die('unused'),
+          authStatus: () => Effect.die('unused'),
+          pullRequests: batchOf(input => Effect.sync(() => (polls.push(`${input.repo}#${String(input.number)}`), { ...view, state: 'MERGED' as const }))),
+          openPullRequestFor: () => Effect.die('unused'),
+          createPullRequest: () => Effect.die('unused'),
+        }),
+      )
+      const layer = PullRequestMonitor.layer.pipe(
+        Layer.provideMerge(
+          Layer.mergeAll(PullRequestStore.layer, merged).pipe(
+            Layer.provideMerge(Layer.mergeAll(StorageDomain.layer, HostApis.layer).pipe(Layer.provide(Layer.succeed(HostContext, hostContext)))),
+          ),
+        ),
+      )
+      return Effect.gen(function* () {
+        const attempts = yield* Ref.make(0)
+        const sidebar = DshxPlugin.make({
+          name: '@dshfiles/thread-sidebar',
+          layer: Layer.empty,
+          apis: [
+            Api.bind(threadSidebarAutoSettleApi, {
+              status: () => Effect.die('unused'),
+              requestSettle: input =>
+                Effect.flatMap(
+                  Ref.getAndUpdate(attempts, count => count + 1),
+                  count =>
+                    count === 0
+                      ? Effect.fail(new SettleBusy())
+                      : Effect.succeed({ results: input.sessionIds.map(sessionId => ({ sessionId, outcome: 'settled' as const })) }),
+                ),
+            }),
+          ],
+        })
+        yield* Effect.promise(() => host.mount(sidebar, { packageId: '@dshfiles/thread-sidebar' }))
+        const store = yield* PullRequestStore
+        const monitor = yield* PullRequestMonitor
+        yield* store.upsert(record({ repo: 'acme/widget', number: 7, sessionId: 'session-a' }))
+
+        yield* monitor.pollAll
+        expect((yield* store.list())[0]?.watching).toBe(true)
+        yield* monitor.pollAll
+        expect((yield* store.list())[0]?.watching).toBe(false)
+        yield* monitor.pollAll
+        expect(polls).toHaveLength(2)
+        expect(yield* Ref.get(attempts)).toBe(2)
+      }).pipe(Effect.provide(layer))
+    }),
+  )
+
   it.effect('polls each unique pull request once and keeps polling after a failing target', () =>
     withStorageHost(host => {
       const polls: string[] = []
@@ -177,11 +252,12 @@ describe('pull-requests pollAll', () => {
         ForgePullRequests.of({
           repositoryInfo: () => Effect.die('unused'),
           authStatus: () => Effect.die('unused'),
-          pullRequest: input =>
+          pullRequests: batchOf(input =>
             Effect.sync(() => {
               polls.push(`${input.repo}#${String(input.number)}`)
               return { ...view, state }
             }),
+          ),
           openPullRequestFor: () => Effect.die('unused'),
           createPullRequest: () => Effect.die('unused'),
         }),
