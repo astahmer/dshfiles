@@ -63,14 +63,17 @@
           maxBytes: 65536
       - id: time-context
         name: '@deepseek-ai/dsh-time-context'
+      # @dshfiles/tool-bash and @dshfiles/tool-fs are native forks (exit code on every run, timeout hint, exact
+      # truncated lines; read from the end, past-end tail, missing-path suggestions). Outside the managed region: an
+      # existing profile needs the same one-line `name` edit in its own preset-standard row.
       - id: tool-bash
-        name: '@deepseek-ai/dsh-tool-bash'
+        name: '@dshfiles/tool-bash'
         disabled: !!js process.platform === 'win32'
       - id: tool-pwsh
         name: '@deepseek-ai/dsh-tool-pwsh'
         disabled: !!js process.platform !== 'win32'
       - id: tool-fs
-        name: '@deepseek-ai/dsh-tool-fs'
+        name: '@dshfiles/tool-fs'
       - id: tool-fs-search
         name: '@deepseek-ai/dsh-tool-fs-search'
         config:
