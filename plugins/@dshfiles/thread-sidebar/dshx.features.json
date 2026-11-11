@@ -1566,7 +1566,7 @@
     {
       "id": "notification-delivery",
       "title": "Configure per-category thread notifications",
-      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure in-app notification placement and timeout, dismiss in-app notices, configure per-category sounds, mute tones separately, or silence and resume all notifications from Settings or the command palette; grant system permission explicitly. A thread open in a visible, focused window raises no alert; the same thread in a hidden tab or an unfocused window does.",
+      "summary": "Choose off, in-app, system, or both delivery for approval, input, agent-message, completed-turn, stopped-turn, and failed-turn events; configure in-app notification placement and timeout, dismiss in-app notices, configure per-category sounds, mute tones separately, or silence and resume all notifications from Settings or the command palette; grant system permission explicitly. A thread open in a visible, focused window raises no alert; the same thread in a hidden tab or an unfocused window does.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
@@ -1574,6 +1574,7 @@
         "expect group \"Thread notifications\"",
         "expect button \"Approval needed: Off\"",
         "expect button \"Turn stopped: Off\"",
+        "expect button \"Agent messages: In-app and system\"",
         "expect button \"Snooze notifications\"",
         "click button \"Snooze notifications\"",
         "expect button \"Resume notifications\"",
@@ -1589,8 +1590,8 @@
       "configuration": [
         {
           "key": "notificationCategories",
-          "defaultValue": "all categories off; per-category sound disabled",
-          "constraints": "Host-synced category settings; each of the five categories selects off, in-app, system, or both, plus an optional sound preset and volume.",
+          "defaultValue": "Agent messages both (in-app, plus system once permission is granted); every other category off; per-category sound disabled",
+          "constraints": "Host-synced category settings; each of the six categories selects off, in-app, system, or both, plus an optional sound preset and volume. Settings saved before a category existed decode with that category's default.",
           "coveredBy": ["thread-sidebar.notifications-settings"]
         },
         {
@@ -1665,6 +1666,12 @@
           "id": "thread-sidebar.notifications-unit-stopped-migration",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
           "testName": "categories saved before the stopped category decode with it defaulted in"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notifications-unit-agent-message-migration",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "older preferences without the Agent messages category decode with it on and keep Input needed"
         },
         {
           "kind": "unit-test",
@@ -3846,12 +3853,19 @@
     {
       "id": "agent-user-notification",
       "title": "Agent sends the user a notification",
-      "summary": "notify_user sends a title and optional body, linked to the calling thread by default, to every open page, which routes it through the Input needed category's delivery and sound, the global snooze and the thread mute, and skips a thread the user is watching in a focused window. Rate-limited to 3 per thread and 12 in total per 10 minutes. Pages report what they did, so the result says delivered: false with the reason and the setting that turns it on when nothing was shown.",
+      "summary": "notify_user sends a title and optional body, linked to the calling thread by default, to every open page, which routes it through its own Agent messages category (on by default, independent of Input needed) for delivery and sound, the global snooze and the thread mute, and skips a thread the user is watching in a focused window. Rate-limited to 3 per thread and 12 in total per 10 minutes. Pages report what they did, so the result says delivered: false with the reason and the setting that turns it on when nothing was shown.",
       "surfaces": ["host", "client"],
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tool notify_user; in-app toast and system notification",
-      "configuration": [],
+      "configuration": [
+        {
+          "key": "notificationCategories.agent-message",
+          "defaultValue": "both, sound off",
+          "constraints": "Off, in-app, system, or both, plus an optional sound, in Settings › Notifications › Thread notifications › Agent messages. Off makes notify_user return delivered: false (category-off) with that path.",
+          "coveredBy": ["thread-sidebar.agent-user-notification-category", "thread-sidebar.agent-user-notification-category-off"]
+        }
+      ],
       "states": ["delivered", "not-delivered", "rate-limited"],
       "failureModes": [
         "A fourth send from one thread within 10 minutes, or a thirteenth in total, returns rate-limited with the seconds to wait and publishes nothing.",
@@ -3876,6 +3890,18 @@
           "id": "thread-sidebar.agent-user-notification-not-delivered",
           "file": "plugins/@dshfiles/thread-sidebar/src/user-notification-host.test.ts",
           "testName": "reports delivered: false with the reason and how to turn it on when every page skipped it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.agent-user-notification-category",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
+          "testName": "an agent message shows with Input needed off and Agent messages on"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.agent-user-notification-category-off",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
+          "testName": "an agent message is suppressed with Agent messages off, even with Input needed on"
         },
         {
           "kind": "unit-test",

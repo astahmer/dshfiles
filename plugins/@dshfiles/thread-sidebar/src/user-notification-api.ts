@@ -34,7 +34,7 @@ export type UserNotificationPageOutcome = (typeof USER_NOTIFICATION_PAGE_OUTCOME
 /** The next step for the user, so the agent can pass it on in its reply. */
 export const userNotificationRecovery = {
   'category-off':
-    'The user’s “Input needed” notifications are off: they can turn them on in Settings › Notifications › Thread notifications › Input needed (In-app, System or Both).',
+    'Agent messages is off: the user can turn it on in Settings › Notifications › Thread notifications › Agent messages (In-app, System or Both).',
   snoozed:
     'Notifications are snoozed in this browser: the user can resume them with Resume notifications in Settings › Notifications › Thread notifications or the command palette.',
   'thread-muted': 'This thread is muted: the user can choose Unmute in its thread menu.',
@@ -68,7 +68,7 @@ const renderSend = (output: UserNotificationSendOutput): string => {
 
 /**
  * One notification the agent (or a script) sends the user through the sidebar's existing route: the browser shows it
- * in-app and as a system notification according to the user's “Input needed” category, and a click opens the thread.
+ * in-app and as a system notification according to the user's “Agent messages” category, and a click opens the thread.
  */
 export const userNotificationApi = defineApi({
   id: 'thread-user-notifications',

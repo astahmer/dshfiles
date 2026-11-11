@@ -3,8 +3,10 @@ import * as Schema from 'effect/Schema'
 import type { AttentionFinishReason, ThreadAttentionMigrationEntry } from './attention-api.js'
 import { SchemaHelpers } from './schema-helpers.js'
 
-export const THREAD_NOTIFICATION_CATEGORIES = ['approval-needed', 'input-needed', 'turn-finished', 'stopped', 'failed'] as const
+export const THREAD_NOTIFICATION_CATEGORIES = ['approval-needed', 'input-needed', 'agent-message', 'turn-finished', 'stopped', 'failed'] as const
 export type ThreadNotificationCategory = (typeof THREAD_NOTIFICATION_CATEGORIES)[number]
+/** `notify_user` messages: an agent decided the user needs to know, so unlike thread questions this is on by default. */
+export const AGENT_MESSAGE_NOTIFICATION_CATEGORY = 'agent-message' satisfies ThreadNotificationCategory
 /** The categories a finished turn can land in; approvals and questions come from pending interactions. */
 const THREAD_FINISH_NOTIFICATION_CATEGORIES = ['turn-finished', 'stopped', 'failed'] as const
 export type ThreadFinishNotificationCategory = (typeof THREAD_FINISH_NOTIFICATION_CATEGORIES)[number]
@@ -37,6 +39,7 @@ export const storedNotificationsMuted = createStoredValue({
 export const DEFAULT_THREAD_NOTIFICATION_CATEGORIES = {
   'approval-needed': { delivery: 'off', sound: false, soundPreset: 'soft', volume: 0.5 },
   'input-needed': { delivery: 'off', sound: false, soundPreset: 'chime', volume: 0.5 },
+  'agent-message': { delivery: 'both', sound: false, soundPreset: 'chime', volume: 0.5 },
   'turn-finished': { delivery: 'off', sound: false, soundPreset: 'bright', volume: 0.5 },
   stopped: { delivery: 'off', sound: false, soundPreset: 'low', volume: 0.5 },
   failed: { delivery: 'off', sound: false, soundPreset: 'low', volume: 0.5 },
@@ -62,6 +65,10 @@ export const threadNotificationCategoriesSchema = SchemaHelpers.withDecodedDefau
         threadNotificationCategoryPreferencesSchema,
         () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed'],
       ),
+      'agent-message': SchemaHelpers.withDecodedDefault(
+        threadNotificationCategoryPreferencesSchema,
+        () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES['agent-message'],
+      ),
       'turn-finished': SchemaHelpers.withDecodedDefault(
         threadNotificationCategoryPreferencesSchema,
         () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished'],
@@ -76,6 +83,30 @@ export const threadNotificationCategoriesSchema = SchemaHelpers.withDecodedDefau
 const notificationRouteHasInApp = (delivery: ThreadNotificationDelivery): boolean => delivery === 'in-app' || delivery === 'both'
 const notificationRouteHasSystem = (delivery: ThreadNotificationDelivery): boolean => delivery === 'system' || delivery === 'both'
 const threadNotificationHasOutput = (preference: ThreadNotificationCategoryPreferences): boolean => preference.delivery !== 'off' || preference.sound
+
+export interface ThreadNotificationRoute {
+  readonly inApp: boolean
+  readonly system: boolean
+  readonly systemRequested: boolean
+  readonly sound: boolean
+}
+
+/** How one category delivers in this browser, or `category-off` when the user switched it off. */
+const notificationRoute = (input: {
+  readonly categories: ThreadNotificationCategories
+  readonly category: ThreadNotificationCategory
+  readonly systemPermissionGranted: boolean
+}): ThreadNotificationRoute | 'category-off' => {
+  const preference = input.categories[input.category]
+  if (!threadNotificationHasOutput(preference)) return 'category-off'
+  const systemRequested = notificationRouteHasSystem(preference.delivery)
+  return {
+    inApp: notificationRouteHasInApp(preference.delivery),
+    system: systemRequested && input.systemPermissionGranted,
+    systemRequested,
+    sound: preference.sound,
+  }
+}
 
 const notificationCategoriesAreDefault = (categories: ThreadNotificationCategories): boolean =>
   THREAD_NOTIFICATION_CATEGORIES.every(category => {
@@ -93,6 +124,7 @@ const categoriesForLegacyDesktopNotifications = () =>
   ({
     'approval-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['approval-needed'], delivery: 'system' },
     'input-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed'], delivery: 'system' },
+    'agent-message': DEFAULT_THREAD_NOTIFICATION_CATEGORIES['agent-message'],
     'turn-finished': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished'], delivery: 'system' },
     stopped: { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.stopped, delivery: 'system' },
     failed: { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed, delivery: 'system' },
@@ -227,6 +259,7 @@ export class ThreadNotificationModel {
   static readonly notificationRouteHasInApp = notificationRouteHasInApp
   static readonly notificationRouteHasSystem = notificationRouteHasSystem
   static readonly threadNotificationHasOutput = threadNotificationHasOutput
+  static readonly notificationRoute = notificationRoute
   static readonly notificationCategoriesAreDefault = notificationCategoriesAreDefault
   static readonly categoriesForLegacyDesktopNotifications = categoriesForLegacyDesktopNotifications
   static readonly categoryForFinishReason = categoryForFinishReason

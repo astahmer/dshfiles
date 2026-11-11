@@ -103,7 +103,9 @@ describe('UserNotifications.send', () => {
     Effect.gen(function* () {
       const output = yield* sendWith({ title: 'Done' }, agent('session-a'))
       expect(output).toMatchObject({ status: 'sent', delivered: false, reason: 'category-off' })
-      expect(output.recovery).toContain('Settings › Notifications › Thread notifications › Input needed')
+      expect(output.recovery).toContain('Agent messages is off')
+      expect(output.recovery).toContain('Settings › Notifications › Thread notifications › Agent messages')
+      expect(output.recovery).not.toContain('Input needed')
       const rendered = userNotificationApi.methods.send.tool?.render?.(output)
       expect(rendered).toContain('delivered: false')
       expect(rendered).toContain('Tell the user in your reply instead.')

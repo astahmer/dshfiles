@@ -34,6 +34,19 @@ test('older preferences without subscription notice fields follow every turn, st
   assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, subscriptionDelivery: 'queue' })?.subscriptionDelivery, 'queue')
 })
 
+test('older preferences without the Agent messages category decode with it on and keep Input needed', () => {
+  const { 'agent-message': _agentMessage, ...olderCategories } = DEFAULT_PREFERENCES.notificationCategories
+  const parsed = SidebarPreferencesModel.decode({
+    ...DEFAULT_PREFERENCES,
+    notificationCategories: { ...olderCategories, 'input-needed': { ...olderCategories['input-needed'], delivery: 'in-app' } },
+  })
+  assert.ok(parsed)
+  assert.deepEqual(parsed.notificationCategories['agent-message'], DEFAULT_PREFERENCES.notificationCategories['agent-message'])
+  assert.equal(parsed.notificationCategories['agent-message'].delivery, 'both')
+  assert.equal(parsed.notificationCategories['input-needed'].delivery, 'in-app')
+  assert.equal(threadSidebarSettings.schema({}).notificationCategories['agent-message'].delivery, 'both')
+})
+
 test('notification settings accept a no-timeout value in the Host schema', () => {
   const resolved = threadSidebarSettings.schema({ notificationDurationSeconds: 0, notificationPlacement: 'top-right' })
   assert.equal(resolved.notificationDurationSeconds, 0)

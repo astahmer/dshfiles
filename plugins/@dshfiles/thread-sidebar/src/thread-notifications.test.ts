@@ -3,7 +3,9 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { test } from 'vitest'
 import * as Schema from 'effect/Schema'
 import { SchemaHelpers } from './schema-helpers.js'
+import { userNotificationRecovery } from './user-notification-api.js'
 import {
+  AGENT_MESSAGE_NOTIFICATION_CATEGORY,
   createThreadNotificationClaimer,
   DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
   ThreadNotificationModel,
@@ -96,6 +98,41 @@ test('categories saved before the stopped category decode with it defaulted in',
   assert.deepEqual(parsed.stopped, DEFAULT_THREAD_NOTIFICATION_CATEGORIES.stopped)
   assert.equal(parsed['turn-finished'].delivery, 'system')
   assert.equal(parsed['turn-finished'].sound, true)
+})
+
+test('categories saved before agent messages decode with them on by default', () => {
+  const { 'agent-message': _agentMessage, ...savedBeforeAgentMessages } = DEFAULT_THREAD_NOTIFICATION_CATEGORIES
+  const parsed = Schema.decodeUnknownSync(threadNotificationCategoriesSchema)({
+    ...savedBeforeAgentMessages,
+    'input-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed'], delivery: 'system' },
+  })
+  assert.deepEqual(parsed['agent-message'], { delivery: 'both', sound: false, soundPreset: 'chime', volume: 0.5 })
+  assert.equal(parsed['input-needed'].delivery, 'system')
+})
+
+test('an agent message shows with Input needed off and Agent messages on', () => {
+  const categories = {
+    ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+    'input-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed'], delivery: 'off' },
+  } as const
+  assert.deepEqual(ThreadNotificationModel.notificationRoute({ categories, category: AGENT_MESSAGE_NOTIFICATION_CATEGORY, systemPermissionGranted: false }), {
+    inApp: true,
+    system: false,
+    systemRequested: true,
+    sound: false,
+  })
+  assert.equal(ThreadNotificationModel.notificationRoute({ categories, category: 'input-needed', systemPermissionGranted: true }), 'category-off')
+})
+
+test('an agent message is suppressed with Agent messages off, even with Input needed on', () => {
+  const categories = {
+    ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+    'input-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed'], delivery: 'both' },
+    'agent-message': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['agent-message'], delivery: 'off' },
+  } as const
+  const route = ThreadNotificationModel.notificationRoute({ categories, category: AGENT_MESSAGE_NOTIFICATION_CATEGORY, systemPermissionGranted: true })
+  assert.equal(route, 'category-off')
+  assert.match(userNotificationRecovery[route], /^Agent messages is off: .*Thread notifications › Agent messages/)
 })
 
 test('delivery routing distinguishes in-app, system, both, and off', () => {

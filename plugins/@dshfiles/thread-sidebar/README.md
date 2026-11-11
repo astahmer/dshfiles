@@ -607,8 +607,10 @@ muted threads. Mutes follow child-thread action preferences and live in the
 Host-synced `mutedThreads` setting, so every browser stays quiet; mutes saved
 in this browser by older versions are copied there once. **Thread notifications**
 are configured in Settings › Notifications › Thread notifications, separately for approval requests,
-questions, completed turns, stopped turns, and failed turns. Each category can be
-off, in-app, system, or both, with an optional sound preset and volume. In-app
+questions, agent messages (`notify_user`), completed turns, stopped turns, and failed turns. Each category can be
+off, in-app, system, or both, with an optional sound preset and volume. Agent
+messages default to in-app and system; every other category starts off. Settings
+saved before a category existed decode with its default. In-app
 notifications can be placed at any corner or center edge of the sidebar, dismissed
 with the close button, and timed out after 3, 5, 10, 15, 30 or 60 seconds; choose
 Never to leave them until dismissed. These settings follow the user through Host
@@ -629,8 +631,12 @@ in a hidden tab or an unfocused window notifies as usual.
 lets an agent send a title and an optional body, linked to its own thread by
 default (`sessionId: null` for none, or another thread's id). Its description
 limits it to when the user asked to be notified or a long task or routine needs
-their attention. Every open page routes it through the **Input needed** category's delivery and
-sound, the global snooze and the thread's mute,
+their attention. Every open page routes it through its own **Agent messages**
+notification category, independent of **Input needed**: on by default (in-app,
+plus system once permission is granted; no sound), because it fires only when an
+agent decides you need to know and is rate-limited. Switch it off or change its
+delivery and sound in Settings › Notifications › Thread notifications › Agent
+messages; the global snooze and the thread's mute still apply,
 and skips a thread you are watching, as above; a click opens the linked thread.
 Each page reports back what it did, and the tool waits up to
 1.5 s for that: it returns `delivered: true` once a page showed it, or

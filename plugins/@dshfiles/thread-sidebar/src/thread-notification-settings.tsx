@@ -31,6 +31,7 @@ import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 const categoryLabelKeys = {
   'approval-needed': 'threadSidebarApprovalNeeded',
   'input-needed': 'threadSidebarInputNeeded',
+  'agent-message': 'threadSidebarAgentMessages',
   'turn-finished': 'threadSidebarTurnFinished',
   stopped: 'threadSidebarStopped',
   failed: 'threadSidebarFailed',
