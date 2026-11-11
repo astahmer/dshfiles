@@ -1,9 +1,9 @@
 // A stand-in for the OpenSSH client: it runs the remote command on this machine and fakes `-N -L` forwards with a
 // local TCP proxy. FAKE_SSH_LOG records what it was asked and which signals it received; FAKE_SSH_TUNNEL picks how a
-// forward behaves (ready, silent, exit, refused); FAKE_SSH_IGNORE_TERM keeps it alive after SIGTERM;
+// forward behaves (ready, silent, exit, refused, or exit-once: the first forward finds its port taken); FAKE_SSH_IGNORE_TERM keeps it alive after SIGTERM;
 // FAKE_SSH_FORCE_STDERR / FAKE_SSH_FORCE_STDOUT_BYTES replace the remote command with a canned failure or output.
 import { spawn } from 'node:child_process'
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
 import { createConnection, createServer } from 'node:net'
 
 const args = process.argv.slice(2)
@@ -37,7 +37,11 @@ for (let index = 0; index < args.length; index += 1) {
 
 if (forward !== undefined) {
   const [localAddress, localPort, remoteHost, remotePort] = forward.split(':')
-  const scenario = process.env.FAKE_SSH_TUNNEL ?? 'ready'
+  const requested = process.env.FAKE_SSH_TUNNEL ?? 'ready'
+  const onceMarker = `${process.env.FAKE_SSH_LOG ?? ''}.forward-failed`
+  const failOnce = requested === 'exit-once' && !existsSync(onceMarker)
+  if (failOnce) writeFileSync(onceMarker, '')
+  const scenario = requested === 'exit-once' ? (failOnce ? 'exit' : 'ready') : requested
   if (scenario === 'exit') {
     process.stderr.write('debug1: channel_setup_fwd_listener_tcpip: cannot listen to port\n')
     process.exit(255)

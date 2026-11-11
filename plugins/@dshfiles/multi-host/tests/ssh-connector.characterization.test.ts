@@ -335,6 +335,17 @@ describe('ssh tunnel connect', () => {
     expect(await failureCode(SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed }))).toBe('tunnel-failed')
   })
 
+  test('a forward whose ephemeral local port was taken before ssh bound it retries on another port', async () => {
+    process.env.FAKE_SSH_TUNNEL = 'exit-once'
+    const runtime = await startRuntimeFixture()
+    closers.push(runtime.close)
+    const gateway = await connect({ sshTarget: target, remoteHome: await remoteHomeWithLaunch(runtime.port) })
+    closers.push(() => gateway.dispose())
+
+    expect(await gateway.run('session', 'list', { _request: {} })).toEqual({ items: [] })
+    expect((await logLines()).filter(line => line.startsWith('argv ') && line.includes('"-L"'))).toHaveLength(2)
+  })
+
   test('a forward that exits with a recognizable ssh error keeps that error code', async () => {
     process.env.FAKE_SSH_TUNNEL = 'refused'
     expect(await failureCode(SshConnector.connect({ sshTarget: target, remoteHome: remoteHomeFixed }))).toBe('ssh-unreachable')

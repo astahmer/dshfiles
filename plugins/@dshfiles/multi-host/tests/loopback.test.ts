@@ -1,6 +1,8 @@
 import { createServer, type Server } from 'node:http'
 import { Effect, Exit, Schema, Scope } from 'effect'
 import { afterEach, describe, expect, test } from 'vitest'
+import { tracerLayer } from '@dshfiles/dshx/effect'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { Loopback } from '../src/connectors/loopback.js'
 
 const createLoopbackForward = async (input: { readonly target: URL; readonly originPort?: number }) => {
@@ -70,5 +72,18 @@ describe('multi-host loopback origin isolation', () => {
     const reconnected = await createLoopbackForward({ target, originPort: firstOrigin.port })
     forwards.push(reconnected)
     expect(new URL(`http://${reconnected.address}:${reconnected.port}`).origin).toBe(firstUrl.origin)
+  })
+
+  test('binds an ephemeral forward listener directly instead of probing a port and rebinding it', async () => {
+    using recorder = recordSpans()
+    const scope = Effect.runSync(Scope.make())
+    const endpoint = await Effect.runPromise(
+      Scope.provide(scope)(Loopback.forward({ target: new URL('http://127.0.0.1:9') })).pipe(Effect.provide(tracerLayer)),
+    )
+    forwards.push({ dispose: () => Effect.runPromise(Scope.close(scope, Exit.void)) })
+
+    expect(endpoint.port).toBeGreaterThan(0)
+    expect(recorder.named('multi-host loopback forward')).toHaveLength(1)
+    expect(recorder.named('multi-host loopback reserve')).toEqual([])
   })
 })

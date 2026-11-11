@@ -56,7 +56,8 @@ const isLoopbackHost = (hostname: string): boolean => {
 const forward = Effect.fn('multi-host loopback forward')(function* (input: { readonly target: URL; readonly originPort?: number | undefined }) {
   const targetHost = input.target.hostname.replace(/^\[|\]$/g, '')
   if (input.target.protocol !== 'http:' || !isLoopbackHost(targetHost)) return yield* new InvalidRuntimeLocator()
-  const endpoint = yield* reserve(input.originPort)
+  const requestedPort = input.originPort ?? 0
+  if (!isPort(requestedPort)) return yield* new InvalidRuntimeLocator()
   const targetPort = input.target.port === '' ? 80 : Number(input.target.port)
   const sockets = new Set<Socket>()
   const server = createServer(client => {
@@ -74,13 +75,13 @@ const forward = Effect.fn('multi-host loopback forward')(function* (input: { rea
     sockets.add(socket)
     socket.once('close', () => sockets.delete(socket))
   })
-  yield* Effect.acquireRelease(listen({ server, port: endpoint.port }).pipe(Effect.mapError(() => new LoopbackForwardUnavailable())), () =>
+  const port = yield* Effect.acquireRelease(listen({ server, port: requestedPort }).pipe(Effect.mapError(() => new LoopbackForwardUnavailable())), () =>
     Effect.suspend(() => {
       for (const socket of sockets) socket.destroy()
       return close(server)
     }),
   )
-  return endpoint
+  return { address: loopbackAddress, port } satisfies LoopbackEndpoint
 }) satisfies (input: { readonly target: URL; readonly originPort?: number | undefined }) => Effect.Effect<LoopbackEndpoint, unknown, Scope.Scope>
 
 export class Loopback {

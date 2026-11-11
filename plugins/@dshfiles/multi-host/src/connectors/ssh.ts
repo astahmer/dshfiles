@@ -21,8 +21,15 @@ const remoteLaunch = Effect.fnUntraced(function* (input: { readonly sshTarget: s
 const connect = Effect.fnUntraced(function* (input: { readonly sshTarget: string; readonly remoteHome: string; readonly originPort?: number | undefined }) {
   const ssh = yield* Ssh
   const launch = yield* remoteLaunch(input)
-  const endpoint = yield* Loopback.reserve(input.originPort)
-  const tunnel = yield* ssh.tunnel({ sshTarget: input.sshTarget, remotePort: launch.port, localAddress: endpoint.address, localPort: endpoint.port })
+  const openForward = Effect.gen(function* () {
+    const endpoint = yield* Loopback.reserve(input.originPort)
+    const tunnel = yield* ssh.tunnel({ sshTarget: input.sshTarget, remotePort: launch.port, localAddress: endpoint.address, localPort: endpoint.port })
+    return { endpoint, tunnel }
+  })
+  // ssh binds the probed ephemeral port only later, so another process can take it first; ExitOnForwardFailure makes that a TunnelFailed.
+  const { endpoint, tunnel } = yield* input.originPort === undefined
+    ? openForward.pipe(Effect.retry({ times: 2, while: error => error._tag === 'TunnelFailed' }))
+    : openForward
   const localLaunchUrl = `http://${endpoint.address}:${endpoint.port}/?token=${encodeURIComponent(launch.token)}`
   return yield* connectGateway({
     launchUrl: localLaunchUrl,
