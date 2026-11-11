@@ -2,12 +2,15 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import {
   errorGroupSchema,
+  eventLoopStallSchema,
   logListSchema,
   metricSeriesSchema,
   metricSummarySchema,
   receiverStatusSchema,
   serviceMapSchema,
   sessionSummarySchema,
+  storeReclaimSchema,
+  storeSpaceReportSchema,
   traceDetailSchema,
   traceListSchema,
   traceStatsSchema,
@@ -91,6 +94,13 @@ export type LogsInput = Schema.Schema.Type<typeof logsInputSchema>
 const confirmSchema = Schema.Literal(true).annotate({ description: 'Must be true: deleting stored telemetry cannot be undone.' })
 
 export const clearInputSchema = Schema.Struct({ confirm: confirmSchema })
+
+export const reclaimInputSchema = Schema.Struct({
+  confirm: Schema.Literal(true).annotate({
+    description:
+      'Must be true. On a store that is not incremental yet this runs one full VACUUM that blocks the DSH Host for its duration (seconds: 3.4 s for a 62 MB store) and converts the file.',
+  }),
+})
 
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
@@ -195,6 +205,32 @@ export const tracesApi = defineApi({
       description:
         'The OTLP receiver: viewer mode, listen address and state (listening, port in use, off), request and item counters, forwarding, what the store retains, where this DSH process exports its own spans and metrics, and a diagnosis of why telemetry does or does not arrive. Read-only.',
       tool: { name: 'traces_status', readOnly: true, render: compactJson },
+    }),
+    stalls: method({
+      input: Schema.Struct({
+        windowMinutes: windowMinutesSchema,
+        limit: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(100))).annotate({
+          description: 'Stalls to return, newest first; defaults to 20.',
+        }),
+      }),
+      output: Schema.Struct({ stalls: Schema.Array(eventLoopStallSchema) }),
+      description:
+        "DSH Host event-loop stalls (spans 'host event-loop stall', recorded when the loop was blocked past the eventLoopStallMs setting), newest first, each with up to 8 spans that were open while it lasted, ranked by overlap times the share of the span the stall fills, so the blocking work ranks above the turn around it. SQLite busy waits show as 'sqlite lock wait' spans. Read-only.",
+      tool: { name: 'traces_stalls', readOnly: true, render: compactJson },
+    }),
+    storeSpace: method({
+      input: Schema.Struct({}),
+      output: storeSpaceReportSchema,
+      description:
+        "The span store's SQLite file: page size, page and free-page counts in pages and bytes, its auto_vacuum mode, and how traces_reclaim_space would give the free pages back (incremental-vacuum, or a one-time converting vacuum for a file created before incremental auto_vacuum). Read-only.",
+      tool: { name: 'traces_store_space', readOnly: true, render: compactJson },
+    }),
+    reclaimSpace: method({
+      input: reclaimInputSchema,
+      output: storeReclaimSchema,
+      description:
+        "Give the span store's free pages back to the disk and report the bytes freed. Run only when the user asked to reclaim space, and pass confirm: true. An incremental store moves only the pages behind its free ones (2.4 s for 27 MB free); an older store is rewritten once with a full VACUUM (blocks the Host for seconds: 3.4 s for a 62 MB store) and is incremental afterwards. Stored telemetry is kept.",
+      tool: { name: 'traces_reclaim_space', readOnly: false, render: compactJson },
     }),
     clear: method({
       input: clearInputSchema,

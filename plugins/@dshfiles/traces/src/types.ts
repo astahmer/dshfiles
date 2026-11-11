@@ -168,6 +168,52 @@ export const errorGroupSchema = Schema.Struct({
 })
 export type ErrorGroup = Schema.Schema.Type<typeof errorGroupSchema>
 
+/** The span the Host's event-loop probe records for each stall (`stall-monitor.ts`). */
+export const EVENT_LOOP_STALL_SPAN = 'host event-loop stall'
+
+const stallOverlapSchema = Schema.Struct({
+  traceId: Schema.String,
+  spanId: Schema.String,
+  name: Schema.String,
+  service: Schema.String,
+  sessionId: Schema.NullOr(Schema.String),
+  durationMs: finiteNumber,
+  overlapMs: finiteNumber,
+})
+
+export const eventLoopStallSchema = Schema.Struct({
+  traceId: Schema.String,
+  spanId: Schema.String,
+  service: Schema.String,
+  startMs: finiteNumber,
+  stallMs: finiteNumber,
+  overlapping: Schema.Array(stallOverlapSchema),
+})
+export type EventLoopStallView = Schema.Schema.Type<typeof eventLoopStallSchema>
+
+const storeSpaceSchema = Schema.Struct({
+  pageSize: Schema.Int.check(Schema.isGreaterThan(0)),
+  pages: nonNegativeInt,
+  freePages: nonNegativeInt,
+  bytes: nonNegativeInt,
+  freeBytes: nonNegativeInt,
+  autoVacuum: Schema.Literals(['none', 'full', 'incremental']),
+})
+
+export const storeSpaceReportSchema = Schema.Struct({
+  space: storeSpaceSchema,
+  /** How `traces_reclaim_space` would run: a quick incremental vacuum, or one converting VACUUM. */
+  reclaimMethod: Schema.Literals(['incremental-vacuum', 'vacuum']),
+})
+
+export const storeReclaimSchema = Schema.Struct({
+  method: Schema.Literals(['incremental-vacuum', 'vacuum']),
+  before: storeSpaceSchema,
+  after: storeSpaceSchema,
+  bytesFreed: nonNegativeInt,
+  durationMs: nonNegativeNumber,
+})
+
 const logRecordSchema = Schema.Struct({
   id: Schema.Int,
   timeMs: finiteNumber,

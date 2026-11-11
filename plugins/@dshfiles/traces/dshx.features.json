@@ -470,7 +470,7 @@
           "kind": "unit-test",
           "id": "traces.agent-tools",
           "file": "plugins/@dshfiles/traces/src/api-tools.test.ts",
-          "testName": "every traces capability is a named tool and only clear writes"
+          "testName": "every traces capability is a named tool and only clear and reclaim write"
         }
       ],
       "telemetry": [
@@ -1083,6 +1083,123 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "event-loop-stalls",
+      "title": "Host event-loop stalls",
+      "summary": "A 100 ms timer-drift probe records a `host event-loop stall` root span whenever the DSH Host event loop was blocked past `eventLoopStallMs` (100 ms), at most 30 a minute. traces_stalls lists them with the spans that were open while each lasted, the work the stall fills most first, so a `sqlite lock wait`, an index pass or a tool call shows as the owner without a live CPU profile.",
+      "surfaces": ["host", "tool"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: probe; agent tool traces_stalls",
+      "configuration": [
+        {
+          "key": "eventLoopStallMs",
+          "defaultValue": "100",
+          "constraints": "0 to 10,000 ms; 0 stops the probe. The probe costs about 0.6 ms of CPU per second.",
+          "coveredBy": ["traces.stall-span", "traces.stall-off"]
+        }
+      ],
+      "states": ["probing", "off", "rate-limited"],
+      "failureModes": [
+        "A stall shorter than threshold + 100 ms can be missed when it starts early in a probe interval; the span's length is a lower bound.",
+        "Past 30 stalls a minute the rest are counted on the next span (host.event_loop.stalls_dropped) instead of recorded."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "traces.stall-browser-journey",
+          "reason": "The feature has no screen: stalls are spans read through traces_stalls and the existing trace explorer. The probe, the span it records on a real blocked loop and the attribution query are unit-tested in stall-monitor.test.ts."
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.stall-detector",
+          "file": "plugins/@dshfiles/traces/src/stall-monitor.test.ts",
+          "testName": "reports a tick that arrives at least the threshold late, as a stall ending now"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.stall-rate-limit",
+          "file": "plugins/@dshfiles/traces/src/stall-monitor.test.ts",
+          "testName": "reports at most maxPerMinute stalls a minute and counts the dropped ones on the next"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.stall-span",
+          "file": "plugins/@dshfiles/traces/src/stall-monitor.test.ts",
+          "testName": "records a host event-loop stall span when the loop is blocked past the threshold"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.stall-off",
+          "file": "plugins/@dshfiles/traces/src/stall-monitor.test.ts",
+          "testName": "records nothing with the threshold at 0"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.stall-attribution",
+          "file": "plugins/@dshfiles/traces/src/stall-monitor.test.ts",
+          "testName": "lists a stall with the spans open during it, the one it fills most first, and leaves out spans outside it"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "host event-loop stall",
+          "file": "plugins/@dshfiles/traces/src/stall-monitor.test.ts",
+          "testName": "records a host event-loop stall span when the loop is blocked past the threshold"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "store-space",
+      "title": "Span store space and Reclaim",
+      "summary": "traces_store_space reports the span store's pages, free pages and auto_vacuum mode; traces_reclaim_space (confirm: true, only on a user's request) gives the free pages back and reports the bytes freed. A store created before incremental auto_vacuum is converted by that one VACUUM; it is never converted on its own.",
+      "surfaces": ["host", "storage", "tool"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "agent tools traces_store_space, traces_reclaim_space",
+      "configuration": [],
+      "states": ["incremental", "not-incremental", "reclaimed"],
+      "failureModes": [
+        "Without confirm: true the reclaim tool refuses to run.",
+        "On a store that is not incremental yet, reclaim blocks the Host for the VACUUM (3.4 s for a 62 MB copy of the live store)."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "traces.store-space-browser-journey",
+          "reason": "The feature has no screen yet: it is two agent tools over the span store. The confirm gate is tested in api-tools.test.ts and the reclaim itself on real files in sqlite-store space.test.ts."
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.reclaim-confirm",
+          "file": "plugins/@dshfiles/traces/src/api-tools.test.ts",
+          "testName": "reclaim refuses to run without an explicit confirm"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.reclaim-store",
+          "file": "plugins/@dshfiles/sqlite-store/src/space.test.ts",
+          "testName": "reclaim converts an existing file with one VACUUM and reports the bytes freed"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

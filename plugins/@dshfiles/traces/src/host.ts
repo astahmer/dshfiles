@@ -19,6 +19,7 @@ import { dialableEndpoint, LocalEndpointLive, ThreadAttentionLive } from './host
 import { OtlpIngest } from './otlp-ingest.js'
 import { Receiver } from './receiver.js'
 import { tracesSettings, TracesSettingsService } from './settings.js'
+import { EventLoopStallMonitor } from './stall-monitor.js'
 import { TraceDb, TraceRepo } from './trace-repo.js'
 import type { Exporters } from './types.js'
 import { AlertWorker, RetentionWorker } from './workers.js'
@@ -41,7 +42,13 @@ const Storage = Layer.unwrap(
 
 const ReceiverLive = Receiver.layer.pipe(Layer.provide(Layer.mergeAll(OtlpIngest.layer, Forwarder.layer.pipe(Layer.provide(FetchHttpClient.layer)))))
 
-const TracesLive = Layer.mergeAll(RetentionWorker, AlertWorker, LocalEndpointLive, AlertAttention.layer.pipe(Layer.provide(HostApis.layer))).pipe(
+const TracesLive = Layer.mergeAll(
+  RetentionWorker,
+  AlertWorker,
+  EventLoopStallMonitor.layer,
+  LocalEndpointLive,
+  AlertAttention.layer.pipe(Layer.provide(HostApis.layer)),
+).pipe(
   Layer.provideMerge(Layer.mergeAll(ReceiverLive, AlertEngine.layer.pipe(Layer.provide(ThreadAttentionLive)))),
   Layer.provideMerge(Layer.mergeAll(TraceRepo.layer, AlertRepo.layer).pipe(Layer.provide(Storage))),
   Layer.provideMerge(Settings.layer(tracesSettings)),
@@ -108,6 +115,20 @@ export default DshxPlugin.make({
         untraced(TraceRepo.use(repo => repo.metricSeries({ name: input.name, service: input.service, windowMinutes: input.windowMinutes ?? 60 }))),
       serviceMap: input => untraced(TraceRepo.use(repo => repo.serviceMap({ windowMinutes: input.windowMinutes ?? 60 }))),
       sessionSummary: input => untraced(TraceRepo.use(repo => repo.sessionSummary(input.sessionId))),
+      stalls: input =>
+        untraced(
+          TraceRepo.use(repo => Effect.map(repo.stalls({ windowMinutes: input.windowMinutes ?? 60, limit: input.limit ?? 20 }), stalls => ({ stalls }))),
+        ),
+      storeSpace: () =>
+        untraced(
+          TraceRepo.use(repo =>
+            Effect.map(repo.space(), space => ({
+              space,
+              reclaimMethod: space.autoVacuum === 'incremental' ? ('incremental-vacuum' as const) : ('vacuum' as const),
+            })),
+          ),
+        ),
+      reclaimSpace: () => untraced(TraceRepo.use(repo => repo.reclaimSpace())),
       clear: () => untraced(TraceRepo.use(repo => repo.clear())),
     }),
     Api.bind(tracesAlertsApi, {

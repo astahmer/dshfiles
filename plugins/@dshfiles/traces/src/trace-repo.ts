@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { SqliteStore } from '@dshfiles/sqlite-store'
+import { SqliteStore, type SqliteReclaimResult, type SqliteSpace } from '@dshfiles/sqlite-store'
 import { Clock, Context, Effect, Layer, Ref, Schema } from 'effect'
 import { SqlClient, SqlSchema, type Statement } from 'effect/sql'
 import { orDieOnStorage } from './storage-failure.js'
@@ -11,6 +11,8 @@ import {
   attributeValueSchema,
   type AttributeValue,
   type ErrorGroup,
+  EVENT_LOOP_STALL_SPAN,
+  type EventLoopStallView,
   type LogList,
   type MetricSeries,
   type MetricSummary,
@@ -372,6 +374,31 @@ const spanSampleRow = Schema.Struct({
   group_value: Schema.NullOr(Schema.String),
   measure_value: Schema.Unknown,
 })
+const stallRow = Schema.Struct({
+  trace_id: Schema.String,
+  span_id: Schema.String,
+  service: Schema.String,
+  start_us: finiteNumber,
+  end_us: finiteNumber,
+  stall_ms: Schema.NullOr(finiteNumber),
+})
+const overlapRow = Schema.Struct({
+  trace_id: Schema.String,
+  span_id: Schema.String,
+  name: Schema.String,
+  service: Schema.String,
+  session_id: Schema.NullOr(Schema.String),
+  start_us: finiteNumber,
+  end_us: finiteNumber,
+})
+
+/** A stall is attributed to spans that started at most this long before it: the work that blocked, not the turn around it. */
+const STALL_OVERLAP_LOOKBACK_US = 10 * 60_000_000
+const MAX_STALL_CANDIDATES = 50
+const MAX_STALL_OVERLAPS = 8
+const stallBlame = (overlap: { readonly overlapMs: number; readonly durationMs: number }): number =>
+  overlap.durationMs <= 0 ? 0 : (overlap.overlapMs * overlap.overlapMs) / overlap.durationMs
+
 const storeSummaryRow = Schema.Struct({ traces: finiteNumber, oldest: Schema.NullOr(finiteNumber), newest: Schema.NullOr(finiteNumber) })
 
 const traceCursor = /^(\d{1,17}):([0-9a-f]{32})$/
@@ -1093,6 +1120,63 @@ const make = Effect.gen(function* () {
     } satisfies SpanSamples
   }, orDieOnStorage)
 
+  const stallSpans = SqlSchema.findAll({
+    Request: Schema.Struct({ sinceUs: finiteNumber, limit: Schema.Int }),
+    Result: stallRow,
+    execute: request =>
+      sql`SELECT trace_id, span_id, service, start_us, end_us, ${attribute('host.event_loop.stall_ms')} AS stall_ms
+         FROM spans s WHERE s.name = ${EVENT_LOOP_STALL_SPAN} AND s.start_us >= ${request.sinceUs} ORDER BY s.start_us DESC LIMIT ${request.limit}`,
+  })
+
+  const overlappingSpans = SqlSchema.findAll({
+    Request: Schema.Struct({ startUs: finiteNumber, endUs: finiteNumber }),
+    Result: overlapRow,
+    execute: window =>
+      sql`SELECT trace_id, span_id, name, service, session_id, start_us, end_us FROM spans
+         WHERE start_us >= ${window.startUs - STALL_OVERLAP_LOOKBACK_US} AND start_us < ${window.endUs} AND end_us > ${window.startUs}
+           AND name <> ${EVENT_LOOP_STALL_SPAN}
+         ORDER BY end_us - start_us LIMIT ${MAX_STALL_CANDIDATES}`,
+  })
+
+  /**
+   * Host event-loop stalls, newest first, each with the spans that were open while it lasted, ranked by overlap × the
+   * share of the span the stall fills (overlap² / duration): the work that blocked ranks above the turn and tool spans
+   * that merely contain it.
+   */
+  const stalls = Effect.fn('trace repo stalls')(function* (query: { readonly windowMinutes: number; readonly limit: number }) {
+    const sinceUs = ((yield* Clock.currentTimeMillis) - query.windowMinutes * 60_000) * 1000
+    const rows = yield* stallSpans({ sinceUs, limit: query.limit })
+    return yield* Effect.forEach(rows, row =>
+      Effect.map(overlappingSpans({ startUs: row.start_us, endUs: row.end_us }), candidates => ({
+        traceId: row.trace_id,
+        spanId: row.span_id,
+        service: row.service,
+        startMs: usToMs(row.start_us),
+        stallMs: row.stall_ms ?? usToMs(row.end_us - row.start_us),
+        overlapping: candidates
+          .map(candidate => ({
+            traceId: candidate.trace_id,
+            spanId: candidate.span_id,
+            name: candidate.name,
+            service: candidate.service,
+            sessionId: candidate.session_id,
+            durationMs: usToMs(candidate.end_us - candidate.start_us),
+            overlapMs: usToMs(Math.min(candidate.end_us, row.end_us) - Math.max(candidate.start_us, row.start_us)),
+          }))
+          .sort((left, right) => stallBlame(right) - stallBlame(left))
+          .slice(0, MAX_STALL_OVERLAPS),
+      })),
+    ) satisfies Effect.Effect<EventLoopStallView[], unknown>
+  }, orDieOnStorage)
+
+  const space = Effect.fn('trace repo space')(function* () {
+    return yield* SqliteStore.space(sql)
+  }, orDieOnStorage)
+
+  const reclaimSpace = Effect.fn('trace repo reclaim space')(function* () {
+    return yield* SqliteStore.reclaim(sql)
+  }, orDieOnStorage)
+
   const summaryRow = SqlSchema.findOne({
     Request: Schema.Void,
     Result: storeSummaryRow,
@@ -1150,6 +1234,9 @@ const make = Effect.gen(function* () {
     listMetrics,
     metricSeries,
     spanSamples,
+    stalls,
+    space,
+    reclaimSpace,
     summary,
     clear,
   })
@@ -1181,6 +1268,9 @@ export class TraceRepo extends Context.Service<
       readonly windowMinutes: number
     }) => Effect.Effect<MetricSeries, MetricNotFound>
     readonly spanSamples: (query: SpanSampleQuery) => Effect.Effect<SpanSamples>
+    readonly stalls: (query: { readonly windowMinutes: number; readonly limit: number }) => Effect.Effect<EventLoopStallView[]>
+    readonly space: () => Effect.Effect<SqliteSpace>
+    readonly reclaimSpace: () => Effect.Effect<SqliteReclaimResult>
     readonly summary: () => Effect.Effect<StoreSummary>
     readonly clear: () => Effect.Effect<ClearResult>
   }

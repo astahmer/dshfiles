@@ -37,6 +37,12 @@ export const tracesSettings = defineSettings({
       .max(2_000_000)
       .default(60_000)
       .description('Keep at most this many metric data points; the oldest go first.'),
+    eventLoopStallMs: Schema.natural()
+      .max(10_000)
+      .default(100)
+      .description(
+        'Record a "host event-loop stall" span whenever the DSH Host event loop is blocked at least this many milliseconds (a 100 ms probe, about 0.6 ms of CPU per second). 0 turns the probe off.',
+      ),
   }),
   applies: 'live',
 })

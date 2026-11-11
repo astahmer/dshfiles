@@ -170,19 +170,20 @@ without the attribute (older spans, other senders) shows no cost rather than $0.
 
 ## Settings (`dshfiles-traces`)
 
-| Setting                 | Default     | Effect                                                                                                                                  |
-| ----------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`                  | `plugin`    | `plugin`: the receiver owns the port. `external`: receiver off, another viewer owns it. `both`: store here and forward to `forwardUrl`. |
-| `host`                  | `127.0.0.1` | Listen address.                                                                                                                         |
-| `allowNonLoopback`      | `false`     | A non-loopback `host` is refused unless this is on.                                                                                     |
-| `port`                  | `4318`      | OTLP/HTTP port; `0` picks a free one (the panel shows it).                                                                              |
-| `forwardUrl`            | empty       | `both` mode: the external viewer's OTLP base URL, e.g. `http://127.0.0.1:4319`. The raw body is forwarded to `/v1/<signal>`.            |
-| `externalViewerUrl`     | empty       | Linked from the panel in `external` and `both` modes, e.g. `http://127.0.0.1:8000` for otel-desktop-viewer.                             |
-| `redactGenAiContent`    | `true`      | Store GenAI message, prompt and tool-payload attributes as `[redacted: N chars]`. The span panel says when a value was redacted.        |
-| `retentionHours`        | `72`        | Drop telemetry received longer ago.                                                                                                     |
-| `retentionSpans`        | `100000`    | Keep at most this many spans; whole traces drop, oldest first.                                                                          |
-| `retentionLogs`         | `100000`    | Keep at most this many log records, oldest first.                                                                                       |
-| `retentionMetricPoints` | `200000`    | Keep at most this many metric data points, oldest first.                                                                                |
+| Setting                 | Default     | Effect                                                                                                                                                     |
+| ----------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`                  | `plugin`    | `plugin`: the receiver owns the port. `external`: receiver off, another viewer owns it. `both`: store here and forward to `forwardUrl`.                    |
+| `host`                  | `127.0.0.1` | Listen address.                                                                                                                                            |
+| `allowNonLoopback`      | `false`     | A non-loopback `host` is refused unless this is on.                                                                                                        |
+| `port`                  | `4318`      | OTLP/HTTP port; `0` picks a free one (the panel shows it).                                                                                                 |
+| `forwardUrl`            | empty       | `both` mode: the external viewer's OTLP base URL, e.g. `http://127.0.0.1:4319`. The raw body is forwarded to `/v1/<signal>`.                               |
+| `externalViewerUrl`     | empty       | Linked from the panel in `external` and `both` modes, e.g. `http://127.0.0.1:8000` for otel-desktop-viewer.                                                |
+| `redactGenAiContent`    | `true`      | Store GenAI message, prompt and tool-payload attributes as `[redacted: N chars]`. The span panel says when a value was redacted.                           |
+| `retentionHours`        | `72`        | Drop telemetry received longer ago.                                                                                                                        |
+| `retentionSpans`        | `100000`    | Keep at most this many spans; whole traces drop, oldest first.                                                                                             |
+| `retentionLogs`         | `100000`    | Keep at most this many log records, oldest first.                                                                                                          |
+| `retentionMetricPoints` | `200000`    | Keep at most this many metric data points, oldest first.                                                                                                   |
+| `eventLoopStallMs`      | `100`       | Record a `host event-loop stall` span when the Host loop was blocked at least this long; `0` stops the probe. See [Event-loop stalls](#event-loop-stalls). |
 
 Settings apply live: changing `mode`, `host` or `port` restarts the receiver without a Host restart.
 
@@ -195,7 +196,7 @@ How the modes map to `OTEL_EXPORTER_OTLP_ENDPOINT`:
 ## Agent tools
 
 Every read the panel makes is a read-only tool; the destructive verbs (`traces_clear`, `traces_alert_delete`) need an
-explicit opt-in.
+explicit opt-in, and so does `traces_reclaim_space`, which can block the Host for seconds.
 
 | Tool                     | What it returns                                                                                                                               |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -216,6 +217,41 @@ explicit opt-in.
 | `traces_alert_delete`    | Removes a rule (a firing one resolves); requires `confirm: true`.                                                                             |
 | `traces_alerts_evaluate` | Evaluates every enabled rule now; only when the user asked.                                                                                   |
 | `traces_breakdown`       | Groups a window's spans by service, span name or an attribute with count, error rate, percentiles and one measure.                            |
+| `traces_stalls`          | Host event-loop stalls newest first, each with the spans open while it lasted, the work it fills most first.                                  |
+| `traces_store_space`     | The span store's pages, free pages, `auto_vacuum` mode and how a reclaim would run.                                                           |
+| `traces_reclaim_space`   | Gives the store's free pages back and reports the bytes freed; requires `confirm: true`. See [Store space](#store-space).                     |
+
+## Event-loop stalls
+
+The Host half runs a timer-drift probe: a 100 ms `setInterval` (unref'd) that measures how late each tick arrives. A
+tick at least `eventLoopStallMs` late (default 100 ms) means the loop was blocked that long, ending now; it becomes a
+root span `host event-loop stall` timed from the probe's clock, with `host.event_loop.stall_ms`,
+`host.event_loop.threshold_ms`, `host.event_loop.probe_interval_ms` and, after a burst, `host.event_loop.stalls_dropped`.
+At most 30 are recorded a minute.
+
+- **Cost.** Measured on an idle Node 22.23 process over 8 s: no probe 0.09 ms CPU per second, this 100 ms probe
+  0.69 ms/s (+0.6), a 50 ms probe 1.27 ms/s, a 20 ms probe 2.40 ms/s, `monitorEventLoopDelay({ resolution: 20 })` with
+  a 1 s poll 1.16 ms/s. Only the 100 ms timer stays under 1 ms/s, so it is a timer, not the histogram.
+- **What it catches.** Every stall of `threshold + 100` ms or more; a shorter one only when it starts late in a tick.
+  The span's length is a lower bound.
+- **Attribution.** Spans arrive when they end, so the probe cannot see what was open. `traces_stalls` asks the store
+  instead: for each stall, the spans that overlapped it (started at most 10 minutes before), ranked by
+  overlap² / duration, so the span the stall fills (a `sqlite lock wait`, `usage index`, a tool call) ranks above the
+  turn that merely contains it. Stalls also show in `traces_search` with `operation: 'host event-loop stall'`.
+- **SQLite lock waits** come from `@dshfiles/sqlite-store`: a `sqlite lock wait` span for a transaction that waited at
+  least 50 ms to start, with `db.namespace` (the file name) and `db.sqlite.lock_wait_ms`.
+
+## Store space
+
+New span stores are created with `auto_vacuum = INCREMENTAL` and `@dshfiles/sqlite-store` returns up to 32 free pages
+every 5 minutes. A store created before that keeps `auto_vacuum = NONE`: retention deletes leave free pages that later
+inserts reuse but the file never shrinks. Measured on a copy of a live store (2026-11-11): 15,786 pages of 4 KiB,
+3,585 free (14.7 MB of 64.7 MB).
+
+`traces_store_space` reports the mode and free pages. `traces_reclaim_space { confirm: true }`, run only on a user's
+request, gives them back: on an incremental store an `incremental_vacuum` (2.4 s for 27 MB free on that copy), on an
+older one a single `auto_vacuum = INCREMENTAL; VACUUM` that converts it (3.4 s on that copy, 64.7 → 41.5 MB, 23.2 MB
+freed). The Host is blocked for that time, so it never runs on its own. The alerts store (116 KB) is not included.
 
 ## Decisions
 
