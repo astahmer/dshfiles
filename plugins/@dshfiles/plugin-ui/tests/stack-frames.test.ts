@@ -166,4 +166,32 @@ describe('StackFrames.extract', () => {
     expect(StackFrames.extract('listening at http://localhost:3000')).toBeUndefined()
     expect(StackFrames.extract('see:\n    at helper (docs/a.md:3)')).toBeUndefined()
   })
+
+  test('ignores grep -c and scoped-package paths that look like Gecko frames', () => {
+    expect(
+      StackFrames.extract(
+        ['plugins/@dshfiles/hmr-gate/src/host.ts:0', 'plugins/@dshfiles/hmr-gate/src/gate.ts:0', 'plugins/@dshfiles/hmr-gate/tests/gate.test.ts:0'].join('\n'),
+      ),
+    ).toBeUndefined()
+    expect(
+      StackFrames.extract(['node_modules/@effect/vitest/dist/index.js:2', 'node_modules/@effect/platform/dist/http.js:14', 'git@github.com:22'].join('\n')),
+    ).toBeUndefined()
+  })
+
+  test('keeps a real Node crash whose paths hold a scoped package', () => {
+    const report = StackFrames.extract(
+      [
+        'Error: Pack plugin pulls-review is not in the onboarding feature catalog',
+        '    at description (/repo/plugins/@dshfiles/onboarding/scripts/pack-docs.ts:31:11)',
+        '    at renderPack (/repo/plugins/@dshfiles/onboarding/scripts/pack-docs.ts:91:3)',
+        '    at Array.map (<anonymous>)',
+        '    at pages (/repo/plugins/@dshfiles/onboarding/scripts/pack-docs.ts:129:5)',
+      ].join('\n'),
+    )
+    expect(report?.frames.map(frame => [frame.name, frame.file, frame.line])).toEqual([
+      ['description', 'pack-docs.ts', 31],
+      ['renderPack', 'pack-docs.ts', 91],
+      ['pages', 'pack-docs.ts', 129],
+    ])
+  })
 })
