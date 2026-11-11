@@ -9,14 +9,19 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { parseSecretReference } from '@dshfiles/credential-port'
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
 import { DshxPlugin, HostContext, hostService } from '@dshfiles/dshx/effect'
-import { Context, Effect, Layer, Option, Queue, Schema, type Scope, Stream } from 'effect'
+import { Context, Duration, Effect, Layer, Option, Queue, Schedule, Schema, type Scope, Stream } from 'effect'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { configSchema, type ManagerConfig } from './config.js'
 import { ClientStartFailed, CredentialStoreFailed, ExecutableUnresolved, ManagerConfigUnavailable } from './errors.js'
 import { oauthGrantSchema, type OAuthGrant } from './oauth.js'
 import { redactingLogger } from './redaction.js'
+import * as statelessMcpClient from './stateless-bridge.js'
+import type { StatelessCall } from './stateless-bridge.js'
+import { StatelessMcp } from './stateless-client.js'
+import type { JsonRecord } from './stateless-protocol.js'
 
 const ENTRY_ID = 'mcp-servers'
+const LIST_RETRY = Schedule.exponential('500 millis')
 const PACKAGE_NAME = '@dshfiles/mcp-servers'
 
 const decodeConfig = Schema.decodeUnknownEffect(configSchema)
@@ -190,12 +195,52 @@ export class McpHost extends Context.Service<
         )
       }
 
+      const stateless = yield* StatelessMcp
+
+      /** A Streamable HTTP server that answers `server/discover` with 2026-07-28 runs statelessly; anything else stays native. */
+      const attachStateless = Effect.fnUntraced(function* (input: {
+        readonly id: string
+        readonly config: Extract<NativeMcpConfig, { transport: 'streamable-http' }>
+        readonly logger: typeof host.ctx.logger
+      }) {
+        const endpoint = { url: input.config.url, headers: input.config.headers }
+        const outcome = yield* stateless.probe(endpoint)
+        if (outcome.kind !== 'modern') {
+          if (outcome.kind === 'incompatible')
+            input.logger.warn('MCP server %s: %s; trying the 2025-11-25 initialize handshake instead.', input.id, outcome.reason)
+          return false
+        }
+        const timeout = Duration.millis(input.config.toolCallTimeoutMs)
+        const call: StatelessCall = yield* DshxPlugin.callbackWithSignal((method: string, params: JsonRecord, extraHeaders: Readonly<Record<string, string>>) => {
+          const request = stateless.request({ endpoint, method, params, extraHeaders, timeout })
+          // Listing is idempotent, so a transient failure retries; a tool call is never replayed.
+          return method === 'tools/list' ? Effect.retry(request, { schedule: LIST_RETRY, times: 4 }) : request
+        })
+        yield* Effect.acquireRelease(
+          Effect.tryPromise({
+            try: () =>
+              host.ctx.extend({ logger: input.logger }).plugin(statelessMcpClient, {
+                serverName: input.config.serverName,
+                discovery: outcome.discovery,
+                call,
+                ...(input.config.maxInstructionBytes !== undefined && { maxInstructionBytes: input.config.maxInstructionBytes }),
+              }),
+            catch: cause => new ClientStartFailed({ id: input.id, cause }),
+          }).pipe(
+            Effect.tapError(error => Effect.sync(() => input.logger.warn('MCP server %s: stateless MCP client failed to start: %s', input.id, error.cause))),
+          ),
+          fiber => Effect.promise(() => fiber.dispose()).pipe(Effect.ignore),
+        )
+        return true
+      })
+
       const attachClient = Effect.fn('mcp server attach')(function* (input: {
         readonly id: string
         readonly config: NativeMcpConfig
         readonly redactions: ReadonlyArray<string>
       }) {
         const logger = redactingLogger(host.ctx.logger, input.redactions)
+        if (input.config.transport === 'streamable-http' && (yield* attachStateless({ id: input.id, config: input.config, logger }))) return
         yield* Effect.acquireRelease(
           Effect.tryPromise({
             try: () => host.ctx.extend({ logger }).plugin(nativeMcpClient, input.config),
@@ -247,5 +292,5 @@ export class McpHost extends Context.Service<
         referenceUpdates,
       })
     }),
-  ).pipe(Layer.provide(SecretReferenceResolver.layer))
+  ).pipe(Layer.provide(Layer.mergeAll(SecretReferenceResolver.layer, StatelessMcp.layer)))
 }

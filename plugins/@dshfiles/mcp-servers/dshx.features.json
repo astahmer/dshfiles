@@ -77,7 +77,8 @@
       "states": ["configured", "enabled", "connected", "disconnected", "failed", "health-unreported"],
       "failureModes": [
         "Malformed URL, inline credential, duplicate tool namespace, or invalid server identifier is rejected.",
-        "Client-loaded status never claims a native server health ping was performed."
+        "Client-loaded status never claims a native server health ping was performed.",
+        "A Streamable HTTP server that answers server/discover with MCP 2026-07-28 runs on the plugin's stateless client; a legacy or unreachable server falls back to the native 2025-11-25 initialize handshake, and a modern server without 2026-07-28 logs why before falling back."
       ],
       "externalDependencies": [
         {
@@ -101,6 +102,24 @@
           "kind": "gherkin",
           "id": "mcp-servers.preferences",
           "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.stateless-modern-tools",
+          "file": "plugins/@dshfiles/mcp-servers/src/stateless-client.test.ts",
+          "testName": "registers a modern server tools under native public names and calls them statelessly"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.stateless-legacy-fallback",
+          "file": "plugins/@dshfiles/mcp-servers/src/stateless-client.test.ts",
+          "testName": "falls back to the 2025-11-25 initialize handshake for a legacy server"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.stateless-era-detection",
+          "file": "plugins/@dshfiles/mcp-servers/src/stateless-protocol.test.ts",
+          "testName": "stays modern on a recognized modern error and falls back on anything else"
         }
       ],
       "telemetry": [
@@ -117,6 +136,12 @@
           "span": "mcp server start",
           "file": "plugins/@dshfiles/mcp-servers/src/mcp-spans.test.ts",
           "testName": "records an mcp server start span with the argument count, never argv or environment"
+        },
+        {
+          "kind": "custom",
+          "span": "mcp stateless request",
+          "file": "plugins/@dshfiles/mcp-servers/src/stateless-client.test.ts",
+          "testName": "records an mcp stateless request span with the method and status, never arguments or credentials"
         }
       ]
     },
