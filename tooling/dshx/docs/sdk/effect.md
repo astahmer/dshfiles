@@ -327,8 +327,6 @@ These are understood and deliberately open, not forgotten:
   vitest child; on the CI Linux runner that child exits mid-run, so the mount is skipped on CI while the unit file and
   the plugin boot gate still run there. Reproduce on a Linux runner and check whether executing an fff tool in a real
   Linux Host also kills the process.
-- The session-search index still opens its own `DatabaseSync`; moving it onto `@dshfiles/sqlite-store` needs a
-  copy-based proof on the multi-gigabyte live index.
 
 ## Reference plugins
 

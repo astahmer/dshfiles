@@ -16,7 +16,17 @@ The freeze, the baseline and the decisions behind this backend are in [Host loop
   core's own code. The search methods forward to a worker and never touch the index file from the Host.
 - **The worker owns the index.** `src/search-worker.ts` runs in a `worker_thread` with its own SQLite connection: no
   decode, parse, or FTS5 work happens on the Host's thread. Measured: 200 000 documents (~800 MB of text) indexed in a
-  worker cost the Host loop a worst gap of 109.5 ms and zero gaps over 250 ms.
+  worker cost the Host loop a worst gap of 109.5 ms and zero gaps over 250 ms. The connection comes from
+  `@dshfiles/sqlite-store` (`SqliteClient`, one serialized connection, WAL and the 32 MB log limit the plugin used to
+  set by hand), so `PRAGMA user_version` becomes the store's own `effect_sql_migrations` table and an existing index is
+  adopted without rewriting a row.
+- **A pass stages outside the transaction and commits a bounded group inside one.** File reads, frame decode and header
+  parsing happen before any write; sessions are staged until 64 of them, 250 ms or 8 MiB of document text, then one
+  `sql.withTransaction` re-reads each cursor (and the archived set) and writes the whole group. A stale cursor — a
+  targeted search or archive change landed while the pass was staging — is skipped instead of overwriting newer state,
+  and a failed write rolls back every session in the group.
+- **Searches never wait behind a transaction for long.** The single connection serializes, so the group bound is also
+  the longest a search can queue: one group of at most 64 sessions or 8 MiB, not a whole pass.
 - **Ingest is incremental and resumable.** A session log is a container of concatenated, checksummed Zstandard frames
   (one-shot decoding stops at the first frame — measured 208 bytes for a 26 MB log, which is why this plugin decodes
   frame by frame). Each pass stores a per-log cursor and decodes only appended frames, commits per session in bounded
@@ -71,6 +81,31 @@ also knows into a temporary root, so the live corpus is only read). Runs on 2026
 
 The ingest time above is measured with the machine otherwise idle-ish; under the load 20-40 of that day a first build
 takes minutes of wall clock in the worker, which is exactly the point: it is background work the Host never waits on.
+
+### Copy-based index check (2026-11-11)
+
+`DatabaseSync` → `@dshfiles/sqlite-store` was proved on a copy, never the live file: a read-only SQLite online backup of
+`plugins/session-search/index.sqlite` (346 MiB including its WAL) into private scratch, then a fresh copy per run. The
+corpus is 120 frozen session logs (36.3 MiB) the backup already indexed, so each run re-indexes them by replacement
+(the copied inode differs), 121 batches and 25,214 documents. Queries are the real `SearchIndex.searchSessions` over
+five terms, unfiltered and conversation-filtered, 5 warm-up requests then 10 rounds (100 samples), and every response
+digest matched the pre-migration one. Node 22.23.3; the machine carried load 27–37 on 10 CPUs from unrelated work, so
+CPU time is reported beside wall time.
+
+| Signal                                            | Before (`DatabaseSync`) | After (`SqliteStore`) |
+| ------------------------------------------------- | ----------------------- | --------------------- |
+| Replacement ingest, wall                          | 6.39 s                  | 5.92 s                |
+| Replacement ingest, process CPU                   | 5.11 s                  | 5.42 s                |
+| Replacement ingest throughput                     | 3,946 docs/s            | 4,259 docs/s          |
+| Search p50 / p95                                  | 10.7 / 24.7 ms          | 10.0 / 21.7 ms        |
+| Search p50 / p95 (second pair, load 36)           | 10.4 / 30.5 ms          | 9.9 / 22.6 ms         |
+| Response digests over the 10 requests             | baseline                | identical             |
+
+A naive first port — one statement per document and one delete per mapped rowid — cost 3.7× the CPU and 3–7× the wall
+time of `DatabaseSync`. The write path now batches 100 documents per `INSERT ... VALUES`, derives contiguous FTS5
+rowids from `last_insert_rowid()`, writes the rowid map and conversation rows with multi-row inserts, and deletes a
+replaced session's documents in 100-rowid chunks. That is what brings ingest back to parity; the numbers above are that
+version.
 One 300 MB round at load 20-27 recorded two Host gaps of ~306 ms and search p50 236 ms while the worker was saturated,
 so the 250 ms budget holds on quiet rounds and is only marginally exceeded under extreme load.
 The bench deliberately polls at 1 s because the worker is single-threaded: a per-150 ms poll competes with the ingest

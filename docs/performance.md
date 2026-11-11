@@ -1288,3 +1288,42 @@ reconnect.
 real history; the lever here is instance and follow-stream count, not bytes: the default held 5 thread views for 14
 visited threads instead of 14. Real history makes each resident Session cost its transcript window, which is what the
 ~20-instance tab was holding. A live-tab after-number still needs the canonical build and a user restart.
+
+## Session-search index on `sqlite-store` (2026-11-11, copied live index)
+
+The search worker opened its own `DatabaseSync` connection. It now builds on `@dshfiles/sqlite-store`
+(`SqliteClient`), and the ingest pass is an Effect program: `runIngestPass` / `indexSessions` stage file reads,
+frame decode and headers outside any transaction, then write a bounded group (64 sessions, 250 ms, or 8 MiB of
+document text) inside one `sql.withTransaction`. Each commit re-reads the staged sessions' cursors and the archived
+set, so a targeted search or archive change that landed during staging is skipped instead of overwritten. A search
+queues behind at most one group, not a whole pass, and a failing group rolls back every session and FTS row in it
+(`tests/ingest.spec.ts`).
+
+Proof used a copy, never the live file. A read-only SQLite online backup of `plugins/session-search/index.sqlite`
+and its WAL (346 MiB) went to private scratch, and every run copied it again. The corpus was 120 frozen session logs
+(36.3 MiB) the backup already indexed, so each run re-indexed by replacement (copied inode differs): 121 batches,
+25,214 documents, until a pass reported no backlog. Queries were the real `SearchIndex.searchSessions` over five
+terms — unfiltered and conversation-filtered — with one warm-up each, then 10 rounds (100 samples). Every response
+digest matched the pre-migration digests. Node 22.23.3; load was 27–62 on 10 CPUs from unrelated work, so process
+CPU and same-round pairs are the meaningful figures, not wall time across rounds.
+
+| Signal                                       | Before (`DatabaseSync`) | After (`SqliteStore`) |
+| -------------------------------------------- | ----------------------- | --------------------- |
+| Replacement ingest, wall                     | 6.39 s                  | 5.92 s                |
+| Replacement ingest, process CPU              | 5.11 s                  | 5.42 s                |
+| Replacement ingest throughput                | 3,946 docs/s            | 4,259 docs/s          |
+| Search p50 / p95                              | 10.7 / 24.7 ms          | 10.0 / 21.7 ms        |
+| Search p50 / p95 (second pair)               | 10.4 / 30.5 ms          | 9.9 / 22.6 ms         |
+| Response digests, 10 fixed requests          | baseline                | identical             |
+
+The first port was not at parity: one SQL statement per document and one delete per mapped rowid cost 3.7× the CPU
+(28 s vs 7.5 s of process CPU) and 3–7× the wall time. Batching the FTS5 inserts (100 documents per statement),
+deriving contiguous rowids from `last_insert_rowid()`, writing the rowid map and conversation rows as multi-row
+inserts, and deleting a replaced session's documents in 100-rowid chunks removed that overhead. The table above is
+the batched version. Query latency is essentially unchanged because search SQL is untouched; the remaining CPU
+difference is the Effect SQL statement layer, ~0.3 s over 25,214 documents.
+
+Reproduce with the scratch harnesses recorded beside the backup (private paths): the ingest harness runs
+`runIngestPass` over the frozen corpus against a fresh copy, and the query harness opens the copy through the same
+`SqliteStore.layer` and asserts the stored digests. The plugin suite remains the gate:
+`pnpm --dir plugins/@dshfiles/session-search test`.
