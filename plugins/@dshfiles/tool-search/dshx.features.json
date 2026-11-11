@@ -33,6 +33,12 @@
           "defaultValue": "512",
           "constraints": "Integer from 1 to 4096.",
           "coveredBy": ["tool-search.ranking-limits-and-patterns"]
+        },
+        {
+          "key": "announceToolChanges",
+          "defaultValue": "true",
+          "constraints": "When the global tool set changes mid-Session, the next step gets one reminder naming only the added tools (with a one-sentence description) and the removed names; false sends nothing.",
+          "coveredBy": ["tool-search.tool-set-delta", "tool-search.cache-safe-fixed-list"]
         }
       ],
       "states": ["deferred", "loaded", "unavailable"],
@@ -54,6 +60,18 @@
           "id": "tool-search.cache-safe-proxy",
           "file": "plugins/@dshfiles/tool-search/src/cache-safe.integration.test.ts",
           "testName": "returns schemas in the search result and keeps the declared tools identical across the Session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.tool-set-delta",
+          "file": "plugins/@dshfiles/tool-search/src/tool-set-delta.test.ts",
+          "testName": "diffs names in order and renders only the change"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.cache-safe-fixed-list",
+          "file": "plugins/@dshfiles/tool-search/src/cache-safe.integration.test.ts",
+          "testName": "keeps the declared tool list fixed in cache-safe mode when an always-visible tool appears mid-Session"
         },
         {
           "kind": "unit-test",

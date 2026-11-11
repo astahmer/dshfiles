@@ -7,7 +7,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
-import { ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools'
+import { ToolRuntime, defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
 import toolSearch from './host.js'
 
@@ -17,12 +17,16 @@ interface ObservedRequest {
   readonly tools: string
   readonly toolNames: readonly string[]
   readonly lastMessage: string
+  readonly messages: string
 }
 
 class ScriptedAdapter extends LlmAdapter {
   readonly requests: ObservedRequest[] = []
 
-  constructor(private readonly steps: readonly Step[]) {
+  constructor(
+    private readonly steps: readonly Step[],
+    private readonly onRequest: (index: number) => void = () => undefined,
+  ) {
     super()
   }
 
@@ -32,7 +36,9 @@ class ScriptedAdapter extends LlmAdapter {
       tools: JSON.stringify(tools),
       toolNames: tools.map(tool => tool.name).sort(),
       lastMessage: JSON.stringify(options.messages.at(-1) ?? null),
+      messages: JSON.stringify(options.messages),
     })
+    this.onRequest(this.requests.length - 1)
     const step = this.steps[this.requests.length - 1] ?? { text: 'Done.' }
     if ('text' in step) {
       yield { type: 'block-start', index: 0, blockType: 'text' }
@@ -50,7 +56,12 @@ class ScriptedAdapter extends LlmAdapter {
   }
 }
 
-const runCacheSafe = async (input: { readonly steps: readonly Step[]; readonly denyTool?: string }) => {
+const runCacheSafe = async (input: {
+  readonly steps: readonly Step[]
+  readonly denyTool?: string
+  readonly config?: { readonly mode: 'cache-safe' | 'progressive'; readonly alwaysVisible: readonly string[] }
+  readonly onRequest?: (index: number, ctx: Context) => void
+}) => {
   const ctx = new Context()
   const writes: { path: string; contents: string }[] = []
   const purges: string[] = []
@@ -99,9 +110,9 @@ const runCacheSafe = async (input: { readonly steps: readonly Step[]; readonly d
       ctx.on('tools/pre-execute', (exec, next) => (exec.name === denied ? Promise.resolve({ kind: 'deny', reason: `policy refuses ${denied}` }) : next()))
     }
     if (toolSearch.setup === undefined) throw new Error('Tool-search Host setup is missing')
-    await ctx.plugin({ ...toolSearch, apply: toolSearch.setup }, { mode: 'cache-safe', alwaysVisible: [] })
+    await ctx.plugin({ ...toolSearch, apply: toolSearch.setup }, { mode: 'cache-safe', alwaysVisible: [], ...input.config })
 
-    const adapter = new ScriptedAdapter(input.steps)
+    const adapter = new ScriptedAdapter(input.steps, index => input.onRequest?.(index, ctx))
     ctx.llm.registerAdapter(['cache-safe-test'], adapter)
     const handle = await ctx.agents.create({
       sessionId: SessionId(`tool-search-cache-safe-${Date.now()}`),
@@ -182,5 +193,58 @@ describe('tool-search cache-safe mode', () => {
 
     expect(result.requests[1]?.lastMessage).toContain('Find it with tool_search first')
     expect(result.requests[2]?.lastMessage).toContain('tool_call cannot call tool_search')
+  })
+})
+
+const midSessionTool = (name: string, description: string): ToolDefinition => ({
+  name,
+  description,
+  parameters: { type: 'object', properties: {}, additionalProperties: false },
+  output: { schema: { type: 'object' }, render: () => [{ type: 'text', text: 'ok' }] },
+  execute: async () => ({}),
+})
+
+/** Request 0 adds two global tools, request 1 removes one of them: the shape of an MCP server's tool list changing. */
+const runToolSetChange = (mode: 'cache-safe' | 'progressive') => {
+  let removeDeploy: (() => void) | undefined
+  return runCacheSafe({
+    config: { mode, alwaysVisible: ['job_*'] },
+    steps: [{ call: 'write_file', args: writeArgs }, { call: 'write_file', args: writeArgs }, { text: 'Done.' }],
+    onRequest: (index, ctx) => {
+      if (index === 0) {
+        removeDeploy = ctx.tools.register(midSessionTool('deploy_preview', 'Deploy a preview build of the current branch. Run only when the user asked.'))
+        ctx.tools.register(midSessionTool('job_audit', 'Audit background jobs.'))
+      }
+      if (index === 1) removeDeploy?.()
+    },
+  })
+}
+
+describe('tool-search mid-Session tool set changes', () => {
+  it.each(['cache-safe', 'progressive'] as const)('tells a %s agent only what was added or removed', async mode => {
+    const result = await runToolSetChange(mode)
+
+    const [, afterAdd, afterRemove] = result.requests
+    expect(afterAdd?.lastMessage).toContain('deploy_preview: Deploy a preview build of the current branch.')
+    expect(afterAdd?.lastMessage).toContain('job_audit: Audit background jobs.')
+    expect(afterAdd?.lastMessage).not.toContain('Run only when the user asked')
+    expect(afterAdd?.lastMessage).not.toContain('write_file')
+    expect(afterAdd?.lastMessage).not.toContain('purge_cache')
+    expect(afterRemove?.lastMessage).toContain('Removed: deploy_preview')
+    expect(afterRemove?.lastMessage).not.toContain('job_audit')
+    expect(afterRemove?.messages.split('Audit background jobs.').length).toBe(2)
+  })
+
+  it('sends no notice while the tool set is unchanged', async () => {
+    const result = await runCacheSafe({ steps: [{ call: 'write_file', args: writeArgs }, { text: 'Saved.' }] })
+
+    expect(result.requests.some(request => request.messages.includes('tool set changed'))).toBe(false)
+  })
+
+  it('keeps the declared tool list fixed in cache-safe mode when an always-visible tool appears mid-Session', async () => {
+    const result = await runToolSetChange('cache-safe')
+
+    expect(result.requests[0]?.toolNames).toEqual(['tool_call', 'tool_search'])
+    expect(new Set(result.requests.map(request => request.tools)).size).toBe(1)
   })
 })

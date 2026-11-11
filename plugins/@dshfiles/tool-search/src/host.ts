@@ -1,5 +1,5 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { ToolSchema } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, type ToolSchema, type UserMessage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { DshxPlugin, HostContext, HostEvents, Tool } from '@dshfiles/dshx/effect'
@@ -7,6 +7,15 @@ import { Context, Effect, Exit, Layer, Ref, Schema, Scope } from 'effect'
 import { serializedSchemaBytes } from './schema-measurement.js'
 import { ToolSearchModel } from './search.js'
 import { TOOL_CALL_NAME, toolCallDefinition } from './tool-call.js'
+import { ToolSetDeltaModel } from './tool-set-delta.js'
+
+const TOOL_SET_SOURCE = 'dshfiles-tool-search'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'dshfiles-tool-search': { readonly kind: 'dshfiles-tool-search'; readonly form: 'tool-set-delta' }
+  }
+}
 
 /** The native core tools an agent needs on its first step; agent-plane registrations stay visible regardless. */
 const nativeCoreTools = [
@@ -40,7 +49,14 @@ const nativeCoreTools = [
   'compaction_threshold',
 ]
 const modeSchema = Schema.Literals(['cache-safe', 'progressive'])
-const defaultConfig = { mode: 'cache-safe' as const, alwaysVisible: nativeCoreTools, maxResults: 5, maxQueryChars: 512, reportSchemaMetrics: false }
+const defaultConfig = {
+  mode: 'cache-safe' as const,
+  alwaysVisible: nativeCoreTools,
+  maxResults: 5,
+  maxQueryChars: 512,
+  reportSchemaMetrics: false,
+  announceToolChanges: true,
+}
 const configSchema = Schema.Struct({
   mode: modeSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('cache-safe' as const))),
   alwaysVisible: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(nativeCoreTools))),
@@ -51,6 +67,7 @@ const configSchema = Schema.Struct({
     Schema.withDecodingDefaultKey(Effect.succeed(512)),
   ),
   reportSchemaMetrics: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  announceToolChanges: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true))),
 }).pipe(Schema.withDecodingDefault(Effect.succeed(defaultConfig)))
 
 type ToolSearchConfig = typeof configSchema.Type
@@ -100,6 +117,11 @@ interface AgentState {
   readonly shadowedNames: ReadonlySet<string>
   readonly selectedNames: Set<string>
   readonly admitFutureGlobalTools: boolean
+  /** Cache-safe only: the global names the request declares, fixed at attachment so the tool list never changes. */
+  readonly declaredNames: ReadonlySet<string>
+  /** The reachable catalog (name → description) the model was last told about. */
+  announced: ReadonlyMap<string, string>
+  catalogChanged: boolean
   deniedNames: readonly string[]
   liftRestriction: (() => void) | undefined
 }
@@ -241,9 +263,50 @@ class ToolSearch extends Context.Service<
             execute: (input, call) => disclose({ state, call, query: input.query, limit: input.limit }),
           })
 
-        /** Deferred global names: eligible, not always visible, not shadowed by an agent-plane registration. */
+        /**
+         * Deferred global names: eligible and not shadowed by an agent-plane registration, minus the always-visible ones.
+         * Cache-safe mode takes "always visible" as the set declared at attachment, so a matching tool that appears later
+         * stays searchable without changing the declared list.
+         */
         const deferredNames = (state: AgentState): Set<string> =>
-          new Set([...refreshCatalog(state).keys()].filter(name => !isAlwaysVisible(name) && !state.shadowedNames.has(name)))
+          new Set(
+            [...refreshCatalog(state).keys()].filter(
+              name => !state.shadowedNames.has(name) && !(config.mode === 'cache-safe' ? state.declaredNames.has(name) : isAlwaysVisible(name)),
+            ),
+          )
+
+        const reachableCatalog = (state: AgentState): Map<string, string> =>
+          new Map([...refreshCatalog(state)].filter(([name]) => !state.shadowedNames.has(name)).map(([name, schema]) => [name, schema.description]))
+
+        /** The pending tool-set change as one reminder, or nothing; the change counts as told once it is returned. */
+        const takeToolSetNotice = (state: AgentState): UserMessage | undefined => {
+          if (!state.catalogChanged) return undefined
+          state.catalogChanged = false
+          const next = reachableCatalog(state)
+          const delta = ToolSetDeltaModel.diff(state.announced, next)
+          state.announced = next
+          if (ToolSetDeltaModel.isEmpty(delta)) return undefined
+          return createUserMessage({
+            content: [{ type: 'text', text: ToolSetDeltaModel.render(delta, config.mode) }],
+            source: { kind: TOOL_SET_SOURCE, form: 'tool-set-delta' },
+          })
+        }
+
+        /** Append the change after the step's own messages: a logged user message, so the cached prefix is untouched. */
+        const announceToolChanges = (state: AgentState) =>
+          Effect.acquireRelease(
+            Effect.sync(() =>
+              state.agent.ctx.on('agent/pre-step', async (payload, next) => {
+                const decision = await next()
+                if (decision.kind === 'reject' || (payload.step === 1 && decision.messages.length === 0)) return decision
+                const notice = takeToolSetNotice(state)
+                if (notice === undefined) return decision
+                const insertAt = decision.messages.findLastIndex(message => payload.messages.includes(message)) + 1
+                return { ...decision, messages: [...decision.messages.slice(0, insertAt), notice, ...decision.messages.slice(insertAt)] }
+              }),
+            ),
+            dispose => Effect.sync(dispose),
+          )
 
         const describeMatches = Effect.fn('tool search describe')(function* (input: {
           readonly state: AgentState
@@ -344,18 +407,23 @@ class ToolSearch extends Context.Service<
             shadowedNames,
             selectedNames: restoreSelectedFromHeader(agent, eligibleNames),
             admitFutureGlobalTools,
+            declaredNames: new Set([...eligibleNames].filter(isAlwaysVisible)),
+            announced: new Map(),
+            catalogChanged: false,
             deniedNames: [],
             liftRestriction: undefined,
           }
+          state.announced = reachableCatalog(state)
           states.set(agent, state)
           yield* Scope.addFinalizer(
             scope,
             ownedSync(() => state.liftRestriction?.()),
           )
-          const attach =
+          const attachMode =
             config.mode === 'cache-safe'
               ? attachCacheSafe(state)
               : owned(Tool.register(searchTool(state), { tools: agent.ctx.tools })).pipe(Effect.andThen(refreshRestriction(state)))
+          const attach = config.announceToolChanges ? attachMode.pipe(Effect.andThen(announceToolChanges(state))) : attachMode
           yield* attach.pipe(
             Scope.provide(scope),
             Effect.provideService(HostContext, hostContext),
@@ -370,6 +438,7 @@ class ToolSearch extends Context.Service<
           yield* reportGlobalSchemas
           for (const state of states.values()) {
             refreshCatalog(state)
+            state.catalogChanged = true
             if (config.mode === 'progressive') yield* refreshRestriction(state)
           }
         })

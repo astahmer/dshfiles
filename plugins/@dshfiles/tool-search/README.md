@@ -17,9 +17,10 @@ This package is not included in the web profile by default. Add `@dshfiles/tool-
     maxResults: 5
     maxQueryChars: 512
     reportSchemaMetrics: false
+    announceToolChanges: true
 ```
 
-`mode` is `cache-safe` (default) or `progressive`; see [Modes](#modes). `alwaysVisible` accepts trimmed tool names with `*` as the only wildcard. `maxResults` must be an integer from 1 through 100; `maxQueryChars` must be an integer from 1 through 4096. `maxResults` and `maxQueryChars` default to `5` and `512`. `alwaysVisible` defaults to the native core tools (`read`, `write`, `edit`, `apply_patch`, `bash`, `glob`, `grep`, `todo_write`, `skill`, `ask_user_question`, `job_*`, `subagent*`, `send_message`, `list_agents`, `interrupt_agent`, `web_search`, `web_fetch`, `present`, `read_image`, the goal tools, `exit_plan_mode`, `workflow`, `working_directory`, `compaction_threshold`); setting it replaces that list, and `[]` defers every global tool. `reportSchemaMetrics` defaults to `false`; set it to `true` only for an isolated measurement profile.
+`mode` is `cache-safe` (default) or `progressive`; see [Modes](#modes). `alwaysVisible` accepts trimmed tool names with `*` as the only wildcard. `maxResults` must be an integer from 1 through 100; `maxQueryChars` must be an integer from 1 through 4096. `maxResults` and `maxQueryChars` default to `5` and `512`. `alwaysVisible` defaults to the native core tools (`read`, `write`, `edit`, `apply_patch`, `bash`, `glob`, `grep`, `todo_write`, `skill`, `ask_user_question`, `job_*`, `subagent*`, `send_message`, `list_agents`, `interrupt_agent`, `web_search`, `web_fetch`, `present`, `read_image`, the goal tools, `exit_plan_mode`, `workflow`, `working_directory`, `compaction_threshold`); setting it replaces that list, and `[]` defers every global tool. `reportSchemaMetrics` defaults to `false`; set it to `true` only for an isolated measurement profile. `announceToolChanges` defaults to `true`; see [Mid-Session tool changes](#mid-session-tool-changes).
 
 ## Modes
 
@@ -36,6 +37,12 @@ DSH_TOOL_SEARCH_EVAL=1 DSH_TOOL_SEARCH_EVAL_CATALOG=/path/to/capture.json DSH_TO
 ```
 
 `DSH_TOOL_SEARCH_EVAL_TASKS` and `DSH_TOOL_SEARCH_EVAL_MODES` (comma-separated) narrow the run; `DSH_TOOL_SEARCH_BENCHMARK_ACCOUNT` and `_MODEL` pick the ai-accounts Codex route.
+
+## Mid-Session tool changes
+
+When the global tool set changes after an agent attached (an MCP server connects, reconnects with a new list, or a plugin unloads), the agent's next step gets one `<system-reminder>` user message naming only the change: each added tool with the first sentence of its description (at most 100 characters, cut on a code point), and the removed names. At most 20 names per side are listed; the rest are counted and stay findable through `tool_search`. Nothing is sent while the set is unchanged, and the catalog is never re-sent. The reminder is a logged message appended after the step's own messages, so the cached prompt prefix (tools, system prompt, earlier messages) is untouched. Several changes before the next step collapse into one net difference; a tool added and removed in between is not mentioned. The told state is in memory: after a Host restart the baseline is the catalog at re-attachment. Set `announceToolChanges: false` to send nothing.
+
+In `cache-safe` mode the declared list is fixed at attachment: a tool that appears later is never declared, even when it matches `alwaysVisible`; it is searchable with `tool_search` and callable with `tool_call`. Removing a declared tool still removes it from the list, since a request cannot declare a tool that no longer exists.
 
 ## Behavior and safety
 
