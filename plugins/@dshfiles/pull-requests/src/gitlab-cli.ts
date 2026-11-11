@@ -15,6 +15,13 @@ const collectText = <E>(stream: Stream.Stream<Uint8Array, E>) =>
 const glabOperations = ['mr-view', 'auth-status', 'mr-list', 'mr-create'] as const
 type GlabOperation = (typeof glabOperations)[number]
 
+const operationSpan = {
+  'mr-view': 'pull request gh view',
+  'auth-status': 'pull request gh auth',
+  'mr-list': 'pull request gh list',
+  'mr-create': 'pull request gh create',
+} as const satisfies Record<GlabOperation, string>
+
 const operationFailure = {
   'mr-view': 'could not read the merge request',
   'auth-status': 'is not signed in to this GitLab host',
@@ -88,14 +95,7 @@ const runGlab = Effect.fnUntraced(function* (input: {
       : { stdin: 'ignore', forceKillAfter: Duration.seconds(1), cwd: input.cwd }
   const command = ChildProcess.make('glab', input.args, commandOptions)
   return yield* withGitHubCommandSpan({
-    name:
-      input.operation === 'mr-create'
-        ? 'pull request gh create'
-        : input.operation === 'mr-list'
-          ? 'pull request gh list'
-          : input.operation === 'auth-status'
-            ? 'pull request gh auth'
-            : 'pull request gh view',
+    name: operationSpan[input.operation],
     attributes: { ...input.attributes, 'dshfiles.forge': 'gitlab' },
     effect: Effect.scoped(
       Effect.gen(function* () {
@@ -167,18 +167,16 @@ const mergeFields = (mr: GlabMergeRequest): Pick<GitHubPullRequestView, 'mergeab
   const drafting = detailed === 'draft' || detailed === 'draft_status'
   const blocked = mr.blocking_discussions_resolved === false || mergeable === 'CONFLICTING'
   const unstable = detailed === 'ci_still_running' || detailed === 'ci_must_pass' || detailed === 'checking'
-  const mergeStateStatus: GitHubPullRequestView['mergeStateStatus'] = drafting
-    ? 'DRAFT'
-    : blocked
-      ? 'BLOCKED'
-      : unstable
-        ? 'UNSTABLE'
-        : mergeable === 'MERGEABLE'
-          ? 'CLEAN'
-          : 'UNKNOWN'
+  const mergeStateStatus = (): GitHubPullRequestView['mergeStateStatus'] => {
+    if (drafting) return 'DRAFT'
+    if (blocked) return 'BLOCKED'
+    if (unstable) return 'UNSTABLE'
+    if (mergeable === 'MERGEABLE') return 'CLEAN'
+    return 'UNKNOWN'
+  }
   const reviewDecision: GitHubPullRequestView['reviewDecision'] =
     mr.approvals_required === undefined ? null : mr.approvals_required > 0 ? 'REVIEW_REQUIRED' : 'APPROVED'
-  return { mergeable, mergeStateStatus, reviewDecision }
+  return { mergeable, mergeStateStatus: mergeStateStatus(), reviewDecision }
 }
 
 const PIPELINE_STATES: Record<string, string> = {
