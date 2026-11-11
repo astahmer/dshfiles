@@ -2,6 +2,7 @@ import type {} from '@deepseek-ai/dsh-plugin-manager'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { Context, Effect, FileSystem, Layer, Option, Ref, Schema } from 'effect'
 import { NativeSettings } from './native-settings-promise.js'
+import { MAX_REASON, PluginManagerFailed, pluginManagerCalls, type BundleInfoLike, type PluginManagerSurface } from './plugin-manager-promise.js'
 import { rowIdOf, type PluginChange, type PluginEntry } from './shell-api.js'
 
 /**
@@ -30,53 +31,6 @@ export class PluginEntryUnknown extends Schema.TaggedError<PluginEntryUnknown>()
     return `No plugin entry ${this.entryId}. List the entries with plugin_inventory and use one of their entryId values.`
   }
 }
-
-export class PluginManagerFailed extends Schema.TaggedError<PluginManagerFailed>()(
-  'PluginManagerFailed',
-  { reason: Schema.String, cause: Schema.optional(Schema.Defect()) },
-  { dshxWireCode: 'plugin-manager-failed' },
-) {
-  override get message(): string {
-    return `${this.reason} Settings › Plugins shows the same entries; the profile’s cordis.patch.yml can be edited by hand.`
-  }
-}
-
-const MAX_REASON = 300
-
-/** The plugin-manager surface these controls read; `PluginManager` satisfies it with its branded entry ids. */
-export interface PluginManagerSurface<Id extends string> {
-  listPlugins(): Promise<readonly PluginInfoLike<Id>[]>
-  setPluginEnabled(id: Id, enabled: boolean): Promise<PluginChangeResult>
-  /** Absent on a manager that predates bundle records; the entries then name no owner. */
-  listBundles?(): Promise<readonly BundleInfoLike[]>
-}
-
-/** What these controls read of a bundle record; `BundleInfo` satisfies it. */
-export interface BundleInfoLike {
-  readonly name: string
-  readonly rows: readonly { readonly rowId: string; readonly entryId?: string }[]
-  readonly overrides: readonly string[]
-}
-
-/** What these controls read of the manager's change result; `ChangeResult` satisfies it. */
-export interface PluginChangeResult {
-  readonly changed: boolean
-  readonly application: PluginChange['application']
-  readonly restartReason?: string
-  readonly enabled?: boolean
-  readonly error?: { readonly code: string; readonly diagnostic?: string }
-  readonly warnings?: readonly string[]
-}
-
-export interface PluginInfoLike<Id extends string> {
-  readonly entryId: Id
-  readonly moduleName: string
-  readonly enabled: boolean
-  readonly fiberPhase: string | null
-  readonly readOnlyReason?: string
-}
-
-const reasonOf = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause)).slice(0, MAX_REASON)
 
 const SEED_START = '# BEGIN NIX-MANAGED DSH PLUGINS'
 const SEED_END = '# END NIX-MANAGED DSH PLUGINS'
@@ -123,14 +77,12 @@ export class PluginControls extends Context.Service<
         const awaitingRestart = yield* Ref.make(new Map<string, boolean>())
         // Bundle records only name owners: when the manager cannot read them, the entries still list, without one.
         const bundles = (found: PluginManagerSurface<Id>): Effect.Effect<readonly BundleInfoLike[]> =>
-          Effect.tryPromise(() => found.listBundles?.() ?? Promise.resolve([])).pipe(Effect.orElseSucceed(() => []))
+          pluginManagerCalls(found).listBundles.pipe(Effect.orElseSucceed(() => []))
         const current = Effect.suspend(() => {
           const found = manager()
           return found === undefined ? Effect.fail(new PluginManagerMissing({})) : Effect.succeed(found)
         })
-        const entries = Effect.flatMap(current, found =>
-          Effect.tryPromise({ try: () => found.listPlugins(), catch: cause => new PluginManagerFailed({ reason: reasonOf(cause), cause }) }),
-        )
+        const entries = Effect.flatMap(current, found => pluginManagerCalls(found).listPlugins)
         const list = Effect.gen(function* () {
           const found = yield* current
           const rows = yield* entries
@@ -159,10 +111,7 @@ export class PluginControls extends Context.Service<
           const rows = yield* entries
           const row = rows.find(candidate => candidate.entryId === input.entryId)
           if (row === undefined) return yield* Effect.fail(new PluginEntryUnknown({ entryId: input.entryId }))
-          const result = yield* Effect.tryPromise({
-            try: () => found.setPluginEnabled(row.entryId, input.enabled),
-            catch: cause => new PluginManagerFailed({ reason: reasonOf(cause), cause }),
-          })
+          const result = yield* pluginManagerCalls(found).setPluginEnabled(row.entryId, input.enabled)
           const change: PluginChange = {
             entryId: input.entryId,
             changed: result.changed,

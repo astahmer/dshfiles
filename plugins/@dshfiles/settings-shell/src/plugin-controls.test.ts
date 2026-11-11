@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer, Option } from 'effect'
-import { PluginControls, seedRegionEntries, type PluginInfoLike, type PluginManagerSurface } from './plugin-controls.js'
+import { PluginControls, seedRegionEntries } from './plugin-controls.js'
+import type { PluginInfoLike, PluginManagerSurface } from './plugin-manager-promise.js'
 
 const entries: PluginInfoLike<string>[] = [
   { entryId: 'dshfiles-backlog', moduleName: '@dshfiles/backlog', enabled: true, fiberPhase: 'active' },
