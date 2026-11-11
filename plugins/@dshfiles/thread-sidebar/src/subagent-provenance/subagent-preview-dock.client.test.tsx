@@ -61,4 +61,27 @@ describe('SubagentPreviewDock', () => {
     fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
     expect(bindings.retainChild).toHaveBeenCalledOnce()
   })
+
+  it('shows a single working child without a group header', () => {
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'] })} />)
+    expect(screen.queryByRole('button', { name: 'subagentPreviewDockToggle' })).toBeNull()
+    expect(rows()).toHaveLength(1)
+  })
+
+  it('collapses every working child under one header and keeps it collapsed as children come and go', () => {
+    const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} />)
+    const header = screen.getByRole('button', { name: 'subagentPreviewDockToggle' })
+    expect(header.getAttribute('aria-expanded')).toBe('true')
+    expect(header.textContent).toContain('2')
+    expect(rows()).toHaveLength(2)
+    fireEvent.click(header)
+    expect(header.getAttribute('aria-expanded')).toBe('false')
+    expect(rows()).toHaveLength(0)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-b'] })} />)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} />)
+    expect(screen.getByRole('button', { name: 'subagentPreviewDockToggle' }).getAttribute('aria-expanded')).toBe('false')
+    expect(rows()).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewDockToggle' }))
+    expect(rows()).toHaveLength(2)
+  })
 })

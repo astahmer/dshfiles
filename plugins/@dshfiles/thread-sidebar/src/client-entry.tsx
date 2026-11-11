@@ -925,6 +925,7 @@ export default defineClient({
         { name: 'conversation.input.dock', id: 'thread-sidebar-subagents-live', order: 4, inject: sessionId => ({ sessionId }) },
         decorate((props: PropsRuntime<'conversation.input.dock'> & { readonly sessionId: SessionSummary['id'] }) => (
           <SubagentPreviewDock
+            key={props.sessionId}
             useSessions={props.useSessions}
             useSessionStatus={props.useSessionStatus}
             sessionId={props.sessionId}

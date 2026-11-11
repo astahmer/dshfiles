@@ -8,6 +8,7 @@ export type ThreadSidebarLocaleKey = keyof typeof en
 const en = {
   subagentPreviewKind: 'Subagent',
   subagentPreviewDock: 'Working subagents',
+  subagentPreviewDockToggle: 'Show or hide the working subagents',
   subagentPreviewToggle: 'Show or hide the progress of {label}',
   subagentPreviewStarting: 'Starting',
   subagentPreviewFailedToStart: 'Failed to start',
@@ -506,6 +507,7 @@ const en = {
 const zh = {
   subagentPreviewKind: '子智能体',
   subagentPreviewDock: '工作中的子智能体',
+  subagentPreviewDockToggle: '显示或隐藏工作中的子智能体',
   subagentPreviewToggle: '显示或隐藏 {label} 的进度',
   subagentPreviewStarting: '正在启动',
   subagentPreviewFailedToStart: '启动失败',
