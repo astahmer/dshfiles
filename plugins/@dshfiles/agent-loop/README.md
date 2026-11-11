@@ -34,13 +34,35 @@ fork in one run (one 600-byte provider signature):
 | Serialized event bytes                              | 1,981 B  | 1,353 B |
 | Blocks on the replayed assistant message, request 2 | 1        | 1       |
 
+## Runaway tool calls
+
+On 2026-11-11 a Codex `apply_patch` call streamed 199 KB of `\n ` over 15 minutes (49,830 argument chunks, about
+13 B/s) until the provider dropped the connection; the whole step then failed with `TRANSPORT terminated`. The adapter
+idle watchdog never fired, because chunks kept arriving.
+
+The fork bounds one tool call's streamed arguments, counted from that call's first chunk:
+
+| Setting (agent-loop row config) | Default            | Effect                                                   |
+| ------------------------------- | ------------------ | -------------------------------------------------------- |
+| `maxToolCallArgumentBytes`      | `524288` (512 KiB) | UTF-8 bytes one call's arguments may reach               |
+| `toolCallArgumentTimeoutMs`     | `180000` (3 min)   | how long one call may keep streaming its arguments       |
+
+Past either bound the attempt stops and the provider request is aborted. The cut call is stored with `{}` arguments and
+never runs; its error result (`TOOL_ARGUMENTS_LIMIT_EXCEEDED`) says what was measured and tells the model to resend
+smaller calls (one `apply_patch` edit per call, or append in chunks). Other calls still open in the same reply are cut
+too and told to resend on their own; calls that already finished run normally. The turn continues with the next step,
+and the user's input is not sent again. A stream that goes silent is still the adapter's idle watchdog's job (300 s on
+pi-ai routes). Set them on the `dshfiles-agent-loop` row; both are volatile and read at each model attempt.
+
 ## Delta
 
 | File                             | Change                                                                                                                                                                                       |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/native/assistant-stream.ts` | adds `settledStream`: the same compact records, with the terminal chunk's envelope reduced to its `response` part                                                                            |
 | `src/native/agent.ts`            | both `assistant/message` appends (settled and interrupted) store `live.settledStream`; `assistant/attempt` still uses the untouched `live.stream`                                            |
-| `src/native/index.ts`            | Cordis declares `FiberState` as a `const enum`, and this workspace pins a Cordis whose runtime has no such export, so the three inactive states are inlined as numbers with the same meaning |
+| `src/native/index.ts`            | Cordis declares `FiberState` as a `const enum`, and this workspace pins a Cordis whose runtime has no such export, so the three inactive states are inlined as numbers with the same meaning; the two tool-argument settings below |
+| `src/native/agent.ts` (2)        | the stream read feeds every chunk to `ToolArgumentLimit`; at a cut it closes the cut calls, leaves the loop (which aborts the provider request), runs only the complete calls and records an error result for each cut one |
+| `src/native/tool-argument-limit.ts` (added) | the bounds, the cut, and the result text the model reads |
 
 `src/host.ts` is ours: it hosts the native plugin class unchanged, like the other vendor forks.
 
@@ -48,7 +70,7 @@ fork in one run (one 600-byte provider signature):
 
 ```sh
 pnpm --dir plugins/@dshfiles/agent-loop typecheck
-pnpm --dir plugins/@dshfiles/agent-loop test        # tests/settled-stream.test.ts
+pnpm --dir plugins/@dshfiles/agent-loop test        # tests/settled-stream.test.ts, tests/tool-argument-limit.test.ts
 node scripts/native-fork-diff.mjs agent-loop
 ```
 
@@ -57,5 +79,5 @@ still reads the full stream: `assistant/attempt` events are unchanged.
 
 ## Update policy
 
-Re-apply the three deltas on an upstream bump, then re-run `native-fork-diff` and the test above. The `FiberState`
+Re-apply the deltas on an upstream bump, then re-run `native-fork-diff` and the test above. The `FiberState`
 inlining can be deleted as soon as the workspace Cordis version exports it.

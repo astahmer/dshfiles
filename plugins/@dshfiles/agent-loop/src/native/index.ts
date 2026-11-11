@@ -34,6 +34,7 @@ import type { SessionHandle, SessionPersistence } from '@deepseek-ai/dsh-session
 import { ReactLoopAgent } from './agent.ts'
 import { inboxProjectionDefinition } from './inbox.ts'
 import { DEFAULT_MAX_PARALLEL_TOOL_CALLS } from './constants.ts'
+import { DEFAULT_MAX_TOOL_CALL_ARGUMENT_BYTES, DEFAULT_TOOL_CALL_ARGUMENT_TIMEOUT_MS } from './tool-argument-limit.ts'
 import type {} from './runtime-context.ts'
 
 /**
@@ -306,6 +307,10 @@ export interface Config {
    * omission defaults to {@link DEFAULT_MAX_PARALLEL_TOOL_CALLS}.
    */
   maxParallelToolCalls: Volatile<number>
+  /** Largest arguments one tool call may stream, in UTF-8 bytes, before the attempt stops and the call fails unrun. */
+  maxToolCallArgumentBytes: Volatile<number>
+  /** Longest one tool call may keep streaming its arguments, in milliseconds, before the attempt stops and the call fails unrun. */
+  toolCallArgumentTimeoutMs: Volatile<number>
   /** Agents created or resumed at plugin startup. */
   agents: (AgentOptions & {
     /** Stable config label used in logs and as the fresh combined-id prefix. */
@@ -317,6 +322,13 @@ export interface Config {
     /** Persisted session to resume instead of creating a fresh session. */
     resumeSessionId?: SessionId
   })[]
+}
+
+type ConfigInput = {
+  agents?: Config['agents']
+  maxParallelToolCalls?: number
+  maxToolCallArgumentBytes?: number
+  toolCallArgumentTimeoutMs?: number
 }
 
 /** Reject self-contained identity conflicts before any configured agent starts. */
@@ -342,8 +354,10 @@ export class AgentLoop extends Service implements AgentFactory {
   static inject = ['agents', 'sessions', 'llm', 'tools', 'systemPrompt', 'sessionProjections']
 
   /** Runtime schema for declarative agents. */
-  static Config: z<{ agents?: Config['agents']; maxParallelToolCalls?: number }, Config> = z.object({
+  static Config: z<ConfigInput, Config> = z.object({
     maxParallelToolCalls: z.number().step(1).min(1).default(DEFAULT_MAX_PARALLEL_TOOL_CALLS).volatile(),
+    maxToolCallArgumentBytes: z.number().step(1).min(1).default(DEFAULT_MAX_TOOL_CALL_ARGUMENT_BYTES).volatile(),
+    toolCallArgumentTimeoutMs: z.number().step(1).min(1).default(DEFAULT_TOOL_CALL_ARGUMENT_TIMEOUT_MS).volatile(),
     agents: z.array(z.object({
       id: z.string().required(),
       sessionId: z.string().min(1),
@@ -354,7 +368,7 @@ export class AgentLoop extends Service implements AgentFactory {
       cwd: z.string(),
       resumeSessionId: z.string(),
     })).default([]),
-  }) as z<{ agents?: Config['agents']; maxParallelToolCalls?: number }, Config>
+  }) as z<ConfigInput, Config>
 
   /** Validated configuration owned by the agent-loop service. */
   readonly config: Config
@@ -368,6 +382,8 @@ export class AgentLoop extends Service implements AgentFactory {
     this.config = {
       agents: applyLauncherIdentities(config.agents, ctx.get(CONFIGURED_AGENT_IDENTITIES_KEY)),
       maxParallelToolCalls: config.maxParallelToolCalls,
+      maxToolCallArgumentBytes: config.maxToolCallArgumentBytes,
+      toolCallArgumentTimeoutMs: config.toolCallArgumentTimeoutMs,
     }
     validateConfiguredAgents(this.config.agents)
     // Register only after every config validation above has passed, so a

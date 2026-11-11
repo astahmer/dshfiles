@@ -38,6 +38,7 @@ import { RuntimeContextProjection } from './runtime-context.ts'
 import { AssistantStreamAttempt } from './assistant-stream.ts'
 import { SystemPromptProjection } from './runtime-context.ts'
 import { executeToolCalls } from './tool-calls.ts'
+import { ToolArgumentLimit, type CutToolCall, type ToolArgumentLimits } from './tool-argument-limit.ts'
 
 type Phase =
   | { kind: 'idle'; lastTurn: number }
@@ -449,6 +450,12 @@ export class ReactLoopAgent implements Agent {
         (frame) => { this.dispatch.emit('agent/assistant-stream', { frame }) },
       )
       let started = false
+      const argumentLimits: ToolArgumentLimits = {
+        maxBytes: this.loopCtx.agentLoop.config.maxToolCallArgumentBytes.get(),
+        maxMs: this.loopCtx.agentLoop.config.toolCallArgumentTimeoutMs.get(),
+      }
+      const argumentLimit = new ToolArgumentLimit(argumentLimits)
+      let cutCalls: readonly CutToolCall[] = []
       try {
         const stream = preparedCall?.stream(request) ?? this.loopCtx.llm.stream(request)
         signal.throwIfAborted()
@@ -456,6 +463,12 @@ export class ReactLoopAgent implements Agent {
         started = true
         for await (const chunk of stream) {
           signal.throwIfAborted()
+          cutCalls = argumentLimit.observe(chunk) ?? []
+          if (cutCalls.length > 0) {
+            // Leaving the loop returns the iterator, which aborts the provider request.
+            for (const closing of ToolArgumentLimit.closingChunks(cutCalls)) live.push(closing)
+            break
+          }
           live.push(chunk)
         }
         signal.throwIfAborted()
@@ -548,10 +561,12 @@ export class ReactLoopAgent implements Agent {
 
         const toolCalls = message.content.filter(block => block.type === 'tool-call')
         if (toolCalls.length === 0) return { kind: 'completed' }
+        const cutIds = new Set(cutCalls.map(call => call.block.id))
         const { concluded } = await executeToolCalls(
-          this.loopCtx, turn, step, toolCalls, signal,
+          this.loopCtx, turn, step, toolCalls.filter(call => !cutIds.has(call.id)), signal,
           context => this.inbox.splice('next-step', this.inbox.nextStep.length, 0, [context]),
         )
+        for (const call of cutCalls) ToolArgumentLimit.appendCutResult(this.session, turn, step, call, argumentLimits)
         return concluded ? { kind: 'completed' } : null
       } catch (error: unknown) {
         if (!live.ended) live.abandon()
