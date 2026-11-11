@@ -6,6 +6,7 @@
 ![Request log](docs/screenshots/usage-request-log.png)
 ![Usage distribution and daily calendar](docs/screenshots/usage-charts.png)
 ![Jev API usage card](docs/screenshots/usage-jev-card.png)
+![Thread Cost facet with the family cost of its subagents](docs/screenshots/usage-thread-family-cost.png)
 
 **Observe › Usage** is the one usage page (docs/ade-ux §6): four tabs, **Cost** (charts),
 **Quota**, **Requests** (the request log) and **Tools** (tool and Jev activity), built from
@@ -20,7 +21,12 @@ DSH session logs and bounded Host-side call observations. Observation only.
   usage-owned registry would make the two bundles depend on each other.
 - **Cost facet**: a **Cost** tab in the thread panel (right pane guide) shows the route the
   thread's last request took, cost per turn, and opens Usage › Requests filtered to the
-  thread, Usage › Quota for the route, or Traces.
+  thread, Usage › Quota for the route, or Traces. A thread with subagents is headed by its
+  **family cost** (itself plus every subagent session below it, followed through the native
+  parent link) with a **Subagents** list; **Thread / With subagents** switches the headline.
+  Threads started with `thread_create` or fan-out have no parent link and stay separate.
+  `usage_thread_family_cost` (read-only) returns the same totals to the Agent. Display only:
+  no setting, no Host cost beyond one indexed query per 30 s while the facet is open.
 
 - **Request log**: model and provider, when, project, input, cache read,
   output, cost, duration, TTFT and status with the stop reason; status chips

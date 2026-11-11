@@ -46,4 +46,30 @@ describe('ThreadCost', () => {
   it('keeps an unpriced turn unknown instead of zero', () => {
     expect(ThreadCost.turnsOf([row({ cost: null })])[0]?.cost).toBeNull()
   })
+
+  const totals = (cost: number, requests: number) => ({ cost, requests, tokens: 0, unpriced: 0 })
+  const family = (members: number) => ({
+    sessionId: 'root',
+    own: totals(1, 2),
+    family: totals(5, 9),
+    members: Array.from({ length: members }, (_, index) => ({
+      sessionId: `child-${String(index)}`,
+      title: null,
+      parentSessionId: 'root',
+      depth: 1,
+      ...totals(4, 7),
+    })),
+    omittedMembers: 0,
+  })
+  const own = { cost: 1, requests: 2 }
+
+  it('heads the facet with the family total when the thread has subagents', () => {
+    expect(ThreadCost.headlineOf({ scope: 'family', family: family(1), own })).toEqual({ cost: 5, requests: 9, scope: 'family' })
+    expect(ThreadCost.headlineOf({ scope: 'own', family: family(1), own })).toEqual({ cost: 1, requests: 2, scope: 'own' })
+  })
+
+  it('falls back to the thread total without subagents or on a Host without family cost', () => {
+    expect(ThreadCost.headlineOf({ scope: 'family', family: family(0), own })).toEqual({ cost: 1, requests: 2, scope: 'own' })
+    expect(ThreadCost.headlineOf({ scope: 'family', family: undefined, own })).toEqual({ cost: 1, requests: 2, scope: 'own' })
+  })
 })

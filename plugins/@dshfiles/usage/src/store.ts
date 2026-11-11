@@ -8,7 +8,8 @@ import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Clock, Context, Effect, Layer, Option, Ref, Schema } from 'effect'
 import { Reactivity } from 'effect/reactivity'
 import { SqlClient } from 'effect/sql'
-import type { ActivityReport, ChartQuery, ChartView, RequestPage, RequestQuery, RequestView } from './api.js'
+import { FAMILY_MEMBER_LIMIT } from './api.js'
+import type { ActivityReport, ChartQuery, ChartView, FamilyCost, FamilyCostQuery, RequestPage, RequestQuery, RequestView } from './api.js'
 import { UsageStoreFailed } from './errors.js'
 import { UsageFoldModel, type RequestRow, type SessionMeta, type ToolExecutionRow } from './fold.js'
 import {
@@ -131,6 +132,17 @@ const breakdownRowSchema = Schema.Struct({
 })
 const latencyRowSchema = Schema.Struct({ start: Schema.Number, ttft_ms: numberColumn, duration_ms: numberColumn })
 const threadRowSchema = Schema.Struct({ session_id: Schema.String, title: textColumn, project: textColumn, cost: Schema.Number, requests: Schema.Number })
+
+const familyRowSchema = Schema.Struct({
+  session_id: Schema.String,
+  title: textColumn,
+  parent_session: textColumn,
+  depth: Schema.Number,
+  cost: Schema.Number,
+  requests: Schema.Number,
+  tokens: Schema.Number,
+  unpriced: Schema.Number,
+})
 const toolRowSchema = Schema.Struct({
   id: Schema.String,
   sessionId: Schema.String,
@@ -435,6 +447,7 @@ const decode = {
   breakdown: listOf(breakdownRowSchema),
   latency: listOf(latencyRowSchema),
   threads: listOf(threadRowSchema),
+  family: listOf(familyRowSchema),
   tools: listOf(toolRowSchema),
   durationTotal: oneOf(durationTotalSchema),
   identifierActivity: listOf(identifierActivityRowSchema),
@@ -711,6 +724,7 @@ export class UsageRepo extends Context.Service<
     readonly setMeta: (input: { readonly key: string; readonly value: string }) => RepoEffect<void>
     readonly requests: (query: RequestQuery) => RepoEffect<RequestPage>
     readonly charts: (query: ChartQuery) => RepoEffect<ChartView>
+    readonly familyCost: (query: FamilyCostQuery) => RepoEffect<FamilyCost>
     readonly recordJevUsage: (record: JevUsageRecord) => RepoEffect<void>
     readonly jevUsage: (query: JevUsageQuery) => RepoEffect<JevUsageView>
     readonly activity: (query: ActivityQuery) => RepoEffect<ActivityReport>
@@ -1114,6 +1128,50 @@ const make = (sql: SqlClient.SqlClient) =>
         } satisfies RequestPage
       },
       Effect.mapError(failed('requests')),
+    )
+
+    /** Depth-first over `sessions.parent_session`; `UNION` (not `ALL`) stops a malformed parent cycle. */
+    const familyCost = Effect.fn('usage family cost read')(
+      function* (query: FamilyCostQuery) {
+        const rows = yield* read(
+          decode.family,
+          `WITH RECURSIVE family(id, depth) AS (
+               SELECT ?, 0
+               UNION SELECT s.id, family.depth + 1 FROM sessions s JOIN family ON s.parent_session = family.id WHERE family.depth < 32
+             )
+             SELECT r.session_id, s.title, s.parent_session, MIN(family.depth) AS depth,
+               COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests, COALESCE(SUM(${TOKENS_SQL}), 0) AS tokens,
+               COALESCE(SUM(r.input IS NOT NULL AND rr.provider IS NULL), 0) AS unpriced
+             FROM ${FROM_SQL} JOIN family ON family.id = r.session_id
+             WHERE ${VISIBLE_SQL}
+             GROUP BY r.session_id ORDER BY cost DESC, requests DESC`,
+          [query.sessionId],
+        )
+        const totalsOf = (members: typeof rows) => ({
+          cost: members.reduce((sum, row) => sum + row.cost, 0),
+          requests: members.reduce((sum, row) => sum + row.requests, 0),
+          tokens: members.reduce((sum, row) => sum + row.tokens, 0),
+          unpriced: members.reduce((sum, row) => sum + row.unpriced, 0),
+        })
+        const descendants = rows.filter(row => row.session_id !== query.sessionId)
+        return {
+          sessionId: query.sessionId,
+          own: totalsOf(rows.filter(row => row.session_id === query.sessionId)),
+          family: totalsOf(rows),
+          members: descendants.slice(0, FAMILY_MEMBER_LIMIT).map(row => ({
+            sessionId: row.session_id,
+            title: row.title,
+            parentSessionId: row.parent_session,
+            depth: row.depth,
+            cost: row.cost,
+            requests: row.requests,
+            tokens: row.tokens,
+            unpriced: row.unpriced,
+          })),
+          omittedMembers: Math.max(0, descendants.length - FAMILY_MEMBER_LIMIT),
+        } satisfies FamilyCost
+      },
+      Effect.mapError(failed('familyCost')),
     )
 
     const summaryOf = (filter: ReturnType<typeof rangeFilter>) =>
@@ -1762,6 +1820,7 @@ const make = (sql: SqlClient.SqlClient) =>
       setMeta,
       requests,
       charts,
+      familyCost,
       recordJevUsage,
       jevUsage,
       activity,

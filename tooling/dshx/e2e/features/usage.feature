@@ -33,3 +33,9 @@ Feature: Usage analytics
   Scenario: A thread's Cost facet folds its requests per turn
     When the thread of a failed request is opened from the log
     Then its Cost facet lists the thread's turns and links to its requests
+
+  @scenario:usage.thread-family-cost
+  Scenario: A thread's Cost facet adds its subagents' cost
+    When the thread of a failed request is opened from the log
+    And a subagent of that thread has recorded requests
+    Then its Cost facet heads with the family cost and lists the subagent

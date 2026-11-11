@@ -1,7 +1,7 @@
-import { cp, mkdir, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { openGlobalPanel } from '../plugin-view-names.js'
 import { DatabaseSync } from 'node:sqlite'
-import { zstdCompressSync } from 'node:zlib'
+import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
@@ -263,6 +263,54 @@ When('the thread of a failed request is opened from the log', async ({ page }: {
     .first()
     .click()
   await expect(page.getByText('activity timeline journey turn', { exact: true }).first()).toBeVisible()
+})
+
+const SUBAGENT_FIXTURE = join(FIXTURE_SESSIONS, '-home-user-dev-sample', '557dd85e-cb22-4b10-a70e-39dabec1bfde', 'session.v4.jsonl.zstd')
+const JOURNEY_SUBAGENT_ID = 'session-family-cost-journey-child'
+
+When('a subagent of that thread has recorded requests', async ({ page }: { page: Page }) => {
+  // The recorded fixtures all live under /home/user; the only other indexed session is the scenario's own thread.
+  const usageDatabase = new DatabaseSync(join(profileFor(page).homeRoot, 'plugins', 'usage', 'usage.db'), { readOnly: true })
+  const threadIds = (() => {
+    try {
+      return usageDatabase
+        .prepare("SELECT id FROM sessions WHERE cwd NOT LIKE '/home/user/%'")
+        .all()
+        .map(row => String(row.id))
+    } finally {
+      usageDatabase.close()
+    }
+  })()
+  expect(threadIds, 'the scenario thread is indexed').toHaveLength(1)
+  const threadId = threadIds[0]
+  const log = zstdDecompressSync(await readFile(SUBAGENT_FIXTURE))
+    .toString()
+    .replace('"id":"557dd85e-cb22-4b10-a70e-39dabec1bfde"', `"id":"${JOURNEY_SUBAGENT_ID}"`)
+    .replace('"parentSession":"session-parent"', `"parentSession":"${String(threadId)}"`)
+  const directory = join(profileFor(page).homeRoot, 'sessions', '-home-user-dev-sample', JOURNEY_SUBAGENT_ID)
+  await mkdir(directory, { recursive: true })
+  await writeFile(join(directory, 'session.v4.jsonl.zstd'), zstdCompressSync(log))
+})
+
+Then('its Cost facet heads with the family cost and lists the subagent', async ({ page }: { page: Page }) => {
+  await openThreadFacet(page, 'Cost')
+  const facet = page.locator('[data-thread-facet="cost"]')
+  // The indexer and the facet each poll every 30 s, so the new child log shows within a minute.
+  await recordAssertion(page, 'usage-cost-facet-shows-family-cost', async () => {
+    await expect(facet.getByRole('heading', { name: 'Subagents', exact: true })).toBeVisible({ timeout: 90_000 })
+    await expect(facet.locator('[data-family-members] li')).toHaveCount(1)
+    await expect(facet.getByRole('radio', { name: 'With subagents', exact: true })).toHaveAttribute('aria-checked', 'true')
+  })
+  const headline = facet.getByRole('heading', { name: 'Cost', exact: true }).locator('..')
+  const familyText = await headline.textContent()
+  await facet.getByRole('radio', { name: 'Thread', exact: true }).click()
+  await recordAssertion(page, 'usage-cost-facet-switches-to-own-cost', async () => {
+    await expect(facet.getByRole('heading', { name: 'Subagents', exact: true })).toHaveCount(0)
+    await expect(headline).not.toHaveText(familyText ?? '')
+  })
+  await facet.getByRole('radio', { name: 'With subagents', exact: true }).click()
+  await captureUsageEvidence(page, 'cost-facet-family')
+  await finishJourneyAssertions(page)
 })
 
 Then("its Cost facet lists the thread's turns and links to its requests", async ({ page }: { page: Page }) => {

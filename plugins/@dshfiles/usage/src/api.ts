@@ -91,6 +91,49 @@ export const requestPageSchema = Schema.Struct({
 
 export type RequestPage = typeof requestPageSchema.Type
 
+export const FAMILY_MEMBER_LIMIT = 200
+
+export const familyCostQuerySchema = Schema.Struct({
+  sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)).pipe(
+    Schema.annotate({ description: 'The thread whose own cost and subagent (descendant) cost to total.' }),
+  ),
+})
+
+export type FamilyCostQuery = typeof familyCostQuerySchema.Type
+
+const familyTotalsSchema = Schema.Struct({
+  /** Sum of priced requests; unpriced requests add nothing and are counted in `unpriced`. */
+  cost: nonNegativeNumber,
+  requests: nonNegativeInteger,
+  tokens: nonNegativeNumber,
+  unpriced: nonNegativeInteger,
+})
+
+export type FamilyTotals = typeof familyTotalsSchema.Type
+
+export const familyMemberSchema = Schema.Struct({
+  sessionId: Schema.String,
+  title: Schema.NullOr(Schema.String),
+  parentSessionId: Schema.NullOr(Schema.String),
+  /** 1 for a direct subagent, 2 for its subagent, and so on. */
+  depth: nonNegativeInteger,
+  ...familyTotalsSchema.fields,
+})
+
+export type FamilyMember = typeof familyMemberSchema.Type
+
+export const familyCostSchema = Schema.Struct({
+  sessionId: Schema.String,
+  own: familyTotalsSchema,
+  family: familyTotalsSchema,
+  /** Descendant sessions with recorded requests, costliest first. */
+  members: Schema.Array(familyMemberSchema).check(Schema.isMaxLength(FAMILY_MEMBER_LIMIT)),
+  /** Descendants with requests beyond `members`; their cost is still in `family`. */
+  omittedMembers: nonNegativeInteger,
+})
+
+export type FamilyCost = typeof familyCostSchema.Type
+
 export const GROUP_DIMENSIONS = ['model', 'provider', 'project', 'purpose'] as const
 
 export const chartQuerySchema = Schema.Struct({
@@ -495,6 +538,13 @@ export const usageApi = defineApi({
       description:
         'Page through recorded LLM requests between two Unix-ms timestamps: model, provider, tokens, cache, latency and list-price cost. Optional provider is an exact, case-sensitive account route filter applied before counting and limiting. Read-only.',
       tool: { name: 'usage_requests', readOnly: true, render: output => JSON.stringify(output) },
+    }),
+    familyCost: UsageSchema.method({
+      input: familyCostQuerySchema,
+      output: familyCostSchema,
+      description:
+        "A thread's own list-price cost and its family cost: the thread plus every subagent session below it (subagents of subagents included), with each descendant's cost, requests and tokens. Read-only.",
+      tool: { name: 'usage_thread_family_cost', readOnly: true, render: compactJson },
     }),
     charts: UsageSchema.method({
       input: chartQuerySchema,

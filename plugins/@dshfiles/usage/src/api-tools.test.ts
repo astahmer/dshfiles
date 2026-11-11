@@ -111,12 +111,21 @@ describe('usage tool exposure', () => {
       'usage_report',
       'usage_requests',
       'usage_status',
+      'usage_thread_family_cost',
     ])
     const readOnly = tools
       .filter(tool => tool.readOnly === true)
       .map(tool => tool.name)
       .sort()
-    expect(readOnly).toEqual(['usage_activity_report', 'usage_jev_report', 'usage_otel_metrics', 'usage_report', 'usage_requests', 'usage_status'])
+    expect(readOnly).toEqual([
+      'usage_activity_report',
+      'usage_jev_report',
+      'usage_otel_metrics',
+      'usage_report',
+      'usage_requests',
+      'usage_status',
+      'usage_thread_family_cost',
+    ])
     expect(usageApi.methods.recordJevUsage.tool).toBeUndefined()
     expect(usageApi.methods.refresh.description ?? '').toMatch(/Call only when the user asked/u)
     expect(usageApi.methods.activity.description ?? '').toMatch(/last 30 days/u)

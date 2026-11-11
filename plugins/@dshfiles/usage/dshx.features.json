@@ -464,17 +464,18 @@
     {
       "id": "thread-cost-facet",
       "title": "Thread panel Cost facet",
-      "summary": "A Cost tab in the thread panel (the right pane's tab chooser): the account route and model of the thread's last request, list-price cost per turn with tokens, models and failures, side requests apart, and links to this thread's requests (Usage › Requests filtered to the thread), Usage › Quota for that route, and Traces. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
+      "summary": "A Cost tab in the thread panel (the right pane's tab chooser): the account route and model of the thread's last request, list-price cost per turn with tokens, models and failures, side requests apart, and links to this thread's requests (Usage › Requests filtered to the thread), Usage › Quota for that route, and Traces. A thread with subagents heads the facet with its family cost (the thread plus every subagent session below it) and lists each subagent's cost; Thread / With subagents switches the headline. The read-only `usage_thread_family_cost` Agent tool returns the same totals. Registered as a right-pane page tab type, so it follows the thread on stage without changing sidebar-right.",
       "reach": ["seed tool-call-thread", "click button \"New tab\"", "click button \"Cost*\"", "expect text \"Per turn\""],
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels › Cost",
       "configuration": [],
-      "states": ["loading", "empty", "per-turn", "unpriced", "read-failed"],
+      "states": ["loading", "empty", "per-turn", "family", "unpriced", "read-failed"],
       "failureModes": [
         "An unpriced request leaves its turn's cost unknown rather than zero.",
-        "Only the thread's own requests are counted; subagents' requests stay in their own threads.",
+        "Family cost follows the native subagent parent link; threads started with thread_create or fan-out have no parent and stay separate.",
+        "A Host without familyCost (before restart) shows only the thread's own total, without the scope switch.",
         "Traces opens the Traces page; selecting the thread's own Traces view needs a contract from the conversation header owner (rich-composer)."
       ],
       "externalDependencies": [],
@@ -489,6 +490,17 @@
           "id": "usage.thread-cost-per-turn",
           "file": "plugins/@dshfiles/usage/src/thread-cost-facet.test.ts",
           "testName": "folds a thread’s requests per turn, newest turn first, side requests last"
+        },
+        {
+          "kind": "gherkin",
+          "id": "usage.thread-family-cost",
+          "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.thread-family-cost-store",
+          "file": "plugins/@dshfiles/usage/src/family-cost.test.ts",
+          "testName": "totals a thread with its subagents and their subagents, but not unrelated threads"
         }
       ],
       "telemetry": [

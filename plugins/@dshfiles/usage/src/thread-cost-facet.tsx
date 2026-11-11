@@ -4,10 +4,11 @@ import { EmptyState, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState } from 'react'
-import { usageApi, type RequestView } from './api.js'
+import { usageApi, type FamilyCost, type RequestView } from './api.js'
 import { ThreadCostWaterfall, WATERFALL_TURN_LIMIT } from './cost-waterfall-steps.js'
 import { UsageFormattingModel } from './format.js'
 
@@ -52,6 +53,21 @@ const turnsOf = (rows: readonly RequestView[]): readonly ThreadCostTurn[] => {
 
 const money = (value: number | null): string => UsageFormattingModel.formatCost(value)
 
+export type CostScope = 'own' | 'family'
+
+/**
+ * The header total: the family total only when the Host answered and the thread has subagents; otherwise this thread's
+ * own requests (an older Host without `familyCost`, or a thread that delegated nothing).
+ */
+const headlineOf = (input: {
+  readonly scope: CostScope
+  readonly family: FamilyCost | undefined
+  readonly own: { readonly cost: number | null; readonly requests: number }
+}): { readonly cost: number | null; readonly requests: number; readonly scope: CostScope } =>
+  input.scope === 'family' && input.family !== undefined && input.family.members.length > 0
+    ? { cost: input.family.family.cost, requests: input.family.family.requests, scope: 'family' }
+    : { ...input.own, scope: 'own' }
+
 /**
  * The thread panel's Cost facet (docs/ade-ux §4.4): the route the thread's last request took, what each turn cost,
  * and links to this thread's requests (Usage › Requests, filtered) and to Traces. Costs are list-price estimates.
@@ -85,6 +101,15 @@ export const ThreadCostFacet = (props: {
   const waterfall = useMemo(() => ThreadCostWaterfall.stepsOf(rows), [rows])
   const total = rows.reduce<number | null>((sum, row) => (row.cost === null ? sum : (sum ?? 0) + row.cost), null)
   const last = rows[0]
+  const [scope, setScope] = useState<CostScope>('family')
+  const family = useQuery({
+    queryKey: ['dshfiles-usage', 'thread-family-cost', props.sessionId],
+    queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => api.familyCost({ sessionId: props.sessionId }, { signal: hostSignal }) }),
+    refetchInterval: 30_000,
+    retry: false,
+  })
+  const hasSubagents = family.data !== undefined && family.data.members.length > 0
+  const headline = headlineOf({ scope, family: family.data, own: { cost: total, requests: page.data?.total ?? 0 } })
 
   return (
     <div
@@ -93,10 +118,29 @@ export const ThreadCostFacet = (props: {
     >
       <PageSection
         heading="Cost"
-        meta={page.data === undefined ? undefined : `${money(total)} · ${String(page.data.total)} requests`}
-        description="List-price estimates of this thread's model requests, side calls included."
+        meta={page.data === undefined ? undefined : `${money(headline.cost)} · ${String(headline.requests)} requests`}
+        description={
+          headline.scope === 'family'
+            ? "List-price estimates of this thread's model requests and its subagents', side calls included."
+            : "List-price estimates of this thread's model requests, side calls included."
+        }
         actions={
           <>
+            {hasSubagents ? (
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                aria-label="Cost scope"
+                value={scope}
+                onValueChange={value => {
+                  if (value === 'own' || value === 'family') setScope(value)
+                }}
+              >
+                <ToggleGroupItem value="own">Thread</ToggleGroupItem>
+                <ToggleGroupItem value="family">With subagents</ToggleGroupItem>
+              </ToggleGroup>
+            ) : null}
             <Button size="xs" variant="outline" onClick={() => props.onShowRequests(props.sessionId)}>
               Requests
             </Button>
@@ -139,6 +183,32 @@ export const ThreadCostFacet = (props: {
           </div>
         </PageSection>
       )}
+      {headline.scope === 'family' && family.data !== undefined ? (
+        <PageSection
+          heading="Subagents"
+          meta={`${money(family.data.family.cost - family.data.own.cost)} · ${String(family.data.members.length + family.data.omittedMembers)}`}
+        >
+          <ul className="dshx:flex dshx:flex-col dshx:text-xs" data-family-members="">
+            {family.data.members.map(member => (
+              <li key={member.sessionId} className="dshx:border-t dshx:border-border/60 dshx:first:border-t-0">
+                <button
+                  type="button"
+                  className="dshx:flex dshx:min-h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:py-1.5 dshx:text-left dshx:hover:bg-accent/50"
+                  style={{ paddingInlineStart: `${String((member.depth - 1) * 12)}px` }}
+                  onClick={() => props.onShowRequests(member.sessionId)}
+                >
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{member.title ?? member.sessionId}</span>
+                  <span className="dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground">{member.requests}</span>
+                  <span className="dshx:w-16 dshx:shrink-0 dshx:text-right dshx:tabular-nums">{money(member.cost)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {family.data.omittedMembers > 0 ? (
+            <p className="dshx:text-xs dshx:text-muted-foreground">{family.data.omittedMembers} cheaper subagents are counted in the total but not listed.</p>
+          ) : null}
+        </PageSection>
+      ) : null}
       {waterfall.steps.length === 0 ? null : (
         <PageSection heading="Cost waterfall" description="Where this thread's spend went, turn by turn.">
           <CostWaterfall steps={waterfall.steps} live={false} />
@@ -188,4 +258,5 @@ export const ThreadCostFacet = (props: {
 
 export class ThreadCost {
   static readonly turnsOf = turnsOf
+  static readonly headlineOf = headlineOf
 }

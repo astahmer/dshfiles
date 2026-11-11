@@ -126,6 +126,7 @@ export default DshxPlugin.make({
     Api.bind(usageApi, {
       requests: input => demanded(UsageRepo.use(repo => repo.requests(input))),
       charts: input => demanded(UsageRepo.use(repo => repo.charts(input))),
+      familyCost: input => demanded(UsageRepo.use(repo => repo.familyCost(input))),
       status: () => demanded(Indexer.use(indexer => indexer.status)),
       refresh: () => Indexer.use(indexer => Effect.andThen(indexer.pass, indexer.status)),
       jevUsage: input => demanded(UsageRepo.use(repo => repo.jevUsage(input))),
