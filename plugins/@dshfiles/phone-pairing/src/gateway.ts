@@ -1,6 +1,8 @@
 import http from 'node:http'
 import type { Duplex } from 'node:stream'
 import { decodeJson, type JsonObject, type JsonValue, jsonValueSchema } from '@dshfiles/dshx/json'
+import { withSpan } from '@dshfiles/dshx/tracing'
+import type { NativeCookie } from './native-cookie.ts'
 
 const COOKIE = '__Host-dsh_phone'
 
@@ -39,22 +41,6 @@ const cookieOf = (header: string | undefined): string | undefined => {
   const [only] = values
   if (values.length !== 1 || only === undefined) return undefined
   return only.slice(COOKIE.length + 1)
-}
-
-export interface NativeCookie {
-  readonly value: string
-  readonly expiresAt: number
-}
-
-/** Exchange the native launch URL for its session cookie; the redirect body is never read. */
-export const mintNativeCookie = async (url: string): Promise<NativeCookie | undefined> => {
-  const response = await fetch(url, { redirect: 'manual' })
-  await response.body?.cancel()
-  const header = response.headers.get('set-cookie')
-  const value = header?.split(';')[0]
-  if (header === null || value === undefined || value === '') return undefined
-  const maxAge = /;\s*max-age=(\d+)/i.exec(header)?.[1]
-  return { value, expiresAt: maxAge === undefined ? Number.POSITIVE_INFINITY : Date.now() + Number(maxAge) * 1_000 }
 }
 
 export interface GatewayOptions {
@@ -297,13 +283,17 @@ export const createPairingGateway = (options: GatewayOptions) => {
       active.clear()
     },
     listen: () =>
-      new Promise<void>((resolve, reject) => {
-        server.once('error', reject)
-        server.listen(options.port, '127.0.0.1', () => {
-          server.off('error', reject)
-          resolve()
-        })
-      }),
+      withSpan(
+        'phone pairing gateway listen',
+        () =>
+          new Promise<void>((resolve, reject) => {
+            server.once('error', reject)
+            server.listen(options.port, '127.0.0.1', () => {
+              server.off('error', reject)
+              resolve()
+            })
+          }),
+      ),
   }
 }
 

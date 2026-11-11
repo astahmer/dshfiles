@@ -10,17 +10,16 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import z from '@deepseek-ai/schemastery'
-import { HostContext, tracerLayer } from '@dshfiles/dshx/effect'
-import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { definePlugin } from '@dshfiles/dshx/host'
-import { Layer, ManagedRuntime, type Effect } from 'effect'
+import type { Effect } from 'effect'
 import { phonePairingApi, type PairingOffer } from './api.ts'
-import { createPairingGateway, mintNativeCookie, type NativeCookie } from './gateway.ts'
-import { decodeEnableArgs, providers, resolveProvider, type Provider } from './providers.ts'
+import { createPairingGateway } from './gateway.ts'
+import type { NativeCookie } from './native-cookie.ts'
+import { decodeEnableArgs, providers, type Provider } from './providers.ts'
 import { renderTerminalQr } from './qr.ts'
-import { PhoneAccessSettings } from './settings.ts'
+import { phoneRuntime } from './runtime-promise.ts'
+import type { PhoneSettings } from './settings.ts'
 import { createPairingStore } from './store.ts'
-import { startTunnel } from './tunnel.ts'
 
 export interface Config {
   gatewayPort?: number
@@ -53,21 +52,21 @@ export default definePlugin({
     const gatewayPort = config.gatewayPort ?? 3443
     const home = process.env.DSH_HOME?.trim() || `${process.env.HOME ?? '.'}/.dsh`
     const directory = `${home}/plugins/phone-pairing`
-    let settingStore: PhoneAccessSettings | undefined
+    const settingsPath = `${directory}/settings.json`
+    /** The persisted choice, once read at startup. */
+    let settings: PhoneSettings | undefined
     let gateway: ReturnType<typeof createPairingGateway> | undefined
     let pairing: Awaited<ReturnType<typeof createPairingStore>> | undefined
     let stopTunnel: Effect.Effect<void> | undefined
     let publicOrigin: string | undefined
-    const runtime = ManagedRuntime.make(
-      Layer.mergeAll(DshChildProcessSpawner.layer, tracerLayer).pipe(Layer.provide(HostContext.layer({ ctx, packageId: '@dshfiles/phone-pairing' }))),
-    )
+    const phone = phoneRuntime(ctx)
 
     ctx.effect(() => () => {
       gateway?.closeAll()
       gateway?.server.close()
       void (async () => {
-        if (stopTunnel !== undefined) await runtime.runPromise(stopTunnel)
-        await runtime.dispose()
+        if (stopTunnel !== undefined) await phone.stopTunnel(stopTunnel)
+        await phone.dispose()
       })()
     })
 
@@ -77,7 +76,7 @@ export default definePlugin({
       const port = serverPort()
       if (connection?.authenticatedUrl === undefined || port === undefined) return undefined
       try {
-        return await mintNativeCookie(connection.authenticatedUrl(`http://127.0.0.1:${port}`))
+        return await phone.mintNativeCookie(connection.authenticatedUrl(`http://127.0.0.1:${port}`))
       } catch {
         return undefined
       }
@@ -115,29 +114,33 @@ export default definePlugin({
     }
     api.rpc.register(phonePairingApi.host({ offer: () => nextOffer() }))
 
+    /** Persists only once the stored choice was read, so an early tool call never overwrites it. */
+    const save = async (next: PhoneSettings): Promise<void> => {
+      if (settings === undefined) return
+      await phone.saveSettings(settingsPath, next)
+      settings = next
+    }
+
     const start = async (requested?: Provider): Promise<{ provider: string; origin: string }> => {
       if (gateway !== undefined && publicOrigin !== undefined) return { provider: 'running', origin: publicOrigin }
-      const settings = settingStore?.current
+      // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot required: a tool call may save new settings across the awaits below.
+      const current = settings
       pairing ??= await createPairingStore({
         path: `${directory}/devices.json`,
         deviceTtlMs: (config.deviceTtlDays ?? 365) * 24 * 3_600_000,
         offerTtlMs: (config.offerTtlSeconds ?? 300) * 1_000,
       })
-      const { provider } = await runtime.runPromise(resolveProvider(requested ?? settings?.provider))
-      const tunnel = settings?.origin === undefined ? await runtime.runPromise(startTunnel(gatewayPort, provider)) : undefined
-      const origin = settings?.origin ?? tunnel?.origin
+      const { provider } = await phone.resolveProvider(requested ?? current?.provider)
+      const tunnel = current?.origin === undefined ? await phone.startTunnel(gatewayPort, provider) : undefined
+      const origin = current?.origin ?? tunnel?.origin
       const upstream = serverPort()
-      if (origin === undefined) throw new Error(`no tunnel for provider ${provider}; set "origin" in ${directory}/settings.json`)
+      if (origin === undefined) throw new Error(`no tunnel for provider ${provider}; set "origin" in ${settingsPath}`)
       if (upstream === undefined) throw new Error('the native listener is unavailable')
       stopTunnel = tunnel?.stop
       publicOrigin = origin
       gateway = createPairingGateway({ upstream, port: gatewayPort, store: pairing, publicOrigin: origin, nativeCookie })
       await gateway.listen()
-      await settingStore?.save(
-        settings?.origin === undefined
-          ? { enabled: true, provider }
-          : { enabled: true, provider, origin: settings.origin },
-      )
+      await save(current?.origin === undefined ? { enabled: true, provider } : { enabled: true, provider, origin: current.origin })
       printOffer()
       return { provider, origin }
     }
@@ -146,10 +149,10 @@ export default definePlugin({
       gateway?.closeAll()
       gateway?.server.close()
       gateway = undefined
-      if (stopTunnel !== undefined) await runtime.runPromise(stopTunnel)
+      if (stopTunnel !== undefined) await phone.stopTunnel(stopTunnel)
       stopTunnel = undefined
       publicOrigin = undefined
-      await settingStore?.save({ enabled: false })
+      await save({ enabled: false })
     }
 
     const tools = {
@@ -159,9 +162,9 @@ export default definePlugin({
         parameters: {},
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
         execute: async () => {
-          const { provider, availability } = await runtime.runPromise(resolveProvider(settingStore?.current.provider))
+          const { provider, availability } = await phone.resolveProvider(settings?.provider)
           const devices = (pairing?.listDevices() ?? []).map(device => `${device.id} last used ${new Date(device.lastUsedAt).toISOString()}`)
-          return JSON.stringify({ enabled: settingStore?.current.enabled ?? false, provider, available: availability, devices })
+          return JSON.stringify({ enabled: settings?.enabled ?? false, provider, available: availability, devices })
         },
       }),
       enable: defineTool({
@@ -214,12 +217,12 @@ export default definePlugin({
     for (const tool of Object.values(tools)) api.tools.register(tool)
 
     void (async () => {
-      const loaded = await PhoneAccessSettings.load(`${directory}/settings.json`)
-      settingStore = loaded.store
-      if (!loaded.settings.enabled) {
-        const { provider, availability } = await runtime.runPromise(resolveProvider(loaded.settings.provider))
+      const loaded = await phone.loadSettings(settingsPath)
+      settings = loaded
+      if (!loaded.enabled) {
+        const { provider, availability } = await phone.resolveProvider(loaded.provider)
         console.log(
-          `phone-pairing: phone access is off. Ask the agent to enable it, or write {"enabled":true} to ${directory}/settings.json. Would use ${provider}; providers: ${availability
+          `phone-pairing: phone access is off. Ask the agent to enable it, or write {"enabled":true} to ${settingsPath}. Would use ${provider}; providers: ${availability
             .map(option => `${option.provider}${option.available ? '' : ` (install: ${option.install ?? 'manual'})`}`)
             .join(', ')}`,
         )

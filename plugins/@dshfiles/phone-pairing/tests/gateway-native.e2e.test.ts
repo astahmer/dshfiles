@@ -2,15 +2,18 @@ import http from 'node:http'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Effect } from 'effect'
+import { FetchHttpClient } from 'effect/http'
 import { describe, expect, it } from 'vitest'
-import { createPairingGateway, mintNativeCookie } from '../src/gateway.ts'
+import { createPairingGateway } from '../src/gateway.ts'
+import { mintNativeCookie } from '../src/native-cookie.ts'
 import { createPairingStore } from '../src/store.ts'
 
 const origin = process.env.PAIRING_E2E_ORIGIN
 const token = process.env.PAIRING_E2E_TOKEN
 const enabled = origin !== undefined && token !== undefined
 
-const nativeCookie = () => mintNativeCookie(`${origin}/?token=${token ?? ''}`)
+const nativeCookie = () => Effect.runPromise(mintNativeCookie(`${origin}/?token=${token ?? ''}`).pipe(Effect.provide(FetchHttpClient.layer)))
 
 const freePort = async (): Promise<number> =>
   new Promise(resolve => {

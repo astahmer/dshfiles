@@ -4,10 +4,18 @@ import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { tracerLayer } from '@dshfiles/dshx/effect'
 import type { JsonValue } from '@dshfiles/dshx/json'
+import { recordSpans } from '@dshfiles/dshx/tracing'
+import { Effect, Layer } from 'effect'
+import { FetchHttpClient } from 'effect/http'
 import { describe, expect, it, vi } from 'vitest'
-import { createPairingGateway, mintNativeCookie, type GatewayOptions } from '../src/gateway.ts'
+import { createPairingGateway, type GatewayOptions } from '../src/gateway.ts'
+import { mintNativeCookie } from '../src/native-cookie.ts'
 import { createPairingStore } from '../src/store.ts'
+
+/** The cookie mint over real `fetch`, traced like the plugin's runtime. */
+const mint = (url: string) => Effect.runPromise(mintNativeCookie(url).pipe(Effect.provide(Layer.mergeAll(FetchHttpClient.layer, tracerLayer))))
 
 const listen = async (server: http.Server): Promise<number> => {
   server.listen(0, '127.0.0.1')
@@ -140,12 +148,34 @@ describe('pairing gateway', () => {
     const port = await listen(native)
     try {
       const before = Date.now()
-      const minted = await mintNativeCookie(`http://127.0.0.1:${port}/?token=fixture`)
+      const minted = await mint(`http://127.0.0.1:${port}/?token=fixture`)
       expect(minted?.value).toBe('dsh-auth=minted')
       expect(minted?.expiresAt).toBeGreaterThanOrEqual(before + 600_000)
       await released
     } finally {
       native.closeAllConnections()
+      await new Promise(resolve => native.close(resolve))
+    }
+  })
+
+  it('records one bounded listen span and one native cookie span without addresses', async () => {
+    using recorder = recordSpans()
+    const native = http.createServer((_request, response) => {
+      response.writeHead(303, { location: './', 'set-cookie': 'dsh-auth=minted; Max-Age=600; Path=/' })
+      response.end()
+    })
+    const nativePort = await listen(native)
+    const paired = await pairedGateway(nativePort, () => mint(`http://127.0.0.1:${nativePort}/?token=fixture`))
+    try {
+      expect((await get(paired.port, '/', paired.cookie)).status).toBe(303)
+      expect(recorder.named('phone pairing gateway listen')).toHaveLength(1)
+      expect(recorder.named('phone pairing native cookie')).toHaveLength(1)
+      const metadata = JSON.stringify(recorder.spans.map(span => ({ attributes: span.attributes, status: span.status })))
+      expect(metadata).not.toContain('127.0.0.1')
+      expect(metadata).not.toContain('fixture')
+      expect(metadata).not.toContain(String(paired.port))
+    } finally {
+      await paired.close()
       await new Promise(resolve => native.close(resolve))
     }
   })
