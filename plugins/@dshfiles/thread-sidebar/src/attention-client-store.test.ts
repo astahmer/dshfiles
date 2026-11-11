@@ -230,6 +230,35 @@ describe('shared thread attention store', () => {
     assert.equal(calls.acknowledge, 1)
   })
 
+  it('rereads after an incomplete write even when an older read is in flight', async () => {
+    const { api } = fakeApi()
+    let reads = 0
+    let finishRead: ((value: ThreadAttentionSnapshot) => void) | undefined
+    const earlier = new Promise<ThreadAttentionSnapshot>(resolve => {
+      finishRead = resolve
+    })
+    store().attach({
+      ...api,
+      state: async () => {
+        reads += 1
+        if (reads === 1) return snapshot(1, ['thread-a'])
+        if (reads === 2) return earlier
+        return snapshot(2, [])
+      },
+      writeCapabilities: async () => ({ deltaVersion: 1 }),
+      writeDelta: async () => ({ revision: 2, complete: false, put: [], removed: [] }),
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    store().changed?.(1)
+    await vi.advanceTimersByTimeAsync(0)
+    await store().acknowledge('thread-a', 1)
+    assert.equal(reads, 2)
+    finishRead?.(snapshot(1, ['thread-a']))
+    await vi.advanceTimersByTimeAsync(0)
+    assert.equal(reads, 3)
+    assert.deepEqual(store().getSnapshot().snapshot?.sessions, [])
+  })
+
   it('never replays a failed delta write through the v1 methods', async () => {
     const { api, calls } = fakeApi()
     store().attach({

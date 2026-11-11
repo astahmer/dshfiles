@@ -181,8 +181,7 @@ const createStore = (): ThreadAttentionStore => {
 
   // A cleared record leaves the Host revision where it was, so an announced revision equal to ours still means a read.
   let rereadQueued = false
-  const changed = (next: number): void => {
-    if (next < revision) return
+  const forceRead = (): void => {
     const force = (): void => {
       lastAttemptAt = 0
       void read()
@@ -197,6 +196,10 @@ const createStore = (): ThreadAttentionStore => {
       rereadQueued = false
       force()
     })
+  }
+  const changed = (next: number): void => {
+    if (next < revision) return
+    forceRead()
   }
 
   const mutate = async (call: () => Promise<ThreadAttentionSnapshot>): Promise<void> => {
@@ -227,12 +230,8 @@ const createStore = (): ThreadAttentionStore => {
 
   const mergeDelta = (changes: ThreadAttentionChanges, since: number): void => {
     const held = state.snapshot
-    if (held === null || held.revision !== since) {
-      void read()
-      return
-    }
-    if (!changes.complete) {
-      void read()
+    if (held === null || held.revision !== since || !changes.complete) {
+      forceRead()
       return
     }
     const merged = new Map(held.sessions.map(view => [view.sessionId, view]))
@@ -257,7 +256,7 @@ const createStore = (): ThreadAttentionStore => {
       try {
         mergeDelta(await client.writeDelta({ since, command }, {}), since)
       } catch (error) {
-        void read()
+        forceRead()
         throw error
       }
     }
