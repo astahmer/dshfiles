@@ -1,10 +1,10 @@
 # Guided onboarding and feature discovery
 
-**Resume here:** P1 and P2 are on `main`. Start P3: **What's new** from jj history (since the last visit; since the fork point for forkers) and opt-in usage suggestions from local tool-call history. Before P3, consider follow-up 7 (phone `reach` paths), which limits Show me where at 390 px. Follow-ups are listed under _P1 follow-ups_; landing checks under _Landing checks_.
+**Resume here:** P1, P2 and P3's **What's new** are on `main`. Next: land the `reachNarrow` phone paths (follow-up 7), then P3's opt-in usage suggestions from local tool-call history. Follow-ups are listed under _P1 follow-ups_; landing checks under _Landing checks_.
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
-**Status:** P0, P1 and P2 landed on `main` (2026-11-11); P3 in progress (What's new) alongside follow-up 7 (phone `reach` paths); usage suggestions follow What's new.
+**Status:** P0, P1 and P2 landed on `main` (2026-11-11). P3: What's new landed (`jj:tspprznw`, `jj:yvnrmxpv`); phone `reach` paths (follow-up 7) in progress; usage suggestions next.
 
 | Phase | Work                                                                                                                                                                | Status      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
