@@ -11,13 +11,12 @@ import {
   type StepStatus,
   type Toolchain,
 } from './pack-plan.js'
+import { DshfilesCheckout } from './dshfiles-checkout.js'
 import { PluginManagerEdge, type PackManagerSurface } from './plugin-manager-promise.js'
 
 const MAX_DETAIL = 300
 const INSTALL_TIMEOUT = Duration.minutes(5)
 const DSHX_BIN = ['tooling', 'dshx', 'packages', 'dshx', 'dist', 'cli', 'bin.js'] as const
-const PROFILE_SYNC = ['scripts', 'profile-sync.ts'] as const
-const SELF = '@dshfiles/onboarding'
 
 /** The profile the Host booted: its name for commands, its home only ever passed to dshx, never shown. */
 export interface BootProfile {
@@ -83,18 +82,17 @@ export class PackControls extends Context.Service<
 
         const exists = (target: string) => fs.exists(target).pipe(Effect.orElseSucceed(() => false))
 
-        /** The checkout this bundle is linked from, read off the plugin manager's record of it; nothing is assumed. */
+        /** The dshx CLI of the checkout this bundle is linked from. */
         const toolchain = Effect.gen(function* (): Effect.fn.Return<ResolvedToolchain> {
           const profile = input.profile()
           if (profile === undefined) return { kind: 'manual', reason: 'This Host was not started from a DSH profile it can name.' }
-          const manager = input.manager()
-          const bundles = yield* PluginManagerEdge.listBundles(manager).pipe(Effect.orElseSucceed(() => []))
-          const source = bundles.find(bundle => bundle.name === SELF)?.source?.replace(/^(link|file):/u, '')
-          const unlinked = 'This profile does not link Getting started from a dshfiles checkout, so the repository toolchain is not on this Host.'
-          if (source === undefined || !path.isAbsolute(source)) return { kind: 'manual', reason: unlinked }
-          const root = path.resolve(source, '..', '..', '..')
+          const checkout = yield* DshfilesCheckout.locate({ manager: input.manager() }).pipe(
+            Effect.provideService(FileSystem.FileSystem, fs),
+            Effect.provideService(Path.Path, path),
+          )
+          if (checkout.kind === 'missing') return { kind: 'manual', reason: checkout.reason }
+          const root = checkout.root
           const bin = path.join(root, ...DSHX_BIN)
-          if (!(yield* exists(path.join(root, ...PROFILE_SYNC)))) return { kind: 'manual', reason: unlinked }
           if (!(yield* exists(bin)))
             return {
               kind: 'manual',
