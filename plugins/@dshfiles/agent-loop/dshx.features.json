@@ -6,9 +6,7 @@
       "id": "settled-stream-size",
       "title": "Store a settled attempt's replay metadata once",
       "summary": "Owned fork of the native agent loop. A settled assistant message carries the provider's replay envelope on its message source; the same envelope's per-block list was also written into the durable compact stream, so every assistant message kept its block signatures twice. This fork stores the stream copy without the block list, leaving the response-level envelope and the message source untouched. Everything else is the pinned upstream code.",
-      "surfaces": [
-        "host"
-      ],
+      "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: no UI",
@@ -17,16 +15,10 @@
           "key": "agents",
           "defaultValue": "[]",
           "constraints": "Restated from the stock row because a patch replaces whole configs.",
-          "coveredBy": [
-            "agent-loop.settled-stream"
-          ]
+          "coveredBy": ["agent-loop.settled-stream"]
         }
       ],
-      "states": [
-        "streaming",
-        "settled",
-        "interrupted"
-      ],
+      "states": ["streaming", "settled", "interrupted"],
       "failureModes": [
         "A consumer that reads per-block replay metadata from the durable stream instead of the message source sees only the response-level envelope. The browser already receives neither copy, and the provider replay path reads the message source — asserted by tests/agent-loop.integration.test.ts.",
         "Every other behaviour is the pinned upstream code; drift is checked with scripts/native-fork-diff.mjs."
@@ -62,9 +54,7 @@
       "id": "tool-argument-limit",
       "title": "Stop a runaway tool call",
       "summary": "A model that keeps streaming one tool call's arguments past a size or time bound (2026-11-11: an apply_patch call streamed 199 KB of whitespace for 15 minutes until the provider dropped the connection and the step failed) is stopped at the stream read. The provider request is aborted, the cut call is recorded with empty arguments and never runs, and its error result tells the model to resend smaller calls. The turn continues with the next step.",
-      "surfaces": [
-        "host"
-      ],
+      "surfaces": ["host"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: no UI",
@@ -73,24 +63,16 @@
           "key": "maxToolCallArgumentBytes",
           "defaultValue": "524288",
           "constraints": "Integer bytes, at least 1; read at each model attempt.",
-          "coveredBy": [
-            "agent-loop.tool-argument-limit"
-          ]
+          "coveredBy": ["agent-loop.tool-argument-limit"]
         },
         {
           "key": "toolCallArgumentTimeoutMs",
           "defaultValue": "180000",
           "constraints": "Integer milliseconds from the call's first argument chunk, at least 1; read at each model attempt. A stream that goes silent is the adapter idle watchdog's job, not this bound.",
-          "coveredBy": [
-            "agent-loop.tool-argument-limit"
-          ]
+          "coveredBy": ["agent-loop.tool-argument-limit"]
         }
       ],
-      "states": [
-        "streaming",
-        "cut",
-        "continued"
-      ],
+      "states": ["streaming", "cut", "continued"],
       "failureModes": [
         "A legitimate call larger than the byte bound, or slower than the time bound, is cut too; the result names both settings so the user can raise them.",
         "Other tool calls still open in the same reply are cut with it and told to resend on their own; calls that already finished run normally."
@@ -113,6 +95,49 @@
         {
           "kind": "not-applicable",
           "reason": "The cut happens inside the native `llm request` span of the attempt it stops, and the cut call is recorded as an ordinary tool/call and tool/result pair."
+        }
+      ]
+    },
+    {
+      "id": "output-limit-continuation",
+      "title": "Continue a reply cut at the output-token limit",
+      "summary": "Off by default. When a reply stops on the output-token limit (finish max-tokens), the turn runs up to maxOutputLimitContinuations extra steps instead of ending. The cut reply stays in history once, exactly as streamed; each extra step adds only a short note asking the model to continue where it stopped without repeating itself, quoting the last 200 characters and naming any tool call the limit cut (the native assembler drops those, so nothing ran). Past the bound the turn ends with max-tokens as before.",
+      "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: no UI",
+      "configuration": [
+        {
+          "key": "maxOutputLimitContinuations",
+          "defaultValue": "0",
+          "constraints": "Integer 0-2 per turn; 0 keeps the upstream behaviour. Each continuation is one more model call, so it spends tokens without a user prompt. Read at each cut.",
+          "coveredBy": ["agent-loop.output-limit-continuation"]
+        }
+      ],
+      "states": ["streaming", "cut", "continued", "exhausted"],
+      "failureModes": [
+        "A model that ignores the note repeats part of its answer; the stored cut reply itself is never re-streamed or rewritten.",
+        "A tool call the limit cut never runs; the note names it so the model can resend it smaller.",
+        "With the bound spent the turn ends with max-tokens, exactly as with the setting off."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "agent-loop.output-limit-continuation",
+          "file": "plugins/@dshfiles/agent-loop/tests/output-limit-continuation.test.ts",
+          "testName": "continues a cut reply once, keeps the streamed text once, and names the cut tool call"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agent-loop.output-limit-continuation.no-ui",
+          "reason": "Host-only: the note is a user/message with source output-limit-continuation, shown by the chat plugin as an execution-request notice it already renders for unknown sources."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Each continuation is an ordinary step whose model call opens the native `llm request` span; the note is a durable user/message event with its own source kind."
         }
       ]
     }

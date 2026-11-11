@@ -39,6 +39,7 @@ import { AssistantStreamAttempt } from './assistant-stream.ts'
 import { SystemPromptProjection } from './runtime-context.ts'
 import { executeToolCalls } from './tool-calls.ts'
 import { ToolArgumentLimit, type CutToolCall, type ToolArgumentLimits } from './tool-argument-limit.ts'
+import { MAX_OUTPUT_LIMIT_CONTINUATIONS, OutputLimitCut } from './output-limit-continuation.ts'
 
 type Phase =
   | { kind: 'idle'; lastTurn: number }
@@ -116,6 +117,8 @@ export class ReactLoopAgent implements Agent {
   /** Process-local revision of assistant frames for this attached Session. */
   private assistantStreamRevision = 0
   private assistantAttemptCounter = 0
+  /** Output-limit continuations spent in the open turn. */
+  private outputLimitContinuations = 0
   private readonly systemPrompt: SystemPromptProjection
   /** Identities fully frozen by this loop; weak references do not retain replaced history. */
   private readonly frozenMessages = new WeakSet<Message>()
@@ -310,6 +313,7 @@ export class ReactLoopAgent implements Agent {
       this.throwError(error)
     }
     phase.turn = turn
+    this.outputLimitContinuations = 0
     let turnEnds: TurnEndReason | null = null
     let target: InboxTarget = 'next-turn'
     try {
@@ -455,6 +459,7 @@ export class ReactLoopAgent implements Agent {
         maxMs: this.loopCtx.agentLoop.config.toolCallArgumentTimeoutMs.get(),
       }
       const argumentLimit = new ToolArgumentLimit(argumentLimits)
+      const outputLimitCut = new OutputLimitCut()
       let cutCalls: readonly CutToolCall[] = []
       try {
         const stream = preparedCall?.stream(request) ?? this.loopCtx.llm.stream(request)
@@ -469,6 +474,7 @@ export class ReactLoopAgent implements Agent {
             for (const closing of ToolArgumentLimit.closingChunks(cutCalls)) live.push(closing)
             break
           }
+          outputLimitCut.observe(chunk)
           live.push(chunk)
         }
         signal.throwIfAborted()
@@ -557,7 +563,14 @@ export class ReactLoopAgent implements Agent {
             stream: live.settledStream,
           }, { surfaceOp: 'append' }).seq,
         )
-        if (finish.kind === 'max-tokens') return { kind: 'max-tokens' }
+        if (finish.kind === 'max-tokens') {
+          const max = Math.min(this.loopCtx.agentLoop.config.maxOutputLimitContinuations.get(), MAX_OUTPUT_LIMIT_CONTINUATIONS)
+          if (this.outputLimitContinuations >= max) return { kind: 'max-tokens' }
+          this.outputLimitContinuations += 1
+          const note = outputLimitCut.message({ attempt: this.outputLimitContinuations, max })
+          this.inbox.splice('next-step', this.inbox.nextStep.length, 0, [note])
+          return null
+        }
 
         const toolCalls = message.content.filter(block => block.type === 'tool-call')
         if (toolCalls.length === 0) return { kind: 'completed' }

@@ -42,10 +42,10 @@ idle watchdog never fired, because chunks kept arriving.
 
 The fork bounds one tool call's streamed arguments, counted from that call's first chunk:
 
-| Setting (agent-loop row config) | Default            | Effect                                                   |
-| ------------------------------- | ------------------ | -------------------------------------------------------- |
-| `maxToolCallArgumentBytes`      | `524288` (512 KiB) | UTF-8 bytes one call's arguments may reach               |
-| `toolCallArgumentTimeoutMs`     | `180000` (3 min)   | how long one call may keep streaming its arguments       |
+| Setting (agent-loop row config) | Default            | Effect                                             |
+| ------------------------------- | ------------------ | -------------------------------------------------- |
+| `maxToolCallArgumentBytes`      | `524288` (512 KiB) | UTF-8 bytes one call's arguments may reach         |
+| `toolCallArgumentTimeoutMs`     | `180000` (3 min)   | how long one call may keep streaming its arguments |
 
 Past either bound the attempt stops and the provider request is aborted. The cut call is stored with `{}` arguments and
 never runs; its error result (`TOOL_ARGUMENTS_LIMIT_EXCEEDED`) says what was measured and tells the model to resend
@@ -54,15 +54,33 @@ too and told to resend on their own; calls that already finished run normally. T
 and the user's input is not sent again. A stream that goes silent is still the adapter's idle watchdog's job (300 s on
 pi-ai routes). Set them on the `dshfiles-agent-loop` row; both are volatile and read at each model attempt.
 
+## Output-token limit
+
+A reply that stops on the output-token limit (`finish: max-tokens`) ends the turn upstream, even mid-sentence or
+mid-tool-call. With `maxOutputLimitContinuations` above `0` the fork runs that many extra steps instead:
+
+| Setting (agent-loop row config) | Default | Effect                                                                         |
+| ------------------------------- | ------- | ------------------------------------------------------------------------------ |
+| `maxOutputLimitContinuations`   | `0`     | extra steps per turn after a cut reply, `0`–`2`; `0` ends the turn as upstream |
+
+Off by default because each continuation is one more model call nobody asked for. The cut reply stays in history once,
+exactly as streamed: nothing is re-streamed or rewritten. The extra step's only new input is a short `user/message` with
+source `output-limit-continuation` (the chat shows it as a notice) that asks the model to continue where it stopped
+without repeating itself, quotes the last 200 characters, and names any tool call the limit cut. The native assembler
+drops such calls, so nothing ran; the model is told to resend them smaller. Past the bound the turn ends with
+`max-tokens`, as before. Volatile, read at each cut.
+
 ## Delta
 
-| File                             | Change                                                                                                                                                                                       |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/assistant-stream.ts` | adds `settledStream`: the same compact records, with the terminal chunk's envelope reduced to its `response` part                                                                            |
-| `src/native/agent.ts`            | both `assistant/message` appends (settled and interrupted) store `live.settledStream`; `assistant/attempt` still uses the untouched `live.stream`                                            |
-| `src/native/index.ts`            | Cordis declares `FiberState` as a `const enum`, and this workspace pins a Cordis whose runtime has no such export, so the three inactive states are inlined as numbers with the same meaning; the two tool-argument settings below |
-| `src/native/agent.ts` (2)        | the stream read feeds every chunk to `ToolArgumentLimit`; at a cut it closes the cut calls, leaves the loop (which aborts the provider request), runs only the complete calls and records an error result for each cut one |
-| `src/native/tool-argument-limit.ts` (added) | the bounds, the cut, and the result text the model reads |
+| File                                              | Change                                                                                                                                                                                                                             |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/assistant-stream.ts`                  | adds `settledStream`: the same compact records, with the terminal chunk's envelope reduced to its `response` part                                                                                                                  |
+| `src/native/agent.ts`                             | both `assistant/message` appends (settled and interrupted) store `live.settledStream`; `assistant/attempt` still uses the untouched `live.stream`                                                                                  |
+| `src/native/index.ts`                             | Cordis declares `FiberState` as a `const enum`, and this workspace pins a Cordis whose runtime has no such export, so the three inactive states are inlined as numbers with the same meaning; the two tool-argument settings below |
+| `src/native/agent.ts` (2)                         | the stream read feeds every chunk to `ToolArgumentLimit`; at a cut it closes the cut calls, leaves the loop (which aborts the provider request), runs only the complete calls and records an error result for each cut one         |
+| `src/native/tool-argument-limit.ts` (added)       | the bounds, the cut, and the result text the model reads                                                                                                                                                                           |
+| `src/native/agent.ts` (3), `index.ts`             | `maxOutputLimitContinuations`: on a `max-tokens` finish within the bound, queue the continuation note on `next-step` and return a non-final step instead of `max-tokens`                                                           |
+| `src/native/output-limit-continuation.ts` (added) | watches the attempt for the text tail and cut tool calls, and builds the note                                                                                                                                                      |
 
 `src/host.ts` is ours: it hosts the native plugin class unchanged, like the other vendor forks.
 
@@ -70,7 +88,7 @@ pi-ai routes). Set them on the `dshfiles-agent-loop` row; both are volatile and 
 
 ```sh
 pnpm --dir plugins/@dshfiles/agent-loop typecheck
-pnpm --dir plugins/@dshfiles/agent-loop test        # tests/settled-stream.test.ts, tests/tool-argument-limit.test.ts
+pnpm --dir plugins/@dshfiles/agent-loop test        # settled-stream, tool-argument-limit, output-limit-continuation
 node scripts/native-fork-diff.mjs agent-loop
 ```
 

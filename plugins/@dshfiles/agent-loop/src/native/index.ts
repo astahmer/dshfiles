@@ -35,6 +35,7 @@ import { ReactLoopAgent } from './agent.ts'
 import { inboxProjectionDefinition } from './inbox.ts'
 import { DEFAULT_MAX_PARALLEL_TOOL_CALLS } from './constants.ts'
 import { DEFAULT_MAX_TOOL_CALL_ARGUMENT_BYTES, DEFAULT_TOOL_CALL_ARGUMENT_TIMEOUT_MS } from './tool-argument-limit.ts'
+import { DEFAULT_MAX_OUTPUT_LIMIT_CONTINUATIONS, MAX_OUTPUT_LIMIT_CONTINUATIONS } from './output-limit-continuation.ts'
 import type {} from './runtime-context.ts'
 
 /**
@@ -311,6 +312,8 @@ export interface Config {
   maxToolCallArgumentBytes: Volatile<number>
   /** Longest one tool call may keep streaming its arguments, in milliseconds, before the attempt stops and the call fails unrun. */
   toolCallArgumentTimeoutMs: Volatile<number>
+  /** Extra steps one turn may spend continuing a reply cut at the output-token limit; `0` (default) ends the turn there. */
+  maxOutputLimitContinuations: Volatile<number>
   /** Agents created or resumed at plugin startup. */
   agents: (AgentOptions & {
     /** Stable config label used in logs and as the fresh combined-id prefix. */
@@ -329,6 +332,7 @@ type ConfigInput = {
   maxParallelToolCalls?: number
   maxToolCallArgumentBytes?: number
   toolCallArgumentTimeoutMs?: number
+  maxOutputLimitContinuations?: number
 }
 
 /** Reject self-contained identity conflicts before any configured agent starts. */
@@ -358,6 +362,7 @@ export class AgentLoop extends Service implements AgentFactory {
     maxParallelToolCalls: z.number().step(1).min(1).default(DEFAULT_MAX_PARALLEL_TOOL_CALLS).volatile(),
     maxToolCallArgumentBytes: z.number().step(1).min(1).default(DEFAULT_MAX_TOOL_CALL_ARGUMENT_BYTES).volatile(),
     toolCallArgumentTimeoutMs: z.number().step(1).min(1).default(DEFAULT_TOOL_CALL_ARGUMENT_TIMEOUT_MS).volatile(),
+    maxOutputLimitContinuations: z.number().step(1).min(0).max(MAX_OUTPUT_LIMIT_CONTINUATIONS).default(DEFAULT_MAX_OUTPUT_LIMIT_CONTINUATIONS).volatile(),
     agents: z.array(z.object({
       id: z.string().required(),
       sessionId: z.string().min(1),
@@ -384,6 +389,7 @@ export class AgentLoop extends Service implements AgentFactory {
       maxParallelToolCalls: config.maxParallelToolCalls,
       maxToolCallArgumentBytes: config.maxToolCallArgumentBytes,
       toolCallArgumentTimeoutMs: config.toolCallArgumentTimeoutMs,
+      maxOutputLimitContinuations: config.maxOutputLimitContinuations,
     }
     validateConfiguredAgents(this.config.agents)
     // Register only after every config validation above has passed, so a

@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The deltas drop the duplicate per-block replay metadata a settled attempt stored inside its durable stream (the message source keeps the envelope the provider needs), and stop a tool call whose streamed arguments outgrow maxToolCallArgumentBytes or toolCallArgumentTimeoutMs (added tool-argument-limit.ts): the attempt is aborted, the cut call never runs and gets an error result.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. The deltas drop the duplicate per-block replay metadata a settled attempt stored inside its durable stream (the message source keeps the envelope the provider needs), and stop a tool call whose streamed arguments outgrow maxToolCallArgumentBytes or toolCallArgumentTimeoutMs (added tool-argument-limit.ts): the attempt is aborted, the cut call never runs and gets an error result; and, when maxOutputLimitContinuations is above 0 (default 0, max 2), continue a reply cut at the output-token limit with a short note instead of ending the turn (added output-limit-continuation.ts).",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-agent-loop",
@@ -13,12 +13,6 @@
       "local": "src/native"
     }
   ],
-  "added": [
-    "src/native/tool-argument-limit.ts"
-  ],
-  "delta": [
-    "src/native/agent.ts",
-    "src/native/assistant-stream.ts",
-    "src/native/index.ts"
-  ]
+  "added": ["src/native/tool-argument-limit.ts", "src/native/output-limit-continuation.ts"],
+  "delta": ["src/native/agent.ts", "src/native/assistant-stream.ts", "src/native/index.ts"]
 }
