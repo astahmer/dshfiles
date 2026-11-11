@@ -63,6 +63,18 @@ blocks the app, makes no model request, and changes the profile only when you co
 5. **Reverse.** Disable pack switches the pack's running rows off (never Core's, never a row another fully enabled pack
    needs) and uninstalls nothing; Enable pack switches them back.
 
+## Outside the app
+
+1. **Compose a profile from packs.** `dshx init --profile <name> [--packs core,versioning,…]` composes a DSH profile
+   from the same packs: a multi-select in a terminal (Core checked and locked), or the ids you pass. It links the packs'
+   plugins with one `profile-sync --bundle` run (the `dshx add` path), creates a missing profile, refuses a profile
+   composed differently unless `--extend`, previews with `--dry-run` and never restarts DSH. See
+   [the CLI reference](../../../tooling/dshx/docs/cli-reference.md#dshx-init-compose-a-profile-from-packs).
+2. **A page per pack.** [`docs/packs`](../../../docs/packs/README.md) holds one generated page per pack: its plugins,
+   prerequisites, key settings, catalog features (curated first), how to enable it and its restart need.
+   `node scripts/pack-docs.ts` regenerates them from `src/packs.ts` and `src/generated/feature-catalog.ts`;
+   `pnpm check:pack-docs` (part of `check:green`) fails on a stale page, so regenerate after changing either.
+
 ## What's new
 
 1. **List.** Getting started's **What's new** lists each `feat(<plugin>): …` and `fix(<plugin>): …` change whose scope
