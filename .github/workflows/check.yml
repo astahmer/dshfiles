@@ -130,7 +130,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2]
+        # Must list every index below the shard count passed to plugin-shard.mjs: a missing index silently skips the
+        # boot of every bundle that round-robins into it.
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -141,7 +143,7 @@ jobs:
       # Every bundle's own boot lands in exactly one shard, and the composed web-profile boot in shard 0 only.
       # Boots stay serial inside a shard: two at once on a 4 vCPU runner left expected Client entries `pending` past
       # their settle window (workbench, agent-preset) although both pass alone and on a 10-core workstation. The
-      # parallelism is the three shards, not concurrency inside one.
+      # parallelism is the four shards, not concurrency inside one.
       - run: node scripts/ci/plugin-shard.mjs ${{ matrix.shard }} 4 boot
 
   e2e-smoke:
