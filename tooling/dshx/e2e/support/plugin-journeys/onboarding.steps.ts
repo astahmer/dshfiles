@@ -492,3 +492,103 @@ Then('Suggestions shows a suggestion or an honest empty state with 44 pixel cont
   await page.setViewportSize({ width: 1280, height: 900 })
   await finishJourneyAssertions(page)
 })
+
+const TRY_IT_FEATURE = 'onboarding#try-it'
+const tryItDialog = (page: Page) => page.locator('[data-try-it-dialog]')
+const featureRow = (page: Page, key: string) => gettingStarted(page).locator(`[data-feature="${key}"]`)
+
+const searchFeatures = async (page: Page, text: string): Promise<void> => {
+  await gettingStarted(page).getByRole('textbox', { name: 'Search features', exact: true }).fill(text)
+}
+
+/** Anything that would start a thread or reach a model: the Try it API call, a Session create or prompt, a provider call. */
+const SEND_PATTERN = /tryIt|session\/create|session\/prompt|createSession|chat\/completions|\/v1\/messages|\/v1\/responses/u
+const sends = new WeakMap<Page, string[]>()
+
+Then('no feature or pack offers Try it while it is off', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'onboarding-try-it-off', async () => {
+    await expect(gettingStarted(page).getByRole('list', { name: 'Features', exact: true }).locator('[data-feature]').first()).toBeVisible()
+    await expect(gettingStarted(page).locator('[data-pack]').first()).toBeVisible()
+    await expect(gettingStarted(page).getByRole('button', { name: /^Try it/u })).toHaveCount(0)
+    await searchFeatures(page, 'Try a feature with the agent')
+    await expect(featureRow(page, TRY_IT_FEATURE)).toBeVisible()
+    await expect(featureRow(page, TRY_IT_FEATURE).getByRole('button', { name: /^Try it/u })).toHaveCount(0)
+  })
+})
+
+When('Try it is turned on from its own feature row in Getting started', async ({ page }: { page: Page }) => {
+  await featureRow(page, TRY_IT_FEATURE).getByRole('button', { name: 'Open Try a feature with the agent in a new thread', exact: true }).click()
+  const toggle = settingsPage(page)
+    .locator('[data-setting-path="tryIt"]')
+    .filter({ has: page.getByRole('switch') })
+    .first()
+    .getByRole('switch')
+  await expect(toggle).not.toBeChecked()
+  await toggle.click()
+  await expect(toggle).toBeChecked()
+})
+
+When('Try it is pressed from the keyboard on the {string} feature', async ({ page }: { page: Page }, title: string) => {
+  const seen: string[] = []
+  sends.set(page, seen)
+  page.on('request', request => {
+    if (SEND_PATTERN.test(request.url()) || SEND_PATTERN.test(request.postData() ?? '')) seen.push(request.url())
+  })
+  page.on('websocket', socket => {
+    socket.on('framesent', frame => {
+      if (typeof frame.payload === 'string' && SEND_PATTERN.test(frame.payload)) seen.push(`ws:${frame.payload.slice(0, 120)}`)
+    })
+  })
+  await searchFeatures(page, title)
+  const button = featureRow(page, TRY_IT_FEATURE).getByRole('button', { name: `Try it: ${title}`, exact: true })
+  await button.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('dialog', { name: `Try it: ${title}`, exact: true })).toBeVisible()
+})
+
+Then('the Try it confirmation names the token cost with 44 pixel controls and nothing was sent yet', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'onboarding-try-it-cost', async () => {
+    const dialog = tryItDialog(page)
+    await expect(dialog.locator('[data-try-it-cost]')).toContainText('starts a new thread')
+    await expect(dialog.locator('[data-try-it-cost]')).toContainText('spends tokens on your current AI account')
+    await expect(dialog.getByRole('button', { name: 'Start demo', exact: true })).toBeVisible()
+    const fits = await dialog.evaluate(element => element.getBoundingClientRect().right <= window.innerWidth)
+    expect(fits).toBe(true)
+    // Layout heights: the dialog's zoom-in scales its bounding boxes while it opens.
+    const heights = await dialog
+      .locator('button')
+      .evaluateAll(elements =>
+        elements
+          .filter(element => element instanceof HTMLElement && element.offsetParent !== null)
+          .map(element => (element instanceof HTMLElement ? element.offsetHeight : 0)),
+      )
+    expect(heights.length).toBe(2)
+    // Three row buttons collapse to icons in a phone-width pane instead of squeezing the title to a word per line.
+    // The open dialog hides the page from the accessibility tree, so the row is read by element, not by role.
+    const titleWidth = await page
+      .locator(`main[aria-label="Getting started"] [data-feature="${TRY_IT_FEATURE}"] p`)
+      .first()
+      .evaluate(element => element.getBoundingClientRect().width)
+    expect(titleWidth).toBeGreaterThan(120)
+    expect(heights.filter(height => height < 44)).toEqual([])
+    expect(sends.get(page) ?? []).toEqual([])
+  })
+  await page.screenshot({ path: test.info().outputPath('try-it.png'), animations: 'disabled' })
+})
+
+When('the Try it confirmation is cancelled', async ({ page }: { page: Page }) => {
+  await tryItDialog(page).getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+Then('no thread was started and no model request was sent, and Try it has focus again', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'onboarding-try-it-cancel-sends-nothing', async () => {
+    await expect(featureRow(page, TRY_IT_FEATURE).getByRole('button', { name: /^Try it: /u })).toBeFocused()
+    await expect(gettingStarted(page)).toBeVisible()
+    // A send would have reached the Host by now; nothing may have left the browser for it.
+    await page.waitForTimeout(1_000)
+    expect(sends.get(page) ?? []).toEqual([])
+  })
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await finishJourneyAssertions(page)
+})

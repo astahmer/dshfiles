@@ -75,3 +75,17 @@ Feature: Onboarding
     When Suggestions is turned on from its Settings link
     And Getting started is opened from the Knowledge destination
     Then Suggestions shows a suggestion or an honest empty state with 44 pixel controls at 390 pixels, and never errors
+
+  @scenario:onboarding.try-it
+  Scenario: Try it stays off and starts nothing, and once on its confirmation names the token cost and Cancel starts no thread
+    Given the isolated plugin composition of "@dshfiles/onboarding, @dshfiles/command-palette, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell" is booted
+    When the setup wizard shown on first run is skipped
+    And Getting started is opened from the Knowledge destination
+    Then no feature or pack offers Try it while it is off
+    When Try it is turned on from its own feature row in Getting started
+    And Getting started is opened from the Knowledge destination
+    And Getting started is narrowed to 390 pixels wide
+    And Try it is pressed from the keyboard on the "Try a feature with the agent in a new thread" feature
+    Then the Try it confirmation names the token cost with 44 pixel controls and nothing was sent yet
+    When the Try it confirmation is cancelled
+    Then no thread was started and no model request was sent, and Try it has focus again
