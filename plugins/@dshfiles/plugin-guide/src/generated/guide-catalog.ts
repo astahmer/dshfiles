@@ -3010,7 +3010,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › secret-link-reveal"
       ],
       "details": [
-        "Used by 15 catalog feature(s)",
+        "Used by 16 catalog feature(s)",
         "Destinations in use: knowledge, land, observe, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
