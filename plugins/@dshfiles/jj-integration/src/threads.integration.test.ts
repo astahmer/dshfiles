@@ -434,6 +434,25 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.locate(thread.path)).threadName).toBe('thread-c0ffee')
   })
 
+  it('removes a spare it could not record, so no unrecorded workspace shows up as a thread', async () => {
+    const sparesRecord = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')
+    mkdirSync(join(sparesRecord, 'blocker'), { recursive: true })
+    let added: () => void = () => undefined
+    const workspaceAdded = new Promise<void>(resolve => (added = resolve))
+    const observing = ThreadWorkspacesTestSupport.promiseThreads({
+      executor: async input => {
+        const result = await executor(input)
+        if (input.args[0] === 'workspace' && input.args[1] === 'add') added()
+        return result
+      },
+    })
+    observing.prewarm(repo)
+    await workspaceAdded
+    await settled(1_500)
+    expect(workspaceNames(repo)).toEqual(['default'])
+    expect(readdirSync(`${repo}-threads`).filter(name => name.startsWith('thread-'))).toEqual([])
+  })
+
   it('replaces a spare it cannot claim instead of stranding it', async () => {
     await threads.provision(repo)
     const spares = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')

@@ -955,8 +955,11 @@ const make = Effect.gen(function* () {
     yield* Ref.update(sparesBeingAdded, current => new Set([...current, name]))
     yield* Effect.gen(function* () {
       yield* fileSystem.makeDirectory(directory, { recursive: true })
-      yield* addWorkspace(repoRoot, name, path.join(directory, name), commitId)
-      yield* updateSpares(repoRoot, spares => ({ ...spares, [target]: name }))
+      const workspacePath = path.join(directory, name)
+      yield* addWorkspace(repoRoot, name, workspacePath, commitId)
+      yield* updateSpares(repoRoot, spares => ({ ...spares, [target]: name })).pipe(
+        Effect.onError(() => removeUnclaimedWorkspace(repoRoot, name, workspacePath)),
+      )
     }).pipe(Effect.ensuring(Ref.update(sparesBeingAdded, current => new Set([...current].filter(entry => entry !== name)))))
   })
 
