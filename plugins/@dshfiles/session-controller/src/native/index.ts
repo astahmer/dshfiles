@@ -697,9 +697,10 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote({ mode: 'stream' })
   async *control(signal: AbortSignal): AsyncIterable<SessionControlFrame> {
-    // dshfiles delta: patches are encoded after the access filter, so a patch never follows a value this caller missed.
+    // dshfiles delta: the queue filters by access before it enqueues, so a patch never follows a value this caller missed.
     const patches = new ProjectionPatchEncoder()
-    for await (const frame of this.controlState.control(signal)) {
+    const readable = (sessionId: SessionId): boolean => this.ctx.remoteAccess.allows({ kind: 'session', id: sessionId })
+    for await (const frame of this.controlState.control(signal, readable)) {
       switch (frame.type) {
         case 'baseline': {
           const projections = Object.fromEntries(Object.entries(frame.value.projections)
@@ -708,7 +709,7 @@ export class SessionController extends TypertRemoteService {
           break
         }
         case 'projection':
-          if (this.ctx.remoteAccess.allows({ kind: 'session', id: frame.sessionId })) yield patches.encode(frame)
+          yield patches.encode(frame)
           break
         /* v8 ignore next -- closed control-frame union. */
         default:

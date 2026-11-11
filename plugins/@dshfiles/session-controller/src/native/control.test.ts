@@ -16,8 +16,8 @@ const projection = (sessionId: string, key: string, value: string) => ({
 
 describe('the control queue', () => {
   it('drops the oldest frames instead of buffering every change a slow client missed', async () => {
-    const queue = new ControlQueue()
-    for (let index = 0; index < 5_000; index += 1) queue.push(projection(`session-${index}`, 'turn', String(index)))
+    const queue = new ControlQueue(() => true)
+    for (let index = 0; index < 5_000; index += 1) queue.push(projection(`session-${index}`, 'turn', String(index)), 64)
     queue.end()
     const frames: string[] = []
     for await (const frame of queue.iterate(new AbortController().signal)) {
@@ -26,6 +26,17 @@ describe('the control queue', () => {
     expect(frames).toHaveLength(4_096)
     // The newest change is still delivered; only the ones nobody read in time are gone.
     expect(frames.at(-1)).toBe('4999')
+  })
+
+  it('never lets frames a client cannot read evict the ones it can', async () => {
+    const queue = new ControlQueue(sessionId => sessionId === 'readable')
+    const readable = projection('readable', 'turn', 'kept')
+    queue.push(readable, 64)
+    for (let index = 0; index < 5_000; index += 1) queue.push(projection('hidden', 'turn', String(index)), 64)
+    queue.end()
+    const frames: unknown[] = []
+    for await (const frame of queue.iterate(new AbortController().signal)) frames.push(frame)
+    expect(frames).toEqual([readable])
   })
 
   it('sends a projection whole once per stream, then only what changed against the value it sent last', () => {

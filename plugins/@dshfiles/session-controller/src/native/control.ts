@@ -39,11 +39,12 @@ export class SessionControlController {
   /**
    * Open one generation of Host-wide live control state.
    * @param signal - Remote stream cancellation.
+   * @param readable - dshfiles delta: whether this caller may read a Session, checked before a frame is queued.
    * @returns one complete baseline followed by live replacement frames.
    */
-  async *control(signal: AbortSignal): AsyncIterable<SessionControlValueFrame> {
+  async *control(signal: AbortSignal, readable: (sessionId: SessionId) => boolean): AsyncIterable<SessionControlValueFrame> {
     signal.throwIfAborted()
-    const queue = new ControlQueue()
+    const queue = new ControlQueue(readable)
     this.streams.add(queue)
     try {
       yield { type: 'baseline', value: this.baseline() }
@@ -85,8 +86,9 @@ export class SessionControlController {
     return blocks
   }
 
-  private broadcast(frame: SessionControlValueFrame): void {
-    for (const stream of this.streams) stream.push(frame)
+  private broadcast(frame: ProjectionFrame): void {
+    const bytes = Buffer.byteLength(JSON.stringify(frame))
+    for (const stream of this.streams) stream.push(frame, bytes)
   }
 }
 
@@ -116,6 +118,8 @@ export class ProjectionPatchEncoder {
   }
 }
 
+type ProjectionFrame = Extract<SessionControlValueFrame, { readonly type: 'projection' }>
+
 export class ControlQueue {
   /**
    * A control frame is a replacement, so a client that reads slowly must not make the Host keep every change it missed:
@@ -125,28 +129,27 @@ export class ControlQueue {
   private static readonly MAX_PENDING = 4_096
   /** A projection value can be large, so the queue also carries a byte budget: a frame count alone is not a bound. */
   private static readonly MAX_PENDING_BYTES = 4 * 1024 * 1024
-  private readonly buffer = new Deque<SessionControlValueFrame>()
+  private readonly buffer = new Deque<{ readonly frame: ProjectionFrame; readonly bytes: number }>()
   private bufferedBytes = 0
   private wake: (() => void) | undefined
   private done = false
 
-  push(frame: SessionControlValueFrame): void {
-    if (this.done) return
-    const bytes = ControlQueue.bytesOf(frame)
-    this.buffer.pushBack(frame)
+  /** @param readable - frames of a Session this stream's caller cannot read are never queued, so they cannot evict readable ones. */
+  constructor(private readonly readable: (sessionId: SessionId) => boolean) {}
+
+  /** @param bytes - the frame's serialized size, measured once by the broadcaster for every stream. */
+  push(frame: ProjectionFrame, bytes: number): void {
+    if (this.done || !this.readable(frame.sessionId)) return
+    this.buffer.pushBack({ frame, bytes })
     this.bufferedBytes += bytes
     while (this.buffer.size > ControlQueue.MAX_PENDING || this.bufferedBytes > ControlQueue.MAX_PENDING_BYTES) {
       const dropped = this.buffer.popFront()
       if (dropped === undefined) break
-      this.bufferedBytes -= ControlQueue.bytesOf(dropped)
+      this.bufferedBytes -= dropped.bytes
     }
     const wake = this.wake
     this.wake = undefined
     wake?.()
-  }
-
-  private static bytesOf(frame: SessionControlValueFrame): number {
-    return Buffer.byteLength(JSON.stringify(frame))
   }
 
   end(): void {
@@ -162,14 +165,14 @@ export class ControlQueue {
     signal.addEventListener('abort', onAbort, { once: true })
     try {
       while (!this.done && !signal.aborted) {
-        const frame = this.buffer.popFront()
-        if (frame !== undefined) {
-          yield frame
+        const entry = this.buffer.popFront()
+        if (entry !== undefined) {
+          yield entry.frame
           continue
         }
         await new Promise<void>((resolve) => { this.wake = resolve })
       }
-      while (this.buffer.size > 0 && !signal.aborted) yield this.buffer.popFront() as SessionControlValueFrame
+      for (let entry = this.buffer.popFront(); entry !== undefined && !signal.aborted; entry = this.buffer.popFront()) yield entry.frame
     } finally {
       signal.removeEventListener('abort', onAbort)
       this.end()
