@@ -16,6 +16,7 @@ export const tracesKeys = {
   errors: (windowMinutes: number) => ['traces', 'errors', windowMinutes] as const,
   serviceMap: (windowMinutes: number) => ['traces', 'service-map', windowMinutes] as const,
   sessionSummary: (sessionId: string) => ['traces', 'session-summary', sessionId] as const,
+  timeline: (input: { readonly sessionId: string; readonly limit: number }) => ['traces', 'timeline', input.sessionId, input.limit] as const,
   turnTrace: (input: { readonly sessionId: string; readonly turn: number }) => ['traces', 'turn-trace', input.sessionId, input.turn] as const,
   metrics: (windowMinutes: number, search: string) => ['traces', 'metrics', windowMinutes, search] as const,
   metric: (input: { readonly name: string; readonly service: string; readonly windowMinutes: number }) => ['traces', 'metric', input] as const,
@@ -108,6 +109,13 @@ export const tracesQueries = {
     queryOptions({
       queryKey: tracesKeys.sessionSummary(sessionId),
       queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.sessionSummary({ sessionId }, { signal: hostSignal }) }),
+      refetchInterval: POLL_MS,
+      retry: false,
+    }),
+  timeline: (client: TracesClient, input: { readonly sessionId: string; readonly limit: number }) =>
+    queryOptions({
+      queryKey: tracesKeys.timeline(input),
+      queryFn: ({ signal }) => runHostRequest({ signal, request: hostSignal => client.timeline(input, { signal: hostSignal }) }),
       refetchInterval: POLL_MS,
       retry: false,
     }),

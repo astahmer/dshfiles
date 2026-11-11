@@ -466,6 +466,36 @@ describe('session summary', () => {
       retention,
     )
 
+  it.effect('lays out the newest session traces with only the attributes the timeline reads', () =>
+    withRepo(
+      Effect.fn(function* (repo) {
+        yield* seedTurn(repo)
+        const timeline = yield* repo.timeline({ sessionId: 'session-t', limit: 2 })
+        expect(timeline.traces.map(trace => trace.traceId)).toEqual([traceId(11), traceId(10)])
+        const turn = timeline.traces[1]
+        expect(turn).toMatchObject({ startMs: 10_000, durationMs: 4_000 })
+        expect(turn?.spans.map(span => span.name)).toEqual([
+          'invoke_agent deepseek-harness',
+          'chat model-a',
+          'chat model-a',
+          'execute_tool bash',
+          'jujutsu/status',
+        ])
+        expect(turn?.spans[1]).toEqual({
+          spanId: spanId(11),
+          name: 'chat model-a',
+          offsetMs: 100,
+          durationMs: 1_000,
+          status: 'error',
+          attributes: { 'gen_ai.operation.name': 'chat', 'gen_ai.usage.input_tokens': 100, 'gen_ai.usage.output_tokens': 10 },
+        })
+        expect(turn?.spans[2]?.attributes).toEqual({ 'gen_ai.usage.input_tokens': 200, 'gen_ai.usage.output_tokens': 20 })
+        expect((yield* repo.timeline({ sessionId: 'session-t', limit: 1 })).traces.map(trace => trace.traceId)).toEqual([traceId(11)])
+        expect((yield* repo.timeline({ sessionId: 'session-none', limit: 20 })).traces).toEqual([])
+      }),
+    ),
+  )
+
   it.effect('counts every span of the session traces, model and tool calls, and tokens from model calls only', () =>
     withRepo(
       Effect.fn(function* (repo) {

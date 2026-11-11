@@ -19,6 +19,7 @@ import {
   type ModelUsage,
   type ServiceMap,
   type SessionSummary,
+  type SessionTimelineTraces,
   type SpanKind,
   type SpanStatus,
   type TraceDetail,
@@ -271,6 +272,18 @@ const traceRow = Schema.Struct({
   session_id: Schema.NullOr(Schema.String),
   cost_usd: Schema.NullOr(finiteNumber),
 })
+const timelineSpanRow = Schema.Struct({
+  trace_id: Schema.String,
+  span_id: Schema.String,
+  parent_span_id: Schema.NullOr(Schema.String),
+  name: Schema.String,
+  start_us: finiteNumber,
+  end_us: finiteNumber,
+  status_code: finiteNumber,
+  attributes: attributesJson,
+})
+/** What the session timeline reads of a span: its kind, tokens and list price. */
+const TIMELINE_ATTRIBUTES = ['gen_ai.operation.name', 'gen_ai.usage.input_tokens', 'gen_ai.usage.output_tokens', SpanCost.attributeKey]
 const spanRow = Schema.Struct({
   span_id: Schema.String,
   parent_span_id: Schema.NullOr(Schema.String),
@@ -886,6 +899,50 @@ const make = Effect.gen(function* () {
     } satisfies TraceDetail
   }, orDieOnStorage)
 
+  const timelineSpansOf = SqlSchema.findAll({
+    Request: Schema.Struct({ sessionId: Schema.String, limit: Schema.Number }),
+    Result: timelineSpanRow,
+    execute: query =>
+      sql`SELECT s.trace_id, s.span_id, s.parent_span_id, s.name, s.start_us, s.end_us, s.status_code,
+             (SELECT json_group_object(a.key, a.value) FROM json_each(s.attributes) a WHERE a.key IN ${sql.in(TIMELINE_ATTRIBUTES)}) AS attributes
+           FROM spans s WHERE s.trace_id IN (
+             SELECT t.trace_id FROM traces t WHERE t.trace_id IN (SELECT trace_id FROM spans WHERE session_id = ${query.sessionId})
+             ORDER BY t.start_us DESC, t.trace_id DESC LIMIT ${query.limit})`,
+  })
+
+  /** A session's newest traces as the timeline draws them, without the attributes, resources and events of `trace`. */
+  const timeline = Effect.fn('trace repo timeline')(function* (query: { readonly sessionId: string; readonly limit: number }) {
+    const byTrace = new Map<string, Schema.Schema.Type<typeof timelineSpanRow>[]>()
+    for (const row of yield* timelineSpansOf(query)) {
+      const rows = byTrace.get(row.trace_id)
+      if (rows === undefined) byTrace.set(row.trace_id, [row])
+      else rows.push(row)
+    }
+    const traces = [...byTrace].map(([traceId, rows]) => {
+      const startUs = Math.min(...rows.map(row => row.start_us))
+      const endUs = Math.max(...rows.map(row => row.end_us))
+      const tree = buildSpanTree(rows.map(row => ({ ...row, spanId: row.span_id, parentSpanId: row.parent_span_id, startUs: row.start_us })))
+      return {
+        traceId,
+        startUs,
+        startMs: usToMs(startUs),
+        durationMs: usToMs(endUs - startUs),
+        spans: tree.map(entry => ({
+          spanId: entry.span.span_id,
+          name: entry.span.name,
+          offsetMs: usToMs(entry.span.start_us - startUs),
+          durationMs: usToMs(entry.span.end_us - entry.span.start_us),
+          status: STATUSES[entry.span.status_code] ?? 'unset',
+          attributes: entry.span.attributes,
+        })),
+      }
+    })
+    traces.sort((left, right) => right.startUs - left.startUs || (left.traceId < right.traceId ? 1 : -1))
+    return {
+      traces: traces.map(trace => ({ traceId: trace.traceId, startMs: trace.startMs, durationMs: trace.durationMs, spans: trace.spans })),
+    } satisfies SessionTimelineTraces
+  }, orDieOnStorage)
+
   /** Model calls per service and model over a window: calls, gen_ai.usage token sums and the dshx.cost.usd sum. */
   const modelUsageOf = SqlSchema.findAll({
     Request: Schema.Struct({ sinceUs: Schema.Number, service: Schema.UndefinedOr(Schema.String) }),
@@ -1226,6 +1283,7 @@ const make = Effect.gen(function* () {
     prune,
     list,
     trace,
+    timeline,
     stats,
     errorGroups,
     serviceMap,
@@ -1252,6 +1310,7 @@ export class TraceRepo extends Context.Service<
     readonly prune: (retention: Retention) => Effect.Effect<number>
     readonly list: (query: TraceListQuery) => Effect.Effect<TraceList, InvalidCursor>
     readonly trace: (traceId: string) => Effect.Effect<TraceDetail, TraceNotFound>
+    readonly timeline: (query: { readonly sessionId: string; readonly limit: number }) => Effect.Effect<SessionTimelineTraces>
     readonly stats: (query: { readonly windowMinutes: number; readonly service?: string | undefined; readonly limit: number }) => Effect.Effect<TraceStats>
     readonly errorGroups: (query: { readonly windowMinutes: number; readonly limit: number }) => Effect.Effect<ErrorGroup[]>
     readonly serviceMap: (query: { readonly windowMinutes: number }) => Effect.Effect<ServiceMap>

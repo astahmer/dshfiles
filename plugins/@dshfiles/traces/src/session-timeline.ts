@@ -1,6 +1,6 @@
 import type { AgentTimelineLane, AgentTimelineSegment } from '@dshfiles/plugin-ui/components/motion/agent-timeline'
 import { TraceFormat } from './format.js'
-import type { TraceDetail } from './types.js'
+import type { TimelineTrace } from './types.js'
 import { WaterfallSpans } from './waterfall-spans.js'
 
 export type SessionTimelineLaneId = 'turns' | 'model' | 'tools'
@@ -22,7 +22,7 @@ const GAP_SHARE = 0.02
 const MIN_GAP_MS = 200
 
 /** Overlapping trace intervals merged into busy blocks, oldest first. */
-const busyBlocks = (traces: readonly TraceDetail[]): readonly BusyBlock[] => {
+const busyBlocks = (traces: readonly TimelineTrace[]): readonly BusyBlock[] => {
   const blocks: BusyBlock[] = []
   for (const trace of [...traces].sort((left, right) => left.startMs - right.startMs)) {
     const last = blocks.at(-1)
@@ -38,7 +38,7 @@ const busyBlocks = (traces: readonly TraceDetail[]): readonly BusyBlock[] => {
  * calls. Wall time between traces is idle and would dwarf the work, so each gap shrinks to a small fixed space; the
  * time inside a trace keeps its real length.
  */
-const build = (input: { readonly traces: readonly TraceDetail[]; readonly laneNames: Readonly<Record<SessionTimelineLaneId, string>> }): SessionTimeline => {
+const build = (input: { readonly traces: readonly TimelineTrace[]; readonly laneNames: Readonly<Record<SessionTimelineLaneId, string>> }): SessionTimeline => {
   const blocks = busyBlocks(input.traces)
   const busyMs = blocks.reduce((sum, block) => sum + (block.endMs - block.startMs), 0)
   const gapMs = Math.max(MIN_GAP_MS, busyMs * GAP_SHARE)

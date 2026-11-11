@@ -9,6 +9,7 @@ import {
   receiverStatusSchema,
   serviceMapSchema,
   sessionSummarySchema,
+  sessionTimelineSchema,
   storeReclaimSchema,
   storeSpaceReportSchema,
   traceDetailSchema,
@@ -122,6 +123,15 @@ export const tracesApi = defineApi({
       description:
         'One stored trace as a span tree in depth-first order: each span with depth, offset and duration in ms, service, kind, status, attributes, resource attributes and events. Read-only.',
       tool: { name: 'traces_get', readOnly: true, render: compactJson },
+    }),
+    timeline: method({
+      input: Schema.Struct({
+        sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+        limit: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(50)),
+      }),
+      output: sessionTimelineSchema,
+      description:
+        "A thread's newest traces, newest first, for its timeline: start and duration, and each span's name, offset, duration, status and only the gen_ai operation, token and cost attributes. Read-only.",
     }),
     stats: method({
       input: Schema.Struct({

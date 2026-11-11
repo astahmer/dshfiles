@@ -97,6 +97,7 @@ export default DshxPlugin.make({
     Api.bind(tracesApi, {
       list: input => untraced(TraceRepo.use(repo => repo.list(input))),
       trace: input => untraced(TraceRepo.use(repo => repo.trace(input.traceId))),
+      timeline: input => untraced(TraceRepo.use(repo => repo.timeline(input))),
       stats: input =>
         untraced(TraceRepo.use(repo => repo.stats({ windowMinutes: input.windowMinutes ?? 60, service: input.service, limit: input.limit ?? 100 }))),
       errors: input =>

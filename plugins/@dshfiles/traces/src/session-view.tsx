@@ -10,7 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowLeftIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, keepPreviousData, useInfiniteQuery, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, keepPreviousData, useInfiniteQuery, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Types } from 'effect'
 import { tracesApi, type LogsInput } from './api.js'
@@ -25,12 +25,12 @@ import { SessionReadingModel, TURN_TRACE_RETRY_MS, type SessionReading } from '.
 import { SessionTimelineModel } from './session-timeline.js'
 import { TraceDetailView } from './trace-detail.js'
 import { TraceList } from './trace-list.js'
-import type { SessionSummary, TraceDetail } from './types.js'
+import type { SessionSummary, TimelineTrace } from './types.js'
 
 const countFormat = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 /** The newest traces the turn timeline draws; older turns stay one click away in the list below it. */
 const TIMELINE_TRACES = 20
-const TIMELINE_STALE_MS = 30_000
+const NO_TIMELINE_TRACES: readonly TimelineTrace[] = []
 
 const pair = (left: number | null, right: number | null): string =>
   `${left === null ? '–' : TraceFormat.duration(left)} · ${right === null ? '–' : TraceFormat.duration(right)}`
@@ -78,12 +78,8 @@ const SummaryGrid = (props: { readonly summary: SessionSummary; readonly t: Trac
   )
 }
 
-/** A stable combine keeps one array while no trace query changed, so the timeline memo holds. */
-const loadedTraces = (results: readonly { readonly data?: TraceDetail | undefined }[]): readonly TraceDetail[] =>
-  results.flatMap(result => (result.data === undefined ? [] : [result.data]))
-
 /** The thread's newest traces as one timeline of turns, model calls and tool calls. */
-const TurnTimeline = (props: { readonly traces: readonly TraceDetail[]; readonly t: TracesTranslate }): JSX.Element | null => {
+const TurnTimeline = (props: { readonly traces: readonly TimelineTrace[]; readonly t: TracesTranslate }): JSX.Element | null => {
   const t = props.t
   const timeline = useMemo(
     () =>
@@ -175,16 +171,12 @@ export const SessionTracesView = (
     enabled: section === 'turns' && traceId === null,
   })
   const traceQuery = useQuery({ ...tracesQueries.trace(client, traceId ?? ''), enabled: traceId !== null })
-  const timelineIds = (listQuery.data?.pages.flatMap(page => page.traces) ?? []).slice(0, TIMELINE_TRACES).map(trace => trace.traceId)
-  const timelineTraces = useQueries({
-    queries: timelineIds.map(id => ({
-      ...tracesQueries.trace(client, id),
-      refetchInterval: false as const,
-      staleTime: TIMELINE_STALE_MS,
-      enabled: section === 'turns' && traceId === null,
-    })),
-    combine: loadedTraces,
+  const timelineQuery = useQuery({
+    ...tracesQueries.timeline(client, { sessionId: props.sessionId, limit: TIMELINE_TRACES }),
+    placeholderData: keepPreviousData,
+    enabled: section === 'turns' && traceId === null,
   })
+  const timelineTraces = timelineQuery.data?.traces ?? NO_TIMELINE_TRACES
   // dshx API payloads refuse undefined values, so absent filters are omitted rather than sent as undefined.
   const logFilters: Types.Mutable<Omit<LogsInput, 'cursor'>> = { sessionId: props.sessionId, limit: 50 }
   if (correlation !== null) {

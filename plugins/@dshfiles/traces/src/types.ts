@@ -76,6 +76,26 @@ export const traceDetailSchema = Schema.Struct({
 })
 export type TraceDetail = Schema.Schema.Type<typeof traceDetailSchema>
 
+const timelineSpanSchema = Schema.Struct({
+  spanId: Schema.String,
+  name: Schema.String,
+  offsetMs: finiteNumber,
+  durationMs: nonNegativeNumber,
+  status: spanStatusSchema,
+  attributes: attributesSchema,
+})
+
+const timelineTraceSchema = Schema.Struct({
+  traceId: Schema.String,
+  startMs: finiteNumber,
+  durationMs: nonNegativeNumber,
+  spans: Schema.Array(timelineSpanSchema),
+})
+export type TimelineTrace = Schema.Schema.Type<typeof timelineTraceSchema>
+
+export const sessionTimelineSchema = Schema.Struct({ traces: Schema.Array(timelineTraceSchema) })
+export type SessionTimelineTraces = Schema.Schema.Type<typeof sessionTimelineSchema>
+
 const latencyFields = {
   count: nonNegativeInt,
   errorCount: nonNegativeInt,
