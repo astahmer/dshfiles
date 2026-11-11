@@ -357,6 +357,13 @@
         "Activity uses session metadata timestamps and may reflect metadata updates."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Threads › Board.",
+        "doneWhen": "Your threads show as columns on their own page.",
+        "open": {
+          "panel": "dshfiles-thread-board"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -488,6 +495,10 @@
           "deterministicFake": "Item-to-signal mapping pinned in src/inbox-signals.test.ts; status mapping in src/thread-status.test.ts."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Threads and read the groups.",
+        "doneWhen": "Your threads are grouped as Needs you, Working, Ready, Idle and Done."
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -3755,6 +3766,13 @@
           "reason": "Client-only page over the attention-api methods, whose Host spans already exist."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Inbox › Waiting threads.",
+        "doneWhen": "Each thread waiting on you is listed once, with Open and Done.",
+        "open": {
+          "panel": "thread-sidebar-waiting"
+        }
+      },
       "verification": [
         {
           "kind": "unit-test",

@@ -21,6 +21,10 @@
       "states": ["collapsed", "expanded", "moving", "idle", "busy", "failed"],
       "failureModes": ["Move at the first/last boundary is a no-op.", "A missing item or absent live agent rejects mutation without changing order."],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Queue two messages while the agent works, then drag one above the other.",
+        "doneWhen": "The queue sends them in your new order."
+      },
       "verification": [
         {
           "kind": "gherkin",

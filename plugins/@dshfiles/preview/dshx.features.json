@@ -144,6 +144,11 @@
           "deterministicFake": "src/dev-servers.test.ts passes live jobs as plain records."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["account", "project"],
+        "firstAction": "Ask the agent to start the project's dev server, then open the thread header's dev servers chip.",
+        "doneWhen": "The chip lists the port and opens it in the browser."
+      },
       "verification": [
         {
           "kind": "gherkin",

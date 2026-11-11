@@ -531,6 +531,10 @@
         "Opening, from the sidebar, the very view the Host already shows under the Start page leaves the Start page in front: the Host reports no change."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Press + at the end of the tab strip.",
+        "doneWhen": "A new tab opens with a search over threads and views."
+      },
       "verification": [
         {
           "kind": "gherkin",

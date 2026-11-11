@@ -106,6 +106,10 @@
       "states": ["offered", "picked", "claimed"],
       "failureModes": ["A disabled or failing command reports its error as the composer's command notice instead of sending the line."],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Type / at the start of the composer and pick a command.",
+        "doneWhen": "The command runs and its token leaves the draft."
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -660,6 +660,10 @@
         "Each thread keeps its own native page record, so a facet closed while another thread is on screen can reappear when its thread returns."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "In a pane, open Choose a view and pick a page under Thread panels.",
+        "doneWhen": "That thread page opens in the pane and follows the thread on screen."
+      },
       "verification": [
         {
           "kind": "gherkin",

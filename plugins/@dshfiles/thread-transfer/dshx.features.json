@@ -26,6 +26,10 @@
         "expect dialog \"Export thread\"",
         "expect text \"Saved *\""
       ],
+      "onboarding": {
+        "firstAction": "Open a thread's row menu and choose Export….",
+        "doneWhen": "A .dshthread file downloads, ready to import on another machine."
+      },
       "verification": [
         {
           "kind": "gherkin",

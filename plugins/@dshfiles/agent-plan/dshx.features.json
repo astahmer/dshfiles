@@ -50,6 +50,11 @@
         "A step the agent marked done without first marking it in progress is timed from the write before it."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Ask the agent for a multi-step task and let it write a plan.",
+        "doneWhen": "A plan card shows Step N of M and the current step sits beside the composer."
+      },
       "verification": [
         {
           "kind": "gherkin",

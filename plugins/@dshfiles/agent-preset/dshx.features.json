@@ -32,6 +32,15 @@
           "reason": "Client-only native row replacement; preset and Settings operations retain their existing native RPC instrumentation."
         }
       ],
+      "onboarding": {
+        "firstAction": "In a new thread, pick a preset from the Standard mode chip before typing.",
+        "doneWhen": "The chip names the preset and the first message runs with it.",
+        "open": {
+          "settings": {
+            "section": "agent-presets"
+          }
+        }
+      },
       "verification": [
         {
           "kind": "unit-test",

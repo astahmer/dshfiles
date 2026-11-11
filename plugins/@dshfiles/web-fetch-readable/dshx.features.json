@@ -119,6 +119,11 @@
           "deterministicFake": "tests/citation-sources.test.ts covers the sources the section shows; the section component itself renders in the citations journey."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Ask the agent to read a web page.",
+        "doneWhen": "A chip with the page's host and title shows under the web_fetch call."
+      },
       "verification": [
         {
           "kind": "gherkin",

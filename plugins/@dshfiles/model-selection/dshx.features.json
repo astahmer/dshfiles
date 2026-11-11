@@ -57,6 +57,11 @@
           "reason": "The client calls the registered route-capacity API owned by @dshfiles/model-effort-picker; that feature owns the api-dispatch telemetry."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "In a new thread, choose a model before typing.",
+        "doneWhen": "The first message runs on that model."
+      },
       "verification": [
         {
           "kind": "unit-test",

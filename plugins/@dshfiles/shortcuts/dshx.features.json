@@ -16,6 +16,10 @@
         "A missing layout service is surfaced rather than silently swallowed."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Press Cmd+B on a Mac or Ctrl+B elsewhere.",
+        "doneWhen": "The sidebar hides and shows again on the next press."
+      },
       "verification": [
         {
           "kind": "gherkin",

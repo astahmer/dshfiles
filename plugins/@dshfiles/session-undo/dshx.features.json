@@ -26,6 +26,11 @@
         "hover button \"Redo the undone turn and its files\"",
         "expect text \"Redo the undone turn and its files\""
       ],
+      "onboarding": {
+        "prerequisites": ["project", "repository"],
+        "firstAction": "After a turn that edited files, press Undo last turn in the composer.",
+        "doneWhen": "The files and the conversation return to before that turn, and Redo brings them back."
+      },
       "verification": [
         {
           "kind": "gherkin",

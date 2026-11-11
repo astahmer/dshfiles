@@ -245,6 +245,10 @@
       ],
       "externalDependencies": [],
       "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "onboarding": {
+        "firstAction": "Set Settings › General › Running threads limit to a number above 0.",
+        "doneWhen": "Past that many running threads, a new turn waits for a free slot."
+      },
       "verification": [
         {
           "kind": "gherkin",

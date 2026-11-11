@@ -25,6 +25,10 @@
           "deterministicFake": "The provisional row and its removal are exercised by the session-controller unit tests; the scratch journey drives the delayed create through the real Host."
         }
       ],
+      "onboarding": {
+        "firstAction": "Press + for a New thread and start typing right away.",
+        "doneWhen": "The composer takes your text before the thread exists, and sending creates it."
+      },
       "verification": [
         {
           "kind": "unit-test",

@@ -46,6 +46,11 @@
           "deterministicFake": "The shared directory tests exercise the manual compaction contract; the real profile owns command execution."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Open the model picker in the composer and search for a model.",
+        "doneWhen": "The composer names the model and account you picked."
+      },
       "verification": [
         {
           "kind": "unit-test",

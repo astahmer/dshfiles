@@ -17,6 +17,11 @@
         "A side chat from before a reload has no flow left; closing its tab still archives it."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "In a thread with a finished turn, type /btw and a question.",
+        "doneWhen": "The answer opens in a btw tab beside the thread, which keeps going untouched."
+      },
       "verification": [
         {
           "kind": "gherkin",

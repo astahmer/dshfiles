@@ -21,6 +21,11 @@
         "A renderer exception falls back to the native code card (Chat's code-fence boundary)."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Ask the agent to draw a flow as a mermaid diagram.",
+        "doneWhen": "The diagram renders in the transcript instead of code."
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -32,6 +32,10 @@
         "click button \"Annotate an element\"",
         "expect text \"plugins/@dshfiles/annotations/src*\""
       ],
+      "onboarding": {
+        "firstAction": "Press Annotate an element in the composer and click a part of the page.",
+        "doneWhen": "A note linked to that element's source sits in the draft, not yet sent."
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -34,6 +34,10 @@
         "Thread-content results include subagents, duplicate the title, or hide project, date, and status metadata."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open the command palette and type part of a thread title or file name.",
+        "doneWhen": "Picking a result opens that thread or file."
+      },
       "verification": [
         {
           "kind": "gherkin",

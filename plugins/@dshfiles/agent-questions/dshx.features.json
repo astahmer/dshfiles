@@ -260,6 +260,11 @@
           "deterministicFake": "The loopback fake Command Code provider issues the ask_user_question call and records the pending tool result and the late reply."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Ask the agent to check something with you before it acts.",
+        "doneWhen": "A question card shows in the thread and your answer reaches the agent."
+      },
       "verification": [
         {
           "kind": "gherkin",

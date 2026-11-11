@@ -34,6 +34,11 @@
         "If DSH stops rendering tool cards through the keyed tool-call renderer and its renderSlot dispatch, the line disappears and the browser console logs one @dshfiles/tool-meta warning; the cards themselves are untouched."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Ask the agent for a task that runs a tool.",
+        "doneWhen": "Each tool card shows when it started and how long it took."
+      },
       "verification": [
         {
           "kind": "gherkin",

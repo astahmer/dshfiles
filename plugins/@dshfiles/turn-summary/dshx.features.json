@@ -70,6 +70,11 @@
         "Test counts read only the last Vitest, Jest or pytest summary line a command printed in the turn."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Ask the agent for a task that edits a file or runs a command.",
+        "doneWhen": "A one-line summary of files, commands and time shows under the turn."
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -17,6 +17,10 @@
         "A deferred send queues behind a running turn; it never steers."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Attach a large file and press Enter before it finishes uploading.",
+        "doneWhen": "The message sends by itself once the upload ends."
+      },
       "verification": [
         {
           "kind": "gherkin",

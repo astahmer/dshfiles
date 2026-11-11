@@ -52,6 +52,11 @@
         "A plain ```html fence or an unclosed preview fence renders as code."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Ask the agent to ask you to choose between options.",
+        "doneWhen": "A question form shows the options and your answer reaches the agent."
+      },
       "verification": [
         {
           "kind": "unit-test",

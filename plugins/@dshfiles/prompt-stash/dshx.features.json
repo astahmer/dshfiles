@@ -17,6 +17,10 @@
         "A cross-tab revision conflict preserves the local edit and offers save-as-copy."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Prompts in the composer and save a snippet.",
+        "doneWhen": "The snippet inserts into any composer without sending."
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -192,6 +196,13 @@
         "Ctrl+R outside a focused composer is left to the browser (page reload)."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Run Search prompt history from the command palette and type a word you sent before.",
+        "doneWhen": "Enter puts that prompt in the composer without sending it.",
+        "open": {
+          "command": "@dshfiles/prompt-stash.history"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

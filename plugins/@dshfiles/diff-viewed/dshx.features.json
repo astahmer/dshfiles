@@ -16,6 +16,10 @@
         "A malformed or unavailable summary hides progress instead of displaying invented state."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open a thread's review tab and mark a changed file Viewed.",
+        "doneWhen": "The file shows as viewed and the progress count goes up."
+      },
       "verification": [
         {
           "kind": "gherkin",

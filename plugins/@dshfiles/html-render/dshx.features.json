@@ -25,6 +25,11 @@
         "Open in new tab is blocked by a browser that refuses pop-ups; Copy HTML and Expand still work."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Ask the agent to show a chart or mockup as an HTML page.",
+        "doneWhen": "The page shows as a card in the transcript and opens in a new tab."
+      },
       "verification": [
         {
           "kind": "gherkin",

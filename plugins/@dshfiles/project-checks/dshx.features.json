@@ -241,6 +241,11 @@
           "deterministicFake": "Run the same protocol against a temporary local bare git repository, jj repositories and a local shell runner; ssh command construction is asserted separately."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["project"],
+        "firstAction": "Open Project checks in the composer and run a configured check.",
+        "doneWhen": "The check's receipt shows its result."
+      },
       "verification": [
         {
           "kind": "gherkin",

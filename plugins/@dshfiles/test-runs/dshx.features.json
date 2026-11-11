@@ -49,6 +49,11 @@
         "Output from another runner, a spilled preview or a persistent shell keeps the native bash card."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account", "project"],
+        "firstAction": "Ask the agent to run the project's Vitest tests.",
+        "doneWhen": "A test-results card shows per-file results instead of terminal text."
+      },
       "verification": [
         {
           "kind": "gherkin",

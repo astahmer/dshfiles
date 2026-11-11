@@ -34,6 +34,10 @@
         "A quoted path cannot keep its scope prefix through a drill, so it continues as a plain @ mention."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Type @ in the composer and pick a file or a thread.",
+        "doneWhen": "The reference shows as a chip in your message."
+      },
       "verification": [
         {
           "kind": "gherkin",

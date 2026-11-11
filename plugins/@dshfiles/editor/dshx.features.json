@@ -21,6 +21,13 @@
       "states": ["empty", "editing", "saving", "conflict", "deleted"],
       "failureModes": ["Stale revisions are refused; reload after copying unsaved edits.", "Storage errors leave the current draft available for retry."],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Run Editor: Artifacts from the command palette in a thread and create a document.",
+        "doneWhen": "The document is saved with the thread and opens again later.",
+        "open": {
+          "command": "dshfiles-editor.artifacts"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -78,6 +85,11 @@
           "deterministicFake": "Use temporary directories with synthetic files and edits; do not read or write a user repository."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["project"],
+        "firstAction": "Open a new tab, pick Editor: Files and open a file of the project.",
+        "doneWhen": "You edit and save the file in the editor."
+      },
       "verification": [
         {
           "kind": "gherkin",

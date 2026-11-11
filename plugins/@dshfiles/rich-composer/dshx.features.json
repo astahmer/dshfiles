@@ -373,6 +373,10 @@
       "externalDependencies": [],
       "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
       "reachNarrow": ["click button \"New\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "onboarding": {
+        "firstAction": "Press ArrowUp in an empty composer of a thread.",
+        "doneWhen": "Your previous prompt fills the composer and Escape restores the draft."
+      },
       "verification": [
         {
           "kind": "gherkin",

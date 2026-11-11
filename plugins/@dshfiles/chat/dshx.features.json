@@ -331,6 +331,13 @@
       ],
       "externalDependencies": [],
       "reach": ["seed tool-call-thread", "press ControlOrMeta+f", "fill textbox \"Find in thread\" \"bash\"", "expect text \"Tool call\""],
+      "onboarding": {
+        "firstAction": "Press Cmd+F (Ctrl+F elsewhere) in a thread and type a word.",
+        "doneWhen": "The thread jumps to each match, older history included.",
+        "open": {
+          "command": "dshfiles-chat.find-in-thread"
+        }
+      },
       "verification": [
         {
           "kind": "unit-test",

@@ -46,6 +46,10 @@
         "The stock attachment Loader row stays active, so its single-slot registration conflicts with the replacement."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Attach two images to a message and click one.",
+        "doneWhen": "The gallery opens and the arrow keys move between the images."
+      },
       "verification": [
         {
           "kind": "gherkin",
