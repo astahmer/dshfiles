@@ -6,7 +6,12 @@
       "id": "model-selection",
       "title": "Search and select account models",
       "summary": "Search account-and-model routes in a two-pane composer picker: brand marks, the model name with a subtle service label, account tags with each account's colour and remaining quota (the same binding window as the AI Accounts strip), a six-bar reasoning-effort glyph with a hover legend, and a details pane for accounts, reasoning effort and the fallback chain; route handoff stays with the shared selection directory.",
-      "surfaces": ["client", "host", "api", "integration"],
+      "surfaces": [
+        "client",
+        "host",
+        "api",
+        "integration"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: model picker",
@@ -18,7 +23,15 @@
         "hover button \"Reasoning effort: *\"",
         "expect button \"High\""
       ],
-      "states": ["closed", "open", "scanning", "searching", "empty-search", "handoff-check", "compacting"],
+      "states": [
+        "closed",
+        "open",
+        "scanning",
+        "searching",
+        "empty-search",
+        "handoff-check",
+        "compacting"
+      ],
       "failureModes": [
         "A search with no catalog match shows an explicit empty state without clearing the current model or reasoning effort.",
         "A truncated account chip keeps the whole account name on hover.",
@@ -59,18 +72,33 @@
           "featureFile": "tooling/dshx/e2e/features/model-effort-picker.feature"
         }
       ],
-      "telemetry": [{ "kind": "automatic", "source": "api-dispatch" }]
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     },
     {
       "id": "fast-mode",
       "title": "Enable Fast mode on supported Codex models",
       "summary": "The composer picker shows Fast mode only for explicitly supported AI Accounts Codex models, as a switch on the inspected route's header and on that row's hover; the row control is mounted with the list so it never waits for a hover to answer. AI Accounts can enable it by default, with per-session route overrides, and adds the legacy service_tier=priority through pi-ai's supported payload hook. The composer shows a lightning icon while Fast mode is enabled.",
-      "surfaces": ["client", "host", "api"],
+      "surfaces": [
+        "client",
+        "host",
+        "api"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: model picker › Fast mode",
+      "currentSurface": "composer: model picker \u203a Fast mode",
       "configuration": [],
-      "states": ["hidden", "available", "enabled", "updating", "error"],
+      "states": [
+        "hidden",
+        "available",
+        "enabled",
+        "updating",
+        "error"
+      ],
       "failureModes": [
         "Without an eligible AI Accounts Codex route/model the switch stays hidden.",
         "Unsupported models and non-Codex provider routes never receive the Fast service tier.",
@@ -102,26 +130,39 @@
       "id": "account-swap",
       "title": "Swap to the next account offering the same model",
       "summary": "A swap button beside the composer model picker moves the Session to the next provider route, in catalog order, that offers the selected model id, keeping the reasoning effort when the target advertises it.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: model picker › account swap",
+      "currentSurface": "composer: model picker \u203a account swap",
       "configuration": [
         {
           "key": "accountSwap",
           "defaultValue": "true",
           "constraints": "Boolean; show the swap button. It only renders when another route offers the selected model.",
-          "choices": ["true", "false"],
-          "coveredBy": ["model-effort-picker.account-swap-next"]
+          "choices": [
+            "true",
+            "false"
+          ],
+          "coveredBy": [
+            "model-effort-picker.account-swap-next"
+          ]
         },
         {
           "key": "accountSwapRoutes",
           "defaultValue": "[]",
           "constraints": "Provider route ids to rotate through; empty rotates through every route that offers the selected model.",
-          "coveredBy": ["model-effort-picker.account-swap-routes"]
+          "coveredBy": [
+            "model-effort-picker.account-swap-routes"
+          ]
         }
       ],
-      "states": ["hidden", "idle", "selecting"],
+      "states": [
+        "hidden",
+        "idle",
+        "selecting"
+      ],
       "failureModes": [
         "No other route offers the selected model, or every other one is excluded by accountSwapRoutes: the button stays hidden.",
         "A target model without the current reasoning effort falls back to its own default effort.",
@@ -172,12 +213,20 @@
         "click button \"Add fallback\"",
         "expect list \"Fallback order\""
       ],
-      "surfaces": ["client", "host"],
+      "surfaces": [
+        "client",
+        "host"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
-      "currentSurface": "composer: model picker › Fallback chain",
+      "currentSurface": "composer: model picker \u203a Fallback chain",
       "configuration": [],
-      "states": ["unavailable", "follows-default", "thread-chain", "serving-fallback"],
+      "states": [
+        "unavailable",
+        "follows-default",
+        "thread-chain",
+        "serving-fallback"
+      ],
       "failureModes": [
         "Without the AI Accounts fallback API (older Host or no AI Accounts) the section stays hidden and the picker works as before.",
         "Outside Priority distribution the section says the chain does not run.",
@@ -201,6 +250,60 @@
         {
           "kind": "not-applicable",
           "reason": "Chain edits go through the @dshfiles/ai-accounts API, whose api-dispatch spans that catalog lists; this plugin serves no Host method of its own."
+        }
+      ]
+    },
+    {
+      "id": "model-fan-out-gesture",
+      "title": "Shift-click models to fan out",
+      "summary": "Shift-click a model row to collect it for fan-out instead of switching this thread's model; a bar above the list counts the selection and Fan out\u2026 opens thread-sidebar's fan-out dialog with those routes preselected once two are collected. Scratch has one advertised model, so the reach covers the gesture and the counted bar; the two-route handoff and the dialog are exercised by unit tests and thread-sidebar's own fan-out journey.",
+      "surfaces": [
+        "client",
+        "integration"
+      ],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: model picker fan-out selection",
+      "configuration": [],
+      "reach": [
+        "seed tool-call-thread",
+        "click button \", reasoning *\"",
+        "shiftclick button \"Use gpt-6-luna*\"",
+        "shiftclick button \"Use claude-sonnet-5-5*\"",
+        "expect text \"2 models selected\"",
+        "click button \"Fan out\u2026\"",
+        "expect dialog \"Send to several models\""
+      ],
+      "states": [
+        "closed",
+        "collecting",
+        "ready",
+        "empty"
+      ],
+      "failureModes": [
+        "A shift-click past the six-route Host limit leaves the selection unchanged.",
+        "A second shift-click on a collected route removes it.",
+        "Clearing the selection leaves the current model unchanged; a plain click still selects one model.",
+        "Without the thread-sidebar bundle the gesture still collects routes, and Fan out\u2026 dispatches an event nothing answers."
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only selection state plus one bounded browser event; the fan-out itself is thread-sidebar's existing Host call."
+        }
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "model-effort-picker.fan-out-selection",
+          "file": "plugins/@dshfiles/model-effort-picker/tests/model-picker-model.spec.ts",
+          "testName": "shift-click collects routes and a second shift-click removes that route"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "model-effort-picker.fan-out-gesture-browser",
+          "reason": "The gesture is client-only selection state over the composer picker; its browser reach ('shiftclick' steps) runs through dshx dev open and the unit tests cover the selection rules."
         }
       ]
     }

@@ -21,6 +21,8 @@ export default defineConfig({
     'thread-row-actions': 'src/thread-row-actions.ts',
     // Updates other plugins know only a Host restart applies, shown in thread-sidebar's one restart status item.
     'restart-sources': 'src/restart-sources.ts',
+    // A picker gesture in another plugin asks the sidebar's fan-out dialog to open with its models preselected.
+    'fan-out-request': 'src/fan-out-request.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },
 })

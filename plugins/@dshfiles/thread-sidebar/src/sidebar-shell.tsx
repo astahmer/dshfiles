@@ -85,6 +85,7 @@ import {
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
+import { FAN_OUT_REQUEST_EVENT, fanOutRoutesOf } from './fan-out-request.js'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { registerWorkbenchPaletteActions } from './workbench-palette.js'
 import { threadActionsApi } from './thread-actions-api.js'
@@ -343,6 +344,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const restartApi = useApi(threadSidebarRestartApi)
   const fanOutApi = useApi(threadActionsApi)
   const fanOutWorkspaceId = useSyncExternalStore(PaletteBridge.subscribeFanOut, PaletteBridge.readFanOutWorkspaceId, () => undefined)
+  const fanOutPreset = useSyncExternalStore(PaletteBridge.subscribeFanOut, PaletteBridge.readFanOutModels, () => undefined)
   const fanOutOpen = fanOutWorkspaceId !== undefined
   const loadModelCatalog = props.loadModelCatalog
   const fanOutCatalog = useQuery({
@@ -353,6 +355,19 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   })
   const [fanOutText, setFanOutText] = useState('')
   const [fanOutModels, setFanOutModels] = useState<readonly { provider: string; model: string; reasoningEffort?: string }[]>([])
+  useEffect(() => {
+    if (!fanOutOpen) return
+    setFanOutModels(fanOutPreset ?? [])
+  }, [fanOutOpen, fanOutPreset])
+  useEffect(() => {
+    const onRequest = (event: Event): void => {
+      if (!(event instanceof CustomEvent)) return
+      const models = fanOutRoutesOf(event.detail)
+      if (models !== undefined) PaletteBridge.openFanOut(null, models)
+    }
+    window.addEventListener(FAN_OUT_REQUEST_EVENT, onRequest)
+    return () => window.removeEventListener(FAN_OUT_REQUEST_EVENT, onRequest)
+  }, [])
   const sendFanOut = useMutation({
     mutationFn: async () => {
       const result = await fanOutApi.fanOut({

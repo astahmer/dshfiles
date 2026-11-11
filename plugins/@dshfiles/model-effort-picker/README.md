@@ -18,6 +18,18 @@ keeps only the part that identifies the account (`OpenCode Go Alex` next to `Ope
 Hovering a truncated account tag or provider name shows the whole label. Hovering the effort glyph opens that model's
 reasoning levels over the list and picks one directly.
 
+## Fan out several models
+
+![A shift-clicked model row with its counted fan-out bar](docs/screenshots/model-fan-out-gesture.png)
+
+![Fan-out dialog with the picked models already checked](docs/screenshots/model-fan-out-dialog.png)
+
+Shift-click model rows to collect routes instead of switching this thread's model: each row gains a primary ring, and a
+bar above the list counts the selection with **Fan out…** and **Clear**. Two through six routes are accepted (the Host
+fan-out method's own bounds). **Fan out…** closes the picker and opens thread-sidebar's fan-out dialog with those
+models already checked, where you type the prompt; the request crosses plugins as the bounded
+`@dshfiles/thread-sidebar/fan-out-request` event, and a plain click still selects one model as before.
+
 ## Fallback chain
 
 The details pane shows a minimal "No fallbacks" state with a small add action. Stored rungs are compact draggable rows

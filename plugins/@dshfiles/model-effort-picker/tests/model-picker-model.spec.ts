@@ -206,3 +206,23 @@ describe('model picker fallback chain', () => {
     expect(ModelPickerModel.fallbackLabel(groups, { provider: 'gone', model: 'm1' })).toEqual({ provider: 'gone', model: 'm1', effort: undefined })
   })
 })
+
+describe('model picker fan-out selection', () => {
+  const route = (provider: string, model: string): ModelSelection => ({ provider, model })
+
+  it('shift-click collects routes and a second shift-click removes that route', () => {
+    const picked = ModelPickerModel.toggledFanOut([], route('northstar', 'nova-3'))
+    expect(picked).toEqual([route('northstar', 'nova-3')])
+    expect(ModelPickerModel.toggledFanOut(picked, route('redwood', 'r2'))).toEqual([route('northstar', 'nova-3'), route('redwood', 'r2')])
+    expect(ModelPickerModel.toggledFanOut(picked, route('northstar', 'nova-3'))).toEqual([])
+  })
+
+  it('keeps one route per provider and model and stops at the Host fan-out limit', () => {
+    const routes = [route('a', '1'), route('b', '2'), route('c', '3'), route('d', '4'), route('e', '5'), route('f', '6')]
+    const full = routes.reduce<readonly ModelSelection[]>((chain, entry) => ModelPickerModel.toggledFanOut(chain, entry), [])
+    expect(full).toHaveLength(ModelPickerModel.fanOutLimit)
+    expect(ModelPickerModel.toggledFanOut(full, route('g', '7'))).toEqual(full)
+    expect(ModelPickerModel.isFanOutRoute(full, route('c', '3'))).toBe(true)
+    expect(ModelPickerModel.isFanOutRoute(full, route('c', '9'))).toBe(false)
+  })
+})

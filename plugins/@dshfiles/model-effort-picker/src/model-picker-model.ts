@@ -179,6 +179,19 @@ export class ModelPickerModel {
 
   static withoutFallback = (chain: readonly FallbackRoute[], index: number): readonly FallbackRoute[] => chain.filter((_, position) => position !== index)
 
+  /** Fan-out routes a shift-click collects: bounded like the Host fan-out method, one rung per provider and model. */
+  static readonly fanOutLimit = 6
+
+  static toggledFanOut = (chain: readonly ModelSelection[], selection: ModelSelection): readonly ModelSelection[] => {
+    const present = chain.some(route => route.provider === selection.provider && route.model === selection.model)
+    if (present) return chain.filter(route => route.provider !== selection.provider || route.model !== selection.model)
+    if (chain.length >= ModelPickerModel.fanOutLimit) return chain
+    return [...chain, selection]
+  }
+
+  static isFanOutRoute = (chain: readonly ModelSelection[], selection: Pick<ModelSelection, 'provider' | 'model'>): boolean =>
+    chain.some(route => route.provider === selection.provider && route.model === selection.model)
+
   /** Move one rung to another position, shifting the rungs between; an index outside the chain leaves it as it is. */
   static reorderedFallback = (chain: readonly FallbackRoute[], from: number, to: number): readonly FallbackRoute[] => {
     const moving = chain[from]

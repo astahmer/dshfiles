@@ -53,7 +53,8 @@ unassigned sessions.
 
 The reusable board page is **Thread Sidebar: Board** (Threads › Board in the rail).
 
-**Multi-model fan-out.** `thread_fan_out` creates two to six independent threads for one prompt. Each thread is created blank, assigned its requested provider/model (and optional reasoning effort), titled `<prompt prefix> · <model>`, then receives the prompt. Creations run at concurrency two; each result reports its thread ID or failure without cancelling sibling work. With jj-integration isolation enabled, every thread is created in its own workspace.
+**Multi-model fan-out.** The model picker's shift-click gesture opens this dialog with its models preselected
+(`@dshfiles/thread-sidebar/fan-out-request`). `thread_fan_out` creates two to six independent threads for one prompt. Each thread is created blank, assigned its requested provider/model (and optional reasoning effort), titled `<prompt prefix> · <model>`, then receives the prompt. Creations run at concurrency two; each result reports its thread ID or failure without cancelling sibling work. With jj-integration isolation enabled, every thread is created in its own workspace.
 
 **Status grouping (default).** **All threads** groups rows by the ADE status vocabulary (plan `docs/ade-ux` §4.3,
 §4.7; `src/thread-status.ts`): **Pinned** on top, then **Needs you**, **Working**, **Ready**, **Idle** and **Done**.

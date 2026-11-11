@@ -38,7 +38,9 @@ sticky toast through the page's Dialogs and Toasts providers; needs `@dshfiles/d
 hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
 input. `hover <role> "<name>"` leaves the pointer on hover-only UI for the next
-`shot`. A `click`, `rightclick` or `hover` step may end with `at <x>,<y>` to hit
+`shot`. `shiftclick <role> "<name>"` holds Shift for multi-selection gestures
+(a model picker's fan-out selection, a range selection). A `click`, `rightclick`,
+`shiftclick` or `hover` step may end with `at <x>,<y>` to hit
 that point of the element's own box instead of its centre; use it when an overlay
 the element reveals on hover — a thread row's action strip — covers the centre:
 `rightclick text "Mute target" at 24,16`. Backlog items get a random `b:<ref>`, so a

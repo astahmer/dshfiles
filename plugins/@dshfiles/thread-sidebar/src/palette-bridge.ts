@@ -5,11 +5,16 @@ const DEFAULT_RECENT_LIMIT = 10
 
 let sidebarPlugin: PluginContext | undefined
 let recentLimit = DEFAULT_RECENT_LIMIT
-let fanOutWorkspaceId: string | null | undefined
+/** One open fan-out request: the workspace it targets and the models a picker gesture preselected. */
+export interface FanOutRequest {
+  readonly workspaceId: string | null
+  readonly models?: readonly { readonly provider: string; readonly model: string; readonly reasoningEffort?: string }[]
+}
+let fanOutRequest: FanOutRequest | undefined
 const fanOutListeners = new Set<() => void>()
 
-const openFanOut = (workspaceId: string | null): void => {
-  fanOutWorkspaceId = workspaceId
+const openFanOut = (workspaceId: string | null, models?: FanOutRequest['models']): void => {
+  fanOutRequest = models === undefined ? { workspaceId } : { workspaceId, models }
   for (const listener of fanOutListeners) listener()
 }
 
@@ -18,9 +23,10 @@ const subscribeFanOut = (listener: () => void): (() => void) => {
   return () => fanOutListeners.delete(listener)
 }
 
-const readFanOutWorkspaceId = (): string | null | undefined => fanOutWorkspaceId
+const readFanOutWorkspaceId = (): string | null | undefined => fanOutRequest?.workspaceId
+const readFanOutModels = (): FanOutRequest['models'] => fanOutRequest?.models
 const closeFanOut = (): void => {
-  fanOutWorkspaceId = undefined
+  fanOutRequest = undefined
   for (const listener of fanOutListeners) listener()
 }
 
@@ -75,5 +81,6 @@ export class PaletteBridge {
   static readonly closeFanOut = closeFanOut
   static readonly subscribeFanOut = subscribeFanOut
   static readonly readFanOutWorkspaceId = readFanOutWorkspaceId
+  static readonly readFanOutModels = readFanOutModels
   static readonly defaultRecentLimit = DEFAULT_RECENT_LIMIT
 }

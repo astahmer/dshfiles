@@ -157,7 +157,9 @@ export const ModelRow = (props: {
   readonly accountAccent: string | undefined
   readonly providerLabel: string | undefined
   readonly current: ModelSelection | null
+  readonly fanOutSelected: boolean
   readonly onSelect: (selection: ModelSelection) => void
+  readonly onFanOut: (selection: ModelSelection) => void
   readonly onInspect: () => void
   readonly onEffort: (selection: ModelSelection) => void
 }) => {
@@ -177,18 +179,24 @@ export const ModelRow = (props: {
       className={cn(
         'dshx:group/row dshx:flex dshx:h-7 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-1.5 dshx:transition-colors dshx:hover:bg-accent/60',
         props.active && 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/60',
+        props.fanOutSelected && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary/60',
       )}
+      data-fan-out-selected={props.fanOutSelected || undefined}
       data-model-picker-row
       onFocus={() => setRevealed(true)}
       onPointerEnter={() => setRevealed(true)}
     >
       <button
         aria-label={`Use ${name}${props.providerLabel === undefined ? '' : ` via ${props.providerLabel}`} (${props.group.name})`}
-        aria-pressed={props.active}
+        aria-pressed={props.active || props.fanOutSelected}
         className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
         data-model-picker-option
         disabled={props.busy}
-        onClick={() => props.onSelect(ModelPickerModel.selectionForModel(props.group, props.model, props.current))}
+        onClick={event => {
+          const selection = ModelPickerModel.selectionForModel(props.group, props.model, props.current)
+          if (event.shiftKey) props.onFanOut(selection)
+          else props.onSelect(selection)
+        }}
         type="button"
       >
         <BrandMark brand={brand} className="dshx:size-4" name={name} />

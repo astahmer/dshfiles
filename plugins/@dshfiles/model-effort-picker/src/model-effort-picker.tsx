@@ -17,6 +17,7 @@ import { ModelDetails, type InspectedRoute } from './model-details.js'
 import { ModelPickerModel } from './model-picker-model.js'
 import { ModelRow } from './model-row.js'
 import { PROVIDER_LABEL } from './provider-labels.js'
+import { requestFanOut } from '@dshfiles/thread-sidebar/fan-out-request'
 import { modelEffortPickerSettings } from './settings.js'
 
 type Props = ModelSelectInjected & { readonly locked: boolean; readonly sessionId: string }
@@ -66,6 +67,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const [inspected, setInspected] = useState<InspectedRoute | null>(null)
   const [narrowDetails, setNarrowDetails] = useState(false)
   const [popoverWidth, setPopoverWidth] = useState<number | null>(null)
+  const [fanOut, setFanOut] = useState<readonly ModelSelection[]>([])
   const modelListRef = useRef<HTMLDivElement | null>(null)
   // The popover's Portal mounts its content one render after `open`, so the fit below waits for the list node itself.
   const [listNode, setListNode] = useState<HTMLDivElement | null>(null)
@@ -172,6 +174,24 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const choose = (selection: ModelSelection): void => {
     setInspected({ model: selection.model, provider: selection.provider })
     void submitSelection(selection)
+  }
+
+  /** Shift-click collects routes for one fan-out request instead of switching this thread's model. */
+  const toggleFanOut = (selection: ModelSelection): void => {
+    setFanOut(previous => ModelPickerModel.toggledFanOut(previous, selection))
+  }
+
+  const startFanOut = (): void => {
+    if (fanOut.length < 2) return
+    requestFanOut(
+      fanOut.map(route => ({
+        provider: route.provider,
+        model: route.model,
+        ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort }),
+      })),
+    )
+    setFanOut([])
+    setOpen(false)
   }
 
   const showDetails = (route: InspectedRoute): void => {
@@ -342,10 +362,12 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                           active={active}
                           busy={busy}
                           current={current}
+                          fanOutSelected={ModelPickerModel.isFanOutRoute(fanOut, { provider: group.id, model: model.id })}
                           group={group}
                           key={`${group.id}:${model.id}`}
                           model={model}
                           onEffort={choose}
+                          onFanOut={toggleFanOut}
                           onInspect={() => showDetails({ model: model.id, provider: group.id })}
                           onSelect={choose}
                           providerLabel={providerLabels.get(group.id)}
@@ -361,6 +383,21 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     )}
                   </div>
                 </ScrollArea>
+                {fanOut.length > 0 ? (
+                  <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-2 dshx:py-1.5">
+                    <span className="dshx:min-w-0 dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
+                      {fanOut.length} model{fanOut.length === 1 ? '' : 's'} selected
+                    </span>
+                    <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
+                      <Button onClick={() => setFanOut([])} size="sm" type="button" variant="ghost">
+                        Clear
+                      </Button>
+                      <Button disabled={fanOut.length < 2} onClick={startFanOut} size="sm" type="button">
+                        Fan out…
+                      </Button>
+                    </span>
+                  </div>
+                ) : null}
                 {state.failures.length > 0 && (
                   <p className="dshx:px-1 dshx:text-[10px] dshx:text-muted-foreground">
                     {state.failures.length} provider{state.failures.length === 1 ? '' : 's'} could not load:{' '}
