@@ -274,6 +274,7 @@ test('a scenario-level impact is never wider than the task-level impact it repla
   const affectedOwners = new Set(affected.map(scenario => scenario.owner))
   const taskLevel = [...affectedOwners].reduce((sum, owner) => sum + (owners.get(owner)?.scenarios.length ?? 0), 0)
   assert.ok(affected.length > 0 && affected.length < taskLevel, `expected fewer than the ${String(taskLevel)} scenarios its owners hold, saw ${String(affected.length)}`)
+  assert.ok(affected.length * 4 < total, `expected a small share of all ${String(total)} scenarios, saw ${String(affected.length)}`)
   assert.ok(affectedOwners.size < owners.size)
 })
 
