@@ -68,6 +68,7 @@ const jjBackend = (jj: ReviewJj['Service']): ReviewBackend => ({
       ),
     ),
   commit: input => Effect.map(jj.read({ path: input.path, args: revisionArgs(input.revision), outputLimit: 4_096 }), output => output.stdout.trim()),
+  baseCommit: input => Effect.map(jj.read({ path: input.path, args: revisionArgs(input.base), outputLimit: 4_096 }), output => output.stdout.trim()),
   diff: input => jj.read({ path: input.path, args: diffArgs(input.base, input.head), outputLimit: input.limit }),
   messages: {
     missing: 'Jujutsu (jj) is not available to the Host.',
@@ -143,6 +144,8 @@ export class ReviewWorkspace extends Context.Service<
         const head = yield* backend.commit({ path: input.path, revision: headRevision })
         if (head.length === 0) return failure(input.path, 'jj-failed', 'The working-copy revision could not be read.')
         const diff = yield* backend.diff({ path: input.path, base, head: headRevision, limit: MAX_PATCH_CHARS })
+        // Only image previews need it, so a base that does not read as one commit leaves them without a before side.
+        const baseCommit = yield* backend.baseCommit({ path: input.path, base, head: headRevision }).pipe(Effect.orElseSucceed(() => ''))
         const baseLabel = input.exactRange ? (input.fromChangeId ?? '') : base
         const range = `${baseLabel}..${input.exactRange ? (input.toChangeId ?? '') : backend.liveHead}`
         const grouped = yield* groupPatch({ patch: diff.stdout, title: range })
@@ -151,6 +154,8 @@ export class ReviewWorkspace extends Context.Service<
           path: input.path,
           base: baseLabel,
           head,
+          ...(/^[0-9a-z]{1,128}$/u.test(baseCommit) ? { baseCommit } : undefined),
+          workingCopy: !input.exactRange,
           range,
           patch: diff.stdout,
           truncated: diff.truncated || grouped.clipped,

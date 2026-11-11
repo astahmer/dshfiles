@@ -16,6 +16,8 @@ import { diffsReviewApi, type RevisionReview } from './api.js'
 import { ReviewGraphModel, type ReviewGraphEntry } from './review-graph.js'
 import { useRevisionsViewedMarks, type RevisionFile } from './viewed-marks.js'
 import { orderReviewFiles } from './file-importance.js'
+import { ChangedImages } from './changed-images.js'
+import { ReviewImageModel } from './review-image-query.js'
 
 const METRICS = GRAPH_DENSITY.compact
 const CHIP = 'dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:font-mono! dshx:text-[10px] dshx:leading-none'
@@ -75,13 +77,19 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
   )
   const current = revisions[currentIndex]
   const currentPatch = current?.patch ?? ''
+  const images = useMemo(
+    () => (current === undefined ? [] : ReviewImageModel.revisionImages({ workspacePath, commitId: current.commitId, files: current.files })),
+    [current, workspacePath],
+  )
   const parsed = useMemo(() => {
     if (current === undefined || currentPatch.length === 0) return []
     const order = new Map(orderReviewFiles({ files: current.files }).map((file, index) => [file.path, index]))
+    const imagePaths = new Set(images.map(image => image.path))
     return parsePatchFiles(currentPatch)
       .flatMap(file => file.files)
+      .filter(file => !imagePaths.has(file.name))
       .sort((left, right) => (order.get(left.name) ?? Infinity) - (order.get(right.name) ?? Infinity))
-  }, [current, currentPatch])
+  }, [current, currentPatch, images])
   const packageJson = usePackageJsonTables(currentPatch, parsed)
   const graph = useMemo(() => ReviewGraphModel.entries(revisions), [revisions])
   const graphWidth = graphWidthFor(METRICS, Math.max(1, ...graph.map(entry => entry.layout.laneCount)))
@@ -277,7 +285,26 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
             </p>
           </div>
           <PackageJsonTables onShowText={path => setChosen({ commitId: current.commitId, focusPath: path })} view={packageJson} />
-          {packageJson.textFiles.length === 0 && parsed.length > 0 ? null : (
+          <ChangedImages
+            images={images}
+            renderActions={path => {
+              const target = { commitId: current.commitId, path }
+              const viewed = marks.isViewed(target)
+              return (
+                <Button
+                  aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${path}`}
+                  className="dshx:gap-1 dshx:text-[11px]"
+                  disabled={!marks.ready}
+                  onClick={() => marks.set([target], !viewed)}
+                  size="sm"
+                  variant={viewed ? 'secondary' : 'ghost'}
+                >
+                  {viewed ? 'Viewed' : 'Mark viewed'}
+                </Button>
+              )
+            }}
+          />
+          {packageJson.textFiles.length === 0 && (parsed.length > 0 || images.length > 0) ? null : (
             <div
               className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
               data-testid="combined-diff"

@@ -19,11 +19,14 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type R
 import { diffsReviewApi } from './api.js'
 import { FacetSessionStateModel, type FacetSessionPatch } from './changes-facet-state.js'
 import { ChangesScopeModel, changesScopeSchema, type ChangesRequest, type ChangesScope } from './changes-scope.js'
+import { ChangedImages } from './changed-images.js'
 import { CombinedReview } from './combined-review.js'
 import { orderReviewFiles } from './file-importance.js'
 import { LandCard } from './land-card.js'
 import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
-import { TurnChangesModel, TurnChangesReadError, type TurnChangesEvent } from './turn-changes.js'
+import { ReviewImageModel, WORKING_COPY } from './review-image-query.js'
+import { TurnChangesModel, type TurnChangesEvent } from './turn-changes.js'
+import { TurnDiffModel, type FacetDiff } from './turn-diff.js'
 import { useRangeViewedMarks, useTurnViewedMarks, type ViewedMarksView } from './viewed-marks.js'
 import { Schema } from 'effect'
 
@@ -37,23 +40,7 @@ export interface ChangesFacetProps {
 }
 
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
-/** One turn can list many files; the facet reads at most this many comparisons and says so. */
-const MAX_TURN_DIFFS = 150
 const noValue = (): undefined => undefined
-
-interface FacetFile {
-  readonly path: string
-  readonly display: string
-  readonly added: number
-  readonly deleted: number
-}
-
-interface FacetDiff {
-  readonly files: readonly FacetFile[]
-  readonly patch: string
-  readonly truncated: boolean
-  readonly label: string
-}
 
 interface UserQuestionsProjection {
   readonly userQuestions?: { readonly active: readonly unknown[] }
@@ -85,32 +72,6 @@ const useThreadSummary = (sessions: ISessions, sessionId: string | undefined) =>
   return {
     cwd: useSyncExternalStore(subscribe, readCwd, noValue),
     busy: useSyncExternalStore(subscribe, readBusy, () => false),
-  }
-}
-
-/** Fetch one document-relative Host route as JSON; a non-2xx answer is an error the facet can show. */
-const fetchJson = async (url: string, signal: AbortSignal): Promise<unknown> => {
-  const response = await fetch(url, { signal })
-  if (!response.ok) throw new TurnChangesReadError(response.status)
-  return response.json()
-}
-
-const readTurnDiff = async (input: { readonly sessionId: string; readonly seq: number; readonly signal: AbortSignal }): Promise<FacetDiff> => {
-  const summary = TurnChangesModel.decodeSummary(await fetchJson(TurnChangesModel.summaryUrl(input.sessionId, input.seq), input.signal))
-  if (summary === undefined) throw new Error("This turn's change summary could not be read. Refresh to try again.")
-  const listed = summary.files.slice(0, MAX_TURN_DIFFS)
-  const patches = await Promise.all(
-    listed.map(async (file, index) => {
-      if (file.binary === true || file.oversized === true) return ''
-      const diff = TurnChangesModel.decodeDiff(await fetchJson(TurnChangesModel.diffUrl(input.sessionId, input.seq, index), input.signal))
-      return diff === undefined ? '' : TurnChangesModel.patchOf(diff)
-    }),
-  )
-  return {
-    files: listed.map(file => ({ path: file.path, display: file.display, added: file.added, deleted: file.deleted })),
-    patch: patches.join(''),
-    truncated: summary.files.length > listed.length,
-    label: `Turn ${String(summary.turn)}`,
   }
 }
 
@@ -184,7 +145,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
     enabled: activeScope === 'turn' && props.sessionId !== undefined && activeSeq !== undefined,
     staleTime: Number.POSITIVE_INFINITY,
     retry: TurnChangesModel.retryRead,
-    queryFn: ({ signal }) => readTurnDiff({ sessionId: props.sessionId ?? '', seq: activeSeq ?? 0, signal }),
+    queryFn: ({ signal }) => TurnDiffModel.read({ sessionId: props.sessionId ?? '', seq: activeSeq ?? 0, cwd, signal }),
   })
 
   const rangeResult = rangeDiff.data
@@ -211,6 +172,12 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
         deleted: file.deletions,
       })),
       patch: rangeResult.patch,
+      images: ReviewImageModel.rangeImages({
+        workspacePath: rangeResult.path,
+        files: rangeResult.files,
+        base: rangeResult.baseCommit,
+        head: rangeResult.workingCopy === false ? rangeResult.head : WORKING_COPY,
+      }),
       truncated: rangeResult.truncated,
       label: rangeResult.range,
     }
@@ -218,8 +185,10 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
   const parsedFiles = useMemo(() => {
     if (diff === undefined || diff.patch.length === 0) return []
     const order = new Map(diff.files.map((file, index) => [file.path, index]))
+    const imagePaths = new Set(diff.images.map(image => image.path))
     return parsePatchFiles(diff.patch)
       .flatMap(file => file.files)
+      .filter(file => !imagePaths.has(file.name))
       .sort((left, right) => (order.get(left.name) ?? Infinity) - (order.get(right.name) ?? Infinity))
   }, [diff])
   const packageJson = usePackageJsonTables(diff?.patch ?? '', parsedFiles)
@@ -468,9 +437,27 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
             })}
           </ul>
           <PackageJsonTables onShowText={path => patchFacet({ focusPath: path })} view={packageJson} />
+          <ChangedImages
+            images={diff.images}
+            renderActions={path => {
+              const viewed = marks.viewed.has(path)
+              return (
+                <Button
+                  aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${path}`}
+                  className="dshx:gap-1 dshx:text-[11px]"
+                  disabled={!marks.ready}
+                  onClick={() => marks.set([path], !viewed)}
+                  size="sm"
+                  variant={viewed ? 'secondary' : 'ghost'}
+                >
+                  {viewed ? 'Viewed' : 'Mark viewed'}
+                </Button>
+              )
+            }}
+          />
           {commentBox}
           {commentStatus}
-          {packageJson.textFiles.length === 0 && parsedFiles.length > 0 ? null : (
+          {packageJson.textFiles.length === 0 && (parsedFiles.length > 0 || diff.images.length > 0) ? null : (
             <div
               className="dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border"
               data-testid="changes-diffs"

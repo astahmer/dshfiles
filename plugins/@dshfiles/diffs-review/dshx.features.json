@@ -171,7 +171,7 @@
       "surfaces": ["client", "host"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "left-nav: Review \u203a Summarize",
+      "currentSurface": "left-nav: Review › Summarize",
       "configuration": [],
       "states": ["idle", "summarizing", "summarized", "no-route", "unparsed", "failed"],
       "failureModes": [
@@ -250,7 +250,7 @@
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "left-nav: Review \u203a reviewed marks",
+      "currentSurface": "left-nav: Review › reviewed marks",
       "configuration": [],
       "states": ["unselected", "range-selected", "marked", "cleared"],
       "failureModes": [
@@ -354,6 +354,103 @@
       ]
     },
     {
+      "id": "changed-image-preview",
+      "title": "See changed images in a review instead of a dropped binary file",
+      "summary": "The Changes facet, the Review page and the combined revisions review show each changed image: before and after side by side when both are known revisions (a jj or git range's base and head, a revision and its parent), else the one version there is, labelled (Current for the working copy and a turn). Bytes come from the Host's GET /api/diffs-review.image: jj file show or git cat-file at a plain revision id, or the working copy resolved inside the repository; image extensions only, at most 8 MB, under nosniff and a sandboxing policy so an SVG never runs script.",
+      "surfaces": ["client", "host"],
+      "surface": "threadFacet",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes, Review page",
+      "configuration": [],
+      "states": ["loading", "before-and-after", "after-only", "before-only", "missing", "too-large", "outside", "failed"],
+      "failureModes": [
+        "An image larger than 8 MB says so and points to opening the file instead of reading it.",
+        "A version the image is not in (moved, or the turn's folder changed) says so and suggests refreshing the review.",
+        "A working-copy file that resolves outside the repository through a symlink is refused and says why.",
+        "A revset, an option, an absolute path or a path with .. segments is refused before jj or git runs.",
+        "A read that fails offers Try again."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jujutsu",
+          "boundary": "The jj CLI (jj file show, jj root) in the reviewed repository.",
+          "deterministicFake": "The route test creates a disposable jj repository with an image changed across two revisions."
+        },
+        {
+          "id": "git",
+          "boundary": "The git CLI (git cat-file blob, git rev-parse) in a git-only repository.",
+          "deterministicFake": "The route test creates a disposable git repository with two commits of an image."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "diffs-review.changed-image-preview",
+          "featureFile": "tooling/dshx/e2e/features/diffs-review.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diffs-review.changed-image-turn",
+          "file": "plugins/@dshfiles/diffs-review/tests/turn-diff.spec.ts",
+          "testName": "shows a changed binary image by its current version instead of dropping it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diffs-review.changed-image-revisions",
+          "file": "plugins/@dshfiles/diffs-review/tests/review-image.spec.ts",
+          "testName": "serves a jj revision, its parent and the working copy, each as its own bytes under nosniff"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diffs-review.changed-image-git",
+          "file": "plugins/@dshfiles/diffs-review/tests/review-image.spec.ts",
+          "testName": "serves a git commit and its parent"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diffs-review.changed-image-injection",
+          "file": "plugins/@dshfiles/diffs-review/tests/review-image.spec.ts",
+          "testName": "refuses revsets, options and paths that could leave the repository before running anything"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diffs-review.changed-image-refusals",
+          "file": "plugins/@dshfiles/diffs-review/tests/review-image.spec.ts",
+          "testName": "refuses a non-image, a symlink out of the repository, an oversized image, a missing one and a folder outside any repository"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diffs-review.changed-image-sides",
+          "file": "plugins/@dshfiles/diffs-review/tests/review-image.spec.ts",
+          "testName": "addresses each side the review shows, labelled by version"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "jj"
+        },
+        {
+          "kind": "custom",
+          "span": "diffs-review image read",
+          "file": "plugins/@dshfiles/diffs-review/tests/review-image.spec.ts",
+          "testName": "records one diffs-review image read span with the answered status"
+        },
+        {
+          "kind": "custom",
+          "span": "git <verb>",
+          "file": "plugins/@dshfiles/git-cli/src/git.test.ts",
+          "testName": "records one git <verb> client span with value-free attributes and the exit code"
+        }
+      ],
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Review workspace changes: *\"",
+        "click radio \"Uncommitted\"",
+        "expect text \"The working-copy revision only.\""
+      ]
+    },
+    {
       "id": "package-json-table",
       "title": "Read package.json dependency changes as a table",
       "summary": "In the Changes facet, the combined revisions review and the Review page, a changed package.json shows its added, removed and updated dependencies as a table (package and section, previous, new, change) that replaces the file text diff; Show text diff puts the lines back. A row whose section the diff never names keeps the text on screen, and other changed lines are counted so the table hides nothing.",
@@ -412,7 +509,7 @@
       "surfaces": ["client", "api"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "right-pane: Changes \u203a Revisions",
+      "currentSurface": "right-pane: Changes › Revisions",
       "configuration": [],
       "states": ["loading", "stack", "gaps", "partly-unresolved", "none-resolved", "truncated", "viewed", "failed", "page"],
       "failureModes": [
@@ -501,7 +598,7 @@
     {
       "id": "turn-card-opens-changes",
       "title": "A turn's Edited files card opens Changes on that turn",
-      "summary": "Claims the native per-turn review address (dsh-resource://changes-review/\u2026) at the extension band, so the Edited N files card and its review button open the one Changes facet scoped to that turn instead of a second review tab; the viewed marks are the same per-turn marks the native review tab writes.",
+      "summary": "Claims the native per-turn review address (dsh-resource://changes-review/…) at the extension band, so the Edited N files card and its review button open the one Changes facet scoped to that turn instead of a second review tab; the viewed marks are the same per-turn marks the native review tab writes.",
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
@@ -537,7 +634,7 @@
       "surfaces": ["client", "api"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "right-pane: Changes \u203a Land",
+      "currentSurface": "right-pane: Changes › Land",
       "configuration": [],
       "states": ["shared-checkout", "nothing-to-land", "ready", "behind", "conflicted", "undescribed", "busy", "queued", "landing", "landed", "failed"],
       "failureModes": [
@@ -604,7 +701,7 @@
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
-      "currentSurface": "right-pane: Changes \u203a diff line selection",
+      "currentSurface": "right-pane: Changes › diff line selection",
       "configuration": [],
       "states": ["no-selection", "commenting", "queued", "composer-unavailable"],
       "failureModes": ["Without a composer on screen the comment stays in the box with a hint to open the thread and add it again."],
@@ -626,7 +723,7 @@
     {
       "id": "review-marks-migration",
       "title": "Move the Review page's marks into the one viewed-marks store",
-      "summary": "On load, the Review page's earlier reviewed record (workspace, base, head \u2192 paths) is written into diff-viewed's store as revision-range marks in batches, then emptied; a failed write keeps the record for the next load.",
+      "summary": "On load, the Review page's earlier reviewed record (workspace, base, head → paths) is written into diff-viewed's store as revision-range marks in batches, then emptied; a failed write keeps the record for the next load.",
       "surfaces": ["client", "storage"],
       "surface": "infrastructure",
       "destination": "none",

@@ -17,7 +17,9 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type R
 import { diffsReviewApi } from './api.js'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import type { ChangesRequest } from './changes-scope.js'
+import { ChangedImages } from './changed-images.js'
 import { CombinedReview } from './combined-review.js'
+import { ReviewImageModel, WORKING_COPY } from './review-image-query.js'
 import { orderReviewFiles } from './file-importance.js'
 import { useRangeViewedMarks } from './viewed-marks.js'
 import { PageReviewContextModel } from './review-page-context.js'
@@ -212,6 +214,22 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
 
   const markReviewed = (path: string): void => marks.set([path], !reviewedPaths.has(path))
   const packageJson = usePackageJsonTables(result?.status === 'ok' ? result.patch : '', reviewFiles)
+  const images = useMemo(
+    () =>
+      result?.status === 'ok'
+        ? ReviewImageModel.rangeImages({
+            workspacePath: result.path,
+            files: result.files,
+            base: result.baseCommit,
+            head: result.workingCopy === false ? result.head : WORKING_COPY,
+          })
+        : [],
+    [result],
+  )
+  const textFiles = useMemo(() => {
+    const imagePaths = new Set(images.map(image => image.path))
+    return packageJson.textFiles.filter(file => !imagePaths.has(file.name))
+  }, [images, packageJson.textFiles])
   const reviewControls = (path: string): ReactNode => {
     const isReviewed = reviewedPaths.has(path)
     return (
@@ -413,7 +431,12 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
           <PackageJsonTables headerActions={reviewControls} view={packageJson} />
         </div>
       ) : null}
-      {scopes.length > 0 && packageJson.textFiles.length > 0 ? (
+      {scopes.length > 0 && images.length > 0 ? (
+        <div className="dshx:mx-5 dshx:mb-3 dshx:@max-pane-narrow:mx-3">
+          <ChangedImages images={images} renderActions={reviewControls} />
+        </div>
+      ) : null}
+      {scopes.length > 0 && textFiles.length > 0 ? (
         <div
           data-testid="diffs-review-diffs"
           className={cn(
@@ -422,7 +445,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
           )}
         >
           <PatchView
-            files={packageJson.textFiles}
+            files={textFiles}
             className="dshx:flex-1"
             empty={<p className={cn(HINT, 'dshx:p-3')}>No diff hunks to display.</p>}
             renderHeaderPrefix={file => {

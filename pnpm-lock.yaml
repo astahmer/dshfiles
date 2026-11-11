@@ -3265,6 +3265,9 @@ importers:
       '@dshfiles/git-cli':
         specifier: workspace:*
         version: link:../git-cli
+      '@dshfiles/image-preview':
+        specifier: workspace:*
+        version: link:../image-preview
       '@dshfiles/jj-cli':
         specifier: workspace:*
         version: link:../jj-cli

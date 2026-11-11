@@ -1,6 +1,7 @@
 import type { CommandResult } from '@deepseek-ai/dsh-commands'
+import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-subprocess'
-import { Api, DshxPlugin } from '@dshfiles/dshx/effect'
+import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
 import { HostCommands } from '@dshfiles/dshx/effect/host-commands'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { SessionId } from '@dshfiles/dshx/ids'
@@ -15,6 +16,8 @@ import { ReviewJj } from './jj.js'
 import { ProjectBase } from './project-base.js'
 import { reviewReportText } from './report.js'
 import { ReviewWorkspace, type ReviewInput } from './review.js'
+import { ReviewImages, serveReviewImage } from './review-image.js'
+import { REVIEW_IMAGE_PATH } from './review-image-query.js'
 import { RevisionReviewModel } from './revision-review.js'
 import { DiffsReviewSummary } from './summarize.js'
 import { SummaryRoutes } from './summary-routes-promise.js'
@@ -58,11 +61,37 @@ const reviewLayer = Layer.provideMerge(
   Layer.mergeAll(jjLayer, gitLayer, NodeFileSystem.layer, ProjectBase.layer.pipe(Layer.provide(HostApis.layer))),
 )
 
-const diffsReviewLayer = Layer.provideMerge(reportCommands, Layer.provideMerge(DiffsReviewSummary.layer, Layer.merge(reviewLayer, SummaryRoutes.layer)))
+/** `GET /api/diffs-review.image` inside Connection's authentication fence, removed when the plugin unloads. */
+const imageRoute = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const connection = yield* hostService('connection')
+    const run = Effect.runPromiseWith(yield* DshxPlugin.detachedContext<ReviewImages>())
+    yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        connection.fetch.register({
+          path: REVIEW_IMAGE_PATH,
+          methods: ['GET'],
+          requestBody: 'buffered',
+          fetch: request => run(serveReviewImage(request), { signal: request.signal }),
+        }),
+      ),
+      remove => Effect.promise(async () => remove()),
+    )
+  }),
+).pipe(
+  Layer.provide(
+    ReviewImages.layer.pipe(Layer.provide(Layer.mergeAll(Jj.layer, Git.layer, NodeFileSystem.layer, NodePath.layer)), Layer.provide(platformLayer)),
+  ),
+)
+
+const diffsReviewLayer = Layer.provideMerge(
+  reportCommands,
+  Layer.provideMerge(DiffsReviewSummary.layer, Layer.mergeAll(reviewLayer, SummaryRoutes.layer, imageRoute)),
+)
 
 export default DshxPlugin.make({
   name: 'dshfiles-diffs-review',
-  inject: ['subprocess', 'commands'],
+  inject: ['subprocess', 'commands', 'connection'],
   layer: diffsReviewLayer,
   apis: [
     Api.bind(diffsReviewApi, {

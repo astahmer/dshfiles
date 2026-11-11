@@ -32,6 +32,7 @@
   "dependencies": {
     "@dshfiles/diff-viewed": "workspace:*",
     "@dshfiles/git-cli": "workspace:*",
+    "@dshfiles/image-preview": "workspace:*",
     "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",

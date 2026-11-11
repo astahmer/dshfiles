@@ -121,6 +121,28 @@ dependency. Registry data (license, downloads, release date) is not shown.
 
 ![A package.json change as a table of dependencies](docs/screenshots/package-json-table.png)
 
+**Changed images.** In this facet, the Revisions scope and the Review page, a changed image (`png`,
+`jpg`, `jpeg`, `gif`, `webp`, `svg`, `avif`) shows as the picture instead of a dropped binary file.
+When both sides are known revisions, before and after sit side by side: a scope's base commit and
+`Current` (the working copy), a saved range's base and head, or a selected revision's parent and
+the revision. Otherwise the one side there is shows, labelled: an added image has no before, a
+removed one no after, and a turn shows only `Current`, because DSH's turn snapshot keeps no image
+bytes. Each image keeps its viewed or reviewed mark.
+
+![A changed image, before and after](docs/screenshots/changed-image-preview.png)
+
+The bytes come from the Host route `GET /api/diffs-review.image?path=&file=&revision=[&side=parent]`,
+inside Connection's authentication. A revision is read with `jj file show -r <id> root-file:"<file>"`
+or `git cat-file blob <id>:<file>`; `working-copy` reads the file on disk, resolved with symlinks
+followed, and refuses one that lands outside the repository root. A revision must be a plain commit
+or change id (no revset, no option) and a file repository-relative with no `.` or `..` segment, so
+both are refused before jj or git runs. Only image extensions are read, at most 8 MB (413 above),
+and answered with an explicit `Content-Type`, `nosniff`, `no-store` and a `sandbox` content security
+policy; the page shows them from a blob URL, so an SVG never runs script. The guard, headers and
+browser hook are shared with `@dshfiles/deliverables` through
+[`@dshfiles/image-preview`](../image-preview/README.md). Each read leaves a `diffs-review image read`
+span with the answered status.
+
 Ways in: the turn card (this plugin claims the native `dsh-resource://changes-review/…` address,
 so the card opens Changes on that turn instead of a second review tab), the right pane's tab
 chooser, the jujutsu composer bar ("Review workspace changes"), **Open in thread** on a Land row or

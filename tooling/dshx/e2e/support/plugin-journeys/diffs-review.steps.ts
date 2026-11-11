@@ -87,6 +87,30 @@ Then("every scope's file diffs appear in the same scrollable review", async ({ p
   await finishJourneyAssertions(page)
 })
 
+/** A 1×1 PNG: a real image the browser decodes, so the review shows it instead of a binary placeholder. */
+const CHANGED_IMAGE = {
+  path: 'docs/screenshots/review-image.png',
+  base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+}
+
+When('the thread workspace holds a changed image', async ({ page }: { page: Page }) => {
+  const path = join(threadWorkspacePathFor(page), CHANGED_IMAGE.path)
+  await mkdir(dirname(path), { recursive: true })
+  await writeFile(path, Buffer.from(CHANGED_IMAGE.base64, 'base64'))
+})
+
+Then('the changed image shows in the review as its current version', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'diffs-review-shows-changed-image', async () => {
+    const card = page.locator(`[data-changed-image="${CHANGED_IMAGE.path}"]`)
+    await expect(card).toBeVisible({ timeout: 30_000 })
+    const image = card.getByRole('img', { name: `${CHANGED_IMAGE.path}, Current`, exact: true })
+    await expect(image).toBeVisible({ timeout: 30_000 })
+    await expect.poll(() => image.evaluate(element => (element instanceof HTMLImageElement ? element.naturalWidth : 0))).toBe(1)
+    await expect(card.getByText('Before', { exact: false })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('all changed files are selected for batch review', async ({ page }: { page: Page }) => {
   await page.getByRole('checkbox', { name: 'Select all files in this review', exact: true }).check()
   await expect(page.getByText('2 selected', { exact: true })).toBeVisible()

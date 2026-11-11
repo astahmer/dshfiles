@@ -37,6 +37,16 @@ Feature: Diffs review thread review scopes
     Then the Review page reads the git thread worktree against "main"
     Then every scope's file diffs appear in the same scrollable review
 
+  @scenario:diffs-review.changed-image-preview
+  Scenario: See a changed image in the review instead of a dropped binary file
+    Given the isolated plugin composition of "@dshfiles/diffs-review, @dshfiles/diff-viewed, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And a message is sent in the thread workspace
+    And the thread workspace holds a changed image
+    And the Review page is opened from the sidebar
+    Then the Review page reads the thread workspace against "main"
+    Then the changed image shows in the review as its current version
+
   @scenario:diffs-review.batch-reviewed
   Scenario: Mark selected files reviewed across scopes in one action
     Given the isolated plugin composition of "@dshfiles/diffs-review, @dshfiles/diff-viewed, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker" is booted

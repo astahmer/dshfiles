@@ -21,6 +21,8 @@ export interface ReviewBackend {
   readonly resolves: (input: { readonly path: string; readonly revision: string }) => Effect.Effect<boolean, JjReadFailed>
   /** The short commit id of a revision, or empty when it does not resolve. */
   readonly commit: (input: { readonly path: string; readonly revision: string }) => Effect.Effect<string, JjReadFailed>
+  /** The short commit id of a diff's before side: jj diffs from `base` itself, a live git review from its merge base with HEAD. */
+  readonly baseCommit: (input: { readonly path: string; readonly base: string; readonly head: string }) => Effect.Effect<string, JjReadFailed>
   readonly diff: (input: {
     readonly path: string
     readonly base: string

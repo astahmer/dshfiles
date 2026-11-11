@@ -40,6 +40,13 @@ export class ReviewGit extends Context.Service<ReviewGit, ReviewBackend>()('@dsh
         return ''
       })
 
+      const baseCommit = Effect.fn('review git base commit')(function* (input: { readonly path: string; readonly base: string; readonly head: string }) {
+        if (!isSafeRevision(input.base)) return ''
+        if (input.head !== 'HEAD') return yield* commit({ path: input.path, revision: input.base })
+        const output = yield* run(['merge-base', input.base, 'HEAD'], input.path)
+        return output.exitCode === 0 ? output.stdout.trim().slice(0, 12) : ''
+      })
+
       const worktreeTree = (cwd: string) =>
         Effect.scoped(
           Effect.gen(function* () {
@@ -77,6 +84,7 @@ export class ReviewGit extends Context.Service<ReviewGit, ReviewBackend>()('@dsh
         savedRevision: id => id,
         resolves: input => Effect.map(commit(input), short => short.length > 0),
         commit,
+        baseCommit,
         diff,
         messages: {
           missing: 'git is not available to the Host; install git, make sure DSH can find it on PATH, then reopen the review.',

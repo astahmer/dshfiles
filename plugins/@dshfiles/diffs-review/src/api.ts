@@ -40,6 +40,10 @@ export const reviewResultSchema = Schema.Union([
     path: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048)),
     base: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
     head: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+    /** The commit the patch's before side is, so a changed image can show it; absent when it could not be read. */
+    baseCommit: Schema.optional(Schema.String.check(Schema.isPattern(/^[0-9a-z]{1,128}$/u))),
+    /** True when the after side is the working copy as it is now, false for a saved range's head commit. */
+    workingCopy: Schema.optional(Schema.Boolean),
     range: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
     patch: Schema.String.check(Schema.isMaxLength(MAX_PATCH_CHARS)),
     truncated: Schema.Boolean,

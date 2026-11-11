@@ -17,6 +17,8 @@ export type TurnChangedFile = typeof changedFileSchema.Type
 
 const summarySchema = Schema.Struct({
   turn: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1)),
+  /** The thread's folder when the turn ran; listed paths are relative to it. */
+  cwd: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   files: Schema.Array(changedFileSchema),
   total: Schema.Number,
   added: Schema.Number,
