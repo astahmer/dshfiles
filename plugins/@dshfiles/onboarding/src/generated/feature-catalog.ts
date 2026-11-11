@@ -161,14 +161,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     {
       "name": "cordis-cards",
       "description": "Owned native Cordis cards and panel whose inventory read waits for the connection instead of rereading on its first reset.",
-      "ui": false,
-      "features": 0
+      "ui": true,
+      "features": 1
     },
     {
       "name": "cordis-client-runner",
       "description": "Owned native dynamic-package runner whose inspect manifest is published once per connected generation.",
-      "ui": false,
-      "features": 0
+      "ui": true,
+      "features": 1
     },
     {
       "name": "credential-port",
@@ -443,8 +443,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     {
       "name": "schedule",
       "description": "Owned native Tasks page and reminder catalogs that keep each catalog read until a schedule change or reconnect.",
-      "ui": false,
-      "features": 0
+      "ui": true,
+      "features": 1
     },
     {
       "name": "secret-catalog",
@@ -509,8 +509,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     {
       "name": "settings-subagent",
       "description": "Owned native Subagent settings page whose model catalog read waits for the connection and is shared page-wide.",
-      "ui": false,
-      "features": 0
+      "ui": true,
+      "features": 1
     },
     {
       "name": "settings-web-search",
@@ -3331,6 +3331,28 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         "click button \"Preview cleanup\"",
         "expect text \"Conversations to delete\""
       ],
+      "onboarding": null
+    },
+    {
+      "key": "cordis-cards#inventory-read-once",
+      "plugin": "cordis-cards",
+      "id": "inventory-read-once",
+      "title": "Cordis panel and cards read the inventory once per connection",
+      "summary": "The native Cordis sidebar panel and the cordis_define, cordis_run, cordis_stop and cordis_undefine tool cards from one owned fork of the stock row. Behaviour is the native one; the dynamic-plugin inventory read waits for the page's first connected generation instead of being dis…",
+      "destination": "threads",
+      "currentSurface": "sidebar footer: Cordis panel, and Cordis tool cards in the transcript",
+      "reach": [],
+      "onboarding": null
+    },
+    {
+      "key": "cordis-client-runner#inspect-manifest-once",
+      "plugin": "cordis-client-runner",
+      "id": "inspect-manifest-once",
+      "title": "Publish the Client inspect manifest once per connection",
+      "summary": "The native dynamic-package runner from one owned fork of the stock row. Behaviour is the native one; the page's inspect manifest is no longer sent before the connection is up and then again by the first reset: the first connected generation publishes it once, and every later gen…",
+      "destination": "none",
+      "currentSurface": "client: dynamic Cordis package runner (no UI)",
+      "reach": [],
       "onboarding": null
     },
     {
@@ -6183,6 +6205,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "schedule#catalog-read-reuse",
+      "plugin": "schedule",
+      "id": "catalog-read-reuse",
+      "title": "Tasks and reminder catalogs keep their read until a schedule change",
+      "summary": "The native Tasks page, task tabs and the Session header's reminders from one owned fork of the stock row. Behaviour is the native one; a reminder catalog subscribed again keeps its last read while no schedule/changed event or connection reset happened since, so reopening a threa…",
+      "destination": "work",
+      "currentSurface": "sidebar: Tasks page, task tabs and the Session header's reminders",
+      "reach": [],
+      "onboarding": null
+    },
+    {
       "key": "secret-catalog#scoped-alias-catalog",
       "plugin": "secret-catalog",
       "id": "scoped-alias-catalog",
@@ -6806,6 +6839,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         "fill searchbox \"Search settings\" \"Jev\"",
         "expect text \"Key\""
       ],
+      "onboarding": null
+    },
+    {
+      "key": "settings-subagent#subagent-settings",
+      "plugin": "settings-subagent",
+      "id": "subagent-settings",
+      "title": "Subagent settings",
+      "summary": "The native Subagent plugin page (recursion depth, concurrent count and subagent model selection) from one owned fork of the stock row. Behaviour is the native one; the model catalog read waits for the page's first connected generation instead of being repeated by its first reset…",
+      "destination": "settings",
+      "currentSurface": "settings: Plugins › Subagent",
+      "reach": [],
       "onboarding": null
     },
     {
