@@ -26,12 +26,24 @@ describe('account provider profiles', () => {
     const upstream = anthropicProvider()
     const model = upstream.getModels()[0]
     if (model === undefined) throw new Error('Expected Anthropic catalog')
-    const profile = ProviderProfileModel.buildProfile({ upstream, provider: 'claude-test', displayName: 'Claude', additionalModelIds: [], cacheRetention: () => settings(retention) })
-    const adapter = new EffortPinnedAdapter({
-      profiles: () => new Map([['claude-test', profile]]),
-      resolveApiKey: async () => 'test-key',
-      auth: { credentials: { read: async () => undefined, list: async () => [], modify: async () => undefined, delete: async () => undefined }, authContext: { env: async () => undefined, fileExists: async () => false } },
-    }, { reasoningDefaults: new Map(), fastMode: disabledFastMode })
+    const profile = ProviderProfileModel.buildProfile({
+      upstream,
+      provider: 'claude-test',
+      displayName: 'Claude',
+      additionalModelIds: [],
+      cacheRetention: () => settings(retention),
+    })
+    const adapter = new EffortPinnedAdapter(
+      {
+        profiles: () => new Map([['claude-test', profile]]),
+        resolveApiKey: async () => 'test-key',
+        auth: {
+          credentials: { read: async () => undefined, list: async () => [], modify: async () => undefined, delete: async () => undefined },
+          authContext: { env: async () => undefined, fileExists: async () => false },
+        },
+      },
+      { reasoningDefaults: new Map(), fastMode: disabledFastMode },
+    )
     const originalFetch = globalThis.fetch
     let body = ''
     globalThis.fetch = async (_input, init) => {
@@ -39,7 +51,16 @@ describe('account provider profiles', () => {
       return new Response('{"error":{"message":"stop here"}}', { status: 400 })
     }
     const run = async () => {
-      for await (const _chunk of adapter.stream({ provider: 'claude-test', model: model.id, messages: [{ role: 'system', id: MessageId('system'), source: { kind: 'system-prompt' }, content: [{ type: 'text', text: 'System instructions' }] }, { role: 'user', content: [{ type: 'text', text: 'hi' }] }] })) { /* drain */ }
+      for await (const _chunk of adapter.stream({
+        provider: 'claude-test',
+        model: model.id,
+        messages: [
+          { role: 'system', id: MessageId('system'), source: { kind: 'system-prompt' }, content: [{ type: 'text', text: 'System instructions' }] },
+          { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+        ],
+      })) {
+        /* drain */
+      }
       return body
     }
     try {

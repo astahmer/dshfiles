@@ -101,7 +101,14 @@ const IdleCacheWarning = (props: {
 
   const [now, setNow] = useState(Date.now)
   const lifetime =
-    route === null ? null : IdleCacheModel.lifetime({ ...route, modelsDevId: quote?.modelsDevId ?? null, overrides: preferences.promptCacheMinutes, retention: preferences.promptCacheRetention })
+    route === null
+      ? null
+      : IdleCacheModel.lifetime({
+          ...route,
+          modelsDevId: quote?.modelsDevId ?? null,
+          overrides: preferences.promptCacheMinutes,
+          retention: preferences.promptCacheRetention,
+        })
   const expiresAt = lastUsedAt === null ? null : IdleCacheModel.expiresAt({ lastUsedAt, lifetime })
   useEffect(() => {
     const current = Date.now()

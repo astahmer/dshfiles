@@ -770,7 +770,9 @@ const IdleCacheGroup = (props: { readonly readOnly: boolean; readonly write: (ta
   const savedText = minutesToText(preferences.promptCacheMinutes)
   const [draft, setDraft] = useState<string | null>(null)
   const parsed = textToMinutes(draft ?? savedText)
-  const retentionText = Object.entries(preferences.promptCacheRetention).map(([route, value]) => `${route} = ${value}`).join('\n')
+  const retentionText = Object.entries(preferences.promptCacheRetention)
+    .map(([route, value]) => `${route} = ${value}`)
+    .join('\n')
   const [retentionDraft, setRetentionDraft] = useState<string | null>(null)
   const retentionLines = textToOverrides(retentionDraft ?? retentionText)
   const retention: Record<string, 'short' | 'long'> = {}
@@ -815,9 +817,12 @@ const IdleCacheGroup = (props: { readonly readOnly: boolean; readonly write: (ta
         )}
       </Row>
       <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
-        <Label className="dshx:text-sm dshx:font-normal" htmlFor="ai-accounts-prompt-cache-retention">Cache retention</Label>
+        <Label className="dshx:text-sm dshx:font-normal" htmlFor="ai-accounts-prompt-cache-retention">
+          Cache retention
+        </Label>
         <p className="dshx:text-xs dshx:text-muted-foreground">
-          One rule per line: <code>route/model = long</code> or <code>route/* = short</code>. Use long only where the provider and model support extended caching.
+          One rule per line: <code>route/model = long</code> or <code>route/* = short</code>. Use long only where the provider and model support extended
+          caching.
         </p>
         <Textarea
           className="dshx:min-h-16 dshx:font-mono! dshx:text-xs"

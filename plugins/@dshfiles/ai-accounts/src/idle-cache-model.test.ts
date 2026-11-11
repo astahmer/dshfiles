@@ -39,7 +39,10 @@ describe('IdleCacheModel.lifetime', () => {
       minutes: 1_440,
       source: 'retention',
     })
-    expect(IdleCacheModel.lifetime({ ...route, overrides: { 'claude-main/*': 30 }, retention: { 'claude-main/*': 'long' } })).toEqual({ minutes: 30, source: 'override' })
+    expect(IdleCacheModel.lifetime({ ...route, overrides: { 'claude-main/*': 30 }, retention: { 'claude-main/*': 'long' } })).toEqual({
+      minutes: 30,
+      source: 'override',
+    })
   })
 
   it('uses the published default per vendor, from models.dev or the model name', () => {
