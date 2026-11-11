@@ -25,7 +25,7 @@ import {
 } from './item.js'
 import { ItemRelations, type BacklogLease, type ItemRelationIndex } from './item-relations.js'
 import { StartThreadForm } from './start-thread.js'
-import type { LeaseWrite } from './backlog-repo.js'
+import type { ItemAppend, LeaseWrite, MergeRedirect } from './backlog-repo.js'
 import { DueDates } from './due-date.js'
 import { Recurrence } from './recurrence.js'
 import { derivedUlid } from './ulid.js'
@@ -282,6 +282,13 @@ interface StoreState {
   readonly derived: ReadonlyMap<string, number>
   readonly nextId: number
   readonly revision: number
+}
+
+/** A merge being built: every item as it will be, and the writes and redirects that commit it together. */
+interface MergePlan {
+  readonly items: Map<number, BacklogItem>
+  readonly writes: ItemAppend[]
+  readonly redirects: MergeRedirect[]
 }
 
 /** What a read sees: the records, the time it reads at, the dormancy thresholds of that moment and how items relate. */
@@ -991,8 +998,8 @@ export class BacklogStore extends Context.Service<
         return kept.map(file => file.attachment)
       })
 
-      /** Applies a change and its event; touching an item is what keeps it fresh. */
-      const touch = Effect.fnUntraced(function* (item: BacklogItem, actor: BacklogActor, event: EventDraft, change: BacklogChange, leaseWrite?: LeaseWrite) {
+      /** The item after a change and its event, not yet stored. */
+      const changed = Effect.fnUntraced(function* (item: BacklogItem, actor: BacklogActor, event: EventDraft, change: BacklogChange) {
         const at = yield* Clock.currentTimeMillis
         const actorId = actorIdOf(actor)
         const fieldChanges = BacklogItems.humanFieldNames.flatMap(field => {
@@ -1015,11 +1022,23 @@ export class BacklogStore extends Context.Service<
           lastActivityAt: at,
           events: [...item.events, { at, actor: actorId, origin: actorId, ...event, ...(fieldChanges.length !== 0 && { fieldChanges }) }],
         }
-        const next = withClearable(merged, { parent, delegate, criteria, plan, planApproval, summary, due, recurrence, gates })
-        yield* persist(next, event.origin ?? actorId, leaseWrite)
-        const stored = next.events.at(-1)
-        if (stored !== undefined) yield* PubSub.publish(notices, { item: next, event: stored })
-        return yield* detailOf(next)
+        return {
+          next: withClearable(merged, { parent, delegate, criteria, plan, planApproval, summary, due, recurrence, gates }),
+          origin: event.origin ?? actorId,
+        }
+      })
+
+      const announceEvent = (item: BacklogItem) => {
+        const stored = item.events.at(-1)
+        return stored === undefined ? Effect.void : Effect.asVoid(PubSub.publish(notices, { item, event: stored }))
+      }
+
+      /** Applies a change and its event; touching an item is what keeps it fresh. */
+      const touch = Effect.fnUntraced(function* (item: BacklogItem, actor: BacklogActor, event: EventDraft, change: BacklogChange, leaseWrite?: LeaseWrite) {
+        const result = yield* changed(item, actor, event, change)
+        yield* persist(result.next, result.origin, leaseWrite)
+        yield* announceEvent(result.next)
+        return yield* detailOf(result.next)
       })
 
       const closeDuplicateTargets = Effect.fnUntraced(function* (source: BacklogItem) {
@@ -1527,8 +1546,21 @@ export class BacklogStore extends Context.Service<
         return true
       })
 
-      const mergeOne = Effect.fnUntraced(function* (input: { readonly survivorId: number; readonly duplicate: BacklogItem; readonly actor: BacklogActor }) {
-        const survivor = yield* find(input.survivorId)
+      /** Stages one write of a merge on `plan`; nothing is stored until the whole merge commits. */
+      const stage = Effect.fnUntraced(function* (plan: MergePlan, item: BacklogItem, actor: BacklogActor, event: EventDraft, change: BacklogChange) {
+        const result = yield* changed(item, actor, event, change)
+        plan.writes.push({ prev: item, next: result.next, origin: result.origin, lease: yield* leaseAfter(result.next, result.origin) })
+        plan.items.set(result.next.id, result.next)
+      })
+
+      const mergeOne = Effect.fnUntraced(function* (input: {
+        readonly plan: MergePlan
+        readonly survivorId: number
+        readonly duplicate: BacklogItem
+        readonly actor: BacklogActor
+      }) {
+        const plan = input.plan
+        const survivor = plan.items.get(input.survivorId)
         if (survivor === undefined) return
         const duplicate = input.duplicate
         const survivorRef = BacklogReference.refOf(survivor)
@@ -1549,7 +1581,8 @@ export class BacklogStore extends Context.Service<
         }))
         const links = BacklogItems.uniqueLinks([...survivor.links.filter(link => !isEither(link)), ...duplicate.links.filter(link => !isEither(link))])
         const tags = [...new Set([...survivor.tags, ...duplicate.tags])].slice(0, 20)
-        yield* touch(
+        yield* stage(
+          plan,
           { ...survivor, events: [...survivor.events, ...moved] },
           input.actor,
           { kind: 'edited', detail: `merged ${duplicateLabel} (${String(moved.length)} comments, ${String(copied.length)} files)` },
@@ -1563,11 +1596,12 @@ export class BacklogStore extends Context.Service<
           ]),
           ...closedStateChange({ item: duplicate, status: 'dropped' }),
         }
-        yield* touch(duplicate, input.actor, { kind: 'moved', detail: `${duplicate.status} → dropped (merged into ${survivorLabel})` }, closing)
-        const others = [...(yield* Ref.get(state)).records.values()].filter(item => item.id !== duplicate.id)
+        yield* stage(plan, duplicate, input.actor, { kind: 'moved', detail: `${duplicate.status} → dropped (merged into ${survivorLabel})` }, closing)
+        const others = [...plan.items.values()].filter(item => item.id !== duplicate.id)
         for (const child of others.filter(item => item.parent === duplicateRef)) {
           const parent = child.id === survivor.id ? (duplicate.parent ?? null) : survivorRef
-          yield* touch(
+          yield* stage(
+            plan,
             child,
             { kind: 'system' },
             { kind: 'edited', detail: `parent ${duplicateLabel} → ${parent === null ? 'none' : BacklogReference.label(parent)} (merged)` },
@@ -1578,12 +1612,9 @@ export class BacklogStore extends Context.Service<
           const rewritten = BacklogItems.uniqueLinks(
             other.links.map(link => (link.type === 'item' && link.target === duplicateRef ? { ...link, target: survivorRef } : link)),
           )
-          yield* touch(other, { kind: 'system' }, { kind: 'linked', detail: `${duplicateLabel} → ${survivorLabel} (merged)` }, { links: rewritten })
+          yield* stage(plan, other, { kind: 'system' }, { kind: 'linked', detail: `${duplicateLabel} → ${survivorLabel} (merged)` }, { links: rewritten })
         }
-        yield* repo
-          .addRedirect({ itemId: duplicate.id, targetId: survivor.id, alias: duplicateRef, target: survivorRef, origin: actorIdOf(input.actor) })
-          .pipe(Effect.mapError(writeFailed(duplicate, 'put')))
-        yield* Ref.update(state, current => ({ ...current, redirects: new Map(current.redirects).set(duplicateRef, survivorRef) }))
+        plan.redirects.push({ itemId: duplicate.id, targetId: survivor.id, alias: duplicateRef, target: survivorRef, origin: actorIdOf(input.actor) })
       })
 
       const merge = Effect.fn('backlog store merge')(function* (input: {
@@ -1606,7 +1637,24 @@ export class BacklogStore extends Context.Service<
             reason: `${alreadyMerged.map(BacklogReference.labelOf).join(', ')} was already merged; its reference opens the item it was merged into.`,
           })
         yield* Effect.annotateCurrentSpan({ 'dshx.backlog.items': duplicates.length })
-        for (const duplicate of duplicates) yield* mergeOne({ survivorId: survivor.id, duplicate, actor: input.actor })
+        const plan: MergePlan = { items: new Map(current.records), writes: [], redirects: [] }
+        for (const duplicate of duplicates) yield* mergeOne({ plan, survivorId: survivor.id, duplicate, actor: input.actor })
+        yield* repo.commitMerge({ writes: plan.writes, redirects: plan.redirects }).pipe(Effect.mapError(writeFailed(survivor, 'put')))
+        const at = yield* Clock.currentTimeMillis
+        yield* Ref.update(state, latest => {
+          const records = new Map(latest.records)
+          const leases = new Map(latest.leases)
+          for (const write of plan.writes) {
+            records.set(write.next.id, write.next)
+            if (write.lease?.kind === 'clear') leases.delete(write.next.id)
+            if (write.lease?.kind === 'set') leases.set(write.next.id, write.lease.lease)
+          }
+          const redirects = new Map(latest.redirects)
+          for (const redirect of plan.redirects) redirects.set(redirect.alias, redirect.target)
+          return { ...latest, records, leases, redirects, revision: Math.max(latest.revision + 1, at) }
+        })
+        yield* announceRevision
+        yield* Effect.forEach(plan.writes, write => announceEvent(write.next), { discard: true })
         const merged = yield* find(survivor.id)
         if (merged === undefined) return notFound
         return found({ ...(yield* detailOf(merged)), merged: duplicates.map(duplicate => BacklogReference.refOf(duplicate)) })

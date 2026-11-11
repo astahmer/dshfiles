@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
+import { BacklogDb } from './backlog-db.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogStore } from './store.js'
 import { BacklogTestStore } from './test-support.js'
@@ -42,6 +43,37 @@ describe('duplicate merge', () => {
       const refused = yield* Effect.flip(store.merge({ survivorId: survivor.id, duplicateIds: [duplicate.id], actor: user }))
       expect(refused._tag).toBe('BacklogMergeInvalid')
       expect((yield* Effect.flip(store.merge({ survivorId: survivor.id, duplicateIds: [survivor.id], actor: user })))._tag).toBe('BacklogMergeInvalid')
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('leaves nothing behind when a merge write fails, so a retry moves each comment once', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(1_000)
+      const rows = BacklogTestStore.rows()
+      const context = yield* Layer.build(BacklogTestStore.layer({ rows }))
+      const store = Context.get(context, BacklogStore)
+      const sql = Context.get(context, BacklogDb)
+      const survivor = (yield* store.capture({ text: 'keep me', actor: user })).item
+      const duplicate = (yield* store.capture({ text: 'merge me', actor: user })).item
+      yield* store.comment({ id: duplicate.id, text: 'only once', actor: user })
+      yield* sql`CREATE TRIGGER refuse_redirect BEFORE INSERT ON alias_redirects BEGIN SELECT RAISE(ABORT, 'disk full'); END`
+
+      const failed = yield* Effect.flip(store.merge({ survivorId: survivor.id, duplicateIds: [duplicate.id], actor: user }))
+      expect(failed._tag).toBe('BacklogWriteFailed')
+      const reopened = Context.get(yield* Layer.build(BacklogTestStore.layer({ rows })), BacklogStore)
+      for (const view of [store, reopened]) {
+        const kept = yield* view.get(survivor.id)
+        expect(kept.ok && kept.value.item.events.filter(event => event.kind === 'commented')).toEqual([])
+        const untouched = yield* view.get(duplicate.id)
+        expect(untouched.ok && untouched.value.item.status).not.toBe('dropped')
+      }
+
+      yield* sql`DROP TRIGGER refuse_redirect`
+      const merged = yield* store.merge({ survivorId: survivor.id, duplicateIds: [duplicate.id], actor: user })
+      if (!merged.ok) throw new Error('the retry was refused')
+      expect(merged.value.item.events.filter(event => event.kind === 'commented').map(event => event.detail)).toEqual([
+        `Moved from b:${BacklogReference.refOf(duplicate)}:\n\nonly once`,
+      ])
     }).pipe(Effect.scoped),
   )
 

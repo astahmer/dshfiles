@@ -119,6 +119,22 @@ const LeaseRow = Schema.Struct({ alias: Schema.String, holder: Schema.String, ac
 /** What a write does to the item's claim, in the same transaction as its ops. */
 export type LeaseWrite = { readonly kind: 'set'; readonly lease: BacklogLease } | { readonly kind: 'clear' }
 
+/** One item write: the ops that turn `prev` into `next`, by `origin`, with its claim change. */
+export interface ItemAppend {
+  readonly prev: BacklogItem
+  readonly next: BacklogItem
+  readonly origin: string
+  readonly lease?: LeaseWrite | undefined
+}
+
+export interface MergeRedirect {
+  readonly itemId: number
+  readonly targetId: number
+  readonly alias: string
+  readonly target: string
+  readonly origin: string
+}
+
 const chunks = <A>(values: readonly A[]): A[][] =>
   Array.from({ length: Math.ceil(values.length / INSERT_CHUNK) }, (_unused, index) => values.slice(index * INSERT_CHUNK, (index + 1) * INSERT_CHUNK))
 
@@ -153,27 +169,17 @@ export class BacklogRepo extends Context.Service<
       readonly identity?: { readonly itemId: string; readonly createOpId: string } | undefined
     }) => Effect.Effect<void, unknown>
     /** Appends the ops that turn `prev` into `next` and refreshes the cache row, with its claim change, in one transaction. */
-    readonly append: (input: {
-      readonly prev: BacklogItem
-      readonly next: BacklogItem
-      readonly origin: string
-      readonly lease?: LeaseWrite | undefined
-    }) => Effect.Effect<void, unknown>
+    readonly append: (input: ItemAppend) => Effect.Effect<void, unknown>
     /** Every stored claim by the item's numeric id, live or expired; the sweep removes expired ones. */
     readonly loadLeases: Effect.Effect<ReadonlyMap<number, BacklogLease>, unknown>
     /** Every merged duplicate's ref and the ref of the item it was merged into. */
     readonly loadRedirects: Effect.Effect<ReadonlyMap<string, string>, unknown>
     /**
-     * Records that `alias` (merged duplicate `itemId`'s ref) now names `target` (survivor `targetId`'s ref): a `redirect`
-     * op on the duplicate, so every peer learns it too, and the row this Host resolves refs with.
+     * A whole merge in one transaction: every item write in order, then each redirect, so a failure leaves nothing half
+     * merged. A redirect records that `alias` (merged duplicate `itemId`'s ref) now names `target` (survivor `targetId`'s
+     * ref): a `redirect` op on the duplicate, so every peer learns it too, and the row this Host resolves refs with.
      */
-    readonly addRedirect: (input: {
-      readonly itemId: number
-      readonly targetId: number
-      readonly alias: string
-      readonly target: string
-      readonly origin: string
-    }) => Effect.Effect<void, unknown>
+    readonly commitMerge: (input: { readonly writes: readonly ItemAppend[]; readonly redirects: readonly MergeRedirect[] }) => Effect.Effect<void, unknown>
     /** Ops this Host stored after `cursor` in its own storing order, at most `limit` and about `maxBytes`, and its newest sequence. */
     readonly opsSince: (input: {
       readonly cursor: number
@@ -527,25 +533,30 @@ export class BacklogRepo extends Context.Service<
               ON CONFLICT (item_id) DO UPDATE SET holder = excluded.holder, acquired_at = excluded.acquired_at,
                 expires_at = excluded.expires_at, heartbeat = excluded.heartbeat`
 
-      const append = Effect.fnUntraced(function* (input: {
-        readonly prev: BacklogItem
-        readonly next: BacklogItem
-        readonly origin: string
-        readonly lease?: LeaseWrite | undefined
-      }) {
+      const stampAppend = Effect.fnUntraced(function* (input: ItemAppend) {
         const ops = BacklogOps.diff(input.prev, input.next)
-        if (ops.length === 0 && input.lease === undefined) return
+        if (ops.length === 0 && input.lease === undefined) return undefined
         const itemId = yield* requireCanonical(input.next.id)
         const records = yield* stamp({ itemId, origin: input.origin, ops })
-        yield* sql.withTransaction(
-          Effect.gen(function* () {
-            if (records.length > 0) {
-              yield* insertOps(records)
-              yield* writeItemRow({ itemId, item: input.next, deleted: false })
-            }
-            if (input.lease !== undefined) yield* writeLease(itemId, input.lease)
-          }),
-        )
+        return { itemId, records, item: input.next, lease: input.lease }
+      })
+
+      const writeAppend = Effect.fnUntraced(function* (input: {
+        readonly itemId: string
+        readonly records: readonly BacklogOpRecord[]
+        readonly item: BacklogItem
+        readonly lease: LeaseWrite | undefined
+      }) {
+        if (input.records.length > 0) {
+          yield* insertOps(input.records)
+          yield* writeItemRow({ itemId: input.itemId, item: input.item, deleted: false })
+        }
+        if (input.lease !== undefined) yield* writeLease(input.itemId, input.lease)
+      })
+
+      const append = Effect.fnUntraced(function* (input: ItemAppend) {
+        const stamped = yield* stampAppend(input)
+        if (stamped !== undefined) yield* sql.withTransaction(writeAppend(stamped))
       })
 
       const loadLeases = Effect.gen(function* () {
@@ -687,18 +698,23 @@ export class BacklogRepo extends Context.Service<
         sql`INSERT INTO alias_redirects (alias, target, created_at) VALUES (${input.alias}, ${input.target}, ${input.at})
           ON CONFLICT (alias) DO UPDATE SET target = excluded.target, created_at = excluded.created_at`
 
-      const addRedirect = Effect.fnUntraced(function* (input: {
-        readonly itemId: number
-        readonly targetId: number
-        readonly alias: string
-        readonly target: string
-        readonly origin: string
-      }) {
+      const stampRedirect = Effect.fnUntraced(function* (input: MergeRedirect) {
         const itemId = yield* requireCanonical(input.itemId)
         const targetId = yield* requireCanonical(input.targetId)
         const records = yield* stamp({ itemId, origin: input.origin, ops: [{ kind: 'redirect', target: targetId }] })
         const at = records[0]?.hlc.wall ?? (yield* Clock.currentTimeMillis)
-        yield* sql.withTransaction(Effect.andThen(insertOps(records), putRedirect({ alias: input.alias, target: input.target, at })))
+        return { records, alias: input.alias, target: input.target, at }
+      })
+
+      const commitMerge = Effect.fnUntraced(function* (input: { readonly writes: readonly ItemAppend[]; readonly redirects: readonly MergeRedirect[] }) {
+        const appends = (yield* Effect.forEach(input.writes, stampAppend)).filter(entry => entry !== undefined)
+        const redirects = yield* Effect.forEach(input.redirects, stampRedirect)
+        yield* sql.withTransaction(
+          Effect.gen(function* () {
+            yield* Effect.forEach(appends, writeAppend, { discard: true })
+            yield* Effect.forEach(redirects, redirect => Effect.andThen(insertOps(redirect.records), putRedirect(redirect)), { discard: true })
+          }),
+        )
       })
 
       const opsSince = Effect.fn('backlog peer ops since')(function* (input: { readonly cursor: number; readonly limit: number; readonly maxBytes: number }) {
@@ -990,7 +1006,7 @@ export class BacklogRepo extends Context.Service<
       return BacklogRepo.of({
         hostId,
         loadRedirects,
-        addRedirect,
+        commitMerge,
         opsSince,
         ingest,
         numericId,
