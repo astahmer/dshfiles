@@ -16,7 +16,7 @@ import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { SidebarSettings } from './sidebar-settings.js'
 import { createThreadActions, type HostEffect, type ThreadActionDeps, type ThreadActionSet } from './thread-actions.js'
 import { uniqueProjectTitle } from './project-titles.js'
-import { loadThreadDirectories } from './thread-directories-host.js'
+import { loadThreadDirectories } from './thread-directories-promise.js'
 
 const PROMPT_TIMEOUT_MS = 15_000
 

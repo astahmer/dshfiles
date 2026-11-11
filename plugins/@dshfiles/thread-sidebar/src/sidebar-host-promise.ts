@@ -16,7 +16,7 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Context, Effect, Layer, Option } from 'effect'
 import type { RebasedThread } from './rebased-threads.js'
 import { HostCallFailed, HostCapabilityMissing } from './sidebar-errors.js'
-import { loadThreadDirectories } from './thread-directories-host.js'
+import { loadThreadDirectories } from './thread-directories-promise.js'
 import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
 
 type SessionListItem = Awaited<ReturnType<CordisContext['sessionController']['list']>>['items'][number]

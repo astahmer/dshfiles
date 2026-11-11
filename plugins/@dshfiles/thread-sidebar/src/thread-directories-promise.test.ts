@@ -3,7 +3,7 @@ import { createTestHost, type TestHost } from '@dshfiles/dshx/testing'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { Effect } from 'effect'
 import { afterEach, describe, expect, test } from 'vitest'
-import { loadThreadDirectories } from './thread-directories-host.js'
+import { loadThreadDirectories } from './thread-directories-promise.js'
 import { WorkspacePaths } from './workspace-paths.js'
 
 const provider = (owner: string, threadsDirectory: (repoRoot: string) => string) =>
