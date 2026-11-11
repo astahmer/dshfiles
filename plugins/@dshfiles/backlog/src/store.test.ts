@@ -10,7 +10,7 @@ import { BacklogTestStore, type BacklogTestRows } from './test-support.js'
 
 const DAY_MS = 86_400_000
 
-const openStore = (rows = BacklogTestStore.rows()) => Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => Context.get(context, BacklogStore))
+const openStore = (rows?: BacklogTestRows) => Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => Context.get(context, BacklogStore))
 const openRepo = (rows: BacklogTestRows) => Effect.map(Layer.build(BacklogTestStore.layer({ rows })), context => Context.get(context, BacklogRepo))
 
 /** An item the JSON storage domain held before the SQLite store. */
