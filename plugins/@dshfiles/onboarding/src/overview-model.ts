@@ -1,6 +1,6 @@
 import * as Schema from 'effect/Schema'
 import { PREREQUISITES, routeSchema, type CatalogFeature, type FeatureCatalog, type Route } from './catalog-model.js'
-import { CURATED_BUNDLES } from './curation.js'
+import { curationOf } from './curation.js'
 import { PACK_ACTIONS, PackPlan, packPreviewSchema, pluginStateSchema, type PackPreview, type PluginState } from './pack-plan.js'
 import { PACKS } from './packs.js'
 import { ReachModel } from './reach-model.js'
@@ -209,11 +209,8 @@ const packs = (input: {
     keySettings: pack.keySettings,
   }))
 
-const curatedPlugins = new Map(CURATED_BUNDLES.map(bundle => [bundle.plugin, bundle]))
-
 const rowOf = (feature: CatalogFeature): FeatureRow => {
-  const bundle = curatedPlugins.get(feature.plugin)
-  const curated = feature.onboarding !== null || (bundle !== undefined && feature.destination !== 'none')
+  const curation = curationOf(feature)
   return {
     key: feature.key,
     plugin: feature.plugin,
@@ -221,8 +218,8 @@ const rowOf = (feature: CatalogFeature): FeatureRow => {
     summary: feature.summary,
     destination: feature.destination,
     currentSurface: feature.currentSurface,
-    curated,
-    route: feature.onboarding?.open ?? (feature.destination === 'none' ? undefined : bundle?.open) ?? null,
+    curated: curation.curated,
+    route: curation.route,
     firstAction: feature.onboarding?.firstAction ?? null,
     doneWhen: feature.onboarding?.doneWhen ?? null,
     prerequisites: feature.onboarding?.prerequisites ?? [],

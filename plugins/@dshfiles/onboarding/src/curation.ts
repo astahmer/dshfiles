@@ -1,4 +1,4 @@
-import type { Route } from './catalog-model.js'
+import type { CatalogFeature, Route } from './catalog-model.js'
 
 /**
  * The curated "major features" (plan Appendix A): one row per bundle, with the route its page opens. A feature's own
@@ -72,3 +72,21 @@ export const CURATED_BUNDLES: readonly CuratedBundle[] = [
   { plugin: 'apply-patch' },
   { plugin: 'tool-search' },
 ]
+
+const curatedBundles = new Map(CURATED_BUNDLES.map(bundle => [bundle.plugin, bundle]))
+
+/** Whether a feature is curated, and the route its Open button takes (`null`: no button). */
+interface Curation {
+  readonly curated: boolean
+  readonly route: Route | null
+}
+
+/**
+ * The one "curated" rule, shared by the Getting started gallery (overview-model.ts) and `scripts/pack-docs.ts`: a feature
+ * with an `onboarding` block, or a curated bundle's feature that lives somewhere (`destination` is not `none`). Only
+ * type imports, so plain `node --experimental-strip-types` loads it.
+ */
+export const curationOf = (feature: Pick<CatalogFeature, 'plugin' | 'destination' | 'onboarding'>): Curation => {
+  const bundle = feature.destination === 'none' ? undefined : curatedBundles.get(feature.plugin)
+  return { curated: feature.onboarding !== null || bundle !== undefined, route: feature.onboarding?.open ?? bundle?.open ?? null }
+}

@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import type { FeatureCatalog } from './catalog-model.js'
 import { FEATURE_CATALOG } from './generated/feature-catalog.js'
 import { OnboardingOverview, type ChecklistFacts } from './overview-model.js'
+import { PACKS } from './packs.js'
 
 const facts = (overrides: Partial<ChecklistFacts> = {}): ChecklistFacts => ({
   account: { source: 'ai-accounts', saved: 1, connected: 1 },
@@ -193,5 +199,35 @@ describe('feature search', () => {
     expect(text.length).toBeLessThanOrEqual(6_000)
     expect(text).toContain('- [x] An AI account is connected')
     expect(text).toContain('Versioning workflow')
+  })
+})
+
+describe('curated rule', () => {
+  const packDocsScript = fileURLToPath(new URL('../../../../scripts/pack-docs.ts', import.meta.url))
+  const curatedLine = /^\d+\. \*\*(?<title>.+?)\*\* \(`(?<plugin>[^`]+)`/u
+
+  const packDocsCurated = (page: string): readonly string[] => {
+    const lines = page.split('\n')
+    const start = lines.indexOf('### Curated')
+    if (start === -1) return []
+    const end = lines.findIndex((line, index) => index > start && line.startsWith('#'))
+    return lines
+      .slice(start + 1, end === -1 ? undefined : end)
+      .map(line => curatedLine.exec(line)?.groups)
+      .filter(groups => groups !== undefined)
+      .map(groups => `${groups['plugin'] ?? ''}/${groups['title'] ?? ''}`)
+  }
+
+  it('gives the gallery and scripts/pack-docs.ts the same curated features from the generated catalog', () => {
+    const out = mkdtempSync(join(tmpdir(), 'onboarding-pack-docs-'))
+    onTestFinished(() => rmSync(out, { recursive: true, force: true }))
+    const result = spawnSync(process.execPath, ['--experimental-strip-types', packDocsScript, '--out', out], { encoding: 'utf8' })
+    expect(result.status, result.stderr).toBe(0)
+    const rows = FEATURE_CATALOG.features.map(OnboardingOverview.rowOf)
+    for (const pack of PACKS) {
+      const gallery = pack.plugins.flatMap(plugin => rows.filter(row => row.plugin === plugin && row.curated).map(row => `${row.plugin}/${row.title}`))
+      expect(packDocsCurated(readFileSync(join(out, `${pack.id}.md`), 'utf8')), pack.id).toEqual(gallery)
+    }
+    expect(rows.filter(row => row.curated).length).toBeGreaterThan(0)
   })
 })

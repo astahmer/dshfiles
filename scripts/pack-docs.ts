@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import type { CatalogFeature, Prerequisite } from '../plugins/@dshfiles/onboarding/src/catalog-model.ts'
-import { CURATED_BUNDLES } from '../plugins/@dshfiles/onboarding/src/curation.ts'
+import { curationOf } from '../plugins/@dshfiles/onboarding/src/curation.ts'
 import { FEATURE_CATALOG } from '../plugins/@dshfiles/onboarding/src/generated/feature-catalog.ts'
 import { PACKS, type Pack } from '../plugins/@dshfiles/onboarding/src/packs.ts'
 
@@ -23,9 +23,7 @@ const prerequisiteLabels = {
   github: 'The GitHub CLI is signed in (`gh auth login`).',
 } satisfies Record<Prerequisite, string>
 
-const curatedPlugins = new Set(CURATED_BUNDLES.map(bundle => bundle.plugin))
-/** Same rule as the Getting started gallery (overview-model.ts): an onboarding block, or a curated bundle's user-facing feature. */
-const isCurated = (feature: CatalogFeature): boolean => feature.onboarding !== null || (curatedPlugins.has(feature.plugin) && feature.destination !== 'none')
+const isCurated = (feature: CatalogFeature): boolean => curationOf(feature).curated
 
 const description = (plugin: string): string => {
   const entry = FEATURE_CATALOG.plugins.find(candidate => candidate.name === plugin)
