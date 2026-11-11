@@ -14,23 +14,27 @@ The freeze, the baseline and the decisions behind this backend are in [Host loop
 - **Search is a pure read.** `SessionSearchEngine` extends core's exported `SessionQueryEngine` and implements only
   `searchSessions` / `searchEvents`; the inherited reads (list, read, titles, filters, traces, observations) stay
   core's own code. The search methods forward to a worker and never touch the index file from the Host.
-- **The worker owns the index.** `src/search-worker.ts` runs in a `worker_thread` with its own SQLite connection: no
-  decode, parse, or FTS5 work happens on the Host's thread. Measured: 200 000 documents (~800 MB of text) indexed in a
-  worker cost the Host loop a worst gap of 109.5 ms and zero gaps over 250 ms. The connection comes from
-  `@dshfiles/sqlite-store` (`SqliteClient`, one serialized connection, WAL and the 32 MB log limit the plugin used to
-  set by hand), so `PRAGMA user_version` becomes the store's own `effect_sql_migrations` table and an existing index is
-  adopted without rewriting a row.
+- **The worker owns the index.** `src/search-worker.ts` runs in a `worker_thread` with two SQLite connections: one
+  writable that only ingest uses, and one read-only that answers searches and health. No decode, parse, or FTS5 work
+  happens on the Host's thread; a read never queues behind the ingest transaction. Measured: 200 000 documents
+  (~800 MB of text) indexed in a worker cost the Host loop a worst gap of 109.5 ms and zero gaps over 250 ms. The
+  writable connection comes from `@dshfiles/sqlite-store` (`SqliteClient`, WAL and the 32 MB log limit the plugin used
+  to set by hand), and the read-only one is a second `SqliteClient` on the same file; `PRAGMA user_version` becomes the
+  store's own `effect_sql_migrations` table and an existing index is adopted without rewriting a row.
 - **A pass stages outside the transaction and commits a bounded group inside one.** File reads, frame decode and header
   parsing happen before any write; sessions are staged until 64 of them, 250 ms or 8 MiB of document text, then one
   `sql.withTransaction` re-reads each cursor (and the archived set) and writes the whole group. A stale cursor — a
   targeted search or archive change landed while the pass was staging — is skipped instead of overwriting newer state,
   and a failed write rolls back every session in the group.
-- **Searches never wait behind a transaction for long.** The single connection serializes, so the group bound is also
-  the longest a search can queue: one group of at most 64 sessions or 8 MiB, not a whole pass.
+- **Searches read on their own connection, so they never queue behind the group transaction.** The writable connection
+  stays the only writer, and the read-only one sees the last committed snapshot in WAL, the same state a search between
+  two groups saw. Within that transaction the longest a search can wait is one document insert, which is why a chunk is
+  also bounded by text bytes (1 MiB) as well as 100 rows: one capped 64 KB document per row made a single native FTS5
+  call carry 6.4 MB.
 - **Ingest is incremental and resumable.** A session log is a container of concatenated, checksummed Zstandard frames
   (one-shot decoding stops at the first frame — measured 208 bytes for a 26 MB log, which is why this plugin decodes
-  frame by frame). Each pass stores a per-log cursor and decodes only appended frames, commits per session in bounded
-  batches, and resumes after a crash instead of restarting the corpus.
+  frame by frame). Each pass stores a per-log cursor and decodes only appended frames, commits staged sessions in
+  bounded groups, and resumes after a crash instead of restarting the corpus.
 - **Documents are bounded.** Text is capped per event type (conversation 64 KB, tool traffic 8 KB); the untruncated
   text stays in the session log. The giant 49.5 MB log in this corpus holds 157 MB of decoded events in 34 869 events.
 - **Filters are translated, not dropped.** Core's own `materializeSessionEventResultFilters` validates the clauses and
@@ -110,6 +114,33 @@ One 300 MB round at load 20-27 recorded two Host gaps of ~306 ms and search p50 
 so the 250 ms budget holds on quiet rounds and is only marginally exceeded under extreme load.
 The bench deliberately polls at 1 s because the worker is single-threaded: a per-150 ms poll competes with the ingest
 it is measuring.
+
+### Group-commit search latency (2026-11-11)
+
+`pnpm --dir plugins/@dshfiles/session-search bench:commit` indexes 64 Sessions (~4.9 MiB of document text, one frame
+per event) through the built worker, then appends two events to every log so a second 64-Session group commits while one
+search at a time runs back to back. Before, every search shared the writable connection and waited out the whole group
+transaction; after, searches read on their own connection and the insert chunks bound one statement. Eight runs (three
+before, five after) on a machine at load 36–42 of 10 CPUs from unrelated work; wall drifts with that load, so runs are
+reported as median (range) and process CPU is reported beside them.
+
+| Signal                                                           | Before (one connection) | After (read connection + 1 MiB chunks) |
+| ---------------------------------------------------------------- | ----------------------- | -------------------------------------- |
+| Worker-reported slowest search during the delta group commit     | 408 ms (190–950)        | **64 ms (38–263)**                     |
+| Client search p50 during the delta group commit                  | 16.2 ms (9.6–26.6)      | 13.5 ms (9.8–17.2)                     |
+| Client search p95 during the delta group commit (not comparable) | 201 ms (25–417)         | 503 ms (265–576)                       |
+| Idle p95 in the same runs (load reference)                       | 72 ms (15–158)          | 80 ms (30–300)                         |
+| Same corpus: documents, sessions, ordering digest                | 256 / 64, identical     | 256 / 64, identical                    |
+| First-build process CPU (write path unchanged)                   | 2 713 ms (2 621–2 778)  | 2 729 ms (2 582–2 736)                 |
+| Delta-group process CPU (write path unchanged)                   | 1 726 ms (1 517–2 079)  | 1 615 ms (1 496–1 750)                 |
+
+The client-observed p95 is not comparable across the two variants: before the fix, the bench's `health` RPC shared the
+writable connection and often absorbed the pause itself, while the search RPC stayed fast; after the fix `health` returns
+immediately, so a search that lands inside the worker's remaining synchronous work (staging decode plus one bounded
+insert) carries it. The worker-reported slowest search isolates the search path and is the number this change targets:
+the table's 408 → 64 ms is the transaction queue, and the residual ~1 s tail at this load is worker-thread scheduling.
+The group transaction, its rollback and the committed pages are unchanged — only the shape of the synchronous statement
+and the connection a read uses.
 
 ## Development
 

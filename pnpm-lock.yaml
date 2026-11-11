@@ -7048,6 +7048,9 @@ importers:
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.1.2(effect@4.1.2)(redis@6.3.1)
+      '@effect/sql-sqlite-node':
+        specifier: 'catalog:'
+        version: 4.1.2(effect@4.1.2)
       effect:
         specifier: 'catalog:'
         version: 4.1.2

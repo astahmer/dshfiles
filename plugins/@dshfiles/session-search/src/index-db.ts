@@ -135,6 +135,29 @@ const freelistRowSchema = Schema.Struct({ freelist_count: numberLike })
 const documentRowidSchema = Schema.Struct({ document_rowid: numberLike })
 const insertedRowSchema = Schema.Struct({ lastInsertRowid: numberLike })
 const DOCUMENT_INSERT_CHUNK = 100
+// One synchronous FTS5 INSERT is the longest a search can wait behind this worker, so a chunk is bounded by text bytes
+// too: 100 capped 64 KB documents are 6.4 MB in one native call. The batch stays inside the group transaction, which is
+// what keeps the WAL commits and the FTS5 segment writes unchanged.
+const DOCUMENT_INSERT_BYTES = 1024 * 1024
+
+type DocumentChunk = { readonly start: number; readonly end: number }
+
+const documentChunks = (documents: readonly DocumentRow[]): readonly DocumentChunk[] => {
+  const chunks: DocumentChunk[] = []
+  let start = 0
+  let bytes = 0
+  for (const [index, document] of documents.entries()) {
+    const size = Buffer.byteLength(document.text)
+    if (index > start && (index - start >= DOCUMENT_INSERT_CHUNK || bytes + size > DOCUMENT_INSERT_BYTES)) {
+      chunks.push({ start, end: index })
+      start = index
+      bytes = 0
+    }
+    bytes += size
+  }
+  if (start < documents.length) chunks.push({ start, end: documents.length })
+  return chunks
+}
 
 export interface SessionCursor {
   readonly id: string
@@ -339,25 +362,26 @@ export class SearchIndex {
           yield* this.sql.unsafe('DELETE FROM sessions WHERE id = ?', [header.id])
         }
         const rowids: number[] = []
+        const chunks = documentChunks(documents)
         // One statement per chunk: FTS5 assigns rowids from the current maximum upward, so a contiguous chunk yields
         // contiguous rowids and no document needs a read back to learn its rowid.
-        for (let start = 0; start < documents.length; start += DOCUMENT_INSERT_CHUNK) {
-          const chunk = documents.slice(start, start + DOCUMENT_INSERT_CHUNK)
+        for (const chunk of chunks) {
+          const chunkDocuments = documents.slice(chunk.start, chunk.end)
           const values: (string | number)[] = []
-          for (const document of chunk)
+          for (const document of chunkDocuments)
             values.push(document.text, document.sessionId, document.seq, document.type, document.time, document.surface, document.truncated ? 1 : 0)
-          const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')
+          const placeholders = chunkDocuments.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')
           const inserted = yield* this.sql.unsafe(
             `INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES ${placeholders}`,
             values,
           ).raw
           const chunkLast = Schema.decodeUnknownSync(insertedRowSchema)(inserted).lastInsertRowid
-          const chunkFirst = chunkLast - chunk.length + 1
-          for (let index = 0; index < chunk.length; index += 1) rowids.push(chunkFirst + index)
+          const chunkFirst = chunkLast - chunkDocuments.length + 1
+          for (let index = 0; index < chunkDocuments.length; index += 1) rowids.push(chunkFirst + index)
         }
-        for (let start = 0; start < documents.length; start += DOCUMENT_INSERT_CHUNK) {
-          const chunk = documents.slice(start, start + DOCUMENT_INSERT_CHUNK)
-          const chunkRowids = rowids.slice(start, start + DOCUMENT_INSERT_CHUNK)
+        for (const chunk of chunks) {
+          const chunkDocuments = documents.slice(chunk.start, chunk.end)
+          const chunkRowids = rowids.slice(chunk.start, chunk.end)
           const mappingValues: (string | number)[] = []
           for (const rowid of chunkRowids) mappingValues.push(header.id, rowid)
           yield* this.sql.unsafe(
@@ -366,7 +390,7 @@ export class SearchIndex {
           )
           const conversation: (string | number)[] = []
           const conversationPlaceholders: string[] = []
-          for (const [index, document] of chunk.entries()) {
+          for (const [index, document] of chunkDocuments.entries()) {
             if (!isConversation(document)) continue
             conversationPlaceholders.push('(?, ?, ?, ?, ?, ?, ?, ?)')
             conversation.push(

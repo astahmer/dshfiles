@@ -10,8 +10,10 @@ import { workerData } from 'node:worker_threads'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import * as NodeRuntime from '@effect/platform-node/NodeRuntime'
 import * as NodeWorkerRunner from '@effect/platform-node/NodeWorkerRunner'
+import { SqliteClient } from '@effect/sql-sqlite-node'
 import { SqliteStore } from '@dshfiles/sqlite-store'
 import { Clock, Duration, Effect, FiberHandle, Layer, Queue, Ref, Schema } from 'effect'
+import { Reactivity } from 'effect/reactivity'
 import { RpcServer } from 'effect/rpc'
 import { SqlClient } from 'effect/sql'
 import type { SqlError } from 'effect/sql/SqlError'
@@ -46,6 +48,13 @@ const Handlers = SearchWorkerRpcs.toLayer(
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
     const index = new SearchIndex(sql, config.indexPath)
+    // Searches read from their own connection, so a bounded ingest group can commit without queueing them behind its
+    // transaction. The write connection keeps the only writer and the single-connection write path unchanged; in WAL mode
+    // a reader sees the last committed snapshot, which is the same state a search between two groups used to see.
+    const readSql = yield* SqliteClient.make({ filename: config.indexPath, readonly: true, busyTimeout: Duration.seconds(5) }).pipe(
+      Effect.provide(Reactivity.layer),
+    )
+    const readIndex = new SearchIndex(readSql, config.indexPath)
     const progress = yield* Ref.make<Progress>({
       root: undefined,
       ingesting: false,
@@ -69,7 +78,7 @@ const Handlers = SearchWorkerRpcs.toLayer(
     let lastCompactionAt = 0
 
     const health = Effect.flatMap(Ref.get(progress), (current): Effect.Effect<IndexHealth, SearchWorkerFailed> =>
-      index
+      readIndex
         .health({
           behindSessions: current.behindSessions,
           behindBytes: current.behindBytes,
@@ -175,9 +184,9 @@ const Handlers = SearchWorkerRpcs.toLayer(
               yield* indexSessions({ index, root, budgetMs: 1_000, windowBytes, now: Date.now }, request.sessionIds ?? []).pipe(Effect.mapError(indexFailure))
             }
           }
-          return yield* timedSearch(index.searchSessions(request))
+          return yield* timedSearch(readIndex.searchSessions(request))
         }),
-      SearchEvents: request => timedSearch(Effect.map(index.searchEvents(request), rows => ({ sessionId: request.sessionId, ...rows }))),
+      SearchEvents: request => timedSearch(Effect.map(readIndex.searchEvents(request), rows => ({ sessionId: request.sessionId, ...rows }))),
       // A find names its Session, so an archived (cold) one is read back for this request, as a targeted search is.
       FindInSession: request =>
         Effect.gen(function* () {
@@ -185,7 +194,7 @@ const Handlers = SearchWorkerRpcs.toLayer(
           if (root !== undefined) {
             yield* indexSessions({ index, root, budgetMs: 1_000, windowBytes, now: Date.now }, [request.sessionId]).pipe(Effect.mapError(indexFailure))
           }
-          return yield* timedSearch(index.findInSession(request))
+          return yield* timedSearch(readIndex.findInSession(request))
         }),
       Health: () => health,
       Nudge: () => Effect.andThen(Queue.offer(wake, undefined), health),

@@ -15,7 +15,42 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
-it('ingests a log whose frames are larger than the read window', async () => {
+it('maps rowids across several insert chunks for one oversized batch', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'session-search-chunks-'))
+  roots.push(root)
+  const sessionId = 'session-cccccccc-0000-4000-8000-000000000000'
+  const path = await writeSessionLog({ directory: join(root, 'sessions', 'project', sessionId), exchanges: 1, sessionId })
+  // Over 1 MiB of document text in one batch: the insert path splits it into several statements, and every rowid must
+  // still map back to its document.
+  for (let index = 0; index < 20; index += 1) {
+    const line = `${JSON.stringify({
+      type: 'user/message',
+      seq: 4 + index,
+      time: 1_700_000_200_000 + index,
+      surfaceOp: 'append',
+      data: {
+        id: `msg-${String(index)}`,
+        role: 'user',
+        content: [{ type: 'text', text: `${'padding '.repeat(8_000)}needle${String(index)} ${index === 19 ? 'zebra' : ''}` }],
+        source: { kind: 'user' },
+      },
+    })}\n`
+    await appendFile(path, zstdCompressSync(Buffer.from(line, 'utf8'), { params: { [constants.ZSTD_c_checksumFlag]: 1 } }))
+  }
+
+  const outcome = await runWithIndex(join(root, 'index.sqlite'), function* (index) {
+    const ingest = yield* runIngestPass({ index, root: join(root, 'sessions'), budgetMs: 10_000, windowBytes: 4 * 1024 * 1024, now: Date.now })
+    const last = yield* index.searchSessions({ query: 'zebra', limit: 5 })
+    const found = yield* index.findInSession({ sessionId, query: 'zebra', limit: 5 })
+    return { ingest, last, found }
+  })
+
+  expect(outcome.ingest.documents).toBeGreaterThan(20)
+  expect(outcome.last.matches.map(match => match.header.id)).toEqual([sessionId])
+  expect(outcome.found.matches.map(match => match.seq)).toEqual([23])
+})
+
+it('indexes a log whose frames are larger than the read window', async () => {
   const root = await mkdtemp(join(tmpdir(), 'session-search-ingest-'))
   roots.push(root)
   const sessionId = 'session-dddddddd-0000-4000-8000-000000000000'
