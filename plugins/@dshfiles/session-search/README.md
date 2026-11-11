@@ -69,6 +69,22 @@ in seq order, with a short snippet:
 Clients import the contract from `@dshfiles/session-search/search-api`; the Chat find bar is its first caller
 ([Chat: find in thread](../chat/README.md#find-in-thread)).
 
+## Prompt history
+
+The `promptHistory` method of the `session-search` API serves the prompts a person sent across every top-level
+thread, newest first, each text once. `@dshfiles/prompt-stash` calls it for its **All threads** tab, Ctrl+R and the
+`prompt_history_search` agent tool, and owns the user-facing bounds (retention and size settings).
+
+- A `user_prompts` table (migration `2_user_prompts`) holds one row per user message of a current surface whose text
+  the index kept whole: its document rowid, session, seq, time, length and whether a person sent it. It is ordered by an
+  ordinary `time` index, so a read never scans FTS rows to find the newest prompts.
+- `window` keeps only the newest N prompts and `maxChars` drops longer ones (pasted logs); `text` narrows to prompts
+  holding every word (the last as a prefix), as a find does. Subagent threads (`delegation_depth > 0`) and messages a
+  plugin or agent sent are left out.
+- Rows indexed before the migration have no sender flag and are kept until their thread is indexed again. The
+  migration backfills from `session_documents` once, in the worker.
+- Reindexing or forgetting (archiving) a thread drops its rows with its documents.
+
 ## Measured
 
 Bench: `pnpm bench:owned` (gated on `OWNED_BENCH=1`; it copies a byte-bounded subset of the newest logs the stock index

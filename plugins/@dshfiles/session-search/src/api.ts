@@ -1,7 +1,16 @@
 import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
-import { FIND_LIMIT_MAX, findMatchSchema, indexHealthSchema, type FindMatch } from './api-schemas.js'
+import {
+  FIND_LIMIT_MAX,
+  findMatchSchema,
+  historyPromptSchema,
+  indexHealthSchema,
+  PROMPT_HISTORY_CHARS_MAX,
+  PROMPT_HISTORY_LIMIT_MAX,
+  PROMPT_HISTORY_WINDOW_MAX,
+  type FindMatch,
+} from './api-schemas.js'
 import { strictStandardSchema } from './schema.js'
 
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
@@ -52,6 +61,19 @@ export const sessionSearchApi = defineApi({
       description:
         'Find every event of one DSH thread (Session) whose text contains all words of `text` (the last word may be a prefix), in transcript order: the whole stored transcript, older turns and tool calls and results included (model thinking is not indexed). Each match has its event seq, type, time and a short snippet. `limit` defaults to 200. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.',
       tool: { name: 'thread_find', readOnly: true, render: renderFind },
+    }),
+    // Added after the first release: a Host started before it answers with an unknown-endpoint error.
+    promptHistory: method({
+      input: Schema.Struct({
+        text: Schema.optional(Schema.String.check(Schema.isMaxLength(512))),
+        limit: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(PROMPT_HISTORY_LIMIT_MAX)),
+        window: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(PROMPT_HISTORY_WINDOW_MAX)),
+        maxChars: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(PROMPT_HISTORY_CHARS_MAX)),
+      }),
+      output: Schema.Struct({ ownsService: Schema.Boolean, prompts: Schema.Array(historyPromptSchema) }),
+      description:
+        'The prompts people sent across every top-level thread, newest first, each text once: only the newest `window` prompts no longer than `maxChars` characters, narrowed to those containing every word of `text` when given. Subagent threads and messages sent by a plugin or agent are left out. Read-only.',
+      readOnly: true,
     }),
   },
 })

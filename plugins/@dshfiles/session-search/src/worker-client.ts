@@ -8,7 +8,7 @@ import * as NodeWorker from '@effect/platform-node/NodeWorker'
 import { Context, Duration, Effect, FileSystem, Layer, Path } from 'effect'
 import { RpcClient, type RpcClientError } from 'effect/rpc'
 
-import type { IndexHealth } from './api-schemas.js'
+import type { IndexHealth, PromptHistoryRequest, PromptHistoryResult } from './api-schemas.js'
 import {
   SearchWorkerFailed,
   SearchWorkerRpcs,
@@ -56,6 +56,7 @@ export class SearchWorker extends Context.Service<
     readonly searchSessions: (request: SessionSearchRequest) => WorkerCall<SearchSessionsResult>
     readonly searchEvents: (request: SessionEventSearchRequest) => WorkerCall<SearchEventsResult>
     readonly findInSession: (request: FindInSessionRequest) => WorkerCall<FindInSessionResult>
+    readonly promptHistory: (request: PromptHistoryRequest) => WorkerCall<PromptHistoryResult>
     readonly health: WorkerCall<IndexHealth>
     /** Wake the ingest loop now, for example after a Session event was committed. */
     readonly nudge: WorkerCall<IndexHealth>
@@ -89,6 +90,7 @@ export class SearchWorker extends Context.Service<
           searchSessions: request => call(client.SearchSessions(request)),
           searchEvents: request => call(client.SearchEvents(request)),
           findInSession: request => call(client.FindInSession(request)),
+          promptHistory: request => call(client.PromptHistory(request)),
           health: call(client.Health()),
           nudge: call(client.Nudge()),
           startIngest: root => call(client.StartIngest({ root })),

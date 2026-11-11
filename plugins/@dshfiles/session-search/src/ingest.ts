@@ -118,6 +118,8 @@ const stageSession = (options: IngestPassOptions & { readonly log: SessionLogFil
     decoded = FrameLog.decodeFrom(window, 0)
   }
   const events = parseEvents(decoded.text, replace)
+  const humanPrompts = new Set<number>()
+  for (const event of events) if (event.type === 'user/message' && event.data.source.kind === 'user') humanPrompts.add(event.seq)
   const rows: DocumentRow[] = []
   if (events.length > 0) {
     // Core's builder folds the whole event list to classify surfaces, so it can only run on a session's full history.
@@ -140,6 +142,7 @@ const stageSession = (options: IngestPassOptions & { readonly log: SessionLogFil
         surface: document.surface,
         text: bounded.text,
         truncated: bounded.truncated,
+        ...(document.type === 'user/message' ? { humanPrompt: humanPrompts.has(document.seq) } : {}),
       })
     }
   }

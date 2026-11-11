@@ -8,7 +8,7 @@ import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { SqlClient } from 'effect/sql'
 import * as SchemaGetter from 'effect/SchemaGetter'
-import type { IndexHealth } from './api-schemas.js'
+import type { HistoryPrompt, IndexHealth, PromptHistoryRequest } from './api-schemas.js'
 import { withoutUndefined } from './optional-fields.js'
 import type { EventFilters, FindInSessionRequest, SearchMatch, SessionEventSearchRequest, SessionHeaderRow, SessionSearchRequest } from './protocol.js'
 import { sessionHeaderSchema } from './protocol.js'
@@ -74,13 +74,38 @@ CREATE TABLE IF NOT EXISTS meta (
 ) STRICT;
 `
 
-export const indexMigrations = {
-  '1_initial_schema': Effect.gen(function* () {
+/**
+ * One row per user message of a session's current surface whose text the index kept whole, keyed by its document rowid.
+ * The prompt history reads it in time order through an ordinary index instead of scanning FTS rows. `human` is 1 for a
+ * prompt a person sent, 0 for one a plugin or agent sent, NULL for rows indexed before the flag existed.
+ */
+const USER_PROMPTS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS user_prompts (
+  document_rowid INTEGER PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  time INTEGER NOT NULL,
+  chars INTEGER NOT NULL,
+  human INTEGER
+) STRICT;
+CREATE INDEX IF NOT EXISTS user_prompts_time ON user_prompts (time);
+CREATE INDEX IF NOT EXISTS user_prompts_session ON user_prompts (session_id);
+INSERT OR IGNORE INTO user_prompts (document_rowid, session_id, seq, time, chars, human)
+  SELECT rowid, session_id, seq, time, length(text), NULL FROM session_documents
+  WHERE type = 'user/message' AND surface = 'current' AND truncated = 0
+`
+
+const runStatements = (schema: string) =>
+  Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    for (const statement of SCHEMA.split(';').map(part => part.trim())) {
+    for (const statement of schema.split(';').map(part => part.trim())) {
       if (statement.length > 0) yield* sql.unsafe(statement)
     }
-  }),
+  })
+
+export const indexMigrations = {
+  '1_initial_schema': runStatements(SCHEMA),
+  '2_user_prompts': runStatements(USER_PROMPTS_SCHEMA),
 }
 
 /** SQLite hands back an integer as either a number or a bigint depending on its size. */
@@ -124,6 +149,13 @@ const rankedRowSchema = Schema.Struct({
 })
 
 const findRowSchema = Schema.Struct({ seq: numberLike, type: Schema.String, time: numberLike, marked_text: Schema.String })
+
+const historyRowSchema = Schema.Struct({ session_id: Schema.String, seq: numberLike, time: numberLike, text: Schema.String })
+
+/** Rows read per returned prompt, so repeated prompts collapsing into one still fill the page. */
+const HISTORY_OVERFETCH = 4
+
+const isUserPrompt = (document: DocumentRow): boolean => document.type === 'user/message' && document.surface === CONVERSATION_SURFACE && !document.truncated
 
 /** A find shows one line per match, shorter than a session search's excerpt. */
 const FIND_SNIPPET_CHARS = 160
@@ -195,6 +227,8 @@ export interface DocumentRow {
   readonly surface: string
   readonly text: string
   readonly truncated: boolean
+  /** For a user message: whether a person sent it rather than a plugin or agent; absent when unknown. */
+  readonly humanPrompt?: boolean
 }
 
 export interface BatchInput {
@@ -332,6 +366,7 @@ export class SearchIndex {
         if (counted._tag === 'Failure' || counted.success.count === 0) return
         yield* this.sql.unsafe('DELETE FROM session_documents WHERE session_id = ?', [sessionId])
         yield* this.sql.unsafe('DELETE FROM conversation_documents WHERE session_id = ?', [sessionId])
+        yield* this.sql.unsafe('DELETE FROM user_prompts WHERE session_id = ?', [sessionId])
         return
       }
       const rowids = mapped.map(row => Schema.decodeUnknownSync(documentRowidSchema)(row).document_rowid)
@@ -343,6 +378,7 @@ export class SearchIndex {
         yield* this.sql.unsafe(`DELETE FROM conversation_documents WHERE rowid IN (${placeholders})`, chunk)
       }
       yield* this.sql.unsafe('DELETE FROM session_document_rows WHERE session_id = ?', [sessionId])
+      yield* this.sql.unsafe('DELETE FROM user_prompts WHERE session_id = ?', [sessionId])
     })
 
   readonly forget = (sessionId: string) =>
@@ -408,6 +444,19 @@ export class SearchIndex {
             yield* this.sql.unsafe(
               `INSERT INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES ${conversationPlaceholders.join(', ')}`,
               conversation,
+            )
+          const prompts: (string | number | null)[] = []
+          const promptPlaceholders: string[] = []
+          for (const [index, document] of chunk.entries()) {
+            if (!isUserPrompt(document)) continue
+            promptPlaceholders.push('(?, ?, ?, ?, ?, ?)')
+            const human = document.humanPrompt === undefined ? null : document.humanPrompt ? 1 : 0
+            prompts.push(chunkRowids[index] ?? 0, document.sessionId, document.seq, document.time, document.text.length, human)
+          }
+          if (promptPlaceholders.length > 0)
+            yield* this.sql.unsafe(
+              `INSERT OR REPLACE INTO user_prompts (document_rowid, session_id, seq, time, chars, human) VALUES ${promptPlaceholders.join(', ')}`,
+              prompts,
             )
         }
         const truncated = documents.reduce((total, document) => total + (document.truncated ? 1 : 0), 0)
@@ -648,6 +697,43 @@ export class SearchIndex {
         }
       },
     )
+
+  /**
+   * The newest prompts people sent across top-level threads, newest first, each text once. Only the newest `window`
+   * prompts no longer than `maxChars` are read; `query` (an FTS5 expression) narrows them. Subagent threads and
+   * messages a plugin or agent sent are left out.
+   */
+  readonly promptHistory = (request: PromptHistoryRequest) =>
+    Effect.gen({ self: this }, function* () {
+      const table: DocumentTable = (yield* this.conversationReady()) ? 'conversation_documents' : 'session_documents'
+      const match = request.query === undefined ? '' : `WHERE d.rowid IN (SELECT rowid FROM ${table} WHERE ${table} MATCH ?)`
+      const bindings: (string | number)[] = [request.maxChars, request.window]
+      if (request.query !== undefined) bindings.push(request.query)
+      bindings.push(request.limit * HISTORY_OVERFETCH)
+      const rows = yield* this.sql.unsafe(
+        `WITH recent AS (
+           SELECT p.document_rowid, p.session_id, p.seq, p.time FROM user_prompts AS p
+           JOIN sessions AS s ON s.id = p.session_id
+           WHERE p.human IS NOT 0 AND p.chars <= ? AND coalesce(s.delegation_depth, 0) = 0
+           ORDER BY p.time DESC LIMIT ?
+         )
+         SELECT r.session_id AS session_id, r.seq AS seq, r.time AS time, d.text AS text
+         FROM recent AS r JOIN ${table} AS d ON d.rowid = r.document_rowid ${match}
+         ORDER BY r.time DESC, r.document_rowid DESC LIMIT ?`,
+        bindings,
+      )
+      const seen = new Set<string>()
+      const prompts: HistoryPrompt[] = []
+      for (const value of rows) {
+        const row = Schema.decodeUnknownSync(historyRowSchema)(value)
+        const key = row.text.trim()
+        if (key.length === 0 || seen.has(key)) continue
+        seen.add(key)
+        prompts.push({ sessionId: row.session_id, seq: row.seq, time: row.time, text: row.text })
+        if (prompts.length === request.limit) break
+      }
+      return { prompts }
+    })
 
   readonly vacuum = () => Effect.asVoid(this.sql.unsafe('VACUUM'))
 

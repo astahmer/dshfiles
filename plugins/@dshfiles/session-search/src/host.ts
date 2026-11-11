@@ -144,6 +144,21 @@ export default DshxPlugin.make({
           yield* Effect.annotateCurrentSpan({ 'dshx.find.matches': found.matches.length, 'dshx.find.has_more': found.hasMore })
           return { ownsService: true, matches: found.matches, hasMore: found.hasMore }
         }).pipe(Effect.withSpan('session search find', { attributes: { 'dsh.session.id': input.sessionId } })),
+      promptHistory: input =>
+        Effect.gen(function* () {
+          if (!(yield* (yield* SessionQueryOwnership).owned)) return { ownsService: false, prompts: [] }
+          const text = input.text?.trim() ?? ''
+          const query = text.length === 0 ? null : findExpression(text)
+          if (text.length > 0 && query === null) return { ownsService: true, prompts: [] }
+          const found = yield* (yield* SearchWorker).promptHistory({
+            ...(query === null ? {} : { query }),
+            limit: input.limit,
+            window: input.window,
+            maxChars: input.maxChars,
+          })
+          yield* Effect.annotateCurrentSpan({ 'dshx.prompt_history.rows': found.prompts.length, 'dshx.prompt_history.filtered': query !== null })
+          return { ownsService: true, prompts: found.prompts }
+        }).pipe(Effect.withSpan('session search prompt history')),
     }),
   ],
 })

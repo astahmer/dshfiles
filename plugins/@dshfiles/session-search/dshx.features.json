@@ -92,6 +92,54 @@
           "source": "agent-tool"
         }
       ]
+    },
+    {
+      "id": "prompt-history",
+      "title": "Search the prompts sent across threads",
+      "summary": "Serve the newest prompts a person sent across every top-level thread, newest first and each text once, from a time-ordered user_prompts table beside the FTS index: bounded by a window of newest prompts and a size cap, optionally narrowed to prompts holding every typed word. Subagent threads and plugin- or agent-sent messages are left out.",
+      "surfaces": ["host", "storage", "api"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: session-search promptHistory API (read by @dshfiles/prompt-stash)",
+      "configuration": [],
+      "states": ["prompts", "no-match", "not-owner"],
+      "failureModes": [
+        "Prompts indexed before the human/plugin flag existed are kept (flag unknown) until their thread is indexed again.",
+        "A prompt longer than the index's 65 536-character cap was truncated and never becomes a history row.",
+        "When another plugin owns sessionQuery, ownsService is false and prompt-stash shows how to add the plugin."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-search.prompt-history-order",
+          "file": "plugins/@dshfiles/session-search/tests/prompt-history.spec.ts",
+          "testName": "lists the prompts people sent across threads, newest first and each text once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-search.prompt-history-bounds",
+          "file": "plugins/@dshfiles/session-search/tests/prompt-history.spec.ts",
+          "testName": "narrows to prompts holding every word, keeps only the newest window and skips oversized or truncated prompts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-search.prompt-history-reindex",
+          "file": "plugins/@dshfiles/session-search/tests/prompt-history.spec.ts",
+          "testName": "drops a thread’s prompts when the thread is reindexed or forgotten"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "session-search.prompt-history-no-browser-surface",
+          "reason": "The history tab that calls this API belongs to @dshfiles/prompt-stash and is walked by its own journey."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ]
 }

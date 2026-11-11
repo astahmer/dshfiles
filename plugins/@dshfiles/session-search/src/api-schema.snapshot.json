@@ -306,6 +306,91 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "name": "promptHistory",
+      "description": "The prompts people sent across every top-level thread, newest first, each text once: only the newest `window` prompts no longer than `maxChars` characters, narrowed to those containing every word of `text` when given. Subagent threads and messages sent by a plugin or agent are left out. Read-only.",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "window": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50000
+          },
+          "maxChars": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536
+          }
+        },
+        "required": [
+          "limit",
+          "window",
+          "maxChars"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ownsService": {
+            "type": "boolean"
+          },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "time": {
+                  "type": "number"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sessionId",
+                "seq",
+                "time",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "ownsService",
+          "prompts"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }
