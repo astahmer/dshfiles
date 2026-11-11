@@ -432,7 +432,7 @@ describe('thread actions: archive', () => {
         unarchive: async () => archived,
       }),
     )
-    const validate = (output: unknown, schema: Schema.Codec<unknown, unknown> | undefined) => {
+    const validate = <S extends Schema.Codec<unknown, unknown>>(output: S['Type'], schema: S | undefined) => {
       if (schema === undefined) throw new Error('method declares no output schema')
       return Schema.toStandardSchemaV1(schema, { parseOptions: { onExcessProperty: 'error' } })['~standard'].validate(output)
     }
@@ -454,7 +454,7 @@ describe('thread actions: archive', () => {
         setSettled: async () => many,
       }),
     )
-    const validate = (output: unknown, schema: Schema.Codec<unknown, unknown> | undefined) => {
+    const validate = <S extends Schema.Codec<unknown, unknown>>(output: S['Type'], schema: S | undefined) => {
       if (schema === undefined) throw new Error('method declares no output schema')
       return Schema.toStandardSchemaV1(schema, { parseOptions: { onExcessProperty: 'error' } })['~standard'].validate(output)
     }

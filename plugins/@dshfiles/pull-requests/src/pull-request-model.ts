@@ -1,4 +1,5 @@
 import * as Schema from 'effect/Schema'
+import { repositorySchema } from './forge.js'
 
 export const forgeSearchItemSchema = Schema.Struct({
   number: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
@@ -12,9 +13,6 @@ export type ForgeSearchItem = typeof forgeSearchItemSchema.Type
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
 const cwdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048))
 const pullRequestNumberSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
-import { repositorySchema } from './forge.js'
-
-const githubRepositorySchema = repositorySchema
 
 /** A GitHub pull-request or GitLab merge-request URL on an https forge host. */
 export const pullRequestUrlSchema = Schema.String.check(
@@ -119,7 +117,7 @@ const lastErrorSchema = Schema.NullOr(Schema.Literals(['gh-command-failed', 'inv
 export const pullRequestRecordSchema = Schema.Struct({
   id: Schema.String,
   sessionId: sessionIdSchema,
-  repo: githubRepositorySchema,
+  repo: repositorySchema,
   number: pullRequestNumberSchema,
   url: githubPullRequestUrlSchema,
   cwd: Schema.String.check(Schema.isMaxLength(2048)),
@@ -135,7 +133,7 @@ export type PullRequestRecord = Schema.Schema.Type<typeof pullRequestRecordSchem
 
 export const pullRequestLinkViewSchema = Schema.Struct({
   sessionId: sessionIdSchema,
-  repo: githubRepositorySchema,
+  repo: repositorySchema,
   number: pullRequestNumberSchema,
   url: githubPullRequestUrlSchema,
   watching: Schema.Boolean,
@@ -160,7 +158,7 @@ export type WatchOwner = Schema.Schema.Type<typeof watchOwnerSchema>
 export const ownedWatchRecordSchema = Schema.Struct({
   id: Schema.String,
   owner: watchOwnerSchema,
-  repo: githubRepositorySchema,
+  repo: repositorySchema,
   number: pullRequestNumberSchema,
   url: githubPullRequestUrlSchema,
   cwd: Schema.String.check(Schema.isMaxLength(2048)),
@@ -175,7 +173,7 @@ export type OwnedWatchRecord = Schema.Schema.Type<typeof ownedWatchRecordSchema>
 
 const ownedWatchViewSchema = Schema.Struct({
   owner: watchOwnerSchema,
-  repo: githubRepositorySchema,
+  repo: repositorySchema,
   number: pullRequestNumberSchema,
   url: githubPullRequestUrlSchema,
   watching: Schema.Boolean,
@@ -293,7 +291,7 @@ export const pullRequestLinkInputSchema = Schema.Union([urlLocatorSchema, number
 export type PullRequestLinkInput = Schema.Schema.Type<typeof pullRequestLinkInputSchema>
 
 const urlTargetSchema = Schema.Struct({ sessionId: Schema.optional(sessionIdSchema), url: githubPullRequestUrlSchema })
-const repositoryTargetSchema = Schema.Struct({ sessionId: Schema.optional(sessionIdSchema), repo: githubRepositorySchema, number: pullRequestNumberSchema })
+const repositoryTargetSchema = Schema.Struct({ sessionId: Schema.optional(sessionIdSchema), repo: repositorySchema, number: pullRequestNumberSchema })
 
 export const pullRequestTargetInputSchema = Schema.Union([urlTargetSchema, repositoryTargetSchema])
 export type PullRequestTargetInput = Schema.Schema.Type<typeof pullRequestTargetInputSchema>
@@ -313,7 +311,7 @@ export const pullRequestMutationOutputSchema = Schema.Struct({ link: pullRequest
 
 export const pullRequestRemovalOutputSchema = Schema.Struct({
   sessionId: sessionIdSchema,
-  repo: githubRepositorySchema,
+  repo: repositorySchema,
   number: pullRequestNumberSchema,
   removed: Schema.Boolean,
 })

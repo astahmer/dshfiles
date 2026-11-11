@@ -11,10 +11,14 @@ import { Effect, FileSystem, Option, Schema } from 'effect'
 
 const ZSTD_MAGIC = 0xfd2fb528
 
+/**
+ * One session-log line. Only `type` is checked: `seq` and `time` count only when they are numbers, and every consumer
+ * decodes `data` (or, for the `session` header, the top-level fields) with its own schema.
+ */
 export interface LogRecord {
   readonly type: string
-  readonly seq?: number
-  readonly time?: number
+  readonly seq?: unknown
+  readonly time?: unknown
   readonly data?: unknown
   readonly [key: string]: unknown
 }
@@ -72,8 +76,7 @@ const parseLines = (text: string, into: LogRecord[]): void => {
   for (const line of text.split('\n')) {
     if (line.length === 0) continue
     const value: unknown = JSON.parse(line)
-    // SAFETY: only `type` is checked here; every consumer decodes `data` with its own schema.
-    if (typeof value === 'object' && value !== null && 'type' in value && typeof value.type === 'string') into.push(value as LogRecord)
+    if (typeof value === 'object' && value !== null && 'type' in value && typeof value.type === 'string') into.push({ ...value, type: value.type })
   }
 }
 

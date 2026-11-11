@@ -1,7 +1,9 @@
+import type { Schema } from 'effect'
 import { describe, expect, test } from 'vitest'
 import { reduceTranscript } from '../src/transcript.js'
 
-const event = (seq: number, type: string, data: unknown) => ({ type: 'event', event: { type, seq, time: seq, data } })
+/** One recorded session event as the remote runtime streams it: its `data` is the JSON payload of that event type. */
+const event = (seq: number, type: string, data: Schema.Json) => ({ type: 'event', event: { type, seq, time: seq, data } })
 
 // Shapes recorded from a real DSH 0.2.0-rc.2 session on the Raspberry Pi scratch runtime.
 const records = [

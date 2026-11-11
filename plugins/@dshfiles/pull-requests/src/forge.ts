@@ -34,7 +34,7 @@ const forgeOfHost = (host: string): ForgeKind | undefined => {
 }
 
 /** The forge and project a URL names, or undefined when it is not an https pull/merge-request URL of a supported forge. */
-export const parseForgePullRequestUrl = (url: string): ForgePullRequestTarget | undefined => {
+const parseForgePullRequestUrl = (url: string): ForgePullRequestTarget | undefined => {
   const github = GITHUB_URL.exec(url)
   if (github !== null) {
     const [, owner, repository, numberText] = github
@@ -58,7 +58,7 @@ export const parseForgePullRequestUrl = (url: string): ForgePullRequestTarget | 
  * Resolve a stored repository key. A dotted first segment is a forge host (`gitlab.com/group/project`); a bare
  * `owner/name` is GitHub, which is what every record written before GitLab support holds.
  */
-export const forgeTargetOf = (repo: string): ForgeTarget | undefined => {
+const forgeTargetOf = (repo: string): ForgeTarget | undefined => {
   const prefixed = HOST_PREFIX.exec(repo)
   if (prefixed !== null) {
     const [, host, project] = prefixed
@@ -72,21 +72,21 @@ export const forgeTargetOf = (repo: string): ForgeTarget | undefined => {
 }
 
 /** The stored key for a repository: host-qualified except for github.com, which keeps the bare `owner/name`. */
-export const repositoryKeyOf = (target: ForgeTarget): string => (target.kind === 'github' ? target.project : `${target.host}/${target.project}`)
+const repositoryKeyOf = (target: ForgeTarget): string => (target.kind === 'github' ? target.project : `${target.host}/${target.project}`)
 
-export const pullRequestUrlOf = (target: ForgeTarget, number: number): string =>
+const pullRequestUrlOf = (target: ForgeTarget, number: number): string =>
   target.kind === 'github'
     ? `https://${target.host}/${target.project}/pull/${String(number)}`
     : `https://${target.host}/${target.project}/-/merge_requests/${String(number)}`
 
 /** The webhook/CLI project argument a forge command takes (`owner/name`, or the full GitLab group path). */
-export const projectArgumentOf = (target: ForgeTarget): string => target.project
+const projectArgumentOf = (target: ForgeTarget): string => target.project
 
-export const unsupportedForgeMessage = (repo: string): string =>
+const unsupportedForgeMessage = (repo: string): string =>
   `${repo} does not name a GitHub or GitLab repository. Use a GitHub pull-request URL or a GitLab merge-request URL, or run the command in a checkout whose origin is one of those.`
 
 /** A remote URL (`git@host:path.git`, `ssh://host/path`, `https://host/path`) as a forge target, or undefined. */
-export const forgeTargetOfRemoteUrl = (url: string): ForgeTarget | undefined => {
+const forgeTargetOfRemoteUrl = (url: string): ForgeTarget | undefined => {
   const trimmed = url
     .trim()
     .replace(/\.git$/u, '')
@@ -102,4 +102,15 @@ export const forgeTargetOfRemoteUrl = (url: string): ForgeTarget | undefined => 
   const kind = forgeOfHost(host)
   if (kind === undefined || !/^(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+$/u.test(project)) return undefined
   return { kind, host, project }
+}
+
+/** Forge URL and repository-key rules, grouped for the monitor, the forge port and tests. */
+export class ForgeModel {
+  static readonly parsePullRequestUrl = parseForgePullRequestUrl
+  static readonly targetOf = forgeTargetOf
+  static readonly targetOfRemoteUrl = forgeTargetOfRemoteUrl
+  static readonly repositoryKeyOf = repositoryKeyOf
+  static readonly pullRequestUrlOf = pullRequestUrlOf
+  static readonly projectArgumentOf = projectArgumentOf
+  static readonly unsupportedMessage = unsupportedForgeMessage
 }

@@ -10,7 +10,7 @@ export interface IdleCompactionCandidate {
   /** Re-read immediately before the billed request: false when the thread gained activity, a turn, or queued input. */
   readonly stillIdle: () => boolean
   /** The engine's own idle compaction admission; refuses a thread it cannot own. */
-  readonly compact: () => Promise<unknown>
+  readonly compact: () => Promise<void>
 }
 
 /**

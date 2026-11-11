@@ -21,7 +21,7 @@ export const observedIdleCandidate = (input: {
   readonly currentLastActivityAt: () => number | null
   readonly liveAgent: () => LiveAgentIdleState | undefined
   readonly tokens: number | null
-  readonly compact: () => Promise<unknown>
+  readonly compact: () => Promise<void>
 }): IdleCompactionCandidate | null => {
   if (input.observedLastActivityAt === null) return null
   const observedLastActivityAt = input.observedLastActivityAt

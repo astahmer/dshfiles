@@ -2,12 +2,12 @@
   "oxlint": {
     "antislop(no-conditional-empty-object-spread)": 0,
     "antislop(no-export-bag)": 0,
-    "antislop(no-known-value-widening)": 95,
+    "antislop(no-known-value-widening)": 91,
     "antislop(no-runtime-typeof)": 26,
-    "antislop(no-unknown-parameters)": 226,
+    "antislop(no-unknown-parameters)": 225,
     "antislop(no-unknown-returns)": 117,
-    "antislop(no-unsafe-dictionary-type)": 169,
-    "antislop(require-safety-comment-for-type-assertion)": 297,
+    "antislop(no-unsafe-dictionary-type)": 167,
+    "antislop(require-safety-comment-for-type-assertion)": 296,
     "react(purity)": 0,
     "react-hooks(exhaustive-deps)": 0,
     "ui-guidance(no-native-title)": 64

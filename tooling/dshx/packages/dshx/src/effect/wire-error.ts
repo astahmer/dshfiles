@@ -23,7 +23,7 @@ export type WireFailure =
 
 const taggedFailure = Schema.Struct({ _tag: Schema.String, message: Schema.optional(Schema.String) })
 const isTaggedFailure = Schema.is(taggedFailure)
-const decodeDetails = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))
+const decodeDetails = Schema.decodeUnknownOption(Schema.JsonObject)
 const wireCodeOf = SchemaAST.resolveAt<string>('dshxWireCode')
 
 /** `NotFound` → `not-found`: the code an unannotated tagged failure had before wire codes were opt-in. */
@@ -35,10 +35,10 @@ const legacyCode = (tag: string): string =>
     .replace(/^-+|-+$/gu, '')
 
 /** The wrapped `cause` stays on the Host: it can carry provider messages, paths or stderr the Client must never see. */
-const withoutCause = (details: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> =>
-  Object.fromEntries(Object.entries(details).filter(([key]) => key !== 'cause'))
+const withoutCause = (details: Schema.JsonObject): Schema.JsonObject => Object.fromEntries(Object.entries(details).filter(([key]) => key !== 'cause'))
 
-const encodedDetails = (schema: Schema.Codec<unknown, unknown>, error: unknown): Readonly<Record<string, unknown>> | undefined =>
+/** The error's fields as the JSON its Schema class encodes to. */
+const encodedDetails = (schema: Schema.Codec<unknown, unknown>, error: unknown): Schema.JsonObject | undefined =>
   Option.getOrUndefined(Option.map(Option.flatMap(Schema.encodeUnknownOption(Schema.toCodecJson(schema))(error), decodeDetails), withoutCause))
 
 /** Contract errors are Schema error classes; their encoding needs no services. */

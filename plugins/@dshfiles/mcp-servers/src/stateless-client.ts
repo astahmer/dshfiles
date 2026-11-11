@@ -26,8 +26,8 @@ export interface StatelessEndpoint {
 
 interface RawAnswer {
   readonly status: number
-  /** The JSON-RPC message answering the request, or the bare JSON body; undefined when there was none. */
-  readonly message: unknown
+  /** The JSON-RPC message answering the request, or the bare JSON object body; undefined when there was none. */
+  readonly message: JsonRecord | undefined
 }
 
 /**
@@ -91,16 +91,12 @@ export class StatelessMcp extends Context.Service<
           )
           if (type === 'text/event-stream') {
             const decode = StatelessMcpModel.sseDecoder()
-            let message: unknown
+            let message: JsonRecord | undefined
             yield* Stream.runForEachWhile(bounded, text =>
               Effect.sync(() => {
                 for (const data of decode(text)) {
-                  let parsed: unknown
-                  try {
-                    parsed = JSON.parse(data)
-                  } catch {
-                    continue
-                  }
+                  const parsed = StatelessMcpModel.parseJsonObject(data)
+                  if (parsed === undefined) continue
                   // Request-scoped notifications (progress, logging) precede the final response; they are not surfaced.
                   const answer = StatelessMcpModel.responseFor(id, parsed)
                   if (answer !== undefined) message = answer
@@ -111,12 +107,7 @@ export class StatelessMcp extends Context.Service<
             return { status: response.status, message } satisfies RawAnswer
           }
           const text = yield* Stream.mkString(bounded)
-          let message: unknown
-          try {
-            message = text.length === 0 ? undefined : JSON.parse(text)
-          } catch {
-            message = undefined
-          }
+          const message = text.length === 0 ? undefined : StatelessMcpModel.parseJsonObject(text)
           return { status: response.status, message } satisfies RawAnswer
         }).pipe(
           Effect.provideService(FetchHttpClient.RequestInit, { redirect: 'error' }),
@@ -160,9 +151,9 @@ export class StatelessMcp extends Context.Service<
         if (answer.status < 200 || answer.status >= 300)
           return yield* new StatelessRequestFailed({ method: input.method, reason: `the server answered HTTP ${answer.status}` })
         const message = answer.message
-        if (typeof message !== 'object' || message === null || !('result' in message))
+        if (message === undefined || !('result' in message))
           return yield* new StatelessRequestFailed({ method: input.method, reason: 'the server sent no JSON-RPC result' })
-        const complete = StatelessMcpModel.completeResult(message.result)
+        const complete = StatelessMcpModel.completeResult(message['result'])
         if (!complete.ok) return yield* new StatelessRequestFailed({ method: input.method, reason: complete.reason })
         return complete.result
       })

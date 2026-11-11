@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Schema } from 'effect'
-import { forgeTargetOf, pullRequestUrlOf, type ForgeKind, type ForgeTarget } from './forge.js'
+import { ForgeModel, type ForgeKind, type ForgeTarget } from './forge.js'
 import { GhCommandFailed, GhResponseInvalid, GitHubCli, type PullRequestBatchRead, type PullRequestRead } from './github-cli.js'
 import { GitLabCli, GlabCommandFailed, GlabResponseInvalid } from './gitlab-cli.js'
 
@@ -78,14 +78,14 @@ export class ForgePullRequests extends Context.Service<
       const gitlab = yield* GitLabCli
 
       const targetOf = (repo: string): Effect.Effect<ForgeTarget, UnsupportedRepository> => {
-        const target = forgeTargetOf(repo)
+        const target = ForgeModel.targetOf(repo)
         return target === undefined ? Effect.fail(new UnsupportedRepository({ repo })) : Effect.succeed(target)
       }
 
       const repositoryInfo = Effect.fn('pull-requests forge repository')(function* (input: { readonly cwd: string }) {
         const gh = yield* github.repositoryInfo({ cwd: input.cwd }).pipe(Effect.option)
         if (gh._tag === 'Some') {
-          const target = forgeTargetOf(gh.value.repo)
+          const target = ForgeModel.targetOf(gh.value.repo)
           return {
             repo: gh.value.repo,
             kind: 'github' as const,
@@ -114,7 +114,7 @@ export class ForgePullRequests extends Context.Service<
         readonly targets: readonly ForgePullRequestTarget[]
         readonly minRemaining: number
       }) {
-        const resolved = input.targets.map(target => ({ target, forge: forgeTargetOf(target.repo) }))
+        const resolved = input.targets.map(target => ({ target, forge: ForgeModel.targetOf(target.repo) }))
         const githubTargets = resolved.flatMap((entry, index) =>
           entry.forge?.kind === 'github' ? [{ index, repo: entry.forge.project, number: entry.target.number, known: entry.target.known }] : [],
         )
@@ -187,4 +187,4 @@ export class ForgePullRequests extends Context.Service<
   )
 }
 
-export { pullRequestUrlOf, repoKeyOf }
+export { repoKeyOf }

@@ -21,6 +21,17 @@ export type JsonRecord = Readonly<Record<string, unknown>>
 
 const isRecord = (value: unknown): value is JsonRecord => typeof value === 'object' && value !== null && !Array.isArray(value)
 
+/** One JSON message body as a JSON object; undefined when it is not JSON or not an object (a bare array, a string, …). */
+const parseJsonObject = (text: string): JsonRecord | undefined => {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return undefined
+  }
+  return isRecord(parsed) ? parsed : undefined
+}
+
 /** What one `server/discover` answer says; `serverInfo` is display-only. */
 export interface Discovery {
   readonly version: string
@@ -41,8 +52,8 @@ export type ProbeOutcome =
   | { readonly kind: 'incompatible'; readonly reason: string }
 
 /** A JSON-RPC error object, when `body` is one. */
-const jsonRpcError = (body: unknown): { readonly code: number; readonly message: string; readonly data: unknown } | undefined => {
-  if (!isRecord(body) || !isRecord(body['error'])) return undefined
+const jsonRpcError = (body: JsonRecord | undefined): { readonly code: number; readonly message: string; readonly data: unknown } | undefined => {
+  if (body === undefined || !isRecord(body['error'])) return undefined
   const { code, message, data } = body['error']
   if (typeof code !== 'number') return undefined
   return { code, message: typeof message === 'string' ? message.slice(0, 240) : '', data }
@@ -50,10 +61,10 @@ const jsonRpcError = (body: unknown): { readonly code: number; readonly message:
 
 const stringList = (value: unknown): ReadonlyArray<string> => (Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [])
 
-/** Classify the probe's HTTP status and parsed JSON body (undefined when the body was empty or not JSON). */
-const classifyProbe = (status: number, body: unknown): ProbeOutcome => {
+/** Classify the probe's HTTP status and parsed JSON body (undefined when the body was empty, not JSON or not an object). */
+const classifyProbe = (status: number, body: JsonRecord | undefined): ProbeOutcome => {
   const error = jsonRpcError(body)
-  if (status >= 200 && status < 300 && isRecord(body) && isRecord(body['result'])) {
+  if (status >= 200 && status < 300 && body !== undefined && isRecord(body['result'])) {
     const result = body['result']
     const versions = stringList(result['supportedVersions'])
     if (!versions.includes(MODERN_PROTOCOL_VERSION))
@@ -101,7 +112,7 @@ export interface ParamHeader {
  * integer, string or boolean properties reachable through `properties` keys alone, with unique token names.
  */
 const paramHeaders = (
-  inputSchema: unknown,
+  inputSchema: JsonRecord,
 ): { readonly ok: true; readonly headers: ReadonlyArray<ParamHeader> } | { readonly ok: false; readonly reason: string } => {
   const found: Array<ParamHeader> = []
   const allowed = new Set<unknown>()
@@ -136,7 +147,7 @@ const paramHeaders = (
 }
 
 /** The `Mcp-Param-*` headers for one call; a missing or null value omits its header. */
-const paramHeaderValues = (headers: ReadonlyArray<ParamHeader>, args: JsonRecord): Readonly<Record<string, string>> => {
+const paramHeaderValues = (headers: ReadonlyArray<ParamHeader>, args: JsonRecord) => {
   const values: Record<string, string> = {}
   for (const { path, header } of headers) {
     let value: unknown = args
@@ -149,7 +160,11 @@ const paramHeaderValues = (headers: ReadonlyArray<ParamHeader>, args: JsonRecord
 }
 
 /** The methods whose `params.name` or `params.uri` is mirrored into `Mcp-Name`. */
-const NAMED_METHODS: Readonly<Record<string, 'name' | 'uri'>> = { 'tools/call': 'name', 'prompts/get': 'name', 'resources/read': 'uri' }
+const NAMED_METHODS: ReadonlyMap<string, 'name' | 'uri'> = new Map([
+  ['tools/call', 'name'],
+  ['prompts/get', 'name'],
+  ['resources/read', 'uri'],
+])
 
 /** One modern JSON-RPC request: its body and the headers that mirror it. */
 const request = (input: {
@@ -157,18 +172,18 @@ const request = (input: {
   readonly method: string
   readonly params: JsonRecord
   readonly extraHeaders?: Readonly<Record<string, string>> | undefined
-}): { readonly body: string; readonly headers: Readonly<Record<string, string>> } => {
-  const previousMetadata = isRecord(input.params['_meta']) ? input.params['_meta'] : undefined
+}) => {
+  const callerMeta = isRecord(input.params['_meta']) ? input.params['_meta'] : undefined
   const params = {
     ...input.params,
     _meta: {
-      ...previousMetadata,
+      ...callerMeta,
       'io.modelcontextprotocol/protocolVersion': MODERN_PROTOCOL_VERSION,
       'io.modelcontextprotocol/clientInfo': CLIENT_INFO,
       'io.modelcontextprotocol/clientCapabilities': {},
     },
   }
-  const nameField = NAMED_METHODS[input.method]
+  const nameField = NAMED_METHODS.get(input.method)
   const name = nameField === undefined ? undefined : input.params[nameField]
   return {
     body: JSON.stringify({ jsonrpc: '2.0', id: input.id, method: input.method, params }),
@@ -184,8 +199,8 @@ const request = (input: {
 }
 
 /** The JSON-RPC response for `id` among the messages of one response, ignoring request-scoped notifications. */
-const responseFor = (id: number, message: unknown): JsonRecord | undefined =>
-  isRecord(message) && message['id'] === id && ('result' in message || 'error' in message) ? message : undefined
+const responseFor = (id: number, message: JsonRecord): JsonRecord | undefined =>
+  message['id'] === id && ('result' in message || 'error' in message) ? message : undefined
 
 /**
  * Incremental SSE decoder for one request-scoped response stream: feed decoded text, get each event's `data`.
@@ -230,6 +245,7 @@ export class StatelessMcpModel {
   static readonly encodeHeaderValue = encodeHeaderValue
   static readonly jsonRpcError = jsonRpcError
   static readonly paramHeaders = paramHeaders
+  static readonly parseJsonObject = parseJsonObject
   static readonly paramHeaderValues = paramHeaderValues
   static readonly request = request
   static readonly responseFor = responseFor

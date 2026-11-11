@@ -15,7 +15,7 @@ const candidate = (sessionId: string, overrides: Partial<IdleCompactionCandidate
   lastActivityAt: 1_000 * MINUTE,
   tokens: 200_000,
   stillIdle: () => true,
-  compact: () => Promise.resolve(null),
+  compact: () => Promise.resolve(),
   ...overrides,
 })
 
@@ -25,7 +25,7 @@ describe('sweepIdleCompaction', () => {
     const compacted: string[] = []
     const compact = (id: string) => () => {
       compacted.push(id)
-      return Promise.resolve(null)
+      return Promise.resolve()
     }
     const done = await sweepIdleCompaction({
       now: 1_056 * MINUTE,
@@ -52,7 +52,7 @@ describe('sweepIdleCompaction', () => {
         candidate('due', {
           compact: () => {
             calls += 1
-            return Promise.resolve(null)
+            return Promise.resolve()
           },
         }),
       ],
@@ -75,7 +75,7 @@ describe('sweepIdleCompaction', () => {
         candidate('free', {
           compact: () => {
             compacted.push('free')
-            return Promise.resolve(null)
+            return Promise.resolve()
           },
         }),
       ],
@@ -134,7 +134,7 @@ describe('sweepIdleCompaction', () => {
           },
           compact: () => {
             calls += 1
-            return Promise.resolve(null)
+            return Promise.resolve()
           },
         }),
       ],
