@@ -43,6 +43,7 @@ import { ExpandButton } from './shell/ExpandButton.tsx'
 import type { SidebarRightInjected } from './shell/SidebarRight.tsx'
 import { closeWithPaneFocus, openWithPaneFocus } from './shell/close-focus.ts'
 import { RightbarRoot, type RightbarRootInjected } from './shell/RightbarRoot.tsx'
+import { createRenderedStores } from './rendered-stores.ts'
 import { SidebarSessionViews } from './session-views.ts'
 import { createSidebarRightController, DEFAULT_RESIDENT_THREADS } from './service.ts'
 import { holdsSession } from './tab-domain.ts'
@@ -228,72 +229,74 @@ export function apply(ctx: ClientContext): void {
     const handle = createSidebarRightStore(() => defaultSeed(tabs))
     // Each Session Context generation owns one Store. Background tab actions
     // use the latest adoption for that Session.
+    const bind = (sessionId: SessionId, instance: ReturnType<typeof handle.create>): void => {
+      sessionReleases.get(sessionId)?.()
+      const releaseAdoption = adopt(sessionId, instance)
+      let releaseProjection: (() => void) | undefined
+      const navigationSubscriptions = new Map<TabId, () => void>()
+      const sync = (): void => {
+        // Only the on-screen Session projects into the Workbench: every loaded Session keeps its own store, and
+        // projecting them all opened one dock panel per Session for the same tab kind.
+        const rows =
+          controller.mounted.getSnapshot() !== sessionId
+            ? []
+            : Object.values(instance.getSnapshot().bySession[sessionId]?.layout.tabs ?? {}).filter(
+                tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel',
+              )
+        for (const [tabId, unsubscribe] of navigationSubscriptions) {
+          if (!rows.some(tab => tab.id === tabId)) {
+            unsubscribe()
+            navigationSubscriptions.delete(tabId)
+          }
+        }
+        for (const tab of rows) {
+          if (!navigationSubscriptions.has(tab.id))
+            navigationSubscriptions.set(tab.id, controller.tabDomain.occurrence(sessionId, tab).navigation.subscribe(sync))
+        }
+        // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: `releaseProjection` is reassigned before the old projection is released.
+        const previous = releaseProjection
+        releaseProjection = resourcePanels.publish(
+          sessionId,
+          rows.map(tab => ({
+            id: SidebarResourcePanelModel.id(sessionId, tab.id),
+            sessionId,
+            tabId: tab.id,
+            kind: tab.kind,
+            title: tab.title,
+            address: tab.contentId,
+            navigationRevision: controller.tabDomain.occurrence(sessionId, tab).navigation.getSnapshot().revision,
+          })),
+          tabId => controller.closeIn(sessionId, tabId as TabId),
+        )
+        // New projection owns the key before old cleanup: observers never see a false close.
+        previous?.()
+      }
+      const unsubscribe = instance.subscribe(sync)
+      const unsubscribeMode = workbenchMode.subscribe(sync)
+      const unsubscribeMounted = controller.mounted.subscribe(sync)
+      sync()
+      sessionReleases.set(sessionId, () => {
+        unsubscribe()
+        unsubscribeMode()
+        unsubscribeMounted()
+        releaseProjection?.()
+        for (const unsubscribe of navigationSubscriptions.values()) unsubscribe()
+        navigationSubscriptions.clear()
+        releaseAdoption()
+      })
+    }
+    const rendered = createRenderedStores({ create: sessionId => handle.create(sessionId), bind })
     const store: typeof handle = {
       ...handle,
       create: scopeKey => {
-        const instance = handle.create(scopeKey)
-        if (scopeKey !== undefined) {
-          const sessionId = scopeKey as SessionId
-          sessionReleases.get(sessionId)?.()
-          const releaseAdoption = adopt(sessionId, instance)
-          let releaseProjection: (() => void) | undefined
-          const navigationSubscriptions = new Map<TabId, () => void>()
-          const sync = (): void => {
-            // Only the on-screen Session projects into the Workbench: every loaded Session keeps its own store, and
-            // projecting them all opened one dock panel per Session for the same tab kind.
-            const rows =
-              controller.mounted.getSnapshot() !== sessionId
-                ? []
-                : Object.values(instance.getSnapshot().bySession[sessionId]?.layout.tabs ?? {}).filter(
-                    tab => tab.kind !== 'guide' && tab.kind !== 'dshfiles-workbench-side-panel',
-                  )
-            for (const [tabId, unsubscribe] of navigationSubscriptions) {
-              if (!rows.some(tab => tab.id === tabId)) {
-                unsubscribe()
-                navigationSubscriptions.delete(tabId)
-              }
-            }
-            for (const tab of rows) {
-              if (!navigationSubscriptions.has(tab.id))
-                navigationSubscriptions.set(tab.id, controller.tabDomain.occurrence(sessionId, tab).navigation.subscribe(sync))
-            }
-            // oxlint-disable-next-line antislop/no-passthrough-variable -- snapshot: `releaseProjection` is reassigned before the old projection is released.
-            const previous = releaseProjection
-            releaseProjection = resourcePanels.publish(
-              sessionId,
-              rows.map(tab => ({
-                id: SidebarResourcePanelModel.id(sessionId, tab.id),
-                sessionId,
-                tabId: tab.id,
-                kind: tab.kind,
-                title: tab.title,
-                address: tab.contentId,
-                navigationRevision: controller.tabDomain.occurrence(sessionId, tab).navigation.getSnapshot().revision,
-              })),
-              tabId => controller.closeIn(sessionId, tabId as TabId),
-            )
-            // New projection owns the key before old cleanup: observers never see a false close.
-            previous?.()
-          }
-          const unsubscribe = instance.subscribe(sync)
-          const unsubscribeMode = workbenchMode.subscribe(sync)
-          const unsubscribeMounted = controller.mounted.subscribe(sync)
-          sync()
-          sessionReleases.set(sessionId, () => {
-            unsubscribe()
-            unsubscribeMode()
-            unsubscribeMounted()
-            releaseProjection?.()
-            for (const unsubscribe of navigationSubscriptions.values()) unsubscribe()
-            navigationSubscriptions.clear()
-            releaseAdoption()
-          })
-        }
+        const instance = scopeKey === undefined ? handle.create(scopeKey) : rendered.create(scopeKey as SessionId)
         return {
           ...instance,
           clearPersisted() {
             instance.clearPersisted()
-            if (scopeKey !== undefined) forget(scopeKey as SessionId)
+            if (scopeKey === undefined) return
+            rendered.forget(scopeKey as SessionId)
+            forget(scopeKey as SessionId)
           },
         }
       },
@@ -301,9 +304,7 @@ export function apply(ctx: ClientContext): void {
     // A link can be followed before its Session's seat renders (a Workbench thread
     // panel, a Session the native selection does not name). The persisted store
     // the seat reads later already holds the opened tab.
-    mintStore = sessionId => {
-      store.create(sessionId)
-    }
+    mintStore = rendered.mint
     const injected: Omit<SidebarRightInjected, 'keyedHooks' | 'occurrence' | 'closeTab' | 'measureRoom'> = {
       syncPresentation({ shown, track, fullscreen }) {
         // The native seat's unmount cleanup can run after Workbench takes over.
