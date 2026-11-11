@@ -7,9 +7,15 @@ import { Ssh, shellQuote } from './ssh.js'
 
 type OriginRequest = { readonly kind: 'local'; readonly path: string } | { readonly kind: 'remote'; readonly runtimeId: string; readonly path: string }
 type OriginCacheEntry = { readonly origin: string | null; readonly expiresAt: number; readonly stamp: string }
-type RemoteHostGroup = { readonly sshTarget: string; readonly pathsByRuntime: Map<string, Set<string>> }
+type RemoteHostGroup = {
+  readonly sshTarget: string
+  readonly pathsByRuntime: Map<string, Set<string>>
+  readonly stampByRuntime: Map<string, string>
+}
 
 const cacheDurationMs = 5 * 60_000
+/** A failed or timed-out read is retried soon, without letting an unreachable host cost an SSH attempt per call. */
+const failureCacheDurationMs = 30_000
 const maxCacheEntries = 20_000
 const localOutputLimitBytes = 16_384
 const remoteOutputLimitBytes = 4 * 1024 * 1024
@@ -41,7 +47,7 @@ const gitConfigStamp = (path: string) =>
     )}:${info.size}`
   }).pipe(Effect.orElseSucceed(() => ''))
 
-const cacheOrigin = (request: OriginRequest, origin: string | null, stamp = ''): void => {
+const cacheOrigin = (input: { readonly request: OriginRequest; readonly origin: string | null; readonly stamp?: string; readonly durationMs?: number }): void => {
   const now = Date.now()
   for (const [key, value] of originCache) if (value.expiresAt <= now) originCache.delete(key)
   while (originCache.size >= maxCacheEntries) {
@@ -49,7 +55,7 @@ const cacheOrigin = (request: OriginRequest, origin: string | null, stamp = ''):
     if (oldest === undefined) break
     originCache.delete(oldest)
   }
-  originCache.set(cacheKey(request), { origin, expiresAt: now + cacheDurationMs, stamp })
+  originCache.set(cacheKey(input.request), { origin: input.origin, expiresAt: now + (input.durationMs ?? cacheDurationMs), stamp: input.stamp ?? '' })
 }
 
 const normalizedRepositoryPath = (value: string): string | null => {
@@ -153,7 +159,13 @@ const readRemoteGroup = (group: RemoteHostGroup, paths: readonly string[]) =>
     const valid = Option.isSome(result) && result.value.code === 0 && !result.value.timedOut && !result.value.outputExceeded
     const pathOrigins = valid ? parseRemoteOutput(result.value.stdout, new Set(paths)) : new Map<string, string | null>()
     for (const [runtimeId, runtimePaths] of group.pathsByRuntime) {
-      for (const path of runtimePaths) cacheOrigin({ kind: 'remote', runtimeId, path }, pathOrigins.get(path) ?? null)
+      for (const path of runtimePaths)
+        cacheOrigin({
+          request: { kind: 'remote', runtimeId, path },
+          origin: pathOrigins.get(path) ?? null,
+          stamp: group.stampByRuntime.get(runtimeId) ?? '',
+          durationMs: valid ? cacheDurationMs : failureCacheDurationMs,
+        })
     }
   })
 
@@ -191,7 +203,16 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
       concurrency: 16,
     }),
   )
-  const stampOf = (request: OriginRequest): string => (request.kind === 'local' ? (localStamps.get(request.path) ?? '') : '')
+  const records = input.remote.length === 0 ? undefined : yield* (yield* HostDirectory).read
+  const remoteTargets = new Map(
+    input.remote.map(({ runtimeId }) => {
+      const runtime = records?.runtimes.find(record => record.id === runtimeId)
+      const host = runtime === undefined ? undefined : records?.hosts.find(record => record.id === runtime.hostId)
+      return [runtimeId, { host, stamp: runtime === undefined || host === undefined ? '' : JSON.stringify([host.connector, runtime.locator]) }] as const
+    }),
+  )
+  const stampOf = (request: OriginRequest): string =>
+    request.kind === 'local' ? (localStamps.get(request.path) ?? '') : (remoteTargets.get(request.runtimeId)?.stamp ?? '')
   const localReads = new Map<string, OriginRequest>()
   const pendingRemote = new Map<string, Set<string>>()
 
@@ -209,30 +230,25 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
   if (localReads.size > 0) {
     yield* Effect.forEach(
       [...localReads.values()],
-      request => readLocalOrigin(request.path).pipe(Effect.tap(origin => Effect.sync(() => cacheOrigin(request, origin, stampOf(request))))),
+      request => readLocalOrigin(request.path).pipe(Effect.tap(origin => Effect.sync(() => cacheOrigin({ request, origin, stamp: stampOf(request) })))),
       { concurrency: 8 },
     )
   }
 
   let pending = false
   if (pendingRemote.size > 0) {
-    const directory = yield* HostDirectory
-    const targets = yield* Effect.forEach(
-      [...pendingRemote.entries()],
-      ([runtimeId, paths]) =>
-        Effect.gen(function* () {
-          const runtime = yield* directory.findRuntime(runtimeId)
-          const host = runtime === undefined ? undefined : yield* directory.findHost(runtime.hostId)
-          return { runtimeId, paths, host }
-        }),
-      { concurrency: 8 },
-    )
+    const targets = [...pendingRemote.entries()].map(([runtimeId, paths]) => ({
+      runtimeId,
+      paths,
+      host: remoteTargets.get(runtimeId)?.host,
+      stamp: remoteTargets.get(runtimeId)?.stamp ?? '',
+    }))
     const localRemoteReads = new Map<string, OriginRequest>()
     const remoteHosts = new Map<string, RemoteHostGroup>()
 
     for (const target of targets) {
       if (target.host === undefined) {
-        for (const path of target.paths) cacheOrigin({ kind: 'remote', runtimeId: target.runtimeId, path }, null)
+        for (const path of target.paths) cacheOrigin({ request: { kind: 'remote', runtimeId: target.runtimeId, path }, origin: null })
         continue
       }
       if (target.host.connector.kind === 'local') {
@@ -245,7 +261,9 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
       const group = remoteHosts.get(target.host.connector.sshTarget) ?? {
         sshTarget: target.host.connector.sshTarget,
         pathsByRuntime: new Map<string, Set<string>>(),
+        stampByRuntime: new Map<string, string>(),
       }
+      group.stampByRuntime.set(target.runtimeId, target.stamp)
       for (const path of target.paths) addPath(group.pathsByRuntime, target.runtimeId, path)
       remoteHosts.set(group.sshTarget, group)
     }
@@ -253,7 +271,7 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
     if (localRemoteReads.size > 0) {
       yield* Effect.forEach(
         [...localRemoteReads.values()],
-        request => readLocalOrigin(request.path).pipe(Effect.tap(origin => Effect.sync(() => cacheOrigin(request, origin)))),
+        request => readLocalOrigin(request.path).pipe(Effect.tap(origin => Effect.sync(() => cacheOrigin({ request, origin, stamp: stampOf(request) })))),
         { concurrency: 8 },
       )
     }

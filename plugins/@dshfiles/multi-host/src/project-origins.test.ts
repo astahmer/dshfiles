@@ -6,7 +6,7 @@ import { NodeServices } from '@effect/platform-node'
 import { tracerLayer } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { Effect, Layer } from 'effect'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { HostDirectory } from './host-directory.js'
 import type { HostDirectory as HostDirectoryValue, HostRecord, RuntimeRecord } from './records.js'
 import { normalizeProjectOrigin, readProjectOrigins } from './project-origins.js'
@@ -175,6 +175,88 @@ test('answers pending instead of waiting for an unreachable SSH host, and joins 
   expect(joined).toEqual(first)
   expect(settled).toEqual({ origins: first.origins })
   expect(runs).toBe(1)
+})
+
+const sshHost = (input: { readonly id: string; readonly sshTarget: string }): HostRecord => ({
+  schemaVersion: 2,
+  id: input.id,
+  name: input.id,
+  connector: { kind: 'ssh', sshTarget: input.sshTarget },
+  hidden: false,
+  createdAt: '2026-11-04T00:00:00.000Z',
+})
+const sshRuntime = (input: { readonly id: string; readonly hostId: string }): RuntimeRecord => ({
+  schemaVersion: 2,
+  id: input.id,
+  hostId: input.hostId,
+  name: input.id,
+  locator: { kind: 'ssh', remoteHome: '/home/remote' },
+  identity: null,
+  createdAt: '2026-11-04T00:00:00.000Z',
+})
+const sshAnswer = (input: { readonly code: number; readonly stdout: string }): SshResult => ({
+  code: input.code,
+  stdout: input.stdout,
+  stderr: '',
+  timedOut: false,
+  outputExceeded: false,
+  durationMs: 1,
+})
+
+test('retries a failed remote origin read well before the success lifetime ends', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  try {
+    const host = sshHost({ id: 'host-flaky', sshTarget: 'flaky' })
+    const runtime = sshRuntime({ id: 'runtime-flaky', hostId: host.id })
+    let runs = 0
+    const services = testServices({
+      host,
+      runtimes: [runtime],
+      sshRun: () =>
+        Effect.sync(() => {
+          runs += 1
+          return runs === 1 ? sshAnswer({ code: 255, stdout: '' }) : sshAnswer({ code: 0, stdout: '/work/flaky\tgit@github.com:owner/flaky.git\n' })
+        }),
+    })
+    const read = () =>
+      Effect.runPromise(readProjectOrigins({ localPaths: [], remote: [{ runtimeId: runtime.id, paths: ['/work/flaky'] }] }).pipe(Effect.provide(services)))
+
+    const failed = await read()
+    vi.setSystemTime(Date.now() + 60_000)
+    const retried = await read()
+
+    expect(failed.origins[0]?.origin).toBeNull()
+    expect(retried.origins[0]?.origin).toBe('github.com/owner/flaky')
+    expect(runs).toBe(2)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('drops cached remote origins when the host connector changes', async () => {
+  const runtime = sshRuntime({ id: 'runtime-moved', hostId: 'host-moved' })
+  const targets: string[] = []
+  const servicesFor = (sshTarget: string) =>
+    testServices({
+      host: sshHost({ id: 'host-moved', sshTarget }),
+      runtimes: [runtime],
+      sshRun: request =>
+        Effect.sync(() => {
+          targets.push(request.sshTarget)
+          return sshAnswer({ code: 0, stdout: `/work/moved\tgit@github.com:owner/${request.sshTarget}.git\n` })
+        }),
+    })
+  const read = (sshTarget: string) =>
+    Effect.runPromise(
+      readProjectOrigins({ localPaths: [], remote: [{ runtimeId: runtime.id, paths: ['/work/moved'] }] }).pipe(Effect.provide(servicesFor(sshTarget))),
+    )
+
+  const before = await read('old-box')
+  const after = await read('new-box')
+
+  expect(before.origins[0]?.origin).toBe('github.com/owner/old-box')
+  expect(after.origins[0]?.origin).toBe('github.com/owner/new-box')
+  expect(targets).toEqual(['old-box', 'new-box'])
 })
 
 test('records the project origins span without exposing input paths', async () => {
