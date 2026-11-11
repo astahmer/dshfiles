@@ -34,6 +34,10 @@ The sidebar **Use this account for this thread** action shares its Host implemen
 
 The Session-controller fork publishes the reusable `thread-model` contract and corresponding `thread_local_model_state` / `thread_select_local_model` tools. Selection is serialized and revision-checked at commit; it preserves the in-flight request and applies to future requests. Native model-picker behavior remains separate. Optional compaction guidance is presentation/advice only; native `/compact` remains an explicit user decision, not a new automatic tool action. See the [AI Accounts behavior](../plugins/@dshfiles/ai-accounts/README.md#use-an-account-for-the-current-thread) and [native contract](../plugins/@dshfiles/session-controller/README.md#thread-local-model-selection). The historical survey counts below are not recalculated by this scoped addition.
 
+## Onboarding (DSH 0.2.1-rc.2)
+
+`@dshfiles/onboarding` binds every user-facing capability of Getting started to its Host API. `onboarding_overview` (read-only) returns the checklist, packs and feature rows the page shows, and with `preview: { pack, action }` the exact pack change the dialog previews. `onboarding_pack_apply` (write, run only when the user asked) applies one pack change and requires `confirm: true`; a call without it changes nothing, and the other action reverses it. `onboarding_reach` (read-only) returns the steps **Show me where** walks. Opening a page, replaying the wizard and walking a feature are presentation and have no tool: the Agent gives the user the steps and the user walks them. See the [plugin README](../plugins/@dshfiles/onboarding/README.md#agent-tools). The historical survey counts below are not recalculated by this scoped addition.
+
 ## Coverage summary
 
 Counts are from the audits below. "Missing" counts proposed tools with a real
