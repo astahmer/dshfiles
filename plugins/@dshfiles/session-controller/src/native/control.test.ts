@@ -28,6 +28,18 @@ describe('the control queue', () => {
     expect(frames.at(-1)).toBe('4999')
   })
 
+  it('frees the byte budget of the frames the client already read', async () => {
+    const queue = new ControlQueue(() => true)
+    const reader = queue.iterate(new AbortController().signal)[Symbol.asyncIterator]()
+    const first = projection('a', 'turn', 'first')
+    const second = projection('a', 'turn', 'second')
+    queue.push(first, 3 * 1024 * 1024)
+    expect((await reader.next()).value).toEqual(first)
+    queue.push(second, 3 * 1024 * 1024)
+    queue.end()
+    expect((await reader.next()).value).toEqual(second)
+  })
+
   it('never lets frames a client cannot read evict the ones it can', async () => {
     const queue = new ControlQueue(sessionId => sessionId === 'readable')
     const readable = projection('readable', 'turn', 'kept')

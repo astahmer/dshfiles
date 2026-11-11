@@ -160,19 +160,25 @@ export class ControlQueue {
     wake?.()
   }
 
+  private take(): { readonly frame: ProjectionFrame; readonly bytes: number } | undefined {
+    const entry = this.buffer.popFront()
+    if (entry !== undefined) this.bufferedBytes -= entry.bytes
+    return entry
+  }
+
   async *iterate(signal: AbortSignal): AsyncIterable<SessionControlValueFrame> {
     const onAbort = (): void => { this.end() }
     signal.addEventListener('abort', onAbort, { once: true })
     try {
       while (!this.done && !signal.aborted) {
-        const entry = this.buffer.popFront()
+        const entry = this.take()
         if (entry !== undefined) {
           yield entry.frame
           continue
         }
         await new Promise<void>((resolve) => { this.wake = resolve })
       }
-      for (let entry = this.buffer.popFront(); entry !== undefined && !signal.aborted; entry = this.buffer.popFront()) yield entry.frame
+      for (let entry = this.take(); entry !== undefined && !signal.aborted; entry = this.take()) yield entry.frame
     } finally {
       signal.removeEventListener('abort', onAbort)
       this.end()
