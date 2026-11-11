@@ -297,6 +297,14 @@ describe('RemoteInteractions', () => {
         yield* Queue.offer(runtime.controlFrames, { type: 'baseline', value: { projections: {} } })
         yield* Queue.offer(runtime.controlFrames, { type: 'projection', sessionId: 'session-remote', key: 'userQuestions', value: { active: [] }, seq: 7 })
         expect(yield* Queue.take(received)).toEqual({ sessionId: 'session-remote', key: 'userQuestions', value: { active: [] }, seq: 7 })
+        yield* Queue.offer(runtime.controlFrames, {
+          type: 'projection-patch',
+          sessionId: 'session-remote',
+          key: 'userQuestions',
+          patch: { o: { active: { a: 0, i: [{ id: 'q-1' }] } } },
+          seq: 8,
+        })
+        expect(yield* Queue.take(received)).toEqual({ sessionId: 'session-remote', key: 'userQuestions', value: { active: [{ id: 'q-1' }] }, seq: 8 })
       }),
     ),
   )
