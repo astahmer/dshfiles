@@ -2,7 +2,7 @@
   "name": "@dshfiles/onboarding",
   "version": "0.1.0",
   "private": true,
-  "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and a read-only onboarding_overview agent tool.",
+  "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs, what changed in owned plugins since your last visit and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and read-only onboarding_overview and onboarding_whats_new agent tools.",
   "license": "MIT",
   "files": [
     "dist",

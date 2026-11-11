@@ -359,6 +359,110 @@
       ]
     },
     {
+      "id": "whats-new",
+      "title": "See what changed in your plugins since your last visit",
+      "summary": "Getting started's What's new lists every feat(<plugin>) and fix(<plugin>) change to an owned plugin, grouped by plugin with its catalog description, newest first, at most 50, each with its date. It is read on the Host from the jj (or git) history of the dshfiles checkout this profile links Getting started from, five seconds per command and cached a minute, while the page is open or the agent asks. A change reads New only after you pressed Mark as seen once (kept per browser); a first visit shows the list without badges. When a remote's bookmark of the trunk's name differs from the local one, its changes not yet in local history show as of the last fetch, with the fetch command to copy; nothing is fetched. A registry install says why there is no history and links the repository commits. Each plugin's Features button narrows the feature search to it. The onboarding_whats_new agent tool returns the same list. No network or model request.",
+      "reach": ["click tab \"Knowledge\"", "click button \"Getting started\"", "expect region \"What's new*\""],
+      "surfaces": ["client", "host", "api", "tool", "settings"],
+      "surface": "detail",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › What's new",
+      "configuration": [
+        {
+          "key": "whatsNew",
+          "defaultValue": "true",
+          "constraints": "Boolean; off hides the section and reads no history, for the page and the agent tool alike.",
+          "coveredBy": ["onboarding.whats-new-off", "onboarding.whats-new-page-off"]
+        }
+      ],
+      "states": ["loading", "ready", "empty", "new-since-last-visit", "upstream-ahead", "no-checkout", "unreadable", "host-unreadable", "off"],
+      "failureModes": [
+        "No linked dshfiles checkout (a registry install): the section says so and links the repository commits on GitHub; nothing runs.",
+        "jj and git both absent from DSH's PATH, a command slower than five seconds or a failed log: the section names the tool and the command to run in the checkout, with Try again; a failed read is retried after five seconds, not a minute.",
+        "An older Host without the method: the section says to restart DSH or enable the plugin, with Try again.",
+        "Upstream is only as fresh as the last fetch: the section says so and offers the fetch command to copy."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj-or-git-history",
+          "boundary": "Runs jj --ignore-working-copy bookmark list and jj log (or git for-each-ref, git remote and git log without jj) in the linked dshfiles checkout, read-only, never fetching; only the explicit line format is read.",
+          "deterministicFake": "src/whats-new-history.test.ts builds real jj and git repositories in a temporary directory, with a remote ref written locally, and records each call."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "onboarding history read",
+          "file": "plugins/@dshfiles/onboarding/src/whats-new-history.test.ts",
+          "testName": "reads a git checkout, names the upstream changes main lacks, and opens one onboarding history read span"
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and read What's new.",
+        "doneWhen": "You pressed Mark as seen, so the next change reads New.",
+        "open": {
+          "panel": "dshfiles-onboarding"
+        }
+      },
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "onboarding.whats-new",
+          "featureFile": "tooling/dshx/e2e/features/onboarding.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.whats-new-parser",
+          "file": "plugins/@dshfiles/onboarding/src/whats-new-model.test.ts",
+          "testName": "keeps feat and fix scoped to an owned plugin, one entry per owned scope, and drops everything else"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.whats-new-window",
+          "file": "plugins/@dshfiles/onboarding/src/whats-new-model.test.ts",
+          "testName": "marks only what landed after the last seen instant, and nothing once the newest was seen"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.whats-new-mark-seen",
+          "file": "plugins/@dshfiles/onboarding/src/whats-new-section.client.test.tsx",
+          "testName": "marks what landed since the last visit as New until the user marks it seen, never on its own"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.whats-new-jj",
+          "file": "plugins/@dshfiles/onboarding/src/whats-new-history.test.ts",
+          "testName": "prefers jj in a jj checkout, never snapshotting the working copy"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.whats-new-no-checkout",
+          "file": "plugins/@dshfiles/onboarding/src/whats-new-history.test.ts",
+          "testName": "reads nothing without a linked checkout, and points at the repository commits instead"
+        },
+        {
+          "kind": "host-test",
+          "id": "onboarding.whats-new-off",
+          "file": "plugins/@dshfiles/onboarding/src/host.test.ts",
+          "testName": "serves What’s new as the read-only onboarding_whats_new tool, and reads no history while the setting is off"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.whats-new-page-off",
+          "file": "plugins/@dshfiles/onboarding/src/getting-started-page.test.tsx",
+          "testName": "searches every feature, narrows by destination and hides packs and What’s new when their settings are off"
+        }
+      ]
+    },
+    {
       "id": "feature-reach",
       "title": "Ask how to get to a feature",
       "summary": "The read-only onboarding_reach agent tool (onboarding/reach) returns one catalogued feature's reach steps as the dshx grammar parses them: each action, its locator (ARIA role, text, label or title) and accessible name, the fill value or key, which steps this app cannot replay (seed, attach, right-click, shift-click) and why, plus the destination the feature lives in, its Open route and its docs. Show me where reads the same method, so the Agent and the page give one answer. The catalog stays on the Host; it changes nothing.",

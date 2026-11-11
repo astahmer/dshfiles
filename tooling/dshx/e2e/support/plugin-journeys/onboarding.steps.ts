@@ -400,3 +400,48 @@ Then(
     await finishJourneyAssertions(page)
   },
 )
+
+const whatsNew = (page: Page) => gettingStarted(page).locator('[data-whats-new]')
+const WHATS_NEW_SEEN_KEY = 'dshfiles.onboarding.whats-new.v1'
+
+Then("What's new shows the checkout's changes or says why it cannot, and never errors", async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'onboarding-whats-new-honest-state', async () => {
+    await expect(gettingStarted(page).getByRole('region', { name: /^What's new/u })).toBeVisible()
+    // The scratch profile may or may not link the bundle from a checkout: either honest state passes, an error never does.
+    await expect(whatsNew(page)).toHaveAttribute('data-whats-new', /^(ready|no-checkout|unreadable)$/u)
+    const state = await whatsNew(page).getAttribute('data-whats-new')
+    if (state === 'ready') {
+      // A first visit lists changes without a New badge on each.
+      await expect(whatsNew(page).locator('[data-whats-new-entry][data-new]')).toHaveCount(0)
+      expect(await page.evaluate(key => localStorage.getItem(key), WHATS_NEW_SEEN_KEY)).toBeNull()
+    } else {
+      await expect(whatsNew(page).getByRole('link', { name: 'Open the commits on GitHub', exact: true })).toHaveAttribute('href', /^https:\/\/github\.com\//u)
+    }
+  })
+  await whatsNew(page).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: test.info().outputPath('whats-new.png'), animations: 'disabled' })
+})
+
+Then("What's new keeps 44 pixel controls, and Mark as seen from the keyboard is the only thing that moves its last visit", async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'onboarding-whats-new-narrow', async () => {
+    const fits = await whatsNew(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)
+    expect(fits).toBe(true)
+    const heights = await whatsNew(page)
+      .locator('button, a')
+      .evaluateAll(elements =>
+        elements.filter(element => element instanceof HTMLElement && element.offsetParent !== null).map(element => element.getBoundingClientRect().height),
+      )
+    expect(heights.filter(height => height < 44)).toEqual([])
+  })
+  await recordAssertion(page, 'onboarding-whats-new-mark-seen', async () => {
+    expect(await page.evaluate(key => localStorage.getItem(key), WHATS_NEW_SEEN_KEY)).toBeNull()
+    const mark = whatsNew(page).getByRole('button', { name: 'Mark as seen', exact: true })
+    if ((await whatsNew(page).getAttribute('data-whats-new')) !== 'ready' || (await mark.count()) === 0) return
+    await mark.focus()
+    await page.keyboard.press('Enter')
+    await expect(mark).toHaveCount(0)
+    expect(await page.evaluate(key => localStorage.getItem(key), WHATS_NEW_SEEN_KEY)).toMatch(/^"\d{4}-\d{2}-\d{2}T/u)
+  })
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await finishJourneyAssertions(page)
+})

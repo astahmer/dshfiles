@@ -56,3 +56,12 @@ Feature: Onboarding
     Then the walk reaches "Check for DSH updates", announces it, and clicked nothing by itself
     When the walk is ended
     Then no walk overlay or walk listener is left
+
+  @scenario:onboarding.whats-new
+  Scenario: What's new lists the checkout's changes, or says why it cannot, and marks them seen only when asked
+    Given the isolated plugin composition of "@dshfiles/onboarding, @dshfiles/command-palette, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell" is booted
+    When the setup wizard shown on first run is skipped
+    And Getting started is opened from the Knowledge destination
+    Then What's new shows the checkout's changes or says why it cannot, and never errors
+    When Getting started is narrowed to 390 pixels wide
+    Then What's new keeps 44 pixel controls, and Mark as seen from the keyboard is the only thing that moves its last visit

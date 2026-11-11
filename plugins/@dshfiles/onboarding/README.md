@@ -10,6 +10,8 @@
 
 ![Show me where a feature lives, one step at a time](docs/screenshots/show-me-where.png)
 
+![See what changed in your plugins since your last visit](docs/screenshots/whats-new.png)
+
 Getting started for anyone adopting dshfiles: the whole setup, one plugin, a pack of plugins or one feature. It never
 blocks the app, makes no model request, and changes the profile only when you confirm a pack change.
 
@@ -59,6 +61,28 @@ blocks the app, makes no model request, and changes the profile only when you co
 5. **Reverse.** Disable pack switches the pack's running rows off (never Core's, never a row another fully enabled pack
    needs) and uninstalls nothing; Enable pack switches them back.
 
+## What's new
+
+1. **List.** Getting started's **What's new** lists each `feat(<plugin>): …` and `fix(<plugin>): …` change whose scope
+   names an owned plugin directory (a title scoping two plugins counts for each), grouped by plugin with its catalog
+   description, newest plugin first, at most 50 changes (12 until **Show all**), each with its date. `chore`, `docs`,
+   `test`, `refactor` and `perf` stay out: they rarely change what a user sees. **Features** narrows the feature search
+   to that plugin.
+2. **Since your last visit.** A change reads **New** when it landed after the instant you last pressed **Mark as seen**
+   (kept per browser, `dshfiles.onboarding.whats-new.v1`). Opening the page never moves it, and before the first press
+   nothing reads New.
+3. **Upstream since your fork point.** For each remote whose bookmark (git: branch) of the local trunk's name points
+   elsewhere — `main@upstream` against `main`, whatever the remote is called — the changes there not yet in local history.
+   The trunk is git's checked-out branch, or jj's first local `main`, `master` or `trunk`. Nothing is fetched, so the list
+   is as of the last fetch; the card offers `jj git fetch --remote <name>` (or `git fetch <name>`) to copy.
+4. **Source.** Read on the Host at request time from the dshfiles checkout this profile links Getting started from (the
+   same lookup as pack installs): `jj --ignore-working-copy bookmark list` and `jj log`, or else git (`for-each-ref`,
+   `remote`, `log`) when the checkout has no `.jj` or jj is not on DSH's PATH. Five seconds per command, cached 60 s (5 s
+   after a failure). No build-time list: any commit would make one stale.
+5. **No history here.** A registry install (no linked checkout) says so and links the
+   [repository commits](https://github.com/astahmer/dshfiles/commits/main); a failed read names the command to run in the
+   checkout, with Try again.
+
 ## Show me where
 
 1. **Walk.** A non-modal card (feature title, `Step 2 of 5 · Click "Settings"`, **Next**, **End**) and a ring around the
@@ -93,6 +117,7 @@ All apply live; none needs a restart.
 | `githubCheck` | `true`  | Run `gh auth status --hostname github.com` on the Host (5 s timeout, cached 60 s); off reports `off`. |
 | `packs`       | `true`  | Show the packs section.                                                                               |
 | `curatedOnly` | `true`  | List only curated features until you search.                                                          |
+| `whatsNew`    | `true`  | Show What's new; off hides it and reads no history, for the page and `onboarding_whats_new` alike.    |
 
 ## Agent tools
 
@@ -105,7 +130,9 @@ All apply live; none needs a restart.
 3. `onboarding_reach` (read-only, `onboarding/reach`) answers "how do I get to X" with the steps Show me where walks:
    each action, locator and name, the steps this app cannot replay and why, the destination, Open route and docs. Find
    `key` with `onboarding_overview`.
-4. Opening a page, replaying the wizard and walking Show me where are presentation and have no tool: the Agent gives
+4. `onboarding_whats_new` (read-only, `onboarding/whatsNew`) returns the same changes and upstream lists the page shows,
+   with `since` (ISO 8601), `plugin` and `limit` (default 50). Marking changes seen is per browser and has no tool.
+5. Opening a page, replaying the wizard and walking Show me where are presentation and have no tool: the Agent gives
    the user the steps from `onboarding_reach`, and the user walks them.
 
 ## Data
@@ -118,7 +145,8 @@ All apply live; none needs a restart.
    ships a block.
 3. `src/packs.ts` defines the packs once; a test fails when a pack names a plugin directory or a setting that does not
    exist.
-4. Nothing is stored on the Host. The wizard outcome lives in browser storage (`dshfiles.onboarding.wizard.v1`).
+4. Nothing is stored on the Host. The wizard outcome and What's new's last visit live in browser storage
+   (`dshfiles.onboarding.wizard.v1`, `dshfiles.onboarding.whats-new.v1`).
 
 ## Limits
 
@@ -134,4 +162,5 @@ All apply live; none needs a restart.
 `onboarding/overview`, `onboarding/reach` and `onboarding/applyPack` get the automatic `api-dispatch` spans, and their
 tools the `agent-tool` span. The Show me where overlay is client-only and opens no span. The GitHub check opens one `onboarding gh auth` span per run with its status and never reads gh's output. A pack
 preview opens `onboarding pack preview`, an apply `onboarding pack apply`, and each install one `onboarding dshx add`
-span with the plugin and exit code.
+span with the plugin and exit code. Each uncached What's new read opens one `onboarding history read` span with the VCS,
+its state and the entry and upstream counts; `onboarding/whatsNew` and its tool get the automatic spans.
