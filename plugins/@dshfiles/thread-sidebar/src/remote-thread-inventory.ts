@@ -186,7 +186,10 @@ const mapRemoteThreadsToLocalProjects = (input: {
   })
 }
 
+const pollIntervals = { threadListMs: 30_000, runtimeStatusMs: 60_000 } as const
+
 export class RemoteThreadInventoryModel {
+  static readonly pollIntervals = pollIntervals
   static readonly filter = filterRemoteSidebarThreads
   static readonly build = buildRemoteSidebarThreads
   static readonly runtimesWithStartedThreads = runtimesWithStartedThreads
@@ -199,7 +202,7 @@ export const useRemoteSidebarThreads = (enabled: boolean, localProjects: readonl
   const startedHere = useQuery({
     queryKey: multiHostKeys.threads,
     queryFn: ({ signal }) => api.threadList(undefined, { signal }),
-    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 15_000),
+    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : pollIntervals.threadListMs),
     retry: false,
     enabled,
   })
@@ -210,7 +213,7 @@ export const useRemoteSidebarThreads = (enabled: boolean, localProjects: readonl
     return runtimesWithStartedThreads(directory.data?.runtimes ?? [], threads)
   }, [directory.data?.runtimes, enabled, startedHere.data?.threads])
   const statusQueries = useQueries({
-    queries: runtimes.map(runtime => ({ ...multiHostQueries.status(api, runtime.id, 30_000), enabled })),
+    queries: runtimes.map(runtime => ({ ...multiHostQueries.status(api, runtime.id, pollIntervals.runtimeStatusMs), enabled })),
   })
   const statuses = useMemo(() => {
     if (!enabled) return []

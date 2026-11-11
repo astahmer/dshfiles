@@ -14,6 +14,10 @@ const status = {
   ],
 } satisfies Awaited<ReturnType<import('@dshfiles/multi-host/destination').MultiHostClient['runtimeStatus']>>
 
+test('polls the thread list every 30 s and runtime status every 60 s, the documented cadence', () => {
+  expect(RemoteThreadInventoryModel.pollIntervals).toEqual({ threadListMs: 30_000, runtimeStatusMs: 60_000 })
+})
+
 test('only probes runtimes that own started-here threads', () => {
   const runtimes = [{ id: 'runtime-a' }, { id: 'runtime-b' }, { id: 'runtime-c' }]
   expect(
