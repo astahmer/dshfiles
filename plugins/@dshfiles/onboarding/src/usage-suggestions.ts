@@ -1,8 +1,9 @@
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { usageApi } from '@dshfiles/usage/api'
-import { Clock, Context, Duration, Effect, Layer, Ref, Semaphore } from 'effect'
+import { Clock, Context, Duration, Effect, Layer } from 'effect'
 import type { FeatureCatalog } from './catalog-model.js'
 import { SUGGESTION_DAYS, SuggestionsModel, type Suggestions } from './suggestions-model.js'
+import { TtlCell } from './ttl-cell.js'
 
 const READY_TTL = Duration.minutes(10)
 const FAILED_TTL = Duration.seconds(5)
@@ -59,21 +60,9 @@ export class UsageSuggestions extends Context.Service<UsageSuggestions, { readon
           Effect.withSpan('onboarding suggestions read', { kind: 'client' }),
         )
 
-        // Not an Effect Cache: its lookup would run under the span current at layer build, the ended `plugin activate`.
-        const last = yield* Ref.make<{ readonly value: Suggestions; readonly until: number } | null>(null)
-        const oneRead = yield* Semaphore.make(1)
-        const read = oneRead.withPermit(
-          Effect.gen(function* () {
-            const now = yield* Clock.currentTimeMillis
-            const cached = yield* Ref.get(last)
-            if (cached !== null && now < cached.until) return cached.value
-            const value = yield* readUsage
-            // An absent or failing owner is asked again soon, so Try again after enabling Usage answers at once.
-            const ttl = value.state === 'ready' ? READY_TTL : FAILED_TTL
-            yield* Ref.set(last, { value, until: now + Duration.toMillis(ttl) })
-            return value
-          }),
-        )
+        // An absent or failing owner is asked again soon, so Try again after enabling Usage answers at once.
+        const cell = yield* TtlCell.make({ read: () => readUsage, timeToLive: (value: Suggestions) => (value.state === 'ready' ? READY_TTL : FAILED_TTL) })
+        const read = cell(null)
 
         return UsageSuggestions.of({ read })
       }),

@@ -1,8 +1,9 @@
-import { Cache, Context, Duration, Effect, Exit, FileSystem, Layer, Path, Stream } from 'effect'
+import { Context, Duration, Effect, FileSystem, Layer, Path, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import type { CatalogPlugin } from './catalog-model.js'
 import { DshfilesCheckout } from './dshfiles-checkout.js'
 import { isMissingExecutable } from './github-auth.js'
+import { TtlCell } from './ttl-cell.js'
 import type { PackManagerSurface } from './plugin-manager-promise.js'
 import {
   COMMITS_URL,
@@ -218,11 +219,8 @@ export class WhatsNewHistory extends Context.Service<WhatsNewHistory, { readonly
             Effect.withSpan('onboarding history read', { kind: 'client' }),
           )
 
-        const history = yield* Cache.makeWith(readRepository, {
-          capacity: 1,
-          // A failed read retries soon, so Try again after fixing PATH or the checkout answers within seconds.
-          timeToLive: exit => (Exit.isSuccess(exit) && exit.value.state === 'ready' ? READY_TTL : FAILED_TTL),
-        })
+        // A failed read retries soon, so Try again after fixing PATH or the checkout answers within seconds.
+        const history = yield* TtlCell.make({ read: readRepository, timeToLive: (read: HistoryRead) => (read.state === 'ready' ? READY_TTL : FAILED_TTL) })
 
         const plugins = (entries: readonly WhatsNewEntry[]) =>
           [...new Set(entries.map(entry => entry.plugin))].flatMap(name => {
@@ -237,7 +235,7 @@ export class WhatsNewHistory extends Context.Service<WhatsNewHistory, { readonly
               Effect.provideService(Path.Path, path),
             )
             if (checkout.kind === 'missing') return { state: 'no-checkout', reason: checkout.reason, commitsUrl: COMMITS_URL } as const
-            const value = yield* Cache.get(history, checkout.root)
+            const value = yield* history(checkout.root)
             if (value.state === 'unreadable') return { state: 'unreadable', reason: value.reason, commitsUrl: COMMITS_URL } as const
             const slice = WhatsNewModel.select({ entries: value.entries, request })
             const upstream = value.upstream.map(target => {

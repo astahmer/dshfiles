@@ -1,3 +1,4 @@
+import { execFileSync, spawn } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -203,6 +204,63 @@ describe('onboarding Host', () => {
       expect(text).toContain('https://github.com/astahmer/dshfiles/commits/main')
     } finally {
       await on.host.dispose()
+    }
+  })
+
+  it('records one onboarding history read span for a checkout read through the mounted Host', async () => {
+    const root = join(scratch, 'history-checkout')
+    mkdirSync(join(root, 'plugins', '@dshfiles', 'onboarding'), { recursive: true })
+    mkdirSync(join(root, 'scripts'), { recursive: true })
+    writeFileSync(join(root, 'scripts', 'profile-sync.ts'), '')
+    const git = (args: readonly string[]) =>
+      execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', ...args], { cwd: root, stdio: 'ignore' })
+    git(['init', '--quiet', '--initial-branch=main'])
+    git(['commit', '--quiet', '--allow-empty', '-m', 'feat(backlog): capture from anywhere'])
+    const host = await createTestHost()
+    host.ctx.provide('settings', {
+      configure: () => () => undefined,
+      describe: () => [{ ns: 'dshfiles-onboarding', value: { githubCheck: false, checklist: false, whatsNew: true } }],
+      update: async () => undefined,
+      replace: async () => undefined,
+    } as never)
+    // A real spawn, as the DSH subprocess service does it, so the Host reads the fixture's history.
+    host.ctx.provide('subprocess', {
+      resolveExecutable: async (name: string) => name,
+      spawn: (spec: { readonly argv: readonly string[]; readonly cwd: string }) => {
+        const [executable = '', ...args] = spec.argv
+        const child = spawn(executable, args, { cwd: spec.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+        const exited = new Promise<{ readonly exitCode: number | null; readonly signal: string | null }>(resolve => {
+          child.on('close', (code, signal) => resolve({ exitCode: code, signal }))
+          child.on('error', () => resolve({ exitCode: null, signal: null }))
+        })
+        return {
+          done: exited,
+          waitForExit: async () => {
+            await exited
+            return true
+          },
+          terminate: () => child.kill('SIGKILL'),
+          stdout: child.stdout,
+          stderr: child.stderr,
+        }
+      },
+    } as never)
+    host.ctx.provide('pluginManager', {
+      listPlugins: async () => [],
+      setPluginEnabled: async () => ({ changed: false, application: 'applied' }),
+      listBundles: async () => [{ name: '@dshfiles/onboarding', source: `link:${join(root, 'plugins', '@dshfiles', 'onboarding')}` }],
+    } as never)
+    await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
+    try {
+      using recorder = recordSpans()
+      const client = createHostApiClient(host.ctx, onboardingApi, '@test/caller')
+      const first = await client.whatsNew({})
+      expect(first.state).toBe('ready')
+      await client.whatsNew({})
+      expect(recorder.named('onboarding history read')).toHaveLength(1)
+      expect(recorder.span('onboarding history read').attributes).toMatchObject({ 'onboarding.history.state': 'ready', 'onboarding.history.vcs': 'git' })
+    } finally {
+      await host.dispose()
     }
   })
 
