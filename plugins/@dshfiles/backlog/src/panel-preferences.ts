@@ -1,4 +1,5 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { panelOccurrenceStorageKey } from '@dshfiles/workbench/panel-occurrence'
 import { Effect, Schema } from 'effect'
 import { BacklogItems, type BacklogStatus } from './item.js'
 import { BacklogShipped } from './shipped.js'
@@ -33,22 +34,22 @@ const preferencesSchema = Schema.Struct({
   }).pipe(Schema.withDecodingDefaultKey(Effect.succeed(hideAgentItemsDefaults))),
   shippedPeriod: Schema.Literals(BacklogShipped.unitPeriods).pipe(Schema.withDecodingDefaultKey(Effect.succeed('week'))),
 })
-const panelStorageKey = (base: string, panelId: string | undefined): string =>
-  panelId === undefined || panelId === BACKLOG_PANEL_ID ? base : `${base}/panel/${encodeURIComponent(panelId)}`
+const panelStorageKey = (base: string, panelId: string | undefined, scopeKey: string | undefined): string =>
+  panelId === undefined || panelId === BACKLOG_PANEL_ID ? base : panelOccurrenceStorageKey({ base, panelId, scopeKey })
 
 export const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
 const boardStatusSchema = Schema.Literals(['inbox', 'todo', 'doing', 'done', 'dropped'])
 const noHiddenColumns: readonly BacklogStatus[] = []
-export const boardColumnsFor = (panelId: string | undefined) =>
+export const boardColumnsFor = (panelId: string | undefined, scopeKey?: string) =>
   createStoredValue({
-    key: panelStorageKey('dshfiles.backlog.board-columns.v1', panelId),
+    key: panelStorageKey('dshfiles.backlog.board-columns.v1', panelId, scopeKey),
     schema: Schema.Struct({ order: Schema.Array(boardStatusSchema), hidden: Schema.Array(boardStatusSchema) }),
     fallback: { order: [...boardStatuses], hidden: noHiddenColumns },
   })
 
-export const panelPreferences = (panelId: string | undefined) =>
+export const panelPreferences = (panelId: string | undefined, scopeKey?: string) =>
   createStoredValue({
-    key: panelStorageKey('dshfiles.backlog.view.v2', panelId),
+    key: panelStorageKey('dshfiles.backlog.view.v2', panelId, scopeKey),
     schema: preferencesSchema,
     fallback: {
       view: 'feed' as const,

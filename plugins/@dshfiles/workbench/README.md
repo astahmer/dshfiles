@@ -113,6 +113,10 @@ The same controls remain reachable at 360, 480, 768 and 1024 pixels, including w
 - Main-page tab titles drop the `Plugin: ` prefix of their navigation label. A plugin that knows a better name adds a
   `PanelTitles` entry (`{ panelId, title }`, a dshx registry in `@dshfiles/workbench/panel-titles`); `@dshfiles/main-tabs`
   provides the shell's destination section labels this way.
+- A panel that persists presentation state (view, filter, sort, selection) keys it by occurrence through
+  `@dshfiles/workbench/panel-occurrence`: `panelOccurrence({ panelId, scopeKey? })` joins the Workbench project scope,
+  `useWorkbenchScopeKey()` re-keys on a scope switch, and `panelOccurrenceStorageKey({ base, panelId, scopeKey?, legacyKeys? })`
+  returns `<base>/panel/<occurrence>`, seeded on first read from the pre-scope per-panel key (or `legacyKeys`).
 - `dockDefault` remains readable for existing contributor/layout compatibility. Fresh right and bottom panes start with a **New tab** chooser; a saved layout still wins.
 - Layouts persist per surface in `localStorage`: `dshfiles.workbench.layout.v1` (main),
   `dshfiles.workbench.dock-layout.v1` (dock), `dshfiles.workbench.bottom-layout.v1` (bottom row),

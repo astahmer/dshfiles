@@ -1,3 +1,4 @@
+import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
 import { ArrowLeftIcon, ArrowRightIcon, Columns3Icon, LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
@@ -221,7 +222,8 @@ export const BoardView = (props: {
   readonly triageOff: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
-  const boardColumns = useMemo(() => boardColumnsFor(props.panelId), [props.panelId])
+  const scopeKey = useWorkbenchScopeKey()
+  const boardColumns = useMemo(() => boardColumnsFor(props.panelId, scopeKey), [props.panelId, scopeKey])
   const columnPreferences = boardColumns.useValue()
   const orderedStatuses = useMemo(
     // A status missing from a stored order (an older value) sorts last instead of first.

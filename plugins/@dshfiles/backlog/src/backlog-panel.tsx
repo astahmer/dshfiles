@@ -1,3 +1,4 @@
+import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useResource, useSettings } from '@dshfiles/dshx/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
@@ -454,7 +455,8 @@ export const BacklogPanel = (props: {
     backfillStartError ??
     (backfill.error === null ? null : errorMessage(backfill.error, 'Could not read backfill progress.')) ??
     (backfillJobId !== null && backfill.isSuccess && backfill.data === null ? 'This backfill is no longer available in this Host process.' : null)
-  const preferences = useMemo(() => panelPreferences(props.panelId), [props.panelId])
+  const scopeKey = useWorkbenchScopeKey()
+  const preferences = useMemo(() => panelPreferences(props.panelId, scopeKey), [props.panelId, scopeKey])
   const stored = preferences.useValue()
   const view = stored.view
   const setPreference = (change: Partial<typeof stored>): void => {

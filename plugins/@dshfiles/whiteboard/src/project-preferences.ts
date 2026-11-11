@@ -1,4 +1,5 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { panelOccurrenceStorageKey } from '@dshfiles/workbench/panel-occurrence'
 import { Schema } from 'effect'
 
 const PANEL_ID = 'dshfiles-whiteboard'
@@ -6,21 +7,11 @@ const PANEL_ID = 'dshfiles-whiteboard'
 const ORIGINAL_IDS = new Set([PANEL_ID, `main/${PANEL_ID}`])
 const LEGACY_KEY = 'dshfiles-whiteboard:project'
 
-const scopedKey = (panelId: string): string => `${LEGACY_KEY}/panel/${encodeURIComponent(panelId)}`
-
-/** A preference saved before Whiteboard isolated occurrences belongs to the first occurrence that asks for it. */
-const inheritLegacy = (key: string): void => {
-  try {
-    if (window.localStorage.getItem(key) !== null) return
-    const legacy = window.localStorage.getItem(LEGACY_KEY)
-    if (legacy !== null) window.localStorage.setItem(key, legacy)
-  } catch {
-    // Storage refused (private mode or quota): the store itself falls back to no selection.
-  }
-}
-
-export const projectPreferences = (panelId: string | undefined) => {
-  const key = panelId === undefined || ORIGINAL_IDS.has(panelId) ? LEGACY_KEY : scopedKey(panelId)
-  if (key !== LEGACY_KEY) inheritLegacy(key)
+/** A selection saved before occurrences (then scopes) had their own keys seeds the first occurrence that asks for it. */
+export const projectPreferences = (panelId: string | undefined, scopeKey?: string) => {
+  const key =
+    panelId === undefined || ORIGINAL_IDS.has(panelId)
+      ? LEGACY_KEY
+      : panelOccurrenceStorageKey({ base: LEGACY_KEY, panelId, scopeKey, legacyKeys: [`${LEGACY_KEY}/panel/${encodeURIComponent(panelId)}`, LEGACY_KEY] })
   return createStoredValue({ key, schema: Schema.NullOr(Schema.String), fallback: null })
 }

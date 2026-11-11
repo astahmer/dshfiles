@@ -35,6 +35,16 @@ describe('whiteboard panel project preferences', () => {
     expect(projectPreferences('second').get()).toBe('/second')
   })
 
+  it('keeps the same panel apart in two simultaneous Workbench project scopes', () => {
+    localStorage.setItem('dshfiles-whiteboard:project/panel/tab%2Falpha', JSON.stringify('/before-scopes'))
+    const projectA = projectPreferences('tab/alpha', 'project:/work/a')
+    const projectB = projectPreferences('tab/alpha', 'project:/work/b')
+    expect(projectA.get()).toBe('/before-scopes')
+    projectA.set('/a')
+    expect(projectB.get()).toBe('/before-scopes')
+    expect(projectPreferences('tab/alpha', 'project:/work/a').get()).toBe('/a')
+  })
+
   it('migrates the legacy selection into the original Workbench occurrence only', () => {
     projectPreferences(undefined).set('/legacy')
     expect(projectPreferences('dshfiles-whiteboard').get()).toBe('/legacy')

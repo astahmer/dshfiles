@@ -44,7 +44,8 @@ import { ServiceMapView } from './service-map.js'
 import { TraceList } from './trace-list.js'
 import { Schema, type Types } from 'effect'
 import { tracesTabSchema, WINDOW_OPTIONS, type TracesView } from './view-state.js'
-import { panelStores, useWorkbenchScopeKey } from './panel-stores.js'
+import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
+import { panelStores } from './panel-stores.js'
 
 const ALL = '__all__'
 

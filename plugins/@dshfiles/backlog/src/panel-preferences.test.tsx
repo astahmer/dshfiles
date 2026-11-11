@@ -24,6 +24,23 @@ describe('panel presentation preferences', () => {
     expect(boardColumnsFor('second').get().hidden).toEqual([])
   })
 
+  it('keeps the same panel apart in two simultaneous Workbench project scopes', () => {
+    const projectA = panelPreferences('panel/first', 'project:/work/a')
+    const projectB = panelPreferences('panel/first', 'project:/work/b')
+    projectA.set({ ...projectA.get(), view: 'board' })
+    expect(projectB.get().view).toBe('feed')
+    expect(panelPreferences('panel/first', 'project:/work/a').get().view).toBe('board')
+    const columnsA = boardColumnsFor('panel/first', 'project:/work/a')
+    columnsA.set({ ...columnsA.get(), hidden: ['done'] })
+    expect(boardColumnsFor('panel/first', 'project:/work/b').get().hidden).toEqual([])
+  })
+
+  it('starts each scope from the preference the panel saved before scopes', () => {
+    localStorage.setItem('dshfiles.backlog.view.v2/panel/panel%2Ffirst', JSON.stringify({ view: 'board', groupBy: 'status', showDormant: false }))
+    expect(panelPreferences('panel/first', 'project:/work/a').get().view).toBe('board')
+    expect(panelPreferences('panel/first', 'project:/work/b').get().view).toBe('board')
+  })
+
   it('isolates simultaneous panels and restores each after remount', async () => {
     const first = panelPreferences('panel/first')
     const second = panelPreferences('panel/second')

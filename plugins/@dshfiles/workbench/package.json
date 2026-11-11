@@ -31,6 +31,10 @@
       "types": "./src/tabs.ts",
       "default": "./dist/tabs.js"
     },
+    "./panel-occurrence": {
+      "types": "./src/panel-occurrence.ts",
+      "default": "./dist/panel-occurrence.js"
+    },
     "./conversation-header": {
       "types": "./src/conversation-header.ts",
       "default": "./dist/conversation-header.js"

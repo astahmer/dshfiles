@@ -1,3 +1,4 @@
+import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -18,7 +19,8 @@ import type { ProjectChoice, WhiteboardClient } from './ui-model.js'
 const PANEL_ID = 'dshfiles-whiteboard'
 
 function WhiteboardPage(props: { readonly api: WhiteboardClient; readonly workspaces: Context['workspaces']; readonly panelId?: string }): JSX.Element {
-  const storedProject = useMemo(() => projectPreferences(props.panelId), [props.panelId])
+  const scopeKey = useWorkbenchScopeKey()
+  const storedProject = useMemo(() => projectPreferences(props.panelId, scopeKey), [props.panelId, scopeKey])
   const subscribe = useCallback((listener: () => void) => props.workspaces.list.subscribe(listener), [props.workspaces])
   const read = useCallback(() => props.workspaces.list.getSnapshot(), [props.workspaces])
   const items = useSyncExternalStore(subscribe, read, read).items

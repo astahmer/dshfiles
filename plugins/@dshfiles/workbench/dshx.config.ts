@@ -8,6 +8,7 @@ export default defineConfig({
     registry: 'src/registry.ts',
     'panel-titles': 'src/panel-titles.ts',
     tabs: 'src/tabs.ts',
+    'panel-occurrence': 'src/panel-occurrence.ts',
     'close-button-position': 'src/close-button-position.ts',
     'conversation-header': 'src/conversation-header.ts',
     'thread-on-screen': 'src/thread-on-screen.ts',
