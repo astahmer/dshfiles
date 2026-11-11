@@ -5,6 +5,7 @@ import { delimiter, join } from 'node:path'
 import { prepareComposedBootProfile, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../../packages/dshx/src/project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
+import { seedRowsComposingNestedBundles } from '../../packages/dshx/src/project/seed-nested-rows.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
 import { resolveDshExecutable } from '../../packages/dshx/src/project/dsh-executable.js'
 import { guardedCommand } from '../../packages/dshx/src/scratch/guarded-spawn.js'
@@ -277,8 +278,20 @@ const buildBundleOnce = async (bundle: { readonly projectRoot: string; readonly 
 }
 
 /** Boot a scratch composition of all owned bundles without touching the user's `web` profile. */
+/**
+ * Owned bundles the composed web profile can load: a bundle with a Loader row of its own, or one a web seed row
+ * composes as a preset child. A preset-child fork the seed does not swap in (`@dshfiles/tool-fs` and `tool-bash` stay
+ * in the repository unloaded since 0b13313a) is left out, as the seed leaves it out, instead of being expected and
+ * reported as never composed.
+ */
+const loadableWebBundles = async (): Promise<LocalBootBundle[]> => {
+  const seedPatch = await readFile(join(sourceProfileRoot, 'cordis.patch.yml'), 'utf8')
+  const bundles = await LocalBundleModel.listLocalBootBundles()
+  return bundles.filter(bundle => bundle.composesLoaderRows || seedRowsComposingNestedBundles(seedPatch, [bundle.packageId]) !== '')
+}
+
 export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Promise<BootedProfile> => {
-  const bundles = requireNonEmptyBundles(await LocalBundleModel.listLocalBootBundles(), 'No owned plugin bundles were found for the composed scratch profile.')
+  const bundles = requireNonEmptyBundles(await loadableWebBundles(), 'No owned plugin bundles were found for the composed scratch profile.')
   for (const bundle of bundles) await buildBundleOnce(bundle)
   const prepareStartedAt = Date.now()
   const cordisPatch = await withStartupAcknowledgements(bundles.map(bundle => bundle.packageId))
