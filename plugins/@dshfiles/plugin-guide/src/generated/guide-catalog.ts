@@ -2416,6 +2416,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/thread-sidebar/thread-directories",
+      "kind": "module",
+      "title": "@dshfiles/thread-sidebar/thread-directories",
+      "summary": "Which project a thread workspace belongs to, for plugins that group by project: the VCS providers' thread folders (one page-wide read per project set) and the resolver that falls back to the `<repository>-threads` layout.",
+      "publicSymbol": "(side-effect module)",
+      "importFrom": "@dshfiles/thread-sidebar/thread-directories",
+      "owner": "@dshfiles/thread-sidebar",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-directories.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "ToolCallSections",
       "importFrom": "@dshfiles/tool-meta/tool-call-sections",
       "owner": "@dshfiles/tool-meta",
