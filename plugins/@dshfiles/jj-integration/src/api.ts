@@ -4,6 +4,7 @@ import {
   jjRepositoriesEffectSchema,
   jjRevisionEffectSchema,
   jjThreadEffectSchema,
+  jjThreadsApiIdentity,
   type JjRepositoryView,
   type JjRevisionView,
   type JjThreadView,
@@ -237,9 +238,9 @@ const renderCleanup = (output: CleanupResult): string => {
 }
 
 export const jjIntegrationApi = defineApi({
-  id: 'jj-threads',
-  version: 1,
-  owner: '@dshfiles/jj-integration',
+  id: jjThreadsApiIdentity.apiId,
+  version: jjThreadsApiIdentity.version,
+  owner: jjThreadsApiIdentity.packageId,
   methods: {
     ownWorkspaceFor: method({
       input: ownWorkspaceForInputSchema,

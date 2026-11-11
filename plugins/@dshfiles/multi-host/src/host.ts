@@ -19,6 +19,7 @@ import {
   fileReferenceCandidatesSchema,
   fileUploadValueSchema,
   jjRepositoriesEffectSchema,
+  jjThreadsApiIdentity,
   multiHostApi,
   sessionRepositoryReads,
   sessionRepositoryWrites,
@@ -1003,7 +1004,7 @@ const handlers = Api.handlers(multiHostApi, {
     const mutation = input.method === 'provision' || input.method === 'noFolder'
     return yield* withRuntime(
       input.runtimeId,
-      gateway => gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })(input.method, input.input),
+      gateway => gateway.pluginApi(jjThreadsApiIdentity)(input.method, input.input),
       { mutation },
     ).pipe(
       Effect.map(value => ({ ok: true as const, value })),
@@ -1187,7 +1188,7 @@ const handlers = Api.handlers(multiHostApi, {
         owner.runtimeId,
         gateway =>
           Effect.flatMap(
-            gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })('repositories', {}),
+            gateway.pluginApi(jjThreadsApiIdentity)('repositories', {}),
             decodeJjRepositories,
           ),
         { mutation: false },
@@ -1207,7 +1208,7 @@ const handlers = Api.handlers(multiHostApi, {
       const value = yield* withRuntime(
         owner.runtimeId,
         gateway =>
-          gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })(
+          gateway.pluginApi(jjThreadsApiIdentity)(
             input.method,
             RemoteJjScope.asking({ method: input.method, sessionId: input.sessionId, action: input.input }),
           ),
@@ -1246,7 +1247,7 @@ const handlers = Api.handlers(multiHostApi, {
         withRuntime(
           runtime.id,
           gateway => {
-            const threadsApi = gateway.pluginApi({ packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 })
+            const threadsApi = gateway.pluginApi(jjThreadsApiIdentity)
             // `repositories` answers from the owner's last scan, and a scan coalesces, so asking here keeps this page current.
             return threadsApi('refreshRepositories', {}).pipe(
               Effect.ignore,

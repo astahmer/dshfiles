@@ -230,6 +230,8 @@ const remoteThreadSchema = Schema.Struct({
   hostName: Schema.String,
   connected: Schema.Boolean,
 })
+/** jj-integration declares its API with this identity and multi-host calls it on remote runtimes with the same one. */
+export const jjThreadsApiIdentity = { packageId: '@dshfiles/jj-integration', apiId: 'jj-threads', version: 1 } as const
 /** jj-integration methods a manager may call on a remote runtime; the folder and bookmark pickers need these. */
 const remotePluginMethodSchema = Schema.Literals(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
 /** The JJ thread actions a mirrored thread reaches on its owner; each one names that thread's own folder. */
