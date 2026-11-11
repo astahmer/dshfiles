@@ -9,9 +9,10 @@ import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { DestinationSections } from '@dshfiles/thread-sidebar/destinations'
 import { useCallback, useEffect, type ReactNode } from 'react'
 import { onboardingApi } from './api.js'
-import { GettingStartedPage, TOUCH, type GettingStartedProps } from './getting-started-page.js'
+import { GettingStartedPage, type GettingStartedProps } from './getting-started-page.js'
 import type { Overview, OverviewInput } from './overview-model.js'
 import { Routes, type RouteServices } from './routes.js'
+import { TOUCH } from './touch.js'
 import { ONBOARDING_DEFAULTS, onboardingSettings, type OnboardingSettings } from './settings.js'
 import { SetupWizard } from './setup-wizard.js'
 import { ShowMeWhere } from './show-me-where.js'
@@ -32,6 +33,11 @@ const useOnboardingSettings = (): OnboardingSettings => {
 const useLoadOverview = (): ((input: OverviewInput, signal: AbortSignal) => Promise<Overview>) => {
   const api = useApi(onboardingApi)
   return useCallback((input, signal) => api.overview(input, { signal }), [api])
+}
+
+const useLoadWhatsNew = (): GettingStartedProps['loadWhatsNew'] => {
+  const api = useApi(onboardingApi)
+  return useCallback((input, signal) => api.whatsNew(input, { signal }), [api])
 }
 
 const WalkUnreadable = (props: { readonly onRetry: () => void }): ReactNode => (
@@ -142,6 +148,7 @@ export default defineClient({
               applyPack={useApplyPack()}
               copy={copy}
               loadOverview={useLoadOverview()}
+              loadWhatsNew={useLoadWhatsNew()}
               routes={routes}
               settings={useOnboardingSettings()}
               showWhere={WalkStore.start}

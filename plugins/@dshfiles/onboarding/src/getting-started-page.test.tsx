@@ -71,8 +71,13 @@ const routes = (registered: readonly string[]): RouteServices & { readonly opene
   }
 }
 
-const renderPage = (input: { readonly registered: readonly string[]; readonly packs?: boolean }) => {
+const renderPage = (input: { readonly registered: readonly string[]; readonly packs?: boolean; readonly whatsNew?: boolean }) => {
   const services = routes(input.registered)
+  const loadWhatsNew = vi.fn(async () => ({
+    state: 'no-checkout' as const,
+    reason: 'Not linked from a checkout.',
+    commitsUrl: 'https://github.com/astahmer/dshfiles/commits/main',
+  }))
   const startWizard = vi.fn()
   const showWhere = vi.fn()
   const copy = vi.fn(async () => true)
@@ -82,14 +87,15 @@ const renderPage = (input: { readonly registered: readonly string[]; readonly pa
         applyPack={applyPack}
         copy={copy}
         loadOverview={(request, _signal) => loadOverview(request)}
+        loadWhatsNew={loadWhatsNew}
         routes={services}
-        settings={{ ...ONBOARDING_DEFAULTS, packs: input.packs ?? true }}
+        settings={{ ...ONBOARDING_DEFAULTS, packs: input.packs ?? true, whatsNew: input.whatsNew ?? true }}
         showWhere={showWhere}
         startWizard={startWizard}
       />
     </PluginQueryProvider>,
   )
-  return { services, startWizard, showWhere, copy }
+  return { services, startWizard, showWhere, copy, loadWhatsNew }
 }
 
 describe('GettingStartedPage', () => {
@@ -124,12 +130,15 @@ describe('GettingStartedPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Start setup' }))
     expect(page.startWizard).toHaveBeenCalledOnce()
+    expect((await screen.findByRole('region', { name: /What's new/u })).dataset.whatsNew).toBe('no-checkout')
   })
 
-  it('searches every feature, narrows by destination and hides packs when the setting is off', async () => {
-    renderPage({ registered: [], packs: false })
+  it('searches every feature, narrows by destination and hides packs and What’s new when their settings are off', async () => {
+    const page = renderPage({ registered: [], packs: false, whatsNew: false })
     await screen.findByRole('region', { name: /Setup checklist/u })
     expect(screen.queryByRole('region', { name: /Packs/u })).toBeNull()
+    expect(screen.queryByRole('region', { name: /What's new/u })).toBeNull()
+    expect(page.loadWhatsNew).not.toHaveBeenCalled()
     fireEvent.change(screen.getByLabelText('Search features'), { target: { value: 'onboarding checklist' } })
     await waitFor(() => expect(loadOverview).toHaveBeenLastCalledWith({ query: 'onboarding checklist' }))
     await screen.findByText('See what this setup can do and what it still needs on one page')

@@ -24,9 +24,10 @@ import { PackChangeDialog, type PackChangeDialogProps, type PackTarget } from '.
 import type { PackAction, PluginState } from './pack-plan.js'
 import { Routes, type RouteServices } from './routes.js'
 import type { OnboardingSettings } from './settings.js'
+import { TOUCH } from './touch.js'
+import { WhatsNewSection, type WhatsNewSectionProps } from './whats-new-section.js'
+import { WhatsNewStore } from './whats-new-store.js'
 
-/** 44 px on phones and touch screens, the kit's own height elsewhere. */
-export const TOUCH = 'dshx:max-sm:min-h-[44px] dshx:pointer-coarse:min-h-[44px]'
 const TOUCH_FIELD = 'dshx:max-sm:h-[44px] dshx:pointer-coarse:h-[44px]'
 
 const DESTINATION_LABELS = {
@@ -66,6 +67,7 @@ export interface GettingStartedProps {
   readonly applyPack: PackChangeDialogProps['applyPack']
   /** Start Show me where on one feature's `reach` steps. */
   readonly showWhere: (featureKey: string) => void
+  readonly loadWhatsNew: WhatsNewSectionProps['loadWhatsNew']
 }
 
 const ChecklistRow = (props: {
@@ -293,6 +295,12 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
   )
   const refresh = useCallback(() => void queryClient.invalidateQueries({ queryKey: ['onboarding', 'overview'] }), [queryClient])
   const done = checklist?.filter(item => item.state === 'done').length ?? 0
+  const lastSeen = WhatsNewStore.useLastSeen()
+  const showFeatures = useCallback((plugin: string) => {
+    setDestination(undefined)
+    setSearch(plugin)
+    searchInput.current?.focus()
+  }, [])
 
   return (
     <main aria-label="Getting started" className="dshx-root dshx:@container dshx:h-full">
@@ -316,6 +324,15 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
                 ))}
               </ul>
             </PageSection>
+          ) : null}
+          {props.settings.whatsNew ? (
+            <WhatsNewSection
+              copy={props.copy}
+              lastSeen={lastSeen}
+              loadWhatsNew={props.loadWhatsNew}
+              markSeen={WhatsNewStore.markSeen}
+              showFeatures={showFeatures}
+            />
           ) : null}
           {props.settings.packs && data !== undefined ? (
             <PageSection heading="Packs" meta={String(data.packs.length)}>

@@ -4,7 +4,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useId, useState, type ReactNode } from 'react'
 import type { Prerequisite } from './catalog-model.js'
-import { TOUCH } from './getting-started-page.js'
+import { TOUCH } from './touch.js'
 import type { ChecklistItem, Overview, OverviewInput } from './overview-model.js'
 import { Routes, type RouteServices } from './routes.js'
 
