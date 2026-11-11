@@ -15,6 +15,16 @@ Feature: Root timed ask_user_question
     When the pending question is answered "Production"
     Then the Agent receives the late answer "Production" as a user-question reply
 
+  @scenario:agent-questions.native-inbox-browser-journey
+  Scenario: A continued native question reaches the Inbox and is answered there
+    Given the isolated Agent Questions composition with timed questions is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model asks a timed question in a fresh workspace
+    And the wait ends pending while the question stays answerable
+    Then the pending native question appears in the Inbox
+    When the native Inbox question is answered "Production"
+    Then the native Inbox answer "Production" reaches the Agent and resolves the item
+
   @scenario:agent-questions.root-timed-question-cancel
   Scenario: Stopping the turn cancels a timed question that is still counting down
     Given the isolated Agent Questions composition with timed questions is booted

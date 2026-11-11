@@ -462,9 +462,9 @@
           "testName": "states pending forms of live threads, answers one in place through the native answer API, and resolves it"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "agent-questions.native-inbox-browser-journey",
-          "reason": "The reach needs a model tool call to ask_user_question from the fake provider, and the composed scratch profile never reaches the New thread composer: after the fake account is added, New session leaves the AI Accounts page open (same failure on the 2026-11-04 timed journeys, plans/ade-ux). The provider round trip stays proven on a real Cordis Host in native-question-attention.test.ts."
+          "featureFile": "tooling/dshx/e2e/features/agent-questions-timed.feature"
         }
       ],
       "telemetry": [

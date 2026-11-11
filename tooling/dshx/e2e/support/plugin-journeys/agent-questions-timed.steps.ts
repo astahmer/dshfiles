@@ -6,7 +6,8 @@ import { bootComposedPluginProfile } from '../boot.js'
 import { Given, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
 import { finishJourneyAssertions, recordAssertion, restartScratchProfileInBrowser, visitIsolatedPluginProfile } from '../steps.js'
-import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
+import { createScratchDirectory, startThreadWithModel } from '../threads.js'
+import { openGlobalPanel } from '../plugin-view-names.js'
 
 const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
 const THREAD_TITLE = 'Timed question fixture'
@@ -58,14 +59,17 @@ const askInFreshWorkspace = async (page: Page, timeout: number): Promise<void> =
   const root = await createScratchDirectory('dshx-timed-question-e2e-')
   const workspace = join(root, 'timed-question-project')
   await mkdir(workspace)
-  await registerWorkspaceFolder(page, workspace)
-  await startThreadWithModel(page, { project: 'timed-question-project', model: 'commandcode_work/gpt-6-luna' })
+  await startThreadWithModel(page, { project: workspace, model: 'commandcode_work/gpt-6-luna' })
   const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
   await composer.fill(askDirective(timeout))
+  await expect.poll(async () => (await composer.textContent())?.includes('call ask_user_question') === true).toBe(true)
   await composer.press('Enter')
   // The New thread view usually follows the thread it started; when it stays put, open the thread as a user would.
   const thread = page.getByRole('treeitem', { name: new RegExp(THREAD_TITLE, 'u') }).first()
   await expect(async () => {
+    // The rich composer is an editor, so a fast Enter can land before its model takes the text; send again while it
+    // still holds the directive.
+    if (!(await questionCard(page).isVisible()) && (await composer.textContent())?.includes('call ask_user_question') === true) await composer.press('Enter')
     if (!(await questionCard(page).isVisible()) && (await thread.isVisible())) await thread.click()
     await expect(questionCard(page)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 60_000 })
@@ -73,7 +77,18 @@ const askInFreshWorkspace = async (page: Page, timeout: number): Promise<void> =
 
 Given('the isolated Agent Questions composition with timed questions is booted', async ({ page }: { page: Page }) => {
   const profile = await bootComposedPluginProfile({
-    packageIds: ['@dshfiles/agent-questions', '@dshfiles/ai-accounts', '@dshfiles/workspace-folder-picker'],
+    packageIds: [
+      '@dshfiles/agent-questions',
+      '@dshfiles/activity-timeline',
+      '@dshfiles/thread-sidebar',
+      '@dshfiles/session-controller',
+      '@dshfiles/rich-composer',
+      '@dshfiles/chat',
+      '@dshfiles/tool-ask-user',
+      '@dshfiles/user-questions',
+      '@dshfiles/ai-accounts',
+      '@dshfiles/workspace-folder-picker',
+    ],
     profileLabel: 'agent-questions-timed',
     cordisPatch: await seedPresetRow(),
   })
@@ -118,6 +133,44 @@ When('the wait ends pending while the question stays answerable', async ({ page 
   await probe('pending.html', () => card.evaluate(element => element.outerHTML))
 })
 
+const nativeInboxItem = (page: Page) => page.locator('[data-attention-item]').filter({ hasText: QUESTION_TEXT })
+
+Then('the pending native question appears in the Inbox', async ({ page }: { page: Page }) => {
+  await openGlobalPanel(page, 'Inbox')
+  await recordAssertion(page, 'agent-questions-native-inbox-visible', async () => {
+    await expect(nativeInboxItem(page)).toBeVisible({ timeout: 30_000 })
+    await expect(nativeInboxItem(page).getByRole('button', { name: 'Production', exact: true })).toBeVisible()
+  })
+  const shots = process.env.DSHX_E2E_SHOT_DIR
+  if (shots !== undefined) await page.screenshot({ path: join(shots, 'native-question-inbox.png') })
+})
+
+When('the native Inbox question is answered {string}', async ({ page }: { page: Page }, option: string) => {
+  await nativeInboxItem(page).getByRole('button', { name: option, exact: true }).click()
+})
+
+Then('the native Inbox answer {string} reaches the Agent and resolves the item', async ({ page }: { page: Page }, option: string) => {
+  await recordAssertion(page, 'agent-questions-native-inbox-answer', async () => {
+    await expect(nativeInboxItem(page)).toHaveCount(0, { timeout: 30_000 })
+    await expect
+      .poll(
+        () =>
+          fakeCommandCodeFor(page)
+            .requests.flatMap(request => request.messages)
+            .some(
+              message =>
+                message.role === 'user' &&
+                message.text.includes('answer_to_pending_question') &&
+                message.text.includes(option) &&
+                message.text.includes('call_0_ask_user_question'),
+            ),
+        { timeout: 30_000 },
+      )
+      .toBe(true)
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the pending question is answered {string}', async ({ page }: { page: Page }, option: string) => {
   const card = questionCard(page)
   await card.getByRole('radio', { name: option, exact: true }).click()
@@ -158,11 +211,19 @@ Then('the question card is no longer answerable', async ({ page }: { page: Page 
   await finishJourneyAssertions(page)
 })
 
+Then('the restarted page is reachable', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('button', { name: /^New (session|thread)$/ }).first()).toBeVisible({ timeout: 30_000 })
+})
+
 When('the scratch Host restarts and the thread is reopened', async ({ page }: { page: Page }) => {
   await restartScratchProfileInBrowser(page)
-  const thread = page.getByRole('treeitem', { name: THREAD_TITLE }).or(page.getByRole('button', { name: THREAD_TITLE })).first()
+  const thread = page
+    .getByRole('treeitem', { name: new RegExp(THREAD_TITLE, 'u') })
+    .or(page.getByRole('button', { name: new RegExp(THREAD_TITLE, 'u') }))
+    .first()
   await expect(thread).toBeVisible({ timeout: 30_000 })
-  await thread.click()
+  // The restarted Host restores the thread as the current one, and its row overlay then swallows the click.
+  if ((await thread.getAttribute('aria-current')) !== 'page') await thread.click()
 })
 
 Then('the pending question card survives the restart', async ({ page }: { page: Page }) => {

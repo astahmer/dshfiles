@@ -253,7 +253,9 @@ const visitScratchProfile = async (page: Page, profile: BootedProfile, url = pro
     traceBootPhase('page-load', loadStartedAt, profile.profile)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Could not open the ${profile.profile} scratch profile: ${message.replaceAll(PRIVATE_URL, '<private-url>')}`)
+    throw new Error(
+      `Could not open the ${profile.profile} scratch profile: ${message.replaceAll(PRIVATE_URL, '<private-url>')}\nHost output:\n${profile.output()}`,
+    )
   }
 }
 

@@ -21,8 +21,13 @@ export const openNewThreadAddWorkspace = async (page: Page): Promise<void> => {
 
 /** Register a folder through the Add workspace flow of @dshfiles/workspace-folder-picker; it becomes the New thread project. */
 export const registerWorkspaceFolder = async (page: Page, path: string, open: (page: Page) => Promise<void> = openSidebarAddWorkspace): Promise<void> => {
-  const picker = page.getByRole('dialog', { name: 'Add workspace' })
   await open(page)
+  await addWorkspaceFolderThroughDialog(page, path)
+}
+
+/** The Add workspace dialog itself, for a caller that already opened it from the New thread project chip. */
+export const addWorkspaceFolderThroughDialog = async (page: Page, path: string): Promise<void> => {
+  const picker = page.getByRole('dialog', { name: 'Add workspace' })
   await expect(picker).toBeVisible()
   // The picker opens on the Host home and rewrites the path field when that first listing lands.
   await expect(picker.locator('p').filter({ hasText: /^\// }).first()).toBeVisible()
@@ -87,15 +92,30 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
     .getByRole('button', { name: /^New (session|thread)$/ })
     .first()
     .click()
-  await expect(page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true }).or(page.getByRole('textbox', { name: 'Choose workspace', exact: true })),
+  ).toBeVisible()
   const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
   const expectedProject = input.project.startsWith('/') ? basename(input.project) : input.project
   if ((await projectButton.textContent())?.trim() !== expectedProject) {
     await projectButton.click()
     const projectPicker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
-    // Which control opens is only known once one has: counting straight after the click can catch neither.
-    await expect(projectPicker.or(page.getByRole('menuitem', { name: input.project, exact: true }))).toBeVisible()
-    if ((await projectPicker.count()) > 0) {
+    const addDialog = page.getByRole('dialog', { name: 'Add workspace', exact: true })
+    const addWorkspace = page.getByRole('menuitem', { name: /Add workspace/ })
+    // Which control opens is only known once one has: a profile with no projects goes straight to Add workspace, one
+    // with projects lists them plus an Add workspace row.
+    await expect(
+      addDialog
+        .or(projectPicker)
+        .or(addWorkspace)
+        .or(page.getByRole('menuitem', { name: input.project, exact: true })),
+    ).toBeVisible()
+    if (await addDialog.isVisible()) {
+      await addWorkspaceFolderThroughDialog(page, input.project)
+    } else if (await addWorkspace.isVisible()) {
+      await addWorkspace.click()
+      await addWorkspaceFolderThroughDialog(page, input.project)
+    } else if ((await projectPicker.count()) > 0) {
       await expect(projectPicker).toBeVisible()
       if (input.project.startsWith('/')) {
         const search = projectPicker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true })
