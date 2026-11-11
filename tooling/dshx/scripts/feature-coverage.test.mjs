@@ -201,6 +201,58 @@ test('rejects unknown presentation values and contradictory pairs', async () => 
   })
 })
 
+test('accepts an onboarding block and rejects an unknown prerequisite, a second route or an empty sentence', async () => {
+  await withFixture(async ({ root, catalogFile }) => {
+    const onboarding = {
+      prerequisites: ['account', 'project'],
+      firstAction: 'Open Observe › Profiles and boot one.',
+      doneWhen: 'A profile shows Ready.',
+      open: { panel: 'demo-profiles' },
+    }
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].onboarding = onboarding
+    })
+    const valid = runCheck(root)
+    assert.equal(valid.status, 0, valid.stderr)
+
+    for (const settings of [{ section: 'general' }, { entryId: 'demo', fieldPath: ['timeoutMs'] }]) {
+      await editCatalog(catalogFile, catalog => {
+        catalog.features[0].onboarding = { ...onboarding, open: { settings } }
+      })
+      const settingsRoute = runCheck(root)
+      assert.equal(settingsRoute.status, 0, settingsRoute.stderr)
+    }
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].onboarding = { ...onboarding, prerequisites: ['coffee'] }
+    })
+    const unknownPrerequisite = runCheck(root)
+    assert.equal(unknownPrerequisite.status, 1)
+    assert.match(unknownPrerequisite.stderr, /features\.0\.onboarding\.prerequisites\.0: Expected "account"/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].onboarding = { ...onboarding, open: { panel: 'demo-profiles', command: '@dshfiles/demo.open' } }
+    })
+    const twoRoutes = runCheck(root)
+    assert.equal(twoRoutes.status, 1)
+    assert.match(twoRoutes.stderr, /features\.0\.onboarding\.open/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].onboarding = { ...onboarding, firstAction: '' }
+    })
+    const emptySentence = runCheck(root)
+    assert.equal(emptySentence.status, 1)
+    assert.match(emptySentence.stderr, /features\.0\.onboarding\.firstAction/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].onboarding = { ...onboarding, tour: true }
+    })
+    const unknownKey = runCheck(root)
+    assert.equal(unknownKey.status, 1)
+    assert.match(unknownKey.stderr, /features\.0\.onboarding\.tour: Expected no excess property/)
+  })
+})
+
 test('requires a telemetry entry on every feature', async () => {
   await withFixture(async ({ root, catalogFile }) => {
     await editCatalog(catalogFile, catalog => {

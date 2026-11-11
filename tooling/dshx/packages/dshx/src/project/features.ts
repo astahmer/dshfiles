@@ -157,6 +157,35 @@ const externalDependencySchema = strictStruct({
 })
 
 /**
+ * Setup a feature can need first, ticked by `@dshfiles/onboarding`'s checklist from live Host state: a configured AI
+ * account, a registered project, a jj or git repository, a signed-in GitHub CLI.
+ */
+export const DSHX_ONBOARDING_PREREQUISITES = ['account', 'project', 'repository', 'github'] as const
+
+const sentenceSchema = Schema.String.check(Schema.isMinLength(3), Schema.isMaxLength(240))
+const routeIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200))
+
+/** Exactly one supported way to open the feature: a main panel, a contributed command, or a Settings place. */
+const onboardingRouteSchema = Schema.Union([
+  strictStruct({ panel: routeIdSchema }),
+  strictStruct({ command: routeIdSchema }),
+  strictStruct({
+    settings: Schema.Union([
+      strictStruct({ section: routeIdSchema }),
+      strictStruct({ entryId: routeIdSchema, fieldPath: Schema.Array(routeIdSchema).check(Schema.isMinLength(1), Schema.isMaxLength(16)) }),
+    ]),
+  }),
+])
+
+/** How a newcomer starts using the feature, read by the onboarding gallery, its packs and its agent tool. */
+const onboardingSchema = strictStruct({
+  prerequisites: Schema.optional(Schema.Array(Schema.Literals(DSHX_ONBOARDING_PREREQUISITES))),
+  firstAction: sentenceSchema,
+  doneWhen: sentenceSchema,
+  open: Schema.optional(onboardingRouteSchema),
+})
+
+/**
  * State a reach needs that one short UI path cannot create, set up by `dshx dev open`:
  * `shared-workspaces` creates five named workspaces on the scratch sample project's working copy;
  * `rebase-ready-thread` is a thread in its own jj workspace whose described revision is ready to rebase (the agent's edit
@@ -285,6 +314,8 @@ export const DshxFeatureSchema = strictStruct({
   destination: Schema.optional(DshxDestinationSchema),
   /** Where the feature lives today, as a user finds it (e.g. `left-nav: AI Accounts: Usage history`); feeds the migration map. */
   currentSurface: Schema.optional(Schema.String.check(Schema.isMinLength(3))),
+  /** First action, done-when sentence, prerequisites and route for the onboarding gallery. */
+  onboarding: Schema.optional(onboardingSchema),
 })
 
 export const DshxFeatureCatalogSchema = strictStruct({
