@@ -12,6 +12,7 @@ import { parse } from 'yaml'
 import { CORDIS_IDENTITY_DEPENDENCIES } from 'create-dshx/capabilities'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { seedRowsComposingNestedBundles } from './seed-nested-rows.js'
+import { BundleSuppliers } from './bundle-suppliers.js'
 
 const WORKSPACE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../../')
 const PROFILE_NAME = 'dshx-boot'
@@ -24,11 +25,6 @@ const ProfilePackage = withUnknownProperties({
 })
 const WorkspacePackage = withUnknownProperties({ packageManager: Schema.String })
 const ProjectPackage = withUnknownProperties({ dsh: Schema.Unknown })
-const ClientExternals = withUnknownProperties({
-  dsh: withUnknownProperties({
-    client: Schema.optional(withUnknownProperties({ external: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))) })),
-  }),
-})
 const PnpmModules = withUnknownProperties({ packageManager: Schema.String, storeDir: Schema.String.check(Schema.isMinLength(1)) })
 const SHARED_CORDIS_PACKAGES = Object.keys(CORDIS_IDENTITY_DEPENDENCIES)
 
@@ -173,8 +169,16 @@ const prepareBootProfiles = async (
   if (pinnedNode !== '' && process.versions.node !== pinnedNode) {
     throw new Error(`Boot checks require repository Node ${pinnedNode}; current Node is ${process.versions.node}.`)
   }
-  // A bundle that keeps an owned package external (shared-runtime) cannot load without it, so its provider joins the profile.
-  const composedBundles: [BootProfileBundle, ...BootProfileBundle[]] = [...localBundles]
+  const [firstBundle, ...remainingBundles] = BundleSuppliers.withSuppliers({
+    bundles: localBundles,
+    manifestPath: bundle => join(bundle.projectRoot, 'package.json'),
+    supplier: packageId => {
+      const projectRoot = join(WORKSPACE_ROOT, 'plugins', packageId)
+      return existsSync(join(projectRoot, 'package.json')) ? { projectRoot, packageId } : undefined
+    },
+  })
+  if (firstBundle === undefined) throw new Error('A scratch profile needs at least one bundle.')
+  const composedBundles: [BootProfileBundle, ...BootProfileBundle[]] = [firstBundle, ...remainingBundles]
   for (const bundle of composedBundles) {
     const projectManifest = Schema.decodeUnknownSync(ProjectPackage)(
       decodeJson(jsonValueSchema, await readFile(join(bundle.projectRoot, 'package.json'), 'utf8')),
@@ -183,15 +187,8 @@ const prepareBootProfiles = async (
       throw new Error(`Cannot prepare a DSH boot profile for ${bundle.packageId}: package.json has no dsh bundle metadata.`)
     }
     assertSharedCordisIdentity(bundle.projectRoot)
-    for (const external of Schema.decodeUnknownSync(ClientExternals)(projectManifest).dsh.client?.external ?? []) {
-      const providerRoot = join(WORKSPACE_ROOT, 'plugins', external)
-      if (!external.startsWith('@dshfiles/') || composedBundles.some(composed => composed.packageId === external)) continue
-      if (!existsSync(join(providerRoot, 'package.json'))) continue
-      composedBundles.push({ projectRoot: providerRoot, packageId: external })
-    }
   }
 
-  const [firstBundle, ...remainingBundles] = composedBundles
   const packageIds: [string, ...string[]] = [firstBundle.packageId, ...remainingBundles.map(bundle => bundle.packageId)]
   const additionalBundleIds = options.additionalBundleIds ?? []
   const expectedBundles: [string, ...string[]] = [packageIds[0], ...packageIds.slice(1), ...additionalBundleIds]

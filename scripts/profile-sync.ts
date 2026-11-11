@@ -24,6 +24,7 @@ import { parseArgs } from 'node:util'
 import * as Schema from 'effect/Schema'
 // The dshx source, not its dist: this runs on checkouts where dshx is not built yet.
 import { BundleFreshness } from '../tooling/dshx/packages/dshx/src/repository/bundle-freshness.ts'
+import { BundleSuppliers } from '../tooling/dshx/packages/dshx/src/project/bundle-suppliers.ts'
 import { ScriptJson } from './json.ts'
 
 /**
@@ -38,7 +39,7 @@ import { ScriptJson } from './json.ts'
  * managed and the seed dropped are removed unless the user changed them, `@dshfiles/*` rows are exactly the seed's, the
  * marked Cordis region is restored, and `pnpm install` runs only when the manifest differs from the last installed one.
  * Every other entry is the user's and stays. Without a seed the profile gets every owned bundle; `--bundle` adds or
- * refreshes the named bundles and leaves the other rows alone. Writes happen under DSH's `package.json.lock` and are
+ * refreshes the named bundles with the owned bundles their client keeps external, and leaves the other rows alone. Writes happen under DSH's `package.json.lock` and are
  * atomic.
  */
 
@@ -389,8 +390,18 @@ const syncOwnedBundles = async (): Promise<void> => {
     const unknown = [...selectedNames].filter(name => !ownedBundles.some(bundle => bundle.name === name))
     if (unknown.length > 0) throw new Error(`Unknown owned bundles: ${unknown.join(', ')}`)
   }
-  const selectedBundles = selectedNames === null ? ownedBundles : ownedBundles.filter(bundle => selectedNames.has(bundle.name))
-  const replaced = (name: string): boolean => (selectedNames === null ? isOwned(name) : selectedNames.has(name))
+  const selectedBundles =
+    selectedNames === null
+      ? ownedBundles
+      : BundleSuppliers.withSuppliers({
+          bundles: ownedBundles.filter(bundle => selectedNames.has(bundle.name)).map(bundle => ({ ...bundle, packageId: bundle.name })),
+          manifestPath: bundle => join(bundle.directory, 'package.json'),
+          supplier: packageId => {
+            const bundle = ownedBundles.find(owned => owned.name === packageId)
+            return bundle === undefined ? undefined : { ...bundle, packageId }
+          },
+        })
+  const replaced = (name: string): boolean => (selectedNames === null ? isOwned(name) : selectedBundles.some(bundle => bundle.name === name))
 
   await withProfileLock(async () => {
     const manifest = normalizedManifest(readJson(profileManifestSchema, manifestPath))

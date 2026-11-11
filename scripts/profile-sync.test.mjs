@@ -178,6 +178,13 @@ test('adds only the named bundle with --bundle', () => {
   assert.match(output, /^ {2}\+ @dshfiles\/memory$/m)
 })
 
+test('adds the owned bundles a named bundle keeps external with --bundle', () => {
+  writeJson(join(profileDirectory(), 'package.json'), { dependencies: {}, dsh: { profile: { bundles: [] } } })
+  const output = execFileSync(process.execPath, [script, '--profile', 'web', '--home', home, '--bundle', '@dshfiles/memory', '--dry-run'], { encoding: 'utf8' })
+  assert.match(output, /^ {2}\+ @dshfiles\/input-trigger$/m)
+  assert.match(output, /^ {2}\+ @dshfiles\/shared-runtime$/m)
+})
+
 test('refuses to push every owned bundle into a dsh-superagent profile, but allows one named bundle', () => {
   const superagentHome = join(root, 'superagent-home')
   const manifestPath = join(superagentHome, 'profiles/superagent/package.json')
