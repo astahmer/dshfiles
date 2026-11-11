@@ -82,13 +82,15 @@ export const TurnSummaryLine = (props: {
   const [open, setOpen] = useState<OpenList | undefined>(undefined)
   const [walkthroughOpen, setWalkthroughOpen] = useState(false)
   if (summary === undefined || settings?.enabled === false || TurnActivity.isEmpty(summary)) return null
+  const walkthrough = settings?.walkthrough !== false && hasWalkthrough(summary)
   const segments = TurnActivity.segments(summary, {
     includeReads: settings?.includeReads !== false,
     lineCounts: settings?.lineCounts !== false,
     testResults: settings?.testResults !== false,
+    editedFiles: !walkthrough,
   })
   const failures = summary.failedCommands.length
-  if (segments.length === 0 && failures === 0) return null
+  if (segments.length === 0 && failures === 0 && !walkthrough) return null
   const canList = failures > 0 && settings?.listFailures !== false
   const openLists = settings?.openLists !== false
   const toggle = (list: OpenList) => () => setOpen(current => (current === list ? undefined : list))
@@ -96,7 +98,6 @@ export const TurnSummaryLine = (props: {
   const end = props.turn.end?.time
   const duration = settings?.duration !== false && start !== undefined && end !== undefined ? TurnActivity.duration(end - start) : undefined
   const changesSeq = summary.changesSeq
-  const walkthrough = settings?.walkthrough !== false && hasWalkthrough(summary)
   const label = (segment: TurnSegment, index: number): string => (index === 0 ? segment.text.charAt(0).toUpperCase() + segment.text.slice(1) : segment.text)
   const segmentView = (segment: TurnSegment, index: number): ReactNode => {
     const list = segment.key === 'files' || segment.key === 'commands' ? segment.key : undefined
@@ -139,7 +140,7 @@ export const TurnSummaryLine = (props: {
         )}
         {walkthrough ? (
           <>
-            <span aria-hidden>·</span>
+            {segments.length > 0 || failures > 0 || duration !== undefined ? <span aria-hidden>·</span> : null}
             <TurnWalkthroughToggle open={walkthroughOpen} onToggle={() => setWalkthroughOpen(current => !current)} />
           </>
         ) : null}

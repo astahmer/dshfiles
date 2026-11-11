@@ -260,18 +260,21 @@ export class TurnActivity {
 
   /**
    * The footer's parts, each naming the list it opens: "Edited 3 files +42 −7 · ran 6 commands · tests 40/42 · read 4
-   * files". Line counts and tests are left out when their option is off or nothing was counted.
+   * files". Line counts and tests are left out when their option is off or nothing was counted; `editedFiles: false`
+   * leaves the edits to the walkthrough and the native changed-files card, which already summarize them.
    */
   static segments(
     summary: TurnActivitySummary,
-    options: { readonly includeReads: boolean; readonly lineCounts: boolean; readonly testResults: boolean },
+    options: { readonly includeReads: boolean; readonly lineCounts: boolean; readonly testResults: boolean; readonly editedFiles?: boolean },
   ): readonly TurnSegment[] {
     const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`
     const lines = TurnActivity.lineTotals(summary)
     const counted = options.lineCounts && lines.added + lines.removed > 0 ? ` +${lines.added} −${lines.removed}` : ''
     const tests = options.testResults ? summary.tests : undefined
     const segments: (TurnSegment | undefined)[] = [
-      summary.editedFiles.length > 0 ? { key: 'files', text: `edited ${plural(summary.editedFiles.length, 'file', 'files')}${counted}` } : undefined,
+      options.editedFiles !== false && summary.editedFiles.length > 0
+        ? { key: 'files', text: `edited ${plural(summary.editedFiles.length, 'file', 'files')}${counted}` }
+        : undefined,
       summary.commands > 0 ? { key: 'commands', text: `ran ${plural(summary.commands, 'command', 'commands')}` } : undefined,
       tests === undefined ? undefined : { key: 'tests', text: `tests ${tests.passed}/${tests.total}`, failed: tests.failed > 0 },
       options.includeReads && summary.readFiles > 0 ? { key: 'reads', text: `read ${plural(summary.readFiles, 'file', 'files')}` } : undefined,
