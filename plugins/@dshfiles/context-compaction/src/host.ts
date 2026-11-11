@@ -3,9 +3,11 @@ import { BasicCompactionEngine, type ResolvedConfig } from '@deepseek-ai/dsh-com
 import type { ImageBlock, Message } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-token-meter'
 import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
-import { runOutsideReload } from '@dshfiles/dshx/host'
+import { createHostApiClient, isApiServed, runOutsideReload } from '@dshfiles/dshx/host'
 import { Llm } from '@dshfiles/dshx/effect/llm'
 import type { SessionId } from '@dshfiles/dshx/ids'
+import { SessionId as sessionIdSchema } from '@dshfiles/dshx/ids'
+import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
 import { Context, Effect, Layer, Schema } from 'effect'
 import { compactionApi, type CompactionThreshold } from './compaction-api.js'
 import { compactionThresholdTokens } from './compaction-threshold.js'
@@ -154,12 +156,13 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
         Effect.sync(() => host.ctx.plugin(engine, { maxTokens: config.maxTokens })),
         fiber => Effect.promise(() => fiber.dispose()),
       )
-      // One idle sweep owns every resident thread: the Session controller evicts an Agent after five idle minutes, so a
-      // cold thread is not resumed here behind its owner's back (see the README for that limit).
-      const compaction = host.ctx.get('compaction')
+      // One sweep owns every visible thread. The Session controller resumes a cold Agent under its own admission and
+      // hold, so this timer never touches `ctx.agents` directly.
+      const sessions = createHostApiClient(host.ctx, sessionsApi, '@dshfiles/context-compaction')
       const lastActivity = new Map<SessionId, number>()
       const compactedAt = new Map<SessionId, number>()
       const sweepAbort = new AbortController()
+      const toSessionId = (value: string): SessionId => Schema.decodeSync(sessionIdSchema)(value)
       let sweeping = false
       yield* Effect.acquireRelease(
         Effect.sync(() => {
@@ -181,33 +184,38 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
           )
           const offDisposed = host.ctx.on('agent/disposed', ({ agent }) => lastActivity.delete(agent.id), { global: true })
           const timer = setInterval(() => {
-            if (!config.idle.enabled || sweeping || compaction === undefined) return
+            if (!config.idle.enabled || sweeping) return
             runOutsideReload(host.ctx, () => {
+              if (!isApiServed(host.ctx, sessionsApi)) return
               sweeping = true
-              const now = Date.now()
-              const candidates: IdleCompactionCandidate[] = []
-              for (const agent of host.ctx.get('agents')?.list() ?? []) {
-                if (agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0) continue
-                const lastActivityAt = lastActivity.get(agent.id)
-                if (lastActivityAt === undefined) continue
-                const measured = host.ctx.get('tokenMeter')?.measure(agent.session).totalTokens
-                candidates.push({
-                  sessionId: agent.id,
-                  lastActivityAt,
-                  tokens: measured === undefined || !Number.isFinite(measured) ? null : Math.round(measured),
-                  compact: () => compaction.compactNow(agent, sweepAbort.signal),
+              void (async () => {
+                const now = Date.now()
+                const listed = await sessions.list({ limit: 200 }, { signal: sweepAbort.signal })
+                const candidates: IdleCompactionCandidate[] = []
+                for (const row of listed.threads) {
+                  if (row.running) continue
+                  const sessionId = toSessionId(row.sessionId)
+                  const agent = host.ctx.get('agents')?.get(sessionId)
+                  const measured = agent === undefined ? undefined : host.ctx.get('tokenMeter')?.measure(agent.session).totalTokens
+                  candidates.push({
+                    sessionId,
+                    lastActivityAt: lastActivity.get(sessionId) ?? row.updatedAt,
+                    tokens: measured === undefined || !Number.isFinite(measured) ? null : Math.round(measured),
+                    compact: async () => {
+                      const result = await sessions.compact({ sessionId: row.sessionId, minTokens: config.idle.minTokens }, { signal: sweepAbort.signal })
+                      if (result.kind === 'error') throw new Error(result.text ?? 'Compaction failed.')
+                    },
+                  })
+                }
+                const compacted = await sweepIdleCompaction({
+                  now,
+                  candidates,
+                  compactedAt,
+                  policy: config.idle,
+                  onFailure: ({ sessionId, error }) => logger.warn(`context-compaction: idle compaction of "${sessionId}" skipped: ${String(error)}`),
                 })
-              }
-              void sweepIdleCompaction({
-                now,
-                candidates,
-                compactedAt,
-                policy: config.idle,
-                onFailure: ({ sessionId, error }) => logger.warn(`context-compaction: idle compaction of "${sessionId}" skipped: ${String(error)}`),
-              })
-                .then(compacted => {
-                  for (const sessionId of compacted) compactedAt.set(sessionId, Date.now())
-                })
+                for (const sessionId of compacted) compactedAt.set(sessionId, Date.now())
+              })()
                 .catch((error: unknown) => logger.warn(`context-compaction: idle sweep failed: ${String(error)}`))
                 .finally(() => {
                   sweeping = false

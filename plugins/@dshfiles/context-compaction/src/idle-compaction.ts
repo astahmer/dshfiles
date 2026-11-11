@@ -43,7 +43,8 @@ export class IdleCompactionModel {
     readonly policy: IdleCompactionPolicy
   }): boolean => {
     if (!input.policy.enabled || input.policy.lifetimeMinutes <= input.policy.leadMinutes) return false
-    if (input.lastActivityAt === null || input.tokens === null || input.tokens < input.policy.minTokens) return false
+    if (input.lastActivityAt === null) return false
+    if (input.tokens !== null && input.tokens < input.policy.minTokens) return false
     if (input.compactedAt !== null && input.compactedAt >= input.lastActivityAt) return false
     return input.now >= IdleCompactionModel.dueAt({ lastActivityAt: input.lastActivityAt, policy: input.policy })
   }

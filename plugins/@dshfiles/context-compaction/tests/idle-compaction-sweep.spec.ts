@@ -38,8 +38,8 @@ describe('sweepIdleCompaction', () => {
       compactedAt: new Map([[id('done'), 1_000 * MINUTE]]),
       policy,
     })
-    expect(compacted).toEqual(['due'])
-    expect(done).toEqual([id('due')])
+    expect(compacted).toEqual(['due', 'cold'])
+    expect(done).toEqual([id('due'), id('cold')])
     expect(recorder.span('context compaction idle sweep').attributes).toEqual({ candidates: 5 })
   })
 

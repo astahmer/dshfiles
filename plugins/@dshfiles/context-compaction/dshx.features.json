@@ -80,9 +80,9 @@
       ],
       "states": ["off", "waiting", "due", "compacting", "skipped"],
       "failureModes": [
-        "Only a thread whose Agent is still attached can be compacted; the Session controller evicts idle Agents after five minutes, so a longer configured lifetime is not reached for a cold thread.",
-        "A thread with a running turn, queued input or an open question is skipped; the next sweep retries it.",
-        "A refused maintenance admission (busy or cancelled) is logged and the other candidates still run."
+        "The sweep lists the newest 200 visible threads; a larger history leaves older threads alone until they move back into that window.",
+        "A running thread is skipped and retried on a later sweep; a compaction command that fails is logged and retried.",
+        "A cold thread's idle start is the thread list's updatedAt (its last human prompt), so a thread whose long turn just finished can look idle slightly early."
       ],
       "externalDependencies": [],
       "verification": [

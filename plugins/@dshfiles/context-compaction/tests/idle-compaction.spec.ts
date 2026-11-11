@@ -19,7 +19,7 @@ describe('IdleCompactionModel', () => {
       IdleCompactionModel.due({ now, lastActivityAt, compactedAt: null, tokens: 200_000, policy, ...overrides })
     expect(due({ policy: DEFAULT_IDLE_COMPACTION })).toBe(false)
     expect(due({ tokens: 99_999 })).toBe(false)
-    expect(due({ tokens: null })).toBe(false)
+    expect(due({ tokens: null })).toBe(true)
     expect(due({ lastActivityAt: null })).toBe(false)
     expect(due({ compactedAt: lastActivityAt })).toBe(false)
     expect(due({ compactedAt: lastActivityAt - MINUTE })).toBe(true)

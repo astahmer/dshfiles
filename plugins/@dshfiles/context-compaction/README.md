@@ -16,7 +16,7 @@ The `threshold` API (agent tool `compaction_threshold`, module `@dshfiles/contex
 
 A thread left idle past its provider's prompt-cache lifetime re-sends its whole prompt uncached on the next message. One compaction shortly before that costs less when the thread resumes much later, and nothing when it never resumes. **Off by default**: each compaction is one billed request per idle thread, so turn it on only after a measurement shows it pays (b:7csc).
 
-The Host half sweeps every minute over the Agents it still holds. A thread is due when it is idle, has no queued input, holds at least `idle.minTokens` (100,000 by default), and its last request is `lifetimeMinutes - leadMinutes` old (60 and 5 by default, so at 55 idle minutes). The sweep then calls the running engine's `compactNow`, which reserves the thread's next-turn admission atomically; a running turn, queued work or a refused admission skips that thread and the sweep retries it. Each pass records the `context compaction idle sweep` span with its candidate count. One compaction per idle stretch: a later request re-arms it.
+The Host half sweeps every minute over the visible threads the Session controller lists. A thread is due when it is idle, has no running turn, holds at least `idle.minTokens` (100,000 by default), and its last request is `lifetimeMinutes - leadMinutes` old (60 and 5 by default, so at 55 idle minutes). It then calls `sessions.compact` with that token floor: the controller resumes a cold thread under its own admission, holds its Agent for the whole command, measures the thread, and skips it below the floor without a model request. Each pass records the `context compaction idle sweep` span with its candidate count. One compaction per idle stretch: a later request re-arms it.
 
 Settings live on the Loader row config, next to `maxTokens`:
 
@@ -31,7 +31,7 @@ config:
 
 Set `lifetimeMinutes` to the cache lifetime the route actually asks for: 5 for an Anthropic route on the default `short` retention, 60 with `cacheRetention: long` (ai-accounts › Idle prompt cache › Cache retention).
 
-**Limit:** the Session controller disposes an idle Agent after five minutes and keeps the Session log as the source of truth. This sweep therefore only compacts a thread that is still attached, and skips any other; a thread with a longer cache lifetime needs the controller to expose a hold/admission contract, which it does not today. Use it with a short lifetime until that lands.
+**Limits:** the sweep reads the newest 200 visible threads (`sessions.list`), so a very large history leaves older threads alone. Its idle start is the thread list's `updatedAt` for a cold thread (the last human prompt) and the last request or turn end for a resident one, so a thread whose long turn just finished may look idle slightly early. A running thread is skipped; a failed command is logged and retried on a later sweep.
 
 ## Verify
 
