@@ -1801,6 +1801,7 @@ Then('the chat tail offers Jev secret setup', async ({ page }: { page: Page }) =
 When('the Jev setup offer stores and binds a synthetic value', async ({ page }: { page: Page }) => {
   const offer = page.getByTestId('secret-setup-offer')
   await offer.getByRole('button', { name: 'Set up missing secrets', exact: true }).click()
+  await offer.getByRole('button', { name: 'Set up', exact: true }).click()
   const value = offer.getByRole('textbox', { name: 'Secret value', exact: true })
   await expect(value).toHaveAttribute('type', 'password')
   await value.fill('synthetic-jev-setup-value')
