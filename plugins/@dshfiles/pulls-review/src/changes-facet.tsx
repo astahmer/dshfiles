@@ -20,6 +20,7 @@ import { pullsReviewApi } from './api.js'
 import { FacetSessionStateModel, type FacetSessionPatch } from './changes-facet-state.js'
 import { ChangesScopeModel, changesScopeSchema, type ChangesRequest, type ChangesScope } from './changes-scope.js'
 import { CombinedReview } from './combined-review.js'
+import { orderReviewFiles } from './file-importance.js'
 import { LandCard } from './land-card.js'
 import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
 import { TurnChangesModel, TurnChangesReadError, type TurnChangesEvent } from './turn-changes.js'
@@ -197,16 +198,30 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
 
   const turnData = turnDiff.data
   const diff = useMemo((): FacetDiff | undefined => {
-    if (activeScope === 'turn') return turnData
+    if (activeScope === 'turn') {
+      if (turnData === undefined) return undefined
+      return { ...turnData, files: orderReviewFiles({ files: turnData.files.map(file => ({ ...file, additions: file.added, deletions: file.deleted })) }) }
+    }
     if (rangeResult?.status !== 'ok') return undefined
     return {
-      files: rangeResult.files.map(file => ({ path: file.path, display: file.path, added: file.additions, deleted: file.deletions })),
+      files: orderReviewFiles({ files: rangeResult.files }).map(file => ({
+        path: file.path,
+        display: file.path,
+        added: file.additions,
+        deleted: file.deletions,
+      })),
       patch: rangeResult.patch,
       truncated: rangeResult.truncated,
       label: rangeResult.range,
     }
   }, [activeScope, rangeResult, turnData])
-  const parsedFiles = useMemo(() => (diff === undefined || diff.patch.length === 0 ? [] : parsePatchFiles(diff.patch).flatMap(file => file.files)), [diff])
+  const parsedFiles = useMemo(() => {
+    if (diff === undefined || diff.patch.length === 0) return []
+    const order = new Map(diff.files.map((file, index) => [file.path, index]))
+    return parsePatchFiles(diff.patch)
+      .flatMap(file => file.files)
+      .sort((left, right) => (order.get(left.name) ?? Infinity) - (order.get(right.name) ?? Infinity))
+  }, [diff])
   const packageJson = usePackageJsonTables(diff?.patch ?? '', parsedFiles)
   const paths = useMemo(() => (diff?.files ?? []).map(file => file.path), [diff])
   const viewedCount = paths.filter(path => marks.viewed.has(path)).length

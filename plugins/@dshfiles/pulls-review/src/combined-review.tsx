@@ -13,6 +13,7 @@ import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState, type ReactNode } from 'react'
 import { pullsReviewApi, type RevisionReview } from './api.js'
 import { useRevisionsViewedMarks, type RevisionFile } from './viewed-marks.js'
+import { orderReviewFiles } from './file-importance.js'
 
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
 const STAT = 'dshx:font-mono dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground'
@@ -69,7 +70,13 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
   )
   const current = revisions[currentIndex]
   const currentPatch = current?.patch ?? ''
-  const parsed = useMemo(() => (currentPatch.length === 0 ? [] : parsePatchFiles(currentPatch).flatMap(file => file.files)), [currentPatch])
+  const parsed = useMemo(() => {
+    if (current === undefined || currentPatch.length === 0) return []
+    const order = new Map(orderReviewFiles({ files: current.files }).map((file, index) => [file.path, index]))
+    return parsePatchFiles(currentPatch)
+      .flatMap(file => file.files)
+      .sort((left, right) => (order.get(left.name) ?? Infinity) - (order.get(right.name) ?? Infinity))
+  }, [current, currentPatch])
   const packageJson = usePackageJsonTables(currentPatch, parsed)
 
   if (query.isPending)
@@ -165,7 +172,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
                 aria-label={`Files of ${revision.shortChangeId}`}
                 className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:border-t dshx:border-border"
               >
-                {revision.files.map(file => {
+                {orderReviewFiles({ files: revision.files }).map(file => {
                   const target = { commitId: revision.commitId, path: file.path }
                   const viewed = marks.isViewed(target)
                   return (

@@ -112,9 +112,11 @@ Feature: pulls.review thread review scopes
   Scenario: A turn's Edited files card opens the Changes facet on that turn
     Given the isolated plugin composition of "@dshfiles/pulls-review, @dshfiles/diff-viewed, @dshfiles/jj-integration, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
     When a Command Code account backed by a local fake provider is added
-    And the fake model writes "alpha.txt" and "beta.txt" in a fresh review workspace
+    And the fake model writes "a.test.ts" and "index.ts" in a fresh review workspace
     And the Edited files card of turn 1 is opened
     Then the Changes facet shows "This turn" with 2 changed files
-    When "alpha.txt" is marked viewed in the Changes facet
+    And the Changes files are ordered "index.ts" then "a.test.ts"
+    When "index.ts" is marked viewed in the Changes facet
     Then the Changes facet reads "1/2 viewed"
+    And the Changes files are ordered "index.ts" then "a.test.ts"
     And the Changes journey is complete

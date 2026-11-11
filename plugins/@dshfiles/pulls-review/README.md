@@ -20,7 +20,9 @@ read it, and can it land?" without leaving the thread:
   file (list and diff header), plus Mark all viewed. Marks live in
   [diff-viewed](../diff-viewed/README.md)'s one store: per-turn marks are the same ones the native
   review tab's Viewed toggle writes; revision-scope marks are keyed by workspace, base and head
-  commit, so a new revision starts unread.
+  commit, so a new revision starts unread. Files are ordered by deterministic importance: entry
+  points and source first, then tests, lockfiles and generated files, with larger changes first within
+  each group. Viewed marks never change the order. This uses no model and incurs no model cost.
 - **Line comments.** Click or drag line numbers in a diff, write a comment and choose **Add to next
   message**: it becomes a line-comment chip in the thread's composer through the public dshx
   `Composer` contract (rich-composer sends it as `<comment path lines>`).
@@ -75,7 +77,7 @@ product features stay out of it.
 ## Review page
 
 Review a project's or workspace's changes the way [pulls.review](https://pulls.review) does:
-all changed-file diffs in one vertically scrollable view, grouped by scope and
+all changed-file diffs in one vertically scrollable view, ordered by importance and
 with per-file review progress — inside DSH.
 
 ![pulls.review groups changed files by scope and tracks review progress](docs/screenshots/thread-review-scopes.png)

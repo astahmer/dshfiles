@@ -18,6 +18,7 @@ import { pullsReviewApi } from './api.js'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import type { ChangesRequest } from './changes-scope.js'
 import { CombinedReview } from './combined-review.js'
+import { orderReviewFiles } from './file-importance.js'
 import { useRangeViewedMarks } from './viewed-marks.js'
 import { PageReviewContextModel } from './review-page-context.js'
 import { reviewWithHistoryFallback } from './review-source.js'
@@ -179,14 +180,12 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
   }, [head, resetSummarize])
 
   const parsed = useMemo(() => (result?.status === 'ok' && result.patch.length > 0 ? parsePatchFiles(result.patch).flatMap(file => file.files) : []), [result])
-  const reviewFiles = useMemo(
-    () =>
-      scopes.flatMap(scope => {
-        const paths = new Set(scope.filePaths)
-        return parsed.filter(file => paths.has(file.name))
-      }),
-    [parsed, scopes],
-  )
+  const reviewFiles = useMemo(() => {
+    if (result?.status !== 'ok') return []
+    const paths = new Set(scopes.flatMap(scope => scope.filePaths))
+    const order = new Map(orderReviewFiles({ files: result.files }).map((file, index) => [file.path, index]))
+    return parsed.filter(file => paths.has(file.name)).sort((left, right) => (order.get(left.name) ?? Infinity) - (order.get(right.name) ?? Infinity))
+  }, [parsed, result, scopes])
   const scopeByPath = useMemo(() => {
     const result = new Map<string, (typeof scopes)[number]>()
     for (const scope of scopes) {
@@ -281,7 +280,7 @@ const WorkspaceReview = (props: PullsReviewPanelProps): ReactNode => {
     <div className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto">
       <Page
         heading="Review"
-        description="Changed files of a project or workspace against its base, grouped by scope. Marks are kept across browsers."
+        description="Changed files of a project or workspace against its base, ordered by importance. Marks are kept across browsers."
         meta={
           result?.status === 'ok' ? (
             <Badge variant="secondary" className="dshx:font-mono dshx:text-[11px]">

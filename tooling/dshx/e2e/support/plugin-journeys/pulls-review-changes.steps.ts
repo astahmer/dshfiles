@@ -63,6 +63,12 @@ Then('the Changes facet shows {string} with {int} changed file(s)', async ({ pag
   })
 })
 
+Then('the Changes files are ordered {string} then {string}', async ({ page }: { page: Page }, first: string, second: string) => {
+  const rows = facet(page).getByRole('list', { name: 'Changed files', exact: true }).getByRole('listitem')
+  await expect(rows.nth(0)).toContainText(first)
+  await expect(rows.nth(1)).toContainText(second)
+})
+
 When('the {string} scope is chosen in the Changes facet', async ({ page }: { page: Page }, scope: string) => {
   await facet(page).getByRole('radio', { name: scope, exact: true }).click()
 })
