@@ -627,6 +627,12 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "features": 1
     },
     {
+      "name": "tool-subagent",
+      "description": "Owned fork of DSH's subagent delegation tool whose model-selection policy follows the saved setting in running Sessions",
+      "ui": false,
+      "features": 1
+    },
+    {
       "name": "traces",
       "description": "Local OTLP/HTTP trace receiver and viewer: trace list, span waterfall, operation stats and error groups inside DSH.",
       "ui": true,
@@ -25375,6 +25381,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "Keep a bounded global tool surface per agent and progressively reveal ranked global tools through Native Tool Mode search.",
       "destination": "none",
       "currentSurface": "host: tool search (not mounted)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "tool-subagent#live-model-selection-policy",
+      "plugin": "tool-subagent",
+      "id": "live-model-selection-policy",
+      "title": "Subagent model routes follow the saved setting in running threads",
+      "summary": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/m…",
+      "destination": "none",
+      "currentSurface": "agent tools: subagent, subagent_fork, list_subagent_models",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
