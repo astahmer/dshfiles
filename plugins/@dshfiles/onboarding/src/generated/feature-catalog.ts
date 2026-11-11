@@ -336,7 +336,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "onboarding",
       "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and a read-only onboarding_overview agent tool.",
       "ui": true,
-      "features": 2
+      "features": 3
     },
     {
       "name": "optmem-core",
@@ -5274,7 +5274,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "getting-started",
       "title": "See what this setup can do and what it still needs on one page",
-      "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (AI account configured, project added, project is a jj or git repository, GitHub CLI signed in) with a fix action for each open ite…",
+      "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (an AI account connected, counted from AI accounts when it is installed, project added, project is a jj or git repository, GitHub C…",
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started; palette: Onboarding: Getting started",
       "reach": [
@@ -5285,6 +5285,28 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": {
         "firstAction": "Open Knowledge › Getting started and fix each open checklist item.",
         "doneWhen": "Every checklist item shows Done.",
+        "open": {
+          "panel": "dshfiles-onboarding"
+        }
+      }
+    },
+    {
+      "key": "onboarding#pack-change",
+      "plugin": "onboarding",
+      "id": "pack-change",
+      "title": "Enable or disable a plugin pack after an exact preview",
+      "summary": "Each non-core pack on Getting started has Enable pack and Disable pack. Either opens one dialog that names exactly which packages would install, which rows would be enabled or disabled, which are already fine, which another pack keeps on, the pack's prerequisites and whether a r…",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › Packs › Enable pack / Disable pack",
+      "reach": [
+        "click tab \"Knowledge\"",
+        "click button \"Getting started\"",
+        "click button \"Enable pack: Observe & perf\"",
+        "expect dialog \"Enable Observe & perf\""
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and press Enable pack on a pack you want.",
+        "doneWhen": "The pack card shows every plugin enabled.",
         "open": {
           "panel": "dshfiles-onboarding"
         }

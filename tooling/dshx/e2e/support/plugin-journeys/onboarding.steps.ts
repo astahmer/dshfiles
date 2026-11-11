@@ -8,6 +8,11 @@ const STARTER_PROMPT = 'Explain how this project is organised and where I should
 const gettingStarted = (page: Page) => page.getByRole('main', { name: 'Getting started', exact: true })
 const wizard = (page: Page) => page.locator('[data-setup-wizard]')
 const paletteDialog = (page: Page) => page.getByRole('dialog', { name: 'Command palette' })
+const packDialog = (page: Page) => page.locator('[data-pack-dialog]')
+const pack = (page: Page, title: string) =>
+  gettingStarted(page)
+    .locator('[data-pack]')
+    .filter({ has: page.getByRole('heading', { name: title, exact: true }) })
 const composer = (page: Page) => page.getByRole('textbox', { name: /commands, @ files or sessions$/u }).first()
 
 const runPaletteCommand = async (page: Page, title: string): Promise<void> => {
@@ -158,3 +163,67 @@ Then('the palette opened Getting started with its eight packs', async ({ page }:
   })
   await finishJourneyAssertions(page)
 })
+
+/** Requests that would change the profile or restart DSH; the preview journey must send none. */
+const writes = new WeakMap<Page, string[]>()
+
+When('Enable pack is pressed from the keyboard on the {string} pack', async ({ page }: { page: Page }, title: string) => {
+  const seen: string[] = []
+  writes.set(page, seen)
+  page.on('request', request => {
+    if (/applyPack|[Rr]estart/u.test(request.url()) || /applyPack|requestRestart/u.test(request.postData() ?? '')) seen.push(request.url())
+  })
+  await page.evaluate(() => sessionStorage.setItem('onboarding-e2e-no-reload', 'kept'))
+  // The open dialog hides the page from the accessibility tree, so its box is read by element, not by role.
+  const pageBox = () => page.locator('main[aria-label="Getting started"]').boundingBox()
+  const before = await pageBox()
+  await pack(page, title)
+    .getByRole('button', { name: `Enable pack: ${title}`, exact: true })
+    .focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('dialog', { name: `Enable ${title}`, exact: true })).toBeVisible()
+  const after = await pageBox()
+  await recordAssertion(page, 'onboarding-pack-dialog-no-shift', async () => {
+    expect(after?.x).toBe(before?.x)
+    expect(after?.width).toBe(before?.width)
+  })
+})
+
+Then('the pack preview names what would install and the restart it needs, with 44 pixel controls and no page shift', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'onboarding-pack-preview', async () => {
+    const dialog = packDialog(page)
+    await expect(dialog.locator('[data-preview-section="install"]')).toBeVisible()
+    await expect(dialog.locator('[data-preview-section="install"]')).toContainText('traces')
+    await expect(dialog.locator('[data-preview-section="restart"]')).toContainText('Restart when idle')
+    await expect(page.getByRole('dialog')).toHaveCount(1)
+    const width = await dialog.evaluate(element => element.getBoundingClientRect().right <= window.innerWidth)
+    expect(width).toBe(true)
+    const heights = await dialog
+      .locator('button, a')
+      .evaluateAll(elements =>
+        elements.filter(element => element instanceof HTMLElement && element.offsetParent !== null).map(element => element.getBoundingClientRect().height),
+      )
+    expect(heights.length).toBeGreaterThan(0)
+    expect(heights.filter(height => height < 44)).toEqual([])
+  })
+  await page.screenshot({ path: test.info().outputPath('pack-change.png'), animations: 'disabled' })
+})
+
+When('the pack preview is dismissed with Escape', async ({ page }: { page: Page }) => {
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+Then(
+  'the {string} pack is unchanged, its Enable pack button has focus again and nothing was applied or restarted',
+  async ({ page }: { page: Page }, title: string) => {
+    await recordAssertion(page, 'onboarding-pack-cancel-changes-nothing', async () => {
+      await expect(pack(page, title).getByRole('button', { name: `Enable pack: ${title}`, exact: true })).toBeFocused()
+      await expect(pack(page, title).locator('[data-plugin-state="not-installed"]')).toHaveCount(4)
+      expect(writes.get(page) ?? []).toEqual([])
+      expect(await page.evaluate(() => sessionStorage.getItem('onboarding-e2e-no-reload'))).toBe('kept')
+    })
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await finishJourneyAssertions(page)
+  },
+)

@@ -5,7 +5,7 @@
     {
       "id": "getting-started",
       "title": "See what this setup can do and what it still needs on one page",
-      "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (AI account configured, project added, project is a jj or git repository, GitHub CLI signed in) with a fix action for each open item, the eight plugin packs with every plugin enabled, disabled or not installed plus its prerequisites and key settings, and a curated-first search over every catalogued feature grouped by destination, with an Open button only where the route is registered. The onboarding_overview agent tool returns the same checklist, packs and rows. It changes nothing.",
+      "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (an AI account connected, counted from AI accounts when it is installed, project added, project is a jj or git repository, GitHub CLI signed in) with a fix action for each open item, the eight plugin packs with every plugin enabled, disabled or not installed plus its prerequisites and key settings, and a curated-first search over every catalogued feature grouped by destination, with an Open button only where the route is registered. The onboarding_overview agent tool returns the same checklist, packs and rows. It changes nothing.",
       "reach": ["click tab \"Knowledge\"", "click button \"Getting started\"", "expect heading \"Getting started\""],
       "surfaces": ["client", "host", "api", "tool", "command", "settings"],
       "surface": "destinationSection",
@@ -51,8 +51,14 @@
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
         {
           "kind": "custom",
           "span": "onboarding gh auth",
@@ -63,7 +69,9 @@
       "onboarding": {
         "firstAction": "Open Knowledge › Getting started and fix each open checklist item.",
         "doneWhen": "Every checklist item shows Done.",
-        "open": { "panel": "dshfiles-onboarding" }
+        "open": {
+          "panel": "dshfiles-onboarding"
+        }
       },
       "verification": [
         {
@@ -100,6 +108,122 @@
           "id": "onboarding.packs",
           "file": "plugins/@dshfiles/onboarding/src/catalog.test.ts",
           "testName": "name only plugin directories that exist, with one Core pack"
+        }
+      ]
+    },
+    {
+      "id": "pack-change",
+      "title": "Enable or disable a plugin pack after an exact preview",
+      "summary": "Each non-core pack on Getting started has Enable pack and Disable pack. Either opens one dialog that names exactly which packages would install, which rows would be enabled or disabled, which are already fine, which another pack keeps on, the pack's prerequisites and whether a restart follows; nothing changes before Confirm, Cancel changes nothing and a satisfied pack says Up to date. Confirm works one plugin at a time with progress and Stop after this plugin: existing rows switch through the plugin manager, whose applied, restart-required (with its reason) or overridden verdict is shown as given; missing owned bundles install with the dshfiles checkout's dshx add into the profile DSH runs, or, when this Host cannot reach that checkout, come back as the exact command to copy with the install docs. Core is never disabled and nothing restarts DSH: the result says what waits for a restart (Restart when idle under the managed launcher, otherwise your own launcher). onboarding_overview returns the same preview and onboarding_pack_apply applies it only with confirm: true.",
+      "reach": [
+        "click tab \"Knowledge\"",
+        "click button \"Getting started\"",
+        "click button \"Enable pack: Observe & perf\"",
+        "expect dialog \"Enable Observe & perf\""
+      ],
+      "surfaces": ["client", "host", "api", "tool"],
+      "surface": "detail",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › Packs › Enable pack / Disable pack",
+      "configuration": [
+        {
+          "key": "packs",
+          "defaultValue": "true",
+          "constraints": "Boolean; off hides the packs section and with it both buttons. The agent tools stay available.",
+          "coveredBy": ["onboarding.pack-dialog"]
+        }
+      ],
+      "states": [
+        "previewing",
+        "up-to-date",
+        "unavailable",
+        "manual-install",
+        "applying",
+        "stopping",
+        "applied",
+        "restart-required",
+        "partial",
+        "failed",
+        "cancelled"
+      ],
+      "failureModes": [
+        "No plugin manager on this Host: the preview says so and offers only Close; edit the profile's cordis.patch.yml by hand.",
+        "Profile not linked from a dshfiles checkout, or its dshx CLI unbuilt: installs show the exact dshx add command to copy and the install docs; rows still switch.",
+        "dshx add fails (offline, pnpm, profile write): that plugin reads failed with dshx's own message, paths replaced by $DSH_HOME and <dshfiles checkout>; the verdict is Partly done or Not changed with the command to retry, never success.",
+        "A row a higher profile layer overrides reads overridden with the cordis.patch.yml recovery; a read-only row is listed under Cannot change here.",
+        "An unanswered Host call stops the run: the remaining plugins read not started and the page rereads the Host."
+      ],
+      "externalDependencies": [
+        {
+          "id": "dshx-add",
+          "boundary": "Runs node <checkout>/tooling/dshx/packages/dshx/dist/cli/bin.js add @dshfiles/<plugin> --profile <active profile> --home <DSH home> --json on the Host, one package at a time, five-minute bound; only its JSON envelope is read.",
+          "deterministicFake": "src/pack-controls.test.ts spawns a fake checkout whose dshx CLI records each call and fails one package."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "onboarding dshx add",
+          "file": "plugins/@dshfiles/onboarding/src/pack-controls.test.ts",
+          "testName": "switches rows through the plugin manager, installs one package at a time and reports a partial install as partial"
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and press Enable pack on a pack you want.",
+        "doneWhen": "The pack card shows every plugin enabled.",
+        "open": {
+          "panel": "dshfiles-onboarding"
+        }
+      },
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "onboarding.pack-preview",
+          "featureFile": "tooling/dshx/e2e/features/onboarding.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.pack-dialog",
+          "file": "plugins/@dshfiles/onboarding/src/getting-started-page.test.tsx",
+          "testName": "previews a pack change, and Cancel changes nothing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.pack-up-to-date",
+          "file": "plugins/@dshfiles/onboarding/src/getting-started-page.test.tsx",
+          "testName": "says Up to date and offers no confirm when nothing would change"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.pack-partial",
+          "file": "plugins/@dshfiles/onboarding/src/pack-controls.test.ts",
+          "testName": "switches rows through the plugin manager, installs one package at a time and reports a partial install as partial"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.pack-verdict",
+          "file": "plugins/@dshfiles/onboarding/src/pack-controls.test.ts",
+          "testName": "relays the plugin manager verdict instead of inventing one, and enable then disable restores the rows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.pack-manual",
+          "file": "plugins/@dshfiles/onboarding/src/pack-controls.test.ts",
+          "testName": "degrades to the exact command to copy when the profile is not linked from a checkout, and runs nothing"
+        },
+        {
+          "kind": "host-test",
+          "id": "onboarding.pack-apply-tool",
+          "file": "plugins/@dshfiles/onboarding/src/host.test.ts",
+          "testName": "refuses a bare onboarding_pack_apply request, and relays the plugin manager verdict once confirmed"
         }
       ]
     },
@@ -141,7 +265,9 @@
         "prerequisites": ["account", "project"],
         "firstAction": "Run Onboarding: Show the setup wizard from the command palette.",
         "doneWhen": "A starter prompt waits in the composer.",
-        "open": { "command": "@dshfiles/onboarding.wizard" }
+        "open": {
+          "command": "@dshfiles/onboarding.wizard"
+        }
       },
       "verification": [
         {
