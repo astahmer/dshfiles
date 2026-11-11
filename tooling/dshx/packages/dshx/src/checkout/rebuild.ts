@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { decodeJson, jsonValueSchema } from '../json.js'
+import { DependencyManifests } from '../repository/bundle-freshness.js'
 
 export class CheckoutSyncError extends Error {
   readonly code: string
@@ -50,7 +51,6 @@ const manifestSchema = Schema.Struct({
   exports: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 })
 const sourceMapSchema = Schema.Struct({ sources: Schema.Array(Schema.String) })
-const dependencyManifestSchema = Schema.Struct({ version: Schema.Literal(1), sources: Schema.Array(Schema.String) })
 
 interface PluginPackage {
   readonly name: string
@@ -83,7 +83,7 @@ const bundledSources = (root: string, directory: string, bundle: string): Readon
   const distDirectory = join(root, directory, 'dist')
   const manifestPath = join(distDirectory, `${bundle}.js.deps.json`)
   if (existsSync(manifestPath)) {
-    const manifest = Schema.decodeUnknownOption(dependencyManifestSchema)(decodeJson(jsonValueSchema, readFileSync(manifestPath, 'utf8')))
+    const manifest = DependencyManifests.decodeOption(readFileSync(manifestPath, 'utf8'))
     if (Option.isSome(manifest)) return new Set(manifest.value.sources.map(source => relative(root, resolve(join(root, directory), source))))
   }
   const mapPath = join(distDirectory, `${bundle}.js.map`)

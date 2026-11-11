@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { normalizePath, type InlineConfig, type Plugin, type PluginOption, type ResolvedConfig, type Rollup } from 'vite'
 import { DshxError } from '../diagnostics.js'
 import { resolveVitePlugins } from '../config/vite-plugins.js'
+import { DependencyManifests } from '../repository/bundle-freshness.js'
 import type { BuildArtifact, BuildReport, BuildWatcher } from './types.js'
 
 interface KernelBoundary {
@@ -182,7 +183,7 @@ const dependencyManifestPlugin = (options: {
       await mkdir(options.outDir, { recursive: true })
       await writeFile(
         resolve(options.outDir, `${options.entryFile}.deps.json`),
-        `${JSON.stringify({ version: 1, face: options.face, sources, hashes }, null, 2)}\n`,
+        DependencyManifests.encode({ version: 1, face: options.face, sources, hashes }),
         'utf8',
       )
     },

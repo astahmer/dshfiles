@@ -9,9 +9,17 @@ import { join, resolve } from 'node:path'
  */
 
 const dependencyManifestSchema = Schema.Struct({
+  version: Schema.Literal(1),
+  face: Schema.Literals(['host', 'client']),
   sources: Schema.Array(Schema.String),
   hashes: Schema.optional(Schema.Record(Schema.String, Schema.NullOr(Schema.String))),
 })
+
+/** The `<bundle>.js.deps.json` file the compiler writes next to each bundle: the sources it read and their hashes. */
+export type DependencyManifest = typeof dependencyManifestSchema.Type
+
+const encodeDependencyManifest = (manifest: DependencyManifest): string => `${JSON.stringify(manifest, null, 2)}\n`
+const decodeDependencyManifestOption = (text: string) => Schema.decodeUnknownOption(Schema.fromJsonString(dependencyManifestSchema))(text)
 const packageScriptsSchema = Schema.Struct({ scripts: Schema.optional(Schema.Record(Schema.String, Schema.String)) })
 
 export type BundleFreshnessReport =
@@ -46,7 +54,7 @@ const inspect = (input: { readonly directory: string }): BundleFreshnessReport =
     const bundlePath = join(distDirectory, bundle)
     if (!existsSync(bundlePath)) return { status: 'stale', bundle, source: null, reason: 'bundle-missing' }
     const builtAt = statSync(bundlePath).mtimeMs
-    const manifest = decodeJson(dependencyManifestSchema, readFileSync(join(distDirectory, manifestFile), 'utf8'))
+    const manifest = DependencyManifests.decode(readFileSync(join(distDirectory, manifestFile), 'utf8'))
     // A Windows build records `..\node_modules\…` sources, and Vite ids may carry a `?worker&inline` style query.
     for (const source of manifest.sources.filter(path => !/node_modules[\\/]/u.test(path))) {
       const sourcePath = resolve(input.directory, source.replace(/\?.*$/su, ''))
@@ -58,6 +66,12 @@ const inspect = (input: { readonly directory: string }): BundleFreshnessReport =
     }
   }
   return { status: 'fresh' }
+}
+
+export class DependencyManifests {
+  static readonly encode = encodeDependencyManifest
+  static readonly decode = (text: string): DependencyManifest => decodeJson(dependencyManifestSchema, text)
+  static readonly decodeOption = decodeDependencyManifestOption
 }
 
 export class BundleFreshness {
