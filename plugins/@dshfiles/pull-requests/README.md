@@ -34,22 +34,60 @@ Create reads only the thread's directory (none at all when `cwd` is passed), nev
 - Uses the installed `gh` (GitHub) or `glab` (GitLab) executable and its existing login. It never reads, prints, or stores an authentication token. GitHub Enterprise hosts are not supported; any https GitLab host is.
 - GitLab: a bare `owner/name` repository key is GitHub (the same keys older records hold), and a dotted first segment names a forge host (`gitlab.com/group/sub/project`). Repository and merge-request URLs are parsed strictly (https only, no userinfo, `/-/merge_requests/<n>`); other hosts are refused with a message naming the supported forges. `glab mr view --output json` is decoded into the same normalized view the GitHub watcher stores: `detailed_merge_status`/`merge_status` map mergeability, `blocking_discussions_resolved` and conflicts map to BLOCKED, `head_pipeline.status` becomes one `pipeline` check entry, and `approvals_required` maps the review decision. `glab mr create --yes` creates the merge request; the push is the same `jj git push` as GitHub.
 - Verify GitLab on a host with `glab` installed: `glab auth status`, then `pnpm --dir plugins/@dshfiles/pull-requests test` covers parsing and normalization, and `link`/`watch` need a real merge-request URL.
-- Watching polls immediately. After that, Host events refresh a thread's watched pull requests within a debounce (3 seconds by default): a `jj git push`, `git push`, `gh pr create|merge|ready|close|reopen` or `glab mr …` command returning in that thread, the end of one of its turns, or a new link to a pull request that another thread watches. A pull request checked in the last 20 seconds is skipped, so a push and the turn end after it cost one `gh pr view`. A slow sweep polls every watched pull request every ten minutes by default as the fallback for changes made outside DSH. Multiple linked threads watching the same repository and PR share one `gh pr view` per poll. Links, last-known state, and rate-limit backoff persist in the Host `StorageDomain`.
+- Watching polls immediately. After that, Host events refresh a thread's watched pull requests within a debounce (3 seconds by default): a `jj git push`, `git push`, `gh pr create|merge|ready|close|reopen` or `glab mr …` command returning in that thread, the end of one of its turns, or a new link to a pull request that another thread watches. A pull request checked in the last 20 seconds is skipped, so a push and the turn end after it cost one read. A slow sweep polls every watched pull request every ten minutes by default as the fallback for changes made outside DSH. Multiple linked threads and backlog items watching the same repository and PR share one read per poll; every GitHub pull request of one pass is read in batched GraphQL calls (see [GitHub API budget](#github-api-budget)). Links, last-known state, and rate-limit backoff persist in the Host `StorageDomain`.
 - Measured by the probe in `tests/refresh-triggers.spec.ts` (five watched pull requests, one hour, two pushes): the former two-minute sweep made 150 `gh pr view` calls and saw a push up to two minutes late; the event-driven watcher makes 32 and sees each push within the 3-second debounce.
-- Settings (namespace `dshfiles-pull-requests`, applied live): `refreshOnThreadEvents` (default on; off leaves only the sweep), `eventDebounceSeconds` (default 3, 1–60), `sweepMinutes` (default 10, 1–120; lower it when event refresh is off). Each burst and each sweep reads them again, so a change applies without a restart; a Host older than this namespace runs on these defaults.
-- Polling requests `state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,comments,reviews,body`. New
+- Settings (namespace `dshfiles-pull-requests`, applied live): `refreshOnThreadEvents` (default on; off leaves only the sweep), `eventDebounceSeconds` (default 3, 1–60), `sweepMinutes` (default 10, 1–120; lower it when event refresh is off), `githubPointsFloor` (default 500, 0–4,900; see below). Each burst and each sweep reads them again, so a change applies without a restart; a Host older than this namespace runs on these defaults.
+- A full read takes `state`, `mergeable`, `mergeStateStatus`, `reviewDecision`, the head commit's check rollup (up to 100 checks), the latest 20 comments and reviews with their totals, and `body`. New
   comment/review messages contain only author and timestamp, not user-authored text. The first 16,384 characters of
   the description are kept with the last known state, so another plugin can read the closing references it names
   (`Closes b:k3f9`); a stored record written before that field simply has no description.
-- The `gh pr view` status rollup does not separately identify required versus optional checks. The “checks passed” transition is therefore conservative: GitHub must report `mergeStateStatus: CLEAN`, at least one status entry must be present, and every returned entry must be successful. It does not claim a separately enumerated branch-protection check set.
-- Rate limiting applies persisted exponential backoff starting at two minutes and capped at one hour. Other CLI or schema failures retain the last known state and retry on a later cycle.
-- On merge or close, watching stops and the plugin asks `thread-sidebar` to settle the linked thread. Auto-settle can skip running, waiting, blank, archived, pinned, opted-out, or descendant-active threads. If `thread-sidebar` is absent, pull-request state continues updating and the Host logs that message/settle integration was unavailable.
+- GitHub's status rollup does not separately identify required versus optional checks. The “checks passed” transition is therefore conservative: GitHub must report `mergeStateStatus: CLEAN`, at least one status entry must be present, and every returned entry must be successful. It does not claim a separately enumerated branch-protection check set.
+- A rate-limit error applies persisted exponential backoff starting at two minutes and capped at one hour, and stops the remaining batches of that pass. Other CLI or schema failures retain the last known state and retry on a later cycle; a pull request GitHub cannot answer (deleted, no access) fails alone while the rest of its batch still reads.
+- On merge or close, watching stops after that one read, and the plugin asks `thread-sidebar` to settle the linked thread. Auto-settle can skip running, waiting, blank, archived, pinned, opted-out, or descendant-active threads. When `thread-sidebar` is loaded but the settle request fails, the link keeps watching and the next poll asks again; once it is settled (or when `thread-sidebar` is absent and nothing can settle it) the terminal pull request is never polled again. If `thread-sidebar` is absent, the Host logs that message/settle integration was unavailable.
+
+## GitHub API budget
+
+GitHub gives each account 5,000 GraphQL points an hour, shared with every `gh` call agents make. The watcher spends as
+little of it as it can:
+
+1. **Batched reads.** One `gh api graphql` call reads up to fifty pull requests with aliases (`p0: repository(…){pullRequest(number:…){…}}`), and the same query asks for `rateLimit { cost remaining resetAt }`.
+2. **Fingerprint pass.** A pull request whose stored snapshot has a fingerprint is first read cheaply: `state`, `updatedAt`, `mergeable`, `mergeStateStatus`, `reviewDecision`, the head commit `oid`, its rollup state and its check counts by state. The digest of those fields is stored with the snapshot; when it still matches, nothing else is read and no transition can have happened. Check runs do not move `updatedAt`, so the head commit and check counts are part of the digest. Only the pull requests whose digest changed get the full read.
+3. **Budget floor.** When a read reports fewer than `githubPointsFloor` points remaining (default 500), GitHub reads wait until the reported `resetAt`. An explicit `pull_request_watch` still reads once. `0` never waits.
+4. **Terminal pull requests** stop after the read that saw them merge or close (above).
+
+Measured by `tests/gh-call-budget.spec.ts`: a stub `gh` counts processes and charges points with GitHub's formula (requests each connection needs, summed, divided by 100, at least 1). GitHub charged the same costs live, for read-only queries against `cli/cli` on 2026-11-11: `gh pr view` = one query = 1 point; fifty aliases full = 2 points (71 KB), fifty aliases fingerprint = 1 point (11 KB).
+
+| Watched pull requests | Before, per sweep (`gh pr view` each) | After, first sweep (full) | After, quiet sweep (fingerprint) | Before → after per hour at the 10 min sweep |
+| --------------------: | ------------------------------------- | ------------------------- | -------------------------------- | ------------------------------------------- |
+|                     5 | 5 spawns, 5 points                    | 1 spawn, 1 point          | 1 spawn, 1 point                 | 30 → 6 spawns, 30 → 6 points                |
+|                    50 | 50 spawns, 50 points                  | 1 spawn, 2 points         | 1 spawn, 1 point                 | 300 → 6 spawns, 300 → 6 points              |
+|                   300 | 300 spawns, 300 points                | 6 spawns, 12 points       | 6 spawns, 6 points               | 1,800 → 36 spawns, 1,800 → 36 points        |
+
+A pull request that changed between sweeps adds one full read to its batch (one more spawn, 1–2 points per fifty).
+Event refreshes cost the same per batch as a sweep; the 20-second minimum age still applies.
+
+## Webhooks (optional, not wired)
+
+Polling stays the only refresh path. A GitHub repository webhook could push refreshes instead of waiting for the sweep,
+but only when GitHub can reach the Host: the DSH web server listens on a local address, so it needs a public URL or a
+tunnel (`cloudflared tunnel`, `tailscale funnel`, `ngrok`). With one:
+
+1. `@dshfiles/project-automations` already serves signed webhooks at `POST /automations/webhook/<id>` and verifies
+   GitHub's `x-hub-signature-256` against a `secret:ALIAS` (its README covers limits and replay handling). Today such an automation starts a thread with a prompt; it does not refresh a watched pull request.
+2. The wiring, proposed and not built: subscribe the repository webhook to `pull_request`, `pull_request_review`,
+   `check_suite` and `issue_comment` (`issues` only matters to the backlog's issue states); map each delivery to
+   `repository.full_name` plus `pull_request.number` (or `check_suite.pull_requests[].number`, or `issue.number` when
+   `issue.pull_request` is set); refresh only pull requests already watched, through the same debounced batch read.
+   Unknown pull requests are ignored, so a delivery can never add a watch.
+3. It stays off by default and needs a secret reference setting plus the credential-port and web-server dependencies in
+   this plugin. Batching and the fingerprint pass already cut a 300-watch hour to 36 points, so the webhook would buy
+   latency, not budget.
 
 ## Watches owned by backlog items, and issue states
 
 The published contract (`@dshfiles/pull-requests/api`) also serves Host plugins that keep forge state for something other than a thread. They are Host API methods, not Agent tools: the backlog decides what to watch.
 
-- `watchFor({ owner: { kind: 'backlog-item', id }, url, cwd? })` watches a pull request or merge request for that owner. It is stored in its own `owned` table of the same storage domain (a domain stored before it opens with the table empty), polled by the same sweep and in the same `gh pr view` as the thread links of that pull request, and never prompts or settles a thread. A new watch polls at once unless a rate-limit backoff holds; then the sweep picks it up. Idempotent; a watch on a merged or closed pull request keeps its terminal state and is not polled again.
+- `watchFor({ owner: { kind: 'backlog-item', id }, url, cwd? })` watches a pull request or merge request for that owner. It is stored in its own `owned` table of the same storage domain (a domain stored before it opens with the table empty), polled by the same sweep and in the same batched read as the thread links of that pull request, and never prompts or settles a thread. A new watch polls at once unless a rate-limit backoff holds; then the sweep picks it up. Idempotent; a watch on a merged or closed pull request keeps its terminal state and is not polled again.
 - `unwatchFor({ owner, url? })` releases one watch, or all of an owner's; `ownedWatches({ kind })` lists them with each last known state and `lastCheckedAt`.
 - `issueStates({ urls })` reads up to 100 GitHub issues, fifty per `gh api graphql` call (`state` and `stateReason` only). An issue gh cannot answer (deleted, transferred) comes back in `failed` while the rest of its batch still reads; a rate limit stops the remaining batches and answers `rateLimited: true`, so the caller backs off. Nothing is stored here: the caller keeps what it read.
 - The backlog uses both: each open item watches the pull requests it links and reads its linked issues on its own `revisionPollMinutes` pass (see the backlog README).

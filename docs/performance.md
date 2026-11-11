@@ -3,6 +3,30 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Pull-request watcher GitHub budget (2026-11-11)
+
+`@dshfiles/pull-requests` read each watched pull request with its own `gh pr view`: one process and one GraphQL query
+(1 point) per pull request per sweep. Backlog items can now own up to 300 watches, so a 10-minute sweep could spend
+1,800 points an hour of the account's 5,000, shared with agents' own `gh` calls. It now reads fifty pull requests per
+`gh api graphql` call, first with a fingerprint pass (state, `updatedAt`, mergeability, head commit, check counts) and a
+full read only for those whose fingerprint changed, reads `rateLimit` in the same query and waits for `resetAt` below a
+500-point floor (setting `githubPointsFloor`).
+
+Unit probe `plugins/@dshfiles/pull-requests/tests/gh-call-budget.spec.ts` (real `GitHubCli`, monitor and JSON store; a
+stub `gh` counting processes and charging GitHub's documented point formula). The same costs were charged live by
+read-only `gh api graphql` queries against `cli/cli`: `gh pr view` one request; fifty aliases full 2 points (71 KB);
+fifty aliases fingerprint 1 point (11 KB). Per hour assumes the default 10-minute sweep and no event refreshes.
+
+| Watches | Before, per sweep      | After, first sweep  | After, quiet sweep | Per hour, before → after             |
+| ------: | ---------------------- | ------------------- | ------------------ | ------------------------------------ |
+|       5 | 5 spawns, 5 points     | 1 spawn, 1 point    | 1 spawn, 1 point   | 30 → 6 spawns, 30 → 6 points         |
+|      50 | 50 spawns, 50 points   | 1 spawn, 2 points   | 1 spawn, 1 point   | 300 → 6 spawns, 300 → 6 points       |
+|     300 | 300 spawns, 300 points | 6 spawns, 12 points | 6 spawns, 6 points | 1,800 → 36 spawns, 1,800 → 36 points |
+
+The probe's two sweeps of 300 took 92 s before and 34 s after on this machine; most of the remainder is the JSON test
+store's per-record writes, not `gh`. Not measured: the live Host (the change needs a Host restart) and event-refresh
+volume, which costs the same per batch as a sweep.
+
 ## Attention store and live baseline (2026-11-11; investigation)
 
 The live Host was not restarted or heap-censused. Load was 29.96 on 10 logical CPUs, so these are a congested-instance
