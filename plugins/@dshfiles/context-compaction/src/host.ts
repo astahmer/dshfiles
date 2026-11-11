@@ -3,6 +3,7 @@ import { BasicCompactionEngine, type ResolvedConfig } from '@deepseek-ai/dsh-com
 import type { ImageBlock, Message } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-token-meter'
 import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
+import { runOutsideReload } from '@dshfiles/dshx/host'
 import { Llm } from '@dshfiles/dshx/effect/llm'
 import type { SessionId } from '@dshfiles/dshx/ids'
 import { Context, Effect, Layer, Schema } from 'effect'
@@ -10,9 +11,23 @@ import { compactionApi, type CompactionThreshold } from './compaction-api.js'
 import { compactionThresholdTokens } from './compaction-threshold.js'
 import { compactionRequestBudget, MIN_REQUEST_BUDGET_BYTES } from './budget.js'
 import { serializedMessageBytes, summarizeInChunks, SummaryRequestFailed } from './chunked-summary.js'
+import { sweepIdleCompaction, type IdleCompactionCandidate } from './idle-compaction-sweep.js'
+
+const SWEEP_INTERVAL_MS = 60_000
+/** Session events that start a new idle stretch: a cache lifetime counts from the request they carry. */
+const idleStartsOn = (type: string): boolean => type === 'user/message' || type === 'request/header' || type === 'turn/end'
+
+const IdleCompactionConfig = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  minTokens: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(100_000))),
+  lifetimeMinutes: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(5))),
+  leadMinutes: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(1))),
+})
 
 const CompactionConfig = Schema.Struct({
   maxTokens: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(8_192))),
+  // Off by default: a compaction is a billed request per idle thread, so it only runs where a measurement showed it pays.
+  idle: IdleCompactionConfig.pipe(Schema.withDecodingDefaultKey(Effect.succeed({ enabled: false }))),
 })
 
 type SummarizeInput = Parameters<BasicCompactionEngine['summarize']>[0]
@@ -136,8 +151,79 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
         },
       )
       yield* Effect.acquireRelease(
-        Effect.sync(() => host.ctx.plugin(engine, config)),
+        Effect.sync(() => host.ctx.plugin(engine, { maxTokens: config.maxTokens })),
         fiber => Effect.promise(() => fiber.dispose()),
+      )
+      // One idle sweep owns every resident thread: the Session controller evicts an Agent after five idle minutes, so a
+      // cold thread is not resumed here behind its owner's back (see the README for that limit).
+      const compaction = host.ctx.get('compaction')
+      const lastActivity = new Map<SessionId, number>()
+      const compactedAt = new Map<SessionId, number>()
+      const sweepAbort = new AbortController()
+      let sweeping = false
+      yield* Effect.acquireRelease(
+        Effect.sync(() => {
+          const logger = host.ctx.logger('context-compaction')
+          const offEvent = host.ctx.on(
+            'session/event',
+            (session, event) => {
+              if (idleStartsOn(event.type)) lastActivity.set(session.id, event.time)
+            },
+            { global: true },
+          )
+          const offStatus = host.ctx.on(
+            'agent/status',
+            ({ agent, status }) => {
+              if (status === 'idle') lastActivity.set(agent.id, Date.now())
+              else lastActivity.delete(agent.id)
+            },
+            { global: true },
+          )
+          const offDisposed = host.ctx.on('agent/disposed', ({ agent }) => lastActivity.delete(agent.id), { global: true })
+          const timer = setInterval(() => {
+            if (!config.idle.enabled || sweeping || compaction === undefined) return
+            runOutsideReload(host.ctx, () => {
+              sweeping = true
+              const now = Date.now()
+              const candidates: IdleCompactionCandidate[] = []
+              for (const agent of host.ctx.get('agents')?.list() ?? []) {
+                if (agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0) continue
+                const lastActivityAt = lastActivity.get(agent.id)
+                if (lastActivityAt === undefined) continue
+                const measured = host.ctx.get('tokenMeter')?.measure(agent.session).totalTokens
+                candidates.push({
+                  sessionId: agent.id,
+                  lastActivityAt,
+                  tokens: measured === undefined || !Number.isFinite(measured) ? null : Math.round(measured),
+                  compact: () => compaction.compactNow(agent, sweepAbort.signal),
+                })
+              }
+              void sweepIdleCompaction({
+                now,
+                candidates,
+                compactedAt,
+                policy: config.idle,
+                onFailure: ({ sessionId, error }) => logger.warn(`context-compaction: idle compaction of "${sessionId}" skipped: ${String(error)}`),
+              })
+                .then(compacted => {
+                  for (const sessionId of compacted) compactedAt.set(sessionId, Date.now())
+                })
+                .catch((error: unknown) => logger.warn(`context-compaction: idle sweep failed: ${String(error)}`))
+                .finally(() => {
+                  sweeping = false
+                })
+            })
+          }, SWEEP_INTERVAL_MS)
+          timer.unref()
+          return () => {
+            clearInterval(timer)
+            offEvent()
+            offStatus()
+            offDisposed()
+            sweepAbort.abort()
+          }
+        }),
+        dispose => Effect.sync(dispose),
       )
       return CompactionThresholds.of({
         read: Effect.fn('context compaction threshold read')(function* (sessionId: SessionId) {

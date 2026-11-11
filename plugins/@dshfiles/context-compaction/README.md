@@ -12,6 +12,27 @@ The subclass uses only the published `BasicCompactionEngine` hook and calls `sup
 
 The `threshold` API (agent tool `compaction_threshold`, module `@dshfiles/context-compaction/compaction-api`) answers, for one live thread, the token count at which automatic compaction next runs. It takes the running engine's resolved policy (captured from the engine instance, so profile overrides and `modelPolicies` count), the thread's routed provider/model from its latest request header, the route's context window, and the output reservation (`maxTokens` from that header, else the adapter default), and applies `floor(min(W × thresholdRatio, W − O − headroomTokens))` as `compaction-basic`'s `resolveCompactSpec` does (that function is not exported, so `compactionThresholdTokens` restates it and its tests pin the documented defaults). It also returns the engine's own pressure reading (`tokenMeter.measure().totalTokens`). It returns null before the thread routed a request, for a route that declares no window, and where the engine itself would skip proactive compaction. `@dshfiles/agent-plan` shows it beside the composer's context meter.
 
+## Idle compaction
+
+A thread left idle past its provider's prompt-cache lifetime re-sends its whole prompt uncached on the next message. One compaction shortly before that costs less when the thread resumes much later, and nothing when it never resumes. **Off by default**: each compaction is one billed request per idle thread, so turn it on only after a measurement shows it pays (b:7csc).
+
+The Host half sweeps every minute over the Agents it still holds. A thread is due when it is idle, has no queued input, holds at least `idle.minTokens` (100,000 by default), and its last request is `lifetimeMinutes - leadMinutes` old (60 and 5 by default, so at 55 idle minutes). The sweep then calls the running engine's `compactNow`, which reserves the thread's next-turn admission atomically; a running turn, queued work or a refused admission skips that thread and the sweep retries it. Each pass records the `context compaction idle sweep` span with its candidate count. One compaction per idle stretch: a later request re-arms it.
+
+Settings live on the Loader row config, next to `maxTokens`:
+
+```yaml
+config:
+  idle:
+    enabled: true
+    minTokens: 100000
+    lifetimeMinutes: 60
+    leadMinutes: 5
+```
+
+Set `lifetimeMinutes` to the cache lifetime the route actually asks for: 5 for an Anthropic route on the default `short` retention, 60 with `cacheRetention: long` (ai-accounts › Idle prompt cache › Cache retention).
+
+**Limit:** the Session controller disposes an idle Agent after five minutes and keeps the Session log as the source of truth. This sweep therefore only compacts a thread that is still attached, and skips any other; a thread with a longer cache lifetime needs the controller to expose a hold/admission contract, which it does not today. Use it with a short lifetime until that lands.
+
 ## Verify
 
 ```bash

@@ -44,6 +44,80 @@
       ]
     },
     {
+      "id": "idle-compaction",
+      "title": "Idle compaction before cache expiry",
+      "summary": "An opt-in Host timer compacts a large thread that has sat idle for most of its prompt-cache lifetime, so the next message does not re-send the whole prompt uncached. Off by default: each compaction is one billed request.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: timer, no UI",
+      "configuration": [
+        {
+          "key": "idle.enabled",
+          "defaultValue": "false",
+          "constraints": "A compaction is one billed request per idle thread; turn it on only after a measurement.",
+          "choices": ["true", "false"],
+          "coveredBy": ["context-compaction.idle-timing", "context-compaction.idle-sweep"]
+        },
+        {
+          "key": "idle.minTokens",
+          "defaultValue": "100000",
+          "constraints": "A thread below this prompt size is left alone.",
+          "coveredBy": ["context-compaction.idle-timing"]
+        },
+        {
+          "key": "idle.lifetimeMinutes",
+          "defaultValue": "5",
+          "constraints": "The cache lifetime the thread's route asks for; 60 with cacheRetention long.",
+          "coveredBy": ["context-compaction.idle-timing"]
+        },
+        {
+          "key": "idle.leadMinutes",
+          "defaultValue": "1",
+          "constraints": "How long before the lifetime ends to compact.",
+          "coveredBy": ["context-compaction.idle-timing"]
+        }
+      ],
+      "states": ["off", "waiting", "due", "compacting", "skipped"],
+      "failureModes": [
+        "Only a thread whose Agent is still attached can be compacted; the Session controller evicts idle Agents after five minutes, so a longer configured lifetime is not reached for a cold thread.",
+        "A thread with a running turn, queued input or an open question is skipped; the next sweep retries it.",
+        "A refused maintenance admission (busy or cancelled) is logged and the other candidates still run."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.idle-timing",
+          "file": "tests/idle-compaction.spec.ts",
+          "testName": "is due only shortly before the cache lifetime ends"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.idle-sweep",
+          "file": "tests/idle-compaction-sweep.spec.ts",
+          "testName": "compacts only the threads due, once per idle stretch, and records its span"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "context-compaction.idle-browser-journey",
+          "reason": "This Host-only timer has no browser-owned surface; its timing and span are verified by unit tests and a scratch profile boot."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "context compaction idle sweep",
+          "file": "tests/idle-compaction-sweep.spec.ts",
+          "testName": "compacts only the threads due, once per idle stretch, and records its span"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
+      ]
+    },
+    {
       "id": "compaction-threshold",
       "title": "Next automatic compaction for a thread",
       "summary": "The threshold API (agent tool compaction_threshold) returns the token count at which automatic compaction next runs for one live thread: the running engine's policy, the thread's routed model and context window, its output reservation, and the engine's own pressure reading. agent-plan shows it beside the composer's context meter.",
