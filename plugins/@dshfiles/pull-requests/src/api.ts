@@ -9,6 +9,7 @@ import {
   type PullRequestCreatePreview,
 } from './create-model.js'
 import {
+  forgeSearchItemSchema,
   pullRequestLinkInputSchema,
   pullRequestListInputSchema,
   pullRequestListOutputSchema,
@@ -49,16 +50,29 @@ export const pullRequestApi = defineApi({
   version: 1,
   owner: '@dshfiles/pull-requests',
   methods: {
+    search: method({
+      input: Schema.Struct({
+        cwd: Schema.String.check(Schema.isMinLength(1)),
+        query: Schema.String.check(Schema.isMaxLength(100), Schema.isPattern(/^[\p{L}\p{N} _.-]*$/u)),
+      }),
+      output: Schema.Struct({ items: Schema.Array(forgeSearchItemSchema) }),
+      description: 'Search recent issues and pull requests in the current GitHub repository. Read-only.',
+      tool: {
+        name: 'pull_request_search',
+        readOnly: true,
+        render: output => output.items.map(item => `#${String(item.number)} ${item.title} ${item.url}`).join('\n') || 'No matching issues or pull requests.',
+      },
+    }),
     link: method({
       input: pullRequestLinkInputSchema,
       output: pullRequestMutationOutputSchema,
-      description: `Link a GitHub pull request to a DSH thread by GitHub URL, or by number and repository cwd. The session id defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
+      description: `Link a GitHub pull request or GitLab merge request to a DSH thread by URL, or by number and repository cwd. The session id defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'pull_request_link', render: renderLink },
     }),
     unlink: method({
       input: pullRequestTargetInputSchema,
       output: pullRequestRemovalOutputSchema,
-      description: `Remove one GitHub pull-request link from a DSH thread. Specify the URL or repository and number; the session id defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
+      description: `Remove one GitHub pull-request or GitLab merge-request link from a DSH thread. Specify the URL or repository and number; the session id defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'pull_request_unlink',
         render: output => `${output.removed ? 'Unlinked' : 'No link found for'} ${output.repo}#${String(output.number)} from thread ${output.sessionId}.`,
@@ -68,7 +82,7 @@ export const pullRequestApi = defineApi({
       input: pullRequestListInputSchema,
       output: pullRequestListOutputSchema,
       description:
-        'List GitHub pull-request links for one thread (defaults to the calling thread) or across all threads with all: true, including each link’s last known state and whether it is watched. Read-only.',
+        'List GitHub pull-request and GitLab merge-request links for one thread (defaults to the calling thread) or across all threads with all: true, including each link’s last known state and whether it is watched. Read-only.',
       tool: {
         name: 'pull_request_list',
         readOnly: true,
@@ -84,26 +98,26 @@ export const pullRequestApi = defineApi({
     watch: method({
       input: pullRequestLinkInputSchema,
       output: pullRequestMutationOutputSchema,
-      description: `Start watching a GitHub pull request; watching creates the thread link if needed. The session id defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
+      description: `Start watching a GitHub pull request or GitLab merge request; watching creates the thread link if needed. The session id defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'pull_request_watch', render: renderLink },
     }),
     createPreview: method({
       input: pullRequestCreatePreviewInputSchema,
       output: pullRequestCreatePreviewSchema,
       description:
-        'Preview creating a GitHub pull request from a thread’s jj workspace: the repository, base branch, bookmark to push, the commits above the base, a title and body drafted from the thread with its model, an existing open pull request for the bookmark, and every blocking problem with its recovery. Changes nothing (it only reads jj, gh and the thread). Pass its bookmark, base, headCommitId, title and body to pull_request_create. Read-only.',
+        'Preview creating a pull request (GitHub) or merge request (GitLab) from a thread’s jj workspace: the repository, base branch, bookmark to push, the commits above the base, a title and body drafted from the thread with its model, an existing open pull request for the bookmark, and every blocking problem with its recovery. Changes nothing (it only reads jj, gh and the thread). Pass its bookmark, base, headCommitId, title and body to pull_request_create. Read-only.',
       tool: { name: 'pull_request_create_preview', readOnly: true, render: renderPreview },
     }),
     create: method({
       input: pullRequestCreateInputSchema,
       output: pullRequestCreateOutputSchema,
-      description: `Create a GitHub pull request from a thread’s jj workspace after pull_request_create_preview: sets the bookmark on the previewed head commit, pushes it with jj git push, runs gh pr create (or reuses an open pull request for the bookmark), then links and watches it on the thread. Requires confirm: true and the preview’s headCommitId; refuses when the workspace moved. Publishes to GitHub. ${ONLY_WHEN_ASKED}`,
+      description: `Create a pull request or merge request from a thread’s jj workspace after pull_request_create_preview: sets the bookmark on the previewed head commit, pushes it with jj git push, runs gh pr create or glab mr create (or reuses an open one for the bookmark), then links and watches it on the thread. Requires confirm: true and the preview’s headCommitId; refuses when the workspace moved. Publishes to the forge. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'pull_request_create', render: renderCreate },
     }),
     unwatch: method({
       input: pullRequestTargetInputSchema,
       output: pullRequestMutationOutputSchema,
-      description: `Stop watching one linked GitHub pull request without removing its thread link. The session id defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
+      description: `Stop watching one linked pull request or merge request without removing its thread link. The session id defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'pull_request_unwatch', render: renderLink },
     }),
   },

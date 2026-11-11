@@ -10,7 +10,7 @@ import {
   type PullRequestCreatePreview,
   type PullRequestCreatePreviewInput,
 } from './create-model.js'
-import { GitHubCli, type GitHubRepositoryInfo } from './github-cli.js'
+import { ForgePullRequests, type ForgeRepositoryInfo } from './forge-port.js'
 import { cwdForCaller, PullRequestMonitor, sessionFor, type PullRequestMonitorError } from './monitor.js'
 import { ProjectBase } from './project-base.js'
 import type { PullRequestRecord } from './pull-request-model.js'
@@ -58,7 +58,7 @@ export class PullRequestCreator extends Context.Service<
     PullRequestCreator,
     Effect.gen(function* () {
       const jj = yield* Jj
-      const github = yield* GitHubCli
+      const forge = yield* ForgePullRequests
       const thread = yield* ThreadContext
       const monitor = yield* PullRequestMonitor
       const projectBase = yield* ProjectBase
@@ -80,28 +80,36 @@ export class PullRequestCreator extends Context.Service<
           ),
         )
 
-      /** gh availability and the GitHub repository, as problems instead of failures. */
-      const checkGitHub = Effect.fn('pull-requests create gh check')(function* (cwd: string) {
-        const auth = yield* github.authStatus.pipe(Effect.result)
+      /** Forge CLI availability and the repository, as problems instead of failures. */
+      const checkForge = Effect.fn('pull-requests create forge check')(function* (cwd: string) {
+        const info = yield* forge.repositoryInfo({ cwd }).pipe(Effect.option)
+        if (Option.isNone(info))
+          return {
+            repository: null,
+            problems: [CreateModel.problem('repository-unknown', `Neither gh nor glab could resolve a GitHub or GitLab repository for ${cwd}.`)],
+          }
+        const auth = yield* forge.authStatus({ repo: info.value.repo }).pipe(Effect.result)
         if (auth._tag === 'Failure') {
-          const missing = auth.failure.missing === true
+          const missing = 'missing' in auth.failure && auth.failure.missing === true
+          const gitlab = info.value.kind === 'gitlab'
+          const cli = gitlab ? 'glab' : 'gh'
           return {
             repository: null,
             problems: [
-              missing
-                ? CreateModel.problem('gh-missing', 'The GitHub CLI (gh) is not installed on the DSH Host.')
-                : CreateModel.problem('gh-unauthenticated', 'The GitHub CLI is not signed in to github.com.'),
+              CreateModel.problem(
+                missing ? (gitlab ? 'glab-missing' : 'gh-missing') : gitlab ? 'glab-unauthenticated' : 'gh-unauthenticated',
+                missing
+                  ? `The ${gitlab ? 'GitLab' : 'GitHub'} CLI (${cli}) is not installed on the DSH Host.`
+                  : `The ${gitlab ? 'GitLab' : 'GitHub'} CLI (${cli}) is not signed in to ${info.value.host}.`,
+              ),
             ],
           }
         }
-        const info = yield* github.repositoryInfo({ cwd }).pipe(Effect.option)
-        if (Option.isNone(info))
-          return { repository: null, problems: [CreateModel.problem('repository-unknown', `gh could not find a GitHub repository for ${cwd}.`)] }
         return { repository: info.value, problems: [] }
       })
 
       /** Remote, base, head commit and the commits a push would publish. */
-      const readWorkspace = Effect.fn('pull-requests create workspace')(function* (cwd: string, repository: GitHubRepositoryInfo | null) {
+      const readWorkspace = Effect.fn('pull-requests create workspace')(function* (cwd: string, repository: ForgeRepositoryInfo | null) {
         const problems: CreateProblem[] = []
         const remotes = yield* runJj(['git', 'remote', 'list'], cwd)
         if (remotes.kind === 'problem') return { workspace: undefined, problems: [remotes.problem] }
@@ -222,7 +230,7 @@ export class PullRequestCreator extends Context.Service<
             problems: [CreateModel.problem('no-session-cwd', 'This thread has no working directory.')],
           } satisfies PullRequestCreatePreview
 
-        const gh = yield* checkGitHub(cwd)
+        const gh = yield* checkForge(cwd)
         const read = yield* readWorkspace(cwd, gh.repository)
         const workspace = read.workspace
         const commits = workspace?.commits ?? []
@@ -240,7 +248,7 @@ export class PullRequestCreator extends Context.Service<
             : (workspace.existingBookmark ?? CreateModel.bookmarkFromTitle(snapshot.title.length > 0 ? snapshot.title : head.summary, head.changeId))
         const existingUrl =
           gh.repository !== null && bookmark !== null
-            ? yield* github.openPullRequestFor({ repo: gh.repository.repo, cwd, head: bookmark }).pipe(Effect.orElseSucceed(() => null))
+            ? yield* forge.openPullRequestFor({ repo: gh.repository.repo, cwd, head: bookmark }).pipe(Effect.orElseSucceed(() => null))
             : null
         const problems = [...gh.problems, ...read.problems]
         return {
@@ -283,7 +291,7 @@ export class PullRequestCreator extends Context.Service<
           const missing = CreateModel.problem('no-session-cwd', 'This thread has no working directory.')
           return failed('preflight', missing.message, missing.recovery, { problems: [missing] })
         }
-        const gh = yield* checkGitHub(cwd)
+        const gh = yield* checkForge(cwd)
         const read = yield* readWorkspace(cwd, gh.repository)
         const problems = [...gh.problems, ...read.problems]
         const first = problems[0]
@@ -312,10 +320,10 @@ export class PullRequestCreator extends Context.Service<
         if (pushed.kind === 'problem') return failed('push', pushed.problem.message, pushed.problem.recovery)
         if (pushed.output.exitCode !== 0) return failed('push', `jj git push failed: ${firstLine(pushed.output.stderr)}`, pushRecovery(pushed.output.stderr))
 
-        const existing = yield* github.openPullRequestFor({ repo: gh.repository.repo, cwd, head: input.bookmark }).pipe(Effect.orElseSucceed(() => null))
+        const existing = yield* forge.openPullRequestFor({ repo: gh.repository.repo, cwd, head: input.bookmark }).pipe(Effect.orElseSucceed(() => null))
         let url = existing
         if (url === null) {
-          const created = yield* github
+          const created = yield* forge
             .createPullRequest({
               repo: gh.repository.repo,
               cwd,
@@ -328,9 +336,9 @@ export class PullRequestCreator extends Context.Service<
             .pipe(Effect.result)
           if (created._tag === 'Failure')
             return failed(
-              'gh-create',
+              'forge-create',
               created.failure.message,
-              `The branch ${input.bookmark} is pushed. Retry, or open the pull request on GitHub and link it with pull_request_link.`,
+              `The branch ${input.bookmark} is pushed. Retry, or open the pull request on your forge and link it with pull_request_link.`,
               { pushed: true },
             )
           url = created.success

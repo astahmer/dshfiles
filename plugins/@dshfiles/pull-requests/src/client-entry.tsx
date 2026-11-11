@@ -1,4 +1,5 @@
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
@@ -6,6 +7,7 @@ import { GitPullRequestIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { pullRequestApi } from './api.js'
+import { ForgeMentions } from './forge-mentions.js'
 import { CreatePullRequestDialog, type CreateDialogApi, type Translate } from './create-dialog.js'
 import { PULL_REQUESTS_LOCALE_NAMESPACE, pullRequestsLocale } from './locales.js'
 
@@ -34,7 +36,7 @@ const createTargetStore = () => {
 export default defineClient({
   name: '@dshfiles/pull-requests',
   locales: [pullRequestsLocale],
-  inject: ['slots'],
+  inject: ['slots', 'sessions', 'inputTriggers'],
   setup(ctx, _decorate, metadata) {
     const t: Translate = (key, params) => ctx.locale.bind(PULL_REQUESTS_LOCALE_NAMESPACE)(key, params)
     const api = createApiClient(ctx, pullRequestApi)
@@ -43,6 +45,18 @@ export default defineClient({
       create: input => api.create(input),
     }
     const target = createTargetStore()
+    const forgeMentions = ForgeMentions.create({
+      search: async (sessionId, query, signal) => {
+        const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate?.id === sessionId)
+        if (session?.cwd === undefined || !/^[\p{L}\p{N} _.-]*$/u.test(query)) return []
+        try {
+          return (await api.search({ cwd: session.cwd, query }, { signal })).items
+        } catch {
+          return []
+        }
+      },
+    })
+    ctx.effect(() => ctx.inputTriggers.registerSource(forgeMentions), 'pull-requests: forge mentions')
 
     ctx.effect(
       () =>

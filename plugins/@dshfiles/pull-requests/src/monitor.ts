@@ -4,7 +4,10 @@ import { StorageDomainReadFailed, StorageDomainWriteFailed } from '@dshfiles/dsh
 import { threadActionsApi } from '@dshfiles/thread-sidebar/thread-actions-api'
 import { threadSidebarAutoSettleApi } from '@dshfiles/thread-sidebar/auto-settle-api'
 import { Clock, Context, Effect, Layer, Schema } from 'effect'
-import { GhCommandFailed, GhResponseInvalid, GitHubCli } from './github-cli.js'
+import { GhCommandFailed, GhResponseInvalid } from './github-cli.js'
+import { GlabCommandFailed, GlabResponseInvalid } from './gitlab-cli.js'
+import { forgeTargetOf, parseForgePullRequestUrl, pullRequestUrlOf, repositoryKeyOf } from './forge.js'
+import { ForgePullRequests, UnsupportedRepository, type ForgeFailure } from './forge-port.js'
 import {
   summarizePullRequest,
   transitionPullRequest,
@@ -19,11 +22,9 @@ import {
 } from './pull-request-model.js'
 import { PullRequestStore } from './store.js'
 
-type PullRequestPollResult =
-  | { readonly kind: 'success'; readonly value: GitHubPullRequestView }
-  | { readonly kind: 'failure'; readonly error: GhCommandFailed | GhResponseInvalid }
+type PullRequestPollResult = { readonly kind: 'success'; readonly value: GitHubPullRequestView } | { readonly kind: 'failure'; readonly error: ForgeFailure }
 
-const capturePullRequestResult = (effect: Effect.Effect<GitHubPullRequestView, GhCommandFailed | GhResponseInvalid>) =>
+const capturePullRequestResult = (effect: Effect.Effect<GitHubPullRequestView, ForgeFailure>) =>
   effect.pipe(
     Effect.map((value): PullRequestPollResult => ({ kind: 'success', value })),
     Effect.catch((error): Effect.Effect<PullRequestPollResult> => Effect.succeed({ kind: 'failure', error })),
@@ -67,6 +68,9 @@ export type PullRequestMonitorError =
   | PullRequestLinkNotFound
   | GhCommandFailed
   | GhResponseInvalid
+  | GlabCommandFailed
+  | GlabResponseInvalid
+  | UnsupportedRepository
   | StorageDomainReadFailed
   | StorageDomainWriteFailed
 
@@ -82,13 +86,9 @@ export const sessionFor = (provided: string | undefined, caller: ApiCaller): Eff
 export const cwdForCaller = (caller: ApiCaller): string => (caller.kind === 'agent' ? (caller.cwd ?? '') : '')
 
 const parsePullRequestUrl = (url: string): { readonly repo: string; readonly number: number; readonly url: string } | undefined => {
-  const match = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/([1-9]\d*)\/?$/u.exec(url)
-  const owner = match?.[1]
-  const repository = match?.[2]
-  const numberText = match?.[3]
-  if (owner === undefined || repository === undefined || numberText === undefined) return undefined
-  const number = Number(numberText)
-  return { repo: `${owner}/${repository}`, number, url: `https://github.com/${owner}/${repository}/pull/${String(number)}` }
+  const target = parseForgePullRequestUrl(url)
+  if (target === undefined) return undefined
+  return { repo: repositoryKeyOf(target), number: target.number, url: target.url }
 }
 
 const eventLabel = (event: PullRequestEvent): string => `${event.author === null ? 'unknown author' : `@${event.author}`} at ${event.at}`
@@ -168,7 +168,7 @@ export class PullRequestMonitor extends Context.Service<
     PullRequestMonitor,
     Effect.gen(function* () {
       const store = yield* PullRequestStore
-      const github = yield* GitHubCli
+      const forge = yield* ForgePullRequests
       const hostApis = yield* HostApis
       const threadActions = hostApis.client(threadActionsApi)
       const autoSettle = hostApis.client(threadSidebarAutoSettleApi)
@@ -177,7 +177,11 @@ export class PullRequestMonitor extends Context.Service<
         const sessionId = yield* sessionFor(input.sessionId, caller)
         if ('url' in input) {
           const parsed = parsePullRequestUrl(input.url)
-          if (parsed === undefined) return yield* new PullRequestLocatorInvalid({ reason: 'Use a GitHub.com pull-request URL.' })
+          if (parsed === undefined)
+            return yield* new PullRequestLocatorInvalid({
+              reason:
+                'Use a GitHub pull-request URL (https://github.com/<owner>/<repo>/pull/<n>) or a GitLab merge-request URL (https://<host>/<group>/<project>/-/merge_requests/<n>).',
+            })
           return recordFor({
             sessionId,
             ...parsed,
@@ -186,12 +190,13 @@ export class PullRequestMonitor extends Context.Service<
           })
         }
 
-        const repo = yield* github.repositoryName({ cwd: input.cwd })
+        const info = yield* forge.repositoryInfo({ cwd: input.cwd })
+        const target = forgeTargetOf(info.repo) ?? { kind: info.kind, host: info.host, project: info.project }
         return recordFor({
           sessionId,
-          repo,
+          repo: info.repo,
           number: input.number,
-          url: `https://github.com/${repo}/pull/${String(input.number)}`,
+          url: pullRequestUrlOf(target, input.number),
           cwd: input.cwd,
           watching: false,
         })
@@ -201,7 +206,11 @@ export class PullRequestMonitor extends Context.Service<
         const sessionId = yield* sessionFor(input.sessionId, caller)
         if ('url' in input) {
           const parsed = parsePullRequestUrl(input.url)
-          if (parsed === undefined) return yield* new PullRequestLocatorInvalid({ reason: 'Use a GitHub.com pull-request URL.' })
+          if (parsed === undefined)
+            return yield* new PullRequestLocatorInvalid({
+              reason:
+                'Use a GitHub pull-request URL (https://github.com/<owner>/<repo>/pull/<n>) or a GitLab merge-request URL (https://<host>/<group>/<project>/-/merge_requests/<n>).',
+            })
           return { sessionId, repo: parsed.repo, number: parsed.number, id: linkId({ sessionId, repo: parsed.repo, number: parsed.number }) }
         }
         return { sessionId, repo: input.repo, number: input.number, id: linkId({ sessionId, repo: input.repo, number: input.number }) }
@@ -265,10 +274,10 @@ export class PullRequestMonitor extends Context.Service<
 
         const firstWatcher = initialWatchers[0]
         if (firstWatcher === undefined) return
-        const result = yield* capturePullRequestResult(github.pullRequest({ repo: firstWatcher.repo, number: firstWatcher.number, cwd: firstWatcher.cwd }))
+        const result = yield* capturePullRequestResult(forge.pullRequest({ repo: firstWatcher.repo, number: firstWatcher.number, cwd: firstWatcher.cwd }))
         if (result.kind === 'failure') {
-          const rateLimited = result.error._tag === 'GhCommandFailed' && result.error.rateLimited
-          const errorTag = result.error._tag === 'GhResponseInvalid' ? 'invalid-response' : 'gh-command-failed'
+          const rateLimited = (result.error._tag === 'GhCommandFailed' || result.error._tag === 'GlabCommandFailed') && result.error.rateLimited
+          const errorTag = result.error._tag === 'GhResponseInvalid' || result.error._tag === 'GlabResponseInvalid' ? 'invalid-response' : 'gh-command-failed'
           const currentWatchers = (yield* store.watched).filter(record => samePullRequest(record, firstWatcher))
           const count = rateLimited ? Math.max(...currentWatchers.map(record => record.consecutiveRateLimits), 0) + 1 : 0
           const retryAfterAt = now + backoffDelay(count)

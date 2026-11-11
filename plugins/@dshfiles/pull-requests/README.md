@@ -2,9 +2,9 @@
 
 ![Create a GitHub pull request from a thread](docs/screenshots/github-pull-request-create.png)
 
-GitHub integration that creates a pull request from a DSH thread, links it to the thread, watches it, and reports meaningful state changes through the thread sidebar. In the browser, the command palette's **Create pull request from this thread** opens a dialog: it previews the repository, bookmark, base and commits, shows a title and body drafted from the thread that you can edit, lists every blocker with its fix, and pushes and creates only when you confirm. The result links the pull request to the thread and starts watching it. The plugin exposes these Agent tools:
+Forge integration that creates a pull request or merge request from a DSH thread, links it to the thread, watches it, and reports meaningful state changes through the thread sidebar. GitHub uses `gh`; GitLab uses `glab` behind the same forge port (`src/forge-port.ts`), so link, watch, create and the composer `#` picker work on both. In the browser, the command palette's **Create pull request from this thread** opens a dialog: it previews the repository, bookmark, base and commits, shows a title and body drafted from the thread that you can edit, lists every blocker with its fix, and pushes and creates only when you confirm. The result links the pull request to the thread and starts watching it. The plugin exposes these Agent tools:
 
-- `pull_request_link` — link by GitHub.com PR URL, or by number and repository `cwd`.
+- `pull_request_link` — link by GitHub PR URL or GitLab merge-request URL, or by number and repository `cwd`.
 - `pull_request_unlink` — remove one link by URL or repository plus number.
 - `pull_request_list` — list one thread's links, or all links with `all: true`; includes last known state and watch status.
 - `pull_request_watch` / `pull_request_unwatch` — start or stop watching; watch creates the link if needed, unwatch keeps it.
@@ -31,7 +31,9 @@ Create re-checks everything and refuses when the workspace head is no longer the
 
 ## Runtime behavior and limits
 
-- Uses the installed `gh` executable and its existing login. It never reads, prints, or stores an authentication token. Only GitHub.com PR URLs are accepted; GitHub Enterprise hosts are not supported.
+- Uses the installed `gh` (GitHub) or `glab` (GitLab) executable and its existing login. It never reads, prints, or stores an authentication token. GitHub Enterprise hosts are not supported; any https GitLab host is.
+- GitLab: a bare `owner/name` repository key is GitHub (the same keys older records hold), and a dotted first segment names a forge host (`gitlab.com/group/sub/project`). Repository and merge-request URLs are parsed strictly (https only, no userinfo, `/-/merge_requests/<n>`); other hosts are refused with a message naming the supported forges. `glab mr view --output json` is decoded into the same normalized view the GitHub watcher stores: `detailed_merge_status`/`merge_status` map mergeability, `blocking_discussions_resolved` and conflicts map to BLOCKED, `head_pipeline.status` becomes one `pipeline` check entry, and `approvals_required` maps the review decision. `glab mr create --yes` creates the merge request; the push is the same `jj git push` as GitHub.
+- Verify GitLab on a host with `glab` installed: `glab auth status`, then `pnpm --dir plugins/@dshfiles/pull-requests test` covers parsing and normalization, and `link`/`watch` need a real merge-request URL.
 - Watching polls immediately, then every two minutes. Multiple linked threads watching the same repository and PR share one `gh pr view` per poll. Links, last-known state, and rate-limit backoff persist in the Host `StorageDomain`.
 - Polling requests `state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,comments,reviews,body`. New
   comment/review messages contain only author and timestamp, not user-authored text. The first 16,384 characters of

@@ -6,7 +6,8 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import { PullRequestCreator } from '../src/create.js'
 import { CreateModel } from '../src/create-model.js'
-import { GhCommandFailed, GitHubCli, type GitHubPullRequestCreate } from '../src/github-cli.js'
+import { GhCommandFailed, type GitHubPullRequestCreate } from '../src/github-cli.js'
+import { ForgePullRequests } from '../src/forge-port.js'
 import { PullRequestMonitor } from '../src/monitor.js'
 import { ProjectBase } from '../src/project-base.js'
 import type { PullRequestRecord } from '../src/pull-request-model.js'
@@ -70,13 +71,12 @@ interface GhScript {
   create?: 'ok' | 'fail'
 }
 
-const fakeGh = (script: GhScript, created: GitHubPullRequestCreate[]) =>
+const fakeForge = (script: GhScript, created: GitHubPullRequestCreate[]) =>
   Layer.succeed(
-    GitHubCli,
-    GitHubCli.of({
-      repositoryName: () => Effect.succeed('acme/widget'),
+    ForgePullRequests,
+    ForgePullRequests.of({
       pullRequest: () => Effect.die('pullRequest is not used here'),
-      authStatus:
+      authStatus: () =>
         script.auth === 'missing'
           ? Effect.fail(new GhCommandFailed({ operation: 'auth-status', rateLimited: false, missing: true }))
           : script.auth === 'unauthenticated'
@@ -85,7 +85,7 @@ const fakeGh = (script: GhScript, created: GitHubPullRequestCreate[]) =>
       repositoryInfo: () =>
         script.repo === 'unknown'
           ? Effect.fail(new GhCommandFailed({ operation: 'repo-info', rateLimited: false, exitCode: 1 }))
-          : Effect.succeed({ repo: 'acme/widget', defaultBranch: 'main' }),
+          : Effect.succeed({ repo: 'acme/widget', kind: 'github' as const, host: 'github.com', project: 'acme/widget', defaultBranch: 'main' }),
       openPullRequestFor: () => Effect.succeed(script.existing ?? null),
       createPullRequest: input =>
         Effect.suspend(() => {
@@ -167,7 +167,7 @@ const harness = (options: { jj?: JjScript; gh?: GhScript; answer?: string; proje
     Layer.provide(
       Layer.mergeAll(
         fakeJj(options.jj ?? {}, jjCalls),
-        fakeGh(options.gh ?? {}, created),
+        fakeForge(options.gh ?? {}, created),
         fakeThread(completions, options.answer),
         fakeMonitor(links),
         options.projectBase === undefined
@@ -318,7 +318,7 @@ describe('pull request creation', () => {
       expect(push).toMatchObject({ status: 'failed', stage: 'push', pushed: false })
       expect(push.status === 'failed' ? push.recovery : '').toContain('jj git fetch')
       const create = yield* PullRequestCreator.use(creator => creator.create(confirmed, caller)).pipe(Effect.provide(ghFailed.layer))
-      expect(create).toMatchObject({ status: 'failed', stage: 'gh-create', pushed: true })
+      expect(create).toMatchObject({ status: 'failed', stage: 'forge-create', pushed: true })
       expect(create.status === 'failed' ? create.recovery : '').toContain('pull_request_link')
       expect(ghFailed.links).toEqual([])
     })

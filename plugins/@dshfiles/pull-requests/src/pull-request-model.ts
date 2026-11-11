@@ -1,11 +1,26 @@
 import * as Schema from 'effect/Schema'
 
+export const forgeSearchItemSchema = Schema.Struct({
+  number: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  title: Schema.String,
+  state: Schema.String,
+  url: Schema.String.check(Schema.isPattern(/^https:\/\/github\.com\/[^/]+\/[^/]+\/(?:issues|pull)\/[1-9]\d*$/u)),
+  isPullRequest: Schema.Boolean,
+})
+export type ForgeSearchItem = typeof forgeSearchItemSchema.Type
+
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
 const cwdSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2048))
 const pullRequestNumberSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
-const githubRepositorySchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u))
+import { repositorySchema } from './forge.js'
 
-export const githubPullRequestUrlSchema = Schema.String.check(Schema.isPattern(/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9]\d*\/?$/u))
+const githubRepositorySchema = repositorySchema
+
+/** A GitHub pull-request or GitLab merge-request URL on an https forge host. */
+export const pullRequestUrlSchema = Schema.String.check(
+  Schema.isPattern(/^https:\/\/[A-Za-z0-9.-]+(?::\d{1,5})?\/(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+\/(?:pull|-\/merge_requests)\/[1-9]\d*\/?$/u),
+)
+export const githubPullRequestUrlSchema = pullRequestUrlSchema
 
 const actorSchema = Schema.NullOr(Schema.Struct({ login: Schema.String }))
 const githubTimestampSchema = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u))

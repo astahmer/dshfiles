@@ -1,6 +1,6 @@
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { Context, Duration, Effect, Layer, Schema, Stream } from 'effect'
-import { githubPullRequestViewSchema, type GitHubPullRequestView } from './pull-request-model.js'
+import { forgeSearchItemSchema, githubPullRequestViewSchema, type ForgeSearchItem, type GitHubPullRequestView } from './pull-request-model.js'
 
 const POLL_FIELDS = 'state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,comments,reviews,body'
 const PULL_REQUEST_PROJECTION =
@@ -143,6 +143,7 @@ const repositoryInfoSchema = Schema.Struct({
   defaultBranchRef: Schema.NullOr(Schema.Struct({ name: Schema.String })),
 })
 const pullRequestListSchema = Schema.Array(Schema.Struct({ url: Schema.String, state: Schema.optional(Schema.String) }))
+const forgeSearchSchema = Schema.Array(forgeSearchItemSchema)
 const PULL_REQUEST_URL = /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9]\d*/u
 
 export interface GitHubRepositoryInfo {
@@ -186,6 +187,10 @@ export class GitHubCli extends Context.Service<
       readonly cwd: string
       readonly head: string
     }) => Effect.Effect<string | null, GhCommandFailed | GhResponseInvalid>
+    readonly searchIssues: (input: {
+      readonly cwd: string
+      readonly query: string
+    }) => Effect.Effect<readonly ForgeSearchItem[], GhCommandFailed | GhResponseInvalid>
     /** Runs `gh pr create` and returns the new pull request URL. */
     readonly createPullRequest: (input: GitHubPullRequestCreate) => Effect.Effect<string, GhCommandFailed | GhResponseInvalid>
   }
@@ -258,6 +263,20 @@ export class GitHubCli extends Context.Service<
         return url !== undefined && PULL_REQUEST_URL.test(url) ? url : null
       })
 
+      const searchIssues = Effect.fn('pull-requests gh search')(function* (input: { readonly cwd: string; readonly query: string }) {
+        const repo = yield* repositoryName({ cwd: input.cwd })
+        const output = yield* provide(
+          runGh({
+            operation: 'pr-list',
+            args: ['search', 'issues', '--include-prs', '--repo', repo, '--limit', '30', '--json', 'number,title,state,url,isPullRequest', '--', input.query],
+            cwd: input.cwd,
+            span: 'pull request gh list',
+            attributes: { ...pluginAttributes, 'github.repository': repo },
+          }),
+        )
+        return yield* decodeGhJson('pr-list', forgeSearchSchema)(output)
+      })
+
       const createPullRequest = Effect.fn('pull-requests gh create')(function* (input: GitHubPullRequestCreate) {
         const output = yield* provide(
           runGh({
@@ -287,7 +306,7 @@ export class GitHubCli extends Context.Service<
         return url
       })
 
-      return GitHubCli.of({ repositoryName, pullRequest, authStatus, repositoryInfo, openPullRequestFor, createPullRequest })
+      return GitHubCli.of({ repositoryName, pullRequest, authStatus, repositoryInfo, openPullRequestFor, searchIssues, createPullRequest })
     }),
   )
 }

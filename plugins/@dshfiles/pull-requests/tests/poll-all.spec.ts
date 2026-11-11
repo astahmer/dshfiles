@@ -10,7 +10,8 @@ import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
-import { GhCommandFailed, GitHubCli } from '../src/github-cli.js'
+import { GhCommandFailed } from '../src/github-cli.js'
+import { ForgePullRequests } from '../src/forge-port.js'
 import { PullRequestMonitor } from '../src/monitor.js'
 import type { GitHubPullRequestView, PullRequestRecord } from '../src/pull-request-model.js'
 import { PullRequestStore } from '../src/store.js'
@@ -46,11 +47,12 @@ const record = (input: { readonly repo: string; readonly number: number; readonl
   lastError: null,
 })
 
-const fakeGitHub = (polls: string[]) =>
+const fakeForge = (polls: string[]) =>
   Layer.succeed(
-    GitHubCli,
-    GitHubCli.of({
-      repositoryName: () => Effect.die('repositoryName is not used here'),
+    ForgePullRequests,
+    ForgePullRequests.of({
+      repositoryInfo: () => Effect.die('repositoryInfo is not used here'),
+      authStatus: () => Effect.die('authStatus is not used here'),
       pullRequest: input =>
         Effect.suspend(() => {
           const key = `${input.repo}#${String(input.number)}`
@@ -59,8 +61,6 @@ const fakeGitHub = (polls: string[]) =>
             ? Effect.fail(new GhCommandFailed({ operation: 'pr-view', rateLimited: false, exitCode: 1, detail: 'boom' }))
             : Effect.succeed(view)
         }),
-      authStatus: Effect.die('authStatus is not used here'),
-      repositoryInfo: () => Effect.die('repositoryInfo is not used here'),
       openPullRequestFor: () => Effect.die('openPullRequestFor is not used here'),
       createPullRequest: () => Effect.die('createPullRequest is not used here'),
     }),
@@ -91,7 +91,7 @@ describe('pull-requests pollAll', () => {
       const hostContext = HostContext.of({ ctx: host.ctx, packageId: PACKAGE_ID })
       const layer = PullRequestMonitor.layer.pipe(
         Layer.provideMerge(
-          Layer.mergeAll(PullRequestStore.layer, fakeGitHub(polls)).pipe(
+          Layer.mergeAll(PullRequestStore.layer, fakeForge(polls)).pipe(
             Layer.provideMerge(Layer.mergeAll(StorageDomain.layer, HostApis.layer).pipe(Layer.provide(Layer.succeed(HostContext, hostContext)))),
           ),
         ),

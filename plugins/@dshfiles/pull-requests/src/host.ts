@@ -10,6 +10,8 @@ import { MergedPullRequests } from '@dshfiles/jj-integration/merged-pull-request
 import { pullRequestApi } from './api.js'
 import { PullRequestCreator } from './create.js'
 import { GitHubCli } from './github-cli.js'
+import { GitLabCli } from './gitlab-cli.js'
+import { ForgePullRequests } from './forge-port.js'
 import { PullRequestMonitor } from './monitor.js'
 import { ProjectBase } from './project-base.js'
 import { PullRequestStore } from './store.js'
@@ -28,7 +30,10 @@ const pullRequestLinkViewOf = (record: PullRequestRecord): PullRequestLinkView =
 })
 
 const hostServices = Layer.mergeAll(StorageDomain.layer, DshChildProcessSpawner.layer, HostApis.layer)
-const storeAndGitHub = Layer.mergeAll(PullRequestStore.layer, GitHubCli.layer).pipe(Layer.provideMerge(hostServices))
+const storeAndGitHub = Layer.mergeAll(
+  PullRequestStore.layer,
+  ForgePullRequests.layer.pipe(Layer.provideMerge(Layer.mergeAll(GitHubCli.layer, GitLabCli.layer))),
+).pipe(Layer.provideMerge(hostServices))
 const monitor = PullRequestMonitor.layer.pipe(Layer.provideMerge(storeAndGitHub))
 const jjAndThread = Layer.mergeAll(Jj.layer, ThreadContext.layer).pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, DshChildProcessSpawner.layer)),
@@ -53,6 +58,7 @@ export default DshxPlugin.make({
   layer: pollWorker,
   apis: [
     Api.bind(pullRequestApi, {
+      search: input => GitHubCli.use(github => github.searchIssues(input).pipe(Effect.map(items => ({ items })))),
       link: (input, call) =>
         PullRequestMonitor.use(monitor => monitor.link(input, call.caller).pipe(Effect.map(link => ({ link: pullRequestLinkViewOf(link) })))),
       unlink: (input, call) => PullRequestMonitor.use(monitor => monitor.unlink(input, call.caller)),

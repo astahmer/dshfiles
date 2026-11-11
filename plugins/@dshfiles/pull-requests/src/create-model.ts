@@ -26,6 +26,8 @@ export const createProblemCodes = [
   'no-commits',
   'undescribed-commits',
   'conflicted-commits',
+  'glab-missing',
+  'glab-unauthenticated',
 ] as const
 export type CreateProblemCode = (typeof createProblemCodes)[number]
 
@@ -99,7 +101,7 @@ export const pullRequestCreateInputSchema = Schema.Struct({
 })
 export type PullRequestCreateInput = Schema.Schema.Type<typeof pullRequestCreateInputSchema>
 
-export const createFailureStages = ['preflight', 'bookmark', 'push', 'gh-create', 'link'] as const
+export const createFailureStages = ['preflight', 'bookmark', 'push', 'gh-create', 'forge-create', 'link'] as const
 
 export const pullRequestCreateOutputSchema = Schema.Union([
   Schema.Struct({
@@ -124,11 +126,13 @@ export type PullRequestCreateOutput = Schema.Schema.Type<typeof pullRequestCreat
 const recoveries = {
   'no-session-cwd': 'Open the thread in a workspace folder, or pass cwd with the jj workspace to push from.',
   'gh-missing': 'Install the GitHub CLI (https://cli.github.com, e.g. `brew install gh`), then retry.',
+  'glab-missing': 'Install the GitLab CLI (https://gitlab.com/gitlab-org/cli, e.g. `brew install glab`), then retry.',
   'gh-unauthenticated': 'Run `gh auth login` in a terminal on the DSH machine, then retry.',
-  'repository-unknown': 'Make sure the workspace has a GitHub remote (`gh repo view` must succeed there), then retry.',
+  'glab-unauthenticated': 'Run `glab auth login` for that GitLab host in a terminal on the DSH machine, then retry.',
+  'repository-unknown': 'Make sure the workspace has a GitHub or GitLab remote (`gh repo view` or `glab repo view` must succeed there), then retry.',
   'jj-missing': 'Install Jujutsu (`brew install jj`) so DSH can push the thread bookmark, then retry.',
   'not-a-jj-repository': 'Run this from a jj workspace (for example a thread workspace), or `jj git init --colocate` the checkout.',
-  'no-remote': 'Add the GitHub remote with `jj git remote add origin <url>`, then retry.',
+  'no-remote': 'Add the forge remote with `jj git remote add origin <url>`, then retry.',
   'base-missing': 'Fetch the base branch with `jj git fetch`, then retry.',
   'no-commits': 'Commit the thread work first: the workspace has no changes above the base branch.',
   'undescribed-commits':
@@ -151,7 +155,7 @@ export class CreateModel {
     'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++ if(conflict, "c", "-") ++ "\\t" ++ if(description, "d", "-") ++ "\\t" ++ description.first_line() ++ "\\n"'
 
   static readonly GENERATION_SYSTEM_PROMPT = [
-    'You write GitHub pull-request titles and descriptions.',
+    'You write pull-request titles and descriptions for GitHub and GitLab.',
     'You receive the DSH thread that produced a change (its title and messages) and the commits being proposed.',
     'Answer with the title on the first line (imperative, at most 72 characters, no trailing period, no label),',
     'then a blank line, then a Markdown body: a short summary paragraph, then a "## Changes" list, then "## Testing" if the thread mentions how it was verified.',
