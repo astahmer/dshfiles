@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "live-model-selection-policy",
+      "title": "Subagent model routes follow the saved setting in running threads",
+      "summary": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/model-selection-policy event, and the policy projection keeps the latest one, so a route added after a thread started is accepted without a new thread.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["enabled", "disabled-mid-session"],
+      "failureModes": [
+        "A profile whose preset-standard delegation rows still name @deepseek-ai/dsh-tool-subagent keeps the frozen per-Session route list.",
+        "A thread that started with model selection off keeps a tool without provider/model fields until a new thread; turning the setting off mid-thread keeps the last recorded routes."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.live-policy",
+          "file": "plugins/@dshfiles/tool-subagent/src/live-model-selection.test.ts",
+          "testName": "allows a route added to the setting after the Session recorded its policy"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.disabled-keeps-policy",
+          "file": "plugins/@dshfiles/tool-subagent/src/live-model-selection.test.ts",
+          "testName": "keeps the recorded routes when the setting is turned off mid-Session"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "tool-subagent.no-browser-surface",
+          "reason": "Host-only route policy: the native settings page and tool cards are unchanged, and the real-service unit tests drive the setting edit and the tool call."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tools: subagent, subagent_fork, list_subagent_models"
+    }
+  ]
+}

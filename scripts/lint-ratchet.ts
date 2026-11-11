@@ -87,6 +87,7 @@ const astGrepVendored = [
   'plugins/@dshfiles/subprocess-local/src/native/**',
   'plugins/@dshfiles/goal-tool/src/native/**',
   'plugins/@dshfiles/tool-ask-user/src/native/**',
+  'plugins/@dshfiles/tool-subagent/src/native/**',
   'plugins/@dshfiles/session-controller/src/host.ts',
   'plugins/@dshfiles/subprocess-local/src/host.ts',
   'plugins/@dshfiles/session-controller/typert/**',
@@ -129,6 +130,7 @@ const astGrepNativeEntryImporters = [
   'plugins/@dshfiles/sidebar-terminal/src/client-entry.ts',
   'plugins/@dshfiles/sidebar-terminal/src/registration.test.ts',
   'plugins/@dshfiles/tool-fs/src/read.test.ts',
+  'plugins/@dshfiles/tool-subagent/src/live-model-selection.test.ts',
 ]
 
 const ruleCapsSchema = Schema.Record(Schema.String, Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)))

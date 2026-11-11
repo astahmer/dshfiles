@@ -14,6 +14,7 @@
     "plugins/@dshfiles/agent-preset/src/native/**",
     "plugins/@dshfiles/frame-layout/src/native/**",
     "plugins/@dshfiles/user-questions/src/native/**",
+    "plugins/@dshfiles/tool-subagent/src/native/**",
     "plugins/@dshfiles/rich-composer/src/native/**",
     "plugins/@dshfiles/chat/src/native/**",
     "plugins/@dshfiles/session-controller/src/native/**",

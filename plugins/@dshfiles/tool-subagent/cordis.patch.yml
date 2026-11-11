@@ -1,0 +1,4 @@
+# The delegation tools are children of the preset-standard `delegation` group, not global Loader rows.
+# profiles/web/cordis.patch.yml swaps the `tool-subagent` and `tool-subagent-fork` children to this package, so this
+# bundle only makes the package resolvable. The `subagentModelSelection` settings service stays the native row.
+[]

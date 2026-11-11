@@ -135,14 +135,16 @@
             name: '@deepseek-ai/dsh-tool-subagent-control'
           - id: tool-subagent-list-agents
             name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+          # @dshfiles/tool-subagent: the model-selection policy follows the saved setting in running Sessions (b:rmkm).
+          # Outside the managed region: an existing profile needs the same `name` edit on both delegation rows.
           - id: tool-subagent
-            name: '@deepseek-ai/dsh-tool-subagent'
+            name: '@dshfiles/tool-subagent'
             config:
               provider: spawn
               toolName: subagent
               modelSelectionSettings: true
           - id: tool-subagent-fork
-            name: '@deepseek-ai/dsh-tool-subagent'
+            name: '@dshfiles/tool-subagent'
             config:
               provider: fork
               toolName: subagent_fork
