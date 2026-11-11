@@ -177,6 +177,11 @@
           "deterministicFake": "tests/create.spec.ts replaces ThreadContext with a fixed answer; the Host test has no model and asserts the commit-message fallback."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["account", "repository", "github"],
+        "firstAction": "Run Create pull request from this thread from the command palette.",
+        "doneWhen": "After you confirm, the pull request opens on GitHub, linked to the thread."
+      },
       "verification": [
         {
           "kind": "gherkin",

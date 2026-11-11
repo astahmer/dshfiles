@@ -74,6 +74,13 @@
         "A completed recipient stays completed; a stored message is read only during a later natural execution."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Agents › Messages and post a message to a topic.",
+        "doneWhen": "Your message shows in the topic's history.",
+        "open": {
+          "panel": "agent-communication"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -74,6 +74,11 @@
           "deterministicFake": "Real temporary jj repositories in src/threads.integration.test.ts; no jj mock is used."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["project", "repository"],
+        "firstAction": "In a new thread's run row, set the Workspace segment to its own workspace.",
+        "doneWhen": "The thread runs in its own jj workspace, not in the project checkout."
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -775,6 +780,11 @@
           "deterministicFake": "Real temporary jj repositories in src/threads.integration.test.ts; no jj mock is used."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["project", "repository"],
+        "firstAction": "Open the thread workspace control in a thread's header and choose Integrate.",
+        "doneWhen": "The thread's revisions land on the bookmark."
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -1024,6 +1034,14 @@
           "deterministicFake": "Real temporary jj repositories in the browser journey; the discard confirmation flow is unit-tested against a fake client."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["project", "repository"],
+        "firstAction": "Open Land › Workspaces and pick a thread workspace.",
+        "doneWhen": "The workspace shows its state, and a ready one integrates from there.",
+        "open": {
+          "panel": "jj-integration"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

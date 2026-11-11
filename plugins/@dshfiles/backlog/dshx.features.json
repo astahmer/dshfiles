@@ -50,6 +50,13 @@
         "A capture the Host refuses puts its text back in the box with Retry; a box holding only blank lines after a send counts as empty."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Work › Backlog and type a note or task into the capture box.",
+        "doneWhen": "The item shows in the feed with its kind and title.",
+        "open": {
+          "panel": "dshfiles-backlog-panel"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -1024,6 +1031,10 @@
         "An invalid chip reference blocks the send instead of sending broken text."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Type @b: in the composer and pick a backlog item.",
+        "doneWhen": "The item shows as a chip in your message."
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -1960,6 +1971,14 @@
         "An upload or prompt failure reports the created Session id instead of silently starting without mandatory context."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Right-click a backlog item and choose Start thread.",
+        "doneWhen": "A new thread opens, linked from the item.",
+        "open": {
+          "panel": "dshfiles-backlog-panel"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

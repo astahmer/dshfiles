@@ -33,6 +33,13 @@
         "A pinned route this Host does not offer is flagged, with a reset to the harness default."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Agents › Directory and create an agent with a handle and instructions.",
+        "doneWhen": "The agent is listed in the directory and enabled.",
+        "open": {
+          "panel": "dshfiles-agents"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -160,6 +167,11 @@
         "A catalog without the agent's route leaves the Host default model."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Start a new thread with @ followed by an agent's handle and your request.",
+        "doneWhen": "A thread runs on that agent with your text as its first prompt."
+      },
       "verification": [
         {
           "kind": "unit-test",

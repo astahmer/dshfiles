@@ -48,6 +48,14 @@
           "testName": "starts one thread for the latest missed occurrence when a schedule is due, also after a restart, one span per run"
         }
       ],
+      "onboarding": {
+        "prerequisites": ["account", "project"],
+        "firstAction": "Open Work › Automations and create a schedule for a project.",
+        "doneWhen": "Run now starts a thread in that project and the run shows in its history.",
+        "open": {
+          "panel": "project-automations"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

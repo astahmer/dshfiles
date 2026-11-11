@@ -180,6 +180,14 @@
           "deterministicFake": "Use real disposable local jj repositories for integration journeys; no remotes, user repository, or network mutation."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["project", "repository"],
+        "firstAction": "Open Land › History and pick a revision.",
+        "doneWhen": "The revision's detail and changed files show.",
+        "open": {
+          "panel": "dshfiles-jujutsu"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -913,6 +921,14 @@
           "deterministicFake": "Real disposable local JJ repositories."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["project", "repository"],
+        "firstAction": "Open Land › Source control and describe the working copy.",
+        "doneWhen": "The working copy shows your description.",
+        "open": {
+          "panel": "dshfiles-jujutsu-source-control"
+        }
+      },
       "verification": [
         {
           "kind": "not-applicable",

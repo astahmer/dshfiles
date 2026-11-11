@@ -36,6 +36,13 @@
         "Modern Hosts do not forward absolute skill paths, and the Agent Toolkit decoder drops legacy path fields before rendering."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Agents › Capabilities while a thread is on screen.",
+        "doneWhen": "The page lists the tools, plugins, MCP servers and skills that thread can use.",
+        "open": {
+          "panel": "dshfiles-agent-toolkit"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

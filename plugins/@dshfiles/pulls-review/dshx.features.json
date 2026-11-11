@@ -56,6 +56,14 @@
         "click menuitemradio \"Workspaces\"",
         "expect option \"thread-*\""
       ],
+      "onboarding": {
+        "prerequisites": ["project", "repository"],
+        "firstAction": "Open Land › Review and pick a project or thread workspace.",
+        "doneWhen": "Its changes show in one diff, grouped by scope.",
+        "open": {
+          "panel": "pulls-review"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -302,6 +310,11 @@
         "click checkbox \"Mark viewed: seeded-work.md\"",
         "expect text \"1/1 viewed\""
       ],
+      "onboarding": {
+        "prerequisites": ["project", "repository"],
+        "firstAction": "Open the Changes tab in a thread's side panel after a turn that edited files.",
+        "doneWhen": "The turn's changes show with a file list and diff."
+      },
       "verification": [
         {
           "kind": "gherkin",
