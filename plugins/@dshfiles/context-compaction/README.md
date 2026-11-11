@@ -16,7 +16,11 @@ The `threshold` API (agent tool `compaction_threshold`, module `@dshfiles/contex
 
 A thread left idle past its provider's prompt-cache lifetime re-sends its whole prompt uncached on the next message. One compaction shortly before that costs less when the thread resumes much later, and nothing when it never resumes. **Off by default**: each compaction is one billed request per idle thread, so turn it on only after a measurement shows it pays (b:7csc).
 
-The Host half sweeps every minute over the visible threads the Session controller lists. A thread is due when it is idle, has no running turn, holds at least `idle.minTokens` (100,000 by default), and its last request is `lifetimeMinutes - leadMinutes` old (60 and 5 by default, so at 55 idle minutes). It then calls `sessions.compact` with that token floor: the controller resumes a cold thread under its own admission, holds its Agent for the whole command, measures the thread, and skips it below the floor without a model request. Each pass records the `context compaction idle sweep` span with its candidate count. One compaction per idle stretch: a later request re-arms it.
+The Host half sweeps every minute over the visible threads the Session controller lists. It only considers a thread whose last request or turn end this Host observed itself since it activated: session events arm a new idle stretch, and that timestamp is kept when the Agent is evicted, so a cold thread stays eligible from the request this Host saw. The thread list's `updatedAt` is deliberately not a fallback — it is the last human prompt, so a thread whose long turn ran after it would look idle far too early. A thread with no observed timestamp is skipped. After a Host restart the observation map is empty, so no cold thread is compacted until it shows new activity; the restart does not repeat a sweep over the same stale row.
+
+A thread is due once its observed idle start is `lifetimeMinutes - leadMinutes` old (the fallback config is 5 and 1, so at 4 idle minutes), has no running turn, holds at least `idle.minTokens` (100,000 by default), and has not been attempted for this idle stretch. At `lifetimeMinutes` the cache is already gone, so the sweep stops and does not compact after expiry: a later compaction saves no re-send. It then calls `sessions.compact` with that token floor: the controller resumes a cold thread under its own admission, holds its Agent for the whole command, measures the thread, and skips it below the floor without a model request. Each pass records the `context compaction idle sweep` span with its candidate count.
+
+Immediately before the billed request the sweep rechecks the live Agent: it must still be idle with an empty inbox, and the observed idle start must not have moved. A thread that started a turn or queued input since the pass began is left for the next sweep. One attempt per idle stretch means a provider failure is logged and not retried for that stretch; a new request arms a new one. The checkpoint message a compaction writes is not treated as activity, so a compaction cannot arm the next one.
 
 Settings live on the Loader row config, next to `maxTokens`:
 
@@ -29,9 +33,9 @@ config:
     leadMinutes: 5
 ```
 
-Set `lifetimeMinutes` to the cache lifetime the route actually asks for: 5 for an Anthropic route on the default `short` retention, 60 with `cacheRetention: long` (ai-accounts › Idle prompt cache › Cache retention).
+Set `lifetimeMinutes` to the cache lifetime the route actually asks for: 5 for an Anthropic route on the default `short` retention, 60 with `cacheRetention: long` (ai-accounts › Idle prompt cache › Cache retention). `minTokens` is capped at 10,000,000, the Sessions API's own limit.
 
-**Limits:** the sweep reads the newest 200 visible threads (`sessions.list`), so a very large history leaves older threads alone. Its idle start is the thread list's `updatedAt` for a cold thread (the last human prompt) and the last request or turn end for a resident one, so a thread whose long turn just finished may look idle slightly early. A running thread is skipped; a failed command is logged and retried on a later sweep.
+**Limits:** the sweep reads the newest 200 visible threads (`sessions.list`), so a very large history leaves older threads alone. A running thread is skipped. A thread this Host never observed active, including every thread at startup, is skipped until it emits a new request, turn end, or idle status. A failed command is logged and not retried for the same idle stretch, and a compaction is never attempted after the cache lifetime has expired.
 
 ## Verify
 

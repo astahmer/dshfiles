@@ -4,7 +4,14 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import plugin from '../src/host.js'
 
-const mount = (config: { readonly maxTokens?: number } | undefined) =>
+const mount = (
+  config:
+    | {
+        readonly maxTokens?: number
+        readonly idle?: { readonly enabled?: boolean; readonly minTokens?: number; readonly lifetimeMinutes?: number; readonly leadMinutes?: number }
+      }
+    | undefined,
+) =>
   Effect.gen(function* () {
     const host = yield* Effect.acquireRelease(
       Effect.promise(() => createTestHost()),
@@ -26,6 +33,13 @@ describe('the context-compaction Host', () => {
   it.effect('refuses a row config whose maxTokens is not a positive integer', () =>
     Effect.gen(function* () {
       const refused = yield* mount({ maxTokens: 0 }).pipe(Effect.exit)
+      expect(refused._tag).toBe('Failure')
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('refuses an idle token floor above the sessions API cap', () =>
+    Effect.gen(function* () {
+      const refused = yield* mount({ idle: { enabled: true, minTokens: 10_000_001 } }).pipe(Effect.exit)
       expect(refused._tag).toBe('Failure')
     }).pipe(Effect.scoped),
   )

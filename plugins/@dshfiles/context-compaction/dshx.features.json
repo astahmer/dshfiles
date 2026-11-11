@@ -46,7 +46,7 @@
     {
       "id": "idle-compaction",
       "title": "Idle compaction before cache expiry",
-      "summary": "An opt-in Host timer compacts a large thread that has sat idle for most of its prompt-cache lifetime, so the next message does not re-send the whole prompt uncached. Off by default: each compaction is one billed request.",
+      "summary": "An opt-in Host timer compacts a large thread that has sat idle for most of its prompt-cache lifetime, so the next message does not re-send the whole prompt uncached. It only trusts activity this Host observed itself, attempts once per idle stretch and never after expiry. Off by default: each compaction is one billed request.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -68,8 +68,8 @@
         {
           "key": "idle.lifetimeMinutes",
           "defaultValue": "5",
-          "constraints": "The cache lifetime the thread's route asks for; 60 with cacheRetention long.",
-          "coveredBy": ["context-compaction.idle-timing"]
+          "constraints": "The cache lifetime the thread's route asks for; 60 with cacheRetention long. No compaction runs once it has expired.",
+          "coveredBy": ["context-compaction.idle-timing", "context-compaction.idle-expiry"]
         },
         {
           "key": "idle.leadMinutes",
@@ -78,11 +78,14 @@
           "coveredBy": ["context-compaction.idle-timing"]
         }
       ],
-      "states": ["off", "waiting", "due", "compacting", "skipped"],
+      "states": ["off", "waiting", "due", "compacting", "skipped", "expired"],
       "failureModes": [
         "The sweep lists the newest 200 visible threads; a larger history leaves older threads alone until they move back into that window.",
-        "A running thread is skipped and retried on a later sweep; a compaction command that fails is logged and retried.",
-        "A cold thread's idle start is the thread list's updatedAt (its last human prompt), so a thread whose long turn just finished can look idle slightly early."
+        "A running thread is skipped, and a live Agent that gained a turn or queued input is rechecked and skipped immediately before the billed request.",
+        "A failed compaction is logged and not retried for the same idle stretch, so a provider failure cannot bill that thread again.",
+        "A compaction's own checkpoint message is not treated as new activity, so it cannot arm the next sweep.",
+        "No compaction runs after the cache lifetime has expired: the next prompt is already uncached, so it would save nothing.",
+        "A thread this Host never observed active, including every thread at startup, is skipped until it emits new activity. The thread list's last-prompt time is never used as an idle start."
       ],
       "externalDependencies": [],
       "verification": [
@@ -91,6 +94,30 @@
           "id": "context-compaction.idle-timing",
           "file": "tests/idle-compaction.spec.ts",
           "testName": "is due only shortly before the cache lifetime ends"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.idle-expiry",
+          "file": "tests/idle-compaction.spec.ts",
+          "testName": "never compacts after the cache lifetime expired, when the next prompt is already uncached"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.idle-candidate",
+          "file": "tests/idle-candidate.spec.ts",
+          "testName": "skips a thread whose idle start this Host never observed, with no fallback timestamp"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.idle-attempt",
+          "file": "tests/idle-compaction-sweep.spec.ts",
+          "testName": "bills a failed attempt once per idle stretch instead of retrying every sweep"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.idle-generation",
+          "file": "tests/idle-generation.spec.ts",
+          "testName": "does not arm another attempt from a compaction checkpoint it wrote itself"
         },
         {
           "kind": "unit-test",

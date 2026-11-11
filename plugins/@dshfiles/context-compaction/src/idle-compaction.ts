@@ -20,8 +20,8 @@ export interface IdleCompactionPolicy {
 export const DEFAULT_IDLE_COMPACTION: IdleCompactionPolicy = {
   enabled: false,
   minTokens: 100_000,
-  lifetimeMinutes: 60,
-  leadMinutes: 5,
+  lifetimeMinutes: 5,
+  leadMinutes: 1,
 }
 
 const MINUTE_MS = 60_000
@@ -31,21 +31,27 @@ export class IdleCompactionModel {
   static readonly dueAt = (input: { readonly lastActivityAt: number; readonly policy: IdleCompactionPolicy }): number =>
     input.lastActivityAt + (input.policy.lifetimeMinutes - input.policy.leadMinutes) * MINUTE_MS
 
+  /** The moment that idle stretch's cache is gone: a later compaction saves no re-send, so it must not run. */
+  static readonly expiresAt = (input: { readonly lastActivityAt: number; readonly policy: IdleCompactionPolicy }): number =>
+    input.lastActivityAt + input.policy.lifetimeMinutes * MINUTE_MS
+
   /**
-   * Whether one thread should be compacted now. `compactedAt` is the last compaction this sweep caused for the same
-   * idle stretch: a second pass must not pay for the same thread twice, and a new request arms it again.
+   * Whether one thread should be compacted now. `attemptedAt` is the idle start of the last compaction this sweep
+   * tried for the same idle stretch: an attempt is one billed request even when it fails, so a second pass must not
+   * pay for the same stretch twice, and a new request arms a new stretch.
    */
   static readonly due = (input: {
     readonly now: number
     readonly lastActivityAt: number | null
-    readonly compactedAt: number | null
+    readonly attemptedAt: number | null
     readonly tokens: number | null
     readonly policy: IdleCompactionPolicy
   }): boolean => {
     if (!input.policy.enabled || input.policy.lifetimeMinutes <= input.policy.leadMinutes) return false
     if (input.lastActivityAt === null) return false
     if (input.tokens !== null && input.tokens < input.policy.minTokens) return false
-    if (input.compactedAt !== null && input.compactedAt >= input.lastActivityAt) return false
+    if (input.attemptedAt !== null && input.attemptedAt >= input.lastActivityAt) return false
+    if (input.now >= IdleCompactionModel.expiresAt({ lastActivityAt: input.lastActivityAt, policy: input.policy })) return false
     return input.now >= IdleCompactionModel.dueAt({ lastActivityAt: input.lastActivityAt, policy: input.policy })
   }
 }
