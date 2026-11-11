@@ -13,6 +13,11 @@ export const onboardingSettings = defineSettings({
       .description('Tick the GitHub item by running `gh auth status` on the Host, at most once a minute while Getting started or the agent asks.'),
     packs: Schema.boolean().default(true).description('Show plugin packs on Getting started with each plugin enabled, disabled or not installed.'),
     curatedOnly: Schema.boolean().default(true).description('List only the curated major features on Getting started until you search.'),
+    whatsNew: Schema.boolean()
+      .default(true)
+      .description(
+        "Show What's new on Getting started: feat and fix changes to owned plugins, read from the dshfiles checkout's jj or git history while the page or the agent asks. Off hides it and reads no history.",
+      ),
   }),
   applies: 'live',
 })
@@ -20,4 +25,4 @@ export const onboardingSettings = defineSettings({
 export type OnboardingSettings = SettingsValue<typeof onboardingSettings.schema>
 
 /** Schema defaults, for a Client that renders before the namespace loads or on a Host that predates it. */
-export const ONBOARDING_DEFAULTS: OnboardingSettings = { wizard: true, checklist: true, githubCheck: true, packs: true, curatedOnly: true }
+export const ONBOARDING_DEFAULTS: OnboardingSettings = { wizard: true, checklist: true, githubCheck: true, packs: true, curatedOnly: true, whatsNew: true }

@@ -12,6 +12,7 @@ import { PackPlan } from './pack-plan.js'
 import { ReachModel } from './reach-model.js'
 import { onboardingSettings } from './settings.js'
 import { SetupFacts } from './setup-facts.js'
+import { WhatsNewHistory } from './whats-new-history.js'
 
 const platform = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
 
@@ -31,6 +32,17 @@ const packs = Layer.unwrap(
   ),
 ).pipe(Layer.provide(Layer.mergeAll(platform, DshChildProcessSpawner.layer)))
 
+const whatsNew = Layer.unwrap(
+  Effect.map(HostContext, host =>
+    WhatsNewHistory.layerFrom({
+      manager: () => host.ctx.get('pluginManager') ?? undefined,
+      plugins: FEATURE_CATALOG.plugins,
+      jjExecutable: 'jj',
+      gitExecutable: 'git',
+    }),
+  ),
+).pipe(Layer.provide(Layer.mergeAll(platform, DshChildProcessSpawner.layer)))
+
 /** Prerequisite states for a pack plan, from the same checklist read the page shows. */
 const prerequisitesNow = SetupFacts.use(setup =>
   Effect.gen(function* () {
@@ -45,7 +57,7 @@ export default DshxPlugin.make({
   name: 'dshfiles-onboarding',
   inject: ['subprocess'],
   settings: [onboardingSettings],
-  layer: Layer.mergeAll(facts, packs),
+  layer: Layer.mergeAll(facts, packs, whatsNew),
   apis: [
     Api.bind(onboardingApi, {
       overview: request =>
@@ -72,6 +84,12 @@ export default DshxPlugin.make({
         }),
       reach: request =>
         Effect.succeed(ReachModel.reach({ catalog: FEATURE_CATALOG, key: request.key, routeOf: feature => OnboardingOverview.rowOf(feature).route })),
+      whatsNew: request =>
+        Effect.gen(function* () {
+          const settings = yield* SetupFacts.use(setup => setup.settings)
+          if (!settings.whatsNew) return { state: 'off' } as const
+          return yield* WhatsNewHistory.use(history => history.read(request))
+        }),
       applyPack: request =>
         Effect.gen(function* () {
           const controls = yield* PackControls

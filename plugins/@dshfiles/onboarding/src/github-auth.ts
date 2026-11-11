@@ -6,7 +6,7 @@ export type GithubAuthStatus = 'signed-in' | 'signed-out' | 'missing' | 'failed'
 const MISSING_EXECUTABLE = /ENOENT|not ?found|no such file/iu
 
 /** Whether a spawn failure means the executable is absent; the platform error's shape is read without trusting it. */
-const isMissingExecutable = (error: unknown): boolean => {
+export const isMissingExecutable = (error: unknown): boolean => {
   if (typeof error !== 'object' || error === null) return false
   const reason = 'reason' in error && typeof error.reason === 'object' && error.reason !== null && '_tag' in error.reason ? error.reason._tag : undefined
   if (reason === 'NotFound') return true

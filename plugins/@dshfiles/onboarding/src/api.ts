@@ -3,6 +3,7 @@ import * as Schema from 'effect/Schema'
 import { OnboardingOverview, overviewInputSchema, overviewSchema } from './overview-model.js'
 import { PACK_ACTIONS, PackPlan, packOutcomeSchema } from './pack-plan.js'
 import { ReachModel, reachInputSchema, reachOutputSchema } from './reach-model.js'
+import { WhatsNewModel, whatsNewInputSchema, whatsNewSchema } from './whats-new-model.js'
 
 const shortName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
 
@@ -33,6 +34,13 @@ export const onboardingApi = defineApi({
       description:
         'How to get to one catalogued feature in the app, step by step: each `reach` step with its action (click, hover, fill, press, expect…), the control it targets (an ARIA role, or text, label or title) and its accessible name, plus which steps this app cannot replay (seed, attach, right-click and shift-click are E2E-only) and why. Also names the destination the feature lives in, its Open route and its docs. Find `key` (`<plugin>#<feature>`) with onboarding_overview. The same data drives Show me where on Getting started. Changes nothing. Read-only.',
       tool: { name: 'onboarding_reach', readOnly: true, render: ReachModel.render },
+    }),
+    whatsNew: method({
+      input: whatsNewInputSchema,
+      output: whatsNewSchema,
+      description:
+        "What changed in the owned dshfiles plugins, newest first: every `feat(<plugin>)` and `fix(<plugin>)` change in the jj (or git) history of the dshfiles checkout this profile links Getting started from, each with its plugin, date and commit, plus the plugins' catalog descriptions. `upstream` lists, per remote whose bookmark of the same name differs from the local one, the changes there not yet in local history, as of the last fetch; this method never fetches. `since` (ISO 8601) keeps changes that landed after an instant, `plugin` one plugin, `limit` bounds the list (default 50). `no-checkout` means a registry install with no history on this Host (the same changes are at `commitsUrl`); `off` means the onboarding `whatsNew` setting is off. No network or model request. Read-only.",
+      tool: { name: 'onboarding_whats_new', readOnly: true, render: WhatsNewModel.render },
     }),
     applyPack: method({
       input: applyPackInputSchema,

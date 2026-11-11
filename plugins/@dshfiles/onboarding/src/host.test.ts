@@ -155,6 +155,56 @@ describe('onboarding Host', () => {
     }
   })
 
+  it('serves What’s new as the read-only onboarding_whats_new tool, and reads no history while the setting is off', async () => {
+    const mount = async (whatsNew: boolean) => {
+      const host = await createTestHost()
+      host.ctx.provide('settings', {
+        configure: () => () => undefined,
+        describe: () => [{ ns: 'dshfiles-onboarding', value: { githubCheck: false, checklist: false, whatsNew } }],
+        update: async () => undefined,
+        replace: async () => undefined,
+      } as never)
+      host.ctx.provide('subprocess', {} as never)
+      const bundleReads: string[] = []
+      host.ctx.provide('pluginManager', {
+        listPlugins: async () => [],
+        setPluginEnabled: async () => ({ changed: false, application: 'applied' }),
+        listBundles: async () => {
+          bundleReads.push('read')
+          return [{ name: '@dshfiles/onboarding' }]
+        },
+      } as never)
+      await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
+      return { host, bundleReads }
+    }
+    const off = await mount(false)
+    try {
+      const client = createHostApiClient(off.host.ctx, onboardingApi, '@test/caller')
+      expect(await client.whatsNew({})).toEqual({ state: 'off' })
+      expect(off.bundleReads).toEqual([])
+    } finally {
+      await off.host.dispose()
+    }
+    const on = await mount(true)
+    try {
+      const tool = on.host.tools.get('onboarding_whats_new')
+      expect(tool?.isConcurrencySafe?.({})).toBe(true)
+      const text = JSON.stringify(
+        await on.host.tools.execute({
+          callId: ToolCallId('call-whats-new'),
+          name: 'onboarding_whats_new',
+          arguments: { limit: 5 },
+          signal: new AbortController().signal,
+        }),
+      )
+      expect(on.bundleReads).toEqual(['read'])
+      expect(text).toContain('does not link Getting started from a dshfiles checkout')
+      expect(text).toContain('https://github.com/astahmer/dshfiles/commits/main')
+    } finally {
+      await on.host.dispose()
+    }
+  })
+
   it('refuses a bare onboarding_pack_apply request, and relays the plugin manager verdict once confirmed', async () => {
     const host = await createTestHost()
     host.ctx.provide('settings', {
