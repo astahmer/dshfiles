@@ -3016,6 +3016,9 @@ importers:
 
   plugins/@dshfiles/deliverables:
     dependencies:
+      '@dshfiles/image-preview':
+        specifier: workspace:*
+        version: link:../image-preview
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -3959,6 +3962,21 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 18.3.1(react@18.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2)
+
+  plugins/@dshfiles/image-preview:
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 18.3.31
+      react:
+        specifier: 'catalog:'
+        version: 18.3.1
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

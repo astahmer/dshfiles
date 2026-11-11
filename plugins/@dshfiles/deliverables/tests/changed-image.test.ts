@@ -6,29 +6,11 @@ import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceChangesSummary } from '@deepseek-ai/dsh-workspace-changes/types'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { MAX_CHANGED_IMAGE_BYTES, changesImageUrl, imageTypeOf } from '../src/changed-image.ts'
+import { ImagePreview } from '@dshfiles/image-preview'
+import { changesImageUrl } from '../src/changed-image.ts'
 import { serveChangedImage } from '../src/changed-image-route.ts'
 
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
-
-describe('imageTypeOf', () => {
-  it('names the media type of each previewable image extension, in any case', () => {
-    expect(imageTypeOf('docs/screenshots/getting-started-390.png')).toBe('image/png')
-    expect(imageTypeOf('a/b.JPG')).toBe('image/jpeg')
-    expect(imageTypeOf('b.jpeg')).toBe('image/jpeg')
-    expect(imageTypeOf('c.gif')).toBe('image/gif')
-    expect(imageTypeOf('d.webp')).toBe('image/webp')
-    expect(imageTypeOf('e.svg')).toBe('image/svg+xml')
-    expect(imageTypeOf('C:\\shots\\f.avif')).toBe('image/avif')
-  })
-
-  it('refuses other files, dotfiles and extension-like directory names', () => {
-    expect(imageTypeOf('dist/client.js')).toBeUndefined()
-    expect(imageTypeOf('.png')).toBeUndefined()
-    expect(imageTypeOf('shots.png/readme')).toBeUndefined()
-    expect(imageTypeOf('archive.constructor')).toBeUndefined()
-  })
-})
 
 describe('serveChangedImage', () => {
   let root: string
@@ -45,7 +27,7 @@ describe('serveChangedImage', () => {
     await writeFile(join(outside, 'secret.png'), PNG)
     await symlink(join(outside, 'secret.png'), join(root, 'linked.png'))
     await writeFile(join(root, 'huge.png'), '')
-    await truncate(join(root, 'huge.png'), MAX_CHANGED_IMAGE_BYTES + 1)
+    await truncate(join(root, 'huge.png'), ImagePreview.maxBytes + 1)
     await ctx.plugin(LocalFileSystem, { cwd: root })
   })
 

@@ -3,7 +3,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { FileSystem } from '@deepseek-ai/dsh-fs'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceChanges } from '@deepseek-ai/dsh-workspace-changes/types'
-import { CHANGES_IMAGE_PATH, MAX_CHANGED_IMAGE_BYTES, imageTypeOf } from './changed-image.ts'
+import { ImagePreview } from '@dshfiles/image-preview'
+import { CHANGES_IMAGE_PATH } from './changed-image.ts'
 
 /** The filesystem calls the route needs: canonical resolution, containment, metadata and one bounded read. */
 type ChangedImageFs = Pick<FileSystem, 'resolve' | 'contains' | 'stat' | 'readBytes'>
@@ -18,7 +19,7 @@ const COORDINATE = /^\d+$/
 const coordinateOf = (value: string | null): number | undefined =>
   value !== null && COORDINATE.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined
 
-const refusal = (status: number, text: string): Response => new Response(text, { status, headers: { 'cache-control': 'no-store' } })
+const refusal = (status: number, reason: string): Response => ImagePreview.refusal({ status, reason })
 
 const isTooLarge = (error: unknown): boolean => typeof error === 'object' && error !== null && 'code' in error && error.code === 'FS_TOO_LARGE'
 
@@ -40,26 +41,19 @@ export const serveChangedImage = async (sources: ChangedImageSources, request: R
   if (summary === undefined) return refusal(404, 'Change summary unavailable.')
   const file = summary.files[index]
   if (file === undefined) return refusal(404, 'Changed file not found in this summary.')
-  const type = imageTypeOf(file.path)
+  const type = ImagePreview.typeOf(file.path)
   if (type === undefined) return refusal(415, 'Changed file is not an image.')
   const root = await sources.fs.resolve(summary.cwd, { signal: request.signal })
   const target = await sources.fs.resolve(file.path, { cwd: summary.cwd, signal: request.signal })
   if (!sources.fs.contains(root, target)) return refusal(403, 'Changed file is outside the workspace.')
   const info = await sources.fs.stat(target, request.signal)
   if (info?.type !== 'file') return refusal(404, 'Changed image no longer exists.')
-  const data = await sources.fs.readBytes(target, request.signal, MAX_CHANGED_IMAGE_BYTES).catch((error: unknown) => {
+  const data = await sources.fs.readBytes(target, request.signal, ImagePreview.maxBytes).catch((error: unknown) => {
     if (isTooLarge(error)) return undefined
     throw error
   })
   if (data === undefined) return refusal(413, 'Changed image exceeds the preview size cap.')
-  return new Response(new Uint8Array(data), {
-    headers: {
-      'content-type': type,
-      'cache-control': 'no-store',
-      'x-content-type-options': 'nosniff',
-      'content-security-policy': "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox",
-    },
-  })
+  return ImagePreview.response({ bytes: data, type })
 }
 
 /**

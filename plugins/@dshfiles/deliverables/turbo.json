@@ -8,10 +8,13 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__deliverables.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__image-preview.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__plugin-ui.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shared-runtime.sha256",
         "$TURBO_ROOT$/plugins/@dshfiles/deliverables/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/deliverables/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/image-preview/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/image-preview/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/plugin-ui/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/shared-runtime/cordis.patch.yml",

@@ -1,0 +1,43 @@
+{
+  "name": "@dshfiles/image-preview",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Which changed files preview as images, the guarded Host response that serves their bytes, and the browser hook that shows them, shared by the plugins that preview images.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "dshx.features.json"
+  ],
+  "type": "module",
+  "types": "./src/image-preview.ts",
+  "exports": {
+    ".": {
+      "types": "./src/image-preview.ts",
+      "default": "./dist/image-preview.js"
+    },
+    "./react": {
+      "types": "./src/react.ts",
+      "default": "./dist/react.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --run build && vitest run && node --test tests/runtime-distribution.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

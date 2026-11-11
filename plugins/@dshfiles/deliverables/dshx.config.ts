@@ -2,7 +2,7 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/deliverables',
-  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/image-preview'] },
   client: {
     dshxRuntime: 'shared',
     shared: '@dshfiles/shared-runtime',

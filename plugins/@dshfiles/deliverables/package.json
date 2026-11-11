@@ -31,6 +31,7 @@
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
+    "@dshfiles/image-preview": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*"
   },
   "devDependencies": {

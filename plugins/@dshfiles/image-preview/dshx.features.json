@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "image-preview-response",
+      "title": "One guarded way to serve and show a changed image",
+      "summary": "Name the previewable image types, answer with their bytes under nosniff and a sandboxing policy within an 8 MB cap, and read them into a blob URL in the browser.",
+      "surfaces": ["host", "client", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host and client: library",
+      "configuration": [],
+      "states": ["served", "missing", "too-large", "outside", "not-an-image"],
+      "failureModes": [
+        "A file whose extension is not a previewable image type is never served as one.",
+        "An SVG served this way runs no script even when its URL is opened directly."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "image-preview.types",
+          "file": "plugins/@dshfiles/image-preview/src/image-preview.test.ts",
+          "testName": "names the media type of each previewable image extension, in any case"
+        },
+        {
+          "kind": "unit-test",
+          "id": "image-preview.headers",
+          "file": "plugins/@dshfiles/image-preview/src/image-preview.test.ts",
+          "testName": "serves the bytes under their media type, unsniffed, uncached and sandboxed"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Pure functions and a browser hook; the routes that call them own their spans."
+        }
+      ]
+    }
+  ],
+  "ioDelegation": [
+    {
+      "file": "src/react.ts",
+      "reason": "Browser hook: it reads a preview route whose Host owner opens the span (diffs-review image read, the deliverables changes.image route)."
+    }
+  ]
+}
