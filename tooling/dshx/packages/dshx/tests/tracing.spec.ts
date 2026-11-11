@@ -21,7 +21,7 @@ import {
   withSpan,
 } from '../src/tracing/index.js'
 import { LocalOtlpEndpointRegistry } from '../src/tracing/local-endpoint.js'
-import { OtlpTraceExport, type FinishedSpan, type OtlpTraceRequest } from '../src/tracing/otlp-exporter.js'
+import { OtlpTraceExport, type FinishedSpan } from '../src/tracing/otlp-exporter.js'
 import { TracerModel, type Tracer } from '../src/tracing/tracer.js'
 
 const ENDPOINT_ENV = { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector.test:4318/' }
@@ -186,12 +186,16 @@ describe('in-process receiver hand-off', () => {
     const sink = collector()
     const delivered: string[][] = []
     let failures = 1
-    const deliverTraces = async (request: OtlpTraceRequest) => {
+    const parseDeliveredBatch = async (request: unknown) => {
       if (failures-- > 0) throw new Error('store busy')
-      delivered.push(request.resourceSpans.flatMap(resource => resource.scopeSpans.flatMap(scope => scope.spans.map(span => span.name))))
+      delivered.push(
+        Schema.decodeUnknownSync(exportRequestSchema)(request).resourceSpans.flatMap(resource =>
+          resource.scopeSpans.flatMap(scope => scope.spans.map(span => span.name)),
+        ),
+      )
     }
     const exporter = OtlpTraceExport.createBatchExporter({
-      config: () => OtlpTraceExport.configFrom({}, { baseUrl: 'http://127.0.0.1:4318', deliverTraces }),
+      config: () => OtlpTraceExport.configFrom({}, { baseUrl: 'http://127.0.0.1:4318', deliverTraces: parseDeliveredBatch }),
       fetch: sink.fetch,
       initialBackoffMs: 1,
       maxBackoffMs: 1,
