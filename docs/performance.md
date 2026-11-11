@@ -3,6 +3,88 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Attention store and live baseline (2026-11-11; investigation)
+
+The live Host was not restarted or heap-censused. Load was 29.96 on 10 logical CPUs, so these are a congested-instance
+baseline, not a controlled benchmark. The JSON attention unit was 313,423 bytes on disk.
+
+| Probe                                        | Before                                                               | After        |
+| -------------------------------------------- | -------------------------------------------------------------------- | ------------ |
+| Host lag, 60 s (168 samples)                 | p50 72 ms; p90 613 ms; p99 2,447 ms; max 5,629 ms                    | Not measured |
+| Five thread switches                         | Composer 317–506 ms; history 592–1,915 ms; 1–4 long tasks per switch | Not measured |
+| Attention `changesSince`, 81 spans in 60 min | p50 0.315 ms; p95 1.125 ms                                           | Not measured |
+
+A 60-second Host CPU profile reported 51.7 s busy and 22.9 s inclusive under agent-loop step. Machine contention and
+inclusive samples preclude attributing this as the cause of a particular switch. The inspector was closed afterward.
+A regression probe against the JSON backend also showed that deleting the final migrated record re-imports it from the
+retained legacy unit on reopen; the attention store must not switch layouts until that migration is safe.
+
+## Attention writes answer a delta, and the unit stores one record per thread (2026-11-11)
+
+The v1 attention contract answered every write with the whole snapshot: at 2,000 unread threads that is a ~192 KB
+answer for acknowledging one row, and the `thread_attention` unit rewrote its whole document (~313 KB on the live Host)
+for the same change. Both are fixed without breaking an older Host or an older page.
+
+Measured with a scratch script over the real JSON backend and the real Effect schemas (1,056 rows, Node 22, 5 writes
+after warm-up; absolute times are disk-bound and machine-dependent, the ratio is the result):
+
+| Measure                                      | Before                                    | After                                                             |
+| -------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| Answer to one acknowledge, 1,056 unread rows | 192,407 B (full snapshot)                 | 291 B (`writeDelta`) — 661× smaller                               |
+| One durable write over that unit, p50        | 22.93 ms (single document rewritten)      | 13.65 ms (one record document)                                    |
+| Same, min/max                                | 11.46 / 33.86 ms                          | 6.17 / 31.03 ms                                                   |
+| Host work per write                          | plan + rewrite whole unit, then read back | plan + write the changed records, delta computed in the same lock |
+
+How it works:
+
+- `thread_attention` declares `layout: 'per-record'`, so the storage backend writes one document per unread thread. The
+  first open migrates the old whole-unit file, which is now crash-safe: the new tree is staged beside the unit, fsynced
+  and published by one directory rename, its legacy global value and keys are validated first, and a marker document
+  makes the tree authoritative so deleting the last record cannot re-import it later.
+- The API keeps all six v1 write methods unchanged for older pages, and adds `writeDelta({ since, command })` plus a
+  read-only `writeCapabilities` probe. A page probes once without writing; only a positive answer enables delta writes,
+  and a failed delta write is never replayed through the v1 methods. The delta is computed from the committed state
+  inside the same `SynchronizedRef` critical section as the durable write, so it names every change since the caller's
+  revision, including concurrent finishes and drops.
+- The page store serializes writes, merges a delta only when it still holds the revision that write was built on, and
+  falls back to a full read when the answer is incomplete or the held revision moved. An older Host, or a Host without
+  the probe, keeps the v1 full-snapshot write path.
+
+Not measured: the live Host improvement. The change needs a Host restart to reach the running instance, and the delta
+path needs a page reload; the numbers above are the mechanism's, not the GUI's.
+
+## Memory re-digest skips unchanged threads (2026-11-11)
+
+Live traces (30,000-span store, ~31 min retained at sampling) put `memory digest thread` at **27 spans, p50 3.57 s,
+p95 20.67 s, max 21.95 s**, with 67 `memory jev ask` spans (p50 263 ms, p95 759 ms) in the same window. The digester read
+the Session, asked Jev to classify up to 12 user messages and called the model _before_ reading its indexed cursor, so
+every idle re-digest of an unchanged thread repeated the classifier and model calls.
+
+The digest now reads `indexedThrough` before classifying and returns `unchanged` when the thread's last event is already
+indexed and a stored digest exists. Verified by a new journey in `memory-services.test.ts`: the second digest of the
+same thread leaves both the Jev-ask and the summarizer call counts unchanged.
+
+| Measure                                          | Before                   | After                              |
+| ------------------------------------------------ | ------------------------ | ---------------------------------- |
+| Jev calls for a re-digest of an unchanged thread | up to 12 per attempt     | 0 (asserted)                       |
+| Summarizer calls for that re-digest              | 1                        | 0 (asserted)                       |
+| Live digest span duration                        | p50 3.57 s / p95 20.67 s | Not measured: needs a Host restart |
+
+## Candidates measured and deliberately skipped (2026-11-11)
+
+| Candidate                           | Current evidence                                                                                                                                      | Decision                                                                                           |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| P0-6 `preview/devServers` ×3        | 306 spans, p50 2.78 s, p95 11.67 s, 27 errors; three roots started within 0.334 ms but call arguments are not traced, so duplicate calls are unproven | Keep open: a capture with a thread open and per-`QueryClient` count is needed before changing code |
+| P0-7 `jujutsu-composer/context` ×4  | 48 spans, p50 4.87 s, p95 24.50 s; one 22.6 s trace is dominated by inter-span waits, not jj alone                                                    | Keep open: needs a Workbench panel-visibility signal or an always-rendered ref target              |
+| P0-9 `backlog/list` 744 KB          | 0 `backlog/list` spans in the retained window; the panel still asks for `limit: 2000`                                                                 | Keep open: the fix is an API + product decision on paging                                          |
+| P0-10 `settings/describe` 201 KB ×2 | Core `ui-settings` reads at apply and on the first reset; its row id is the settings namespace                                                        | Skipped: core, not an owned plugin (Host gaps 97/99)                                               |
+| C05 main-tabs subscriptions         | Source subscribes session/workspace/layout/adapter and recomputes before key dedupe; no current browser CPU attribution                               | Skipped: no measured cost                                                                          |
+| C15 Memory read cards               | 3 notes / 34 digests when counted 2026-11-04; no current panel-render trace                                                                           | Skipped: no measured cost                                                                          |
+| H12 usage chart projections         | 0 `usage charts read` spans in the retained window                                                                                                    | Skipped: no measured cost                                                                          |
+| T02 remainder (slot registrations)  | Source calls `clientSlotRegistrations` twice per build; the recorded 471/72/401 → 147/49/104 ms receipt is not a slot measurement                     | Skipped: no measured slot cost                                                                     |
+| T06 scratch preparation             | Serial builds identified, no stage spans to attribute                                                                                                 | Skipped: no measured cost                                                                          |
+| cordis-client-runner catalogs       | 297 of 332 KB, evaluation p50 4.9 ms, first 6.7 ms (2026-11-04); lazy client chunks are feasible in dshx, but no current load shows the cost          | Skipped: a split build is a further dshx primitive for a 4.9 ms cost                               |
+
 ## Workbench main-seat baseline (2026-10-26)
 
 Measured an existing live instance before builds or browser E2E load; no live restart or deployment. Its private profile name and endpoint are omitted.
@@ -1206,27 +1288,3 @@ reconnect.
 real history; the lever here is instance and follow-stream count, not bytes: the default held 5 thread views for 14
 visited threads instead of 14. Real history makes each resident Session cost its transcript window, which is what the
 ~20-instance tab was holding. A live-tab after-number still needs the canonical build and a user restart.
-
-## Agent browser mirror cost (2026-11-11)
-
-The mirror (`preview/mirrorFrame`) polls a viewport JPEG at quality 55 every 500 ms while the Agent browser tab and the
-window are visible, and sends only a hash when the image did not change. Is that polling the cost? Probe
-`.agents/skills/live-performance-audit/scripts/mirror-probe.mjs` runs the exact frame work — `page.screenshot({ type:
-'jpeg', quality: 55 })`, SHA-1, image only when the hash changed — for four 60 s windows against a loopback fixture, and
-reports frames/s, KB/s, and the CPU of the process taking the screenshots (in DSH this is the Host) plus the Chromium
-process tree.
-
-| Window        | Content                          | Calls | Frames | Bytes/s  | Screenshot CPU | Chromium CPU |
-| ------------- | -------------------------------- | ----- | ------ | -------- | -------------- | ------------ |
-| idle          | still page, viewer not polling   | 0     | 0      | 0        | 0.4 %          | 0 %          |
-| still-poll    | still page, polling              | 115   | 1      | 0.1 kB   | 0.7 %          | 2.3 %        |
-| animated-poll | CSS spinner, every frame differs | 112   | 112    | 17.4 kB  | 0.6 %          | 6.7 %        |
-| dense-poll    | 24 text cards with animated bars | 112   | 112    | 209.7 kB | 0.9 %          | 11.1 %       |
-
-Polling is not the cost: a watched tab costs well under one core of Chromium (7–11 %) and about 1 % of the Host-side
-screenshot path, and an unchanged page costs a hash. The bytes track page entropy: ~17 kB/s for a spinner on a flat
-background, ~210 kB/s (~12.6 MB/min) for a text-dense page that changes every frame. Both stay modest for a local GUI,
-so the mirror keeps polling and does not switch to CDP `Page.startScreencast`. The measurement runs the mirror's own
-frame path in a standalone Chromium, not inside a scratch DSH Host: full-rate video or canvas pages, and DSH's own event
-loop alongside the capture, remain unmeasured. The probe prints one JSON envelope; `SECONDS`/`--seconds` and
-`ONLY=<window>` narrow a run.
