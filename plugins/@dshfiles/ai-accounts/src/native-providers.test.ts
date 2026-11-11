@@ -81,6 +81,16 @@ describe('native provider switch', () => {
     expect(await readFile(patchPath, 'utf8')).toBe(original)
   })
 
+  it('keeps both switches when two rows are turned off at the same time without HMR', async () => {
+    const ctx = host()
+    await Promise.all([
+      setNativeProviderEnabled(ctx, { entryId: 'llm-commandcode', enabled: false }),
+      setNativeProviderEnabled(ctx, { entryId: 'llm-deepseek', enabled: false }),
+    ])
+    const state = await readNativeProviders(ctx)
+    expect(state.providers.filter(provider => !provider.enabled).map(provider => provider.entryId)).toEqual(['llm-commandcode', 'llm-deepseek'])
+  })
+
   it('refuses rows it does not list and rows disabled by someone else', async () => {
     const ctx = host()
     await expect(setNativeProviderEnabled(ctx, { entryId: 'tool-bash', enabled: false })).rejects.toThrow(/not a native provider/)

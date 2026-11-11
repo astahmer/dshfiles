@@ -36,6 +36,15 @@ const writePatch = async (path: string, text: string): Promise<void> => {
   await rename(temporary, path)
 }
 
+let patchWrites: Promise<void> = Promise.resolve()
+
+/** One read-modify-rename of the profile patch at a time, whether or not HMR also serializes it. */
+const serializePatchWrite = (work: () => Promise<void>): Promise<void> => {
+  const next = patchWrites.then(work)
+  patchWrites = next.catch(() => undefined)
+  return next
+}
+
 /** Rows switched back on in this process, listed until their providers re-register. */
 const reenabling = new WeakMap<Context, Map<string, string>>()
 
@@ -100,6 +109,6 @@ export const setNativeProviderEnabled = async (ctx: Context, input: { readonly e
     }
   }
   const hmr = ctx.get('hmr')
-  await (hmr === undefined ? apply() : hmr.runExclusive(apply))
+  await serializePatchWrite(() => (hmr === undefined ? apply() : hmr.runExclusive(apply)))
   return readNativeProviders(ctx)
 }
