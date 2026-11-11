@@ -5,9 +5,9 @@ import { extractSessionEventText } from '@deepseek-ai/dsh-session-query'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { Llm, LlmCallFailed } from '@dshfiles/dshx/effect/llm'
 import { SessionId } from '@dshfiles/dshx/ids'
-import { recentLogEvents } from '@dshfiles/session-log-window'
 import { Context, Effect, Layer, Option, Schema } from 'effect'
 
+import { readRecentLogEvents } from './session-log-promise.js'
 import { sessionQueryReads } from './session-query-promise.js'
 
 export interface ThreadMessage {
@@ -41,7 +41,6 @@ const isThreadEvent = (event: SessionEvent): boolean => THREAD_EVENT_TYPES.has(e
 interface BoundedReadInput {
   readonly ctx: CordisContext
   readonly sessionId: SessionId
-  readonly signal: AbortSignal
 }
 
 /**
@@ -49,9 +48,9 @@ interface BoundedReadInput {
  * whole log can serve the read exactly. A conversation's last messages and its last request envelope both sit near the
  * end of the log, so the window that holds its newest events holds both.
  */
-const readBoundedThread = async (input: BoundedReadInput): Promise<ThreadConversation | undefined> => {
+const readBoundedThread = Effect.fnUntraced(function* (input: BoundedReadInput) {
   for (let keep = MAX_MESSAGES * 2; ; keep *= 2) {
-    const recent = await recentLogEvents({ ctx: input.ctx, sessionId: input.sessionId, signal: input.signal, matches: isThreadEvent, keep })
+    const recent = yield* readRecentLogEvents({ ctx: input.ctx, sessionId: input.sessionId, matches: isThreadEvent, keep })
     if (recent === undefined) return undefined
     const messages = recent.events
       .filter(event => MESSAGE_TYPES.has(event.type))
@@ -66,7 +65,7 @@ const readBoundedThread = async (input: BoundedReadInput): Promise<ThreadConvers
     if (route !== undefined && (messages.length >= MAX_MESSAGES || recent.complete)) return { route, messages }
     if (recent.complete) return { route, messages }
   }
-}
+})
 
 /** The route the thread's last model request used, from the last request envelope in the window. */
 const routeOf = (events: readonly SessionEvent[]): ThreadConversation['route'] => {
@@ -127,9 +126,7 @@ export class ThreadContext extends Context.Service<
         const reads = sessionQueryReads(sessionQuery)
         // A window of the log's newest events serves a thread's closing conversation; only a log it cannot prove reads
         // whole, and that read keeps the earlier shape of this answer.
-        const bounded = yield* Effect.tryPromise(() => readBoundedThread({ ctx, sessionId: id.value, signal: new AbortController().signal })).pipe(
-          Effect.orElseSucceed(() => undefined),
-        )
+        const bounded = yield* readBoundedThread({ ctx, sessionId: id.value }).pipe(Effect.orElseSucceed(() => undefined))
         if (bounded !== undefined) return bounded
         const log = yield* reads.readSession(id.value).pipe(Effect.option)
         if (Option.isNone(log)) return EMPTY
