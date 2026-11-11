@@ -296,7 +296,8 @@ const createStore = (): ThreadAttentionStore => {
     clearUnread: (sessionId, version) => write({ kind: 'clearUnread', sessionId, version }, () => requireApi().clearUnread({ sessionId, version })),
     clearUnreadMany: entries => write({ kind: 'clearUnreadMany', entries: [...entries] }, () => requireApi().clearUnreadMany({ entries: [...entries] })),
     markUnread: sessionId => write({ kind: 'markUnread', sessionId }, () => requireApi().markUnread({ sessionId })),
-    markUnreadMany: sessionIds => write({ kind: 'markUnreadMany', sessionIds: [...sessionIds] }, () => requireApi().markUnreadMany({ sessionIds: [...sessionIds] })),
+    markUnreadMany: sessionIds =>
+      write({ kind: 'markUnreadMany', sessionIds: [...sessionIds] }, () => requireApi().markUnreadMany({ sessionIds: [...sessionIds] })),
     migrate: entries => write({ kind: 'migrate', entries: [...entries] }, () => requireApi().migrate({ entries: [...entries] })),
     reset: () => {
       listeners.clear()

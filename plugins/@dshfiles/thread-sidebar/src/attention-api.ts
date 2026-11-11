@@ -87,7 +87,10 @@ export const threadAttentionWriteCommandSchema = Schema.Union([
     Schema.Struct({ kind: Schema.Literal('markUnreadMany'), sessionIds: Schema.Array(sessionIdSchema).check(Schema.isMaxLength(MAX_ATTENTION_SESSIONS)) }),
   ),
   SchemaHelpers.strictStruct(
-    Schema.Struct({ kind: Schema.Literal('migrate'), entries: Schema.Array(threadAttentionMigrationEntrySchema).check(Schema.isMaxLength(MAX_ATTENTION_SESSIONS)) }),
+    Schema.Struct({
+      kind: Schema.Literal('migrate'),
+      entries: Schema.Array(threadAttentionMigrationEntrySchema).check(Schema.isMaxLength(MAX_ATTENTION_SESSIONS)),
+    }),
   ),
 ])
 

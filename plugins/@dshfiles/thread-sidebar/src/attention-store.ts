@@ -163,7 +163,10 @@ export class ThreadAttention extends Context.Service<
     readonly markUnreadMany: (sessionIds: ReadonlyArray<string>) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
     readonly migrate: (entries: ReadonlyArray<ThreadAttentionMigrationEntry>) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
     /** One write, answered with every record changed after `since` instead of the whole snapshot. */
-    readonly writeDelta: (input: { readonly since: number; readonly command: ThreadAttentionWriteCommand }) => Effect.Effect<ThreadAttentionChanges, AttentionStorageFailed>
+    readonly writeDelta: (input: {
+      readonly since: number
+      readonly command: ThreadAttentionWriteCommand
+    }) => Effect.Effect<ThreadAttentionChanges, AttentionStorageFailed>
   }
 >()('@dshfiles/thread-sidebar/ThreadAttention') {
   static readonly layer = Layer.effect(
@@ -228,15 +231,17 @@ export class ThreadAttention extends Context.Service<
       const unchanged: AttentionChange = { put: [], remove: [] }
 
       const plans = {
-        acknowledge: (input: { readonly sessionId: string; readonly version: number }): Plan => (records, takeVersion) => {
-          const record = records.get(input.sessionId)
-          if (record === undefined || record.version > input.version) return unchanged
-          if (!record.manuallyUnread) return { put: [], remove: [input.sessionId] }
-          return {
-            put: [{ sessionId: input.sessionId, version: takeVersion(), finishedAt: null, finishedSeq: null, finishedReason: null, manuallyUnread: true }],
-            remove: [],
-          }
-        },
+        acknowledge:
+          (input: { readonly sessionId: string; readonly version: number }): Plan =>
+          (records, takeVersion) => {
+            const record = records.get(input.sessionId)
+            if (record === undefined || record.version > input.version) return unchanged
+            if (!record.manuallyUnread) return { put: [], remove: [input.sessionId] }
+            return {
+              put: [{ sessionId: input.sessionId, version: takeVersion(), finishedAt: null, finishedSeq: null, finishedReason: null, manuallyUnread: true }],
+              remove: [],
+            }
+          },
         clearUnread:
           (input: { readonly sessionId: string; readonly version: number }): Plan =>
           records => {
