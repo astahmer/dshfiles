@@ -168,15 +168,17 @@ export class PullRequestCreator extends Context.Service<
       const generate = Effect.fn('pull-requests create generate')(function* (input: {
         readonly sessionId: string
         readonly threadTitle: string
-        readonly messages: readonly { readonly role: 'user' | 'assistant'; readonly text: string }[]
         readonly commits: readonly CreateCommit[]
-        readonly route: { readonly provider: string; readonly model: string } | undefined
+        readonly requestedRoute: { readonly provider: string; readonly model: string } | undefined
       }) {
         const fallback = CreateModel.fallbackPullRequest({ threadTitle: input.threadTitle, commits: input.commits })
         if (input.commits.length === 0) return { ...fallback, generation: { source: 'fallback' as const, note: 'No commits to describe yet.' } }
         if (!thread.canGenerate)
           return { ...fallback, generation: { source: 'fallback' as const, note: 'The Host has no language-model service; drafted from the commit messages.' } }
-        if (input.route === undefined)
+        // Only a draft the model writes reads the conversation; every other preview answers from jj and the forge.
+        const conversation = yield* thread.conversation(input.sessionId)
+        const route = input.requestedRoute ?? conversation.route
+        if (route === undefined)
           return {
             ...fallback,
             generation: {
@@ -186,10 +188,10 @@ export class PullRequestCreator extends Context.Service<
           }
         const answer = yield* thread
           .complete({
-            ...input.route,
+            ...route,
             sessionId: input.sessionId,
             system: CreateModel.GENERATION_SYSTEM_PROMPT,
-            input: CreateModel.generationInput({ threadTitle: input.threadTitle, messages: input.messages, commits: input.commits }),
+            input: CreateModel.generationInput({ threadTitle: input.threadTitle, messages: conversation.messages, commits: input.commits }),
           })
           .pipe(Effect.timeout('60 seconds'), Effect.option)
         const parsed = Option.isSome(answer) ? CreateModel.parseGeneratedPullRequest(answer.value) : undefined
@@ -198,16 +200,15 @@ export class PullRequestCreator extends Context.Service<
             ...fallback,
             generation: {
               source: 'fallback' as const,
-              note: `${input.route.provider}/${input.route.model} did not return a usable draft; drafted from the commit messages. Edit it, or retry the preview.`,
+              note: `${route.provider}/${route.model} did not return a usable draft; drafted from the commit messages. Edit it, or retry the preview.`,
             },
           }
-        return { ...parsed, generation: { source: 'model' as const, note: `${input.route.provider}/${input.route.model}` } }
+        return { ...parsed, generation: { source: 'model' as const, note: `${route.provider}/${route.model}` } }
       })
 
       const preview = Effect.fn('pull-requests create preview')(function* (input: PullRequestCreatePreviewInput, caller: ApiCaller) {
         const sessionId = yield* sessionFor(input.sessionId, caller)
-        const snapshot = yield* thread.read(sessionId)
-        const cwd = input.cwd ?? snapshot.cwd ?? (cwdForCaller(caller) || undefined)
+        const cwd = input.cwd ?? (yield* thread.cwdOf(sessionId)) ?? (cwdForCaller(caller) || undefined)
         const blank = {
           sessionId,
           repo: null,
@@ -234,18 +235,18 @@ export class PullRequestCreator extends Context.Service<
         const read = yield* readWorkspace(cwd, gh.repository)
         const workspace = read.workspace
         const commits = workspace?.commits ?? []
+        const threadTitle = yield* thread.titleOf(sessionId)
         const draft = yield* generate({
           sessionId,
-          threadTitle: snapshot.title,
-          messages: snapshot.messages,
+          threadTitle,
           commits,
-          route: input.provider !== undefined && input.model !== undefined ? { provider: input.provider, model: input.model } : snapshot.route,
+          requestedRoute: input.provider !== undefined && input.model !== undefined ? { provider: input.provider, model: input.model } : undefined,
         })
         const head = commits[0]
         const bookmark =
           workspace === undefined || head === undefined
             ? null
-            : (workspace.existingBookmark ?? CreateModel.bookmarkFromTitle(snapshot.title.length > 0 ? snapshot.title : head.summary, head.changeId))
+            : (workspace.existingBookmark ?? CreateModel.bookmarkFromTitle(threadTitle.length > 0 ? threadTitle : head.summary, head.changeId))
         const existingUrl =
           gh.repository !== null && bookmark !== null
             ? yield* forge.openPullRequestFor({ repo: gh.repository.repo, cwd, head: bookmark }).pipe(Effect.orElseSucceed(() => null))
@@ -285,8 +286,8 @@ export class PullRequestCreator extends Context.Service<
 
       const create = Effect.fn('pull-requests create')(function* (input: PullRequestCreateInput, caller: ApiCaller) {
         const sessionId = yield* sessionFor(input.sessionId, caller)
-        const snapshot = yield* thread.read(sessionId)
-        const cwd = input.cwd ?? snapshot.cwd ?? (cwdForCaller(caller) || undefined)
+        // Pushing and opening the pull request need only the directory: never the conversation.
+        const cwd = input.cwd ?? (yield* thread.cwdOf(sessionId)) ?? (cwdForCaller(caller) || undefined)
         if (cwd === undefined) {
           const missing = CreateModel.problem('no-session-cwd', 'This thread has no working directory.')
           return failed('preflight', missing.message, missing.recovery, { problems: [missing] })

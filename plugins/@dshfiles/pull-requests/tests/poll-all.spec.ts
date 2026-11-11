@@ -137,4 +137,33 @@ describe('pull-requests pollAll', () => {
       }).pipe(Effect.provide(layer))
     }),
   )
+
+  it.effect('an event refresh polls only the pull requests its threads watch, once, and skips one checked moments ago', () =>
+    withStorageHost(host => {
+      const polls: string[] = []
+      const hostContext = HostContext.of({ ctx: host.ctx, packageId: PACKAGE_ID })
+      const layer = PullRequestMonitor.layer.pipe(
+        Layer.provideMerge(
+          Layer.mergeAll(PullRequestStore.layer, fakeForge(polls)).pipe(
+            Layer.provideMerge(Layer.mergeAll(StorageDomain.layer, HostApis.layer).pipe(Layer.provide(Layer.succeed(HostContext, hostContext)))),
+          ),
+        ),
+      )
+      return Effect.gen(function* () {
+        const store = yield* PullRequestStore
+        const monitor = yield* PullRequestMonitor
+        for (const link of [
+          record({ repo: 'acme/widget', number: 7, sessionId: 'session-a' }),
+          record({ repo: 'acme/widget', number: 7, sessionId: 'session-b' }),
+          record({ repo: 'acme/third', number: 9, sessionId: 'session-e' }),
+        ])
+          yield* store.upsert(link)
+
+        expect(yield* monitor.refresh({ sessionIds: ['session-a', 'session-b', 'session-unknown'], minAgeMs: 20_000 })).toBe(1)
+        expect(polls).toEqual(['acme/widget#7'])
+        expect(yield* monitor.refresh({ sessionIds: ['session-a'], minAgeMs: 20_000 })).toBe(0)
+        expect(polls).toEqual(['acme/widget#7'])
+      }).pipe(Effect.provide(layer))
+    }),
+  )
 })

@@ -15,9 +15,8 @@ export interface ThreadMessage {
   readonly text: string
 }
 
-export interface ThreadSnapshot {
-  readonly cwd: string | undefined
-  readonly title: string
+/** What drafting a pull request reads of a thread's conversation; only a draft the model writes needs it. */
+export interface ThreadConversation {
   /** The route the thread's own model requests used last. */
   readonly route: { readonly provider: string; readonly model: string } | undefined
   readonly messages: readonly ThreadMessage[]
@@ -50,9 +49,7 @@ interface BoundedReadInput {
  * whole log can serve the read exactly. A conversation's last messages and its last request envelope both sit near the
  * end of the log, so the window that holds its newest events holds both.
  */
-const readBoundedThread = async (
-  input: BoundedReadInput,
-): Promise<{ readonly cwd: string | undefined; readonly route: ThreadSnapshot['route']; readonly messages: readonly ThreadMessage[] } | undefined> => {
+const readBoundedThread = async (input: BoundedReadInput): Promise<ThreadConversation | undefined> => {
   for (let keep = MAX_MESSAGES * 2; ; keep *= 2) {
     const recent = await recentLogEvents({ ctx: input.ctx, sessionId: input.sessionId, signal: input.signal, matches: isThreadEvent, keep })
     if (recent === undefined) return undefined
@@ -63,27 +60,36 @@ const readBoundedThread = async (
         return text.trim().length === 0 ? [] : [{ role: event.type === 'user/message' ? 'user' : 'assistant', text }]
       })
       .slice(-MAX_MESSAGES)
-    if (messages.length >= MAX_MESSAGES || recent.complete)
-      // A window that covers the log start is the only one whose silence about a route proves there is none.
-      return { cwd: recent.session.cwd, route: recent.complete ? routeOf(recent.events) : undefined, messages }
+    // The newest request envelope in the window is the thread's last route; a window that covers the log start is the
+    // only one whose silence about a route proves there is none.
+    const route = routeOf(recent.events)
+    if (route !== undefined && (messages.length >= MAX_MESSAGES || recent.complete)) return { route, messages }
+    if (recent.complete) return { route, messages }
   }
 }
 
 /** The route the thread's last model request used, from the last request envelope in the window. */
-const routeOf = (events: readonly SessionEvent[]): ThreadSnapshot['route'] => {
+const routeOf = (events: readonly SessionEvent[]): ThreadConversation['route'] => {
   const header = events.findLast(event => event.type === 'request/header')
   if (header?.type !== 'request/header') return undefined
   const config = header.data.header.config
   return config?.provider !== undefined && config.model !== undefined ? { provider: config.provider, model: config.model } : undefined
 }
 
-const EMPTY: ThreadSnapshot = { cwd: undefined, title: '', route: undefined, messages: [] }
+const EMPTY: ThreadConversation = { route: undefined, messages: [] }
 
-/** What the create flow reads about a thread, and the one model call that drafts its pull request. */
+/**
+ * What the create flow reads about a thread, each piece on its own so a caller pays only for what it uses: the
+ * directory from the stored header, the title from the title index, and the conversation from a window of the log.
+ */
 export class ThreadContext extends Context.Service<
   ThreadContext,
   {
-    readonly read: (sessionId: string) => Effect.Effect<ThreadSnapshot>
+    /** The thread's working directory from its stored header; never decodes the log. */
+    readonly cwdOf: (sessionId: string) => Effect.Effect<string | undefined>
+    readonly titleOf: (sessionId: string) => Effect.Effect<string>
+    /** The newest messages and the last model route: a bounded read of the log's newest events. */
+    readonly conversation: (sessionId: string) => Effect.Effect<ThreadConversation>
     /** False when the Host has no language-model service. */
     readonly canGenerate: boolean
     readonly complete: (request: ThreadCompletion) => Effect.Effect<string, LlmCallFailed>
@@ -98,22 +104,35 @@ export class ThreadContext extends Context.Service<
         Effect.option,
       )
 
-      const read = Effect.fn('pull-requests thread read')(function* (sessionId: string) {
+      const cwdOf = Effect.fn('pull-requests thread cwd')(function* (sessionId: string) {
+        const id = sessionIdOf(sessionId)
+        const persistence = ctx.get('sessionPersistence')
+        if (Option.isNone(id) || persistence === undefined) return undefined
+        const stat = yield* Effect.tryPromise(signal => persistence.stat(id.value, { signal }))
+        return stat?.header.cwd
+      })
+
+      const titleOf = Effect.fn('pull-requests thread title')(function* (sessionId: string) {
         const id = sessionIdOf(sessionId)
         // Looked up per read: session query is optional and may register after this plugin.
         const sessionQuery = ctx.get('sessionQuery')
+        if (Option.isNone(id) || sessionQuery === undefined) return ''
+        return (yield* sessionQueryReads(sessionQuery).readTitle(id.value))?.title ?? ''
+      })
+
+      const conversation = Effect.fn('pull-requests thread conversation')(function* (sessionId: string) {
+        const id = sessionIdOf(sessionId)
+        const sessionQuery = ctx.get('sessionQuery')
         if (Option.isNone(id) || sessionQuery === undefined) return EMPTY
         const reads = sessionQueryReads(sessionQuery)
-        const titled = yield* reads.readTitle(id.value).pipe(Effect.orElseSucceed(() => undefined))
         // A window of the log's newest events serves a thread's closing conversation; only a log it cannot prove reads
         // whole, and that read keeps the earlier shape of this answer.
         const bounded = yield* Effect.tryPromise(() => readBoundedThread({ ctx, sessionId: id.value, signal: new AbortController().signal })).pipe(
           Effect.orElseSucceed(() => undefined),
         )
-        if (bounded !== undefined) return { cwd: bounded.cwd, title: titled?.title ?? '', route: bounded.route, messages: bounded.messages }
+        if (bounded !== undefined) return bounded
         const log = yield* reads.readSession(id.value).pipe(Effect.option)
         if (Option.isNone(log)) return EMPTY
-        const events = log.value.events
         const documents = yield* reads
           .filterEvents(id.value, [{ kind: 'type', values: ['user/message', 'assistant/message'] }])
           .pipe(Effect.orElseSucceed(() => []))
@@ -121,11 +140,13 @@ export class ThreadContext extends Context.Service<
           .filter(document => document.text.trim().length > 0)
           .slice(-MAX_MESSAGES)
           .map((document): ThreadMessage => ({ role: document.type === 'user/message' ? 'user' : 'assistant', text: document.text }))
-        return { cwd: log.value.session.cwd, title: titled?.title ?? '', route: routeOf(events), messages }
+        return { route: routeOf(log.value.events), messages }
       })
 
       return ThreadContext.of({
-        read: sessionId => read(sessionId).pipe(Effect.orElseSucceed(() => EMPTY)),
+        cwdOf: sessionId => cwdOf(sessionId).pipe(Effect.orElseSucceed(() => undefined)),
+        titleOf: sessionId => titleOf(sessionId).pipe(Effect.orElseSucceed(() => '')),
+        conversation: sessionId => conversation(sessionId).pipe(Effect.orElseSucceed(() => EMPTY)),
         canGenerate: Option.isSome(llm),
         complete: request =>
           Option.match(llm, {

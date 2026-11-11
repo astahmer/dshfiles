@@ -97,19 +97,26 @@ const fakeForge = (script: GhScript, created: GitHubPullRequestCreate[]) =>
     }),
   )
 
-const fakeThread = (completions: ThreadCompletion[], answer = 'Add sprockets to the widget\n\nThe widget now spins sprockets.\n\n## Changes\n\n- sprockets') =>
+const fakeThread = (
+  completions: ThreadCompletion[],
+  reads: string[],
+  answer = 'Add sprockets to the widget\n\nThe widget now spins sprockets.\n\n## Changes\n\n- sprockets',
+) =>
   Layer.succeed(
     ThreadContext,
     ThreadContext.of({
-      read: () =>
-        Effect.succeed({
-          cwd: CWD,
-          title: 'Widget sprockets',
-          route: { provider: 'test-provider', model: 'test-model' },
-          messages: [
-            { role: 'user', text: 'Please add sprockets to the widget.' },
-            { role: 'assistant', text: 'Added sprockets; tests pass.' },
-          ],
+      cwdOf: () => Effect.sync(() => (reads.push('cwd'), CWD)),
+      titleOf: () => Effect.sync(() => (reads.push('title'), 'Widget sprockets')),
+      conversation: () =>
+        Effect.sync(() => {
+          reads.push('conversation')
+          return {
+            route: { provider: 'test-provider', model: 'test-model' },
+            messages: [
+              { role: 'user' as const, text: 'Please add sprockets to the widget.' },
+              { role: 'assistant' as const, text: 'Added sprockets; tests pass.' },
+            ],
+          }
         }),
       canGenerate: true,
       complete: request =>
@@ -155,6 +162,7 @@ const fakeMonitor = (links: { kind: 'watch' | 'link'; url: string; sessionId: st
       list: () => Effect.die('unused'),
       unwatch: () => Effect.die('unused'),
       pollAll: Effect.void,
+      refresh: () => Effect.succeed(0),
     }),
   )
 
@@ -163,12 +171,13 @@ const harness = (options: { jj?: JjScript; gh?: GhScript; answer?: string; proje
   const created: GitHubPullRequestCreate[] = []
   const completions: ThreadCompletion[] = []
   const links: { kind: 'watch' | 'link'; url: string; sessionId: string }[] = []
+  const threadReads: string[] = []
   const layer = PullRequestCreator.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
         fakeJj(options.jj ?? {}, jjCalls),
         fakeForge(options.gh ?? {}, created),
-        fakeThread(completions, options.answer),
+        fakeThread(completions, threadReads, options.answer),
         fakeMonitor(links),
         options.projectBase === undefined
           ? ProjectBase.none
@@ -176,12 +185,34 @@ const harness = (options: { jj?: JjScript; gh?: GhScript; answer?: string; proje
       ),
     ),
   )
-  return { layer, jjCalls, created, completions, links }
+  return { layer, jjCalls, created, completions, links, threadReads }
 }
 
 const confirmed = { confirm: true as const, title: 'Add sprockets', body: 'Body', bookmark: 'dsh/widget-sprockets', base: 'main', headCommitId: HEAD }
 
 describe('pull request creation', () => {
+  it.effect('pushing and opening the pull request read only the thread directory, never its conversation', () => {
+    const run = harness()
+    return Effect.gen(function* () {
+      yield* PullRequestCreator.use(creator => creator.create(confirmed, caller))
+      expect(run.threadReads).toEqual(['cwd'])
+      run.threadReads.length = 0
+      yield* PullRequestCreator.use(creator => creator.create({ ...confirmed, cwd: CWD }, caller))
+      expect(run.threadReads).toEqual([])
+    }).pipe(Effect.provide(run.layer))
+  })
+
+  it.effect('a preview reads the conversation only when the model drafts the pull request', () => {
+    const drafted = harness()
+    const nothingToDraft = harness({ jj: { commits: '' } })
+    return Effect.gen(function* () {
+      yield* PullRequestCreator.use(creator => creator.preview({}, caller)).pipe(Effect.provide(drafted.layer))
+      expect(drafted.threadReads.filter(read => read === 'conversation')).toHaveLength(1)
+      yield* PullRequestCreator.use(creator => creator.preview({}, caller)).pipe(Effect.provide(nothingToDraft.layer))
+      expect(nothingToDraft.threadReads).not.toContain('conversation')
+    })
+  })
+
   it.effect('targets the project main branch when the project chose one, instead of the GitHub default branch', () => {
     const run = harness({ projectBase: 'develop' })
     return Effect.gen(function* () {

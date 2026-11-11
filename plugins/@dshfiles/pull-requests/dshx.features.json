@@ -5,7 +5,7 @@
     {
       "id": "github-pull-request-links",
       "title": "Link and watch GitHub pull requests from DSH threads",
-      "summary": "Durably links GitHub.com pull requests to threads, polls each watched repository and number every two minutes through gh, queues concise state transitions, and asks thread-sidebar to settle merged or closed threads.",
+      "summary": "Durably links GitHub.com pull requests to threads, refreshes a thread's watched pull requests through gh when its push command returns, its turn ends or a link is added (3-second debounce), sweeps every watched one every ten minutes as a fallback, queues concise state transitions, and asks thread-sidebar to settle merged or closed threads.",
       "surfaces": ["host", "tool", "integration"],
       "surface": "agentToolOnly",
       "destination": "none",
@@ -44,14 +44,26 @@
           "testName": "links, lists, unwatches and unlinks a PR through the served API"
         },
         {
+          "kind": "unit-test",
+          "id": "pull-requests.event-refresh",
+          "file": "plugins/@dshfiles/pull-requests/tests/refresh-triggers.spec.ts",
+          "testName": "one hour, five watched pull requests, two pushes: gh calls before and after"
+        },
+        {
           "kind": "not-applicable",
           "id": "pull-requests.no-browser-journey",
           "reason": "Linking and watching are Agent tools with no browser UI of their own; creating a pull request (github-pull-request-create) links its result through this path in the browser journey. The served API is exercised through a real test Host in tests/host.spec.ts."
         }
       ],
       "telemetry": [
-        { "kind": "automatic", "source": "api-dispatch" },
-        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
         {
           "kind": "custom",
           "span": "pull request gh repo",

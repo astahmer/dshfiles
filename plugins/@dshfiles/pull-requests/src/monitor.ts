@@ -35,6 +35,10 @@ const MAX_BACKOFF_MS = 60 * 60_000
 /** Watched pull requests polled at once: one `gh` call each, kept modest for GitHub's API budget. */
 const POLL_CONCURRENCY = 6
 const SETTLE_SOURCE = '@dshfiles/pull-requests'
+/** An event-driven refresh skips a pull request checked this recently: a burst of thread events costs one `gh` call. */
+export const EVENT_REFRESH_MIN_AGE_MS = 20_000
+
+const pullRequestKey = (record: Pick<PullRequestRecord, 'repo' | 'number'>): string => `${record.repo.toLowerCase()}#${String(record.number)}`
 
 export class PullRequestSessionRequired extends Schema.TaggedError<PullRequestSessionRequired>()('PullRequestSessionRequired', {
   reason: Schema.String,
@@ -162,6 +166,11 @@ export class PullRequestMonitor extends Context.Service<
     readonly watch: (input: PullRequestLinkInput, caller: ApiCaller) => Effect.Effect<PullRequestRecord, PullRequestMonitorError>
     readonly unwatch: (input: PullRequestTargetInput, caller: ApiCaller) => Effect.Effect<PullRequestRecord, PullRequestMonitorError>
     readonly pollAll: Effect.Effect<void, PullRequestMonitorError>
+    /**
+     * Poll the watched pull requests these threads link, now, once each: the event-driven path (a push, a turn end, a
+     * new link). A pull request checked within `minAgeMs` or in rate-limit backoff is skipped; answers how many polled.
+     */
+    readonly refresh: (input: { readonly sessionIds: readonly string[]; readonly minAgeMs: number }) => Effect.Effect<number, PullRequestMonitorError>
   }
 >()('@dshfiles/pull-requests/PullRequestMonitor') {
   static readonly layer = Layer.effect(
@@ -305,20 +314,19 @@ export class PullRequestMonitor extends Context.Service<
         }
       })
 
-      const pollAll = Effect.fn('pull-requests poll all')(function* () {
-        const watchers = yield* store.watched
+      const groupsOf = (watchers: readonly PullRequestRecord[]): readonly (readonly PullRequestRecord[])[] => {
         const groups = new Map<string, PullRequestRecord[]>()
         for (const watcher of watchers) {
-          const key = `${watcher.repo.toLowerCase()}#${String(watcher.number)}`
+          const key = pullRequestKey(watcher)
           const group = groups.get(key)
           if (group === undefined) groups.set(key, [watcher])
           else group.push(watcher)
         }
-        const targets = [...groups.values()].flatMap(group => {
-          const first = group[0]
-          return first === undefined ? [] : [{ repo: first.repo, number: first.number }]
-        })
-        yield* Effect.forEach(
+        return [...groups.values()]
+      }
+
+      const pollTargets = (targets: readonly { readonly repo: string; readonly number: number }[]) =>
+        Effect.forEach(
           targets,
           target =>
             pollPullRequest({ ...target, force: false }).pipe(
@@ -331,10 +339,35 @@ export class PullRequestMonitor extends Context.Service<
             ),
           { concurrency: POLL_CONCURRENCY, discard: true },
         )
+
+      const refresh = Effect.fn('pull-requests refresh')(function* (input: { readonly sessionIds: readonly string[]; readonly minAgeMs: number }) {
+        const sessionIds = new Set(input.sessionIds)
+        const now = yield* Clock.currentTimeMillis
+        const watched = yield* store.watched
+        const linked = new Set(watched.filter(record => sessionIds.has(record.sessionId)).map(pullRequestKey))
+        const targets = groupsOf(watched.filter(record => linked.has(pullRequestKey(record)))).flatMap(group => {
+          const first = group[0]
+          if (first === undefined) return []
+          const fresh = group.some(record => record.lastCheckedAt !== null && now - record.lastCheckedAt < input.minAgeMs)
+          return fresh ? [] : [{ repo: first.repo, number: first.number }]
+        })
+        yield* pollTargets(targets)
+        return targets.length
+      })
+
+      const pollAll = Effect.fn('pull-requests poll all')(function* () {
+        const targets = groupsOf(yield* store.watched).flatMap(group => {
+          const first = group[0]
+          return first === undefined ? [] : [{ repo: first.repo, number: first.number }]
+        })
+        yield* pollTargets(targets)
       })
 
       const link = Effect.fn('pull-requests link')(function* (input: PullRequestLinkInput, caller: ApiCaller) {
-        return yield* store.upsert(yield* resolveLinkInput(input, caller))
+        const linked = yield* store.upsert(yield* resolveLinkInput(input, caller))
+        // A new link to a pull request another thread watches refreshes it now instead of at the next sweep.
+        yield* refresh({ sessionIds: [linked.sessionId], minAgeMs: EVENT_REFRESH_MIN_AGE_MS }).pipe(Effect.ignore)
+        return linked
       })
 
       const unlink = Effect.fn('pull-requests unlink')(function* (input: PullRequestTargetInput, caller: ApiCaller) {
@@ -370,7 +403,7 @@ export class PullRequestMonitor extends Context.Service<
         return record
       })
 
-      return PullRequestMonitor.of({ link, unlink, list, watch, unwatch, pollAll: pollAll() })
+      return PullRequestMonitor.of({ link, unlink, list, watch, unwatch, pollAll: pollAll(), refresh })
     }),
   )
 }
