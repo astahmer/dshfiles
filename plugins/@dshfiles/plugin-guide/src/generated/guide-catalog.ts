@@ -1254,6 +1254,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/input-trigger/types",
+      "kind": "module",
+      "title": "@dshfiles/input-trigger/types",
+      "summary": "Input-trigger provider contract. Types only — no runtime code. The conversation input layer owns the shared machine currency; the client boundary re-exports it for trigger providers. Providers receive a {@link ClientSessionContext} projection per call — never a Cordis context or the mutable Session. RPC and service ac…",
+      "publicSymbol": "ClientSessionContext, TriggerChar, TriggerPosition, PickVia, PickAction, InputTriggerCandidateIcon",
+      "importFrom": "@dshfiles/input-trigger/types",
+      "owner": "@dshfiles/input-trigger",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [
+        "Also exports: InputTriggerCandidate, InputTriggerCrumb, HeaderRequest, SubmitEnvelope, CandidateRequest, InputTriggerPick, ReferenceCodec, RestoredReference, InputTriggerSource, TriggerGuard"
+      ],
+      "source": "plugins/@dshfiles/input-trigger/src/types.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
@@ -1620,7 +1642,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "automationsApi",
       "importFrom": "@dshfiles/project-automations/api",
       "owner": "@dshfiles/project-automations",
-      "source": "plugins/@dshfiles/project-automations/src/automations-api.ts:122",
+      "source": "plugins/@dshfiles/project-automations/src/automations-api.ts:131",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/project-automations:project-automations",
@@ -1706,7 +1728,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "pullRequestApi",
       "importFrom": "@dshfiles/pull-requests/api",
       "owner": "@dshfiles/pull-requests",
-      "source": "plugins/@dshfiles/pull-requests/src/api.ts:47",
+      "source": "plugins/@dshfiles/pull-requests/src/api.ts:48",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/pull-requests:pull-requests",
@@ -1719,8 +1741,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/pull-requests owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: link, unlink, list, watch, createPreview, create, unwatch",
-        "Agent tools: pull_request_link, pull_request_unlink, pull_request_list (read-only), pull_request_watch, pull_request_create_preview (read-only), pull_request_create, pull_request_unwatch"
+        "Methods: search, link, unlink, list, watch, createPreview, create, unwatch",
+        "Agent tools: pull_request_search (read-only), pull_request_link, pull_request_unlink, pull_request_list (read-only), pull_request_watch, pull_request_create_preview (read-only), pull_request_create, pull_request_unwatch"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2285,6 +2307,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "details": [
         "Registry id: @dshfiles/thread-sidebar.pending-restart-source"
       ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/thread-sidebar/fan-out-request",
+      "kind": "module",
+      "title": "@dshfiles/thread-sidebar/fan-out-request",
+      "summary": "A picker gesture asks the sidebar's fan-out dialog to open with its models preselected. Published as the `@dshfiles/thread-sidebar/fan-out-request` dshx module; importing it loads none of the sidebar's runtime.",
+      "publicSymbol": "FanOutRouteRequest, FAN_OUT_REQUEST_EVENT, fanOutRoutesOf, requestFanOut",
+      "importFrom": "@dshfiles/thread-sidebar/fan-out-request",
+      "owner": "@dshfiles/thread-sidebar",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/thread-sidebar/src/fan-out-request.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2973,7 +3015,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-preset › draft-preset-selection"
       ],
       "details": [
-        "Used by 64 catalog feature(s)",
+        "Used by 65 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
