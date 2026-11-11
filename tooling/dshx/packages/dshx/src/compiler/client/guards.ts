@@ -7,9 +7,11 @@ import { DshxError } from '../../diagnostics.js'
 import { decodeJsonSafe } from '../../json.js'
 import { withUnknownProperties } from '../../schema.js'
 import { containsPrivateDshxImport } from '../private-imports.js'
+import { SecureContextCalls } from './secure-context.js'
 
 // util-values (pure partial-JSON argument reader, no dependencies or globals) was added for @dshfiles/turn-summary.
-const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|file-reference|session|llm|tools|brand|util-values)(\/|$)/
+// util-crypto (randomUUID over getRandomValues) is the secure-context-free UUID every client mints ids with.
+const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|file-reference|session|llm|tools|brand|util-values|util-crypto)(\/|$)/
 const VENDORED_LIBRARY = /^@deepseek-ai\/(cosmokit|schemastery)(\/|$)/
 const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
 
@@ -179,6 +181,16 @@ function singleClientChunkPlugin(lazyChunks: ReadonlySet<string> = new Set()): P
       }
       if (asset.type === 'asset' && containsPrivateDshxImport(code)) {
         throw new DshxError('DSHX1101', `Lazy chunk ${asset.fileName} retained a private DSHX runtime import.`)
+      }
+      const insecure = SecureContextCalls.unguardedCalls(code)[0]
+      if (insecure !== undefined) {
+        throw new DshxError(
+          'DSHX1101',
+          `${asset.fileName} calls ${insecure.api} unguarded, which throws on a page opened over plain HTTP (a LAN or tailnet address): …${insecure.excerpt}…`,
+          {
+            hint: `Use ${insecure.replacement}, or check typeof ${insecure.api} === 'function' right before the call.`,
+          },
+        )
       }
     }
     const unexpectedAssets = assets.filter(asset => !asset.fileName.endsWith('.js.map') && !lazyChunks.has(asset.fileName))
