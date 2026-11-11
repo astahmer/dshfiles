@@ -32,6 +32,21 @@ describe('MCP 2026-07-28 request metadata', () => {
     expect(StatelessMcpModel.request({ id: 8, method: 'tools/list', params: {} }).headers).not.toHaveProperty('Mcp-Name')
   })
 
+  it('preserves valid metadata but overrides reserved fields and ignores non-objects', () => {
+    const reserved = {
+      'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+      'io.modelcontextprotocol/clientInfo': { name: 'dshfiles-mcp-servers', version: '0.1.0' },
+      'io.modelcontextprotocol/clientCapabilities': {},
+    }
+    const request = (meta: unknown) => StatelessMcpModel.request({ id: 1, method: 'tools/list', params: { _meta: meta } }).body
+    expect(request({ custom: 1, ['__proto__']: 'safe', 'io.modelcontextprotocol/protocolVersion': 'old' })).toBe(
+      JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _meta: { custom: 1, ['__proto__']: 'safe', ...reserved } } }),
+    )
+    for (const meta of [null, 'invalid', []]) {
+      expect(request(meta)).toBe(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _meta: reserved } }))
+    }
+  })
+
   it('accepts x-mcp-header only on primitive properties reachable through properties keys', () => {
     const valid = StatelessMcpModel.paramHeaders({
       type: 'object',

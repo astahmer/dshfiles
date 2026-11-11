@@ -156,10 +156,11 @@ const request = (input: {
   readonly params: JsonRecord
   readonly extraHeaders?: Readonly<Record<string, string>> | undefined
 }): { readonly body: string; readonly headers: Readonly<Record<string, string>> } => {
+  const previousMetadata = isRecord(input.params['_meta']) ? input.params['_meta'] : undefined
   const params = {
     ...input.params,
     _meta: {
-      ...(isRecord(input.params['_meta']) ? input.params['_meta'] : {}),
+      ...previousMetadata,
       'io.modelcontextprotocol/protocolVersion': MODERN_PROTOCOL_VERSION,
       'io.modelcontextprotocol/clientInfo': CLIENT_INFO,
       'io.modelcontextprotocol/clientCapabilities': {},
