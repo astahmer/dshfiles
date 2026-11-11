@@ -370,9 +370,9 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
           {pulls.map(pull => {
             const Icon = pullStateIcons[pull.state]
             return (
-              <li key={pull.url} className="dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-[13px]">
+              <li key={pull.url} className="dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-[13px] dshx:max-sm:min-h-11 dshx:pointer-coarse:min-h-11">
                 <Icon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0', pullStateTones[pull.state])} />
-                <a href={pull.url} target="_blank" rel="noreferrer" className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:hover:underline">
+                <a href={pull.url} target="_blank" rel="noreferrer" className="dshx:min-w-0 dshx:flex-1 dshx:self-stretch dshx:content-center dshx:truncate dshx:hover:underline">
                   {pull.repo}#{pull.number}
                 </a>
                 <span aria-label={`State ${pull.state}`} className={cn('dshx:text-[11px]', pullStateTones[pull.state])}>
@@ -390,9 +390,9 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
           {issues.map(issue => {
             const Icon = issueStateIcons[issue.state]
             return (
-              <li key={issue.url} className="dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-[13px]">
+              <li key={issue.url} className="dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-[13px] dshx:max-sm:min-h-11 dshx:pointer-coarse:min-h-11">
                 <Icon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0', issueStateTones[issue.state])} />
-                <a href={issue.url} target="_blank" rel="noreferrer" className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:hover:underline">
+                <a href={issue.url} target="_blank" rel="noreferrer" className="dshx:min-w-0 dshx:flex-1 dshx:self-stretch dshx:content-center dshx:truncate dshx:hover:underline">
                   {issue.repo}#{issue.number}
                 </a>
                 <span aria-label={`Issue state ${issue.state}`} className={cn('dshx:text-[11px]', issueStateTones[issue.state])}>
