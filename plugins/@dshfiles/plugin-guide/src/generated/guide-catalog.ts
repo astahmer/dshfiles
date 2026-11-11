@@ -3002,7 +3002,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › inline-title-edit"
       ],
       "details": [
-        "Used by 34 catalog feature(s)",
+        "Used by 35 catalog feature(s)",
         "Destinations in use: inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3198,7 +3198,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › bounded-batch-resolution"
       ],
       "details": [
-        "Used by 26 catalog feature(s)",
+        "Used by 27 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
