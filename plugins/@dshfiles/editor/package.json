@@ -16,7 +16,10 @@
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js",
-    "./artifacts-api": { "types": "./src/artifacts-api.ts", "default": "./dist/artifacts-api.js" }
+    "./artifacts-api": {
+      "types": "./src/artifacts-api.ts",
+      "default": "./dist/artifacts-api.js"
+    }
   },
   "scripts": {
     "build": "dshx build",
