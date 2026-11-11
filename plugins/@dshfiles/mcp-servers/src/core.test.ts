@@ -12,7 +12,7 @@ type StoredStdioServer = Extract<StoredServer, { readonly transport: 'stdio' }>
 
 const draftSchema = Schema.Union([stdioDraftSchema, httpDraftSchema])
 
-const acceptsDraft = (value: unknown): boolean => Schema.decodeUnknownResult(draftSchema, { onExcessProperty: 'error' })(value)._tag === 'Success'
+const checkDraft = (value: unknown): boolean => Schema.decodeUnknownResult(draftSchema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 
 const server = (overrides: Partial<StoredStdioServer> = {}): StoredStdioServer => ({
   id: 'one',
@@ -62,7 +62,7 @@ describe('MCP manager state', () => {
 
   it('rejects secret values where only credential references are allowed', () => {
     expect(
-      acceptsDraft({
+      checkDraft({
         id: '',
         name: 'Remote',
         serverName: 'remote',
@@ -86,20 +86,20 @@ describe('MCP manager state', () => {
       headerRefs: { Authorization: 'REMOTE_TOKEN' },
       startCommand: { commandLine: 'npx -y @example/tunnel', cwd: '/opt/tunnel', envRefs: { ACCESS_TOKEN: 'TUNNEL_TOKEN' } },
     }
-    expect(acceptsDraft(valid)).toBe(true)
+    expect(checkDraft(valid)).toBe(true)
     expect(
-      acceptsDraft({
+      checkDraft({
         ...valid,
         startCommand: { ...valid.startCommand, cwd: 'relative/path' },
       }),
     ).toBe(false)
-    expect(acceptsDraft({ ...valid, startCommand: null, credential: 'plaintext' })).toBe(false)
+    expect(checkDraft({ ...valid, startCommand: null, credential: 'plaintext' })).toBe(false)
   })
 
   it('rejects credential-bearing URL userinfo, query strings, and fragments', () => {
     for (const url of ['https://user:password@example.com/mcp', 'https://example.com/mcp?access_token=secret', 'https://example.com/mcp#token=secret']) {
       expect(
-        acceptsDraft({
+        checkDraft({
           id: '',
           name: 'Remote',
           serverName: 'remote',
@@ -113,8 +113,7 @@ describe('MCP manager state', () => {
   })
 
   it('accepts plain HTTP only on a loopback host, like the OAuth endpoints', () => {
-    const draft = (url: string) =>
-      acceptsDraft({ id: '', name: 'Local', serverName: 'local', enabled: true, transport: 'streamable-http', url, headerRefs: {} })
+    const draft = (url: string) => checkDraft({ id: '', name: 'Local', serverName: 'local', enabled: true, transport: 'streamable-http', url, headerRefs: {} })
     expect(draft('http://127.0.0.1:4100/mcp')).toBe(true)
     expect(draft('http://localhost:4100/mcp')).toBe(true)
     expect(draft('http://example.com/mcp')).toBe(false)

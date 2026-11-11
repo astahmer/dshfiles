@@ -3,8 +3,7 @@ import { Schema } from 'effect'
 import { projectChecksConfigSchema, ProjectChecksModel } from './core.js'
 
 /** The profile config is decoded with its defaults and rejects an undeclared key, exactly as the Host reads it. */
-const acceptsConfig = (value: unknown): boolean =>
-  Schema.decodeUnknownResult(projectChecksConfigSchema, { onExcessProperty: 'error' })(value)._tag === 'Success'
+const checkConfig = (value: unknown): boolean => Schema.decodeUnknownResult(projectChecksConfigSchema, { onExcessProperty: 'error' })(value)._tag === 'Success'
 import { ProjectChecksReceiptModel, storedReceiptSchema, type StoredReceipt } from './store.js'
 
 describe('trusted project actions', () => {
@@ -16,8 +15,8 @@ describe('trusted project actions', () => {
       root: '/work/project',
     }
 
-    expect(acceptsConfig({ actions: [action, action] })).toBe(false)
-    expect(acceptsConfig({ actions: [{ ...action, root: 'project' }] })).toBe(false)
+    expect(checkConfig({ actions: [action, action] })).toBe(false)
+    expect(checkConfig({ actions: [{ ...action, root: 'project' }] })).toBe(false)
     expect(Schema.decodeUnknownSync(projectChecksConfigSchema)({ actions: [action] }).actions[0]).toMatchObject({ timeoutMs: 60_000, replayPolicy: 'manual' })
     expect(Schema.decodeUnknownSync(projectChecksConfigSchema)(undefined).actions).toEqual([])
   })
@@ -124,11 +123,11 @@ describe('trusted project actions', () => {
     })
 
     it('rejects duplicate remote ids, relative workspaces and unknown remote references', () => {
-      expect(acceptsConfig({ remotes: [remote, remote] })).toBe(false)
-      expect(acceptsConfig({ remotes: [{ ...remote, workspace: 'relative/path' }] })).toBe(false)
-      expect(acceptsConfig({ remotes: [{ ...remote, sshTarget: '-o ProxyCommand=evil' }] })).toBe(false)
+      expect(checkConfig({ remotes: [remote, remote] })).toBe(false)
+      expect(checkConfig({ remotes: [{ ...remote, workspace: 'relative/path' }] })).toBe(false)
+      expect(checkConfig({ remotes: [{ ...remote, sshTarget: '-o ProxyCommand=evil' }] })).toBe(false)
       expect(
-        acceptsConfig({
+        checkConfig({
           actions: [{ ...action, execution: { target: 'remote', remote: 'missing' } }],
           remotes: [remote],
         }),
@@ -136,10 +135,10 @@ describe('trusted project actions', () => {
     })
 
     it('requires an enabled remote for a hard remote target but allows auto without one', () => {
-      expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }] })).toBe(false)
-      expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [{ ...remote, enabled: false }] })).toBe(false)
-      expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [remote] })).toBe(true)
-      expect(acceptsConfig({ actions: [{ ...action, execution: { target: 'auto' } }] })).toBe(true)
+      expect(checkConfig({ actions: [{ ...action, execution: { target: 'remote' } }] })).toBe(false)
+      expect(checkConfig({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [{ ...remote, enabled: false }] })).toBe(false)
+      expect(checkConfig({ actions: [{ ...action, execution: { target: 'remote' } }], remotes: [remote] })).toBe(true)
+      expect(checkConfig({ actions: [{ ...action, execution: { target: 'auto' } }] })).toBe(true)
     })
 
     it('keeps install detection configurable per remote', () => {
@@ -151,7 +150,7 @@ describe('trusted project actions', () => {
         whenPaths: ['pnpm-lock.yaml', 'pnpm-workspace.yaml'],
         timeoutMs: 300_000,
       })
-      expect(acceptsConfig({ remotes: [{ ...remote, install: { command: [] } }] })).toBe(false)
+      expect(checkConfig({ remotes: [{ ...remote, install: { command: [] } }] })).toBe(false)
     })
   })
 })

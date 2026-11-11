@@ -6,7 +6,7 @@ import { aiAccountsApi, type AccountsFile, type NativeProviders } from './api.js
 import { AccountDraftModel } from './account-draft.js'
 
 /** What an older Host actually sends: JSON that the current schema types do not describe. */
-const overTheWire = (value: unknown) => JSON.parse(JSON.stringify(value))
+const toWire = (value: unknown) => JSON.parse(JSON.stringify(value))
 
 const usageCard = { status: 'ok', message: null, identity: null, plan: null, windows: [], bankedResets: 0, bankedResetExpiries: [] }
 
@@ -76,14 +76,14 @@ describe('ai-accounts queries', () => {
   })
 
   it('keeps usage polling in the background and refreshes on focus', async () => {
-    const options = aiAccountsQueries.usage({ usage: async () => overTheWire({ readAt: 1, hostName: 'mac', cards: [] }) }, 60_000)
+    const options = aiAccountsQueries.usage({ usage: async () => toWire({ readAt: 1, hostName: 'mac', cards: [] }) }, 60_000)
     expect(options.refetchOnWindowFocus).toBe('always')
     expect(options.refetchIntervalInBackground).toBe(true)
   })
 
   it('reads usage from an older Host by filling the labels it does not send', async () => {
     const options = aiAccountsQueries.usage(
-      { usage: async () => overTheWire({ readAt: 1, hostName: 'mac', cards: [{ instanceId: 'work', kind: 'codex', enabled: true, usage: usageCard }] }) },
+      { usage: async () => toWire({ readAt: 1, hostName: 'mac', cards: [{ instanceId: 'work', kind: 'codex', enabled: true, usage: usageCard }] }) },
       60_000,
     )
     const usage = await new QueryClient().fetchQuery(options)
@@ -91,7 +91,7 @@ describe('ai-accounts queries', () => {
   })
 
   it('reports an unreadable usage answer as null rather than failing the surface', async () => {
-    const usage = await new QueryClient().fetchQuery(aiAccountsQueries.usage({ usage: async () => overTheWire({ cards: 'nope' }) }, 60_000))
+    const usage = await new QueryClient().fetchQuery(aiAccountsQueries.usage({ usage: async () => toWire({ cards: 'nope' }) }, 60_000))
     expect(usage).toBeNull()
   })
 
@@ -100,7 +100,7 @@ describe('ai-accounts queries', () => {
     const sweep = (readAt: number, usage: unknown) =>
       aiAccountsQueries.keepLastGoodUsage(
         null,
-        overTheWire({ readAt, hostName: 'mac', cards: [{ instanceId: 'work', displayName: 'Work', kind: 'claude', enabled: true, usage }] }),
+        toWire({ readAt, hostName: 'mac', cards: [{ instanceId: 'work', displayName: 'Work', kind: 'claude', enabled: true, usage }] }),
       )
     const merged = aiAccountsQueries.keepLastGoodUsage(
       // An older Host sends no card time, so the sweep that carried the reading dates it.
@@ -122,7 +122,7 @@ describe('ai-accounts queries', () => {
   })
 
   it('marks every kept reading when the Host answer cannot be read', () => {
-    const previous = overTheWire({
+    const previous = toWire({
       readAt: 1_000,
       hostName: 'mac',
       cards: [{ instanceId: 'work', displayName: 'Work', kind: 'codex', enabled: true, usage: { ...usageCard, readAt: 900 } }],
@@ -135,7 +135,7 @@ describe('ai-accounts queries', () => {
     const sweep = (usage: unknown) =>
       aiAccountsQueries.keepLastGoodUsage(
         null,
-        overTheWire({ readAt: 1, hostName: 'mac', cards: [{ instanceId: 'work', displayName: 'Work', kind: 'mistral', enabled: true, usage }] }),
+        toWire({ readAt: 1, hostName: 'mac', cards: [{ instanceId: 'work', displayName: 'Work', kind: 'mistral', enabled: true, usage }] }),
       )
     const windows = [{ label: 'Monthly limit', percentRemaining: 0, resetsAt: null }]
     const merged = aiAccountsQueries.keepLastGoodUsage(sweep(usageCard), sweep({ ...usageCard, status: 'rate-limited', windows }))
@@ -164,7 +164,7 @@ describe('ai-accounts queries', () => {
       { cards: 'nope' },
     ]
     const client = new QueryClient()
-    const options = aiAccountsQueries.usage({ usage: async () => overTheWire(answers.shift()) }, 60_000)
+    const options = aiAccountsQueries.usage({ usage: async () => toWire(answers.shift()) }, 60_000)
     await client.fetchQuery(options)
 
     const afterFailure = await client.fetchQuery(options)
@@ -206,7 +206,7 @@ describe('ai-accounts queries', () => {
         },
         usage: async () => {
           fallbackReads += 1
-          return overTheWire({ readAt: 2, hostName: 'mac', cards: [] })
+          return toWire({ readAt: 2, hostName: 'mac', cards: [] })
         },
       }),
     ).rejects.toThrow('usage read timed out')

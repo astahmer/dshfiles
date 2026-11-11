@@ -46,7 +46,7 @@ describe('API input schemas', () => {
   it('preserves reply attachments when omitted and accepts explicit replacement lists', async () => {
     const schema = backlogApi.methods.editComment.input
     if (schema === undefined) throw new Error('Edit reply input schema is missing')
-    const validate = (value: unknown) => Schema.decodeUnknownResult(schema)(value)
+    const decodeInput = (value: unknown) => Schema.decodeUnknownResult(schema)(value)
     const replacement = {
       id: 'reply-image-1',
       kind: 'image',
@@ -56,10 +56,10 @@ describe('API input schemas', () => {
       data: 'iVBORw==',
     }
 
-    expect(Result.isSuccess(validate({ id: 1, commentId: 'reply-1', text: 'Edited reply' }))).toBe(true)
-    expect(Result.isSuccess(validate({ id: 1, commentId: 'reply-1', text: 'Edited reply', files: [replacement] }))).toBe(true)
-    expect(Result.isSuccess(validate({ id: 1, commentId: 'reply-1', text: 'Edited reply', files: [] }))).toBe(true)
-    expect(Result.isFailure(validate({ id: 1, commentId: 'reply-1', text: '', files: [] }))).toBe(true)
+    expect(Result.isSuccess(decodeInput({ id: 1, commentId: 'reply-1', text: 'Edited reply' }))).toBe(true)
+    expect(Result.isSuccess(decodeInput({ id: 1, commentId: 'reply-1', text: 'Edited reply', files: [replacement] }))).toBe(true)
+    expect(Result.isSuccess(decodeInput({ id: 1, commentId: 'reply-1', text: 'Edited reply', files: [] }))).toBe(true)
+    expect(Result.isFailure(decodeInput({ id: 1, commentId: 'reply-1', text: '', files: [] }))).toBe(true)
   })
 })
 
