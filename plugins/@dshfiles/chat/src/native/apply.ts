@@ -46,9 +46,11 @@ import { derivePresentationPolicy } from './presentation-policy.ts'
 import { CHAT_SETTINGS_NAMESPACE, DEFAULT_LINK_OPENING, DEFAULT_TRANSCRIPT_VIEW_MODE, type ChatSettings } from '../chat-settings.ts'
 import { LinkOpeningRow, type LinkOpeningRowInjected } from './settings/LinkOpeningRow.tsx'
 import { ImageGalleryScopeRow, type ImageGalleryScopeRowInjected } from './settings/ImageGalleryScopeRow.tsx'
+import { UnreadLandingRow, type UnreadLandingRowInjected } from './settings/UnreadLandingRow.tsx'
 import { PerformanceUsageRow, type PerformanceUsageRowInjected } from './settings/PerformanceUsageRow.tsx'
 import { PerformanceUsagePolicy } from './performance-usage.ts'
 import { ImageGalleryScopePolicy } from './image-gallery-scope.ts'
+import { SeenAnswers, UnreadLandingPolicy } from './unread-landing.ts'
 import { useTurnDataValue } from './chat/use-turn-data.ts'
 import { bindDisclosure } from './chat/use-disclosure.ts'
 import { useFlowHidden, useMotionHidden } from './chat/flow-motion.ts'
@@ -141,6 +143,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
   const t = ctx.locale.bind(NS)
   const chatStore = createChatStore()
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
+  const seenAnswers = new SeenAnswers(typeof localStorage === 'undefined' ? null : localStorage)
   const chatSettings = ctx.configForms.get<ChatSettings>(CHAT_SETTINGS_NAMESPACE)
   const linkOpening = createSnapshotStore(chatSettings.getSnapshot().value?.linkOpening ?? DEFAULT_LINK_OPENING)
   ctx.effect(() => chatSettings.subscribe(() => {
@@ -173,7 +176,8 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
   const presentation = derivePresentationPolicy(transcriptView.mode, transcriptView.collapseTiming)
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   const imageGalleryScope = new ImageGalleryScopePolicy(chatSettings)
-  ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose(); imageGalleryScope.dispose() })
+  const unreadLanding = new UnreadLandingPolicy(chatSettings)
+  ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose(); imageGalleryScope.dispose(); unreadLanding.dispose() })
   const performanceUsage = performancePolicy.mode
   registerChatNodeRenderers(ctx, performanceUsage, presentation, decorate)
   ctx.slots.registerFactory({
@@ -191,6 +195,17 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       setImageGalleryScope: scope => { imageGalleryScope.setScope(scope) },
     }),
   }, ImageGalleryScopeRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'unread-landing',
+    order: 19,
+    locale: NS,
+    inject: (): UnreadLandingRowInjected => ({
+      hooks: { unreadLanding: unreadLanding.landing },
+      setUnreadLanding: landing => { unreadLanding.setLanding(landing) },
+    }),
+  }, UnreadLandingRow))
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -219,7 +234,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     const chat = chatSource(binding)
     const conversation = ctx.uiConversation.binding(binding)
     return {
-      hooks: { presentation, imageGalleryScope: imageGalleryScope.scope },
+      hooks: { presentation, imageGalleryScope: imageGalleryScope.scope, unreadLanding: unreadLanding.landing },
       keyedHooks: {
         chatNode: key => chat.getSnapshot().nodes.source(key),
         chatNodeBottom: key => chat.getSnapshot().nodes.bottomSource(key),
@@ -236,7 +251,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
     },
     inject: (sessionId: SessionId): ChatFlowDataInjected => {
       const binding = ctx.sessions.binding(sessionId)
-      if (binding === undefined) return detachedFlow(presentation, imageGalleryScope.scope)
+      if (binding === undefined) return detachedFlow(presentation, imageGalleryScope.scope, unreadLanding.landing)
       return nodeSources(binding)
     },
   }, ChatFlow))
@@ -254,7 +269,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       store: chatStore,
       inject: (sessionId: SessionId): ChatViewInjected => {
         const binding = ctx.sessions.binding(sessionId)
-        if (binding === undefined) return detachedView(presentation, imageGalleryScope.scope)
+        if (binding === undefined) return detachedView(presentation, imageGalleryScope.scope, unreadLanding.landing)
         const session = binding.session
         const chat = chatSource(binding)
         return {
@@ -303,6 +318,10 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
               else chatScrollPositions.set(sessionId, position)
             },
             read: () => chatScrollPositions.get(sessionId) ?? null,
+          },
+          seenAnswer: {
+            read: () => seenAnswers.read(sessionId),
+            markSeen: (anchorKey) => { seenAnswers.markSeen(sessionId, anchorKey) },
           },
           forkAt: (seq) => {
             const turn = [...chat.getSnapshot().timeline.turns.values()].find(turn => turn.end?.seq === seq)

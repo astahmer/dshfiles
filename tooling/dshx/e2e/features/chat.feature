@@ -6,6 +6,14 @@ Feature: Chat browser journeys
     When a real thread with one hundred eighty transcript turns is opened
     Then the latest transcript rows are visible and older rows appear when scrolling up
 
+  @scenario:chat.unread-final-answer
+  Scenario: An unread thread opens at its final answer, and at its end once read
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted
+    When a thread with a long unread final answer is opened
+    Then the thread opens at the start of its final answer under a New divider
+    When the reader reaches its end and opens the thread again
+    Then the thread opens at its end without a divider
+
   @scenario:chat.windowed-transcript-steady-scroll
   Scenario: Scrolling up a long transcript never jumps while older rows mount
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted

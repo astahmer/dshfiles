@@ -2,9 +2,9 @@
 import type {} from '@deepseek-ai/dsh-settings'
 
 import type { Volatile, Context } from '@deepseek-ai/cordis'
-import type { ChatSettings, CollapseTiming, ImageGalleryScope, LinkOpening, PerformanceUsageMode } from './chat-settings.ts'
+import type { ChatSettings, CollapseTiming, ImageGalleryScope, LinkOpening, PerformanceUsageMode, UnreadLanding } from './chat-settings.ts'
 import z from '@deepseek-ai/schemastery'
-import { IMAGE_GALLERY_SCOPE_FIELD, TRANSCRIPT_VIEW_FIELD } from './chat-settings.ts'
+import { IMAGE_GALLERY_SCOPE_FIELD, TRANSCRIPT_VIEW_FIELD, UNREAD_LANDING_FIELD } from './chat-settings.ts'
 
 import { ChatSettingsFields } from './chat-settings.ts'
 
@@ -19,6 +19,8 @@ export interface Config {
   /** Default destination for Chat HTTP(S) links. */
   linkOpening: Volatile<LinkOpening>
   imageGalleryScope: Volatile<ImageGalleryScope>
+  /** Where a thread with an unseen final answer opens. */
+  unreadLanding: Volatile<UnreadLanding>
 }
 
 /** Live preferences projected to the browser. */
@@ -28,6 +30,7 @@ export const Config = z.object({
   performanceUsage: ChatSettingsFields['performanceUsage'].volatile(),
   linkOpening: ChatSettingsFields.linkOpening.volatile(),
   [IMAGE_GALLERY_SCOPE_FIELD]: ChatSettingsFields[IMAGE_GALLERY_SCOPE_FIELD].volatile(),
+  [UNREAD_LANDING_FIELD]: ChatSettingsFields[UNREAD_LANDING_FIELD].volatile(),
 })
 
 /** Host preferences are consumed through the configuration form projection.

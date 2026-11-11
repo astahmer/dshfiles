@@ -89,6 +89,8 @@
     "src/native/chat/user-image-references.ts",
     "src/native/conversation-nodes/route-change.ts",
     "src/native/image-gallery-scope.ts",
-    "src/native/settings/ImageGalleryScopeRow.tsx"
+    "src/native/settings/ImageGalleryScopeRow.tsx",
+    "src/native/settings/UnreadLandingRow.tsx",
+    "src/native/unread-landing.ts"
   ]
 }

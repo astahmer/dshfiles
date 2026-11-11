@@ -37,7 +37,7 @@ import type {
   ChatNodeProcessSource, ChatNodeSource, ChatSnapshot, ChatTurnProcessPresentation,
 } from './snapshot.ts'
 import type { TurnProcessSpec } from './turn-process.ts'
-import type { ImageGalleryScope, PerformanceUsageMode } from '../../chat-settings.ts'
+import type { ImageGalleryScope, PerformanceUsageMode, UnreadLanding } from '../../chat-settings.ts'
 
 /** Selector hook over the current Conversation binding's Chat target. */
 export type UseChat = SnapshotSelectorHook<ChatSnapshot>
@@ -311,6 +311,8 @@ export interface ChatViewInjected {
     presentation: ObservableSnapshot<ChatPresentationPolicy>
     /** Which conversation images the preview lightbox can browse. */
     imageGalleryScope: ObservableSnapshot<ImageGalleryScope>
+    /** Where opening a thread with an unseen final answer lands. */
+    unreadLanding: ObservableSnapshot<UnreadLanding>
   }
   keyedHooks: {
     /** Resolve the stable source for one Chat Node key. */
@@ -332,6 +334,11 @@ export interface ChatViewInjected {
   chatScroll: {
     save: (position: ChatScrollPosition | null) => void
     read: () => ChatScrollPosition | null
+  }
+  /** This browser's memory of the last final answer the reader reached in this Session, by anchor key. */
+  seenAnswer: {
+    read: () => string | null
+    markSeen: (anchorKey: string) => void
   }
   forkAt: (seq: number) => void
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined

@@ -1,6 +1,6 @@
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { ChatPresentationPolicy } from './native/presentation-policy.ts'
-import type { ImageGalleryScope } from './chat-settings.ts'
+import type { ImageGalleryScope, UnreadLanding } from './chat-settings.ts'
 import type { ChatFlowDataInjected, ChatViewInjected } from './native/contract/slots.ts'
 
 /**
@@ -24,8 +24,9 @@ const EMPTY_PROCESS = { getSnapshot: () => undefined, subscribe: () => () => {} 
 export const detachedFlow = (
   presentation: ObservableSnapshot<ChatPresentationPolicy>,
   imageGalleryScope: ObservableSnapshot<ImageGalleryScope>,
+  unreadLanding: ObservableSnapshot<UnreadLanding>,
 ): ChatFlowDataInjected => ({
-  hooks: { presentation, imageGalleryScope },
+  hooks: { presentation, imageGalleryScope, unreadLanding },
   keyedHooks: {
     chatNode: () => EMPTY_NODE,
     chatNodeBottom: () => EMPTY_BOTTOM,
@@ -38,14 +39,16 @@ export const detachedFlow = (
 export const detachedView = (
   presentation: ObservableSnapshot<ChatPresentationPolicy>,
   imageGalleryScope: ObservableSnapshot<ImageGalleryScope>,
+  unreadLanding: ObservableSnapshot<UnreadLanding>,
 ): ChatViewInjected => ({
-  ...detachedFlow(presentation, imageGalleryScope),
+  ...detachedFlow(presentation, imageGalleryScope, unreadLanding),
   openExternalLink: noop,
   openFile: async () => {},
   loadOlder: noop,
   loadThrough: async () => {},
   loadImage: Object.assign(async () => '', { peek: () => undefined }),
   chatScroll: { save: noop, read: () => null },
+  seenAnswer: { read: () => null, markSeen: noop },
   forkAt: noop,
   fileMentions: () => undefined,
 })

@@ -624,6 +624,40 @@ export class ChatViewport {
   }
 
   /**
+   * Find the latest loaded Turn's settled final answer.
+   * @returns its anchor key and row, or null when that Turn has no settled answer mounted.
+   */
+  latestFinalAnswer(): { readonly anchorKey: string; readonly row: HTMLElement } | null {
+    if (this.elements === null) return null
+    const rows = this.elements.list.querySelectorAll<HTMLElement>('[data-chat-final-answer]:not([hidden]):not([hidden] *)')
+    const row = rows[rows.length - 1]
+    const anchorKey = row?.dataset.chatAnchorKey
+    if (row === undefined || anchorKey === undefined) return null
+    const latest = this.latestTurn
+    return latest !== null && row.dataset.chatTurn !== String(latest) ? null : { anchorKey, row }
+  }
+
+  /**
+   * Land with an unread answer at the top and mark where the unread content starts.
+   * @param row - the final answer row to align.
+   * @param label - the divider text shown above it.
+   * @returns the actual landing, or null while detached.
+   */
+  landAtUnread(row: HTMLElement, label: string): ViewportLanding | null {
+    this.clearUnread()
+    row.dataset.chatUnreadLabel = label
+    const turn = Number(row.dataset.chatTurn)
+    return this.align(row, 24, Number.isInteger(turn) ? turn : null)
+  }
+
+  /** Remove the unread divider, once the reader's own input starts newer content. */
+  clearUnread(): void {
+    for (const row of this.elements?.list.querySelectorAll<HTMLElement>('[data-chat-unread-label]') ?? []) {
+      delete row.dataset.chatUnreadLabel
+    }
+  }
+
+  /**
    * Align the nearest available fallback for an unavailable turn anchor.
    * @param turn - minimum turn number for a mounted fallback row.
    * @returns the fallback landing, or null when no eligible row exists.

@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { createRequire } from 'node:module'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -13,7 +13,9 @@ import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel }
 const replayMarker = 'provider-replay-private-marker'
 const browserFrames = new WeakMap<Page, string[]>()
 
-const seedTranscript = async (homeRoot: string, rowCount: number): Promise<void> => {
+const LONG_ANSWER_PARAGRAPHS = 60
+
+const seedTranscript = async (homeRoot: string, rowCount: number, options: { readonly longFinalAnswer?: boolean } = {}): Promise<void> => {
   const projectRequire = createRequire(new URL('../../../../../plugins/@dshfiles/session-controller/package.json', import.meta.url))
   const require = createRequire(projectRequire.resolve('@deepseek-ai/dsh/package.json'))
   const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href)
@@ -57,7 +59,27 @@ const seedTranscript = async (homeRoot: string, rowCount: number): Promise<void>
         seq: seq++,
         time: 303 + row * 10,
         surfaceOp: 'append',
-        data: { turn: row, step: 1, message: createAssistantMessage({ content: [{ type: 'text', text: `Transcript answer ${row}` }], source }), stream: [] },
+        data: {
+          turn: row,
+          step: 1,
+          message: createAssistantMessage({
+            content: [
+              {
+                type: 'text',
+                text:
+                  options.longFinalAnswer === true && row === rowCount
+                    ? [
+                        `Transcript answer ${row}`,
+                        ...Array.from({ length: LONG_ANSWER_PARAGRAPHS }, (_, index) => `Answer paragraph ${index + 1}`),
+                        'Answer end',
+                      ].join('\n\n')
+                    : `Transcript answer ${row}`,
+              },
+            ],
+            source,
+          }),
+          stream: [],
+        },
       })
       events.push({ type: 'step/end', seq: seq++, time: 304 + row * 10, data: { turn: row, step: 1 } })
       events.push({ type: 'turn/end', seq: seq++, time: 305 + row * 10, data: { turn: row, reason: { kind: 'completed' } } })
@@ -78,7 +100,11 @@ const openSeededThread = async (page: Page, title: RegExp): Promise<void> => {
       async () => {
         await page.reload()
         // A thread seeded before boot lists under its workspace; one seeded after it may sit in a collapsed Ungrouped.
-        await fixture.or(ungrouped).first().waitFor({ state: 'attached', timeout: 3_000 }).catch(() => undefined)
+        await fixture
+          .or(ungrouped)
+          .first()
+          .waitFor({ state: 'attached', timeout: 3_000 })
+          .catch(() => undefined)
         if ((await fixture.count()) === 0) await ungrouped.click({ timeout: 3_000 }).catch(() => undefined)
         await fixture
           .first()
@@ -173,6 +199,50 @@ Given(
 
 When('the seeded transcript thread is opened', async ({ page }: { page: Page }) => {
   await openSeededThread(page, /Untitled|Chat transcript window fixture/)
+})
+
+When('a thread with a long unread final answer is opened', async ({ page }: { page: Page }) => {
+  await seedTranscript(profileFor(page).homeRoot, 12, { longFinalAnswer: true })
+  await openSeededThread(page, /Untitled|Chat transcript window fixture/)
+})
+
+Then('the thread opens at the start of its final answer under a New divider', async ({ page }: { page: Page }) => {
+  const scrollport = page.locator('[data-conversation-scroll]').first()
+  await recordAssertion(page, 'chat-unread-thread-opens-at-final-answer', async () => {
+    await expect(scrollport.getByText('Transcript answer 12', { exact: true })).toBeInViewport({ timeout: 15_000 })
+    await expect(scrollport.getByText('Answer end', { exact: true })).not.toBeInViewport()
+    await expect(scrollport.locator('[data-chat-unread-label="New"]')).toHaveCount(1)
+  })
+  await page.screenshot({ path: test.info().outputPath('chat-unread-final-answer.png'), animations: 'disabled' })
+  const wide = page.viewportSize()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await recordAssertion(page, 'chat-unread-divider-fits-a-phone', async () => {
+    const divider = scrollport.locator('[data-chat-unread-label="New"]')
+    await expect(divider).toBeVisible()
+    const box = await divider.boundingBox()
+    expect(box === null ? Number.POSITIVE_INFINITY : box.x + box.width).toBeLessThanOrEqual(390)
+  })
+  await page.screenshot({ path: test.info().outputPath('chat-unread-final-answer-390.png'), animations: 'disabled' })
+  if (wide !== null) await page.setViewportSize(wide)
+})
+
+When('the reader reaches its end and opens the thread again', async ({ page }: { page: Page }) => {
+  const scrollport = page.locator('[data-conversation-scroll]').first()
+  await scrollport.hover()
+  const end = scrollport.getByText('Answer end', { exact: true })
+  for (let round = 0; round < 20 && !(await end.isVisible()); round++) await page.mouse.wheel(0, 2_000)
+  await page.mouse.wheel(0, 4_000)
+  await expect(page.locator('[data-chat-following-tail]')).toHaveCount(1)
+  await openSeededThread(page, /Untitled|Chat transcript window fixture/)
+})
+
+Then('the thread opens at its end without a divider', async ({ page }: { page: Page }) => {
+  const scrollport = page.locator('[data-conversation-scroll]').first()
+  await recordAssertion(page, 'chat-read-thread-opens-at-end', async () => {
+    await expect(scrollport.getByText('Answer end', { exact: true })).toBeInViewport({ timeout: 15_000 })
+    await expect(scrollport.locator('[data-chat-unread-label]')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
 })
 
 When('a real thread with one hundred eighty transcript turns is opened', async ({ page }: { page: Page }) => {

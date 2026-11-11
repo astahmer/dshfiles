@@ -1,6 +1,6 @@
 /** Composes viewport operations, reading policy, and history navigation for Chat. */
-import { useCallback, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
-import type { TranscriptViewMode } from '../../chat-settings.ts'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
+import type { TranscriptViewMode, UnreadLanding } from '../../chat-settings.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { useChatNavigation, type ChatNavigation, type ChatNavigationInput } from './use-chat-navigation.ts'
@@ -23,6 +23,12 @@ export interface ChatScrollInput extends ChatNavigationInput {
   /** A changed work-details preference resets fold reservations after the layout settles. */
   readonly transcriptView: TranscriptViewMode
   readonly loadedTurns: ReturnType<ChatSnapshot['navigation']['items']>
+  /** Opening at an unseen final answer, and the divider marking it. */
+  readonly unread: {
+    readonly landing: UnreadLanding
+    readonly seenAnswer: ChatViewSlotProps['seenAnswer']
+    readonly label: string
+  }
 }
 
 interface ChatScrollState extends ChatReadingState {
@@ -45,7 +51,7 @@ interface ChatScrollState extends ChatReadingState {
 export function useChatScroll(input: ChatScrollInput): ChatScrollState {
   const {
     ready, order, firstSeq, lastKey, lastIsUser, steeringId, submissionId, running, deferCompletedTurns,
-    loadedTurns, chatScroll, hasMore, loadingOlder, loadOlder, loadThrough, transcriptView,
+    loadedTurns, chatScroll, hasMore, loadingOlder, loadOlder, loadThrough, transcriptView, unread,
   } = input
   const { viewport, listRef, columnRef } = useChatViewport()
   const { reading, state } = useChatReading(viewport, chatScroll, loadedTurns.at(-1)?.turn ?? null)
@@ -59,6 +65,17 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
   // A fold batch owns layout and scrolling until it lands: at the tail for own input or a following
   // reader, otherwise with the reader's content still. Growth consumes any room the landing installed.
   const cancelPendingFollow = useCallback(() => { viewport.motion.cancelInput() }, [viewport])
+
+  // Without a saved reading position, a settled thread whose final answer this browser never reached opens at it.
+  const landAtUnreadAnswer = useCallback((current: ChatScrollInput): boolean => {
+    if (current.unread.landing !== 'final-answer' || current.running || current.chatScroll.read() !== null) return false
+    const answer = viewport.latestFinalAnswer()
+    if (answer === null || answer.anchorKey === current.unread.seenAnswer.read()) return false
+    const landing = viewport.landAtUnread(answer.row, current.unread.label)
+    if (landing === null) return false
+    reading.acceptNavigation(landing)
+    return true
+  }, [viewport, reading])
 
   const processContent = useCallback(() => {
     const current = content.current.input
@@ -74,10 +91,11 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     if (current.ready && !content.current.opened) {
       content.current.opened = true
       navigation.reset()
-      reading.restore()
+      if (!landAtUnreadAnswer(current)) reading.restore()
       return
     }
     if (ownInput) {
+      viewport.clearUnread()
       navigation.cancel()
       if (current.deferCompletedTurns && reading.followInputFold()) return
       reading.followTail(current.deferCompletedTurns ? 'smooth' : 'instant')
@@ -96,7 +114,15 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
       if (current.deferCompletedTurns && reading.followInputFold()) return
       reading.followTail()
     } else navigation.reconcile()
-  }, [reading, navigation])
+  }, [reading, navigation, viewport, landAtUnreadAnswer])
+
+  // Reaching the end of a settled thread is reading its answer.
+  const seenAnswer = unread.seenAnswer
+  useEffect(() => {
+    if (!state.initialized || !state.followingTail || running) return
+    const answer = viewport.latestFinalAnswer()
+    if (answer !== null) seenAnswer.markSeen(answer.anchorKey)
+  }, [state.initialized, state.followingTail, running, lastKey, viewport, seenAnswer])
 
   useLayoutEffect(() => {
     const disconnectViewport = viewport.connect({
@@ -137,7 +163,7 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     const previous = content.current.input
     content.current.input = {
       ready, order, lastKey, lastIsUser, steeringId, submissionId, running, loadedTurns, chatScroll,
-      deferCompletedTurns, transcriptView, ...navigationInput,
+      deferCompletedTurns, transcriptView, unread, ...navigationInput,
     }
     if (!deferCompletedTurns) {
       cancelPendingFollow()
@@ -157,7 +183,7 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     })
   }, [
     viewport, reading, processContent, navigationInput, ready, order, lastKey, lastIsUser,
-    steeringId, submissionId, running, loadedTurns, chatScroll, deferCompletedTurns, transcriptView, cancelPendingFollow,
+    steeringId, submissionId, running, loadedTurns, chatScroll, deferCompletedTurns, transcriptView, cancelPendingFollow, unread,
   ])
 
   const previousView = useRef(transcriptView)

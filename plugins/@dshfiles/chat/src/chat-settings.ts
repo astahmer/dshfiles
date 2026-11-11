@@ -23,6 +23,18 @@ export type ImageGalleryScope = typeof IMAGE_GALLERY_SCOPES[number]
 /** Keep unrelated images out of a preview unless the user opts into thread scope. */
 export const DEFAULT_IMAGE_GALLERY_SCOPE: ImageGalleryScope = 'turn'
 
+/** Field selecting where opening a thread with an unseen final answer lands. */
+export const UNREAD_LANDING_FIELD = 'unreadLanding'
+
+/** Where an unseen final answer opens: at the answer's start, or at the transcript's end. */
+export const UNREAD_LANDINGS = ['final-answer', 'bottom'] as const
+
+/** Unread landing preference. */
+export type UnreadLanding = typeof UNREAD_LANDINGS[number]
+
+/** Land at the start of an unseen answer instead of below its tool tail. */
+export const DEFAULT_UNREAD_LANDING: UnreadLanding = 'final-answer'
+
 /** Available points when a completed Turn returns to its historical presentation. */
 export const COLLAPSE_TIMINGS = ['completion', 'next-input'] as const
 
@@ -82,12 +94,15 @@ export interface ChatSettings {
   linkOpening: LinkOpening
   /** Which loaded conversation images an image preview can browse. */
   imageGalleryScope?: ImageGalleryScope
+  /** Where a thread with an unseen final answer opens. */
+  unreadLanding?: UnreadLanding
 }
 
 /** Durable Chat schema; also the wire envelope the browser scope validates against. */
 export const ChatSettingsFields = {
   [COLLAPSE_TIMING_FIELD]: z.union([...COLLAPSE_TIMINGS]).default(DEFAULT_COLLAPSE_TIMING),
   [IMAGE_GALLERY_SCOPE_FIELD]: z.union([...IMAGE_GALLERY_SCOPES]).default(DEFAULT_IMAGE_GALLERY_SCOPE),
+  [UNREAD_LANDING_FIELD]: z.union([...UNREAD_LANDINGS]).default(DEFAULT_UNREAD_LANDING),
   linkOpening: z.union(['sidebar', 'new-tab']).default(DEFAULT_LINK_OPENING),
   performanceUsage: z.union([...PERFORMANCE_USAGE_MODES]).default(DEFAULT_PERFORMANCE_USAGE),
   // Missing and unrecognized modes defer to the client's default.

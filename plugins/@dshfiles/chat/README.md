@@ -10,6 +10,8 @@
 
 ![Mark where the model or effort changed](docs/screenshots/route-change-markers.png)
 
+![Open an unread thread at its final answer](docs/screenshots/unread-final-answer.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.
@@ -83,6 +85,19 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/conversation-nodes/assistant.ts`, `turn-tail.ts`, `AssistantMarkdown.tsx` (also) | text visibility is carried per streamed block and tested with `/\S/` instead of `trim()`, so a chunk no longer copies the whole message text |
 | `src/native/conversation-nodes/route-change.ts`, `register.ts`, `src/native/chat/RouteChangeRow.tsx`, `RouteChangeRow.module.css`, `register-node-renderers.ts`, `src/native/locale.ts` | new: the `route-change` Definition and its keyed renderer (below), registered beside the request-prompt node, with three labels |
 | `src/transcript-find.ts`, `src/transcript-find-bar.tsx`, `ChatView.tsx` (also), `ChatView.module.css` (also), `turn-rail-items.ts`, `apply.ts` (also), `src/client-entry.tsx` (also) | new: the find bar (below); `ChatView` renders it and registers the view as a `Find in thread` target, `turnStarts` maps an event seq to its Turn, `apply` decorates `ChatView` so the bar reads the session-search API, and the client entry adds the command |
+| `src/native/unread-landing.ts`, `src/native/settings/UnreadLandingRow.tsx`, `chat-settings.ts` (also), `host.ts` (also), `apply.ts` (also), `slots.ts` (also), `ChatNodeSeat.tsx` (also), `use-chat-viewport.ts` (also), `use-chat-scroll.ts` (also), `ChatView.tsx` (also), `ChatView.module.css` (also), `locale.ts` (also) | new: open an unread thread at its final answer (below): the `unreadLanding` volatile setting and its General row, a per-browser seen-answer memory, `data-chat-final-answer` on the latest settled answer row, and the first-open landing with its New divider |
+
+### Open an unread thread at its final answer
+
+A thread's answer often sits above a long tool tail or runs longer than the viewport, so opening at the end shows its
+last lines. When a settled thread opens with no saved reading position in this tab and its latest final answer is one
+this browser never reached, Chat lands with that answer at the top under a **New** divider. Reaching the end of the
+transcript marks the answer read, so the next open lands at the end as before; sending a message removes the divider.
+A running thread always follows its tail.
+
+**Settings › General › Open unread threads at**: **Final answer** (default) or **Bottom** (the previous behaviour).
+Live, no restart. Read state is per browser (`localStorage`, the 500 most recently read threads), so another browser
+opens the thread at its answer once.
 
 ### Find in thread
 

@@ -92,6 +92,12 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
     && groupPart !== 'reasoning'
     && routedNode.kind === 'assistant-step'
     && routedNode.data.step === processSpec.answerStep
+  // Independent of folding, so every work-details mode can open an unread thread at its answer.
+  const finalAnswer = routedNode?.kind === 'assistant-step'
+    && groupPart !== 'reasoning'
+    && processPresentation?.turnClosed === true
+    && processSpec !== undefined
+    && routedNode.data.step === processSpec.answerStep
   const ownsDisclosure = routedNode?.kind === 'turn-process' || processAnswer
   const foldable = processWindowReady
     && (liveProcess || processMember || ownsDisclosure)
@@ -164,6 +170,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       data-turn-process-member={processMember || undefined}
       data-turn-process-hidden={processHidden || undefined}
       data-turn-process-answer={compactAnswer || undefined}
+      data-chat-final-answer={finalAnswer || undefined}
     >
       {renderSlot('conversation.chat.node', routedOwner, {
         entryKey: routedNode.kind,

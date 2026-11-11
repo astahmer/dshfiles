@@ -69,8 +69,8 @@ type PendingInput = PendingSubmission | InboxState['next-step'][number]
  * ordered business Node crosses the keyed renderer seat.
  */
 export function ChatView({
-  useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope,
-  sessionId, openFile, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, forkAt, fileMentions,
+  useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope, useUnreadLanding,
+  sessionId, openFile, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, forkAt, fileMentions,
   usePresentation, useProjection, t, viewRequest, completeViewRequest, openView,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
@@ -80,6 +80,9 @@ export function ChatView({
     ?? order.map(key => ({ kind: 'node', key: key as NodeKey })), [groupedEntries, order])
   const nodeStore = useChat(s => s.nodes)
   const imageGalleryScope = useImageGalleryScope(scope => scope)
+  const unreadLanding = useUnreadLanding(landing => landing)
+  const unreadLabel = t('chat.unreadDivider')
+  const unread = useMemo(() => ({ landing: unreadLanding, seenAnswer, label: unreadLabel }), [unreadLanding, seenAnswer, unreadLabel])
   const deferCompletedTurns = usePresentation(policy => policy.collapseTiming === 'next-input')
   const transcriptView = usePresentation(policy => policy.mode)
   // The rail's items are accumulated in the Chat snapshot, so this selector is
@@ -328,6 +331,7 @@ export function ChatView({
     submissionId: visibleSubmissions.at(-1)?.requestId ?? null,
     loadedTurns: turnNavigationItems,
     transcriptView,
+    unread,
   })
   followingTail.current = scroll.followingTail
   // Back at the newest row (and while new rows stream in), the rows read further up leave the DOM again.

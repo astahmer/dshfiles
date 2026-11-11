@@ -405,6 +405,49 @@
           "reason": "Client-only: the marker is derived in the browser from Session events already sent to it."
         }
       ]
+    },
+    {
+      "id": "unread-final-answer",
+      "title": "Open an unread thread at its final answer",
+      "summary": "A settled thread whose final answer this browser has not reached opens with that answer at the top, under a New divider, instead of at the end of the transcript. Reaching the end marks it read, so the next open lands at the end. Settings › General › Open unread threads at switches between Final answer (default) and Bottom.",
+      "surfaces": ["client"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "transcript: opening position",
+      "configuration": [
+        {
+          "key": "unreadLanding",
+          "defaultValue": "final-answer",
+          "constraints": "final-answer or bottom; a live Chat setting under Settings › General, no restart.",
+          "coveredBy": ["chat.unread-final-answer"]
+        }
+      ],
+      "states": ["unread-opened", "read-opened", "bottom-preference"],
+      "failureModes": [
+        "Read state is per browser (localStorage, 500 most recent threads): another browser or a cleared storage opens the thread at its answer once more.",
+        "A saved reading position in this tab wins over the unread landing; a running thread always follows its tail."
+      ],
+      "externalDependencies": [],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.unread-seen-answers",
+          "file": "plugins/@dshfiles/chat/tests/unread-landing.test.ts",
+          "testName": "remembers the answer reached per Session across instances"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.unread-final-answer",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: the landing reads the mounted transcript and browser storage and starts no Host work."
+        }
+      ]
     }
   ]
 }
