@@ -11,12 +11,15 @@ import {
   type ThreadAttentionMigrationEntry,
   type ThreadAttentionSnapshot,
   type ThreadAttentionView,
+  type ThreadAttentionWriteCommand,
 } from './attention-api.js'
 import { AttentionStorageFailed } from './sidebar-errors.js'
 
 export const threadAttentionDomain = defineDomain({
   name: 'thread_attention',
   version: 1,
+  // One document per unread thread: a write touches its own rows instead of rewriting the whole unit.
+  layout: 'per-record',
   tables: {
     sessions: { valueSchema: zodSchemaFromEffect(threadAttentionViewSchema), __key: 'sessions' },
   },
@@ -125,6 +128,9 @@ interface AttentionChange {
 
 type Operation = AttentionStorageFailed['operation']
 
+/** Plans one change against the current records; `takeVersion` reserves the revision a new record version uses. */
+type Plan = (records: ReadonlyMap<string, ThreadAttentionView>, takeVersion: () => number) => AttentionChange
+
 const snapshotOf = (state: AttentionState): ThreadAttentionSnapshot => ({
   revision: state.revision,
   sessions: [...state.records.values()].sort(compareAttentionViews),
@@ -156,6 +162,8 @@ export class ThreadAttention extends Context.Service<
     readonly markUnread: (input: { readonly sessionId: string }) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
     readonly markUnreadMany: (sessionIds: ReadonlyArray<string>) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
     readonly migrate: (entries: ReadonlyArray<ThreadAttentionMigrationEntry>) => Effect.Effect<ThreadAttentionSnapshot, AttentionStorageFailed>
+    /** One write, answered with every record changed after `since` instead of the whole snapshot. */
+    readonly writeDelta: (input: { readonly since: number; readonly command: ThreadAttentionWriteCommand }) => Effect.Effect<ThreadAttentionChanges, AttentionStorageFailed>
   }
 >()('@dshfiles/thread-sidebar/ThreadAttention') {
   static readonly layer = Layer.effect(
@@ -176,8 +184,12 @@ export class ThreadAttention extends Context.Service<
         floor: initialRevision,
       })
 
-      /** Run one change under the mirror's lock: plan it against the current records, write it, then publish it. */
-      const apply = (operation: Operation, plan: (records: ReadonlyMap<string, ThreadAttentionView>, takeVersion: () => number) => AttentionChange) =>
+      /**
+       * Run one change under the mirror's lock: plan it against the current records, write it, then publish it. The
+       * answer carries the committed snapshot and a delta reader bound to the same committed state, so a write can
+       * report every change since the caller's revision without a second, racy read.
+       */
+      const commit = (operation: Operation, plan: Plan) =>
         SynchronizedRef.modifyEffect(state, current =>
           Effect.gen(function* () {
             const at = yield* Clock.currentTimeMillis
@@ -205,11 +217,95 @@ export class ThreadAttention extends Context.Service<
             }
             const floor = boundRemovals(removedAt, current.floor)
             const next = { records, revision, removedAt, floor }
-            return [snapshotOf(next), next] as const
+            return [{ snapshot: snapshotOf(next), changesFor: (since: number) => changesOf(next, since) }, next] as const
           }).pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation, cause }))),
         ).pipe(Effect.tap(() => PubSub.publish(changed, undefined)))
 
+      const apply = (operation: Operation, plan: Plan) => Effect.map(commit(operation, plan), committed => committed.snapshot)
+      const applyDelta = (input: { readonly operation: Operation; readonly plan: Plan; readonly since: number }) =>
+        Effect.map(commit(input.operation, input.plan), committed => committed.changesFor(input.since))
+
       const unchanged: AttentionChange = { put: [], remove: [] }
+
+      const plans = {
+        acknowledge: (input: { readonly sessionId: string; readonly version: number }): Plan => (records, takeVersion) => {
+          const record = records.get(input.sessionId)
+          if (record === undefined || record.version > input.version) return unchanged
+          if (!record.manuallyUnread) return { put: [], remove: [input.sessionId] }
+          return {
+            put: [{ sessionId: input.sessionId, version: takeVersion(), finishedAt: null, finishedSeq: null, finishedReason: null, manuallyUnread: true }],
+            remove: [],
+          }
+        },
+        clearUnread:
+          (input: { readonly sessionId: string; readonly version: number }): Plan =>
+          records => {
+            const record = records.get(input.sessionId)
+            return record === undefined || record.version > input.version ? unchanged : { put: [], remove: [input.sessionId] }
+          },
+        clearUnreadMany:
+          (entries: ReadonlyArray<{ readonly sessionId: string; readonly version: number }>): Plan =>
+          records => ({
+            put: [],
+            remove: entries.flatMap(entry => {
+              const record = records.get(entry.sessionId)
+              return record === undefined || record.version > entry.version ? [] : [entry.sessionId]
+            }),
+          }),
+        markUnread:
+          (input: { readonly sessionId: string }): Plan =>
+          (records, takeVersion) => {
+            const existing = records.get(input.sessionId)
+            return {
+              put: [
+                {
+                  sessionId: input.sessionId,
+                  version: takeVersion(),
+                  finishedAt: existing?.finishedAt ?? null,
+                  finishedSeq: existing?.finishedSeq ?? null,
+                  finishedReason: existing?.finishedReason ?? null,
+                  manuallyUnread: true,
+                },
+              ],
+              remove: [],
+            }
+          },
+        markUnreadMany:
+          (sessionIds: ReadonlyArray<string>): Plan =>
+          (records, takeVersion) => ({
+            put: sessionIds.map(sessionId => {
+              const existing = records.get(sessionId)
+              return {
+                sessionId,
+                version: takeVersion(),
+                finishedAt: existing?.finishedAt ?? null,
+                finishedSeq: existing?.finishedSeq ?? null,
+                finishedReason: existing?.finishedReason ?? null,
+                manuallyUnread: true,
+              }
+            }),
+            remove: [],
+          }),
+        migrate:
+          (entries: ReadonlyArray<ThreadAttentionMigrationEntry>): Plan =>
+          (records, takeVersion) => ({
+            put: entries.flatMap(entry => {
+              if (records.has(entry.sessionId)) return []
+              const record = legacyAttentionRecord(entry, takeVersion())
+              return record === null ? [] : [record]
+            }),
+            remove: [],
+          }),
+      }
+
+      const planOf = (command: ThreadAttentionWriteCommand): { plan: Plan; operation: Operation } => {
+        if (command.kind === 'acknowledge') return { plan: plans.acknowledge(command), operation: 'acknowledge' }
+        if (command.kind === 'clearUnread') return { plan: plans.clearUnread(command), operation: 'clear' }
+        if (command.kind === 'clearUnreadMany') return { plan: plans.clearUnreadMany(command.entries), operation: 'clear' }
+        if (command.kind === 'markUnread') return { plan: plans.markUnread(command), operation: 'mark' }
+        if (command.kind === 'markUnreadMany') return { plan: plans.markUnreadMany(command.sessionIds), operation: 'mark' }
+        return { plan: plans.migrate(command.entries), operation: 'migrate' }
+      }
 
       return ThreadAttention.of({
         snapshot: Effect.map(SynchronizedRef.get(state), snapshotOf),
@@ -231,74 +327,26 @@ export class ThreadAttention extends Context.Service<
           }))
         }),
         acknowledge: Effect.fn('thread attention acknowledge')(function* (input) {
-          return yield* apply('acknowledge', (records, takeVersion) => {
-            const record = records.get(input.sessionId)
-            if (record === undefined || record.version > input.version) return unchanged
-            if (!record.manuallyUnread) return { put: [], remove: [input.sessionId] }
-            return {
-              put: [{ sessionId: input.sessionId, version: takeVersion(), finishedAt: null, finishedSeq: null, finishedReason: null, manuallyUnread: true }],
-              remove: [],
-            }
-          })
+          return yield* apply('acknowledge', plans.acknowledge(input))
         }),
         clearUnread: Effect.fn('thread attention clear')(function* (input) {
-          return yield* apply('clear', records => {
-            const record = records.get(input.sessionId)
-            return record === undefined || record.version > input.version ? unchanged : { put: [], remove: [input.sessionId] }
-          })
+          return yield* apply('clear', plans.clearUnread(input))
         }),
         clearUnreadMany: Effect.fn('thread attention clear many')(function* (entries) {
-          return yield* apply('clear', records => ({
-            put: [],
-            remove: entries.flatMap(entry => {
-              const record = records.get(entry.sessionId)
-              return record === undefined || record.version > entry.version ? [] : [entry.sessionId]
-            }),
-          }))
+          return yield* apply('clear', plans.clearUnreadMany(entries))
         }),
         markUnread: Effect.fn('thread attention mark')(function* (input) {
-          return yield* apply('mark', (records, takeVersion) => {
-            const existing = records.get(input.sessionId)
-            return {
-              put: [
-                {
-                  sessionId: input.sessionId,
-                  version: takeVersion(),
-                  finishedAt: existing?.finishedAt ?? null,
-                  finishedSeq: existing?.finishedSeq ?? null,
-                  finishedReason: existing?.finishedReason ?? null,
-                  manuallyUnread: true,
-                },
-              ],
-              remove: [],
-            }
-          })
+          return yield* apply('mark', plans.markUnread(input))
         }),
         markUnreadMany: Effect.fn('thread attention mark many')(function* (sessionIds) {
-          return yield* apply('mark', (records, takeVersion) => ({
-            put: sessionIds.map(sessionId => {
-              const existing = records.get(sessionId)
-              return {
-                sessionId,
-                version: takeVersion(),
-                finishedAt: existing?.finishedAt ?? null,
-                finishedSeq: existing?.finishedSeq ?? null,
-                finishedReason: existing?.finishedReason ?? null,
-                manuallyUnread: true,
-              }
-            }),
-            remove: [],
-          }))
+          return yield* apply('mark', plans.markUnreadMany(sessionIds))
         }),
         migrate: Effect.fn('thread attention migrate')(function* (entries) {
-          return yield* apply('migrate', (records, takeVersion) => ({
-            put: entries.flatMap(entry => {
-              if (records.has(entry.sessionId)) return []
-              const record = legacyAttentionRecord(entry, takeVersion())
-              return record === null ? [] : [record]
-            }),
-            remove: [],
-          }))
+          return yield* apply('migrate', plans.migrate(entries))
+        }),
+        writeDelta: Effect.fn('thread attention write delta')(function* (input) {
+          const { plan, operation } = planOf(input.command)
+          return yield* applyDelta({ operation, plan, since: input.since })
         }),
       })
     }),

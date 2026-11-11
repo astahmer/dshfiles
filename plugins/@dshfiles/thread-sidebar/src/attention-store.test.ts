@@ -214,6 +214,30 @@ describe('thread attention', () => {
     ),
   )
 
+  it.effect('a delta write answers every change since the caller revision, not only its own', () =>
+    withAttention(30_000, () =>
+      Effect.gen(function* () {
+        const attention = yield* ThreadAttention
+        yield* attention.recordFinish({ sessionId: 'opened', seq: 1, time: 1_000, reason: 'completed' })
+        const seen = yield* attention.snapshot
+        const opened = seen.sessions.find(record => record.sessionId === 'opened')
+
+        yield* attention.recordFinish({ sessionId: 'concurrent', seq: 2, time: 2_000, reason: 'error' })
+        const changes = yield* attention.writeDelta({
+          since: seen.revision,
+          command: { kind: 'clearUnread', sessionId: 'opened', version: opened?.version ?? 0 },
+        })
+        const after = yield* attention.snapshot
+
+        expect(changes.complete).toBe(true)
+        expect(changes.revision).toBe(after.revision)
+        expect(changes.put.map(record => record.sessionId)).toEqual(['concurrent'])
+        expect(changes.removed).toEqual(['opened'])
+        expect(after.sessions.map(record => record.sessionId)).toEqual(['concurrent'])
+      }),
+    ),
+  )
+
   it('keeps the newest removals and raises the floor past the ones it drops', () => {
     const removedAt = new Map([
       ['a', 10],

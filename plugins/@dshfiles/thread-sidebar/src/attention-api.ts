@@ -65,6 +65,47 @@ export const threadAttentionMigrationEntrySchema = SchemaHelpers.strictStruct(
   }),
 )
 
+const recordVersionSchema = Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThan(0))
+
+/**
+ * One write a page asks for: the same operation as its v1 method, but answered with the records changed since the
+ * revision the page holds instead of the whole snapshot.
+ */
+export const threadAttentionWriteCommandSchema = Schema.Union([
+  SchemaHelpers.strictStruct(Schema.Struct({ kind: Schema.Literal('acknowledge'), sessionId: sessionIdSchema, version: recordVersionSchema })),
+  SchemaHelpers.strictStruct(Schema.Struct({ kind: Schema.Literal('clearUnread'), sessionId: sessionIdSchema, version: recordVersionSchema })),
+  SchemaHelpers.strictStruct(
+    Schema.Struct({
+      kind: Schema.Literal('clearUnreadMany'),
+      entries: Schema.Array(SchemaHelpers.strictStruct(Schema.Struct({ sessionId: sessionIdSchema, version: recordVersionSchema }))).check(
+        Schema.isMaxLength(MAX_ATTENTION_SESSIONS),
+      ),
+    }),
+  ),
+  SchemaHelpers.strictStruct(Schema.Struct({ kind: Schema.Literal('markUnread'), sessionId: sessionIdSchema })),
+  SchemaHelpers.strictStruct(
+    Schema.Struct({ kind: Schema.Literal('markUnreadMany'), sessionIds: Schema.Array(sessionIdSchema).check(Schema.isMaxLength(MAX_ATTENTION_SESSIONS)) }),
+  ),
+  SchemaHelpers.strictStruct(
+    Schema.Struct({ kind: Schema.Literal('migrate'), entries: Schema.Array(threadAttentionMigrationEntrySchema).check(Schema.isMaxLength(MAX_ATTENTION_SESSIONS)) }),
+  ),
+])
+
+export const threadAttentionWriteDeltaSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    /** The revision the caller holds; the answer names every change after it, not only this write's. */
+    since: Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)),
+    command: threadAttentionWriteCommandSchema,
+  }),
+)
+
+export const threadAttentionWriteCapabilitiesSchema = SchemaHelpers.strictStruct(
+  Schema.Struct({
+    /** Version of the delta write contract the Host serves; absent means it serves only full snapshots. */
+    deltaVersion: Schema.Literal(1),
+  }),
+)
+
 export const threadSidebarAttentionApi = defineApi({
   id: 'thread-sidebar-attention',
   version: 1,
@@ -131,6 +172,17 @@ export const threadSidebarAttentionApi = defineApi({
       output: threadAttentionSnapshotSchema,
       description: 'Adopt browser-held attention records once, after this Host took ownership of them.',
     }),
+    writeDelta: method({
+      input: threadAttentionWriteDeltaSchema,
+      output: threadAttentionChangesSchema,
+      description: 'Run one attention write and answer the records changed since a revision the caller holds, instead of the whole state.',
+    }),
+    writeCapabilities: method({
+      input: Schema.Void,
+      output: threadAttentionWriteCapabilitiesSchema,
+      description: 'Which attention write contracts this Host serves; a Host without this method answers full snapshots only.',
+      tool: { name: 'thread_attention_write_capabilities', readOnly: true },
+    }),
   },
   events: {
     changed: event({
@@ -141,6 +193,8 @@ export const threadSidebarAttentionApi = defineApi({
 })
 
 export type ThreadAttentionView = Schema.Schema.Type<typeof threadAttentionViewSchema>
+export type ThreadAttentionWriteCommand = Schema.Schema.Type<typeof threadAttentionWriteCommandSchema>
+export type ThreadAttentionWriteDelta = Schema.Schema.Type<typeof threadAttentionWriteDeltaSchema>
 export type ThreadAttentionSnapshot = Schema.Schema.Type<typeof threadAttentionSnapshotSchema>
 export type ThreadAttentionMigrationEntry = Schema.Schema.Type<typeof threadAttentionMigrationEntrySchema>
 export type ThreadAttentionChanges = Schema.Schema.Type<typeof threadAttentionChangesSchema>

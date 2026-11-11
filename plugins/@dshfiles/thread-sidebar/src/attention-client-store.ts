@@ -5,6 +5,7 @@ import {
   type ThreadAttentionMigrationEntry,
   type ThreadAttentionSnapshot,
   type ThreadAttentionView,
+  type ThreadAttentionWriteCommand,
 } from './attention-api.js'
 
 /** The slice of the client this store uses, so a test can serve it without casting. */
@@ -30,6 +31,13 @@ export interface AttentionApi {
     input: { readonly entries: ThreadAttentionMigrationEntry[] },
     options?: { readonly signal?: AbortSignal },
   ) => Promise<ThreadAttentionSnapshot>
+  /** Absent on a Host that predates delta writes; the store then writes through the v1 methods. */
+  readonly writeDelta?: (
+    input: { readonly since: number; readonly command: ThreadAttentionWriteCommand },
+    options?: { readonly signal?: AbortSignal },
+  ) => Promise<ThreadAttentionChanges>
+  /** Absent on that same older Host: probe it before any delta write. */
+  readonly writeCapabilities?: (input?: undefined, options?: { readonly signal?: AbortSignal }) => Promise<{ readonly deltaVersion: 1 }>
 }
 
 export interface ThreadAttentionClientState {
@@ -195,6 +203,69 @@ const createStore = (): ThreadAttentionStore => {
     adopt(await call())
   }
 
+  /**
+   * Delta writes: probed once per page store, never cached as unsupported after a failure, and every write is
+   * serialized so two surfaces cannot send overlapping bases. A delta answer merges only when this page still holds the
+   * revision the write was built on; otherwise the page refreshes from the Host, and a failed delta write is never
+   * replayed through the v1 methods.
+   */
+  let deltaSupported: boolean | null = null
+  let writeQueue: Promise<unknown> = Promise.resolve()
+
+  const deltaReady = async (client: AttentionApi): Promise<boolean> => {
+    if (deltaSupported !== null) return deltaSupported
+    if (client.writeCapabilities === undefined || client.writeDelta === undefined) return false
+    try {
+      await client.writeCapabilities(undefined, {})
+      deltaSupported = true
+      return true
+    } catch (error) {
+      if (error instanceof Error && isApiOwnerMissing(error)) throw error
+      return false
+    }
+  }
+
+  const mergeDelta = (changes: ThreadAttentionChanges, since: number): void => {
+    const held = state.snapshot
+    if (held === null || held.revision !== since) {
+      void read()
+      return
+    }
+    if (!changes.complete) {
+      void read()
+      return
+    }
+    const merged = new Map(held.sessions.map(view => [view.sessionId, view]))
+    for (const sessionId of changes.removed) merged.delete(sessionId)
+    for (const view of changes.put) merged.set(view.sessionId, view)
+    adopt({ revision: changes.revision, sessions: [...merged.values()].sort(compareAttentionViews) })
+  }
+
+  const write = (command: ThreadAttentionWriteCommand, legacy: () => Promise<ThreadAttentionSnapshot>): Promise<void> => {
+    const run = async (): Promise<void> => {
+      const client = requireApi()
+      if (!(await deltaReady(client))) {
+        await mutate(legacy)
+        return
+      }
+      const held = state.snapshot
+      if (held === null || client.writeDelta === undefined) {
+        await mutate(legacy)
+        return
+      }
+      const since = held.revision
+      try {
+        mergeDelta(await client.writeDelta({ since, command }, {}), since)
+      } catch (error) {
+        void read()
+        throw error
+      }
+    }
+    const next = writeQueue.then(run, run)
+    writeQueue = next.catch(() => undefined)
+    return next
+  }
+
   const requireApi = (): AttentionApi => {
     if (api === null) throw new Error('Thread attention was written before any surface mounted it.')
     return api
@@ -221,12 +292,12 @@ const createStore = (): ThreadAttentionStore => {
     },
     refresh: read,
     changed,
-    acknowledge: (sessionId, version) => mutate(() => requireApi().acknowledge({ sessionId, version })),
-    clearUnread: (sessionId, version) => mutate(() => requireApi().clearUnread({ sessionId, version })),
-    clearUnreadMany: entries => mutate(() => requireApi().clearUnreadMany({ entries: [...entries] })),
-    markUnread: sessionId => mutate(() => requireApi().markUnread({ sessionId })),
-    markUnreadMany: sessionIds => mutate(() => requireApi().markUnreadMany({ sessionIds: [...sessionIds] })),
-    migrate: entries => mutate(() => requireApi().migrate({ entries: [...entries] })),
+    acknowledge: (sessionId, version) => write({ kind: 'acknowledge', sessionId, version }, () => requireApi().acknowledge({ sessionId, version })),
+    clearUnread: (sessionId, version) => write({ kind: 'clearUnread', sessionId, version }, () => requireApi().clearUnread({ sessionId, version })),
+    clearUnreadMany: entries => write({ kind: 'clearUnreadMany', entries: [...entries] }, () => requireApi().clearUnreadMany({ entries: [...entries] })),
+    markUnread: sessionId => write({ kind: 'markUnread', sessionId }, () => requireApi().markUnread({ sessionId })),
+    markUnreadMany: sessionIds => write({ kind: 'markUnreadMany', sessionIds: [...sessionIds] }, () => requireApi().markUnreadMany({ sessionIds: [...sessionIds] })),
+    migrate: entries => write({ kind: 'migrate', entries: [...entries] }, () => requireApi().migrate({ entries: [...entries] })),
     reset: () => {
       listeners.clear()
       state = { snapshot: null, error: null, ownerMissing: false }
@@ -237,6 +308,8 @@ const createStore = (): ThreadAttentionStore => {
       lastAttemptAt = 0
       stopped = false
       changesUnsupported = false
+      deltaSupported = null
+      writeQueue = Promise.resolve()
       stopPolling()
     },
   }

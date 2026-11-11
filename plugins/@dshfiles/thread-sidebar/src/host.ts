@@ -210,6 +210,8 @@ export default DshxPlugin.make({
       markUnread: input => ThreadAttention.use(attention => attention.markUnread(input)),
       markUnreadMany: input => ThreadAttention.use(attention => attention.markUnreadMany(input.sessionIds)),
       migrate: input => ThreadAttention.use(attention => attention.migrate(input.entries)),
+      writeDelta: input => ThreadAttention.use(attention => attention.writeDelta(input)),
+      writeCapabilities: (): Effect.Effect<{ readonly deltaVersion: 1 }> => Effect.succeed({ deltaVersion: 1 }),
     }),
     Api.bind(threadSidebarSessionArchiveApi, {
       status: input =>

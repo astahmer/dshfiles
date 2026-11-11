@@ -193,4 +193,72 @@ describe('shared thread attention store', () => {
     assert.equal(asked, 1)
     assert.equal(calls.state, 3)
   })
+
+  it('writes through the delta contract when the Host serves it, merging the answer into the held snapshot', async () => {
+    const { api, calls } = fakeApi()
+    const sent: Array<{ since: number; kind: string }> = []
+    const deltaHost: AttentionApi = {
+      ...api,
+      writeCapabilities: async () => ({ deltaVersion: 1 }),
+      writeDelta: async input => {
+        sent.push({ since: input.since, kind: input.command.kind })
+        return { revision: input.since + 1, complete: true, put: [], removed: ['thread-a'] }
+      },
+    }
+    store().attach(deltaHost)
+    await vi.advanceTimersByTimeAsync(0)
+    await store().acknowledge('thread-a', 1)
+    assert.deepEqual(sent, [{ since: 1, kind: 'acknowledge' }])
+    assert.equal(calls.acknowledge, 0)
+    assert.deepEqual(store().getSnapshot().snapshot?.sessions, [])
+    assert.equal(store().getSnapshot().snapshot?.revision, 2)
+  })
+
+  it('writes through the v1 methods when the Host serves no delta contract', async () => {
+    const { api, calls } = fakeApi()
+    let wrote = 0
+    store().attach({
+      ...api,
+      writeDelta: async () => {
+        wrote += 1
+        return { revision: 2, complete: true, put: [], removed: [] }
+      },
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    await store().acknowledge('thread-a', 1)
+    assert.equal(wrote, 0)
+    assert.equal(calls.acknowledge, 1)
+  })
+
+  it('never replays a failed delta write through the v1 methods', async () => {
+    const { api, calls } = fakeApi()
+    store().attach({
+      ...api,
+      writeCapabilities: async () => ({ deltaVersion: 1 }),
+      writeDelta: async () => Promise.reject(new Error('could not be reached')),
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    await assert.rejects(store().acknowledge('thread-a', 1))
+    assert.equal(calls.acknowledge, 0)
+  })
+
+  it('keeps the queue usable after a failed write', async () => {
+    const { api, calls } = fakeApi()
+    let attempts = 0
+    store().attach({
+      ...api,
+      writeCapabilities: async () => ({ deltaVersion: 1 }),
+      writeDelta: async () => {
+        attempts += 1
+        if (attempts === 1) return Promise.reject(new Error('boom'))
+        return { revision: 2, complete: true, put: [], removed: ['thread-a'] }
+      },
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    await assert.rejects(store().acknowledge('thread-a', 1))
+    await store().acknowledge('thread-a', 1)
+    assert.equal(attempts, 2)
+    assert.equal(calls.acknowledge, 0)
+    assert.deepEqual(store().getSnapshot().snapshot?.sessions, [])
+  })
 })
