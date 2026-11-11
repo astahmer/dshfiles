@@ -22,6 +22,8 @@ const rootArgument = process.argv.indexOf('--root')
 const scannedRoot = rootArgument === -1 ? workspaceRoot : resolve(process.argv[rootArgument + 1] ?? '.')
 const searchRoots = ['plugins', 'tooling', 'scripts']
 const skippedDirectories = new Set(['node_modules', 'dist', 'build', '.git', '.jj', 'output', '.turbo', 'test-results', '.features-gen', 'coverage'])
+/** The dshx CLI's own build caches (`tooling/dshx/.gitignore`): compiled copies, never hand-written source. */
+const generatedCacheDirectories = new Set(['tooling/dshx/packages/dshx/client-runtime', 'tooling/dshx/packages/dshx/runtime-store'])
 const sourceExtensions = /\.[cm]?[jt]sx?$/u
 const zodImport = /^\s*(?:import|export)\b[^'"]*from\s*['"]zod(?:\/[^'"]*)?['"]/mu
 
@@ -47,6 +49,7 @@ const sourceFiles = async (directory, found = []) => {
     const path = join(directory, entry.name)
     if (entry.isDirectory()) {
       if (skippedDirectories.has(entry.name)) continue
+      if (generatedCacheDirectories.has(relative(scannedRoot, path).replaceAll('\\', '/'))) continue
       await sourceFiles(path, found)
       continue
     }

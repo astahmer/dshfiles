@@ -30,3 +30,12 @@ test('a scratch tree is scanned for zod imports, including subpaths and exports'
   assert.equal(result.status, 1)
   assert.match(result.stderr, /plugins\/demo\/src\/owned\.ts: imports zod/u)
 })
+
+test('the dshx build caches are compiled copies, not scanned source', () => {
+  const root = mkdtempSync(join(tmpdir(), 'zod-imports-cache-'))
+  const cache = join(root, 'tooling', 'dshx', 'packages', 'dshx', 'client-runtime', 'cache-id', 'api')
+  mkdirSync(cache, { recursive: true })
+  writeFileSync(join(cache, 'zod-view.js'), "import zod from 'zod'\n")
+  const result = spawnSync(process.execPath, [script, '--root', root], { cwd: import.meta.dirname, encoding: 'utf8' })
+  assert.doesNotMatch(result.stderr, /client-runtime\/cache-id\/api\/zod-view\.js/u)
+})
