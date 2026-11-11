@@ -1,7 +1,7 @@
 import { Fragment, memo, useMemo } from 'react'
 import { fileMediaUrl } from '@deepseek-ai/dsh-util-workspace-path'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { JsonBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import { LinkHandler, MarkdownLinks, useRegistry } from '@dshfiles/dshx/client'
 import type { MarkdownFileMentions, MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -68,7 +68,8 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   const pathImages = useMemo<MarkdownPathImages>(() => {
     return { resolve: value => localPathMediaUrl(document.baseURI, value) }
   }, [])
-  const linkSchemes = useRegistry(LinkHandler).map(handler => handler.scheme)
+  const linkHandlers = useRegistry(LinkHandler)
+  const linkSchemes = useMemo(() => linkHandlers.map(handler => handler.scheme), [linkHandlers])
   const last = blocks.length - 1
   // Tool-call heads render as tool rows in the chat view's grouping pass, so
   // a node that is only those heads (or empty) would paint an empty root
@@ -86,9 +87,10 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
     switch (block.kind) {
       case 'text':
         rendered.push(
-          <InlineReferenceMarkdown
+          <AssistantText
             key={i}
-            text={MarkdownLinks.rewrite(block.text, linkSchemes)}
+            block={block}
+            linkSchemes={linkSchemes}
             streaming={streaming}
             labels={labels}
             fileMentions={mentions}
@@ -157,6 +159,17 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
       </div>
     </div>
   )
+})
+
+type AssistantTextProps = Omit<ComponentProps<typeof InlineReferenceMarkdown>, 'text'> & {
+  block: Extract<AssistantBlock, { kind: 'text' }>
+  linkSchemes: readonly string[]
+}
+
+/** Frozen blocks keep their object identity while a turn streams, so only the growing block is rewritten. */
+const AssistantText = memo(function AssistantText({ block, linkSchemes, ...markdown }: AssistantTextProps) {
+  const text = useMemo(() => MarkdownLinks.rewrite(block.text, linkSchemes), [block, linkSchemes])
+  return <InlineReferenceMarkdown {...markdown} text={text} />
 })
 
 function ProcessReasoning({ hidden, reveal, useGroupAction, children }: {
