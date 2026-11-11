@@ -38,6 +38,52 @@ afterEach(async () => {
 })
 
 describe('synchronous per-record reads', () => {
+  it('preserves the legacy global value during migration', async () => {
+    const root = await makeRoot()
+    const legacy = { unit: { name: 'demo', version: 3 }, global: { theme: 'dark' }, tables: { items: {} } }
+    await writeFile(join(root, 'demo.json'), JSON.stringify(legacy))
+    const { backend, unit } = await openUnit(root)
+    expect((await unit.loadAll()).global).toEqual({ theme: 'dark' })
+    await backend.close()
+  })
+
+  it('rejects unsafe legacy keys without writing outside the unit', async () => {
+    const root = await makeRoot()
+    const legacy = { unit: { name: 'demo', version: 3 }, global: null, tables: { items: { '../escaped': { label: 'a' } } } }
+    await writeFile(join(root, 'demo.json'), JSON.stringify(legacy))
+    const { backend, unit } = await openUnit(root)
+    await expect(unit.loadAll()).rejects.toThrow(/not path-safe/)
+    await backend.close()
+  })
+
+  it('keeps an already-migrated tree authoritative after its last record is deleted', async () => {
+    const root = await makeRoot()
+    await mkdir(join(root, 'demo', 'items'), { recursive: true })
+    await writeFile(join(root, 'demo', 'items', 'a.json'), `${JSON.stringify({ version: 3, record: { label: 'a' } })}\n`)
+    await writeFile(join(root, 'demo.json'), JSON.stringify({ unit: { name: 'demo', version: 3 }, global: null, tables: { items: { a: { label: 'a' } } } }))
+    const first = await openUnit(root)
+    expect((await first.unit.loadAll()).tables.items).toEqual({ a: { label: 'a' } })
+    await first.unit.deleteRecord('items', 'a')
+    await first.backend.close()
+
+    const reopened = await openUnit(root)
+    expect((await reopened.unit.loadAll()).tables.items).toEqual({})
+    await reopened.backend.close()
+  })
+
+  it('does not resurrect deleted rows from a migrated legacy unit', async () => {
+    const root = await makeRoot()
+    const legacy = { unit: { name: 'demo', version: 3 }, global: null, tables: { items: { a: { label: 'a' } } } }
+    await writeFile(join(root, 'demo.json'), JSON.stringify(legacy))
+    const first = await openUnit(root)
+    expect((await first.unit.loadAll()).tables.items).toEqual({ a: { label: 'a' } })
+    await first.unit.deleteRecord('items', 'a')
+    await first.backend.close()
+    const second = await openUnit(root)
+    expect((await second.unit.loadAll()).tables.items).toEqual({})
+    await second.backend.close()
+  })
+
   it('indexes stored document keys without reading a record', async () => {
     const root = await makeRoot()
     const stock = new StockJsonStorageBackend(root)

@@ -30,24 +30,48 @@
  * whole-unit file `<root>/<name>.json` (the pre-per-record layout) seeds
  * per-record documents, provided its stored unit version is in the accepted
  * set — a legacy file stamped with any other version is left alone and reads
- * as the empty unit. Any new document path, including one whose contents are
- * unreadable or stale, suppresses the bootstrap for the whole unit. The
- * legacy file is never changed or deleted.
+ * as the empty unit. The migration is staged beside the unit and published by
+ * one directory rename, with a marker document that keeps a later empty tree
+ * from re-importing the retained legacy file. Any new document path,
+ * including one whose contents are unreadable or stale, suppresses the
+ * bootstrap for the whole unit. The legacy file is never changed or deleted.
  * @module @deepseek-ai/dsh-storage-json/src/per-record-unit
  */
 
-import { readFileSync, readdirSync } from 'node:fs'
-import { mkdir, readFile, readdir, rename, rm } from 'node:fs/promises'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { Dirent } from 'node:fs'
 import { StorageError } from '@deepseek-ai/dsh-storage'
 import type { KvUnit, KvUnitDescriptor } from '@deepseek-ai/dsh-storage'
-import { writeAtomic } from './atomic.ts'
+import { fsyncDirectory, writeAtomic } from './atomic.ts'
 import { parseRecord, serializeRecord } from './format.ts'
 import type { UnitState } from './format.ts'
 
 /** Keys become path segments in this layout; this set is path-safe on every OS. */
 const SAFE_KEY_RE = /^[a-zA-Z0-9_-]+$/
+
+/**
+ * Marks a per-record tree as already bootstrapped, so deleting its last record
+ * never re-imports it from the retained legacy file. The name is deliberately
+ * unsafe as a record key, so neither this unit nor a stock per-record backend
+ * reads it as a record, while both still see a document and skip bootstrap.
+ */
+const MARKER_FILE = '.bootstrap-complete.json'
+
+const markerPath = (descriptor: KvUnitDescriptor, dir: string): string => {
+  const table = descriptor.tables[0]
+  return table === undefined ? join(dir, MARKER_FILE) : join(dir, table, MARKER_FILE)
+}
+
+const hasBootstrapMarker = (descriptor: KvUnitDescriptor, dir: string): boolean => existsSync(markerPath(descriptor, dir))
+
+/** Adopt a tree migrated before the marker existed: its readable records are authoritative. */
+const writeBootstrapMarker = async (descriptor: KvUnitDescriptor, dir: string): Promise<void> => {
+  const path = markerPath(descriptor, dir)
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
+  await writeAtomic(path, serializeRecord(descriptor.version, null))
+}
 
 /**
  * Open one `per-record`-layout unit under `root`: the unit directory is
@@ -100,6 +124,7 @@ async function loadPerRecordState(descriptor: KvUnitDescriptor, dir: string): Pr
           return loadTableRecords(records, versions, join(dir, entry.name))
         }
       }
+      if (entry.name === '.bootstrap-complete.json') return true
       if (entry.name === 'global.json' && descriptor.hasGlobal) {
         const global = await readRecord(join(dir, entry.name), versions)
         if (global !== undefined) state.global = global
@@ -108,6 +133,9 @@ async function loadPerRecordState(descriptor: KvUnitDescriptor, dir: string): Pr
       return false
     }))).some(Boolean)
   if (!hasNewDocuments) await bootstrapLegacyUnit(descriptor, dir, state)
+  else if (!hasBootstrapMarker(descriptor, dir) && [...state.tables.values()].some(records => records.size > 0)) {
+    await writeBootstrapMarker(descriptor, dir)
+  }
   return state
 }
 
@@ -142,9 +170,9 @@ async function bootstrapLegacyUnit(descriptor: KvUnitDescriptor, dir: string, st
   // The legacy document is runtime data: only `unit.name`, `unit.version`,
   // and the tables map shape are checked here — the record values are
   // migrated as-is and the domain layer's schemas judge them.
-  let document: { unit?: { name?: unknown; version?: unknown }; tables?: unknown }
+  let document: { unit?: { name?: unknown; version?: unknown }; tables?: unknown; global?: unknown }
   try {
-    document = JSON.parse(text) as { unit?: { name?: unknown; version?: unknown }; tables?: unknown }
+    document = JSON.parse(text) as { unit?: { name?: unknown; version?: unknown }; tables?: unknown; global?: unknown }
   } catch {
     return // Malformed legacy file: not ours to interpret or delete.
   }
@@ -152,17 +180,56 @@ async function bootstrapLegacyUnit(descriptor: KvUnitDescriptor, dir: string, st
   const stamped = document.unit.version
   if (typeof stamped !== 'number' || !acceptedStamps(descriptor).includes(stamped)) return
   const tables = document.tables
-  if (typeof tables !== 'object' || tables === null) return
-  const recordsByTable = tables as Record<string, Record<string, unknown>>
+  if (typeof tables !== 'object' || tables === null || Array.isArray(tables)) return
+  const recordsByTable = tables as Record<string, unknown>
+  const rows: Array<{ table: string; key: string; value: unknown }> = []
   for (const [table, records] of Object.entries(recordsByTable)) {
-    const target = state.tables.get(table)
-    if (target === undefined) continue
-    for (const [key, value] of Object.entries(records)) {
-      const path = join(dir, table, `${key}.json`)
-      await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-      await writeAtomic(path, serializeRecord(descriptor.version, value))
-      target.set(key, value)
+    if (!state.tables.has(table)) continue
+    if (typeof records !== 'object' || records === null || Array.isArray(records)) {
+      throw new Error(`unit '${descriptor.name}': invalid legacy table '${table}'`)
     }
+    for (const [key, value] of Object.entries(records)) {
+      assertSafeKey(descriptor.name, key)
+      rows.push({ table, key, value })
+    }
+  }
+  const staging = await mkdtemp(join(dirname(dir), `.${descriptor.name}-migration-`))
+  const tree = join(staging, 'tree')
+  const previous = join(staging, 'previous')
+  let movedPrevious = false
+  let published = false
+  try {
+    await mkdir(tree, { mode: 0o700 })
+    for (const row of rows) {
+      const tableDir = join(tree, row.table)
+      await mkdir(tableDir, { recursive: true, mode: 0o700 })
+      await writeAtomic(join(tableDir, `${row.key}.json`), serializeRecord(descriptor.version, row.value))
+    }
+    if (descriptor.hasGlobal && document.global !== undefined) {
+      await writeAtomic(join(tree, 'global.json'), serializeRecord(descriptor.version, document.global))
+    }
+    const markerDir = descriptor.tables[0] === undefined ? tree : join(tree, descriptor.tables[0])
+    await mkdir(markerDir, { recursive: true, mode: 0o700 })
+    await writeAtomic(join(markerDir, MARKER_FILE), serializeRecord(descriptor.version, null))
+    await fsyncDirectory(tree)
+    try {
+      await rename(dir, previous)
+      movedPrevious = true
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    try {
+      await rename(tree, dir)
+      await fsyncDirectory(dirname(dir))
+      published = true
+    } catch (error) {
+      if (movedPrevious) await rename(previous, dir)
+      throw error
+    }
+    for (const row of rows) state.tables.get(row.table)?.set(row.key, row.value)
+    if (descriptor.hasGlobal && document.global !== undefined) state.global = document.global
+  } finally {
+    if (published || !movedPrevious) await rm(staging, { recursive: true, force: true })
   }
 }
 
