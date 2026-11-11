@@ -10,6 +10,41 @@ path is excluded.
 
 ## Where it stands
 
+### Resume here (2026-11-11, after upstream #250 and #251)
+
+The clean `main` snapshot `1ac2f08f` was red again. After the current chunk,
+Oxlint is 1,036 → 1,034, ast-grep is 155 → 151, Effect anti-slop remains
+36 (baseline 33), and formatting drift is 10 → 0. No caps were raised or
+lowered in this chunk: the rules still above cap need real fixes first.
+
+| Rule | Before | After | Cap |
+| --- | ---: | ---: | ---: |
+| `require-safety-comment-for-type-assertion` | 305 | 305 | 297 |
+| `no-unknown-parameters` | 237 | 237 | 226 |
+| `no-unsafe-dictionary-type` | 179 | 179 | 169 |
+| `no-unknown-returns` | 118 | 118 | 117 |
+| `no-known-value-widening` | 101 | 101 | 95 |
+| `ui-guidance(no-native-title)` | 64 | 64 | 64 |
+| `no-runtime-typeof` | 26 | 26 | 26 |
+| `no-conditional-empty-object-spread` | 2 | 0 | 0 |
+| Oxlint errors | 4 | 4 | 0 |
+| `no-deeply-nested-ternary` | 3 | 0 | 0 |
+| `no-direct-json-parse` | 151 | 150 | 147 |
+| `no-direct-json-parse-tsx` | 1 | 1 | 1 |
+
+The two conditional spreads now preserve omission and metadata semantics;
+GitLab merge-state precedence is explicit, and one MCP test uses the shared JSON
+boundary. The 10 drifted committed files are formatted. Remaining errors are
+`pull-requests`' forge export bag and passthrough alias, and the idle scheduler
+and raw error in `context-compaction`. The scheduler must preserve 60-second
+fixed ticks, overlap protection, abort/disposal, and process-liveness behavior;
+it needs lifecycle tests rather than a mechanical lint rewrite. Remaining new
+MCP transport findings also need typed boundaries, not casts or suppressions.
+Re-measure on the then-current clean `main`, fix the over-cap rules and three
+Effect findings, and lower caps only after the gates pass.
+
+### Previous milestone
+
 Measured on a `git archive` of `main` (`be839049`, 2026-11-11) so no other
 agent's uncommitted edits counted. The gate was **red** there: 1 error-level
 finding, 4 rules over cap, one Effect finding over baseline, and 6 files with
