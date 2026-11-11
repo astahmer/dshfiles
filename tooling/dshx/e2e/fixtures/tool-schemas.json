@@ -1,5 +1,5 @@
 {
-  "hostBundles": 79,
+  "hostBundles": 80,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -21,6 +21,7 @@
     "@dshfiles/capabilities-hub",
     "@dshfiles/command-palette",
     "@dshfiles/context-compaction",
+    "@dshfiles/conversation-cleanup",
     "@dshfiles/cordis-cards",
     "@dshfiles/cordis-client-runner",
     "@dshfiles/diff-viewed",
@@ -81,12 +82,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 599,
-  "apiToolBindings": 414,
-  "apiToolNameCount": 414,
-  "apiToolSchemas": 413,
+  "apiMethods": 620,
+  "apiToolBindings": 433,
+  "apiToolNameCount": 433,
+  "apiToolSchemas": 432,
   "definedTools": 24,
-  "tools": 437,
+  "tools": 456,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -1245,6 +1246,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "useExtraUsage": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -1327,6 +1331,26 @@
         },
         "required": [
           "distribution"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "ai_accounts_set_extra_usage",
+      "description": "Allow or refuse a provider’s paid extra usage (overage credits) for one account. With it off, the account stops at its plan limits: routing skips it once a plan window is spent and a turn that would run on it stops with a recovery message. Only accounts whose quota reports extra usage honor it. Call only when the user asked to change that account.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "instanceId",
+          "enabled"
         ],
         "additionalProperties": false
       }
@@ -1771,6 +1795,135 @@
       }
     },
     {
+      "name": "artifact_create",
+      "description": "Create an artifact only when the user asked. Defaults to the calling thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "text/markdown",
+              "text/html"
+            ]
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "mimeType",
+          "content"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "artifact_delete",
+      "description": "Delete an artifact only when the user asked; confirm must be true. Refuses stale revisions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "expectedRevision",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "artifact_list",
+      "description": "List artifacts in a thread. Defaults to the calling thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "artifact_read",
+      "description": "Read an artifact in a thread. Defaults to the calling thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "artifact_update",
+      "description": "Update an artifact only when the user asked. Refuses stale revisions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "text/markdown",
+              "text/html"
+            ]
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "ask_parent_question",
       "description": "Ask your direct parent to decide a question, or pass questionId alone to reattach after Host restart. For a new question, provide options with id and label, optional description, mark one option as recommended, choose expiry behavior, and optionally set timeoutMs from 1,000 to 3,600,000 (default 180,000). The parent may decide directly or use the native ask_user_question tool to ask a human.",
       "parameters": {
@@ -2006,7 +2159,7 @@
     },
     {
       "name": "automation_save",
-      "description": "Create a project automation (omit id) or replace one (pass its id). A schedule trigger takes cron, daily, weekly or every timing with an explicit IANA time zone; a webhook trigger takes the HMAC secret as a secret:ALIAS reference and a per-minute rate limit. Each run starts a new thread in the project with the prompt; a webhook prompt may read {{body.path}} and {{headers.name}}. Call only when the user asked for this.",
+      "description": "Create a project automation (omit id) or replace one (pass its id). A schedule trigger takes cron, daily, weekly or every timing with an explicit IANA time zone; a webhook trigger takes the HMAC secret as a secret:ALIAS reference and a per-minute rate limit. Each run posts its prompt: by default it starts a new thread in the project, and with destination {kind:'existing-thread',sessionId} it adds the prompt to that thread as a queued message. A webhook prompt may read {{body.path}} and {{headers.name}}, and accepts either the timestamped x-dsh-signature scheme or GitHub's x-hub-signature-256 over the raw body. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -2046,6 +2199,44 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "destination": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "new-thread"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "existing-thread"
+                    ]
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "sessionId"
+                ],
+                "additionalProperties": false
+              }
+            ]
           },
           "trigger": {
             "oneOf": [
@@ -4350,6 +4541,20 @@
       }
     },
     {
+      "name": "compaction_threshold",
+      "description": "Read the token count at which automatic compaction next runs for one live thread, from its routed model, context window, output reservation and the compaction policy. Null before the thread routed a request, when the route declares no context window, or when the policy leaves no pressure budget.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {}
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "context_instruction_files",
       "description": "The AGENTS.md-compatible instruction files DSH's workspace instruction loader finds for a thread folder with its default discovery settings (user-global first, then project root to folder), with their sizes. Read-only.",
       "parameters": {
@@ -4363,6 +4568,38 @@
         "required": [
           "cwd"
         ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "conversation_cleanup_delete",
+      "description": "Permanently delete the exact conversations in a fresh cleanup preview, after rechecking their state and obtaining each persistence write lock. Irreversible: removes local JSONL generations, not shared attachments, workspaces, backups or derived indexes. Loaded or changed sessions are skipped; failures are reported individually. Agent calls require a root conversation with Full access; delegated or restricted agents are refused. Call only when the user explicitly asked to delete these conversations and confirmed permanent deletion.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "previewId",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "conversation_cleanup_preview",
+      "description": "Preview permanent deletion of up to 200 local settled OR archived conversations. Loaded sessions, background activity, migration-required logs and the caller are protected. Nothing is deleted. Read-only; preview expires after ten minutes.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
         "additionalProperties": false
       }
     },
@@ -5734,7 +5971,11 @@
       "description": "List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "revisionLimit": {
+            "type": "integer"
+          }
+        },
         "additionalProperties": false
       }
     },
@@ -7015,7 +7256,7 @@
     },
     {
       "name": "multi_host_project_origins",
-      "description": "Read the Git origin URL for local project paths and paths on registered remote runtimes, in bounded batches. Read-only.",
+      "description": "Read the Git origin URL for local project paths and paths on registered remote runtimes, in bounded batches. A remote host slower than 1.5 s answers null with pending: true while its read finishes into the cache; ask again. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -7696,6 +7937,84 @@
       }
     },
     {
+      "name": "notification_history_clear",
+      "description": "Permanently clear only the specified retained notification entries. Read the list first; newer arrivals are preserved. Requires confirm:true. Call only when the user asked to clear notification history.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "ids",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "notification_history_list",
+      "description": "Read the last 500 retained thread notifications, newest first, including read and dismissed entries. Summaries are fixed categories, never conversation contents. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "notification_history_set_dismissed",
+      "description": "Dismiss a notification entry or restore it with dismissed:false. This does not stop, resolve or acknowledge its thread. Call only when the user asked.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "dismissed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "dismissed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "notification_history_set_read",
+      "description": "Mark the specified notification entries read or unread, without acknowledging or changing their threads. Call only when the user asked.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "read": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ids",
+          "read"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "plugin_guide_search",
       "description": "Search the DSH plugin extension surfaces a plugin may use: dshx SDK entry points, native Client slots, owned registries, client contracts, Host APIs, shared modules and feature-catalog surfaces. Each entry names its import, scope, mode, registration shape, additive-or-replacement risk, source file and docs. Static build-time catalog, never live occupancy. Read-only.",
       "parameters": {
@@ -7720,6 +8039,39 @@
             "type": "integer"
           }
         },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plugin_inventory",
+      "description": "List the plugin entries of the active profile with their module, the bundle that declares each row and the bundles that reconfigure it, whether each is enabled, its runtime phase, a change waiting for a restart, whether pnpm profile:sync restores the row from the seed, and why it cannot be changed when the profile patch cannot address it. A query filters by entry id or module. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plugin_set_enabled",
+      "description": "Enable or disable one plugin entry of the active profile (an entryId from plugin_inventory). The plugin manager saves it in the profile patch and reports whether the running DSH applied it or needs a restart; this never restarts DSH. Reverse it with the opposite value. Call only when the user asked to enable or disable that plugin.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entryId",
+          "enabled"
+        ],
         "additionalProperties": false
       }
     },
@@ -8489,7 +8841,7 @@
     },
     {
       "name": "pull_request_create",
-      "description": "Create a GitHub pull request from a thread’s jj workspace after pull_request_create_preview: sets the bookmark on the previewed head commit, pushes it with jj git push, runs gh pr create (or reuses an open pull request for the bookmark), then links and watches it on the thread. Requires confirm: true and the preview’s headCommitId; refuses when the workspace moved. Publishes to GitHub. Call only when the user asked for this.",
+      "description": "Create a pull request or merge request from a thread’s jj workspace after pull_request_create_preview: sets the bookmark on the previewed head commit, pushes it with jj git push, runs gh pr create or glab mr create (or reuses an open one for the bookmark), then links and watches it on the thread. Requires confirm: true and the preview’s headCommitId; refuses when the workspace moved. Publishes to the forge. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8540,7 +8892,7 @@
     },
     {
       "name": "pull_request_create_preview",
-      "description": "Preview creating a GitHub pull request from a thread’s jj workspace: the repository, base branch, bookmark to push, the commits above the base, a title and body drafted from the thread with its model, an existing open pull request for the bookmark, and every blocking problem with its recovery. Changes nothing (it only reads jj, gh and the thread). Pass its bookmark, base, headCommitId, title and body to pull_request_create. Read-only.",
+      "description": "Preview creating a pull request (GitHub) or merge request (GitLab) from a thread’s jj workspace: the repository, base branch, bookmark to push, the commits above the base, a title and body drafted from the thread with its model, an existing open pull request for the bookmark, and every blocking problem with its recovery. Changes nothing (it only reads jj, gh and the thread). Pass its bookmark, base, headCommitId, title and body to pull_request_create. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8562,7 +8914,7 @@
     },
     {
       "name": "pull_request_link",
-      "description": "Link a GitHub pull request to a DSH thread by GitHub URL, or by number and repository cwd. The session id defaults to the calling thread. Call only when the user asked for this.",
+      "description": "Link a GitHub pull request or GitLab merge request to a DSH thread by URL, or by number and repository cwd. The session id defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -8570,7 +8922,7 @@
     },
     {
       "name": "pull_request_list",
-      "description": "List GitHub pull-request links for one thread (defaults to the calling thread) or across all threads with all: true, including each link’s last known state and whether it is watched. Read-only.",
+      "description": "List GitHub pull-request and GitLab merge-request links for one thread (defaults to the calling thread) or across all threads with all: true, including each link’s last known state and whether it is watched. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8585,8 +8937,28 @@
       }
     },
     {
+      "name": "pull_request_search",
+      "description": "Search recent issues and pull requests in the current GitHub repository. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "pull_request_unlink",
-      "description": "Remove one GitHub pull-request link from a DSH thread. Specify the URL or repository and number; the session id defaults to the calling thread. Call only when the user asked for this.",
+      "description": "Remove one GitHub pull-request or GitLab merge-request link from a DSH thread. Specify the URL or repository and number; the session id defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -8594,7 +8966,7 @@
     },
     {
       "name": "pull_request_unwatch",
-      "description": "Stop watching one linked GitHub pull request without removing its thread link. The session id defaults to the calling thread. Call only when the user asked for this.",
+      "description": "Stop watching one linked pull request or merge request without removing its thread link. The session id defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -8602,7 +8974,7 @@
     },
     {
       "name": "pull_request_watch",
-      "description": "Start watching a GitHub pull request; watching creates the thread link if needed. The session id defaults to the calling thread. Call only when the user asked for this.",
+      "description": "Start watching a GitHub pull request or GitLab merge request; watching creates the thread link if needed. The session id defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -9654,7 +10026,7 @@
     },
     {
       "name": "session_undo_history",
-      "description": "The turns of a thread that can be undone or rewound to (session_rewind takes their turn number), newest last, each with its prompt and whether its files were snapshotted, and whether a redo is available. Read-only.",
+      "description": "The turns of a thread that can be undone or rewound to (session_rewind takes their turn number), newest last, each with its prompt, whether its files were snapshotted and the jj revision its edits left, and whether a redo is available. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -9722,6 +10094,25 @@
         },
         "required": [
           "returnPolicy"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "settings_inspect",
+      "description": "Inspect one settings namespace field by field: the schema default, the user override (present even when it equals the default), the inherited value a reset restores, the effective value, and its source (override, profile composition, schema default, or unknown when the Host cannot tell). A query filters fields by path, title or description. Secret fields are never listed. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "namespace"
         ],
         "additionalProperties": false
       }
@@ -9856,6 +10247,14 @@
     {
       "name": "thread_attention_state",
       "description": "Threads whose finished turn (or manual unread mark) the user has not acknowledged yet. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "thread_attention_write_capabilities",
+      "description": "Which attention write contracts this Host serves; a Host without this method answers full snapshots only.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -10039,6 +10438,29 @@
         "required": [
           "text",
           "models"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "thread_find",
+      "description": "Find every event of one DSH thread (Session) whose text contains all words of `text` (the last word may be a prefix), in transcript order: the whole stored transcript, older turns and tool calls and results included (model thinking is not indexed). Each match has its event seq, type, time and a short snippet. `limit` defaults to 200. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sessionId",
+          "text"
         ],
         "additionalProperties": false
       }

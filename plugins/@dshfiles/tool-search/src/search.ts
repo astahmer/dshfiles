@@ -46,6 +46,7 @@ const synonyms: Readonly<Record<string, string>> = {
   add: 'capture create',
   new: 'create capture',
   make: 'create',
+  open: 'create',
   note: 'capture',
   record: 'capture',
   track: 'capture',
