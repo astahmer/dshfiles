@@ -1,4 +1,5 @@
 import { activateAccountRuntime } from './account-runtime.js'
+import { createNativeProviderSwitch } from './native-providers.js'
 import { createServingAccountService } from './serving-account.js'
 import { servingAccountHostApi } from './serving-account-host.js'
 import { threadAccountHostApi } from './thread-account-host.js'
@@ -129,6 +130,7 @@ const startAccountsHost = (input: {
   const pool = input.pool.view
   const resolveCredential = resolveKeyFromContext(ctx)
   const runtime = activateAccountRuntime(ctx)
+  runtime.nativeProviders = createNativeProviderSwitch()
   runtime.pricing = input.pricing
   onRelease(() => {
     if (runtime.pricing === input.pricing) delete runtime.pricing

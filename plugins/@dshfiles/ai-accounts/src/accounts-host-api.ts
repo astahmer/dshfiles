@@ -40,7 +40,6 @@ import { resolveKeyFromContext } from './credentials.js'
 import { createUsageHistoryService } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
 import { mapRolling } from './rolling-concurrency.js'
-import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
 import { PricingCatalogModel } from './pricing-catalog.js'
 import type { PricingSettings } from './settings.js'
 import { AccountSettings } from './account-settings-service.js'
@@ -101,6 +100,12 @@ const secretCatalogBridgeFor = (ctx: Context): SecretCatalogCredentialBridge | u
 const setupFor = (ctx: Context) => {
   const service = accountRuntime(ctx)?.accountSetup
   if (service === undefined) throw new Error('Account connection setup requires the updated Host. Restart when idle before connecting an account.')
+  return service
+}
+
+const nativeProviderSwitch = (ctx: Context) => {
+  const service = accountRuntime(ctx)?.nativeProviders
+  if (service === undefined) throw new Error('Native provider switches start with AI Accounts. Restart when idle, then reopen the Models page.')
   return service
 }
 
@@ -370,8 +375,10 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     if (warning === undefined) return catalog
     return { ...catalog, warning }
   }),
-  nativeProviders: effectHandler(aiAccountsApi, 'nativeProviders', async ({ ctx }) => readNativeProviders(ctx)),
-  setNativeProviderEnabled: effectHandler(aiAccountsApi, 'setNativeProviderEnabled', async ({ input, ctx }) => setNativeProviderEnabled(ctx, input)),
+  nativeProviders: effectHandler(aiAccountsApi, 'nativeProviders', async ({ ctx }) => nativeProviderSwitch(ctx).read(ctx)),
+  setNativeProviderEnabled: effectHandler(aiAccountsApi, 'setNativeProviderEnabled', async ({ input, ctx }) =>
+    nativeProviderSwitch(ctx).setEnabled(ctx, input),
+  ),
   usage: effectHandler(aiAccountsApi, 'usage', async ({ ctx, store }) => accountRuntime(ctx)?.usageCache?.get() ?? readAccountsUsage(ctx, store)),
   refreshUsage: effectHandler(
     aiAccountsApi,

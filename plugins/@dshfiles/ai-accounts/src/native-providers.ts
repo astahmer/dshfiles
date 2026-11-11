@@ -38,84 +38,84 @@ const writePatch = async (path: string, text: string): Promise<void> => {
   await rename(temporary, path)
 }
 
-let patchWrites: Promise<void> = Promise.resolve()
-
-/**
- * One read-modify-rename of the profile patch at a time, whether or not HMR also serializes it. Across processes it
- * takes the profile's `package.json` writer lock, the one DSH's plugin manager and `scripts/profile-sync.ts` hold
- * while they edit the patch, outside `hmr.runExclusive` as the plugin manager does.
- */
-const serializePatchWrite = (work: () => Promise<void>): Promise<void> => {
-  const next = patchWrites.then(work)
-  patchWrites = next.catch(() => undefined)
-  return next
-}
-
-/** Rows switched back on in this process, listed until their providers re-register. */
-const reenabling = new WeakMap<Context, Map<string, string>>()
-
 const unavailable = (reason: string): NativeProviders => ({ available: false, liveReload: false, reason, providers: [] })
 
-export const readNativeProviders = async (ctx: Context): Promise<NativeProviders> => {
-  const patchPath = ctx.get('profileContext')?.patchPath
-  const loader = ctx.get('loader')
-  if (patchPath === undefined || loader === undefined)
-    return unavailable('This Host runs without a profile patch, so native providers cannot be switched here.')
-  const managed = NativeProviderPatch.managedDisabledRows(await readPatch(patchPath))
-  const rows = new Map([...loader.entries()].map(entry => [entry.options.id, entry] as const))
-
-  const routes = new Map<string, string[]>()
-  const labels = new Map<string, string[]>()
-  for (const provider of ctx.get('llm')?.listConfigurableProviders() ?? []) {
-    const entryId = provider.settingsNs
-    if (EXCLUDED_ROWS.has(entryId) || entryId.startsWith('ai-accounts') || !rows.has(entryId)) continue
-    routes.set(entryId, [...(routes.get(entryId) ?? []), provider.provider])
-    labels.set(entryId, [...(labels.get(entryId) ?? []), provider.displayName])
+/**
+ * One switch per plugin activation. Its patch writes run one read-modify-rename at a time, whether or not HMR also
+ * serializes them. Across processes each write takes the profile's `package.json` writer lock, the one DSH's plugin
+ * manager and `scripts/profile-sync.ts` hold while they edit the patch, outside `hmr.runExclusive` as the plugin
+ * manager does.
+ */
+export const createNativeProviderSwitch = () => {
+  let patchWrites: Promise<void> = Promise.resolve()
+  const serializePatchWrite = (work: () => Promise<void>): Promise<void> => {
+    const next = patchWrites.then(work)
+    patchWrites = next.catch(() => undefined)
+    return next
   }
-  // A row this plugin disabled has left the provider directory; it is still listed so it can come back.
-  const returning = reenabling.get(ctx.root) ?? new Map<string, string>()
-  for (const entryId of routes.keys()) returning.delete(entryId)
-  for (const entryId of [...managed.keys(), ...returning.keys()]) if (!routes.has(entryId) && rows.has(entryId)) routes.set(entryId, [])
+  /** Rows switched back on by this activation, listed until their providers re-register. */
+  const returning = new Map<string, string>()
 
-  const providers = [...routes].map(([entryId, served]) => {
-    const row = rows.get(entryId)
-    const running = row !== undefined && !row.disabled && row.fiber !== undefined
-    const ownSwitch = managed.has(entryId)
-    const disabledElsewhere = row?.disabled === true && !ownSwitch && !returning.has(entryId)
-    return {
-      entryId,
-      label: [...new Set(labels.get(entryId) ?? [])].join(' · ') || managed.get(entryId) || returning.get(entryId) || row?.options.name || entryId,
-      routes: served,
-      enabled: !ownSwitch && !disabledElsewhere,
-      running,
-      lockedReason: disabledElsewhere ? 'Disabled by another entry in the profile patch; re-enable it there.' : null,
+  const read = async (ctx: Context): Promise<NativeProviders> => {
+    const patchPath = ctx.get('profileContext')?.patchPath
+    const loader = ctx.get('loader')
+    if (patchPath === undefined || loader === undefined)
+      return unavailable('This Host runs without a profile patch, so native providers cannot be switched here.')
+    const managed = NativeProviderPatch.managedDisabledRows(await readPatch(patchPath))
+    const rows = new Map([...loader.entries()].map(entry => [entry.options.id, entry] as const))
+
+    const routes = new Map<string, string[]>()
+    const labels = new Map<string, string[]>()
+    for (const provider of ctx.get('llm')?.listConfigurableProviders() ?? []) {
+      const entryId = provider.settingsNs
+      if (EXCLUDED_ROWS.has(entryId) || entryId.startsWith('ai-accounts') || !rows.has(entryId)) continue
+      routes.set(entryId, [...(routes.get(entryId) ?? []), provider.provider])
+      labels.set(entryId, [...(labels.get(entryId) ?? []), provider.displayName])
     }
-  })
-  return { available: true, liveReload: ctx.get('hmr') !== undefined, reason: null, providers }
+    // A row this plugin disabled has left the provider directory; it is still listed so it can come back.
+    for (const entryId of routes.keys()) returning.delete(entryId)
+    for (const entryId of [...managed.keys(), ...returning.keys()]) if (!routes.has(entryId) && rows.has(entryId)) routes.set(entryId, [])
+
+    const providers = [...routes].map(([entryId, served]) => {
+      const row = rows.get(entryId)
+      const running = row !== undefined && !row.disabled && row.fiber !== undefined
+      const ownSwitch = managed.has(entryId)
+      const disabledElsewhere = row?.disabled === true && !ownSwitch && !returning.has(entryId)
+      return {
+        entryId,
+        label: [...new Set(labels.get(entryId) ?? [])].join(' · ') || managed.get(entryId) || returning.get(entryId) || row?.options.name || entryId,
+        routes: served,
+        enabled: !ownSwitch && !disabledElsewhere,
+        running,
+        lockedReason: disabledElsewhere ? 'Disabled by another entry in the profile patch; re-enable it there.' : null,
+      }
+    })
+    return { available: true, liveReload: ctx.get('hmr') !== undefined, reason: null, providers }
+  }
+
+  const setEnabled = async (ctx: Context, input: { readonly entryId: string; readonly enabled: boolean }): Promise<NativeProviders> => {
+    const current = await read(ctx)
+    const profile = ctx.get('profileContext')
+    if (!current.available || profile === undefined) return current
+    const patchPath = profile.patchPath
+    const target = current.providers.find(provider => provider.entryId === input.entryId)
+    // Only rows this page lists may be switched, so the method cannot disable an arbitrary plugin.
+    if (target === undefined || !NativeProviderPatch.isPatchRowId(input.entryId)) throw new Error(`'${input.entryId}' is not a native provider row.`)
+    if (target.lockedReason !== null) throw new Error(target.lockedReason)
+    const apply = async (): Promise<void> => {
+      const text = await readPatch(patchPath)
+      const next = input.enabled
+        ? NativeProviderPatch.withRowEnabled(text, input.entryId)
+        : NativeProviderPatch.withRowDisabled(text, { id: input.entryId, label: target.label })
+      if (next !== text) await writePatch(patchPath, next)
+      if (input.enabled) returning.set(input.entryId, target.label)
+    }
+    const hmr = ctx.get('hmr')
+    await serializePatchWrite(() => withFileLock(join(profile.dir, 'package.json'), () => (hmr === undefined ? apply() : hmr.runExclusive(apply))))
+    return read(ctx)
+  }
+
+  return { read, setEnabled }
 }
 
-export const setNativeProviderEnabled = async (ctx: Context, input: { readonly entryId: string; readonly enabled: boolean }): Promise<NativeProviders> => {
-  const current = await readNativeProviders(ctx)
-  const profile = ctx.get('profileContext')
-  if (!current.available || profile === undefined) return current
-  const patchPath = profile.patchPath
-  const target = current.providers.find(provider => provider.entryId === input.entryId)
-  // Only rows this page lists may be switched, so the method cannot disable an arbitrary plugin.
-  if (target === undefined || !NativeProviderPatch.isPatchRowId(input.entryId)) throw new Error(`'${input.entryId}' is not a native provider row.`)
-  if (target.lockedReason !== null) throw new Error(target.lockedReason)
-  const apply = async (): Promise<void> => {
-    const text = await readPatch(patchPath)
-    const next = input.enabled
-      ? NativeProviderPatch.withRowEnabled(text, input.entryId)
-      : NativeProviderPatch.withRowDisabled(text, { id: input.entryId, label: target.label })
-    if (next !== text) await writePatch(patchPath, next)
-    if (input.enabled) {
-      const returning = reenabling.get(ctx.root) ?? new Map<string, string>()
-      returning.set(input.entryId, target.label)
-      reenabling.set(ctx.root, returning)
-    }
-  }
-  const hmr = ctx.get('hmr')
-  await serializePatchWrite(() => withFileLock(join(profile.dir, 'package.json'), () => (hmr === undefined ? apply() : hmr.runExclusive(apply))))
-  return readNativeProviders(ctx)
-}
+export type NativeProviderSwitch = ReturnType<typeof createNativeProviderSwitch>

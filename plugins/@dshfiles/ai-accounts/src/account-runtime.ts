@@ -13,6 +13,7 @@ import type { FastModeService } from './codex-fast-mode.js'
 import type { FastModeUsageHistoryService } from './fast-mode-usage-history.js'
 import type { ServingAccountService } from './serving-account.js'
 import type { AccountSetupService } from './account-setup-service.js'
+import type { NativeProviderSwitch } from './native-providers.js'
 
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: AccountPoolView }
@@ -38,6 +39,7 @@ interface AccountRuntime {
   fastMode?: FastModeService
   fastModeUsageHistory?: FastModeUsageHistoryService
   servingAccount?: ServingAccountService
+  nativeProviders?: NativeProviderSwitch
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()

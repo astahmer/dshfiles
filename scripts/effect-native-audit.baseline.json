@@ -110,7 +110,7 @@
   "@dshfiles/ai-accounts": {
     "layerEmpty": 0,
     "promiseAdapters": 47,
-    "moduleState": 6,
+    "moduleState": 5,
     "timers": 8,
     "childProcess": 5,
     "nodeFs": 19,

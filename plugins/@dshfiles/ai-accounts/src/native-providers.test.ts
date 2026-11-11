@@ -5,7 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
+import { createNativeProviderSwitch, type NativeProviderSwitch } from './native-providers.js'
 
 const original = `- id: llm-commandcode\n  config:\n    apiKeyEnv: COMMANDCODE_API_KEY\n`
 
@@ -18,6 +18,7 @@ interface FakeRow {
 let dir = ''
 let patchPath = ''
 let rows: FakeRow[] = []
+let providerSwitch: NativeProviderSwitch = createNativeProviderSwitch()
 let directory: { provider: string; displayName: string; settingsNs: string; settingsPath: string[] }[] = []
 
 const host = (): Context => {
@@ -30,6 +31,7 @@ const host = (): Context => {
 }
 
 beforeEach(async () => {
+  providerSwitch = createNativeProviderSwitch()
   dir = await mkdtemp(join(tmpdir(), 'ai-accounts-native-'))
   patchPath = join(dir, 'cordis.patch.yml')
   await writeFile(patchPath, original)
@@ -53,7 +55,7 @@ afterEach(async () => {
 
 describe('native provider switch', () => {
   it('lists only native provider rows, not shared or own rows', async () => {
-    const state = await readNativeProviders(host())
+    const state = await providerSwitch.read(host())
     expect(state.available).toBe(true)
     expect(state.liveReload).toBe(false)
     expect(state.providers.map(provider => [provider.entryId, provider.label, provider.enabled, provider.running])).toEqual([
@@ -64,21 +66,21 @@ describe('native provider switch', () => {
 
   it('turns a row off and back on without touching its config, and keeps listing it while off', async () => {
     const ctx = host()
-    const off = await setNativeProviderEnabled(ctx, { entryId: 'llm-commandcode', enabled: false })
+    const off = await providerSwitch.setEnabled(ctx, { entryId: 'llm-commandcode', enabled: false })
     expect(off.providers.find(provider => provider.entryId === 'llm-commandcode')).toMatchObject({ enabled: false, running: true })
     expect(await readFile(patchPath, 'utf8')).toContain(original)
 
     // The Loader applies the patch: the row stops and its routes leave the directory.
     rows[0] = { ...rows[0]!, disabled: true, fiber: undefined }
     directory = directory.filter(provider => provider.settingsNs !== 'llm-commandcode')
-    expect((await readNativeProviders(ctx)).providers.find(provider => provider.entryId === 'llm-commandcode')).toMatchObject({
+    expect((await providerSwitch.read(ctx)).providers.find(provider => provider.entryId === 'llm-commandcode')).toMatchObject({
       label: 'Command Code',
       enabled: false,
       running: false,
       lockedReason: null,
     })
 
-    const on = await setNativeProviderEnabled(ctx, { entryId: 'llm-commandcode', enabled: true })
+    const on = await providerSwitch.setEnabled(ctx, { entryId: 'llm-commandcode', enabled: true })
     expect(on.providers.find(provider => provider.entryId === 'llm-commandcode')).toMatchObject({ enabled: true, running: false, lockedReason: null })
     expect(await readFile(patchPath, 'utf8')).toBe(original)
   })
@@ -86,10 +88,10 @@ describe('native provider switch', () => {
   it('keeps both switches when two rows are turned off at the same time without HMR', async () => {
     const ctx = host()
     await Promise.all([
-      setNativeProviderEnabled(ctx, { entryId: 'llm-commandcode', enabled: false }),
-      setNativeProviderEnabled(ctx, { entryId: 'llm-deepseek', enabled: false }),
+      providerSwitch.setEnabled(ctx, { entryId: 'llm-commandcode', enabled: false }),
+      providerSwitch.setEnabled(ctx, { entryId: 'llm-deepseek', enabled: false }),
     ])
-    const state = await readNativeProviders(ctx)
+    const state = await providerSwitch.read(ctx)
     expect(state.providers.filter(provider => !provider.enabled).map(provider => provider.entryId)).toEqual(['llm-commandcode', 'llm-deepseek'])
   })
 
@@ -98,7 +100,7 @@ describe('native provider switch', () => {
     const synced = `${original}- id: synced-by-profile-sync\n`
     let pending: Promise<unknown> = Promise.resolve()
     await withFileLock(join(dir, 'package.json'), async () => {
-      pending = setNativeProviderEnabled(ctx, { entryId: 'llm-deepseek', enabled: false })
+      pending = providerSwitch.setEnabled(ctx, { entryId: 'llm-deepseek', enabled: false })
       await sleep(100)
       expect(await readFile(patchPath, 'utf8')).toBe(original)
       await writeFile(patchPath, synced)
@@ -106,21 +108,21 @@ describe('native provider switch', () => {
     await pending
     const text = await readFile(patchPath, 'utf8')
     expect(text).toContain('- id: synced-by-profile-sync')
-    expect((await readNativeProviders(ctx)).providers.find(provider => provider.entryId === 'llm-deepseek')?.enabled).toBe(false)
+    expect((await providerSwitch.read(ctx)).providers.find(provider => provider.entryId === 'llm-deepseek')?.enabled).toBe(false)
   })
 
   it('refuses rows it does not list and rows disabled by someone else', async () => {
     const ctx = host()
-    await expect(setNativeProviderEnabled(ctx, { entryId: 'tool-bash', enabled: false })).rejects.toThrow(/not a native provider/)
-    await expect(setNativeProviderEnabled(ctx, { entryId: 'llm-pi-ai', enabled: false })).rejects.toThrow(/not a native provider/)
+    await expect(providerSwitch.setEnabled(ctx, { entryId: 'tool-bash', enabled: false })).rejects.toThrow(/not a native provider/)
+    await expect(providerSwitch.setEnabled(ctx, { entryId: 'llm-pi-ai', enabled: false })).rejects.toThrow(/not a native provider/)
     rows[1] = { ...rows[1]!, disabled: true, fiber: undefined }
-    const state = await readNativeProviders(ctx)
+    const state = await providerSwitch.read(ctx)
     expect(state.providers.find(provider => provider.entryId === 'llm-deepseek')?.lockedReason).toMatch(/another entry/)
-    await expect(setNativeProviderEnabled(ctx, { entryId: 'llm-deepseek', enabled: true })).rejects.toThrow(/another entry/)
+    await expect(providerSwitch.setEnabled(ctx, { entryId: 'llm-deepseek', enabled: true })).rejects.toThrow(/another entry/)
   })
 
   it('reports unavailable on a Host without a profile patch', async () => {
-    const state = await readNativeProviders(new Context())
+    const state = await providerSwitch.read(new Context())
     expect(state).toMatchObject({ available: false, providers: [] })
   })
 })
