@@ -138,6 +138,14 @@
         "A subagent session absent from the thread list opens its parent thread instead; an archived or deleted thread shows a notice."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Open Observe › Usage after a few turns.",
+        "doneWhen": "The Requests tab lists each model request with its tokens and cost.",
+        "open": {
+          "panel": "dshfiles-usage"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -138,6 +138,10 @@
       "states": ["hidden", "pending-one", "pending-many"],
       "failureModes": ["Without thread-sidebar or frame-layout no strip item shows; the Plugins page row and the Inbox item still report the pending restart."],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "After a plugin rebuild, read the Restart pending item in the status strip.",
+        "doneWhen": "It names the plugins that wait for a Host restart."
+      },
       "verification": [
         {
           "kind": "not-applicable",

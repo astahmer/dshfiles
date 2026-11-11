@@ -391,6 +391,13 @@
           "deterministicFake": "Runtime tests inject a fixed Jev response; the review is disabled by default."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Memory and search your notes.",
+        "doneWhen": "A note opens with its source and evidence.",
+        "open": {
+          "panel": "dshfiles-memory-panel"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

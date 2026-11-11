@@ -36,6 +36,14 @@
         "A symlinked whiteboard directory or database is refused."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["project"],
+        "firstAction": "Open Knowledge › Whiteboard and create a board for a project.",
+        "doneWhen": "The board saves as you draw and opens again later.",
+        "open": {
+          "panel": "dshfiles-whiteboard"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -210,6 +210,13 @@
         "A forged pagination cursor is rejected by the Host."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Observe › Traces and open a trace.",
+        "doneWhen": "Its span waterfall shows each step with its duration.",
+        "open": {
+          "panel": "traces"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

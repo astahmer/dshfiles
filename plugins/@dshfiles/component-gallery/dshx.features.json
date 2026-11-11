@@ -18,6 +18,13 @@
         "A filter with no match says so and tells the user to clear it."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Component gallery and pick a tab.",
+        "doneWhen": "The shared components render live on the page.",
+        "open": {
+          "panel": "component-gallery"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

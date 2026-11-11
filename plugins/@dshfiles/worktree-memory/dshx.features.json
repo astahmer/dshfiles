@@ -47,6 +47,13 @@
           "deterministicFake": "src/process-table.test.ts passes live jobs as plain records with label, owner and start time."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Observe › RAM.",
+        "doneWhen": "Memory use shows per workspace and per Node process.",
+        "open": {
+          "panel": "dshfiles-worktree-memory"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

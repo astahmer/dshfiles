@@ -39,6 +39,13 @@
           "deterministicFake": "src/history.test.ts writes plain JSONL session logs and asserts the incremental resume and the merged lifecycle rows."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Observe › Processes and read the Jobs tab.",
+        "doneWhen": "Every thread's running and finished background jobs are listed.",
+        "open": {
+          "panel": "dshfiles-background-jobs"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

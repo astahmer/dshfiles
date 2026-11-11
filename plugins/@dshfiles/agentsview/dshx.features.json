@@ -54,6 +54,13 @@
           "deterministicFake": "fixtures/home/.codex/sessions holds a synthetic Codex rollout (session_meta, context messages, reasoning, function call and output, cumulative token counts)."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Agent CLI threads and open a Claude Code or Codex session.",
+        "doneWhen": "The session's prompts, tool calls and token totals show read-only.",
+        "open": {
+          "panel": "dshfiles-agentsview"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

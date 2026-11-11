@@ -38,6 +38,13 @@
           "deterministicFake": "Adapter mapping is unit-tested with fixed payloads."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Observe › Activity and filter the feed to one thread.",
+        "doneWhen": "The feed lists that thread's events, newest first.",
+        "open": {
+          "panel": "activity-timeline"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -390,6 +397,13 @@
         "The Web shortcut registry admits no Option-letter default, so a capture-phase listener claims Option-J; a binding the user sets in Settings › Key bindings runs the same command."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Inbox › Needs you and answer or open the first item.",
+        "doneWhen": "The item leaves Needs you and the Inbox badge count drops.",
+        "open": {
+          "panel": "attention-inbox"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

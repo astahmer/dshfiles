@@ -112,6 +112,13 @@
         "click button \"Cancel\"",
         "expect heading \"Hosts\""
       ],
+      "onboarding": {
+        "firstAction": "Open Observe › Hosts.",
+        "doneWhen": "Each registered host shows its live load and memory use.",
+        "open": {
+          "panel": "dshfiles-multi-host-hosts"
+        }
+      },
       "verification": [
         {
           "kind": "unit-test",
