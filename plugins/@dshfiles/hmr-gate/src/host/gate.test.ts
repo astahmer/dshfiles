@@ -1,8 +1,8 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { HmrGateModel, digestOf, hostArtifactOf } from './gate.js'
+import { HmrGateModel, HostArtifacts } from './gate.js'
 
 interface FixtureManifest {
   readonly main?: string
@@ -22,38 +22,38 @@ const packageWith = (manifest: FixtureManifest, entryPath: string): string => {
 describe('hostArtifactOf', () => {
   it('reads an owned bundle entry from exports', () => {
     const clientPath = packageWith({ exports: { '.': './dist/index.js' } }, 'dist/index.js')
-    expect(hostArtifactOf(clientPath)?.endsWith('/dist/index.js')).toBe(true)
+    expect(HostArtifacts.hostArtifactOf(clientPath)?.endsWith('/dist/index.js')).toBe(true)
   })
 
   it('reads a native package entry from main', () => {
     const clientPath = packageWith({ main: './lib/index.js' }, 'lib/index.js')
-    expect(hostArtifactOf(clientPath)?.endsWith('/lib/index.js')).toBe(true)
+    expect(HostArtifacts.hostArtifactOf(clientPath)?.endsWith('/lib/index.js')).toBe(true)
   })
 
   it('returns undefined for a client-only package', () => {
     const clientPath = packageWith({ exports: { '.': './dist/index.js' } }, 'dist/client.js')
-    expect(hostArtifactOf(clientPath)).toBeUndefined()
+    expect(HostArtifacts.hostArtifactOf(clientPath)).toBeUndefined()
   })
 })
 
 describe('HmrGateModel', () => {
   it('applies a client rebuild while the Host half is the loaded one', () => {
     const gate = new HmrGateModel()
-    gate.track('pkg', '/pkg/dist/index.js', 'loaded-digest')
+    gate.track('pkg', '/pkg/dist/index.js', 'loaded-digest', 'loaded-digest')
     expect(gate.observe('pkg', 'loaded-digest')).toEqual({ action: 'apply' })
     expect(gate.deferred()).toEqual([])
   })
 
   it('defers while the Host half on disk is not the loaded one', () => {
     const gate = new HmrGateModel()
-    gate.track('pkg', '/pkg/dist/index.js', 'loaded-digest')
+    gate.track('pkg', '/pkg/dist/index.js', 'loaded-digest', 'loaded-digest')
     expect(gate.observe('pkg', 'rebuilt-digest')).toEqual({ action: 'defer', reason: 'host-artifact-changed' })
     expect(gate.deferred()).toEqual(['pkg'])
   })
 
   it('releases a deferral when the Host reloaded that artifact', () => {
     const gate = new HmrGateModel()
-    gate.track('pkg', '/pkg/dist/index.js', 'loaded-digest')
+    gate.track('pkg', '/pkg/dist/index.js', 'loaded-digest', 'loaded-digest')
     gate.observe('pkg', 'rebuilt-digest')
     expect(gate.release(['/other/index.js'])).toEqual([])
     expect(gate.release(['/pkg/dist/index.js'])).toEqual(['pkg'])
@@ -61,9 +61,17 @@ describe('HmrGateModel', () => {
     expect(gate.facts('pkg')).toMatchObject({ loaded: 'rebuilt-digest', disk: 'rebuilt-digest' })
   })
 
+  it('defers a client rebuild when it cannot know which Host half the Host loaded', () => {
+    const gate = new HmrGateModel()
+    gate.track('pkg', '/pkg/dist/index.js', 'disk-digest', undefined)
+    expect(gate.observe('pkg', 'disk-digest')).toEqual({ action: 'defer', reason: 'host-artifact-changed' })
+    expect(gate.release(['/pkg/dist/index.js'])).toEqual(['pkg'])
+    expect(gate.observe('pkg', 'disk-digest')).toEqual({ action: 'apply' })
+  })
+
   it('always applies a package without a Host half', () => {
     const gate = new HmrGateModel()
-    gate.track('client-only', undefined, undefined)
+    gate.track('client-only', undefined, undefined, undefined)
     expect(gate.observe('client-only', 'anything')).toEqual({ action: 'apply' })
     expect(gate.deferred()).toEqual([])
   })
@@ -72,9 +80,23 @@ describe('HmrGateModel', () => {
 describe('digestOf', () => {
   it('reads file content and tolerates a missing file', () => {
     const clientPath = packageWith({ exports: { '.': './dist/index.js' } }, 'dist/index.js')
-    const hostPath = hostArtifactOf(clientPath)
+    const hostPath = HostArtifacts.hostArtifactOf(clientPath)
     expect(hostPath).toBeDefined()
-    expect(digestOf(hostPath ?? '')).toMatch(/^[0-9a-f]{64}$/)
-    expect(digestOf(join(clientPath, 'missing.js'))).toBeUndefined()
+    expect(HostArtifacts.digestOf(hostPath ?? '')).toMatch(/^[0-9a-f]{64}$/)
+    expect(HostArtifacts.digestOf(join(clientPath, 'missing.js'))).toBeUndefined()
+  })
+})
+
+describe('loadedDigestOf', () => {
+  const hostPath = () => HostArtifacts.hostArtifactOf(packageWith({ exports: { '.': './dist/index.js' } }, 'dist/index.js')) ?? ''
+
+  it('trusts an artifact written before the Host process started', () => {
+    const path = hostPath()
+    expect(HostArtifacts.loadedDigestOf({ path, hostStartedAtMs: statSync(path).mtimeMs + 1 })).toBe(HostArtifacts.digestOf(path))
+  })
+
+  it('does not trust an artifact written after the Host process started', () => {
+    const path = hostPath()
+    expect(HostArtifacts.loadedDigestOf({ path, hostStartedAtMs: statSync(path).mtimeMs })).toBeUndefined()
   })
 })

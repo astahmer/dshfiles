@@ -38,9 +38,21 @@ const manifestSchema = Schema.Struct({
 })
 
 /** Read one file's content digest, or undefined when it does not exist (a client-only package). */
-export const digestOf = (path: string): string | undefined => {
+const digestOf = (path: string): string | undefined => {
   try {
     return createHash('sha256').update(readFileSync(path)).digest('hex')
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The digest of the Host artifact the running Host loaded, as far as first sight can tell. An artifact written after the
+ * Host process started may have been rebuilt after the Host read it, so its on-disk digest proves nothing.
+ */
+const loadedDigestOf = (input: { readonly path: string; readonly hostStartedAtMs: number }): string | undefined => {
+  try {
+    return statSync(input.path).mtimeMs < input.hostStartedAtMs ? digestOf(input.path) : undefined
   } catch {
     return undefined
   }
@@ -84,7 +96,7 @@ const packageRootOf = (clientPath: string): string | undefined => {
  * from its manifest rather than assumed from a `dist/` convention, because native
  * packages ship `lib/index.js` and owned bundles ship `dist/index.js`.
  */
-export const hostArtifactOf = (clientPath: string): string | undefined => {
+const hostArtifactOf = (clientPath: string): string | undefined => {
   const root = packageRootOf(clientPath)
   if (root === undefined) return undefined
   let raw: string
@@ -101,6 +113,12 @@ export const hostArtifactOf = (clientPath: string): string | undefined => {
   return fileExists(absolute) ? absolute : undefined
 }
 
+export class HostArtifacts {
+  static readonly digestOf = digestOf
+  static readonly hostArtifactOf = hostArtifactOf
+  static readonly loadedDigestOf = loadedDigestOf
+}
+
 /**
  * Decides whether a rebuilt client bundle may be applied.
  *
@@ -112,9 +130,9 @@ export const hostArtifactOf = (clientPath: string): string | undefined => {
 export class HmrGateModel {
   private readonly records = new Map<string, GateRecord>()
 
-  /** First sight of a package: the Host has just loaded it, so disk and loaded agree. */
-  track(id: string, hostPath: string | undefined, digest: string | undefined): GateVerdict {
-    this.records.set(id, { id, hostPath, loaded: digest, disk: digest })
+  /** First sight of a package. `loaded` stays undefined when the Host may have read an older artifact than `digest`. */
+  track(id: string, hostPath: string | undefined, digest: string | undefined, loaded: string | undefined): GateVerdict {
+    this.records.set(id, { id, hostPath, loaded, disk: digest })
     return { action: 'apply' }
   }
 

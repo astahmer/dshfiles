@@ -10,7 +10,7 @@ import { hmrGateApi, type DeferredPackage, type HmrGateStatus } from './api.js'
 import { DeferredUpdateAttention } from './host/attention.js'
 import { BundleWatch, type BundleWatcherHandle } from './host/bundle-watcher-promise.js'
 import type { BundleRead, BundleStat } from './host/bundle-watcher.js'
-import { HmrGateModel, digestOf, hostArtifactOf } from './host/gate.js'
+import { HmrGateModel, HostArtifacts } from './host/gate.js'
 import { HostReload, type HostReloadOutcome } from './host/host-reload.js'
 
 /**
@@ -60,6 +60,7 @@ const gateConfigSchema = Schema.Struct({ hostReload: Schema.optional(Schema.Bool
 const gateConfigStandardSchema = { '~standard': Schema.toStandardSchemaV1(gateConfigSchema)['~standard'] }
 
 const HOST_RELOAD_HISTORY = 16
+const hostStartedAtMs = Date.now() - process.uptime() * 1000
 
 let runtime: GateRuntime | undefined
 
@@ -127,8 +128,13 @@ const registerGate = (ctx: Context, hostReloadEnabled: boolean): GateRuntime => 
   }
 
   const trackRow = (id: string, path: string, baseline: BundleStat): void => {
-    const hostPath = hostArtifactOf(path)
-    gate.track(id, hostPath, hostPath === undefined ? undefined : digestOf(hostPath))
+    const hostPath = HostArtifacts.hostArtifactOf(path)
+    gate.track(
+      id,
+      hostPath,
+      hostPath === undefined ? undefined : HostArtifacts.digestOf(hostPath),
+      hostPath === undefined ? undefined : HostArtifacts.loadedDigestOf({ path: hostPath, hostStartedAtMs }),
+    )
     watched.set(id, { path, mtimeMs: baseline.mtimeMs, ctimeMs: baseline.ctimeMs, size: baseline.size, dirty: false })
   }
 
@@ -147,7 +153,7 @@ const registerGate = (ctx: Context, hostReloadEnabled: boolean): GateRuntime => 
     row.size = current.size
     row.dirty = false
     const facts = gate.facts(id)
-    const verdict = gate.observe(id, facts?.hostPath === undefined ? undefined : digestOf(facts.hostPath))
+    const verdict = gate.observe(id, facts?.hostPath === undefined ? undefined : HostArtifacts.digestOf(facts.hostPath))
     if (verdict.action === 'apply') {
       applyRebuild(id)
       // A failed apply leaves the row dirty; read it again soon instead of waiting for the next event.
