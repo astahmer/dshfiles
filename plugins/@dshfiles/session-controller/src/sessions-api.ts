@@ -111,8 +111,7 @@ export const sessionsApi = defineApi({
       output: Schema.Struct({ messageId: Schema.String }),
     }),
     compact: method({
-      description:
-        "Compact the thread's history now (the /compact command). With minTokens, a thread below that prompt size is skipped instead of compacted.",
+      description: "Compact the thread's history now (the /compact command). With minTokens, a thread below that prompt size is skipped instead of compacted.",
       input: Schema.Struct({
         sessionId,
         minTokens: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(10_000_000))),

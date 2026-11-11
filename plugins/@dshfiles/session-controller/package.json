@@ -90,6 +90,7 @@
     "@deepseek-ai/dsh-skill": "0.2.1-rc.2",
     "@deepseek-ai/dsh-storage-json": "catalog:",
     "@deepseek-ai/dsh-subagent": "catalog:",
+    "@deepseek-ai/dsh-token-meter": "catalog:",
     "@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.2",
     "@deepseek-ai/dsh-typert-registry": "0.2.1-rc.2",
     "@deepseek-ai/dsh-util-crypto": "0.2.1-rc.2",
@@ -105,8 +106,7 @@
     "@types/node": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "@deepseek-ai/dsh-token-meter": "catalog:"
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
@@ -137,6 +137,7 @@
     "@deepseek-ai/dsh-settings": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-skill": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-subagent": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-token-meter": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-typert-protocol": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-typert-registry": ">=0.2.1-rc.2 <0.3.0-0",
@@ -145,8 +146,7 @@
     "@deepseek-ai/dsh-util-workspace-path": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-working-directory": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0",
-    "@deepseek-ai/schemastery": "^3.18.4",
-    "@deepseek-ai/dsh-token-meter": ">=0.2.1-rc.2 <0.3.0-0"
+    "@deepseek-ai/schemastery": "^3.18.4"
   },
   "dsh": {
     "bundle": {

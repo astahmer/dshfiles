@@ -90,19 +90,19 @@ await sessions.compact({ sessionId }) // or command({ sessionId, line: '/goal â€
 const { value } = await sessions.generate({ prompt, jsonSchema: { type: 'object', properties: { title: { type: 'string' } } } })
 ```
 
-| Method                           | What                                                                                                                                                      |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list`                           | visible threads newest first (title, directory, project, running), filtered by `query` or `projectId`; blank and subagent threads are left out            |
-| `messages`                       | a thread's last user and assistant messages, oldest first, each clipped to 8,000 characters (live or cold thread)                                         |
-| `create`                         | thread in a project or directory, with optional agent preset, title, model and first prompt                                                               |
-| `prompt`                         | user prompt, `queue` (default) or `steer`                                                                                                                 |
-| `command`                        | one slash command line, as typed in the composer                                                                                                          |
-| `message`                        | a message recorded with the calling plugin as its source (`dshfiles-plugin-message`); `next-turn` or `next-step`, `wake` to start an idle thread          |
+| Method                           | What                                                                                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`                           | visible threads newest first (title, directory, project, running), filtered by `query` or `projectId`; blank and subagent threads are left out                                    |
+| `messages`                       | a thread's last user and assistant messages, oldest first, each clipped to 8,000 characters (live or cold thread)                                                                 |
+| `create`                         | thread in a project or directory, with optional agent preset, title, model and first prompt                                                                                       |
+| `prompt`                         | user prompt, `queue` (default) or `steer`                                                                                                                                         |
+| `command`                        | one slash command line, as typed in the composer                                                                                                                                  |
+| `message`                        | a message recorded with the calling plugin as its source (`dshfiles-plugin-message`); `next-turn` or `next-step`, `wake` to start an idle thread                                  |
 | `compact`, `interrupt`           | `/compact`; stop the running turn, keeping the queue. `compact` holds a cold thread's Agent for the whole command and, with `minTokens`, answers `skipped` below that prompt size |
-| `wait`                           | until idle with nothing queued, or `timeoutMs`                                                                                                            |
-| `selectModel`, `selectAgent`     | the thread's model; its agent preset                                                                                                                      |
-| `instructions`, `setInstruction` | keyed instructions every later request carries in its system prompt (a section, so a removed one leaves no trace in history), kept in dshx plugin storage |
-| `generate`                       | dshx `generate` for Clients: one model call outside any thread, `jsonSchema` for JSON output                                                              |
+| `wait`                           | until idle with nothing queued, or `timeoutMs`                                                                                                                                    |
+| `selectModel`, `selectAgent`     | the thread's model; its agent preset                                                                                                                                              |
+| `instructions`, `setInstruction` | keyed instructions every later request carries in its system prompt (a section, so a removed one leaves no trace in history), kept in dshx plugin storage                         |
+| `generate`                       | dshx `generate` for Clients: one model call outside any thread, `jsonSchema` for JSON output                                                                                      |
 
 None of these is an agent tool: what the agent may do to other threads is thread-sidebar's thread tools, which now
 call this API for create, prompt, stop and model selection.
