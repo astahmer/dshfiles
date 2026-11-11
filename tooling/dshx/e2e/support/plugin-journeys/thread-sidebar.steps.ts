@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, type Request, type Response, type TestInfo } from '@playwright/test'
+import { expect, type CDPSession, type Locator, type Page, type Request, type Response, type TestInfo } from '@playwright/test'
 import { openGlobalPanel, viewNamePattern } from '../plugin-view-names.js'
 import { DEFAULT_PREFERENCES } from '../../../../../plugins/@dshfiles/thread-sidebar/src/organization.js'
 import { existsSync } from 'node:fs'
@@ -439,6 +439,112 @@ Then('the thread is restored and open with no archived banner', async ({ page }:
   })
   await finishJourneyAssertions(page)
 })
+
+interface PhoneSubmenuJourney {
+  readonly targetThreadId: string
+  readonly restoreViewport: { readonly width: number; readonly height: number } | null
+  readonly touch: CDPSession
+}
+
+const phoneSubmenuJourneys = new WeakMap<Page, PhoneSubmenuJourney>()
+const PHONE_VIEWPORT = { width: 390, height: 844 }
+
+const sendFailingPrompt = async (page: Page, prompt: string, previousThreadId?: string): Promise<string> => {
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill(prompt)
+  await composer.press('Enter')
+  if (previousThreadId !== undefined) await expect.poll(() => currentThreadId(page), { timeout: 15_000 }).not.toBe(previousThreadId)
+  await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
+  const threadId = currentThreadId(page)
+  if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  return threadId
+}
+
+// The emulation lasts as long as its CDP session, so the journey keeps the session until it restores the page.
+const emulateTouch = async (page: Page): Promise<CDPSession> => {
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 })
+  return cdp
+}
+
+When('two nonblank Host threads exist and the sidebar is shown on a 390 pixel touch screen', async ({ page }: { page: Page }) => {
+  await showThreadsByStatus(page)
+  await startBlankThread(page)
+  const targetThreadId = await sendFailingPrompt(page, 'thread sidebar phone submenu target')
+  await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
+  await sendFailingPrompt(page, 'thread sidebar phone submenu supervisor', targetThreadId)
+  const restoreViewport = page.viewportSize()
+  await page.setViewportSize(PHONE_VIEWPORT)
+  // Touch emulation turns on (pointer: coarse), which shows the row's ⋯ button and the 44 px touch targets.
+  phoneSubmenuJourneys.set(page, { targetThreadId, restoreViewport, touch: await emulateTouch(page) })
+  await expect.poll(() => page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true)
+  await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute('data-shell-phone-nav'))).toBe(true)
+  if (!(await threadSidebar(page).isVisible())) await page.getByRole('button', { name: 'Back to Threads', exact: true }).click()
+  await expect(threadRow(page, targetThreadId)).toBeVisible()
+})
+
+Then(
+  'each thread row submenu opens fully inside the viewport with 44 pixel items and its choice applies',
+  async ({ page, $testInfo }: { page: Page; $testInfo: TestInfo }) => {
+    const journey = phoneSubmenuJourneys.get(page)
+    if (journey === undefined) throw new Error('No phone submenu journey was prepared.')
+    const row = threadRow(page, journey.targetThreadId)
+    const submenu = page.locator('[data-slot="context-menu-sub-content"]')
+    // Status grouping remounts a row as its turn settles, which can close a menu opened in between: reopen until it holds.
+    const openRowSubmenu = async (trigger: RegExp): Promise<void> => {
+      await expect(async () => {
+        const subTrigger = page.getByRole('menuitem', { name: trigger })
+        if (!(await subTrigger.isVisible())) await row.getByTestId('thread-row-menu').click({ timeout: 2_000 })
+        await subTrigger.click({ timeout: 2_000 })
+        await expect(submenu).toBeVisible({ timeout: 2_000 })
+      }).toPass({ timeout: 30_000 })
+    }
+    const expectSubmenuFitsThePhone = async (): Promise<void> => {
+      // Radix positions the submenu over a few frames; poll the settled box rather than its first frame.
+      await expect
+        .poll(async () => {
+          const box = await submenu.boundingBox()
+          return box !== null && box.x >= 0 && box.x + box.width <= PHONE_VIEWPORT.width && box.y >= 0 && box.y + box.height <= PHONE_VIEWPORT.height
+        })
+        .toBe(true)
+      const itemHeights = await submenu.locator('[role^="menuitem"]').evaluateAll(items => items.map(item => item.getBoundingClientRect().height))
+      expect(itemHeights.length).toBeGreaterThan(0)
+      for (const height of itemHeights) expect(height).toBeGreaterThanOrEqual(44)
+    }
+    try {
+      await recordAssertion(page, 'thread-sidebar-phone-notify-submenu-fits', async () => {
+        await openRowSubmenu(/^Notify .* when this thread finishes$/u)
+        await expectSubmenuFitsThePhone()
+        const path = $testInfo.outputPath('thread-subscription-notify-phone.png')
+        await page.screenshot({ path, animations: 'disabled' })
+        await $testInfo.attach('thread-subscription-notify-phone', { path, contentType: 'image/png' })
+        await submenu.getByRole('menuitemradio', { name: 'Only when stuck', exact: true }).click()
+        await expect(submenu).toBeHidden()
+        await openRowSubmenu(/^Notify .* when this thread finishes$/u)
+        await expect(submenu.getByRole('menuitemradio', { name: 'Only when stuck', exact: true })).toHaveAttribute('aria-checked', 'true')
+        await page.keyboard.press('Escape')
+        await page.keyboard.press('Escape')
+        await expect(submenu).toBeHidden()
+      })
+      await recordAssertion(page, 'thread-sidebar-phone-mute-submenu-fits', async () => {
+        await openRowSubmenu(/^Mute thread$/u)
+        await expectSubmenuFitsThePhone()
+        await submenu.getByRole('menuitem').first().click()
+        await expect(submenu).toBeHidden()
+        const muted = page.getByRole('menuitem', { name: 'Muted', exact: true })
+        await expect(async () => {
+          if (!(await muted.isVisible())) await row.getByTestId('thread-row-menu').click({ timeout: 2_000 })
+          await expect(muted).toBeVisible({ timeout: 2_000 })
+        }).toPass({ timeout: 30_000 })
+        await page.keyboard.press('Escape')
+      })
+    } finally {
+      await journey.touch.detach()
+      if (journey.restoreViewport !== null) await page.setViewportSize(journey.restoreViewport)
+    }
+    await finishJourneyAssertions(page)
+  },
+)
 
 let settledThreadId: string | null = null
 

@@ -38,6 +38,8 @@
 
 ![The same Notify submenu for a batch of two selected threads](docs/screenshots/thread-subscription-notify-batch.png)
 
+![On a 390 px phone the Notify submenu opens over its parent menu, inside the screen](docs/screenshots/thread-subscription-notify-phone.png)
+
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
 activity, with pinned, active, parked, inactive, settled, and archived sections. Active

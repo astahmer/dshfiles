@@ -3815,9 +3815,14 @@
           "testName": "subscribing an existing pair changes its level, keeps it when omitted, and default drops it"
         },
         {
+          "kind": "gherkin",
+          "id": "thread-sidebar.phone-row-submenus",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
           "kind": "not-applicable",
           "id": "thread-sidebar.subscription-browser-menu",
-          "reason": "The affordance is the Notify submenu in the thread row context menu (one row or a multi-selection) plus a meta badge on a row that has subscribers; no Gherkin journey drives a row context menu yet, and no two-thread completion is produced by the scratch fake provider in one walk. The reach opens the submenu in a scratch DSH; the state transitions are covered by the store and notifier unit tests listed here."
+          "reason": "The affordance is the Notify submenu in the thread row context menu (one row or a multi-selection) plus a meta badge on a row that has subscribers; the thread-sidebar.phone-row-submenus journey chooses a level from one row's submenu, but no two-thread completion is produced by the scratch fake provider in one walk. The reach opens the submenu in a scratch DSH; the state transitions are covered by the store and notifier unit tests listed here."
         }
       ],
       "telemetry": [

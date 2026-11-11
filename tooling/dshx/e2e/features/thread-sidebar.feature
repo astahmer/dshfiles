@@ -27,6 +27,12 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is settled from its context menu
     Then the thread is settled, opens read-only and unsettles to reply
 
+  @scenario:thread-sidebar.phone-row-submenus
+  Scenario: Thread row submenus open inside a 390 pixel touch screen
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
+    When two nonblank Host threads exist and the sidebar is shown on a 390 pixel touch screen
+    Then each thread row submenu opens fully inside the viewport with 44 pixel items and its choice applies
+
   @scenario:thread-sidebar.board-view
   Scenario: Open the thread board as a page of columns with its own grouping and filters
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat" is booted
