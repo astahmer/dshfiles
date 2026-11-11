@@ -574,7 +574,8 @@ describe('quota continuation service', () => {
       inbox: { nextTurn: queued ? [newerMessage] : [], nextStep: [] },
     })
 
-    const openService = (opened: Context) => createQuotaContinuationService({ context: opened, readResetAt: async () => null, schedule: scheduler.schedule, now })
+    const openService = (opened: Context) =>
+      createQuotaContinuationService({ context: opened, readResetAt: async () => null, schedule: scheduler.schedule, now })
     const storedIds = async (opened: Context): Promise<string[]> => {
       await service?.close()
       const stored = await opened.storageDomain.open(quotaContinuationDomain)
