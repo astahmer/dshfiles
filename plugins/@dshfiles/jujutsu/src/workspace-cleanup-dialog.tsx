@@ -241,7 +241,8 @@ export const WorkspaceCleanupDialog = (props: {
                 </div>
                 {isExpanded && (
                   <BulkSelectList
-                    className="dshx:mx-5 dshx:mb-3 dshx:ml-12 dshx:rounded-xl dshx:p-1 dshx:shadow-none"
+                    className="dshx:mx-5 dshx:mb-2 dshx:ml-12 dshx:rounded-xl dshx:p-1 dshx:shadow-none"
+                    density="compact"
                     heading={choice.label}
                     items={groupRows.map(row => ({
                       id: row.key,
