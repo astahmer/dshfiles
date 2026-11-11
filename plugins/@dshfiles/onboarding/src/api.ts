@@ -3,6 +3,7 @@ import * as Schema from 'effect/Schema'
 import { OnboardingOverview, overviewInputSchema, overviewSchema } from './overview-model.js'
 import { PACK_ACTIONS, PackPlan, packOutcomeSchema } from './pack-plan.js'
 import { ReachModel, reachInputSchema, reachOutputSchema } from './reach-model.js'
+import { SuggestionsModel, suggestionsInputSchema, suggestionsSchema } from './suggestions-model.js'
 import { WhatsNewModel, whatsNewInputSchema, whatsNewSchema } from './whats-new-model.js'
 
 const shortName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
@@ -41,6 +42,13 @@ export const onboardingApi = defineApi({
       description:
         "What changed in the owned dshfiles plugins, newest first: every `feat(<plugin>)` and `fix(<plugin>)` change in the jj (or git) history of the dshfiles checkout this profile links Getting started from, each with its plugin, date and commit, plus the plugins' catalog descriptions. `upstream` lists, per remote whose bookmark of the same name differs from the local one, the changes there not yet in local history, as of the last fetch; this method never fetches. `since` (ISO 8601) keeps changes that landed after an instant, `plugin` one plugin, `limit` bounds the list (default 50). `no-checkout` means a registry install with no history on this Host (the same changes are at `commitsUrl`); `off` means the onboarding `whatsNew` setting is off. No network or model request. Read-only.",
       tool: { name: 'onboarding_whats_new', readOnly: true, render: WhatsNewModel.render },
+    }),
+    suggestions: method({
+      input: suggestionsInputSchema,
+      output: suggestionsSchema,
+      description:
+        'Catalogued features the user has not used yet whose usage pattern suggests value, from the last 30 days of local tool use: each with the counts that triggered it (e.g. many jj shell commands and no thread workspace), why it helps, and its feature row (find it with onboarding_reach). Reads only aggregate counts from the Usage plugin (tool names, the executable of each shell command, request counts), cached for 10 minutes; never prompts, paths or command arguments. `no-usage` means the Usage plugin is not running. Refused while the onboarding `suggestions` setting is off (the default), and nothing is read then. No network or model request. Read-only.',
+      tool: { name: 'onboarding_suggestions', readOnly: true, render: SuggestionsModel.render },
     }),
     applyPack: method({
       input: applyPackInputSchema,

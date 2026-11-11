@@ -12,6 +12,8 @@
 
 ![See what changed in your plugins since your last visit](docs/screenshots/whats-new.png)
 
+![Get features suggested from what you already do](docs/screenshots/usage-suggestions.png)
+
 Getting started for anyone adopting dshfiles: the whole setup, one plugin, a pack of plugins or one feature. It never
 blocks the app, makes no model request, and changes the profile only when you confirm a pack change.
 
@@ -83,6 +85,37 @@ blocks the app, makes no model request, and changes the profile only when you co
    [repository commits](https://github.com/astahmer/dshfiles/commits/main); a failed read names the command to run in the
    checkout, with Try again.
 
+## Suggestions
+
+Off by default (`suggestions`): while off, the section offers **Turn on in Settings** in one line and nothing is read.
+
+1. **What.** Catalogued features you have not used yet whose usage pattern suggests value, from the last 30 days of
+   local tool use. Each names the counts that triggered it, one sentence why, **Show me where** (when walkable) and
+   **Find in features** (its gallery row).
+2. **Rules** (`src/suggestions-model.ts`, in priority order; a test fails when a feature leaves the catalog):
+
+   | Feature                                    | Signal                                                 | Threshold | Not when                                              |
+   | ------------------------------------------ | ------------------------------------------------------ | --------- | ----------------------------------------------------- |
+   | `jj-integration#thread-destination`        | `jj` shell commands                                    | 20        | a `jj_thread_*` / `jj_workspace_setup` call           |
+   | `jujutsu#revision-graph`                   | `jj` shell commands                                    | 50        | a Jujutsu panel read (`jj_load`, …)                   |
+   | `agent-plan#compaction-meter`              | model requests in the longest of the costliest threads | 150       | any compaction request or `compaction_threshold` call |
+   | `pull-requests#github-pull-request-create` | `gh` shell commands                                    | 10        | a `pull_request*` call                                |
+   | `backlog#capture-and-triage`               | `todo_write` calls                                     | 30        | a `backlog_*` call                                    |
+   | `traces#trace-explorer`                    | failed tool calls                                      | 25        | a `traces_*` call                                     |
+   | `memory#memory-tools`                      | thread turns                                           | 200       | a `memory_*` / `find_threads` call                    |
+
+   Repeated prompts (for the prompt stash) are not suggested: no aggregate of prompt text leaves Usage, by design.
+
+3. **Quiet.** At most one new suggestion per local day is shown prominently; it stays while it applies. **Dismiss**
+   hides one for good, **Restore N dismissed** brings them back, **Show all suggestions** lists the rest. Kept per
+   browser (`dshfiles.onboarding.suggestions.featured.v1`, `dshfiles.onboarding.suggestions.dismissed.v1`).
+4. **Source.** The Usage plugin's published API (`dshfiles-usage/activity` and `/charts`), called in process on the
+   Host, at most once per 10 minutes (5 s after a failure or while Usage is absent). Only aggregate counts are kept:
+   tool names, each shell command's executable (never its arguments or subcommand), request counts per purpose and
+   per thread; no prompt, title, path or command line reaches the page or the agent. No network or model request.
+5. **Without Usage.** The section says Usage is not running and to enable it (Settings › Plugins, Observe & perf pack),
+   with Try again. A tool used rarely (outside the 100 most used) can read as unused; Dismiss hides its suggestion.
+
 ## Show me where
 
 1. **Walk.** A non-modal card (feature title, `Step 2 of 5 · Click "Settings"`, **Next**, **End**) and a ring around the
@@ -118,6 +151,7 @@ All apply live; none needs a restart.
 | `packs`       | `true`  | Show the packs section.                                                                               |
 | `curatedOnly` | `true`  | List only curated features until you search.                                                          |
 | `whatsNew`    | `true`  | Show What's new; off hides it and reads no history, for the page and `onboarding_whats_new` alike.    |
+| `suggestions` | `false` | Suggest unused features from local tool use (Usage plugin counts, 10 min cache); off reads nothing.   |
 
 ## Agent tools
 
@@ -132,7 +166,10 @@ All apply live; none needs a restart.
    `key` with `onboarding_overview`.
 4. `onboarding_whats_new` (read-only, `onboarding/whatsNew`) returns the same changes and upstream lists the page shows,
    with `since` (ISO 8601), `plugin` and `limit` (default 50). Marking changes seen is per browser and has no tool.
-5. Opening a page, replaying the wizard and walking Show me where are presentation and have no tool: the Agent gives
+5. `onboarding_suggestions` (read-only, `onboarding/suggestions`) returns the same suggestions, with the counts and
+   feature row of each. While the `suggestions` setting is off it refuses with `suggestions-off` and reads nothing.
+   Dismissing a suggestion is per browser and has no tool.
+6. Opening a page, replaying the wizard and walking Show me where are presentation and have no tool: the Agent gives
    the user the steps from `onboarding_reach`, and the user walks them.
 
 ## Data
@@ -146,7 +183,7 @@ All apply live; none needs a restart.
 3. `src/packs.ts` defines the packs once; a test fails when a pack names a plugin directory or a setting that does not
    exist.
 4. Nothing is stored on the Host. The wizard outcome and What's new's last visit live in browser storage
-   (`dshfiles.onboarding.wizard.v1`, `dshfiles.onboarding.whats-new.v1`).
+   (`dshfiles.onboarding.wizard.v1`, `dshfiles.onboarding.whats-new.v1`, `dshfiles.onboarding.suggestions.*.v1`).
 
 ## Limits
 
@@ -163,4 +200,6 @@ All apply live; none needs a restart.
 tools the `agent-tool` span. The Show me where overlay is client-only and opens no span. The GitHub check opens one `onboarding gh auth` span per run with its status and never reads gh's output. A pack
 preview opens `onboarding pack preview`, an apply `onboarding pack apply`, and each install one `onboarding dshx add`
 span with the plugin and exit code. Each uncached What's new read opens one `onboarding history read` span with the VCS,
-its state and the entry and upstream counts; `onboarding/whatsNew` and its tool get the automatic spans.
+its state and the entry and upstream counts; `onboarding/whatsNew` and its tool get the automatic spans. Each uncached
+Suggestions read opens one `onboarding suggestions read` span with its state and suggestion count (the two Usage calls
+are its children); `onboarding/suggestions` and its tool get the automatic spans.

@@ -40,6 +40,11 @@ const useLoadWhatsNew = (): GettingStartedProps['loadWhatsNew'] => {
   return useCallback((input, signal) => api.whatsNew(input, { signal }), [api])
 }
 
+const useLoadSuggestions = (): GettingStartedProps['loadSuggestions'] => {
+  const api = useApi(onboardingApi)
+  return useCallback((input, signal) => api.suggestions(input, { signal }), [api])
+}
+
 const WalkUnreadable = (props: { readonly onRetry: () => void }): ReactNode => (
   <section
     aria-label="Show me where"
@@ -148,6 +153,7 @@ export default defineClient({
               applyPack={useApplyPack()}
               copy={copy}
               loadOverview={useLoadOverview()}
+              loadSuggestions={useLoadSuggestions()}
               loadWhatsNew={useLoadWhatsNew()}
               routes={routes}
               settings={useOnboardingSettings()}

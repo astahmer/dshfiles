@@ -18,6 +18,11 @@ export const onboardingSettings = defineSettings({
       .description(
         "Show What's new on Getting started: feat and fix changes to owned plugins, read from the dshfiles checkout's jj or git history while the page or the agent asks. Off hides it and reads no history.",
       ),
+    suggestions: Schema.boolean()
+      .default(false)
+      .description(
+        'Suggest features you have not used yet from your local tool use (aggregate counts from the Usage plugin, read at most every 10 minutes while Getting started or the agent asks). No network or model request. Off reads nothing.',
+      ),
   }),
   applies: 'live',
 })
@@ -25,4 +30,12 @@ export const onboardingSettings = defineSettings({
 export type OnboardingSettings = SettingsValue<typeof onboardingSettings.schema>
 
 /** Schema defaults, for a Client that renders before the namespace loads or on a Host that predates it. */
-export const ONBOARDING_DEFAULTS: OnboardingSettings = { wizard: true, checklist: true, githubCheck: true, packs: true, curatedOnly: true, whatsNew: true }
+export const ONBOARDING_DEFAULTS: OnboardingSettings = {
+  wizard: true,
+  checklist: true,
+  githubCheck: true,
+  packs: true,
+  curatedOnly: true,
+  whatsNew: true,
+  suggestions: false,
+}

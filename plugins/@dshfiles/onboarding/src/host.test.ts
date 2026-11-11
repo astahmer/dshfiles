@@ -3,9 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { DshxEffect } from '@dshfiles/dshx/effect'
-import { createHostApiClient } from '@dshfiles/dshx/host'
+import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { usageApi } from '@dshfiles/usage/api'
 import { NodeServices } from '@effect/platform-node'
 import { Effect, Layer } from 'effect'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -202,6 +203,121 @@ describe('onboarding Host', () => {
       expect(text).toContain('https://github.com/astahmer/dshfiles/commits/main')
     } finally {
       await on.host.dispose()
+    }
+  })
+
+  it('reads no usage while suggestions are off, and serves onboarding_suggestions from cached aggregate counts once on', async () => {
+    const reads: string[] = []
+    const unused = (): never => {
+      throw new Error('not read by onboarding')
+    }
+    const fakeUsage = defineHost({
+      apis: [
+        usageApi.host({
+          activity: ({ input }) => {
+            reads.push(`activity:${String(input.days)}`)
+            return {
+              timelineBucket: 'day',
+              tools: [
+                { name: 'bash', calls: 120, errors: 0, interrupted: 0, unknown: 0, averageDurationMs: null },
+                { name: 'todo_write', calls: 3, errors: 0, interrupted: 0, unknown: 0, averageDurationMs: null },
+              ],
+              commandDistribution: [{ command: 'jj squash', calls: 84, totalDurationMs: 1_000 }],
+              jev: { calls: 0, successes: 0, failures: 0, averageDurationMs: null },
+            }
+          },
+          charts: ({ input }) => {
+            reads.push(`charts:${input.groupBy}`)
+            return {
+              summary: {
+                cost: 0,
+                requests: 0,
+                failed: 0,
+                aborted: 0,
+                input: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+                output: 0,
+                unpriced: 0,
+                turns: 12,
+                previous: { cost: 0, requests: 0, tokens: 0 },
+              },
+              keys: [],
+              buckets: [],
+              breakdown: { model: [], provider: [], project: [], purpose: [] },
+              latency: [],
+              topThreads: [{ sessionId: 'session-1', title: 'never leaves usage', project: null, cost: 0, requests: 30 }],
+            }
+          },
+          requests: unused,
+          familyCost: unused,
+          status: unused,
+          jevUsage: unused,
+          recordJevUsage: unused,
+          refresh: unused,
+          otelMetrics: unused,
+        }),
+      ],
+    })
+    const mount = async (suggestions: boolean, withUsage: boolean) => {
+      const host = await createTestHost()
+      host.ctx.provide('settings', {
+        configure: () => () => undefined,
+        describe: () => [{ ns: 'dshfiles-onboarding', value: { githubCheck: false, checklist: false, suggestions } }],
+        update: async () => undefined,
+        replace: async () => undefined,
+      } as never)
+      host.ctx.provide('subprocess', {} as never)
+      if (withUsage) await host.mount(fakeUsage, { packageId: '@dshfiles/usage' })
+      await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
+      return host
+    }
+    const execute = (host: Awaited<ReturnType<typeof createTestHost>>, id: string) =>
+      host.tools.execute({ callId: ToolCallId(id), name: 'onboarding_suggestions', arguments: {}, signal: new AbortController().signal }).then(
+        value => JSON.stringify(value),
+        (error: unknown) => String(error),
+      )
+
+    const off = await mount(false, true)
+    try {
+      const client = createHostApiClient(off.ctx, onboardingApi, '@test/caller')
+      await expect(client.suggestions({})).rejects.toThrow(/suggestions are off/u)
+      expect(await execute(off, 'call-off')).toMatch(/Usage suggestions are off, so no usage was read/u)
+      expect(off.tools.get('onboarding_suggestions')?.isConcurrencySafe?.({})).toBe(true)
+      expect(reads).toEqual([])
+    } finally {
+      await off.dispose()
+    }
+
+    const absent = await mount(true, false)
+    try {
+      const value = await createHostApiClient(absent.ctx, onboardingApi, '@test/caller').suggestions({})
+      expect(value).toMatchObject({ state: 'no-usage' })
+      expect(value.state === 'no-usage' ? value.reason : '').toMatch(/Enable it in Settings › Plugins/u)
+    } finally {
+      await absent.dispose()
+    }
+
+    const on = await mount(true, true)
+    try {
+      using recorder = recordSpans()
+      const client = createHostApiClient(on.ctx, onboardingApi, '@test/caller')
+      const value = await client.suggestions({})
+      expect(value.state === 'ready' ? value.suggestions.map(entry => [entry.rule, entry.evidence, entry.feature.key]) : value).toEqual([
+        ['jj-without-thread-workspaces', '84 jj commands, no thread workspace yet', 'jj-integration#thread-destination'],
+        ['jj-without-revision-graph', '84 jj commands, no revision graph read', 'jujutsu#revision-graph'],
+      ])
+      expect(JSON.stringify(value)).not.toContain('never leaves usage')
+      expect(JSON.stringify(value)).not.toContain('squash')
+      expect(recorder.span('onboarding suggestions read').attributes).toMatchObject({
+        'onboarding.suggestions.state': 'ready',
+        'onboarding.suggestions.count': 2,
+      })
+      expect(await execute(on, 'call-on')).toContain('jj-integration#thread-destination')
+      expect(reads).toEqual(['activity:30', 'charts:purpose'])
+      expect(recorder.named('onboarding suggestions read')).toHaveLength(1)
+    } finally {
+      await on.dispose()
     }
   })
 

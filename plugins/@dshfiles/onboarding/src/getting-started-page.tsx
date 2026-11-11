@@ -23,7 +23,10 @@ import { DESTINATION_ORDER, type ChecklistItem, type FeatureRow, type Overview, 
 import { PackChangeDialog, type PackChangeDialogProps, type PackTarget } from './pack-change-dialog.js'
 import type { PackAction, PluginState } from './pack-plan.js'
 import { Routes, type RouteServices } from './routes.js'
-import type { OnboardingSettings } from './settings.js'
+import { onboardingSettings, type OnboardingSettings } from './settings.js'
+import { SuggestionsSection, type SuggestionsSectionProps } from './suggestions-section.js'
+import { SuggestionsStore } from './suggestions-store.js'
+import { SuggestionsWindow } from './suggestions-window.js'
 import { TOUCH } from './touch.js'
 import { WhatsNewSection, type WhatsNewSectionProps } from './whats-new-section.js'
 import { WhatsNewStore } from './whats-new-store.js'
@@ -68,6 +71,7 @@ export interface GettingStartedProps {
   /** Start Show me where on one feature's `reach` steps. */
   readonly showWhere: (featureKey: string) => void
   readonly loadWhatsNew: WhatsNewSectionProps['loadWhatsNew']
+  readonly loadSuggestions: SuggestionsSectionProps['loadSuggestions']
 }
 
 const ChecklistRow = (props: {
@@ -296,6 +300,14 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
   const refresh = useCallback(() => void queryClient.invalidateQueries({ queryKey: ['onboarding', 'overview'] }), [queryClient])
   const done = checklist?.filter(item => item.state === 'done').length ?? 0
   const lastSeen = WhatsNewStore.useLastSeen()
+  const featured = SuggestionsStore.useFeatured()
+  const [today] = useState(() => SuggestionsWindow.localDay(new Date()))
+  const dismissed = SuggestionsStore.useDismissed()
+  const routes = props.routes
+  const openSuggestionsSetting = useCallback(
+    () => routes.openSettings({ setting: { entryId: onboardingSettings.namespace, fieldPath: ['suggestions'] } }),
+    [routes],
+  )
   const showFeatures = useCallback((plugin: string) => {
     setDestination(undefined)
     setSearch(plugin)
@@ -334,6 +346,19 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
               showFeatures={showFeatures}
             />
           ) : null}
+          <SuggestionsSection
+            dismiss={SuggestionsStore.dismiss}
+            dismissed={dismissed}
+            enabled={props.settings.suggestions}
+            featured={featured}
+            findFeature={showFeatures}
+            loadSuggestions={props.loadSuggestions}
+            openSetting={props.routes.hasSettings() ? openSuggestionsSetting : null}
+            remember={SuggestionsStore.remember}
+            restoreDismissed={SuggestionsStore.restoreDismissed}
+            showWhere={props.showWhere}
+            today={today}
+          />
           {props.settings.packs && data !== undefined ? (
             <PageSection heading="Packs" meta={String(data.packs.length)}>
               <ul className="dshx:grid dshx:grid-cols-2 dshx:gap-3 dshx:@max-pane-compact:grid-cols-1">

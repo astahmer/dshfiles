@@ -65,3 +65,13 @@ Feature: Onboarding
     Then What's new shows the checkout's changes or says why it cannot, and never errors
     When Getting started is narrowed to 390 pixels wide
     Then What's new keeps 44 pixel controls, and Mark as seen from the keyboard is the only thing that moves its last visit
+
+  @scenario:onboarding.usage-suggestions
+  Scenario: Suggestions stay off and read nothing until turned on in Settings, then suggest a feature or say honestly why not
+    Given the isolated plugin composition of "@dshfiles/onboarding, @dshfiles/usage, @dshfiles/command-palette, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell" is booted
+    When the setup wizard shown on first run is skipped
+    And Getting started is opened from the Knowledge destination
+    Then Suggestions is off and offers its setting in one line
+    When Suggestions is turned on from its Settings link
+    And Getting started is opened from the Knowledge destination
+    Then Suggestions shows a suggestion or an honest empty state with 44 pixel controls at 390 pixels, and never errors

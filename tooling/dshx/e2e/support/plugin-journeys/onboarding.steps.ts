@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, recordAssertion, settingsPage } from '../steps.js'
 
 const STARTER_PROMPT = 'Explain how this project is organised and where I should start reading.'
 
@@ -442,6 +442,53 @@ Then("What's new keeps 44 pixel controls, and Mark as seen from the keyboard is 
     await expect(mark).toHaveCount(0)
     expect(await page.evaluate(key => localStorage.getItem(key), WHATS_NEW_SEEN_KEY)).toMatch(/^"\d{4}-\d{2}-\d{2}T/u)
   })
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await finishJourneyAssertions(page)
+})
+
+const suggestionsSection = (page: Page) => gettingStarted(page).locator('[data-suggestions]')
+
+Then('Suggestions is off and offers its setting in one line', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'onboarding-suggestions-off', async () => {
+    await expect(gettingStarted(page).getByRole('region', { name: /^Suggestions/u })).toBeVisible()
+    await expect(suggestionsSection(page)).toHaveAttribute('data-suggestions', 'off')
+    await expect(suggestionsSection(page).locator('p')).toHaveCount(1)
+    await expect(suggestionsSection(page).locator('[data-suggestion]')).toHaveCount(0)
+  })
+})
+
+When('Suggestions is turned on from its Settings link', async ({ page }: { page: Page }) => {
+  await suggestionsSection(page).getByRole('button', { name: 'Turn on in Settings', exact: true }).click()
+  const row = settingsPage(page)
+    .locator('[data-setting-path="suggestions"]')
+    .filter({ has: page.getByRole('switch') })
+    .first()
+  const toggle = row.getByRole('switch')
+  await expect(toggle).not.toBeChecked()
+  await toggle.click()
+  await expect(toggle).toBeChecked()
+})
+
+Then('Suggestions shows a suggestion or an honest empty state with 44 pixel controls at 390 pixels, and never errors', async ({ page }: { page: Page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await recordAssertion(page, 'onboarding-suggestions-on', async () => {
+    // A scratch profile has little or no tool use: an empty ready state or an absent Usage owner is honest, an error never is.
+    await expect(suggestionsSection(page)).toHaveAttribute('data-suggestions', /^(ready|no-usage)$/u)
+    const state = await suggestionsSection(page).getAttribute('data-suggestions')
+    const suggested = await suggestionsSection(page).locator('[data-suggestion]').count()
+    if (state === 'no-usage') await expect(suggestionsSection(page).getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+    if (state === 'ready' && suggested === 0) await expect(suggestionsSection(page).locator('[data-suggestions-empty]')).toBeVisible()
+    const fits = await suggestionsSection(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)
+    expect(fits).toBe(true)
+    const heights = await suggestionsSection(page)
+      .locator('button, a')
+      .evaluateAll(elements =>
+        elements.filter(element => element instanceof HTMLElement && element.offsetParent !== null).map(element => element.getBoundingClientRect().height),
+      )
+    expect(heights.filter(height => height < 44)).toEqual([])
+  })
+  await suggestionsSection(page).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: test.info().outputPath('usage-suggestions.png'), animations: 'disabled' })
   await page.setViewportSize({ width: 1280, height: 900 })
   await finishJourneyAssertions(page)
 })

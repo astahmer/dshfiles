@@ -12,6 +12,8 @@ import { PackPlan } from './pack-plan.js'
 import { ReachModel } from './reach-model.js'
 import { onboardingSettings } from './settings.js'
 import { SetupFacts } from './setup-facts.js'
+import { SUGGESTIONS_OFF_MESSAGE, SuggestionsOffError } from './suggestions-model.js'
+import { UsageSuggestions } from './usage-suggestions.js'
 import { WhatsNewHistory } from './whats-new-history.js'
 
 const platform = Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)
@@ -43,6 +45,8 @@ const whatsNew = Layer.unwrap(
   ),
 ).pipe(Layer.provide(Layer.mergeAll(platform, DshChildProcessSpawner.layer)))
 
+const suggestions = UsageSuggestions.layerFrom({ catalog: FEATURE_CATALOG }).pipe(Layer.provide(HostApis.layer))
+
 /** Prerequisite states for a pack plan, from the same checklist read the page shows. */
 const prerequisitesNow = SetupFacts.use(setup =>
   Effect.gen(function* () {
@@ -57,7 +61,7 @@ export default DshxPlugin.make({
   name: 'dshfiles-onboarding',
   inject: ['subprocess'],
   settings: [onboardingSettings],
-  layer: Layer.mergeAll(facts, packs, whatsNew),
+  layer: Layer.mergeAll(facts, packs, whatsNew, suggestions),
   apis: [
     Api.bind(onboardingApi, {
       overview: request =>
@@ -89,6 +93,12 @@ export default DshxPlugin.make({
           const settings = yield* SetupFacts.use(setup => setup.settings)
           if (!settings.whatsNew) return { state: 'off' } as const
           return yield* WhatsNewHistory.use(history => history.read(request))
+        }),
+      suggestions: () =>
+        Effect.gen(function* () {
+          const settings = yield* SetupFacts.use(setup => setup.settings)
+          if (!settings.suggestions) return yield* new SuggestionsOffError({ message: SUGGESTIONS_OFF_MESSAGE })
+          return yield* UsageSuggestions.use(usage => usage.read)
         }),
       applyPack: request =>
         Effect.gen(function* () {

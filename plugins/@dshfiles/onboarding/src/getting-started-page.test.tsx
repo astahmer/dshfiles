@@ -78,6 +78,7 @@ const renderPage = (input: { readonly registered: readonly string[]; readonly pa
     reason: 'Not linked from a checkout.',
     commitsUrl: 'https://github.com/astahmer/dshfiles/commits/main',
   }))
+  const loadSuggestions = vi.fn(async () => ({ state: 'ready' as const, days: 30, suggestions: [] }))
   const startWizard = vi.fn()
   const showWhere = vi.fn()
   const copy = vi.fn(async () => true)
@@ -87,6 +88,7 @@ const renderPage = (input: { readonly registered: readonly string[]; readonly pa
         applyPack={applyPack}
         copy={copy}
         loadOverview={(request, _signal) => loadOverview(request)}
+        loadSuggestions={loadSuggestions}
         loadWhatsNew={loadWhatsNew}
         routes={services}
         settings={{ ...ONBOARDING_DEFAULTS, packs: input.packs ?? true, whatsNew: input.whatsNew ?? true }}
@@ -95,10 +97,19 @@ const renderPage = (input: { readonly registered: readonly string[]; readonly pa
       />
     </PluginQueryProvider>,
   )
-  return { services, startWizard, showWhere, copy, loadWhatsNew }
+  return { services, startWizard, showWhere, copy, loadWhatsNew, loadSuggestions }
 }
 
 describe('GettingStartedPage', () => {
+  it('offers usage suggestions off by default, reads nothing, and opens the setting when asked', async () => {
+    const page = renderPage({ registered: [] })
+    const section = await screen.findByRole('region', { name: /^Suggestions/u })
+    expect(section.getAttribute('data-suggestions')).toBe('off')
+    fireEvent.click(within(section).getByRole('button', { name: 'Turn on in Settings' }))
+    expect(page.services.opened).toEqual(['settings:{"setting":{"entryId":"dshfiles-onboarding","fieldPath":["suggestions"]}}'])
+    expect(page.loadSuggestions).not.toHaveBeenCalled()
+  })
+
   it('shows the checklist, packs and features, and opens only registered routes', async () => {
     const page = renderPage({ registered: ['ai-accounts', 'dshfiles-backlog-panel'] })
     const checklist = await screen.findByRole('region', { name: /Setup checklist/u })

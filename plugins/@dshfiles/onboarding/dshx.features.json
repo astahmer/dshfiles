@@ -463,6 +463,101 @@
       ]
     },
     {
+      "id": "usage-suggestions",
+      "title": "Get features suggested from what you already do",
+      "summary": "Getting started's Suggestions, off by default, maps the last 30 days of local tool use to catalogued features you have not used yet whose pattern implies value: many jj shell commands and no thread workspace suggest thread workspaces, long threads that never compacted suggest the compaction meter, many gh commands suggest pull requests from a thread, and so on, from a small rules table in the plugin. Only aggregate counts are read, through the Usage plugin's published API (tool names, the executable of each shell command, request counts per purpose and thread), at most every 10 minutes; never a prompt, path or command argument. One suggestion is shown prominently per day (per browser), each can be dismissed for good with Restore to undo, and Show all suggestions lists the rest; each links to Show me where and its gallery row. While off, the section offers the setting in one line and nothing is read. The onboarding_suggestions agent tool returns the same suggestions and refuses while the setting is off. No network or model request.",
+      "reach": ["click tab \"Knowledge\"", "click button \"Getting started\"", "expect region \"Suggestions*\""],
+      "surfaces": ["client", "host", "api", "tool", "settings"],
+      "surface": "detail",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › Suggestions",
+      "configuration": [
+        {
+          "key": "suggestions",
+          "defaultValue": "false",
+          "constraints": "Boolean, off by default; off reads no usage, for the page and the agent tool alike, and the section offers the setting.",
+          "coveredBy": ["onboarding.suggestions-off", "onboarding.suggestions-page-off"]
+        }
+      ],
+      "states": ["off", "loading", "ready", "empty", "all-dismissed", "no-usage", "unreadable", "host-unreadable"],
+      "failureModes": [
+        "Usage plugin not running: the section says Suggestions read local tool use from Usage and how to enable it (Settings › Plugins, Observe & perf pack), with Try again; an absent owner is asked again after five seconds.",
+        "Usage answers with an error: the section says so and points at Usage to check its index, with Try again.",
+        "An older Host without the method: the section says to restart DSH or enable the plugin, with Try again.",
+        "A tool used rarely (outside the 100 most-used) can read as unused, so its feature may still be suggested; Dismiss hides it for good."
+      ],
+      "externalDependencies": [
+        {
+          "id": "usage-activity",
+          "boundary": "The @dshfiles/usage published API (activity and charts methods), called in process through HostApis; an absent owner is reported as no-usage. Only aggregate counts are kept.",
+          "deterministicFake": "src/host.test.ts mounts a fake @dshfiles/usage Host serving the same contract and records every call."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "onboarding suggestions read",
+          "file": "plugins/@dshfiles/onboarding/src/host.test.ts",
+          "testName": "reads no usage while suggestions are off, and serves onboarding_suggestions from cached aggregate counts once on"
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and turn on Suggestions in Settings.",
+        "doneWhen": "Suggestions lists a feature to try, or says nothing in your tool use points to one.",
+        "open": {
+          "settings": {
+            "entryId": "dshfiles-onboarding",
+            "fieldPath": ["suggestions"]
+          }
+        }
+      },
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "onboarding.usage-suggestions",
+          "featureFile": "tooling/dshx/e2e/features/onboarding.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.suggestions-rules",
+          "file": "plugins/@dshfiles/onboarding/src/suggestions-model.test.ts",
+          "testName": "names only catalogued features, each once per rule id, with a threshold and one sentence why"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.suggestions-window",
+          "file": "plugins/@dshfiles/onboarding/src/suggestions-window.test.ts",
+          "testName": "shows at most one new suggestion per day: dismissing today’s pick features nothing until tomorrow"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.suggestions-dismiss",
+          "file": "plugins/@dshfiles/onboarding/src/suggestions-section.client.test.tsx",
+          "testName": "features one suggestion, lists the rest behind Show all, and dismisses for good with a way back"
+        },
+        {
+          "kind": "host-test",
+          "id": "onboarding.suggestions-off",
+          "file": "plugins/@dshfiles/onboarding/src/host.test.ts",
+          "testName": "reads no usage while suggestions are off, and serves onboarding_suggestions from cached aggregate counts once on"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.suggestions-page-off",
+          "file": "plugins/@dshfiles/onboarding/src/getting-started-page.test.tsx",
+          "testName": "offers usage suggestions off by default, reads nothing, and opens the setting when asked"
+        }
+      ]
+    },
+    {
       "id": "feature-reach",
       "title": "Ask how to get to a feature",
       "summary": "The read-only onboarding_reach agent tool (onboarding/reach) returns one catalogued feature's reach steps as the dshx grammar parses them: each action, its locator (ARIA role, text, label or title) and accessible name, the fill value or key, which steps this app cannot replay (seed, attach, right-click, shift-click) and why, plus the destination the feature lives in, its Open route and its docs. Show me where reads the same method, so the Agent and the page give one answer. The catalog stays on the Host; it changes nothing.",

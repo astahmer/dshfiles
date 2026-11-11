@@ -336,7 +336,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "onboarding",
       "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs, what changed in owned plugins since your last visit and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and read-only onboarding_overview and…",
       "ui": true,
-      "features": 6
+      "features": 7
     },
     {
       "name": "optmem-core",
@@ -13755,6 +13755,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         "doneWhen": "You pressed Mark as seen, so the next change reads New.",
         "open": {
           "panel": "dshfiles-onboarding"
+        }
+      }
+    },
+    {
+      "key": "onboarding#usage-suggestions",
+      "plugin": "onboarding",
+      "id": "usage-suggestions",
+      "title": "Get features suggested from what you already do",
+      "summary": "Getting started's Suggestions, off by default, maps the last 30 days of local tool use to catalogued features you have not used yet whose pattern implies value: many jj shell commands and no thread workspace suggest thread workspaces, long threads that never compacted suggest th…",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › Suggestions",
+      "reach": [
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Getting started\"",
+          "action": "click",
+          "by": "button",
+          "name": "Getting started",
+          "value": null
+        },
+        {
+          "text": "expect region \"Suggestions*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Suggestions*",
+          "value": null
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and turn on Suggestions in Settings.",
+        "doneWhen": "Suggestions lists a feature to try, or says nothing in your tool use points to one.",
+        "open": {
+          "settings": {
+            "entryId": "dshfiles-onboarding",
+            "fieldPath": [
+              "suggestions"
+            ]
+          }
         }
       }
     },
