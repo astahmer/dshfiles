@@ -6,7 +6,8 @@ import { NodeServices } from '@effect/platform-node'
 import { tracerLayer } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { Effect, Layer } from 'effect'
-import { expect, test, vi } from 'vitest'
+import { TestClock } from 'effect/testing'
+import { expect, test } from 'vitest'
 import { HostDirectory } from './host-directory.js'
 import type { HostDirectory as HostDirectoryValue, HostRecord, RuntimeRecord } from './records.js'
 import { normalizeProjectOrigin, readProjectOrigins } from './project-origins.js'
@@ -204,33 +205,31 @@ const sshAnswer = (input: { readonly code: number; readonly stdout: string }): S
 })
 
 test('retries a failed remote origin read well before the success lifetime ends', async () => {
-  vi.useFakeTimers({ toFake: ['Date'] })
-  try {
-    const host = sshHost({ id: 'host-flaky', sshTarget: 'flaky' })
-    const runtime = sshRuntime({ id: 'runtime-flaky', hostId: host.id })
-    let runs = 0
-    const services = testServices({
-      host,
-      runtimes: [runtime],
-      sshRun: () =>
-        Effect.sync(() => {
-          runs += 1
-          return runs === 1 ? sshAnswer({ code: 255, stdout: '' }) : sshAnswer({ code: 0, stdout: '/work/flaky\tgit@github.com:owner/flaky.git\n' })
-        }),
-    })
-    const read = () =>
-      Effect.runPromise(readProjectOrigins({ localPaths: [], remote: [{ runtimeId: runtime.id, paths: ['/work/flaky'] }] }).pipe(Effect.provide(services)))
+  const host = sshHost({ id: 'host-flaky', sshTarget: 'flaky' })
+  const runtime = sshRuntime({ id: 'runtime-flaky', hostId: host.id })
+  let runs = 0
+  const services = testServices({
+    host,
+    runtimes: [runtime],
+    sshRun: () =>
+      Effect.sync(() => {
+        runs += 1
+        return runs === 1 ? sshAnswer({ code: 255, stdout: '' }) : sshAnswer({ code: 0, stdout: '/work/flaky\tgit@github.com:owner/flaky.git\n' })
+      }),
+  })
+  const read = readProjectOrigins({ localPaths: [], remote: [{ runtimeId: runtime.id, paths: ['/work/flaky'] }] })
 
-    const failed = await read()
-    vi.setSystemTime(Date.now() + 60_000)
-    const retried = await read()
+  const [failed, retried] = await Effect.runPromise(
+    Effect.gen(function* () {
+      const failed = yield* read
+      yield* TestClock.adjust('60 seconds')
+      return [failed, yield* read] as const
+    }).pipe(Effect.provide(Layer.merge(services, TestClock.layer()))),
+  )
 
-    expect(failed.origins[0]?.origin).toBeNull()
-    expect(retried.origins[0]?.origin).toBe('github.com/owner/flaky')
-    expect(runs).toBe(2)
-  } finally {
-    vi.useRealTimers()
-  }
+  expect(failed.origins[0]?.origin).toBeNull()
+  expect(retried.origins[0]?.origin).toBe('github.com/owner/flaky')
+  expect(runs).toBe(2)
 })
 
 test('drops cached remote origins when the host connector changes', async () => {

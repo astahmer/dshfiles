@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { Duration, Effect, Fiber, FileSystem, Option, Path, Stream } from 'effect'
+import { Clock, Duration, Effect, Fiber, FileSystem, Option, Path, Stream } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import type { ProjectOriginsInput } from './api.js'
 import { HostDirectory } from './host-directory.js'
@@ -27,11 +27,12 @@ const remoteReads = new Map<string, Fiber.Fiber<void>>()
 const cacheKey = (request: OriginRequest): string => JSON.stringify([request.kind, request.kind === 'remote' ? request.runtimeId : '', request.path])
 
 /** A local entry is valid only while its `.git/config` keeps the stamp it was read with, so `git remote set-url` shows at once. */
-const cachedOrigin = (request: OriginRequest, stamp = ''): string | null | undefined => {
+const cachedOrigin = (input: { readonly request: OriginRequest; readonly stamp: string; readonly now: number }): string | null | undefined => {
+  const request = input.request
   const key = cacheKey(request)
   const cached = originCache.get(key)
   if (cached === undefined) return undefined
-  if (cached.expiresAt > Date.now() && cached.stamp === stamp) return cached.origin
+  if (cached.expiresAt > input.now && cached.stamp === input.stamp) return cached.origin
   originCache.delete(key)
   return undefined
 }
@@ -52,8 +53,9 @@ const cacheOrigin = (input: {
   readonly origin: string | null
   readonly stamp?: string
   readonly durationMs?: number
+  readonly now: number
 }): void => {
-  const now = Date.now()
+  const now = input.now
   for (const [key, value] of originCache) if (value.expiresAt <= now) originCache.delete(key)
   while (originCache.size >= maxCacheEntries) {
     const oldest = originCache.keys().next().value
@@ -163,6 +165,7 @@ const readRemoteGroup = (group: RemoteHostGroup, paths: readonly string[]) =>
     const result = yield* remoteOrigins({ sshTarget: group.sshTarget, paths })
     const valid = Option.isSome(result) && result.value.code === 0 && !result.value.timedOut && !result.value.outputExceeded
     const pathOrigins = valid ? parseRemoteOutput(result.value.stdout, new Set(paths)) : new Map<string, string | null>()
+    const now = yield* Clock.currentTimeMillis
     for (const [runtimeId, runtimePaths] of group.pathsByRuntime) {
       for (const path of runtimePaths)
         cacheOrigin({
@@ -170,6 +173,7 @@ const readRemoteGroup = (group: RemoteHostGroup, paths: readonly string[]) =>
           origin: pathOrigins.get(path) ?? null,
           stamp: group.stampByRuntime.get(runtimeId) ?? '',
           durationMs: valid ? cacheDurationMs : failureCacheDurationMs,
+          now,
         })
     }
   })
@@ -221,8 +225,9 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
   const localReads = new Map<string, OriginRequest>()
   const pendingRemote = new Map<string, Set<string>>()
 
+  const startedAt = yield* Clock.currentTimeMillis
   for (const request of requests) {
-    if (cachedOrigin(request, stampOf(request)) !== undefined) continue
+    if (cachedOrigin({ request, stamp: stampOf(request), now: startedAt }) !== undefined) continue
     if (request.kind === 'local') {
       localReads.set(cacheKey(request), request)
       continue
@@ -235,7 +240,10 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
   if (localReads.size > 0) {
     yield* Effect.forEach(
       [...localReads.values()],
-      request => readLocalOrigin(request.path).pipe(Effect.tap(origin => Effect.sync(() => cacheOrigin({ request, origin, stamp: stampOf(request) })))),
+      request =>
+        readLocalOrigin(request.path).pipe(
+          Effect.tap(origin => Effect.map(Clock.currentTimeMillis, now => cacheOrigin({ request, origin, stamp: stampOf(request), now }))),
+        ),
       { concurrency: 8 },
     )
   }
@@ -253,7 +261,7 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
 
     for (const target of targets) {
       if (target.host === undefined) {
-        for (const path of target.paths) cacheOrigin({ request: { kind: 'remote', runtimeId: target.runtimeId, path }, origin: null })
+        for (const path of target.paths) cacheOrigin({ request: { kind: 'remote', runtimeId: target.runtimeId, path }, origin: null, now: startedAt })
         continue
       }
       if (target.host.connector.kind === 'local') {
@@ -276,7 +284,10 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
     if (localRemoteReads.size > 0) {
       yield* Effect.forEach(
         [...localRemoteReads.values()],
-        request => readLocalOrigin(request.path).pipe(Effect.tap(origin => Effect.sync(() => cacheOrigin({ request, origin, stamp: stampOf(request) })))),
+        request =>
+          readLocalOrigin(request.path).pipe(
+            Effect.tap(origin => Effect.map(Clock.currentTimeMillis, now => cacheOrigin({ request, origin, stamp: stampOf(request), now }))),
+          ),
         { concurrency: 8 },
       )
     }
@@ -290,12 +301,13 @@ export const readProjectOrigins = Effect.fn('multi-host project origins')(functi
     'dshx.multi-host.origin_local_reads': localReads.size,
     'dshx.multi-host.origin_pending': pending,
   })
+  const answeredAt = yield* Clock.currentTimeMillis
   return {
     origins: requests.map(request => ({
       kind: request.kind,
       ...(request.kind === 'remote' && { runtimeId: request.runtimeId }),
       path: request.path,
-      origin: cachedOrigin(request, stampOf(request)) ?? null,
+      origin: cachedOrigin({ request, stamp: stampOf(request), now: answeredAt }) ?? null,
     })),
     ...(pending && { pending }),
   }
