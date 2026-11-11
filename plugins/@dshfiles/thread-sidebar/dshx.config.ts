@@ -23,6 +23,8 @@ export default defineConfig({
     'restart-sources': 'src/restart-sources.ts',
     // A picker gesture in another plugin asks the sidebar's fan-out dialog to open with its models preselected.
     'fan-out-request': 'src/fan-out-request.ts',
+    // Plugins that group by project resolve a thread workspace (custom threads directory included) to its project.
+    'thread-directories': 'src/thread-directories.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },
 })

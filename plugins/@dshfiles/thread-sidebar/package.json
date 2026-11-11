@@ -60,6 +60,10 @@
     "./fan-out-request": {
       "types": "./src/fan-out-request.ts",
       "default": "./dist/fan-out-request.js"
+    },
+    "./thread-directories": {
+      "types": "./src/thread-directories.ts",
+      "default": "./dist/thread-directories.js"
     }
   },
   "scripts": {
