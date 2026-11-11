@@ -18,31 +18,39 @@ import { SqliteMigrationFailed, SqliteStoreOpenFailed, type SqliteStoreError, Sq
 SqliteStore.layer(options): Layer<SqlClient.SqlClient, SqliteStoreError, FileSystem | Path>
 SqliteStore.layerAs(Service, options): Layer<Service, SqliteStoreError, FileSystem | Path>
 SqliteStore.make(options): Effect<SqlClient.SqlClient, SqliteStoreError, Scope | FileSystem | Path | Reactivity>
+SqliteStore.space(sql): Effect<SqliteSpace, SqlError | SchemaError | NoSuchElementError>
+SqliteStore.reclaim(sql): Effect<SqliteReclaimResult, SqlError | SchemaError | NoSuchElementError>
 ```
 
-| Option              | Default   | Meaning                                                                                                                          |
-| ------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `filename`          | —         | Absolute path, or `:memory:` (no file work, no lock).                                                                            |
-| `migrations`        | —         | `Record<'<id>_<name>', Effect<void, unknown, SqlClient>>`, run by `effect/sql` `Migrator` (`fromRecord` + `SqliteMigrator.run`). |
-| `legacyUserVersion` | none      | Last `PRAGMA user_version` the old opener wrote. Migrations `1..legacyUserVersion` must exist.                                   |
-| `statementSpans`    | `false`   | Client span per SQL statement.                                                                                                   |
-| `pragmas`           | see below | `journalMode` (`wal`), `synchronous` (`normal`), `busyTimeout` (5 s), `foreignKeys` (driver default: on).                        |
+| Option              | Default          | Meaning                                                                                                                          |
+| ------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `filename`          | —                | Absolute path, or `:memory:` (no file work, no lock).                                                                            |
+| `migrations`        | —                | `Record<'<id>_<name>', Effect<void, unknown, SqlClient>>`, run by `effect/sql` `Migrator` (`fromRecord` + `SqliteMigrator.run`). |
+| `legacyUserVersion` | none             | Last `PRAGMA user_version` the old opener wrote. Migrations `1..legacyUserVersion` must exist.                                   |
+| `statementSpans`    | `false`          | Client span per SQL statement.                                                                                                   |
+| `pragmas`           | see below        | `journalMode` (`wal`), `synchronous` (`normal`), `busyTimeout` (5 s), `foreignKeys` (driver default: on).                        |
+| `autoVacuum`        | `incremental`    | `auto_vacuum` for a file with no page yet; an existing file keeps its mode (see [Free space](#free-space)).                      |
+| `idleVacuum`        | 32 pages / 5 min | Bounded `incremental_vacuum` passes on an incremental file; `{ every, pages }` or `false`.                                       |
+| `lockWaitSpanMs`    | `50`             | A `sqlite lock wait` span for a transaction that waited this long to start; `0` turns it off.                                    |
 
 What one open does, in order:
 
 1. Creates the parent directory with mode `0700` and, when missing, an empty file with mode `0600` so SQLite never
    creates it world-readable.
-2. Opens one serialized connection (prepared-statement cache, `BEGIN IMMEDIATE` transactions), sets `busy_timeout`,
+2. When the file (and its `-wal`) is still empty and `autoVacuum` is `incremental`, writes
+   `auto_vacuum = INCREMENTAL` through a short rollback-journal connection: the mode sticks only before the journal
+   turns to WAL and before the first table.
+3. Opens one serialized connection (prepared-statement cache, `BEGIN IMMEDIATE` transactions), sets `busy_timeout`,
    the journal mode, `synchronous` and `foreign_keys`.
-3. Under a per-file lock (two layers over one file in one process would otherwise busy-wait on each other while
+4. Under a per-file lock (two layers over one file in one process would otherwise busy-wait on each other while
    blocking the event loop), in one transaction: creates `effect_sql_migrations`, refuses a file recorded past the
    highest known migration id, and — only when that table is empty and `legacyUserVersion` is set — reads
    `PRAGMA user_version = N`, refuses `N > legacyUserVersion`, and records migrations `1..N` as applied without running
    them.
-4. Runs the pending migrations in one transaction: one failure rolls back every migration of that open.
-5. With `legacyUserVersion` set, writes the latest applied id back to `PRAGMA user_version`, so a downgrade to the old
+5. Runs the pending migrations in one transaction: one failure rolls back every migration of that open.
+6. With `legacyUserVersion` set, writes the latest applied id back to `PRAGMA user_version`, so a downgrade to the old
    opener does not replay its `CREATE TABLE` steps.
-6. Sets `0600` on the main file, `-wal` and `-shm`.
+7. Sets `0600` on the main file, `-wal` and `-shm`, then starts the idle vacuum passes.
 
 Errors are `Schema.TaggedError`s that keep the underlying `cause`: `SqliteStoreOpenFailed` (`step`:
 `prepare-files | open | pragmas | restrict-files`), `SqliteMigrationFailed` (`kind`: the `MigrationError` kind or
@@ -75,6 +83,43 @@ turn that off. With `statementSpans: false` the store hands out a `SqlClient` wh
 caller's own `Effect.fn` span, `Migrator <id>_<name>` spans, the `sql.transaction` span and the `sqlite-store open`
 span stay. This keeps usage/memory volume out of the trace store and stops traces from tracing its own inserts.
 
+### Free space
+
+Deleting rows (retention, pruning) leaves free pages that later inserts reuse, but the file never shrinks while
+`auto_vacuum = NONE`. New files are therefore created `INCREMENTAL`, and every 5 minutes a pass runs
+`PRAGMA incremental_vacuum(32)`: at most 32 pages (128 KiB), a `sqlite-store incremental vacuum` span with
+`db.sqlite.pages_freed` only when a page moved. A full `VACUUM` never runs on its own.
+
+Measured on copies of the live stores (2026-11-11, `.backup` from a read-only open, load average about 60):
+
+| Store          | Pages (4 KiB) | Free pages | Mode   | Converting `reclaim`                        |
+| -------------- | ------------- | ---------- | ------ | ------------------------------------------- |
+| traces         | 15,786        | 3,585      | `none` | 3.4 s, 64.7 → 41.5 MB (23.2 MB freed)       |
+| memory         | 29,030        | 312        | `none` | 15.8 s, 118.9 → 117.1 MB (1.8 MB freed)     |
+| usage          | 62,885        | 0          | `none` | not run: nothing to free                    |
+| session-search | 98,209        | 111        | `none` | not run (live read only; not on this layer) |
+
+ai-accounts, backlog, whiteboard, alerts and project-checks had no free page. On the converted traces copy, after
+deleting the 1,500 oldest traces (7,607 free pages), a pass took 5–30 ms at 32 pages, 10–169 ms at 64 and 78–367 ms at
+256, hence the small default; `reclaim` then freed the remaining 27 MB in 2.4 s.
+
+An existing file is never converted on its own. `SqliteStore.space(sql)` reports `autoVacuum`, page and free-page
+counts; `SqliteStore.reclaim(sql)` runs on the store's own connection and returns `{ method, before, after,
+bytesFreed, durationMs }`: `incremental-vacuum` on an incremental file, else `auto_vacuum = INCREMENTAL; VACUUM`, which
+converts it, then `wal_checkpoint(TRUNCATE)`. The VACUUM blocks the Host for its whole duration and needs the file's
+size again on disk, so a plugin exposes it only as a user-requested action with an explicit opt-in (traces:
+`traces_reclaim_space { confirm: true }`). To convert a store by hand while DSH is stopped:
+`sqlite3 <file> 'PRAGMA auto_vacuum = INCREMENTAL; VACUUM;'`.
+
+### Lock waits
+
+A top-level `withTransaction` that waited at least `lockWaitSpanMs` (50 ms) before its body started records a
+`sqlite lock wait` span (`db.namespace` = file name, `db.sqlite.lock_wait_ms`): the wait for the store's one
+connection plus `BEGIN IMMEDIATE` busy-waiting on another connection's write lock. A transaction that waited that long
+and then failed with `SQLITE_BUSY` records it as failed. The span is timed from the request, so it overlaps the
+`host event-loop stall` the synchronous busy wait causes, and `traces_stalls` names it. Busy waits of single statements
+outside a transaction are not separated from the statement's own time.
+
 ### Several databases in one plugin
 
 ```ts
@@ -91,7 +136,8 @@ Repos `yield* SpanDb` and use it as `sql`; decode rows with `SqlSchema.findAll/f
 ### Caveat
 
 `node:sqlite` is synchronous: busy waits and long queries still block the Host event loop. This layer fixes lifecycle,
-migrations and typing, not loop stalls; heavy indexing stays in a worker (session-search).
+migrations and typing, not loop stalls; heavy indexing stays in a worker (session-search). Lock waits are visible
+(above), and the traces plugin records each stall.
 
 ## Migrating
 

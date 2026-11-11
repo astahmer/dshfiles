@@ -70,6 +70,124 @@
           "testName": "emits no statement spans by default while keeping the caller span"
         }
       ]
+    },
+    {
+      "id": "sqlite-store-space",
+      "title": "Free pages go back to the disk",
+      "summary": "A new file is created with auto_vacuum = INCREMENTAL, a bounded incremental_vacuum pass returns at most 32 free pages every 5 minutes, and `reclaim` gives every free page back on the store's own connection: incremental_vacuum on an incremental file, or one converting VACUUM on an older file, only when a user asked. `space` reports page and free-page counts and the mode. An existing file is never converted on its own.",
+      "surfaces": ["host", "storage"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
+      "configuration": [
+        {
+          "key": "autoVacuum",
+          "defaultValue": "incremental",
+          "constraints": "Applies only to a file with no page yet; an existing file keeps its mode until reclaim rewrites it.",
+          "choices": ["incremental", "none"],
+          "coveredBy": ["sqlite-store.auto-vacuum-new", "sqlite-store.auto-vacuum-existing"]
+        },
+        {
+          "key": "idleVacuum",
+          "defaultValue": "{ every: 5 minutes, pages: 32 }",
+          "constraints": "false turns the passes off; a file that is not incremental or has no free page costs one pragma read per pass and no span.",
+          "coveredBy": ["sqlite-store.idle-vacuum"]
+        }
+      ],
+      "states": ["incremental", "not-incremental", "no-free-pages", "converted"],
+      "failureModes": [
+        "reclaim on a file that is not incremental runs a full VACUUM: it blocks the Host for the rewrite and briefly needs the file's size again on disk.",
+        "A failed idle pass is skipped until the next tick, never retried in a loop."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.auto-vacuum-new",
+          "file": "plugins/@dshfiles/sqlite-store/src/space.test.ts",
+          "testName": "creates new files with incremental auto_vacuum"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.auto-vacuum-existing",
+          "file": "plugins/@dshfiles/sqlite-store/src/space.test.ts",
+          "testName": "leaves an existing file in its auto_vacuum mode"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.reclaim-convert",
+          "file": "plugins/@dshfiles/sqlite-store/src/space.test.ts",
+          "testName": "reclaim converts an existing file with one VACUUM and reports the bytes freed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.reclaim-incremental",
+          "file": "plugins/@dshfiles/sqlite-store/src/space.test.ts",
+          "testName": "reclaim on an incremental file frees every free page without a VACUUM"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.idle-vacuum",
+          "file": "plugins/@dshfiles/sqlite-store/src/space.test.ts",
+          "testName": "the idle pass returns at most its page budget per tick and records a span"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "sqlite-store incremental vacuum",
+          "file": "plugins/@dshfiles/sqlite-store/src/space.test.ts",
+          "testName": "the idle pass returns at most its page budget per tick and records a span"
+        }
+      ]
+    },
+    {
+      "id": "sqlite-store-lock-wait",
+      "title": "Lock-wait spans",
+      "summary": "A top-level transaction that waited at least 50 ms before its body started (for the store's one connection, or in BEGIN IMMEDIATE for another connection's write lock) records a `sqlite lock wait` span with the file name and the wait; one that gave up with SQLITE_BUSY after waiting records it as failed.",
+      "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
+      "configuration": [
+        {
+          "key": "lockWaitSpanMs",
+          "defaultValue": "50",
+          "constraints": "0 turns the span off; a transaction that starts sooner records nothing.",
+          "coveredBy": ["sqlite-store.lock-wait-off"]
+        }
+      ],
+      "states": ["no-wait", "queued", "busy-timeout"],
+      "failureModes": ["Busy waits of statements outside a transaction are not separated from the statement's own time."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.lock-wait-queued",
+          "file": "plugins/@dshfiles/sqlite-store/src/lock-wait.test.ts",
+          "testName": "records a span when a transaction waits for the connection another transaction holds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.lock-wait-busy",
+          "file": "plugins/@dshfiles/sqlite-store/src/lock-wait.test.ts",
+          "testName": "records a failed span when another connection holds the write lock past the busy timeout"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sqlite-store.lock-wait-off",
+          "file": "plugins/@dshfiles/sqlite-store/src/lock-wait.test.ts",
+          "testName": "records nothing for a transaction that starts at once, or with the span turned off"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "sqlite lock wait",
+          "file": "plugins/@dshfiles/sqlite-store/src/lock-wait.test.ts",
+          "testName": "records a span when a transaction waits for the connection another transaction holds"
+        }
+      ]
     }
   ]
 }

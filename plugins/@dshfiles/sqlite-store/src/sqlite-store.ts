@@ -3,7 +3,11 @@ import { Context, Duration, Effect, Exit, FileSystem, Layer, Path, Schema, Scope
 import { Reactivity } from 'effect/reactivity'
 import { Migrator, SqlClient, SqlSchema } from 'effect/sql'
 import { DeferredStoreMemberMissing, SqliteMigrationFailed, SqliteStoreOpenFailed, type SqliteStoreError, SqliteStoreVersionUnsupported } from './errors.ts'
+import { withLockWaitSpans } from './lock-wait.ts'
+import { type SqliteIdleVacuum, SqliteSpaceModel } from './space.ts'
 import { untracedSqlClient } from './untraced-sql-client.ts'
+
+export type { SqliteAutoVacuum, SqliteIdleVacuum, SqliteReclaimResult, SqliteSpace } from './space.ts'
 
 /** Migration effects keyed `<id>_<name>`, e.g. `0001_init`; ids are positive integers and `1..legacyUserVersion` map to the old `user_version` steps. */
 export type SqliteStoreMigrations = Readonly<Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>>>
@@ -28,9 +32,16 @@ export interface SqliteStoreOptions {
   /** Client spans per SQL statement; off by default so stores never flood (or feed back into) the trace store. */
   readonly statementSpans?: boolean
   readonly pragmas?: SqliteStorePragmas
+  /** `auto_vacuum` for a file that has no table yet; defaults to `incremental`. An existing file keeps its mode until `reclaim` rewrites it. */
+  readonly autoVacuum?: 'incremental' | 'none'
+  /** Bounded `incremental_vacuum` passes on an incremental file; on by default (32 pages every 5 minutes), `false` turns them off. */
+  readonly idleVacuum?: SqliteIdleVacuum | false
+  /** A `sqlite lock wait` span for a transaction that waited at least this long to start; defaults to 50 ms, 0 turns it off. */
+  readonly lockWaitSpanMs?: number
 }
 
 const memoryFilename = ':memory:'
+const DEFAULT_LOCK_WAIT_SPAN_MS = 50
 const migrationsTable = 'effect_sql_migrations'
 const privateDirectoryMode = 0o700
 const privateFileMode = 0o600
@@ -76,6 +87,22 @@ const pragmaStatements = (pragmas: SqliteStorePragmas): ReadonlyArray<string> =>
   `PRAGMA journal_size_limit = ${String(WAL_SIZE_LIMIT_BYTES)}`,
   `PRAGMA wal_autocheckpoint = ${String(WAL_AUTOCHECKPOINT_PAGES)}`,
 ]
+
+const isEmptyFile = Effect.fnUntraced(function* (input: { readonly fs: FileSystem.FileSystem; readonly filename: string }) {
+  for (const file of [input.filename, `${input.filename}-wal`]) if ((yield* input.fs.exists(file)) && (yield* input.fs.stat(file)).size > 0n) return false
+  return true
+})
+
+/**
+ * `auto_vacuum` sticks only when it is written before the journal turns to WAL and before the first table, so a file
+ * with no page yet gets it from a short rollback-journal connection; any other file keeps its mode until a VACUUM.
+ */
+const initializeAutoVacuum = (filename: string) =>
+  Effect.scoped(
+    Effect.flatMap(SqliteClient.make({ filename, disableWAL: true }), sql =>
+      Effect.andThen(sql.unsafe('PRAGMA auto_vacuum = INCREMENTAL'), sql.unsafe('VACUUM')),
+    ),
+  )
 
 type MigrationStepError = Migrator.MigrationError | { readonly _tag: 'SqlError' | 'SchemaError' | 'NoSuchElementError' }
 
@@ -151,12 +178,21 @@ const make = Effect.fn('sqlite-store open')(function* (options: SqliteStoreOptio
   const openFailed = (step: SqliteStoreOpenFailed['step']) => (cause: unknown) => new SqliteStoreOpenFailed({ filename, step, cause })
 
   if (!inMemory) yield* prepareFiles({ fs, path, filename }).pipe(Effect.mapError(openFailed('prepare-files')))
+  if (
+    !inMemory &&
+    (options.autoVacuum ?? 'incremental') === 'incremental' &&
+    (yield* isEmptyFile({ fs, filename }).pipe(Effect.mapError(openFailed('prepare-files'))))
+  )
+    yield* initializeAutoVacuum(filename).pipe(Effect.provide(Reactivity.layer), Effect.mapError(openFailed('open')))
   const client = yield* SqliteClient.make({
     filename,
     busyTimeout: pragmas.busyTimeout ?? Duration.seconds(5),
     disableWAL: pragmas.journalMode === 'delete',
   }).pipe(Effect.mapError(openFailed('open')))
-  const sql = options.statementSpans === true ? client : untracedSqlClient(client)
+  const sql = withLockWaitSpans(options.statementSpans === true ? client : untracedSqlClient(client), {
+    database: inMemory ? memoryFilename : path.basename(filename),
+    thresholdMs: options.lockWaitSpanMs ?? DEFAULT_LOCK_WAIT_SPAN_MS,
+  })
   yield* Effect.forEach(pragmaStatements(pragmas), statement => sql.unsafe(statement), { discard: true }).pipe(Effect.mapError(openFailed('pragmas')))
 
   const migration = migrate({ sql, filename, migrations: options.migrations, legacyUserVersion: options.legacyUserVersion }).pipe(
@@ -168,6 +204,7 @@ const make = Effect.fn('sqlite-store open')(function* (options: SqliteStoreOptio
   yield* inMemory ? migration : Semaphore.withPermit(migrationLockFor(filename), migration)
 
   if (!inMemory) yield* restrictFiles({ fs, filename }).pipe(Effect.mapError(openFailed('restrict-files')))
+  if (!inMemory && options.idleVacuum !== false) yield* Effect.forkScoped(SqliteSpaceModel.idleVacuum(sql, options.idleVacuum ?? {}))
   return sql
 })
 
@@ -222,4 +259,8 @@ export const SqliteStore = {
   layerAs,
   /** Build a plugin's store service on the first call that needs it, instead of at activation. */
   deferred,
+  /** Page size, page and free-page counts and the `auto_vacuum` mode of an open store. */
+  space: SqliteSpaceModel.space,
+  /** Give free pages back on the store's own connection: `incremental_vacuum` on an incremental file, else one converting VACUUM. Run only on a user's request. */
+  reclaim: SqliteSpaceModel.reclaim,
 } as const
