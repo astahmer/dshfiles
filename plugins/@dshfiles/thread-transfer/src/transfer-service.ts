@@ -124,6 +124,8 @@ export class ThreadStore extends Context.Service<
     }) => Effect.Effect<string, ThreadStoreFailed>
     readonly projects: Effect.Effect<readonly DestinationProject[]>
     readonly attach: (input: { readonly sessionId: string; readonly workspaceId: string }) => Effect.Effect<void, ThreadStoreFailed>
+    /** Best effort: hide a thread the import could not finish, so a retry leaves no duplicate. */
+    readonly archive: (sessionId: string) => Effect.Effect<void>
     /** Best effort: make the stored Session live so open thread lists show it. */
     readonly publish: (sessionId: string) => Effect.Effect<void>
     readonly home: string
@@ -370,7 +372,8 @@ export class ThreadTransfer extends Context.Service<
           isSeeded: ThreadBundles.isSeeded(events),
           events,
         })
-        if (target.workspaceId !== null) yield* store.attach({ sessionId, workspaceId: target.workspaceId })
+        if (target.workspaceId !== null)
+          yield* store.attach({ sessionId, workspaceId: target.workspaceId }).pipe(Effect.tapError(() => store.archive(sessionId)))
         yield* store.publish(sessionId)
         if ('transferId' in input.source) {
           const transferId = input.source.transferId

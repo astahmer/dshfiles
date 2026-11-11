@@ -328,4 +328,25 @@ describe('ThreadTransfer', () => {
       ),
     30_000,
   )
+
+  it.live(
+    'archives the new thread when it cannot join its project, so a retry leaves no duplicate',
+    () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const on = yield* machine('frank')
+          const service = yield* transfer(on)
+          const seeded = yield* seedThread(on)
+          const path = join(on.root, 'x.dshthread')
+          yield* service.exportFile({ sessionId: seeded.sessionId, path })
+          yield* Effect.promise(() => rm(on.project, { recursive: true, force: true }))
+          const failed = yield* Effect.flip(service.importThread({ source: { path }, workspaceId: String(on.workspace.id), cwd: undefined }))
+          expect(failed.message).toMatch(/add the thread to its project/u)
+          const archived = on.host.ctx.workspaceRegistry.archivedSessionIds.map(String)
+          expect(archived).toHaveLength(1)
+          expect(archived[0]).not.toBe(seeded.sessionId)
+        }),
+      ),
+    30_000,
+  )
 })

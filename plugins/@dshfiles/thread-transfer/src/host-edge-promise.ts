@@ -105,6 +105,13 @@ export const threadStoreLayer = Layer.effect(
       return { kind: 'file' as const, attachmentId: String(ref.attachmentId), name: ref.name, bytes: ref.bytes }
     })
 
+    const archive = (sessionId: string) =>
+      service('workspaceRegistry', 'archive the thread').pipe(
+        Effect.flatMap(registry => Effect.tryPromise({ try: () => registry.archiveSession(SessionId(sessionId)), catch: failed('archive the thread') })),
+        Effect.catch(error => Effect.logWarning(`thread-transfer: ${sessionId} could not be archived`, error)),
+        Effect.withSpan('thread store archive'),
+      )
+
     const create = Effect.fn('thread store create')(function* (input: {
       readonly cwd: string
       readonly createdAt: number
@@ -141,10 +148,7 @@ export const threadStoreLayer = Layer.effect(
         Effect.catch(error => Effect.succeed(Option.some(error))),
       )
       if (Option.isSome(refused)) {
-        yield* service('workspaceRegistry', 'archive the refused thread').pipe(
-          Effect.flatMap(registry => Effect.tryPromise({ try: () => registry.archiveSession(id), catch: failed('archive the refused thread') })),
-          Effect.ignore,
-        )
+        yield* archive(String(id))
         return yield* refused.value
       }
       return String(id)
@@ -176,6 +180,6 @@ export const threadStoreLayer = Layer.effect(
         Effect.withSpan('thread store publish'),
       )
 
-    return ThreadStore.of({ sessionFormat: SESSION_FORMAT_VERSION, read, readAttachment, saveAttachment, create, projects, attach, publish, home: homedir() })
+    return ThreadStore.of({ sessionFormat: SESSION_FORMAT_VERSION, read, readAttachment, saveAttachment, create, projects, attach, archive, publish, home: homedir() })
   }),
 )
