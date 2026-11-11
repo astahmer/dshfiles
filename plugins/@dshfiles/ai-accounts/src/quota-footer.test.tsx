@@ -22,6 +22,7 @@ const host = vi.hoisted(() => ({
   usage: vi.fn<AccountsClient['usage']>(),
   refreshUsage: vi.fn<AccountsClient['refreshUsage']>(),
   reorderAccount: vi.fn<AccountsClient['reorderAccount']>(),
+  setExtraUsage: vi.fn<AccountsClient['setExtraUsage']>(),
 }))
 type FixturePreferences = Pick<ReturnType<typeof usePreferences>, 'hiddenUsageAccounts' | 'usageShortNameOverrides' | 'edgeWidget'>
 const settings = vi.hoisted(() => {
@@ -69,6 +70,25 @@ const unavailableAccount = (status: Card['usage']['status'] = 'unauthenticated',
   return { ...card, usage: { ...card.usage, status, message, windows: [] } }
 }
 const snapshot = (cards: Card[]): AccountsUsage => ({ readAt: Date.now(), hostName: 'synthetic-host', cards })
+const claudeSpent = (instanceId: string, displayName: string): Card => ({
+  instanceId,
+  displayName,
+  kind: 'claude',
+  enabled: true,
+  usage: {
+    status: 'ok',
+    message: null,
+    identity: null,
+    plan: 'max',
+    windows: [
+      { label: 'Current session', percentRemaining: 64, resetsAt: null },
+      { label: 'Weekly limit', percentRemaining: 0, resetsAt: null },
+    ],
+    bankedResets: 0,
+    bankedResetExpiries: [],
+    extraUsage: { enabled: true, used: 159.33, monthlyLimit: 200, currency: 'EUR', percentUsed: 79.67, resetsAt: null },
+  },
+})
 const savedFile = (cards: readonly Card[]): AccountsFile => ({
   distribution: 'priority',
   cooldownMs: 0,
@@ -721,5 +741,35 @@ describe('actual quota strip and usage popover unavailable-account regression', 
     expect(overviewCard('Codex Example').querySelector('[role="progressbar"]')).not.toBeNull()
     expect(overview().textContent).not.toContain(REJECTED)
     expect(view.client.getQueryData(aiAccountsKeys.file)).toEqual(view.file)
+  })
+})
+
+describe('extra usage switch', () => {
+  it('shows Use extra usage only on the account whose quota reports it and saves the switch', async () => {
+    const spent = claudeSpent('claude_work', 'Claude Work')
+    const view = await mount({ usage: snapshot([spent, healthy('codex_one', 'Codex Work')]) })
+    await click(quotaButton('Claude Work'))
+    const switchFor = (displayName: string): HTMLButtonElement | null =>
+      overviewCard(displayName).querySelector<HTMLButtonElement>('[role="switch"][aria-label^="Use extra usage"]')
+    const toggle = switchFor('Claude Work')
+    if (toggle === null) throw new Error('Missing Use extra usage switch')
+    expect(toggle.getAttribute('aria-label')).toBe('Use extra usage for Claude Work')
+    expect(toggle.getAttribute('data-state')).toBe('unchecked')
+    expect(overviewCard('Claude Work').textContent).toContain('Spent plan windows stop this account instead of drawing overage.')
+    expect(switchFor('Codex Work')).toBeNull()
+
+    const next: AccountsFile = {
+      ...view.file,
+      accounts: view.file.accounts.map(account => ({ ...account, useExtraUsage: account.instanceId === 'claude_work' })),
+    }
+    host.setExtraUsage.mockImplementation(async () => {
+      host.read.mockResolvedValue(next)
+      return next
+    })
+    await click(toggle)
+    expect(host.setExtraUsage).toHaveBeenCalledWith({ instanceId: 'claude_work', enabled: true })
+    expect(host.save).not.toHaveBeenCalled()
+    expect(switchFor('Claude Work')?.getAttribute('data-state')).toBe('checked')
+    expect(overviewCard('Claude Work').textContent).toContain('Spent plan windows draw paid extra usage.')
   })
 })
