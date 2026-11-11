@@ -1,7 +1,9 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
+import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
 
@@ -21,7 +23,7 @@ let directory: { provider: string; displayName: string; settingsNs: string; sett
 const host = (): Context => {
   const ctx = new Context()
   for (const name of ['profileContext', 'loader', 'llm']) ctx.provide(name)
-  ctx.set('profileContext', { patchPath })
+  ctx.set('profileContext', { dir, patchPath })
   ctx.set('loader', { entries: () => rows })
   ctx.set('llm', { listConfigurableProviders: () => directory })
   return ctx
@@ -89,6 +91,22 @@ describe('native provider switch', () => {
     ])
     const state = await readNativeProviders(ctx)
     expect(state.providers.filter(provider => !provider.enabled).map(provider => provider.entryId)).toEqual(['llm-commandcode', 'llm-deepseek'])
+  })
+
+  it('waits for the profile lock profile-sync and the plugin manager hold, and keeps their patch edit', async () => {
+    const ctx = host()
+    const synced = `${original}- id: synced-by-profile-sync\n`
+    let pending: Promise<unknown> = Promise.resolve()
+    await withFileLock(join(dir, 'package.json'), async () => {
+      pending = setNativeProviderEnabled(ctx, { entryId: 'llm-deepseek', enabled: false })
+      await sleep(100)
+      expect(await readFile(patchPath, 'utf8')).toBe(original)
+      await writeFile(patchPath, synced)
+    })
+    await pending
+    const text = await readFile(patchPath, 'utf8')
+    expect(text).toContain('- id: synced-by-profile-sync')
+    expect((await readNativeProviders(ctx)).providers.find(provider => provider.entryId === 'llm-deepseek')?.enabled).toBe(false)
   })
 
   it('refuses rows it does not list and rows disabled by someone else', async () => {

@@ -1,5 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { NativeProviders } from './api.js'
 import { NativeProviderPatch } from './native-provider-patch.js'
 
@@ -38,7 +40,11 @@ const writePatch = async (path: string, text: string): Promise<void> => {
 
 let patchWrites: Promise<void> = Promise.resolve()
 
-/** One read-modify-rename of the profile patch at a time, whether or not HMR also serializes it. */
+/**
+ * One read-modify-rename of the profile patch at a time, whether or not HMR also serializes it. Across processes it
+ * takes the profile's `package.json` writer lock, the one DSH's plugin manager and `scripts/profile-sync.ts` hold
+ * while they edit the patch, outside `hmr.runExclusive` as the plugin manager does.
+ */
 const serializePatchWrite = (work: () => Promise<void>): Promise<void> => {
   const next = patchWrites.then(work)
   patchWrites = next.catch(() => undefined)
@@ -90,8 +96,9 @@ export const readNativeProviders = async (ctx: Context): Promise<NativeProviders
 
 export const setNativeProviderEnabled = async (ctx: Context, input: { readonly entryId: string; readonly enabled: boolean }): Promise<NativeProviders> => {
   const current = await readNativeProviders(ctx)
-  const patchPath = ctx.get('profileContext')?.patchPath
-  if (!current.available || patchPath === undefined) return current
+  const profile = ctx.get('profileContext')
+  if (!current.available || profile === undefined) return current
+  const patchPath = profile.patchPath
   const target = current.providers.find(provider => provider.entryId === input.entryId)
   // Only rows this page lists may be switched, so the method cannot disable an arbitrary plugin.
   if (target === undefined || !NativeProviderPatch.isPatchRowId(input.entryId)) throw new Error(`'${input.entryId}' is not a native provider row.`)
@@ -109,6 +116,6 @@ export const setNativeProviderEnabled = async (ctx: Context, input: { readonly e
     }
   }
   const hmr = ctx.get('hmr')
-  await serializePatchWrite(() => (hmr === undefined ? apply() : hmr.runExclusive(apply)))
+  await serializePatchWrite(() => withFileLock(join(profile.dir, 'package.json'), () => (hmr === undefined ? apply() : hmr.runExclusive(apply))))
   return readNativeProviders(ctx)
 }
