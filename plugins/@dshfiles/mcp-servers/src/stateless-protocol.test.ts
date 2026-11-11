@@ -3,11 +3,16 @@ import { StatelessMcpModel } from './stateless-protocol.js'
 
 describe('MCP 2026-07-28 era detection', () => {
   it('stays modern on a recognized modern error and falls back on anything else', () => {
-    expect(StatelessMcpModel.classifyProbe(200, { jsonrpc: '2.0', id: 1, result: { supportedVersions: ['2026-07-28'], capabilities: { tools: {} } } })).toEqual({
-      kind: 'modern',
-      discovery: { version: '2026-07-28', capabilities: { tools: {} }, instructions: '' },
-    })
-    expect(StatelessMcpModel.classifyProbe(400, { jsonrpc: '2.0', id: 1, error: { code: -32022, message: 'Unsupported', data: { supported: ['2099-01-01'] } } }).kind).toBe('incompatible')
+    expect(StatelessMcpModel.classifyProbe(200, { jsonrpc: '2.0', id: 1, result: { supportedVersions: ['2026-07-28'], capabilities: { tools: {} } } })).toEqual(
+      {
+        kind: 'modern',
+        discovery: { version: '2026-07-28', capabilities: { tools: {} }, instructions: '' },
+      },
+    )
+    expect(
+      StatelessMcpModel.classifyProbe(400, { jsonrpc: '2.0', id: 1, error: { code: -32022, message: 'Unsupported', data: { supported: ['2099-01-01'] } } })
+        .kind,
+    ).toBe('incompatible')
     expect(StatelessMcpModel.classifyProbe(400, { jsonrpc: '2.0', id: 1, error: { code: -32020, message: 'mismatch' } }).kind).toBe('incompatible')
     expect(StatelessMcpModel.classifyProbe(400, { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Server not initialized' } }).kind).toBe('legacy')
     expect(StatelessMcpModel.classifyProbe(404, { jsonrpc: '2.0', id: 1, error: { code: -32601, message: 'Method not found' } }).kind).toBe('legacy')
@@ -26,9 +31,22 @@ describe('MCP 2026-07-28 request metadata', () => {
   })
 
   it('mirrors method, name and protocol version into headers and _meta', () => {
-    const wire = StatelessMcpModel.request({ id: 7, method: 'tools/call', params: { name: 'get_weather', arguments: {} }, extraHeaders: { Authorization: 'Bearer t' } })
-    expect(wire.headers).toMatchObject({ 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/call', 'Mcp-Name': 'get_weather', Authorization: 'Bearer t' })
-    expect(JSON.parse(wire.body)).toMatchObject({ id: 7, params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } } })
+    const wire = StatelessMcpModel.request({
+      id: 7,
+      method: 'tools/call',
+      params: { name: 'get_weather', arguments: {} },
+      extraHeaders: { Authorization: 'Bearer t' },
+    })
+    expect(wire.headers).toMatchObject({
+      'MCP-Protocol-Version': '2026-07-28',
+      'Mcp-Method': 'tools/call',
+      'Mcp-Name': 'get_weather',
+      Authorization: 'Bearer t',
+    })
+    expect(JSON.parse(wire.body)).toMatchObject({
+      id: 7,
+      params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } },
+    })
     expect(StatelessMcpModel.request({ id: 8, method: 'tools/list', params: {} }).headers).not.toHaveProperty('Mcp-Name')
   })
 
@@ -50,14 +68,28 @@ describe('MCP 2026-07-28 request metadata', () => {
   it('accepts x-mcp-header only on primitive properties reachable through properties keys', () => {
     const valid = StatelessMcpModel.paramHeaders({
       type: 'object',
-      properties: { region: { type: 'string', 'x-mcp-header': 'Region' }, nested: { type: 'object', properties: { id: { type: 'integer', 'x-mcp-header': 'Id' } } } },
+      properties: {
+        region: { type: 'string', 'x-mcp-header': 'Region' },
+        nested: { type: 'object', properties: { id: { type: 'integer', 'x-mcp-header': 'Id' } } },
+      },
     })
-    expect(valid).toEqual({ ok: true, headers: [{ path: ['region'], header: 'Region' }, { path: ['nested', 'id'], header: 'Id' }] })
-    expect(StatelessMcpModel.paramHeaderValues(valid.ok ? valid.headers : [], { region: 'eu', nested: { id: 4 } })).toEqual({ 'Mcp-Param-Region': 'eu', 'Mcp-Param-Id': '4' })
+    expect(valid).toEqual({
+      ok: true,
+      headers: [
+        { path: ['region'], header: 'Region' },
+        { path: ['nested', 'id'], header: 'Id' },
+      ],
+    })
+    expect(StatelessMcpModel.paramHeaderValues(valid.ok ? valid.headers : [], { region: 'eu', nested: { id: 4 } })).toEqual({
+      'Mcp-Param-Region': 'eu',
+      'Mcp-Param-Id': '4',
+    })
     expect(StatelessMcpModel.paramHeaderValues(valid.ok ? valid.headers : [], { region: null })).toEqual({})
 
     expect(StatelessMcpModel.paramHeaders({ properties: { n: { type: 'number', 'x-mcp-header': 'N' } } }).ok).toBe(false)
-    expect(StatelessMcpModel.paramHeaders({ properties: { a: { type: 'string', 'x-mcp-header': 'X' }, b: { type: 'string', 'x-mcp-header': 'x' } } }).ok).toBe(false)
+    expect(StatelessMcpModel.paramHeaders({ properties: { a: { type: 'string', 'x-mcp-header': 'X' }, b: { type: 'string', 'x-mcp-header': 'x' } } }).ok).toBe(
+      false,
+    )
     expect(StatelessMcpModel.paramHeaders({ properties: { list: { type: 'array', items: { type: 'string', 'x-mcp-header': 'Item' } } } }).ok).toBe(false)
     expect(StatelessMcpModel.paramHeaders({ properties: { a: { type: 'string', 'x-mcp-header': 'bad name' } } }).ok).toBe(false)
   })

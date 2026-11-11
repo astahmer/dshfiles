@@ -65,9 +65,17 @@ export class StatelessMcp extends Context.Service<
       }) =>
         Effect.gen(function* () {
           const id = nextId++
-          const wire = StatelessMcpModel.request({ id, method: input.method, params: input.params, extraHeaders: { ...input.endpoint.headers, ...input.extraHeaders } })
+          const wire = StatelessMcpModel.request({
+            id,
+            method: input.method,
+            params: input.params,
+            extraHeaders: { ...input.endpoint.headers, ...input.extraHeaders },
+          })
           const response = yield* client.execute(
-            HttpClientRequest.post(input.endpoint.url).pipe(HttpClientRequest.setHeaders(wire.headers), HttpClientRequest.bodyText(wire.body, 'application/json')),
+            HttpClientRequest.post(input.endpoint.url).pipe(
+              HttpClientRequest.setHeaders(wire.headers),
+              HttpClientRequest.bodyText(wire.body, 'application/json'),
+            ),
           )
           yield* Effect.annotateCurrentSpan({ 'http.response.status_code': response.status })
           const type = (response.headers['content-type'] ?? '').split(';')[0]?.trim().toLowerCase()
@@ -117,7 +125,9 @@ export class StatelessMcp extends Context.Service<
             orElse: () => Effect.fail(new StatelessRequestFailed({ method: input.method, reason: 'the request timed out' })),
           }),
           Effect.mapError(cause =>
-            cause instanceof StatelessRequestFailed ? cause : new StatelessRequestFailed({ method: input.method, reason: 'the request could not be sent', cause }),
+            cause instanceof StatelessRequestFailed
+              ? cause
+              : new StatelessRequestFailed({ method: input.method, reason: 'the request could not be sent', cause }),
           ),
         )
 
@@ -147,7 +157,8 @@ export class StatelessMcp extends Context.Service<
             reason: `the server answered JSON-RPC error ${error.code}${error.message ? `: ${error.message}` : ''}`,
             code: error.code,
           })
-        if (answer.status < 200 || answer.status >= 300) return yield* new StatelessRequestFailed({ method: input.method, reason: `the server answered HTTP ${answer.status}` })
+        if (answer.status < 200 || answer.status >= 300)
+          return yield* new StatelessRequestFailed({ method: input.method, reason: `the server answered HTTP ${answer.status}` })
         const message = answer.message
         if (typeof message !== 'object' || message === null || !('result' in message))
           return yield* new StatelessRequestFailed({ method: input.method, reason: 'the server sent no JSON-RPC result' })

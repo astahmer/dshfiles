@@ -211,11 +211,13 @@ export class McpHost extends Context.Service<
           return false
         }
         const timeout = Duration.millis(input.config.toolCallTimeoutMs)
-        const call: StatelessCall = yield* DshxPlugin.callbackWithSignal((method: string, params: JsonRecord, extraHeaders: Readonly<Record<string, string>>) => {
-          const request = stateless.request({ endpoint, method, params, extraHeaders, timeout })
-          // Listing is idempotent, so a transient failure retries; a tool call is never replayed.
-          return method === 'tools/list' ? Effect.retry(request, { schedule: LIST_RETRY, times: 4 }) : request
-        })
+        const call: StatelessCall = yield* DshxPlugin.callbackWithSignal(
+          (method: string, params: JsonRecord, extraHeaders: Readonly<Record<string, string>>) => {
+            const request = stateless.request({ endpoint, method, params, extraHeaders, timeout })
+            // Listing is idempotent, so a transient failure retries; a tool call is never replayed.
+            return method === 'tools/list' ? Effect.retry(request, { schedule: LIST_RETRY, times: 4 }) : request
+          },
+        )
         yield* Effect.acquireRelease(
           Effect.tryPromise({
             try: () =>

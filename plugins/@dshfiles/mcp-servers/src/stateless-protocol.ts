@@ -100,7 +100,9 @@ export interface ParamHeader {
  * Collect a tool's `x-mcp-header` annotations, or explain why the tool must be rejected. Annotations are valid only on
  * integer, string or boolean properties reachable through `properties` keys alone, with unique token names.
  */
-const paramHeaders = (inputSchema: unknown): { readonly ok: true; readonly headers: ReadonlyArray<ParamHeader> } | { readonly ok: false; readonly reason: string } => {
+const paramHeaders = (
+  inputSchema: unknown,
+): { readonly ok: true; readonly headers: ReadonlyArray<ParamHeader> } | { readonly ok: false; readonly reason: string } => {
   const found: Array<ParamHeader> = []
   const allowed = new Set<unknown>()
   const reachable = (schema: unknown, path: ReadonlyArray<string>): string | undefined => {
@@ -213,7 +215,8 @@ const completeResult = (result: unknown): { readonly ok: true; readonly result: 
   if (!isRecord(result)) return { ok: false, reason: 'the server returned a result that is not an object' }
   const { resultType, ...rest } = result
   if (resultType === undefined || resultType === 'complete') return { ok: true, result: rest }
-  if (resultType === 'input_required') return { ok: false, reason: 'the server asked for client input (sampling, elicitation or roots), which DSH does not provide yet' }
+  if (resultType === 'input_required')
+    return { ok: false, reason: 'the server asked for client input (sampling, elicitation or roots), which DSH does not provide yet' }
   return { ok: false, reason: `the server returned an unknown resultType ${String(resultType).slice(0, 40)}` }
 }
 

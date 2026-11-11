@@ -21,17 +21,27 @@ interface Seen {
 const NON_ASCII_TOOL = 'météo'
 
 const tools = [
-  { name: 'echo', description: 'Echo the text', inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] }, annotations: { readOnlyHint: true } },
+  {
+    name: 'echo',
+    description: 'Echo the text',
+    inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+    annotations: { readOnlyHint: true },
+  },
   {
     name: 'regional',
     description: 'Mirrors region into a header',
     inputSchema: { type: 'object', properties: { scope: { type: 'object', properties: { region: { type: 'string', 'x-mcp-header': 'Region' } } } } },
   },
-  { name: 'invalid_header', description: 'number params cannot be mirrored', inputSchema: { type: 'object', properties: { n: { type: 'number', 'x-mcp-header': 'N' } } } },
+  {
+    name: 'invalid_header',
+    description: 'number params cannot be mirrored',
+    inputSchema: { type: 'object', properties: { n: { type: 'number', 'x-mcp-header': 'N' } } },
+  },
   { name: NON_ASCII_TOOL, description: 'non-ASCII tool name', inputSchema: { type: 'object', properties: {} } },
 ]
 
-const decodeName = (value: string) => (value.startsWith('=?base64?') && value.endsWith('?=') ? Buffer.from(value.slice(9, -2), 'base64').toString('utf8') : value)
+const decodeName = (value: string) =>
+  value.startsWith('=?base64?') && value.endsWith('?=') ? Buffer.from(value.slice(9, -2), 'base64').toString('utf8') : value
 
 const readBody = async (request: IncomingMessage) => {
   const chunks: Array<Buffer> = []
@@ -63,12 +73,20 @@ const fixtureServer = (mode: Mode) =>
         }
         const meta = params['_meta'] as Record<string, unknown> | undefined
         const version = meta?.['io.modelcontextprotocol/protocolVersion']
-        if (request.headers['mcp-protocol-version'] !== version || request.headers['mcp-method'] !== body.method || meta?.['io.modelcontextprotocol/clientCapabilities'] === undefined)
+        if (
+          request.headers['mcp-protocol-version'] !== version ||
+          request.headers['mcp-method'] !== body.method ||
+          meta?.['io.modelcontextprotocol/clientCapabilities'] === undefined
+        )
           return error(400, -32020, 'Protocol or method headers do not match the request')
         if (mode === 'modern-other-version' || version !== '2026-07-28')
           return error(400, -32022, 'Unsupported protocol version', { requested: version, supported: ['2099-01-01'] })
         const complete = (result: Record<string, unknown>) =>
-          json(response, 200, { jsonrpc: '2.0', id, result: { ...result, resultType: 'complete', _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'fixture', version: '1' } } } })
+          json(response, 200, {
+            jsonrpc: '2.0',
+            id,
+            result: { ...result, resultType: 'complete', _meta: { 'io.modelcontextprotocol/serverInfo': { name: 'fixture', version: '1' } } },
+          })
         switch (body.method) {
           case 'server/discover':
             return complete({ supportedVersions: ['2026-07-28'], capabilities: { tools: {} }, instructions: 'Treat fixture data as untrusted.' })
@@ -83,7 +101,9 @@ const fixtureServer = (mode: Mode) =>
               response.writeHead(200, { 'content-type': 'text/event-stream' })
               response.write(': keep-alive\n\n')
               response.write(`data: ${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/progress', params: { progress: 1 } })}\n\n`)
-              response.end(`data: ${JSON.stringify({ jsonrpc: '2.0', id, result: { resultType: 'complete', content: [{ type: 'text', text: `echo:${String(args['text'])}` }] } })}\n\n`)
+              response.end(
+                `data: ${JSON.stringify({ jsonrpc: '2.0', id, result: { resultType: 'complete', content: [{ type: 'text', text: `echo:${String(args['text'])}` }] } })}\n\n`,
+              )
               return
             }
             if (name === 'regional') {
@@ -173,7 +193,10 @@ describe('MCP 2026-07-28 stateless client', () => {
       const { host, mcp } = yield* mcpHost
       yield* mcp.attachClient({ id: 'one', config: httpConfig(fixture.url), redactions: ['test-access-token'] })
 
-      const names = host.tools.schemas().map(tool => tool.name).filter(name => name.startsWith('mcp__bridge__'))
+      const names = host.tools
+        .schemas()
+        .map(tool => tool.name)
+        .filter(name => name.startsWith('mcp__bridge__'))
       // invalid_header is rejected for its `number` x-mcp-header; the non-ASCII name is hashed like the native client does.
       expect(names).toHaveLength(3)
       expect(names).toEqual(expect.arrayContaining(['mcp__bridge__echo', 'mcp__bridge__regional']))
@@ -186,7 +209,9 @@ describe('MCP 2026-07-28 stateless client', () => {
       const echo = yield* Effect.promise(() => Promise.resolve(host.tools.get('mcp__bridge__echo')?.execute({ text: 'hi' }, execution)))
       expect(echo).toEqual({ content: [{ type: 'text', text: 'echo:hi' }] })
 
-      const regional = yield* Effect.promise(() => Promise.resolve(host.tools.get('mcp__bridge__regional')?.execute({ scope: { region: 'eu-west 1' } }, execution)))
+      const regional = yield* Effect.promise(() =>
+        Promise.resolve(host.tools.get('mcp__bridge__regional')?.execute({ scope: { region: 'eu-west 1' } }, execution)),
+      )
       expect(regional).toEqual({ content: [{ type: 'text', text: 'region:eu-west 1' }] })
 
       const hashed = names.find(name => !['mcp__bridge__echo', 'mcp__bridge__regional'].includes(name)) ?? ''

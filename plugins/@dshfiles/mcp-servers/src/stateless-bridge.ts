@@ -95,7 +95,8 @@ export async function apply(ctx: Context, config: StatelessBridgeConfig): Promis
   const maxInstructionBytes = config.maxInstructionBytes ?? DEFAULT_MAX_INSTRUCTION_BYTES
   const serverText = config.discovery.instructions.trimEnd()
   const instructions = serverText ? `### MCP server: ${config.serverName}\n\n${serverText}` : ''
-  if (Buffer.byteLength(instructions) > maxInstructionBytes) ctx.logger.warn(`${label}: server instructions exceed maxInstructionBytes (${maxInstructionBytes}); they are not shown to the model`)
+  if (Buffer.byteLength(instructions) > maxInstructionBytes)
+    ctx.logger.warn(`${label}: server instructions exceed maxInstructionBytes (${maxInstructionBytes}); they are not shown to the model`)
   else if (instructions)
     ctx.inject(['systemPrompt'], inner => {
       const prompt: unknown = inner.get('systemPrompt')
@@ -107,11 +108,14 @@ export async function apply(ctx: Context, config: StatelessBridgeConfig): Promis
 
   let disposers: Array<() => void> = []
   let disposed = false
-  ctx.effect(() => () => {
-    disposed = true
-    for (const dispose of disposers) dispose()
-    disposers = []
-  }, 'mcp-stateless-client.tools')
+  ctx.effect(
+    () => () => {
+      disposed = true
+      for (const dispose of disposers) dispose()
+      disposers = []
+    },
+    'mcp-stateless-client.tools',
+  )
 
   const register = (tools: ReadonlyArray<ListedTool>) => {
     const seen = new Set<string>()
@@ -136,7 +140,12 @@ export async function apply(ctx: Context, config: StatelessBridgeConfig): Promis
               outputSchema: tool.outputSchema,
               taskRequired: tool.taskRequired,
               call: (args, execution) =>
-                config.call({ signal: execution.signal }, 'tools/call', { name: tool.name, arguments: args }, StatelessMcpModel.paramHeaderValues(headers.headers, args)),
+                config.call(
+                  { signal: execution.signal },
+                  'tools/call',
+                  { name: tool.name, arguments: args },
+                  StatelessMcpModel.paramHeaderValues(headers.headers, args),
+                ),
             }),
           ),
         )
@@ -154,6 +163,7 @@ export async function apply(ctx: Context, config: StatelessBridgeConfig): Promis
     const tools = await listTools(config.call)
     if (!disposed) register(tools)
   } catch (error) {
-    if (!disposed) ctx.logger.error(`${label}: tools/list failed, no tools registered; use Refresh or disconnect and reconnect the server to retry: ${String(error)}`)
+    if (!disposed)
+      ctx.logger.error(`${label}: tools/list failed, no tools registered; use Refresh or disconnect and reconnect the server to retry: ${String(error)}`)
   }
 }

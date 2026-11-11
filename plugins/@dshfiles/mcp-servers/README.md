@@ -81,10 +81,10 @@ request with the 2026-07-28 per-request metadata (`params._meta` protocol
 version, client info and capabilities, mirrored into `MCP-Protocol-Version`,
 `Mcp-Method` and `Mcp-Name` headers). The answer picks the client:
 
-| Probe answer | Client |
-| --- | --- |
-| A discovery result that lists `2026-07-28` | This bundle's stateless client (`src/stateless-*.ts`) |
-| HTTP error, network error, or a body that is not a modern JSON-RPC error | Native `dsh-mcp-client` (`initialize` handshake) |
+| Probe answer                                                                         | Client                                                     |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| A discovery result that lists `2026-07-28`                                           | This bundle's stateless client (`src/stateless-*.ts`)      |
+| HTTP error, network error, or a body that is not a modern JSON-RPC error             | Native `dsh-mcp-client` (`initialize` handshake)           |
 | Modern error (`-32020`/`-32021`/`-32022`) or a discovery result without `2026-07-28` | Native client, with a warning naming the server's versions |
 
 The stateless client registers tools under the same `mcp__<serverName>__<tool>`
