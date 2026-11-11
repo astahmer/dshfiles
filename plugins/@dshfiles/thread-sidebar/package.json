@@ -53,14 +53,14 @@
       "types": "./src/thread-row-actions.ts",
       "default": "./dist/thread-row-actions.js"
     },
-     "./restart-sources": {
-  "types": "./src/restart-sources.ts",
-  "default": "./dist/restart-sources.js"
- },
- "./fan-out-request": {
-  "types": "./src/fan-out-request.ts",
-  "default": "./dist/fan-out-request.js"
- }
+    "./restart-sources": {
+      "types": "./src/restart-sources.ts",
+      "default": "./dist/restart-sources.js"
+    },
+    "./fan-out-request": {
+      "types": "./src/fan-out-request.ts",
+      "default": "./dist/fan-out-request.js"
+    }
   },
   "scripts": {
     "build": "dshx build",
