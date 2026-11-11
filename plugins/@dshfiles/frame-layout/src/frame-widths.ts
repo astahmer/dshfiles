@@ -18,6 +18,12 @@ export type FrameWidths = typeof frameWidthsSchema.Type
 
 type LayoutInstance = ReturnType<ReturnType<typeof createLayoutStore>['create']>
 
+/** Runs `run` after `delayMs`; the returned function cancels it. */
+type Schedule = (run: () => void, delayMs: number) => () => void
+
+/** A drag changes the width every frame; storage only needs where it settled. */
+const WRITE_DELAY_MS = 150
+
 const writeFrameWidths = (widths: FrameWidths): void => {
   try {
     localStorage.setItem(FRAME_WIDTHS_KEY, JSON.stringify(widths))
@@ -54,19 +60,36 @@ export class FrameWidthsModel {
   }
 
   /**
-   * Write the geometry back on every change: the store's last open width, the
-   * right panel's px preference and whether the wide sidebar is collapsed.
-   * @returns the change subscription's disposer.
+   * Write the geometry back once a change settles: the store's last open width,
+   * the right panel's px preference and whether the wide sidebar is collapsed.
+   * @returns the disposer, which writes a change still waiting.
    */
-  static readonly persist = (instance: LayoutInstance): (() => void) => {
+  static readonly persist = (input: { readonly instance: LayoutInstance; readonly schedule: Schedule }): (() => void) => {
     let last: string | null = null
-    return instance.subscribe(() => {
-      const { sidebar, sidebarLastOpen, rightbar } = instance.getSnapshot().layoutInfo
+    let pending: FrameWidths | null = null
+    let scheduled = false
+    let cancel = (): void => {}
+    const flush = (): void => {
+      scheduled = false
+      if (pending === null) return
+      writeFrameWidths(pending)
+      pending = null
+    }
+    const unsubscribe = input.instance.subscribe(() => {
+      const { sidebar, sidebarLastOpen, rightbar } = input.instance.getSnapshot().layoutInfo
       const next: FrameWidths = { sidebar: sidebarLastOpen, rightbar, collapsed: sidebar === 0 }
       const serialized = JSON.stringify(next)
       if (serialized === last) return
       last = serialized
-      writeFrameWidths(next)
+      pending = next
+      if (scheduled) return
+      scheduled = true
+      cancel = input.schedule(flush, WRITE_DELAY_MS)
     })
+    return () => {
+      unsubscribe()
+      cancel()
+      flush()
+    }
   }
 }

@@ -10,6 +10,11 @@ type SeededFrameWidths = { sidebar: number; rightbar: number | null; collapsed?:
 
 const seed = (widths: SeededFrameWidths): void => localStorage.setItem(FRAME_WIDTHS_KEY, JSON.stringify(widths))
 
+const immediately = (run: () => void): (() => void) => {
+  run()
+  return () => {}
+}
+
 describe('frame width persistence', () => {
   beforeEach(() => localStorage.clear())
 
@@ -46,9 +51,28 @@ describe('frame width persistence', () => {
 
   it('writes a dragged width back for the next page load', () => {
     const instance = openStore()
-    FrameWidthsModel.persist(instance)
+    FrameWidthsModel.persist({ instance, schedule: immediately })
     instance.actions.setSidebar(360)
     instance.actions.setRightbar(480)
+    expect(FrameWidthsModel.read()).toEqual({ sidebar: 360, rightbar: 480, collapsed: false })
+  })
+
+  it('writes a drag once when it settles instead of on every frame, and flushes on dispose', () => {
+    const queued: (() => void)[] = []
+    const schedule = (run: () => void): (() => void) => {
+      queued.push(run)
+      return () => queued.splice(queued.indexOf(run), 1)
+    }
+    const instance = openStore()
+    const dispose = FrameWidthsModel.persist({ instance, schedule })
+    for (let width = 300; width <= 360; width += 4) instance.actions.setSidebar(width)
+    expect(FrameWidthsModel.read()).toBeNull()
+    expect(queued).toHaveLength(1)
+    queued.splice(0).forEach(run => run())
+    expect(FrameWidthsModel.read()).toEqual({ sidebar: 360, rightbar: null, collapsed: false })
+    instance.actions.setRightbar(480)
+    dispose()
+    expect(queued).toHaveLength(0)
     expect(FrameWidthsModel.read()).toEqual({ sidebar: 360, rightbar: 480, collapsed: false })
   })
 
@@ -64,7 +88,7 @@ describe('frame width persistence', () => {
 
   it('writes the collapsed state back and remembers the open width across it', () => {
     const instance = openStore()
-    FrameWidthsModel.persist(instance)
+    FrameWidthsModel.persist({ instance, schedule: immediately })
     instance.actions.setSidebar(360)
     instance.actions.toggleSidebar()
     expect(instance.getSnapshot().layoutInfo.sidebar).toBe(0)
@@ -82,7 +106,7 @@ describe('frame width persistence', () => {
     instance.actions.setSidebar(384)
     instance.actions.setRightbar(460)
     instance.actions.toggleSidebar()
-    const dispose = FrameWidthsModel.persist(instance)
+    const dispose = FrameWidthsModel.persist({ instance, schedule: immediately })
     expect(instance.getSnapshot().layoutInfo.sidebar).toBe(0)
 
     instance.actions.showSidebar()
@@ -100,7 +124,7 @@ describe('frame width persistence', () => {
     instance.actions.setSidebar(360)
     instance.actions.toggleSidebar()
     instance.actions.setViewportWidth(900)
-    const dispose = FrameWidthsModel.persist(instance)
+    const dispose = FrameWidthsModel.persist({ instance, schedule: immediately })
     expect(instance.getSnapshot().layoutInfo.narrowExpanded).toBe(false)
 
     instance.actions.showSidebar()

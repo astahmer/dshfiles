@@ -179,16 +179,17 @@ export function apply(ctx: ClientContext, statusStrip: ComponentType<StatusStrip
     const handle = createLayoutStore()
     const instance = handle.create()
     FrameWidthsModel.restore(instance)
-    const disposeFrameWidths = FrameWidthsModel.persist(instance)
+    const schedule = (run: () => void, delayMs: number): (() => void) => {
+      const timer = window.setTimeout(run, delayMs)
+      return () => window.clearTimeout(timer)
+    }
+    const disposeFrameWidths = FrameWidthsModel.persist({ instance, schedule })
     const store: typeof handle = { ...handle, create: () => instance }
     const panelRetention = PanelRetentionModel.create({
       activePanelId: () => instance.getSnapshot().panelInfo.activePanelId,
       panelKeys: () => ctx.slots.entries('main').flatMap(entry => entry.options.key === undefined ? [] : [entry.options.key]),
       release: keys => instance.actions.retainMainPanels(keys),
-      schedule: (run, delayMs) => {
-        const timer = window.setTimeout(run, delayMs)
-        return () => window.clearTimeout(timer)
-      },
+      schedule,
     })
     const retainMainPanels = (): void => panelRetention.check()
     // Workbench owns pane state/actions; the frame owns the cooperating port's
