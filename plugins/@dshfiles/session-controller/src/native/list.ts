@@ -26,6 +26,7 @@ import type {
 } from './types.ts'
 
 const SEARCH_PROVIDER_CALL_LIMIT = 100
+const SEARCH_STALE_RESTART_LIMIT = 3
 const SESSION_SEARCH_QUERY_MAX_CHARS = 500
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 const LIST_METADATA_KEY = 'sessionListMetadata'
@@ -571,6 +572,7 @@ export class ApiSessionList {
       const seenCursors = new Set<SessionSearchCursor>()
       let cursor: SessionSearchCursor | undefined
       let providerCalls = 0
+      let staleRestarts = 0
       let pageLimit = SESSION_SEARCH_RESULT_LIMIT
       while (authorized.length <= SESSION_SEARCH_RESULT_LIMIT) {
         signal.throwIfAborted()
@@ -604,6 +606,10 @@ export class ApiSessionList {
           if (requestedCursor !== undefined
             && error instanceof SessionQueryError
             && error.code === 'SESSION_QUERY_STALE_CURSOR') {
+            if (staleRestarts >= SEARCH_STALE_RESTART_LIMIT) {
+              throw new Error(`the search index kept changing across ${String(SEARCH_STALE_RESTART_LIMIT)} restarts; retry once indexing settles`)
+            }
+            staleRestarts++
             authorized.length = 0
             acceptedIds.clear()
             seenCursors.clear()

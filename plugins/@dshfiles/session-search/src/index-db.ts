@@ -386,8 +386,18 @@ export class SearchIndex {
       Effect.gen({ self: this }, function* () {
         yield* this.deleteSessionRows(sessionId)
         yield* this.sql.unsafe('DELETE FROM sessions WHERE id = ?', [sessionId])
+        yield* this.bumpRevision
       }),
     )
+
+  /** Bumped by every corpus write, so a page cursor issued before one is known stale: pages are offsets over rank. */
+  readonly bumpRevision = Effect.suspend(() =>
+    this.sql.unsafe(
+      "INSERT INTO meta (key, value) VALUES ('corpus_revision', '1') ON CONFLICT (key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)",
+    ),
+  )
+
+  readonly revision = () => Effect.map(this.meta('corpus_revision'), value => value ?? '0')
 
   readonly commitBatch = (input: BatchInput) =>
     this.sql.withTransaction(
@@ -490,6 +500,7 @@ export class SearchIndex {
             truncated,
           ],
         )
+        yield* this.bumpRevision
       }),
     )
 
@@ -633,6 +644,7 @@ export class SearchIndex {
         filters.push('s.cwd = ?')
         bindings.push(request.cwd)
       }
+      const revision = yield* this.revision()
       const route = yield* this.route(request.filters)
       const events = eventFilterClauses(route.filters)
       const rows = yield* this.rankedRows({
@@ -644,7 +656,7 @@ export class SearchIndex {
         sessionId: undefined,
         query: request.query,
       })
-      return { matches: rows.slice(0, request.limit).map(this.match), hasMore: rows.length > request.limit }
+      return { matches: rows.slice(0, request.limit).map(this.match), hasMore: rows.length > request.limit, revision }
     })
 
   readonly sessionHeader = (sessionId: string) =>
@@ -660,6 +672,7 @@ export class SearchIndex {
 
   readonly searchEvents = (request: SessionEventSearchRequest) =>
     Effect.gen({ self: this }, function* () {
+      const revision = yield* this.revision()
       const route = yield* this.route(request.filters)
       const events = eventFilterClauses(route.filters)
       const rows = yield* this.rankedRows({
@@ -676,6 +689,7 @@ export class SearchIndex {
         header: first === undefined ? yield* this.sessionHeader(request.sessionId) : this.match(first).header,
         matches: rows.slice(0, request.limit).map(this.match),
         hasMore: rows.length > request.limit,
+        revision,
       }
     })
 

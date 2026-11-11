@@ -88,7 +88,7 @@ const searchMatchSchema = Schema.Struct({
 })
 export type SearchMatch = typeof searchMatchSchema.Type
 
-export const searchSessionsResultSchema = Schema.Struct({ matches: Schema.Array(searchMatchSchema), hasMore: Schema.Boolean })
+export const searchSessionsResultSchema = Schema.Struct({ matches: Schema.Array(searchMatchSchema), hasMore: Schema.Boolean, revision: Schema.String })
 export type SearchSessionsResult = typeof searchSessionsResultSchema.Type
 
 export const searchEventsResultSchema = Schema.Struct({
@@ -96,6 +96,7 @@ export const searchEventsResultSchema = Schema.Struct({
   header: Schema.NullOr(sessionHeaderSchema),
   matches: Schema.Array(searchMatchSchema),
   hasMore: Schema.Boolean,
+  revision: Schema.String,
 })
 export type SearchEventsResult = typeof searchEventsResultSchema.Type
 

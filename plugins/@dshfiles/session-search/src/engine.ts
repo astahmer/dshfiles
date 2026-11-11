@@ -52,9 +52,10 @@ const engineConfigSchema = Schema.Struct({
 export type SessionSearchEngineConfig = typeof engineConfigSchema.Encoded
 
 const cursorPayloadSchema = Schema.Struct({
-  version: Schema.Literal(1),
+  version: Schema.Literal(2),
   scope: Schema.Literals(['sessions', 'events']),
   fingerprint: Schema.String,
+  revision: Schema.String,
   offset: nonNegativeCount,
 })
 
@@ -246,7 +247,8 @@ export class SessionSearchEngine extends SessionQueryEngine {
     const sessionIds = this._sessionIds(request.sessionFilters)
     const filters = this._eventFilters(request.eventFilters)
     const fingerprint = this._fingerprint(withoutUndefined({ scope: 'sessions', query, limit, sessionIds, filters }))
-    const offset = this._decodeCursor(request.cursor, 'sessions', fingerprint)
+    const cursor = this._decodeCursor(request.cursor, 'sessions', fingerprint)
+    const offset = cursor?.offset ?? 0
     exec?.signal?.throwIfAborted()
     // An id filter that matches nothing must answer empty, never fall back to the whole corpus.
     if (sessionIds !== undefined && sessionIds.length === 0) return { items: [] }
@@ -260,9 +262,10 @@ export class SessionSearchEngine extends SessionQueryEngine {
       }),
     )
     exec?.signal?.throwIfAborted()
+    this._assertSameRevision(cursor, page.revision)
     return withoutUndefined({
       items: page.matches.map(match => this._sessionHit(match)),
-      nextCursor: page.hasMore ? this._encodeCursor('sessions', fingerprint, offset + limit) : undefined,
+      nextCursor: page.hasMore ? this._encodeCursor({ scope: 'sessions', fingerprint, revision: page.revision, offset: offset + limit }) : undefined,
     })
   }
 
@@ -271,17 +274,19 @@ export class SessionSearchEngine extends SessionQueryEngine {
     const limit = Math.min(this._maxLimit, Math.max(1, request.limit ?? this._defaultLimit))
     const filters = this._eventFilters(request.filters)
     const fingerprint = this._fingerprint(withoutUndefined({ scope: 'events', sessionId: request.sessionId, query, limit, filters }))
-    const offset = this._decodeCursor(request.cursor, 'events', fingerprint)
+    const cursor = this._decodeCursor(request.cursor, 'events', fingerprint)
+    const offset = cursor?.offset ?? 0
     exec?.signal?.throwIfAborted()
     const page = await this._client.searchEvents(
       withoutUndefined({ sessionId: request.sessionId, query, limit, cursor: offset === 0 ? undefined : offset, filters }),
     )
     exec?.signal?.throwIfAborted()
     if (page.header === null) throw new SessionQueryError(`stored session "${request.sessionId}" is not in the search index`, 'SESSION_QUERY_SESSION_NOT_FOUND')
+    this._assertSameRevision(cursor, page.revision)
     return withoutUndefined({
       session: toHeader(page.header),
       items: page.matches.map(match => this._eventHit(match)),
-      nextCursor: page.hasMore ? this._encodeCursor('events', fingerprint, offset + limit) : undefined,
+      nextCursor: page.hasMore ? this._encodeCursor({ scope: 'events', fingerprint, revision: page.revision, offset: offset + limit }) : undefined,
     })
   }
 
@@ -358,16 +363,22 @@ export class SessionSearchEngine extends SessionQueryEngine {
     }
   }
 
-  _decodeCursor(cursor: string | undefined, scope: 'sessions' | 'events', fingerprint: string): number {
-    if (cursor === undefined) return 0
+  _decodeCursor(cursor: string | undefined, scope: 'sessions' | 'events', fingerprint: string): typeof cursorPayloadSchema.Type | undefined {
+    if (cursor === undefined) return undefined
     const payload = this._parseCursor(cursor)
     if (payload === undefined) throw new SessionQueryError('the search cursor is not readable', 'SESSION_QUERY_INVALID_CURSOR')
     if (payload.scope !== scope) throw new SessionQueryError('the search cursor does not belong to this request', 'SESSION_QUERY_INVALID_CURSOR')
     if (payload.fingerprint !== fingerprint) throw new SessionQueryError('the corpus changed since this cursor was issued', 'SESSION_QUERY_STALE_CURSOR')
-    return payload.offset
+    return payload
   }
 
-  _encodeCursor(scope: 'sessions' | 'events', fingerprint: string, offset: number): ReturnType<typeof SessionSearchCursor> {
-    return SessionSearchCursor(Buffer.from(JSON.stringify({ version: 1, scope, fingerprint, offset }), 'utf8').toString('base64url'))
+  /** Pages are offsets over rank, so a page read after an index write could skip or repeat hits: the caller restarts. */
+  _assertSameRevision(cursor: typeof cursorPayloadSchema.Type | undefined, revision: string): void {
+    if (cursor !== undefined && cursor.revision !== revision)
+      throw new SessionQueryError('the corpus changed since this cursor was issued', 'SESSION_QUERY_STALE_CURSOR')
+  }
+
+  _encodeCursor(payload: Omit<typeof cursorPayloadSchema.Type, 'version'>): ReturnType<typeof SessionSearchCursor> {
+    return SessionSearchCursor(Buffer.from(JSON.stringify({ version: 2, ...payload }), 'utf8').toString('base64url'))
   }
 }
