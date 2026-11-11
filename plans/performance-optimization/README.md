@@ -55,15 +55,18 @@ No `main` work found for C05 (main-tabs subscriptions; only `fold workspaces int
 [performance.md](../../docs/performance.md#candidates-measured-and-deliberately-skipped-2026-11-11)).** H10 is now
 implemented narrowly: live traces named it (27 `memory digest thread` spans, p50 3.57 s, p95 20.67 s; 67 Jev asks at
 p50 263 ms), and the digester now returns `unchanged` before classifying or calling the model when the thread's last
-event is already indexed, proven by a journey asserting zero Jev and zero summarizer calls on the second digest. C05,
-C15, H12, T06 and the T02 slot-scan remainder keep their register entries open, marked **skipped for lack of a measured
-cost** (no browser CPU attribution, no current panel trace, 0 `usage charts read` spans, no stage spans, and no slot
-measurement): re-open only when a probe shows their work is visible.
+event is already indexed, proven by a journey asserting zero Jev and zero summarizer calls on the second digest. C05, C15, H12, T06 and the T02 slot-scan remainder keep their register entries open, marked **skipped for lack of a measured
+cost**, with the evidence recorded per entry: no browser CPU attribution for C05, no current panel trace for C15, 0
+`usage charts read` spans for H12, no stage spans for T06, and no slot measurement for the T02 remainder (the recorded
+471/72/401 → 147/49/104 ms receipt is not one). Re-open only when a probe shows their work is visible.
 
 **Cordis inspect catalogs, 2026-11-11.** The runner's generated Slot and API catalogs were 297 of the 332 KB Client
 entry; a literal `import()` now emits them as package-local lazy chunks fetched on the first `cordis_inspect` of their
-provider. Entry 331.7 → 38.9 KB (gzip 55 → 11.7 KB) and ~8.8 ms of cold catalog parse+eval left the boot path; chunks
-are 63.3 + 234.4 KB (gzip 15.9 + 29.2) and the dshx client-build spec covers the `require.async` protocol. Numbers in
+provider. Entry 331.7 → 38.9 KB (gzip 55 → 11.7 KB), and the boot page requests neither chunk; chunks are 63.3 + 234.3
+KB (gzip 15.9 + 29.2). Since DSH serves plugin resources as immutable, the toolchain now names a chunk after its
+target's content instead of its path, so a rebuilt catalog cannot stay cached under an old name (`client-build.spec.ts`
+covers the rename, the unchanged-name case and the `require.async` protocol). A scratch Host served both chunks at the
+exact URL the real loader resolves; no browser-side evaluation timing was taken. Numbers in
 [performance.md](../../docs/performance.md#cordis-inspect-catalogs-load-on-demand-2026-11-11).
 
 **Live audit first (2026-10-19):** the running GUI's own request log was measured directly — read [the audit](evidence/live-request-audit-2026-10-19.md) before picking the next entry, because it reorders the backlog: `session/list` (23.4 MB, 857 Sessions, unpaged) is the single largest cost and is core work, `@dshfiles/jj-integration` `repositories` was fixed here, and the next owned wins are `thread-sidebar`'s mount-time duplicate queries (×2) and the 24.8 MB of client bundles.

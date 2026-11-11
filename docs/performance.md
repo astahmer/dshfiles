@@ -47,8 +47,14 @@ How it works:
   inside the same `SynchronizedRef` critical section as the durable write, so it names every change since the caller's
   revision, including concurrent finishes and drops.
 - The page store serializes writes, merges a delta only when it still holds the revision that write was built on, and
-  falls back to a full read when the answer is incomplete or the held revision moved. An older Host, or a Host without
-  the probe, keeps the v1 full-snapshot write path.
+  falls back to a full read when the answer is incomplete or the held revision moved. That fallback now queues a
+  forced read instead of an ordinary one: the ordinary read reuses an in-flight request or honors the throttle, so a
+  write that committed mid-refresh could leave the page on the pre-write revision until the next poll. An older Host,
+  or a Host without the probe, keeps the v1 full-snapshot write path.
+- Opening a unit that still has its legacy whole-unit file now adopts it eagerly, before any lazy read. A lazy domain
+  only reads on demand, so the old path could boot an index from an unmigrated tree and, once its last record was
+  deleted, re-import the retained legacy rows. `lazy-json-backend.test.ts` covers that delete-then-reopen shape and
+  `lazy-reads.test.ts` covers the eager open, including the unsafe-key rejection it now surfaces at open.
 
 Not measured: the live Host improvement. The change needs a Host restart to reach the running instance, and the delta
 path needs a page reload; the numbers above are the mechanism's, not the GUI's.
@@ -72,18 +78,18 @@ same thread leaves both the Jev-ask and the summarizer call counts unchanged.
 
 ## Candidates measured and deliberately skipped (2026-11-11)
 
-| Candidate                           | Current evidence                                                                                                                                      | Decision                                                                                           |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| P0-6 `preview/devServers` ×3        | 306 spans, p50 2.78 s, p95 11.67 s, 27 errors; three roots started within 0.334 ms but call arguments are not traced, so duplicate calls are unproven | Keep open: a capture with a thread open and per-`QueryClient` count is needed before changing code |
-| P0-7 `jujutsu-composer/context` ×4  | 48 spans, p50 4.87 s, p95 24.50 s; one 22.6 s trace is dominated by inter-span waits, not jj alone                                                    | Keep open: needs a Workbench panel-visibility signal or an always-rendered ref target              |
-| P0-9 `backlog/list` 744 KB          | 0 `backlog/list` spans in the retained window; the panel still asks for `limit: 2000`                                                                 | Keep open: the fix is an API + product decision on paging                                          |
-| P0-10 `settings/describe` 201 KB ×2 | Core `ui-settings` reads at apply and on the first reset; its row id is the settings namespace                                                        | Skipped: core, not an owned plugin (Host gaps 97/99)                                               |
-| C05 main-tabs subscriptions         | Source subscribes session/workspace/layout/adapter and recomputes before key dedupe; no current browser CPU attribution                               | Skipped: no measured cost                                                                          |
-| C15 Memory read cards               | 3 notes / 34 digests when counted 2026-11-04; no current panel-render trace                                                                           | Skipped: no measured cost                                                                          |
-| H12 usage chart projections         | 0 `usage charts read` spans in the retained window                                                                                                    | Skipped: no measured cost                                                                          |
-| T02 remainder (slot registrations)  | Source calls `clientSlotRegistrations` twice per build; the recorded 471/72/401 → 147/49/104 ms receipt is not a slot measurement                     | Skipped: no measured slot cost                                                                     |
-| T06 scratch preparation             | Serial builds identified, no stage spans to attribute                                                                                                 | Skipped: no measured cost                                                                          |
-| cordis-client-runner catalogs       | Entry `client.js` 331.7 KB; both generated catalogs parsed and evaluated at boot (cold 8.8 ms measured 2026-11-11)                                    | Done: catalogs load on first `cordis_inspect`; entry 38.9 KB (-88%), boot evaluation deferred      |
+| Candidate                           | Current evidence                                                                                                                                                                                                                                          | Decision                                                                                                |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| P0-6 `preview/devServers` ×3        | 306 spans, p50 2.78 s, p95 11.67 s, 27 errors; three roots started within 0.334 ms but call arguments are not traced, so duplicate calls are unproven                                                                                                     | Keep open: a capture with a thread open and per-`QueryClient` count is needed before changing code      |
+| P0-7 `jujutsu-composer/context` ×4  | 48 spans, p50 4.87 s, p95 24.50 s; one 22.6 s trace is dominated by inter-span waits, not jj alone                                                                                                                                                        | Keep open: needs a Workbench panel-visibility signal or an always-rendered ref target                   |
+| P0-9 `backlog/list` 744 KB          | 0 `backlog/list` spans in the retained window; the panel still asks for `limit: 2000`                                                                                                                                                                     | Keep open: the fix is an API + product decision on paging                                               |
+| P0-10 `settings/describe` 201 KB ×2 | Core `ui-settings` reads at apply and on the first reset; its row id is the settings namespace                                                                                                                                                            | Skipped: core, not an owned plugin (Host gaps 97/99)                                                    |
+| C05 main-tabs subscriptions         | Source subscribes session/workspace/layout/adapter and recomputes before key dedupe; 0 of the 60 s CPU profile's samples name that render path, and the profile is 51.7 s busy with 22.9 s under agent-loop step, so this is unmeasured rather than cheap | Not optimized: needs a client CPU profile of a tab switch to price it                                   |
+| C15 Memory read cards               | 3 notes / 34 digests when counted 2026-11-04; no current panel-render trace                                                                                                                                                                               | Skipped: no measured cost                                                                               |
+| H12 usage chart projections         | 0 `usage charts read` spans in the retained window                                                                                                                                                                                                        | Skipped: no measured cost                                                                               |
+| T02 remainder (slot registrations)  | Source calls `clientSlotRegistrations` twice per build; 0 slot measurements in the retained window, and the 471/72/401 → 147/49/104 ms receipt is a receipt build, not a slot query                                                                       | Not optimized: unmeasured, the double call is visible in source only                                    |
+| T06 scratch preparation             | Serial builds identified; 0 stage spans in the retained window to attribute                                                                                                                                                                               | Not optimized: unmeasured, no stage spans to price                                                      |
+| cordis-client-runner catalogs       | Entry `client.js` 331.7 KB; both generated catalogs parsed and evaluated at boot                                                                                                                                                                          | Done: catalogs load on first `cordis_inspect`; entry 38.9 KB (-88%), no catalog chunk requested at boot |
 
 ## Cordis inspect catalogs load on demand (2026-11-11)
 
@@ -97,12 +103,19 @@ as a package-local lazy chunk fetched with `require.async` on the first query of
 | Same, gzip                  | 55 KB                  | 11.7 KB                                                                     |
 | Catalogs loaded at boot     | 297 KB (gzip 45 KB)    | none                                                                        |
 | Entry evaluation at boot    | includes both catalogs | catalogs deferred                                                           |
-| First inspect of a provider | 0                      | one chunk fetch (API 63.3 KB / 15.9 KB gzip, Slots 234.4 KB / 29.2 KB gzip) |
+| First inspect of a provider | 0                      | one chunk fetch (API 63.3 KB / 15.9 KB gzip, Slots 234.3 KB / 29.2 KB gzip) |
+| Cold evaluation of both     | at boot                | deferred to the first inspect; not re-measured in a browser                 |
 
-Cold evaluation of the deferred chunks in a fresh `node:vm` context (parse + run, 2026-11-11, Node 22): API catalog
-2.2 ms, Slot catalog 6.6 ms, so ~8.8 ms of boot work moved to the first inspect. Repeats inside one process are much
-cheaper (V8 code cache) and are not a per-load number. The previous 4.9 ms p50 came from a different protocol, so treat
-8.8 ms as the cold figure.
+The boot page evaluates the entry only: it names no catalog chunk. Verified against the real loader, not a fixture:
+a scratch DSH served `client.api-catalog.<hash>.js` and `client.slot-catalog.<hash>.js` at the exact
+`/plugins/@dshfiles/cordis-client-runner/<chunk>?rev=<boot rev>` URL its `require.async` resolves to, 200 with the
+chunk bytes and `text/javascript`. Node `node:vm` evaluation of the two chunks was 2.2 ms and 6.6 ms cold, but that
+protocol differs from the browser's, so it is a floor, not the boot saving; no browser-side evaluation timing was taken.
+
+DSH serves plugin resources as `public, max-age=31536000, immutable`, so a chunk name must change with its bytes. The
+toolchain named chunks after the target's path, which would have frozen a rebuilt catalog in a warm browser; `dshx`
+now hashes the target file's content (falling back to the path only when unreadable), and a rebuild of an unchanged
+target keeps its name. `client-build.spec.ts` asserts both halves.
 
 `native-fork.json` now lists `src/native/providers.ts` in the delta; `node scripts/native-fork-diff.mjs
 cordis-client-runner` reports no undeclared change.
