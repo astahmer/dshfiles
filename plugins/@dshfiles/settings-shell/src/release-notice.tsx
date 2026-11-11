@@ -8,6 +8,7 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import * as Schema from 'effect/Schema'
 import { settingsShellApi } from './shell-api.js'
 import { settingsShellSettings } from './settings.js'
+import { releaseDate } from './release-date.js'
 import { releaseCheckSchedule, type DshReleaseStatus } from './release-status.js'
 import type { ShellTranslate } from './native/locales.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
@@ -48,6 +49,73 @@ const noticeMessage = (props: {
   return props.t('releaseNotice.checking')
 }
 
+const ReleaseVersion = (props: {
+  readonly t: ShellTranslate
+  readonly kind: 'installed' | 'latest'
+  readonly version: string
+  readonly url: string | null | undefined
+  readonly publishedAt: string | null | undefined
+  readonly now: number
+}): JSX.Element => {
+  const date = releaseDate({ publishedAt: props.publishedAt, now: props.now, locale: props.t('releaseNotice.dateLocale') })
+  return (
+    <span className="dshx:inline-flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-1" data-dsh-release-version={props.kind}>
+      <span>{props.t(props.kind === 'installed' ? 'releaseNotice.installed' : 'releaseNotice.latest')}</span>
+      {props.url === null || props.url === undefined ? (
+        <span className="dshx:font-mono dshx:text-foreground">{props.version}</span>
+      ) : (
+        <a
+          className="dshx:inline-flex dshx:items-center dshx:gap-0.5 dshx:font-mono dshx:text-primary dshx:underline dshx:underline-offset-2 dshx:pointer-coarse:min-h-11"
+          href={props.url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {props.version}
+          <ExternalLinkIcon aria-hidden="true" size={11} />
+        </a>
+      )}
+      {date !== null && (
+        <Tooltip label={date.absolute} openOnClick side="bottom">
+          <time className="dshx:inline-flex dshx:items-center dshx:pointer-coarse:min-h-11" dateTime={date.dateTime} tabIndex={0}>
+            · {date.relative}
+          </time>
+        </Tooltip>
+      )}
+    </span>
+  )
+}
+
+const ReleaseVersions = (props: { readonly t: ShellTranslate; readonly status: DshReleaseStatus }): JSX.Element | null => {
+  const [now] = useState(() => Date.now())
+  if (props.status.currentVersion === null) return null
+  const latestVersion = props.status.latestVersion
+  const showLatest = latestVersion !== null && latestVersion !== props.status.currentVersion
+  const behind = props.status.available ? props.status.releases.length : 0
+  return (
+    <div
+      className="dshx:mt-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-1 dshx:text-[12px] dshx:leading-[18px] dshx:text-muted-foreground"
+      data-dsh-release-versions=""
+    >
+      <ReleaseVersion
+        kind="installed"
+        now={now}
+        publishedAt={props.status.currentPublishedAt}
+        t={props.t}
+        url={props.status.currentUrl}
+        version={props.status.currentVersion}
+      />
+      {showLatest && (
+        <ReleaseVersion kind="latest" now={now} publishedAt={props.status.latestPublishedAt} t={props.t} url={props.status.latestUrl} version={latestVersion} />
+      )}
+      {behind > 0 && (
+        <span className="dshx:font-medium dshx:text-foreground">
+          {behind === 1 ? props.t('releaseNotice.behindOne') : props.t('releaseNotice.behind', { count: String(behind) })}
+        </span>
+      )}
+    </div>
+  )
+}
+
 export const DshReleaseIndicator = (props: { readonly t: ShellTranslate }): JSX.Element | null => {
   const status = useReleaseStatus().query
   const dismissed = dismissedRelease.useValue()
@@ -76,11 +144,7 @@ export const DshReleaseNotice = (props: { readonly t: ShellTranslate }): JSX.Ele
           <div className="dshx:text-[14px] dshx:leading-5 dshx:font-medium">
             {noticeMessage({ t: props.t, updateAvailable, isError: status.isError, off, status: releaseStatus })}
           </div>
-          {updateAvailable && (
-            <div className="dshx:mt-1 dshx:text-[12px] dshx:leading-[18px] dshx:text-muted-foreground">
-              {props.t('releaseNotice.compare', { current: releaseStatus.currentVersion ?? '', latest: releaseStatus.latestVersion ?? '' })}
-            </div>
-          )}
+          {releaseStatus !== undefined && <ReleaseVersions status={releaseStatus} t={props.t} />}
         </div>
         {updateAvailable && (
           <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">

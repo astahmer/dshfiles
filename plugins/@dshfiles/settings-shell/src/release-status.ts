@@ -21,10 +21,17 @@ const releaseInfoSchema = Schema.Struct({
   highlights: Schema.Array(releaseHighlightSchema).check(Schema.isMaxLength(12)),
 })
 
+const releaseUrlSchema = Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048), Schema.isPattern(/^https:\/\/github\.com\//u)))
+const publishedAtSchema = Schema.NullOr(Schema.String.check(Schema.isMaxLength(40)))
+
+/** `currentUrl` and both `…PublishedAt` fields are optional: an older Host does not send them. */
 export const dshReleaseStatusSchema = Schema.Struct({
   currentVersion: Schema.NullOr(Schema.String.check(Schema.isMaxLength(100))),
+  currentUrl: Schema.optionalKey(releaseUrlSchema),
+  currentPublishedAt: Schema.optionalKey(publishedAtSchema),
   latestVersion: Schema.NullOr(Schema.String.check(Schema.isMaxLength(100))),
-  latestUrl: Schema.NullOr(Schema.String.check(Schema.isMaxLength(2_048), Schema.isPattern(/^https:\/\/github\.com\//u))),
+  latestUrl: releaseUrlSchema,
+  latestPublishedAt: Schema.optionalKey(publishedAtSchema),
   available: Schema.Boolean,
   comparisonKnown: Schema.Boolean,
   releases: Schema.Array(releaseInfoSchema).check(Schema.isMaxLength(100)),
@@ -109,10 +116,14 @@ export const releaseStatusFromGitHub = (input: { readonly currentVersion: string
   const latest = releases[0]
   const currentIndex = input.currentVersion === null ? -1 : releases.findIndex(release => release.version === input.currentVersion)
   const comparisonKnown = currentIndex >= 0
+  const current = comparisonKnown ? releases[currentIndex] : undefined
   return {
     currentVersion: input.currentVersion,
+    currentUrl: current?.url ?? null,
+    currentPublishedAt: current?.publishedAt ?? null,
     latestVersion: latest?.version ?? null,
     latestUrl: latest?.url ?? null,
+    latestPublishedAt: latest?.publishedAt ?? null,
     available: currentIndex > 0,
     comparisonKnown,
     releases: currentIndex > 0 ? releases.slice(0, currentIndex) : [],

@@ -89,7 +89,7 @@
     {
       "id": "dsh-release-notice",
       "title": "DSH release notice and TL;DR",
-      "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
+      "summary": "The Settings trigger marks a new public DSH release, and General compares it with the installed Host version, links both versions to their GitHub releases with how long ago each shipped and how many releases behind the install is, shows a concise English TL;DR across newer releases, links to the official notes, and lets the user dismiss that release notice.",
       "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect button \"Check for DSH updates\""],
       "surfaces": ["client", "host", "api", "tool", "storage"],
       "surface": "settingsSection",

@@ -6,12 +6,13 @@ import { FetchHttpClient } from 'effect/http'
 import { TestClock } from 'effect/testing'
 import { InstalledVersions } from './installed-versions.js'
 import { ReleaseCheck } from './release-check.js'
-import { githubReleasesJson, releaseCheckSchedule, releaseStatusFromGitHub } from './release-status.js'
+import { releaseDate } from './release-date.js'
+import { dshReleaseStatusSchema, githubReleasesJson, releaseCheckSchedule, releaseStatusFromGitHub } from './release-status.js'
 
-const githubRelease = (input: { readonly tag: string; readonly body?: string; readonly draft?: boolean }) => ({
+const githubRelease = (input: { readonly tag: string; readonly body?: string; readonly draft?: boolean; readonly publishedAt?: string }) => ({
   tag_name: input.tag,
   name: null,
-  published_at: '2026-10-17T08:16:33Z',
+  published_at: input.publishedAt ?? '2026-10-17T08:16:33Z',
   draft: input.draft ?? false,
   body: input.body ?? null,
   html_url: 'ignored external field',
@@ -28,6 +29,45 @@ describe('DSH GitHub release status', () => {
     expect(status.comparisonKnown).toBe(true)
     expect(status.releases.map(release => release.version)).toEqual(['0.2.1-rc.2'])
     expect(status.latestUrl).toBe('https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.2')
+  })
+
+  it('links and dates both the installed and the latest release', () => {
+    const status = releaseStatusFromGitHub({
+      currentVersion: '0.2.1-rc.1',
+      releases: [
+        githubRelease({ tag: 'dsh-v0.2.1-rc.2', publishedAt: '2026-11-08T10:00:00Z' }),
+        githubRelease({ tag: 'dsh-v0.2.1-rc.1', publishedAt: '2026-10-17T08:16:33Z' }),
+      ],
+    })
+
+    expect(status).toMatchObject({
+      currentUrl: 'https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.1',
+      currentPublishedAt: '2026-10-17T08:16:33Z',
+      latestUrl: 'https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.2',
+      latestPublishedAt: '2026-11-08T10:00:00Z',
+    })
+    expect(releaseStatusFromGitHub({ currentVersion: '0.2.1-custom', releases: [githubRelease({ tag: 'dsh-v0.2.1-rc.2' })] })).toMatchObject({
+      currentUrl: null,
+      currentPublishedAt: null,
+    })
+  })
+
+  it('still decodes the status of an older Host without links or dates', () => {
+    const older = { currentVersion: '0.2.1-rc.1', latestVersion: '0.2.1-rc.2', latestUrl: null, available: true, comparisonKnown: true, releases: [] }
+    expect(Schema.decodeUnknownResult(dshReleaseStatusSchema)(older)._tag).toBe('Success')
+  })
+
+  it('formats a release date as relative time with the full date for hover', () => {
+    const now = Date.parse('2026-11-11T10:00:00Z')
+    expect(releaseDate({ publishedAt: '2026-11-08T10:00:00Z', now, locale: 'en' })).toMatchObject({
+      dateTime: '2026-11-08T10:00:00.000Z',
+      relative: '3 days ago',
+      absolute: expect.stringContaining('November 8, 2026'),
+    })
+    expect(releaseDate({ publishedAt: '2026-10-17T08:16:33Z', now, locale: 'en' })?.relative).toBe('4 weeks ago')
+    expect(releaseDate({ publishedAt: '2026-11-11T09:59:30Z', now, locale: 'en' })?.relative).toBe('now')
+    expect(releaseDate({ publishedAt: null, now, locale: 'en' })).toBeNull()
+    expect(releaseDate({ publishedAt: 'not a date', now, locale: 'en' })).toBeNull()
   })
 
   it('does not claim an update when the installed tag is missing or current', () => {
