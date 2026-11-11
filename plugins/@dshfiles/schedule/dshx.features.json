@@ -10,6 +10,10 @@
       "surface": "destinationSection",
       "destination": "work",
       "currentSurface": "sidebar: Tasks page, task tabs and the Session header's reminders",
+      "onboarding": {
+        "firstAction": "Open the Tasks page from the sidebar.",
+        "doneWhen": "Your scheduled tasks and reminders show in one list."
+      },
       "configuration": [],
       "states": ["first-read", "kept-read", "reread-after-change", "reread-after-reset"],
       "failureModes": [

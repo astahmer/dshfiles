@@ -10958,7 +10958,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "sidebar footer: Cordis panel, and Cordis tool cards in the transcript",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open the Cordis panel in the sidebar footer.",
+        "doneWhen": "It lists the dynamic Cordis plugins this Host runs."
+      }
     },
     {
       "key": "cordis-client-runner#inspect-manifest-once",
@@ -19809,7 +19812,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "sidebar: Tasks page, task tabs and the Session header's reminders",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open the Tasks page from the sidebar.",
+        "doneWhen": "Your scheduled tasks and reminders show in one list."
+      }
     },
     {
       "key": "secret-catalog#scoped-alias-catalog",
@@ -21817,7 +21823,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: Plugins › Subagent",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › Plugins › Subagent.",
+        "doneWhen": "The recursion depth, concurrency and subagent model show and save."
+      }
     },
     {
       "key": "settings-web-search#web-search-settings",

@@ -10,6 +10,10 @@
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "settings: Plugins \u203a Subagent",
+      "onboarding": {
+        "firstAction": "Open Settings › Plugins › Subagent.",
+        "doneWhen": "The recursion depth, concurrency and subagent model show and save."
+      },
       "configuration": [],
       "states": ["limits", "model-selection", "catalog-loading", "unserved"],
       "failureModes": [

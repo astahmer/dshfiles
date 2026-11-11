@@ -10,6 +10,10 @@
       "surface": "statusItem",
       "destination": "threads",
       "currentSurface": "sidebar footer: Cordis panel, and Cordis tool cards in the transcript",
+      "onboarding": {
+        "firstAction": "Open the Cordis panel in the sidebar footer.",
+        "doneWhen": "It lists the dynamic Cordis plugins this Host runs."
+      },
       "configuration": [],
       "states": ["awaiting-connection", "read", "reset-reread"],
       "failureModes": [
