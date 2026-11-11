@@ -1323,7 +1323,8 @@ inserts, and deleting a replaced session's documents in 100-rowid chunks removed
 the batched version. Query latency is essentially unchanged because search SQL is untouched; the remaining CPU
 difference is the Effect SQL statement layer, ~0.3 s over 25,214 documents.
 
-Reproduce with the scratch harnesses recorded beside the backup (private paths): the ingest harness runs
-`runIngestPass` over the frozen corpus against a fresh copy, and the query harness opens the copy through the same
-`SqliteStore.layer` and asserts the stored digests. The plugin suite remains the gate:
+To reproduce, take a read-only SQLite online backup of the live index (never open the live file read-write), copy
+120 frozen session logs, run `runIngestPass` against a fresh copy until it reports no backlog, and measure
+`SearchIndex.searchSessions` through the same `SqliteStore.layer` while comparing response digests. The harnesses
+that produced this table were scratch files, removed with the private copy; the plugin suite remains the gate:
 `pnpm --dir plugins/@dshfiles/session-search test`.
