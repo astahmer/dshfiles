@@ -8,6 +8,8 @@ export type TimingKind = 'cron' | 'daily' | 'weekly' | 'every'
 export interface AutomationForm {
   readonly title: string
   readonly projectId: string
+  readonly destinationKind: 'new-thread' | 'existing-thread'
+  readonly sessionId: string
   readonly prompt: string
   readonly agentPreset: string
   readonly provider: string
@@ -31,6 +33,7 @@ export interface AutomationForm {
 export const automationFormProblem = (form: AutomationForm): string | undefined => {
   if (form.title.trim() === '') return 'Give the automation a name.'
   if (form.projectId === '') return 'Choose the project its threads start in.'
+  if (form.destinationKind === 'existing-thread' && form.sessionId.trim() === '') return 'Choose the thread each run posts into, or start a new thread instead.'
   if (form.prompt.trim() === '') return 'Write the prompt each thread starts with.'
   if ((form.provider.trim() === '') !== (form.model.trim() === '')) return 'Give both a provider and a model, or neither to use the default model.'
   if (form.triggerKind === 'webhook') {
@@ -60,6 +63,8 @@ export class AutomationFormModel {
     return {
       title: '',
       projectId: input.projectId,
+      destinationKind: 'new-thread',
+      sessionId: '',
       prompt: '',
       agentPreset: '',
       provider: '',
@@ -88,6 +93,8 @@ export class AutomationFormModel {
       provider: view.model?.provider ?? '',
       model: view.model?.model ?? '',
       enabled: view.enabled,
+      destinationKind: view.destination?.kind ?? 'new-thread',
+      sessionId: view.destination?.kind === 'existing-thread' ? view.destination.sessionId : '',
     }
     if (view.trigger.kind === 'webhook')
       return { ...common, triggerKind: 'webhook', secretRef: view.trigger.secretRef, ratePerMinute: String(view.trigger.ratePerMinute) }
@@ -128,6 +135,10 @@ export class AutomationFormModel {
     if (id !== undefined) draft = { ...draft, id }
     if (form.agentPreset.trim() !== '') draft = { ...draft, agentPreset: form.agentPreset.trim() }
     if (form.provider.trim() !== '' && form.model.trim() !== '') draft = { ...draft, model: { provider: form.provider.trim(), model: form.model.trim() } }
+    draft = {
+      ...draft,
+      destination: form.destinationKind === 'existing-thread' ? { kind: 'existing-thread', sessionId: form.sessionId.trim() } : { kind: 'new-thread' },
+    }
     return draft
   }
 

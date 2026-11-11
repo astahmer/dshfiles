@@ -115,3 +115,42 @@ describe('prompt template', () => {
     expect(PromptTemplate.framing('PR review', ['body.pull_request.title'])).toContain('untrusted external data')
   })
 })
+
+describe('GitHub webhook signatures', () => {
+  // GitHub signs the raw body only: no timestamp, so no replay window; its delivery id is the replay guard.
+  const body = Buffer.from('{"zen":"Keep it logically awesome."}')
+  const signature = WebhookSignature.signGitHub({ secret: SECRET, body })
+
+  it('accepts the raw body signed with the secret', () => {
+    expect(signature).toMatch(/^sha256=[0-9a-f]{64}$/u)
+    expect(WebhookSignature.verifyGitHub({ secret: SECRET, body, signature })).toEqual({ ok: true })
+    expect(WebhookSignature.verifyGitHub({ secret: SECRET, body, signature: signature.toUpperCase().replace('SHA256=', 'sha256=') })).toEqual({ ok: true })
+  })
+
+  it('refuses a tampered body, another secret, a wrong length and non-hex input', () => {
+    expect(WebhookSignature.verifyGitHub({ secret: SECRET, body: Buffer.from('{"zen":"evil"}'), signature })).toEqual({ ok: false, reason: 'bad-signature' })
+    expect(WebhookSignature.verifyGitHub({ secret: 'guessed', body, signature })).toEqual({ ok: false, reason: 'bad-signature' })
+    expect(WebhookSignature.verifyGitHub({ secret: SECRET, body, signature: `sha256=${'a'.repeat(63)}` })).toEqual({ ok: false, reason: 'malformed-signature' })
+    expect(WebhookSignature.verifyGitHub({ secret: SECRET, body, signature: 'sha256=zzzz' })).toEqual({ ok: false, reason: 'malformed-signature' })
+    expect(WebhookSignature.verifyGitHub({ secret: SECRET, body, signature: 'sha1=abc' })).toEqual({ ok: false, reason: 'malformed-signature' })
+  })
+
+  it('keeps the timestamped scheme separate: a body signed for one scheme does not verify under the other', () => {
+    const timestamp = String(now / 1000)
+    const timestamped = WebhookSignature.sign({ secret: SECRET, timestamp, body })
+    expect(WebhookSignature.verifyGitHub({ secret: SECRET, body, signature: timestamped })).toEqual({ ok: false, reason: 'bad-signature' })
+    expect(
+      WebhookSignature.verify({
+        secret: SECRET,
+        body,
+        signature: WebhookSignature.signGitHub({ secret: SECRET, body }),
+        timestamp,
+        now,
+        guard: new ReplayGuard(),
+      }),
+    ).toEqual({
+      ok: false,
+      reason: 'bad-signature',
+    })
+  })
+})

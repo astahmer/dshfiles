@@ -151,6 +151,7 @@ const automationRoutine = (props: {
 /** The Automations page: every project automation with its controls, then the latest runs of all of them. */
 export const AutomationsPanel = (props: {
   readonly projects: () => readonly ProjectChoice[]
+  readonly threads: () => readonly { readonly sessionId: string; readonly title: string }[]
   readonly openThread: (sessionId: string) => void
 }): JSX.Element => {
   const api = useApi(automationsApi)
@@ -268,6 +269,7 @@ export const AutomationsPanel = (props: {
             initial={dialog.initial}
             projects={projects}
             pending={save.isPending}
+            threads={props.threads()}
             error={save.error === null ? null : errorMessage(save.error, HOST_DOWN)}
             onOpenChange={open => (open ? undefined : setDialog(null))}
             onSubmit={form => save.mutate({ id: dialog.id, form })}

@@ -2,16 +2,24 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export const SIGNATURE_HEADER = 'x-dsh-signature'
 export const TIMESTAMP_HEADER = 'x-dsh-timestamp'
+/** GitHub's webhook signature: HMAC-SHA256 over the raw body only, with no timestamp to replay-guard. */
+export const GITHUB_SIGNATURE_HEADER = 'x-hub-signature-256'
 
 /** A request older or newer than this is refused, so a captured request cannot be replayed later. */
 export const REPLAY_WINDOW_SECONDS = 300
 
-export type SignatureRejection = 'missing-signature' | 'malformed-signature' | 'stale-timestamp' | 'bad-signature' | 'replayed'
+export type SignatureRejection = 'missing-signature' | 'malformed-signature' | 'stale-timestamp' | 'bad-signature' | 'replayed' | 'ambiguous-signature'
 
 export type SignatureVerdict = { readonly ok: true } | { readonly ok: false; readonly reason: SignatureRejection }
 
 const SIGNATURE = /^sha256=([0-9a-f]{64})$/u
 const TIMESTAMP = /^\d{1,12}$/u
+
+/** Strict hex decode of a `sha256=<hex>` header value, or undefined when it cannot name a SHA-256 digest. */
+const digestOf = (value: string): Buffer | undefined => {
+  const hex = SIGNATURE.exec(value.trim().toLowerCase())?.[1]
+  return hex === undefined ? undefined : Buffer.from(hex, 'hex')
+}
 
 /** The bytes the sender signs: the Unix timestamp in seconds, a dot, then the raw request body. */
 const signedBytes = (timestamp: string, body: Uint8Array): Buffer => Buffer.concat([Buffer.from(`${timestamp}.`, 'utf8'), body])
@@ -37,6 +45,23 @@ export class ReplayGuard {
 }
 
 export class WebhookSignature {
+  /** `sha256=<hex>` of HMAC-SHA256(secret, body): what GitHub sends in `x-hub-signature-256`. */
+  static signGitHub(input: { readonly secret: string; readonly body: Uint8Array }): string {
+    return `sha256=${createHmac('sha256', input.secret).update(input.body).digest('hex')}`
+  }
+
+  /**
+   * Check GitHub's untimestamped signature against the raw body in constant time. GitHub's delivery id is the replay
+   * guard there, so this verifies authenticity only; the comparison runs on equal-length buffers, never on hex text.
+   */
+  static verifyGitHub(input: { readonly secret: string; readonly body: Uint8Array; readonly signature: string }): SignatureVerdict {
+    const presented = digestOf(input.signature)
+    if (presented === undefined) return { ok: false, reason: 'malformed-signature' }
+    const expected = createHmac('sha256', input.secret).update(input.body).digest()
+    if (presented.length !== expected.length || !timingSafeEqual(expected, presented)) return { ok: false, reason: 'bad-signature' }
+    return { ok: true }
+  }
+
   /** `sha256=<hex>` of HMAC-SHA256(secret, `${timestamp}.${body}`): what a sender puts in `x-dsh-signature`. */
   static sign(input: { readonly secret: string; readonly timestamp: string; readonly body: Uint8Array }): string {
     return `sha256=${createHmac('sha256', input.secret).update(signedBytes(input.timestamp, input.body)).digest('hex')}`

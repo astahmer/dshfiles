@@ -78,6 +78,7 @@ const fixture = async () => {
     },
   })
   const created: Array<Record<string, unknown>> = []
+  const prompted: Array<Record<string, unknown>> = []
   await host.mount(
     defineHost({
       name: '@dshfiles/session-controller',
@@ -89,7 +90,11 @@ const fixture = async () => {
           },
           list: unused,
           messages: unused,
-          prompt: unused,
+          prompt: ({ input }) => {
+            prompted.push({ ...input })
+            if (input.sessionId === 'session-gone') throw new Error('no such session')
+            return { accepted: true }
+          },
           wait: unused,
           interrupt: unused,
           command: unused,
@@ -129,6 +134,7 @@ const fixture = async () => {
     ctx,
     origin,
     created,
+    prompted,
     references,
     restart,
     routes,
@@ -364,4 +370,78 @@ it('runs an automation now and records a start that failed with what to do next'
   await rewrite(saved.id, record => ({ ...record, projectId: 'gone' }))
   expect(await automations.runNow({ id: saved.id })).toMatchObject({ outcome: 'failed', detail: expect.stringContaining('no longer registered') })
   expect(created).toHaveLength(1)
+})
+
+it('posts into an existing thread when the automation names one, and records a missing thread', async () => {
+  const { automations, created, prompted, rewrite } = await fixture()
+  const saved = await automations.save({
+    title: 'Daily digest',
+    projectId: 'project-1',
+    prompt: 'Summarize the open PRs.',
+    destination: { kind: 'existing-thread', sessionId: 'session-target' },
+    trigger: { kind: 'schedule', timing: { kind: 'every', everySeconds: 3600 } },
+  })
+  expect(saved.destination).toEqual({ kind: 'existing-thread', sessionId: 'session-target' })
+  expect(await automations.runNow({ id: saved.id })).toMatchObject({ outcome: 'started', sessionId: 'session-target' })
+  expect(created).toEqual([])
+  expect(prompted).toEqual([{ sessionId: 'session-target', text: 'Summarize the open PRs.', mode: 'queue' }])
+
+  // The thread was archived after the automation was saved: the run says which thread to fix.
+  await rewrite(saved.id, record => ({ ...record, destination: { kind: 'existing-thread', sessionId: 'session-gone' } }))
+  expect(await automations.runNow({ id: saved.id })).toMatchObject({
+    outcome: 'failed',
+    detail: expect.stringContaining('session-gone'),
+  })
+})
+
+it('accepts GitHub webhook signatures over the raw body and refuses tampered or double-signed requests', async () => {
+  const { automations, created, origin } = await fixture()
+  const saved = await automations.save({
+    title: 'Push events',
+    projectId: 'project-1',
+    prompt: 'Handle {{body.ref}}',
+    trigger: { kind: 'webhook', secretRef: 'secret:HOOK' },
+  })
+  const url = `${origin}${saved.webhookPath ?? ''}`
+  const body = JSON.stringify({ ref: 'refs/heads/main' })
+  const signature = WebhookSignature.signGitHub({ secret: HOOK_SECRET, body: Buffer.from(body) })
+  const send = (input: { readonly body: string; readonly signature?: string; readonly timestamped?: boolean }) =>
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-github-event': 'push',
+        ...(input.timestamped === true
+          ? (() => {
+              const timestamp = String(Math.floor(Date.now() / 1000))
+              return {
+                'x-dsh-timestamp': timestamp,
+                'x-dsh-signature': WebhookSignature.sign({ secret: HOOK_SECRET, timestamp, body: Buffer.from(input.body) }),
+              }
+            })()
+          : { 'x-hub-signature-256': input.signature ?? signature }),
+      },
+      body: input.body,
+    })
+
+  const accepted = await send({ body })
+  expect(accepted.status).toBe(202)
+  expect(created[0]?.prompt).toContain('Handle refs/heads/main')
+
+  const tampered = await send({ body: JSON.stringify({ ref: 'refs/heads/evil' }) })
+  expect(tampered.status).toBe(401)
+  const malformed = await send({ body, signature: 'sha256=abc' })
+  expect(malformed.status).toBe(401)
+  const both = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-hub-signature-256': signature,
+      'x-dsh-timestamp': String(Math.floor(Date.now() / 1000)),
+      'x-dsh-signature': WebhookSignature.sign({ secret: HOOK_SECRET, timestamp: String(Math.floor(Date.now() / 1000)), body: Buffer.from(body) }),
+    },
+    body,
+  })
+  expect(both.status).toBe(401)
+  expect((await both.json()).message).toContain('one scheme')
 })

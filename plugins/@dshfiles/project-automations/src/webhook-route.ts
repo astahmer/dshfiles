@@ -5,7 +5,7 @@ import { AutomationRunner } from './automation-runner.js'
 import { AutomationStore } from './automation-store.js'
 import { PromptTemplate } from './prompt-template.js'
 import { SlidingWindowLimiter } from './rate-limit.js'
-import { ReplayGuard, SIGNATURE_HEADER, TIMESTAMP_HEADER, WebhookSignature, type SignatureRejection } from './webhook-signature.js'
+import { ReplayGuard, GITHUB_SIGNATURE_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER, WebhookSignature, type SignatureRejection } from './webhook-signature.js'
 
 /**
  * Webhooks answer under the DSH web server at `/automations/webhook/<automation id>`. The web server matches a prefix
@@ -62,15 +62,14 @@ const reply = (response: ServerResponse, status: number, body: Readonly<Record<s
 
 const outcome = (value: string) => Effect.annotateCurrentSpan('dshx.automation.webhook.outcome', value)
 
-const SIGNING_HINT = `Sign each request: put the Unix time in seconds in ${TIMESTAMP_HEADER} and sha256=HMAC-SHA256(secret, "<timestamp>.<raw body>") in hex in ${SIGNATURE_HEADER}.`
-
 const rejectionDetail = {
-  'missing-signature': `Refused: the request had no ${SIGNATURE_HEADER} or ${TIMESTAMP_HEADER} header. ${SIGNING_HINT}`,
-  'malformed-signature': `Refused: ${SIGNATURE_HEADER} must read sha256=<64 hex digits> and ${TIMESTAMP_HEADER} must be Unix seconds. ${SIGNING_HINT}`,
+  'missing-signature': `Refused: the request had no signature. Send sha256=HMAC-SHA256(secret, "<timestamp>.<raw body>") in ${SIGNATURE_HEADER} with the Unix seconds in ${TIMESTAMP_HEADER}, or GitHub's ${GITHUB_SIGNATURE_HEADER} = HMAC-SHA256(secret, raw body) with no timestamp.`,
+  'malformed-signature': `Refused: the signature must read sha256=<64 hex digits>; ${TIMESTAMP_HEADER} must be Unix seconds when that scheme is used.`,
   'bad-signature':
     'Refused: the signature does not match this automation’s secret. Check that the sender signs with the value behind the referenced secret alias and signs the raw body unchanged.',
   'stale-timestamp': 'Refused: the request timestamp is more than 5 minutes from the DSH Host clock. Sign with the current time and check both clocks.',
   replayed: 'Refused: this exact signed request was already accepted. Send a new request with a fresh timestamp.',
+  'ambiguous-signature': `Refused: the request carried both ${SIGNATURE_HEADER} and ${GITHUB_SIGNATURE_HEADER}. Send one scheme only.`,
 } satisfies Record<SignatureRejection, string>
 
 const header = (request: IncomingMessage, name: string): string | undefined => {
@@ -149,14 +148,21 @@ export const handleWebhook = Effect.fn('automation webhook', { kind: 'server' })
     })
     return yield* reply(response, 503, { ok: false, message: 'This webhook cannot verify requests right now. The DSH owner must fix its secret reference.' })
   }
-  const verdict = WebhookSignature.verify({
-    secret: secret.success.value,
-    body: body.success,
-    signature: header(request, SIGNATURE_HEADER),
-    timestamp: header(request, TIMESTAMP_HEADER),
-    now,
-    guard: guards.replay,
-  })
+  const timestamped = header(request, SIGNATURE_HEADER)
+  const githubSignature = header(request, GITHUB_SIGNATURE_HEADER)
+  const verdict =
+    timestamped !== undefined && githubSignature !== undefined
+      ? { ok: false as const, reason: 'ambiguous-signature' as const }
+      : githubSignature === undefined
+        ? WebhookSignature.verify({
+            secret: secret.success.value,
+            body: body.success,
+            signature: timestamped,
+            timestamp: header(request, TIMESTAMP_HEADER),
+            now,
+            guard: guards.replay,
+          })
+        : WebhookSignature.verifyGitHub({ secret: secret.success.value, body: body.success, signature: githubSignature })
   if (!verdict.ok) {
     yield* outcome(verdict.reason)
     yield* runner.reject({ automation, detail: rejectionDetail[verdict.reason] })

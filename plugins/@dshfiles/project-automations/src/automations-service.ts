@@ -96,6 +96,7 @@ const make = Effect.gen(function* () {
         // A cleared agent preset or model is left out, so the thread uses the Host default.
         if (draft.agentPreset !== undefined) next = { ...next, agentPreset: draft.agentPreset }
         if (draft.model !== undefined) next = { ...next, model: draft.model }
+        if (draft.destination !== undefined) next = { ...next, destination: draft.destination }
         yield* store.put(next)
         return next
       }),

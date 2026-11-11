@@ -24,6 +24,7 @@ const renderDialog = (initial: AutomationForm = AutomationFormModel.empty({ proj
       editing={false}
       initial={initial}
       projects={projects}
+      threads={[{ sessionId: 'session-target', title: 'Daily digest' }]}
       pending={false}
       error={null}
       onOpenChange={() => undefined}
@@ -49,6 +50,7 @@ describe('automation dialog', () => {
       projectId: 'project-1',
       prompt: 'Triage new issues.',
       enabled: true,
+      destination: { kind: 'new-thread' },
       trigger: { kind: 'schedule', timing: { kind: 'daily', time: '09:00', timeZone: 'Europe/Paris' } },
     })
   })

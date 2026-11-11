@@ -64,16 +64,28 @@ const make = Effect.gen(function* () {
     const request: CreateRequest = { projectId: automation.projectId, title: automation.title, prompt: input.prompt }
     if (automation.agentPreset !== undefined) request.agentPreset = automation.agentPreset
     if (automation.model !== undefined) request.model = automation.model
-    const created = known
-      ? yield* sessions.create(request).pipe(
-          Effect.map(result => ({ ok: true as const, sessionId: result.sessionId })),
-          Effect.catch(error => Effect.succeed({ ok: false as const, detail: startFailure(error) })),
-        )
-      : {
-          ok: false as const,
-          detail:
-            'No thread started: this automation’s project is no longer registered in DSH. Edit the automation and choose a project, or add the folder again.',
-        }
+    const destination = automation.destination
+    const created =
+      destination?.kind === 'existing-thread'
+        ? yield* sessions.prompt({ sessionId: destination.sessionId, text: input.prompt, mode: 'queue' }).pipe(
+            Effect.map(() => ({ ok: true as const, sessionId: destination.sessionId })),
+            Effect.catch(error =>
+              Effect.succeed({
+                ok: false as const,
+                detail: `${startFailure(error)} This automation posts into thread ${destination.sessionId}: edit it with automation_save, or start a new thread instead.`,
+              }),
+            ),
+          )
+        : known
+          ? yield* sessions.create(request).pipe(
+              Effect.map(result => ({ ok: true as const, sessionId: result.sessionId })),
+              Effect.catch(error => Effect.succeed({ ok: false as const, detail: startFailure(error) })),
+            )
+          : {
+              ok: false as const,
+              detail:
+                'No thread started: this automation’s project is no longer registered in DSH. Edit the automation and choose a project, or add the folder again.',
+            }
     const finishedAt = yield* Clock.currentTimeMillis
     let run: RunRecord = {
       id: newRunId(),

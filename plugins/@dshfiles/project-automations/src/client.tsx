@@ -20,7 +20,7 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 
 export default defineClient({
   name: '@dshfiles/project-automations',
-  inject: ['slots', 'workspaces', 'uiWorkspace'],
+  inject: ['slots', 'sessions', 'workspaces', 'uiWorkspace'],
   setup(ctx, decorate, metadata) {
     // The sidebar rail lists this page under Work, beside Backlog and Schedules; without the rail it stays a plain link.
     metadata?.plugin?.add(DestinationSections, {
@@ -39,6 +39,15 @@ export default defineClient({
       }))
     // SAFETY: every id passed here is a sessionId the Host returned from sessions.create for a run.
     const openThread = (sessionId: string) => ctx.uiWorkspace.openSession(sessionId as SessionId)
+    // Only threads of a registered project are offered as an automation destination.
+    const threads = () => {
+      const state = ctx.sessions.list.getSnapshot()
+      return state.ids.flatMap(id => {
+        const session = state.byId[id]
+        if (session === undefined || session.blank || session.parentId !== undefined || session.cwd === undefined) return []
+        return [{ sessionId: session.id, title: session.displayTitle }]
+      })
+    }
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 6, label: () => 'Automations' }, PanelGlyph),
     )
@@ -47,7 +56,7 @@ export default defineClient({
         { name: 'main', key: PANEL_ID },
         decorate(() => (
           <PluginQueryProvider>
-            <AutomationsPanel projects={projects} openThread={openThread} />
+            <AutomationsPanel openThread={openThread} projects={projects} threads={threads} />
           </PluginQueryProvider>
         )),
       ),

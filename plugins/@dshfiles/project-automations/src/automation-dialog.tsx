@@ -32,6 +32,7 @@ export const AutomationDialog = (props: {
   readonly editing: boolean
   readonly initial: AutomationForm
   readonly projects: readonly ProjectChoice[]
+  readonly threads: readonly { readonly sessionId: string; readonly title: string }[]
   readonly pending: boolean
   readonly error: string | null
   readonly onOpenChange: (open: boolean) => void
@@ -50,7 +51,7 @@ export const AutomationDialog = (props: {
       <DialogContent className="dshx-root dshx:max-h-[90vh] dshx:overflow-y-auto dshx:sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{props.editing ? 'Edit automation' : 'New automation'}</DialogTitle>
-          <DialogDescription>Each run starts a new thread in the project with this prompt.</DialogDescription>
+          <DialogDescription>Each run sends this prompt to a thread in the project.</DialogDescription>
         </DialogHeader>
         <form
           aria-label="Automation"
@@ -82,6 +83,42 @@ export const AutomationDialog = (props: {
               </Field>
             )}
           </form.Field>
+          <form.Subscribe selector={state => state.values.destinationKind}>
+            {destinationKind => (
+              <>
+                <form.AppField name="destinationKind">
+                  {field => (
+                    <field.SelectField
+                      label="Post into"
+                      options={[
+                        { value: 'new-thread', label: 'A new thread each run' },
+                        { value: 'existing-thread', label: 'One existing thread' },
+                      ]}
+                    />
+                  )}
+                </form.AppField>
+                {destinationKind === 'existing-thread' ? (
+                  <form.Field name="sessionId">
+                    {field => (
+                      <Field>
+                        <FieldLabel id={`${field.name}-label`}>Thread</FieldLabel>
+                        <Combobox
+                          label="Thread"
+                          matchTriggerWidth
+                          value={field.state.value}
+                          placeholder="Choose a thread"
+                          emptyLabel="No thread is open in this project. Start one first, or post into a new thread each run."
+                          options={props.threads.map(thread => ({ value: thread.sessionId, label: thread.title }))}
+                          onValueChange={value => field.handleChange(value)}
+                        />
+                        <FieldDescription>Each run sends its prompt into this thread, like a message you send yourself.</FieldDescription>
+                      </Field>
+                    )}
+                  </form.Field>
+                ) : null}
+              </>
+            )}
+          </form.Subscribe>
           <form.AppField name="triggerKind">
             {field => (
               <field.SelectField

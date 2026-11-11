@@ -2,9 +2,9 @@
 
 ![Start threads in a project on a schedule](docs/screenshots/project-automations.png)
 
-Per-project automations: a schedule or a signed webhook starts a **new thread** in a project with a prompt, an agent
-preset and a model. Open **Work › Automations** to create, edit, pause, resume, run now and delete them, and to read
-their recent runs.
+Per-project automations: a schedule or a signed webhook posts a prompt in a project, either as a **new thread** with
+its agent preset and model or as a message in one **existing thread**. Open **Work › Automations** to create, edit,
+pause, resume, run now and delete them, and to read their recent runs.
 
 DSH's own Schedule bundle covers a different need: reminders delivered into one existing thread. This plugin is the
 project-level counterpart (plan row B5 in `plans/t3code-parity.md`).
@@ -16,9 +16,13 @@ project-level counterpart (plan row B5 in `plans/t3code-parity.md`).
 | Schedule | `cron` (five fields), `daily` at a time, `weekly` on chosen weekdays, or every N minutes (≥ 1) |
 | Webhook  | A `POST /automations/webhook/<id>` on the DSH web server signed with the automation's secret   |
 
-Each run calls the session controller's `sessions.create` with the automation's project, title, prompt, agent preset
-and model, exactly as the New thread button does. The run history keeps the last 25 runs of each automation: trigger,
-outcome (`started`, `failed`, `rejected`), the thread it started and, for a failure, what to do next.
+Each run posts its prompt through the session controller. With **Post into: A new thread each run** (the default) it
+calls `sessions.create` with the project, title, agent preset and model, exactly as the New thread button does. With
+**Post into: One existing thread** it calls `sessions.prompt` on the chosen thread, queueing the prompt like a message
+you send yourself; the thread's own model and preset apply. The run history keeps the last 25 runs of each automation:
+trigger, outcome (`started`, `failed`, `rejected`), the thread it posted into and, for a failure, what to do next. A
+destination thread that was archived or removed makes the run fail with that thread's id, and the automation keeps
+running on its schedule until you edit it.
 
 ### Schedules
 
@@ -62,8 +66,12 @@ curl -X POST -H 'content-type: application/json' -H "x-dsh-timestamp: $ts" -H "x
   that inserted values are untrusted data. Nothing in the payload is ever executed.
 - Limits held in memory (the replay window, the rate counters) reset on a Host restart: a request captured less than
   5 minutes before a restart could be accepted once more after it.
-- The route answers wherever the DSH web server listens. GitHub's own `X-Hub-Signature-256` scheme (no timestamp) is
-  not accepted; relay from a workflow step that signs with the scheme above.
+- The route answers wherever the DSH web server listens.
+- GitHub-style senders may instead sign with `x-hub-signature-256: sha256=<hex HMAC-SHA256(secret, raw body)>`, with
+  no timestamp header. That scheme is verified over the raw bytes exactly as received (never re-serialized JSON) with
+  a constant-time digest comparison, and strict `sha256=<64 lowercase hex>` decoding. It has no replay window: GitHub
+  makes each delivery id unique, and this only proves authenticity. Send one scheme per request; a request carrying
+  both headers is refused, so neither scheme can be downgraded.
 
 ## Agent tools
 
