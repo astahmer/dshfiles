@@ -1425,3 +1425,63 @@ returned 429; the page was opened through the authenticated preview API instead.
 
 These numbers do not name Host polling as a significant cost, so the mirror retains polling rather than switching to CDP
 `Page.startScreencast`. Full-rate video or canvas pages and real Agent browser tab rendering remain unmeasured.
+
+## Live update and thread-open bytes on `/api/remote.mux` (2026-11-11)
+
+Probe [`follow-stream-probe.mjs`](../.agents/skills/live-performance-audit/scripts/follow-stream-probe.mjs) on the live
+GUI (headless Chromium, read-only): `updates` opens a working thread and groups every mux frame by stream endpoint and
+frame/event type for N seconds; `switch` cycles sidebar threads and counts the visits that opened a new
+`session/follow` (a cache miss). Load average 47–92 on 10 cores, so only bytes and counts are meaningful, not times.
+
+What the wire carried before (live Host, built before these changes):
+
+| Stream, frame                                     | Window | Frames | Bytes          | Per update p50 / max |
+| ------------------------------------------------- | ------ | -----: | -------------- | -------------------- |
+| `session/follow` opening snapshot, running thread | open   |      1 | 1,149–1,155 KB | —                    |
+| `session/control` projection (all live Sessions)  | 90 s   |  1,032 | 770 KB         | 263 B / 28.5 KB      |
+| of it `aiAccountsCost` (per-turn cost list)       | 90 s   |     80 | 281 KB         | — / 28.5 KB          |
+| of it `turnOutline`                               | 90 s   |      9 | 110 KB         | — / 21.7 KB          |
+| `session/follow` assistant-stream chunk           | 180 s  |    402 | 148 KB         | 372 B / 2.7 KB       |
+| `session/follow` settled `assistant/message`      | 180 s  |      5 | 26.8 KB        | 3.4 KB / 14.1 KB     |
+
+Two whole-value resends were the cost, and both now send what changed:
+
+1. A settled `assistant/message` carries its recorded chunk stream, which repeats the message's text and arguments
+   (three times with its block-end chunks): 459 KB of the 1.15 MB opening. The browser copy
+   ([`browser-event.ts`](../plugins/@dshfiles/session-controller/src/browser-event.ts)) keeps only the record holding the
+   first token, which is all Trajectory's first-token time reads. The experimental Session inspector no longer lists the
+   chunks of a settled message.
+2. `session/control` republished every projection value whole on each change. Each control stream now remembers the
+   last value it sent per cell and sends later values as patches (array cut plus tail, changed object keys) when
+   smaller: [`projection-patch.ts`](../plugins/@dshfiles/session-source-port/src/projection-patch.ts), encoded in the
+   Session Controller fork, decoded by its client transport and by `multi-host`'s mirrored-runtime follower.
+
+| Measure                                                     | Before          | After                                                 |
+| ----------------------------------------------------------- | --------------- | ----------------------------------------------------- |
+| opening snapshot, captured live frame replayed through fix  | 1,181 KB        | 774 KB (−34 %)                                        |
+| settled `assistant/message` records in that snapshot (91)   | 606 KB          | 199 KB (−67 %); first-token time equal 91/91          |
+| `aiAccountsCost` update at 30 → 35 turns (unit test)        | whole value     | < 1/5 of the whole value, decoded value equal         |
+| live per-update bytes of `session/control` after deployment | 263 B / 28.5 KB | not measured: needs the canonical build and a restart |
+
+Window cache and window rebuilds, measured and left as they are:
+
+| Probe                                  | Result                                                       |
+| -------------------------------------- | ------------------------------------------------------------ |
+| `switch 6 3` (6 threads, 3 rounds)     | 11/12 revisits reused the open window (one reopened 1.25 MB) |
+| `switch 12 2` / `EXPAND=1 switch 16 2` | the sidebar listed 7 threads; 7/7 revisits reused the window |
+| `updates 180` on a running thread      | 0 new `session/follow` opens, 0 re-snapshots in 180 s        |
+
+The Client keeps the last 3 released generations open
+([`service.ts`](../plugins/@dshfiles/session-controller/src/native/client/sessions/service.ts) `PARKED_SCOPE_LIMIT`)
+besides the 4 resident sidebar views, so one streaming thread cannot evict others by size, and a running thread's
+window grows by appended events rather than being rebuilt. A byte budget would keep more threads open, but each open
+generation holds a Host follow that also keeps its Agent from idle eviction; with every visible thread already a hit,
+that Host residency buys nothing measured here.
+
+```sh
+S=.agents/skills/live-performance-audit/scripts
+node $S/follow-stream-probe.mjs updates 180
+node $S/follow-stream-probe.mjs switch 6 3
+pnpm --dir plugins/@dshfiles/session-controller exec vitest run tests/browser-event.test.ts src/native/control.test.ts
+pnpm --dir plugins/@dshfiles/session-source-port exec vitest run src/projection-patch.test.ts
+```
