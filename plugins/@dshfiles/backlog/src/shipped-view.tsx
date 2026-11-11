@@ -8,6 +8,7 @@ import { useMemo } from 'react'
 
 import { backlogApi, BacklogViews, type BacklogShippedView } from './api.js'
 import { BacklogReference } from './backlog-reference.js'
+import { BacklogMentionHandle } from './backlog-mention-handle.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogShipped, type ShippedUnit } from './shipped.js'
 import { ShippedTimeline } from './shipped-timeline.js'
@@ -54,7 +55,7 @@ const ItemRow = (props: {
       )}
     >
       <ItemGlyphs.KindIcon kind={entry.kind} />
-      <span className="dshx:w-12 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">{label}</span>
+      <BacklogMentionHandle item={entry} className="dshx:w-12 dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" />
       <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
         {entry.title}
         {entry.summary === undefined ? null : <span className="dshx:text-muted-foreground"> — {entry.summary}</span>}

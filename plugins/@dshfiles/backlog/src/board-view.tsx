@@ -29,6 +29,7 @@ import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { BacklogReference } from './backlog-reference.js'
+import { BacklogMentionHandle } from './backlog-mention-handle.js'
 import { boardColumnsFor, boardStatuses } from './panel-preferences.js'
 
 const rankIn = (order: readonly BacklogStatus[], status: BacklogStatus): number => {
@@ -140,7 +141,10 @@ const CardFace = (props: {
               {item.activity.comments}
             </span>
           )}
-          <span className="dshx:font-mono!">{BacklogReference.labelOf(item)}</span>
+          {/* The card moves between columns on pointer drag; the label starts a mention drag instead. */}
+          <span onPointerDown={event => event.stopPropagation()}>
+            <BacklogMentionHandle item={item} />
+          </span>
         </span>
       </div>
     </>

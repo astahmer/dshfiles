@@ -26,6 +26,7 @@ import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { itemTransitionName } from './view-transition.js'
 import { BacklogReference } from './backlog-reference.js'
+import { BacklogMentionHandle } from './backlog-mention-handle.js'
 import { BulkSelectionBar, bulkSelectionBarClearance } from './bulk-selection-bar.js'
 import { DueDates } from './due-date.js'
 
@@ -256,7 +257,7 @@ const Row = (props: {
               onPick={priority => actions.update.mutate({ id: item.id, priority })}
             />
           </span>
-          <span className="dshx:w-12 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
+          <BacklogMentionHandle item={item} className="dshx:w-12 dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground" />
           {rename.renaming ? (
             <BacklogInlineTitle
               id={item.id}

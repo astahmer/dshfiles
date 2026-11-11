@@ -6,6 +6,7 @@ import { useState } from 'react'
 
 import type { BacklogDetailView, BacklogSummaryView } from './api.js'
 import { BacklogReference } from './backlog-reference.js'
+import { BacklogMentionHandle } from './backlog-mention-handle.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogNotices } from './notices.js'
 import { useBacklogActions } from './use-backlog-actions.js'
@@ -108,7 +109,7 @@ const WorkLine = (props: { readonly detail: BacklogDetailView; readonly select: 
               className="dshx:inline-flex dshx:max-w-56 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:hover:bg-accent dshx:hover:text-foreground"
             >
               <CornerLeftUpIcon aria-hidden className="dshx:size-3" />
-              <span className="dshx:font-mono!">{BacklogReference.labelOf(parent)}</span>
+              <BacklogMentionHandle item={parent} />
               <span className="dshx:truncate">{parent.title}</span>
             </button>
             <Button
@@ -138,7 +139,7 @@ const ChildRow = (props: { readonly child: BacklogSummaryView; readonly select: 
       >
         <WorkGlyphs.PriorityIcon priority={child.priority} />
         <ItemGlyphs.StatusIcon status={child.status} />
-        <span className="dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">{BacklogReference.labelOf(child)}</span>
+        <BacklogMentionHandle item={child} className="dshx:text-xs dshx:text-muted-foreground" />
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{child.title}</span>
         <WorkGlyphs.ProgressBadge progress={child.children} />
         <WorkGlyphs.ClaimChip lease={child.lease} compact />

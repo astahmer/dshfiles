@@ -7,6 +7,7 @@ import { describe, expect, test, vi } from 'vitest'
 
 import { BacklogMentionDrag } from './backlog-mention-drag.js'
 import { BacklogMentionDropInput } from './backlog-mention-drop.js'
+import { BacklogMentionHandle } from './backlog-mention-handle.js'
 import { BacklogMentions } from './backlog-mentions.js'
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -54,6 +55,29 @@ describe('backlog mention drag payload', () => {
     expect(BacklogMentionDrag.read(transfer(sink => sink.setData(BacklogMentionDrag.MIME, 'not json')))).toBeNull()
     expect(BacklogMentionDrag.read(transfer(sink => sink.setData(BacklogMentionDrag.MIME, JSON.stringify({ ref: 'todo', title: 'x' }))))).toBeNull()
     expect(BacklogMentionDrag.read(null)).toBeNull()
+  })
+})
+
+describe('backlog mention handle', () => {
+  test('every list label drags the item as a mention', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => root.render(<BacklogMentionHandle item={{ id: 7, ref: 'k3f9', title: 'Drag mentions' }} />))
+      const handle = container.querySelector('[data-backlog-mention-handle]')
+      expect(handle?.getAttribute('draggable')).toBe('true')
+      expect(handle?.textContent).toBe('b:k3f9')
+      const dataTransfer = transfer(() => undefined)
+      const values = new Map<string, string>()
+      const sink = { ...dataTransfer, setData: (type: string, value: string) => values.set(type, value) }
+      handle?.dispatchEvent(dragEvent('dragstart', sink))
+      expect(values.get('text/plain')).toBe('b:k3f9')
+      expect(BacklogMentions.decodeRef(values.get(BacklogMentionDrag.MIME) ?? '')).toEqual({ ref: 'k3f9', title: 'Drag mentions' })
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
   })
 })
 

@@ -92,7 +92,7 @@ import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { ItemTimeline } from './item-timeline.js'
 import { BacklogReference } from './backlog-reference.js'
-import { BacklogMentionDrag } from './backlog-mention-drag.js'
+import { BacklogMentionHandle } from './backlog-mention-handle.js'
 
 type OpenThread = (sessionId: string) => void
 type ThreadLabel = (sessionId: string) => string
@@ -1233,14 +1233,7 @@ const PeekBody = (props: {
               <span>/</span>
             </>
           )}
-          <span
-            draggable
-            onDragStart={event => BacklogMentionDrag.write(event.dataTransfer, item)}
-            data-backlog-mention-handle=""
-            className="dshx:cursor-grab dshx:font-mono! dshx:text-foreground"
-          >
-            {BacklogReference.labelOf(item)}
-          </span>
+          <BacklogMentionHandle item={item} className="dshx:text-foreground" />
           {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px]">{item.freshness}</span>}
         </nav>
         <TooltipProvider>

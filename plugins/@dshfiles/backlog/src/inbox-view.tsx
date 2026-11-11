@@ -17,6 +17,7 @@ import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { BacklogReference } from './backlog-reference.js'
+import { BacklogMentionHandle } from './backlog-mention-handle.js'
 
 const threadReasons = {
   completed: { label: 'finished and waits for review', Icon: CircleCheckIcon, tone: 'dshx:text-success' },
@@ -203,7 +204,7 @@ export const InboxView = (props: {
                         <ItemGlyphs.ProjectLabel project={item.project} />·
                       </>
                     )}
-                    <span className="dshx:font-mono!">{BacklogReference.labelOf(item)}</span>· {ItemGlyphs.ago(item.lastActivityAt)}
+                    <BacklogMentionHandle item={item} />· {ItemGlyphs.ago(item.lastActivityAt)}
                   </p>
                 </div>
                 {hasItemReason && (item.attention !== 'none' || item.proposal !== null) ? (

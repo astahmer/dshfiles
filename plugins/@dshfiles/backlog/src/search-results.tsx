@@ -12,6 +12,7 @@ import { StatusFilterBar } from './status-filter-bar.js'
 import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { BacklogReference } from './backlog-reference.js'
+import { BacklogMentionHandle } from './backlog-mention-handle.js'
 
 type MatchField = NonNullable<BacklogSummaryView['match']>['fields'][number]
 
@@ -118,7 +119,7 @@ export const SearchResults = (props: {
             >
               <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-[13px]">
                 <ItemGlyphs.StatusIcon status={item.status} />
-                <span className="dshx:w-12 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
+                <BacklogMentionHandle item={item} className="dshx:w-12 dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground" />
                 <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">
                   <Highlight text={item.title} terms={terms} />
                 </span>

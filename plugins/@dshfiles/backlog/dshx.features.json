@@ -1020,7 +1020,7 @@
     {
       "id": "backlog-mentions",
       "title": "Mention backlog items with @",
-      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text. Dragging an item's `b:<id>` label from the feed or the item header onto a thread composer inserts the same chip at the caret; dropped anywhere else it is plain `b:<id>` text.",
+      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text. Dragging an item's `b:<id>` label (feed, board, list, inbox, search, shipped, the item header, its parent and sub-issues) onto a thread composer inserts the same chip at the caret; dropped anywhere else it is plain `b:<id>` text.",
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -1075,6 +1075,12 @@
           "id": "backlog.mentions-unit-composer-drop",
           "file": "plugins/@dshfiles/backlog/src/backlog-mention-drop.test.tsx",
           "testName": "a dropped item becomes the mention chip at the caret"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.mentions-unit-drag-handle",
+          "file": "plugins/@dshfiles/backlog/src/backlog-mention-drop.test.tsx",
+          "testName": "every list label drags the item as a mention"
         }
       ],
       "telemetry": [

@@ -19,7 +19,7 @@ import { StatusFilterBar } from './status-filter-bar.js'
 import { BacklogText } from './item-text.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { BacklogReference } from './backlog-reference.js'
-import { BacklogMentionDrag } from './backlog-mention-drag.js'
+import { BacklogMentionHandle } from './backlog-mention-handle.js'
 
 const DAY_MS = 86_400_000
 /** Like a chat history: the newest page is mounted first, older entries appear as the scroller reaches its top. */
@@ -109,14 +109,7 @@ const FeedEntry = (props: {
           <div className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-xs">
             <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(author)}</span>
             <span className="dshx:text-muted-foreground">{new Date(item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-            <span
-              draggable
-              onDragStart={event => BacklogMentionDrag.write(event.dataTransfer, item)}
-              data-backlog-mention-handle=""
-              className="dshx:cursor-grab dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground"
-            >
-              {BacklogReference.labelOf(item)}
-            </span>
+            <BacklogMentionHandle item={item} className="dshx:text-[11px] dshx:text-muted-foreground" />
           </div>
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
             <span onClick={event => event.stopPropagation()}>
