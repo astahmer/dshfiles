@@ -189,6 +189,12 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "features": 3
     },
     {
+      "name": "diffs-review",
+      "description": "Review this thread's changes in one scrollable diff, grouped by review scope and marked as you read.",
+      "ui": true,
+      "features": 10
+    },
+    {
       "name": "editor",
       "description": "Monaco file editor for DSH: workspace file tree, tabs, open-from-anywhere and confined saving.",
       "ui": true,
@@ -403,12 +409,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "description": "Link GitHub pull requests to DSH threads, watch status transitions, and settle terminal threads.",
       "ui": true,
       "features": 2
-    },
-    {
-      "name": "pulls-review",
-      "description": "Review this thread's changes in one scrollable diff, grouped and marked by pulls.review scopes.",
-      "ui": true,
-      "features": 10
     },
     {
       "name": "queue-reorder",
@@ -10957,6 +10957,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "sidebar footer: Cordis panel, and Cordis tool cards in the transcript",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10968,6 +10969,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: dynamic Cordis package runner (no UI)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11071,6 +11073,577 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "Keep the thread Changes facet's and the Review page's per-file viewed marks next to the per-turn marks, keyed by workspace, base, head commit and path, with batch writes, per-range reads, a separate 5000-mark bound and the changes_viewed_files / changes_mark_viewed agent tools.",
       "destination": "none",
       "currentSurface": "host: diff_viewed storage",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "diffs-review#thread-review-scopes",
+      "plugin": "diffs-review",
+      "id": "thread-review-scopes",
+      "title": "Review project and workspace changes by scope",
+      "summary": "Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff (or, in a git-only repository, its git diff from the merge base wit…",
+      "destination": "thread-panel",
+      "currentSurface": "left-nav: Review",
+      "reach": [
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "/pulls"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Diffs review · main..@*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Diffs review · main..@*",
+          "value": null
+        },
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Review\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Review\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Review",
+          "value": null
+        },
+        {
+          "text": "expect text \"main..@\"",
+          "action": "expect",
+          "by": "text",
+          "name": "main..@",
+          "value": null
+        },
+        {
+          "text": "expect text \"1 file\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 file",
+          "value": null
+        },
+        {
+          "text": "expect text \"seeded-work.md*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "seeded-work.md*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Docs\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Docs",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose project or workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose project or workspace",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Choose project or workspace\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Choose project or workspace",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter by scope\"",
+          "action": "click",
+          "by": "button",
+          "name": "Filter by scope",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Workspaces\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect option \"thread-*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "thread-*",
+          "value": null
+        },
+        {
+          "text": "click option \"thread-*\"",
+          "action": "click",
+          "by": "option",
+          "name": "thread-*",
+          "value": null
+        },
+        {
+          "text": "expect text \"thread-*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "thread-*",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose project or workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose project or workspace",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter by scope\"",
+          "action": "click",
+          "by": "button",
+          "name": "Filter by scope",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Workspaces\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect option \"thread-*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "thread-*",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "Open Land › Review and pick a project or thread workspace.",
+        "doneWhen": "Its changes show in one diff, grouped by scope.",
+        "open": {
+          "panel": "diffs-review"
+        }
+      }
+    },
+    {
+      "key": "diffs-review#ai-scope-summaries",
+      "plugin": "diffs-review",
+      "id": "ai-scope-summaries",
+      "title": "Summarize review scopes with the thread's own model",
+      "summary": "One model call over the whole diff turns the deterministic scope summaries into short one-line-per-scope prose, using the provider the thread last requested with and the first model that provider offers.",
+      "destination": "thread-panel",
+      "currentSurface": "left-nav: Review › Summarize",
+      "reach": [
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Review\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review",
+          "value": null
+        },
+        {
+          "text": "expect button \"Summarize\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Summarize",
+          "value": null
+        },
+        {
+          "text": "click button \"Summarize\"",
+          "action": "click",
+          "by": "button",
+          "name": "Summarize",
+          "value": null
+        },
+        {
+          "text": "expect text \"The model call failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "The model call failed*",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "diffs-review#batch-reviewed-marks",
+      "plugin": "diffs-review",
+      "id": "batch-reviewed-marks",
+      "title": "Mark a selection of changed files reviewed",
+      "summary": "The review-wide selector covers files across every scope; per-file checkboxes can still extend or toggle the selection, and one action marks or clears it in the review progress the Host keeps for every browser. A plain click on Mark reviewed still toggles that file.",
+      "destination": "thread-panel",
+      "currentSurface": "left-nav: Review › reviewed marks",
+      "reach": [
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Review\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Select all files in this review\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Select all files in this review",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "diffs-review#changes-facet",
+      "plugin": "diffs-review",
+      "id": "changes-facet",
+      "title": "Review a thread's changes in its Changes facet",
+      "summary": "A thread panel tab that follows the thread on screen and shows its changes in four scopes (this turn from DSH's own turn snapshot; whole thread from fork_point(bookmark | @); uncommitted @-..@; vs the target bookmark), with a file list, one diff view and per-file viewed marks ke…",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes",
+      "reach": [
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Review workspace changes: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review workspace changes: *",
+          "value": null
+        },
+        {
+          "text": "expect region \"Land\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click radio \"Whole thread\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Whole thread",
+          "value": null
+        },
+        {
+          "text": "expect text \"0/1 viewed\"",
+          "action": "expect",
+          "by": "text",
+          "name": "0/1 viewed",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Mark viewed: seeded-work.md\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Mark viewed: seeded-work.md",
+          "value": null
+        },
+        {
+          "text": "expect text \"1/1 viewed\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1/1 viewed",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "Open the Changes tab in a thread's side panel after a turn that edited files.",
+        "doneWhen": "The turn's changes show with a file list and diff."
+      }
+    },
+    {
+      "key": "diffs-review#package-json-table",
+      "plugin": "diffs-review",
+      "id": "package-json-table",
+      "title": "Read package.json dependency changes as a table",
+      "summary": "In the Changes facet, the combined revisions review and the Review page, a changed package.json shows its added, removed and updated dependencies as a table (package and section, previous, new, change) that replaces the file text diff; Show text diff puts the lines back. A row w…",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes",
+      "reach": [
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Review workspace changes: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review workspace changes: *",
+          "value": null
+        },
+        {
+          "text": "click radio \"Whole thread\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Whole thread",
+          "value": null
+        },
+        {
+          "text": "expect text \"Every change since this thread left*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Every change since this thread left*",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "diffs-review#combined-revisions",
+      "plugin": "diffs-review",
+      "id": "combined-revisions",
+      "title": "Review several selected revisions together",
+      "summary": "Revisions selected in the graph open as one combined review: a small revision graph, newest first, with each revision's own files, state chips (working copy, conflict, divergent, empty, bookmarks) and viewed count, one revision's diff on screen with Previous and Next (j and k on…",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes › Revisions",
+      "reach": [
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Open right sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open right sidebar",
+          "value": null
+        },
+        {
+          "text": "click text \"Jujutsu\"",
+          "action": "click",
+          "by": "text",
+          "name": "Jujutsu",
+          "value": null
+        },
+        {
+          "text": "expect region \"Revisions\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Revisions",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Seeded work to rebase\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Seeded work to rebase",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Select for review\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Select for review",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Sample project\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Sample project",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Select for review\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Select for review",
+          "value": null
+        },
+        {
+          "text": "click button \"Review together\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review together",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 revisions\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 revisions",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "diffs-review#turn-card-opens-changes",
+      "plugin": "diffs-review",
+      "id": "turn-card-opens-changes",
+      "title": "A turn's Edited files card opens Changes on that turn",
+      "summary": "Claims the native per-turn review address (dsh-resource://changes-review/…) at the extension band, so the Edited N files card and its review button open the one Changes facet scoped to that turn instead of a second review tab; the viewed marks are the same per-turn marks the nat…",
+      "destination": "thread-panel",
+      "currentSurface": "transcript: Edited N files card",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "diffs-review#land-card",
+      "plugin": "diffs-review",
+      "id": "land-card",
+      "title": "Land a thread from the top of its Changes facet",
+      "summary": "The Land card shows the target bookmark, how far the workspace is behind it, conflicts, undescribed revisions and the thread's project-check receipts, and offers one primary Land that previews the exact revisions in a confirm dialog and calls jj-integration's land with every Hos…",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes › Land",
+      "reach": [
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Review workspace changes: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review workspace changes: *",
+          "value": null
+        },
+        {
+          "text": "expect region \"Land\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "expect text \"1 revision to land\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 revision to land",
+          "value": null
+        },
+        {
+          "text": "click button \"Land 1 revision on main\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land 1 revision on main",
+          "value": null
+        },
+        {
+          "text": "expect alertdialog \"Land 1 revision on main?\"",
+          "action": "expect",
+          "by": "alertdialog",
+          "name": "Land 1 revision on main?",
+          "value": null
+        },
+        {
+          "text": "click button \"Land on main\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land on main",
+          "value": null
+        },
+        {
+          "text": "expect text \"Landed 1 revision on main.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Landed 1 revision on main.",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "diffs-review#diff-line-comments",
+      "plugin": "diffs-review",
+      "id": "diff-line-comments",
+      "title": "Comment on diff lines as chips in the next message",
+      "summary": "Selecting line numbers in a Changes diff opens a comment box; Add to next message queues the comment as a line-comment chip in the thread's composer through the public Composer contract (rich-composer serializes it as <comment path lines>).",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes › diff line selection",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "diffs-review#review-marks-migration",
+      "plugin": "diffs-review",
+      "id": "review-marks-migration",
+      "title": "Move the Review page's marks into the one viewed-marks store",
+      "summary": "On load, the Review page's earlier reviewed record (workspace, base, head → paths) is written into diff-viewed's store as revision-range marks in batches, then emptied; a failed write keeps the record for the next load.",
+      "destination": "none",
+      "currentSurface": "host: diffs-review reviewed record",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -18496,577 +19069,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       }
     },
     {
-      "key": "pulls-review#thread-review-scopes",
-      "plugin": "pulls-review",
-      "id": "thread-review-scopes",
-      "title": "Review project and workspace changes by scope",
-      "summary": "Choose a registered project or an existing JJ thread workspace from the shared searchable picker, recover from a missing workspace by choosing another folder, and optionally set a base bookmark; read its jj diff (or, in a git-only repository, its git diff from the merge base wit…",
-      "destination": "thread-panel",
-      "currentSurface": "left-nav: Review",
-      "reach": [
-        {
-          "text": "seed rebase-ready-thread",
-          "action": "seed",
-          "by": null,
-          "name": null,
-          "value": "rebase-ready-thread"
-        },
-        {
-          "text": "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
-          "action": "expect",
-          "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
-          "value": null
-        },
-        {
-          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
-          "action": "fill",
-          "by": "textbox",
-          "name": "Message or run a task, / commands, @ files or sessions",
-          "value": "/pulls"
-        },
-        {
-          "text": "press Enter",
-          "action": "press",
-          "by": null,
-          "name": null,
-          "value": "Enter"
-        },
-        {
-          "text": "expect text \"pulls.review · main..@*\"",
-          "action": "expect",
-          "by": "text",
-          "name": "pulls.review · main..@*",
-          "value": null
-        },
-        {
-          "text": "click tab \"Land\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Land",
-          "value": null
-        },
-        {
-          "text": "click button \"Review\"",
-          "action": "click",
-          "by": "button",
-          "name": "Review",
-          "value": null
-        },
-        {
-          "text": "expect heading \"Review\"",
-          "action": "expect",
-          "by": "heading",
-          "name": "Review",
-          "value": null
-        },
-        {
-          "text": "expect text \"main..@\"",
-          "action": "expect",
-          "by": "text",
-          "name": "main..@",
-          "value": null
-        },
-        {
-          "text": "expect text \"1 file\"",
-          "action": "expect",
-          "by": "text",
-          "name": "1 file",
-          "value": null
-        },
-        {
-          "text": "expect text \"seeded-work.md*\"",
-          "action": "expect",
-          "by": "text",
-          "name": "seeded-work.md*",
-          "value": null
-        },
-        {
-          "text": "expect text \"Docs\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Docs",
-          "value": null
-        },
-        {
-          "text": "click button \"Choose project or workspace\"",
-          "action": "click",
-          "by": "button",
-          "name": "Choose project or workspace",
-          "value": null
-        },
-        {
-          "text": "expect dialog \"Choose project or workspace\"",
-          "action": "expect",
-          "by": "dialog",
-          "name": "Choose project or workspace",
-          "value": null
-        },
-        {
-          "text": "click button \"Filter by scope\"",
-          "action": "click",
-          "by": "button",
-          "name": "Filter by scope",
-          "value": null
-        },
-        {
-          "text": "click menuitemradio \"Workspaces\"",
-          "action": "click",
-          "by": "menuitemradio",
-          "name": "Workspaces",
-          "value": null
-        },
-        {
-          "text": "expect option \"thread-*\"",
-          "action": "expect",
-          "by": "option",
-          "name": "thread-*",
-          "value": null
-        },
-        {
-          "text": "click option \"thread-*\"",
-          "action": "click",
-          "by": "option",
-          "name": "thread-*",
-          "value": null
-        },
-        {
-          "text": "expect text \"thread-*\"",
-          "action": "expect",
-          "by": "text",
-          "name": "thread-*",
-          "value": null
-        },
-        {
-          "text": "click button \"Choose project or workspace\"",
-          "action": "click",
-          "by": "button",
-          "name": "Choose project or workspace",
-          "value": null
-        },
-        {
-          "text": "click button \"Filter by scope\"",
-          "action": "click",
-          "by": "button",
-          "name": "Filter by scope",
-          "value": null
-        },
-        {
-          "text": "click menuitemradio \"Workspaces\"",
-          "action": "click",
-          "by": "menuitemradio",
-          "name": "Workspaces",
-          "value": null
-        },
-        {
-          "text": "expect option \"thread-*\"",
-          "action": "expect",
-          "by": "option",
-          "name": "thread-*",
-          "value": null
-        }
-      ],
-      "reachNarrow": null,
-      "onboarding": {
-        "prerequisites": [
-          "project",
-          "repository"
-        ],
-        "firstAction": "Open Land › Review and pick a project or thread workspace.",
-        "doneWhen": "Its changes show in one diff, grouped by scope.",
-        "open": {
-          "panel": "pulls-review"
-        }
-      }
-    },
-    {
-      "key": "pulls-review#ai-scope-summaries",
-      "plugin": "pulls-review",
-      "id": "ai-scope-summaries",
-      "title": "Summarize review scopes with the thread's own model",
-      "summary": "One model call over the whole diff turns the deterministic scope summaries into short one-line-per-scope prose, using the provider the thread last requested with and the first model that provider offers.",
-      "destination": "thread-panel",
-      "currentSurface": "left-nav: Review › Summarize",
-      "reach": [
-        {
-          "text": "seed rebase-ready-thread",
-          "action": "seed",
-          "by": null,
-          "name": null,
-          "value": "rebase-ready-thread"
-        },
-        {
-          "text": "click tab \"Land\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Land",
-          "value": null
-        },
-        {
-          "text": "click button \"Review\"",
-          "action": "click",
-          "by": "button",
-          "name": "Review",
-          "value": null
-        },
-        {
-          "text": "expect button \"Summarize\"",
-          "action": "expect",
-          "by": "button",
-          "name": "Summarize",
-          "value": null
-        },
-        {
-          "text": "click button \"Summarize\"",
-          "action": "click",
-          "by": "button",
-          "name": "Summarize",
-          "value": null
-        },
-        {
-          "text": "expect text \"The model call failed*\"",
-          "action": "expect",
-          "by": "text",
-          "name": "The model call failed*",
-          "value": null
-        }
-      ],
-      "reachNarrow": null,
-      "onboarding": null
-    },
-    {
-      "key": "pulls-review#batch-reviewed-marks",
-      "plugin": "pulls-review",
-      "id": "batch-reviewed-marks",
-      "title": "Mark a selection of changed files reviewed",
-      "summary": "The review-wide selector covers files across every scope; per-file checkboxes can still extend or toggle the selection, and one action marks or clears it in the review progress the Host keeps for every browser. A plain click on Mark reviewed still toggles that file.",
-      "destination": "thread-panel",
-      "currentSurface": "left-nav: Review › reviewed marks",
-      "reach": [
-        {
-          "text": "click tab \"Land\"",
-          "action": "click",
-          "by": "tab",
-          "name": "Land",
-          "value": null
-        },
-        {
-          "text": "click button \"Review\"",
-          "action": "click",
-          "by": "button",
-          "name": "Review",
-          "value": null
-        },
-        {
-          "text": "expect checkbox \"Select all files in this review\"",
-          "action": "expect",
-          "by": "checkbox",
-          "name": "Select all files in this review",
-          "value": null
-        }
-      ],
-      "reachNarrow": null,
-      "onboarding": null
-    },
-    {
-      "key": "pulls-review#changes-facet",
-      "plugin": "pulls-review",
-      "id": "changes-facet",
-      "title": "Review a thread's changes in its Changes facet",
-      "summary": "A thread panel tab that follows the thread on screen and shows its changes in four scopes (this turn from DSH's own turn snapshot; whole thread from fork_point(bookmark | @); uncommitted @-..@; vs the target bookmark), with a file list, one diff view and per-file viewed marks ke…",
-      "destination": "thread-panel",
-      "currentSurface": "right-pane: Changes",
-      "reach": [
-        {
-          "text": "seed rebase-ready-thread",
-          "action": "seed",
-          "by": null,
-          "name": null,
-          "value": "rebase-ready-thread"
-        },
-        {
-          "text": "click button \"Review workspace changes: *\"",
-          "action": "click",
-          "by": "button",
-          "name": "Review workspace changes: *",
-          "value": null
-        },
-        {
-          "text": "expect region \"Land\"",
-          "action": "expect",
-          "by": "region",
-          "name": "Land",
-          "value": null
-        },
-        {
-          "text": "click radio \"Whole thread\"",
-          "action": "click",
-          "by": "radio",
-          "name": "Whole thread",
-          "value": null
-        },
-        {
-          "text": "expect text \"0/1 viewed\"",
-          "action": "expect",
-          "by": "text",
-          "name": "0/1 viewed",
-          "value": null
-        },
-        {
-          "text": "click checkbox \"Mark viewed: seeded-work.md\"",
-          "action": "click",
-          "by": "checkbox",
-          "name": "Mark viewed: seeded-work.md",
-          "value": null
-        },
-        {
-          "text": "expect text \"1/1 viewed\"",
-          "action": "expect",
-          "by": "text",
-          "name": "1/1 viewed",
-          "value": null
-        }
-      ],
-      "reachNarrow": null,
-      "onboarding": {
-        "prerequisites": [
-          "project",
-          "repository"
-        ],
-        "firstAction": "Open the Changes tab in a thread's side panel after a turn that edited files.",
-        "doneWhen": "The turn's changes show with a file list and diff."
-      }
-    },
-    {
-      "key": "pulls-review#package-json-table",
-      "plugin": "pulls-review",
-      "id": "package-json-table",
-      "title": "Read package.json dependency changes as a table",
-      "summary": "In the Changes facet, the combined revisions review and the Review page, a changed package.json shows its added, removed and updated dependencies as a table (package and section, previous, new, change) that replaces the file text diff; Show text diff puts the lines back. A row w…",
-      "destination": "thread-panel",
-      "currentSurface": "right-pane: Changes",
-      "reach": [
-        {
-          "text": "seed rebase-ready-thread",
-          "action": "seed",
-          "by": null,
-          "name": null,
-          "value": "rebase-ready-thread"
-        },
-        {
-          "text": "click button \"Review workspace changes: *\"",
-          "action": "click",
-          "by": "button",
-          "name": "Review workspace changes: *",
-          "value": null
-        },
-        {
-          "text": "click radio \"Whole thread\"",
-          "action": "click",
-          "by": "radio",
-          "name": "Whole thread",
-          "value": null
-        },
-        {
-          "text": "expect text \"Every change since this thread left*\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Every change since this thread left*",
-          "value": null
-        }
-      ],
-      "reachNarrow": null,
-      "onboarding": null
-    },
-    {
-      "key": "pulls-review#combined-revisions",
-      "plugin": "pulls-review",
-      "id": "combined-revisions",
-      "title": "Review several selected revisions together",
-      "summary": "Revisions selected in the graph open as one combined review: every revision listed oldest first with its own files, one revision's diff on screen with Previous and Next, a viewed mark per file of each revision, and line comments that name their revision. Each revision stays its…",
-      "destination": "thread-panel",
-      "currentSurface": "right-pane: Changes › Revisions",
-      "reach": [
-        {
-          "text": "seed rebase-ready-thread",
-          "action": "seed",
-          "by": null,
-          "name": null,
-          "value": "rebase-ready-thread"
-        },
-        {
-          "text": "click button \"Open right sidebar\"",
-          "action": "click",
-          "by": "button",
-          "name": "Open right sidebar",
-          "value": null
-        },
-        {
-          "text": "click text \"Jujutsu\"",
-          "action": "click",
-          "by": "text",
-          "name": "Jujutsu",
-          "value": null
-        },
-        {
-          "text": "expect region \"Revisions\"",
-          "action": "expect",
-          "by": "region",
-          "name": "Revisions",
-          "value": null
-        },
-        {
-          "text": "rightclick text \"Seeded work to rebase\"",
-          "action": "rightclick",
-          "by": "text",
-          "name": "Seeded work to rebase",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Select for review\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Select for review",
-          "value": null
-        },
-        {
-          "text": "rightclick text \"Sample project\"",
-          "action": "rightclick",
-          "by": "text",
-          "name": "Sample project",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Select for review\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Select for review",
-          "value": null
-        },
-        {
-          "text": "click button \"Review together\"",
-          "action": "click",
-          "by": "button",
-          "name": "Review together",
-          "value": null
-        },
-        {
-          "text": "expect text \"2 revisions\"",
-          "action": "expect",
-          "by": "text",
-          "name": "2 revisions",
-          "value": null
-        }
-      ],
-      "reachNarrow": null,
-      "onboarding": null
-    },
-    {
-      "key": "pulls-review#turn-card-opens-changes",
-      "plugin": "pulls-review",
-      "id": "turn-card-opens-changes",
-      "title": "A turn's Edited files card opens Changes on that turn",
-      "summary": "Claims the native per-turn review address (dsh-resource://changes-review/…) at the extension band, so the Edited N files card and its review button open the one Changes facet scoped to that turn instead of a second review tab; the viewed marks are the same per-turn marks the nat…",
-      "destination": "thread-panel",
-      "currentSurface": "transcript: Edited N files card",
-      "reach": [],
-      "reachNarrow": null,
-      "onboarding": null
-    },
-    {
-      "key": "pulls-review#land-card",
-      "plugin": "pulls-review",
-      "id": "land-card",
-      "title": "Land a thread from the top of its Changes facet",
-      "summary": "The Land card shows the target bookmark, how far the workspace is behind it, conflicts, undescribed revisions and the thread's project-check receipts, and offers one primary Land that previews the exact revisions in a confirm dialog and calls jj-integration's land with every Hos…",
-      "destination": "thread-panel",
-      "currentSurface": "right-pane: Changes › Land",
-      "reach": [
-        {
-          "text": "seed rebase-ready-thread",
-          "action": "seed",
-          "by": null,
-          "name": null,
-          "value": "rebase-ready-thread"
-        },
-        {
-          "text": "click button \"Review workspace changes: *\"",
-          "action": "click",
-          "by": "button",
-          "name": "Review workspace changes: *",
-          "value": null
-        },
-        {
-          "text": "expect region \"Land\"",
-          "action": "expect",
-          "by": "region",
-          "name": "Land",
-          "value": null
-        },
-        {
-          "text": "expect text \"1 revision to land\"",
-          "action": "expect",
-          "by": "text",
-          "name": "1 revision to land",
-          "value": null
-        },
-        {
-          "text": "click button \"Land 1 revision on main\"",
-          "action": "click",
-          "by": "button",
-          "name": "Land 1 revision on main",
-          "value": null
-        },
-        {
-          "text": "expect alertdialog \"Land 1 revision on main?\"",
-          "action": "expect",
-          "by": "alertdialog",
-          "name": "Land 1 revision on main?",
-          "value": null
-        },
-        {
-          "text": "click button \"Land on main\"",
-          "action": "click",
-          "by": "button",
-          "name": "Land on main",
-          "value": null
-        },
-        {
-          "text": "expect text \"Landed 1 revision on main.\"",
-          "action": "expect",
-          "by": "text",
-          "name": "Landed 1 revision on main.",
-          "value": null
-        }
-      ],
-      "reachNarrow": null,
-      "onboarding": null
-    },
-    {
-      "key": "pulls-review#diff-line-comments",
-      "plugin": "pulls-review",
-      "id": "diff-line-comments",
-      "title": "Comment on diff lines as chips in the next message",
-      "summary": "Selecting line numbers in a Changes diff opens a comment box; Add to next message queues the comment as a line-comment chip in the thread's composer through the public Composer contract (rich-composer serializes it as <comment path lines>).",
-      "destination": "thread-panel",
-      "currentSurface": "right-pane: Changes › diff line selection",
-      "reach": [],
-      "reachNarrow": null,
-      "onboarding": null
-    },
-    {
-      "key": "pulls-review#review-marks-migration",
-      "plugin": "pulls-review",
-      "id": "review-marks-migration",
-      "title": "Move the Review page's marks into the one viewed-marks store",
-      "summary": "On load, the Review page's earlier reviewed record (workspace, base, head → paths) is written into diff-viewed's store as revision-range marks in batches, then emptied; a failed write keeps the record for the next load.",
-      "destination": "none",
-      "currentSurface": "host: pulls-review reviewed record",
-      "reach": [],
-      "reachNarrow": null,
-      "onboarding": null
-    },
-    {
       "key": "queue-reorder#queue-ordering",
       "plugin": "queue-reorder",
       "id": "queue-ordering",
@@ -19806,6 +19808,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "sidebar: Tasks page, task tabs and the Session header's reminders",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21813,6 +21816,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Plugins › Subagent",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -26975,7 +26979,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "vcs-provider-port",
       "id": "vcs-detection",
       "title": "Which VCS owns a path",
-      "summary": "VcsDetector (subpath ./detect) names jj or git for a path from the nearest .jj or .git above it, jj first when both exist, reading only the filesystem; jj-integration and pulls-review pick their jj or git adapter with it.",
+      "summary": "VcsDetector (subpath ./detect) names jj or git for a path from the nearest .jj or .git above it, jj first when both exist, reading only the filesystem; jj-integration and diffs-review pick their jj or git adapter with it.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],

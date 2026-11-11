@@ -25,6 +25,7 @@
     "@dshfiles/cordis-cards",
     "@dshfiles/cordis-client-runner",
     "@dshfiles/diff-viewed",
+    "@dshfiles/diffs-review",
     "@dshfiles/editor",
     "@dshfiles/fff-search",
     "@dshfiles/git-worktrees",
@@ -49,7 +50,6 @@
     "@dshfiles/project-checks",
     "@dshfiles/prompt-stash",
     "@dshfiles/pull-requests",
-    "@dshfiles/pulls-review",
     "@dshfiles/queue-reorder",
     "@dshfiles/references",
     "@dshfiles/resource-packs",
@@ -86,12 +86,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 650,
-  "apiToolBindings": 453,
-  "apiToolNameCount": 453,
-  "apiToolSchemas": 452,
+  "apiMethods": 652,
+  "apiToolBindings": 455,
+  "apiToolNameCount": 455,
+  "apiToolSchemas": 454,
   "definedTools": 24,
-  "tools": 476,
+  "tools": 478,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -4635,6 +4635,61 @@
       "parameters": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "diffs_review",
+      "description": "Read a workspace's changes against a base bookmark, or an exact saved range of persistent JJ change IDs, and return review scopes (pulls.review rules) with per-scope file and line counts.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Absolute path of the workspace to review.",
+            "type": "string"
+          },
+          "base": {
+            "description": "Base bookmark or revision; defaults to the project’s main branch (Settings › Projects, dsh.project.json or origin’s default branch), else the first of main, master or trunk.",
+            "type": "string"
+          },
+          "fromChangeId": {
+            "description": "Persistent JJ change ID for the saved range base; requires toChangeId and path set to the owning repository root.",
+            "type": "string"
+          },
+          "toChangeId": {
+            "description": "Persistent JJ change ID for the saved range head; requires fromChangeId and path set to the owning repository root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "diffs_review_revisions",
+      "description": "Review several Jujutsu revisions together: each revision with its own changed files and line counts, ancestors first. The revisions need not be adjacent, and a selection with gaps is reported as such; use jj_details for a patch.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Absolute path of a workspace of the repository.",
+            "type": "string"
+          },
+          "revisions": {
+            "description": "The revisions to review together; they need not be adjacent.",
+            "type": "array",
+            "items": {
+              "description": "A commit id, or a change id, in full or as a unique prefix, as jj log prints them. A revset expression is refused.",
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "path",
+          "revisions"
+        ],
         "additionalProperties": false
       }
     },
@@ -9223,7 +9278,7 @@
     },
     {
       "name": "pulls_review",
-      "description": "Read a workspace's changes against a base bookmark, or an exact saved range of persistent JJ change IDs, and return pulls.review scopes with per-scope file and line counts.",
+      "description": "Former name of diffs_review, kept until 2026-12-31; call diffs_review instead. Same input and output.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -9252,7 +9307,7 @@
     },
     {
       "name": "pulls_review_revisions",
-      "description": "Review several Jujutsu revisions together: each revision with its own changed files and line counts, ancestors first. The revisions need not be adjacent, and a selection with gaps is reported as such; use jj_details for a patch.",
+      "description": "Former name of diffs_review_revisions, kept until 2026-12-31; call diffs_review_revisions instead. Same input and output.",
       "parameters": {
         "type": "object",
         "properties": {
