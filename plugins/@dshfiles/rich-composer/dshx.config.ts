@@ -5,6 +5,7 @@ export default defineConfig({
   modules: {
     'conversation-contract': 'src/conversation-contract.ts',
     'phone-thread-menu': 'src/phone-thread-menu.tsx',
+    'rich-text-editor': 'src/editor/index.ts',
   },
   client: {
     dshxRuntime: 'shared',

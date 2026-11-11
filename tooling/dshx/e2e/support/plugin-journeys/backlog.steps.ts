@@ -1375,10 +1375,14 @@ Then('the captured backlog item keeps both image attachments inline', async ({ p
 })
 
 When('the item description is replaced with {string}', async ({ page }: { page: Page }, text: string) => {
+  const comment = peek(page).getByRole('textbox', { name: 'Comment', exact: true })
+  await comment.fill('Independent draft')
   await peek(page).getByRole('button', { name: 'Edit description', exact: true }).click()
   const body = peek(page).getByRole('textbox', { name: 'Body', exact: true })
+  await expect(body).toHaveAttribute('data-composer-input', 'true')
   await body.fill(text)
   await body.press('ControlOrMeta+Enter')
+  await expect(comment).toContainText('Independent draft')
 })
 
 Then('the item detail shows the saved Markdown description', async ({ page }: { page: Page }) => {
@@ -1423,6 +1427,7 @@ When('the user reply is edited with keyboard navigation', async ({ page }: { pag
   await page.keyboard.press('Enter')
   const editor = activity.getByRole('textbox', { name: 'Edit reply', exact: true })
   await expect(editor).toBeVisible()
+  await expect(editor).toHaveAttribute('data-composer-input', 'true')
   await expect(activity.getByRole('button', { name: 'Open red.png', exact: true })).toBeVisible()
   await activity.getByRole('button', { name: 'Remove red.png', exact: true }).click()
   await activity.locator('input[type="file"]').setInputFiles(join(attachmentFixtures, 'blue.png'))

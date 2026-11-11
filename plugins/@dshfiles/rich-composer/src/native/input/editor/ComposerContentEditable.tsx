@@ -7,7 +7,7 @@
  * calls setEditable.
  */
 import { useLayoutEffect, useRef } from 'react'
-import type { HTMLAttributes, ReactNode } from 'react'
+import type { HTMLAttributes, MutableRefObject, ReactNode } from 'react'
 import type { LexicalEditor } from 'lexical'
 
 // One shell editor has one physical root. During legacy-view retirement, return
@@ -40,6 +40,7 @@ export interface ComposerContentEditableProps extends HTMLAttributes<HTMLDivElem
   readonly editor: LexicalEditor | null
   /** Whether the user may edit (readOnly/disabled states fold in here). */
   readonly editable: boolean
+  readonly elementRef?: MutableRefObject<HTMLDivElement | null> | undefined
 }
 
 /**
@@ -47,13 +48,18 @@ export interface ComposerContentEditableProps extends HTMLAttributes<HTMLDivElem
  * @param props - editor binding, editability, and div passthroughs.
  * @returns the resident contenteditable div.
  */
-export function ComposerContentEditable({ editor, editable, ...rest }: ComposerContentEditableProps): ReactNode {
+export function ComposerContentEditable({ editor, editable, elementRef, ...rest }: ComposerContentEditableProps): ReactNode {
   const ref = useRef<HTMLDivElement | null>(null)
   useLayoutEffect(() => {
     const el = ref.current
     if (editor === null || el === null) return
-    return leaseRoot(editor, el)
-  }, [editor])
+    if (elementRef !== undefined) elementRef.current = el
+    const release = leaseRoot(editor, el)
+    return () => {
+      release()
+      if (elementRef !== undefined && elementRef.current === el) elementRef.current = null
+    }
+  }, [editor, elementRef])
   useLayoutEffect(() => {
     if (editor !== null) editor.setEditable(editable)
   }, [editor, editable])

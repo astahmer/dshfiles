@@ -1,6 +1,6 @@
 /** The Composer model's private Lexical editor, projections, and node operations. */
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import type { LexicalEditor, NodeKey } from 'lexical'
+import type { Klass, LexicalEditor, LexicalNode, NodeKey } from 'lexical'
 import {
   $addUpdateTag, $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isRangeSelection,
   BLUR_COMMAND, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_CRITICAL, createEditor, HISTORY_MERGE_TAG, PASTE_TAG,
@@ -29,6 +29,7 @@ interface DraftEditorRuntimeDeps {
   readonly openReference: (source: string | undefined, reference: Pick<ReferenceInsert, 'ref' | 'appearance'>) => boolean
   readonly lexicon: () => Lexicon
   readonly resolveLexicon: () => ObservableSnapshot<Lexicon> | undefined
+  readonly additionalNodes?: readonly Klass<LexicalNode>[]
 }
 
 /**
@@ -64,7 +65,7 @@ export class DraftEditorRuntime {
   constructor(private readonly deps: DraftEditorRuntimeDeps) {
     this.editor = createEditor({
       namespace: 'dsh-composer',
-      nodes: [ReferenceChipNode, CommandChipNode, TextRefNode],
+      nodes: [ReferenceChipNode, CommandChipNode, TextRefNode, ...(deps.additionalNodes ?? [])],
       onError: (error) => {
         console.error('[rich-composer diagnostic] Lexical editor error', error.stack)
         throw error

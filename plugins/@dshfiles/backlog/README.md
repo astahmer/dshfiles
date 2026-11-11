@@ -176,8 +176,9 @@ Show changes and Revert work in both lanes. Every event and comment records its 
 `agent:<sessionId>`, `system`, `remote:<backend>`); events written before origins derive it on read (a synced comment
 from its `Linear · author:` prefix), so no op is rewritten, and `backlog_get` serves it.
 
-The description box and the reply box are the capture composer's own text box: Markdown, `@` completion
-for agents, backlog items and threads, and images or files picked with the paperclip, pasted or dropped.
+Descriptions and replies use separate instances of the rich composer's editor; capture keeps its own editor. Each keeps
+Markdown, `@` completion for agents, backlog items and threads, and images or files picked with the paperclip, pasted or
+dropped. Item drafts do not borrow or replace a thread's draft.
 A description's files are kept with the item; a reply's files belong to that comment and open in the
 same gallery from the conversation. User-authored replies can be edited or deleted; their actions and the edit form are keyboard-operable, with visible focus and accessible labels. Reply cards have a little extra separation in the activity list.
 

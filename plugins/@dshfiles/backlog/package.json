@@ -57,6 +57,7 @@
     "@dshfiles/project-automations": "workspace:*",
     "@dshfiles/project-checks": "workspace:*",
     "@dshfiles/pull-requests": "workspace:*",
+    "@dshfiles/rich-composer": "workspace:*",
     "@dshfiles/settings-shell": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/sqlite-store": "workspace:*",

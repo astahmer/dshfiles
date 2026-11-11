@@ -24,6 +24,10 @@
       "types": "./src/conversation-contract.ts",
       "default": "./dist/conversation-contract.js"
     },
+    "./rich-text-editor": {
+      "types": "./src/editor/index.ts",
+      "default": "./dist/rich-text-editor.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },

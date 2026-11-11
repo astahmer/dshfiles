@@ -8,8 +8,8 @@ import { useEffect, useRef, useState, type FocusEvent, type ReactNode } from 're
 
 import { AttachFilesButton, AttachmentTray, threadMentionText, useComposerFiles, useFileDrop } from './composer-attachments.js'
 import { useComposerToolHold, type BacklogComposerTools } from './composer-tools.js'
-import { BacklogImageEditor } from './image-reference-editor.js'
-import type { BacklogImageEditorHandle } from './image-reference-editor.js'
+import { BacklogImageEditor } from './item-image-editor.js'
+import type { BacklogImageEditorHandle } from './item-image-editor.js'
 import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion, type MentionSuggestion, type MentionThread } from './mention-completion.js'
 import { continueMarkdownList } from './list-continuation.js'

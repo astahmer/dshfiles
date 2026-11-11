@@ -5,15 +5,9 @@ SQLite op log, short aliases, providers, multi-host peers, backlinks on threads 
 item — is documented in the [plugin README](../../plugins/@dshfiles/backlog/README.md), and the reasoning behind it in
 [backlog redesign](../../plugins/@dshfiles/backlog/docs/redesign.md).
 
-Resume here: item 7 is the only open work. Pull-request descriptions now close the items they name, and the Hosts
-section shows where each peer runs automation (both in the plugin README). The one-off Discord TODO import was
-dropped on 2026-11-10: the user does not want it.
-
-## Open
-
-| #   | Item                                                                                                                                                                                                                                                                                           | State |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| 7   | Edit item bodies and replies with `@dshfiles/rich-composer` instead of the capture editor: it exposes no embeddable editor yet, so this needs a public per-occurrence editor module (see [plugin boundaries](../../docs/plugin-boundaries.md#what-is-not-a-seat-yet-the-rich-composer-editor)) | open  |
+Resume here: nothing open. Item 7 shipped: item bodies and replies use the rich composer's per-occurrence editor
+(`@dshfiles/rich-composer/rich-text-editor`), and capture keeps its own. The remaining work is the live verification
+below, which needs a Host restart the user owns.
 
 ## Unverified live
 
