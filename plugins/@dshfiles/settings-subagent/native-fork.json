@@ -25,5 +25,5 @@
       "local": "locale"
     }
   ],
-  "delta": ["src/native/index.ts", "src/native/subagent-model-selection-card-controller.ts"]
+  "delta": ["src/native/index.ts", "src/native/locales.ts", "src/native/subagent-model-selection-card-controller.ts"]
 }

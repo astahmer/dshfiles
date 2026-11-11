@@ -25,6 +25,7 @@ the recorded delta below.
 | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [subagent-model-selection-card-controller.ts](src/native/subagent-model-selection-card-controller.ts) | The catalog read waits for the page's first connected generation, which then needs no reread (later resets still reset as natively), and goes through `joinPageRead('remote:session/modelCatalog')`. |
 | [index.ts](src/native/index.ts)                                                                       | Tells the controller whether the connection already has a generation, and routes `connection/reset` through `connectionReset()`.                                                                     |
+| [locales.ts](src/native/locales.ts)                                                                   | The model-selection copy says running sessions follow list changes, as the [`@dshfiles/tool-subagent`](../tool-subagent) fork does (b:rmkm).                                                         |
 
 ```sh
 node scripts/native-fork-diff.mjs settings-subagent
