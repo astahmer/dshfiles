@@ -1,7 +1,8 @@
 import { NodeServices } from '@effect/platform-node'
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { decodeEnableArgs, providers, resolveProvider as resolveProviderEffect, type Provider } from '../src/providers.ts'
+import { decodeEnableArgs } from '../src/enable-args.ts'
+import { providers, resolveProvider as resolveProviderEffect, type Provider } from '../src/providers.ts'
 
 const resolveProvider = (preferred?: Provider) => Effect.runPromise(resolveProviderEffect(preferred).pipe(Effect.provide(NodeServices.layer)))
 
