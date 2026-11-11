@@ -53,6 +53,7 @@
     "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
     "@deepseek-ai/dsh-storage-domain": "catalog:",
     "@deepseek-ai/dsh-subprocess": "catalog:",
+    "@deepseek-ai/dsh-util-crypto": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/frame-layout": "workspace:*",
     "@effect/vitest": "catalog:",
@@ -84,6 +85,7 @@
     "@deepseek-ai/dsh-storage-domain": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-subprocess": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-util-crypto": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "^3.18.4"
   },
   "dsh": {

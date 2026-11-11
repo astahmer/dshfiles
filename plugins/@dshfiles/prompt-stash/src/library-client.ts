@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { useApi } from '@dshfiles/dshx/client'
 import * as Schema from 'effect/Schema'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -120,7 +121,7 @@ const completeLocalLibraryMigration = (expectedStore: PromptLibraryStore): void 
   if (shouldReload) storedLibrary.reload()
 }
 
-const createPromptId = (): string => globalThis.crypto.randomUUID()
+const createPromptId = (): string => randomUUID()
 const nowMilliseconds = (): number => Date.now()
 
 /** 30 s, so switching threads reuses the library instead of asking the Host on every composer mount. */

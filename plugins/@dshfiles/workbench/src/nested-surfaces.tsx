@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { ComponentType } from 'react'
 import * as Schema from 'effect/Schema'
 import { workbenchRegions, type NestedSurfacePath, type WorkbenchRegionId, type WorkbenchRegionRegistry, type WorkbenchRegionSurface } from './dock-regions.js'
@@ -26,7 +27,7 @@ export const nestedSurfaceDefinitions = createStoredValue({
 })
 
 /** Allocate once in an Add-container action, not during a component render. */
-export const nestedSurfacePath = (parent: WorkbenchRegionId, token: string = crypto.randomUUID()): NestedSurfacePath => {
+export const nestedSurfacePath = (parent: WorkbenchRegionId, token: string = randomUUID()): NestedSurfacePath => {
   Schema.decodeUnknownSync(pathTokenSchema)(token)
   const prefix = parent.startsWith('nested/') ? decodeNestedSurfacePath(parent) : `nested/${parent}`
   return decodeNestedSurfacePath(`${prefix}/${token}`)

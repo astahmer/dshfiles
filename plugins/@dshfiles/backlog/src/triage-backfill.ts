@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { Cause, Context, Effect, FiberMap, Layer, Option, Ref, Result } from 'effect'
 import type { BacklogBackfillResult } from './api.js'
 import { BacklogBackfill } from './backfill.js'
@@ -151,7 +152,7 @@ export class TriageBackfill extends Context.Service<
 
       const start = Effect.fn('backlog backfill start')(function* (request: { readonly retriage?: boolean | undefined; readonly limit?: number | undefined }) {
         const retriage = request.retriage === true
-        const job: BackfillJob = { jobId: globalThis.crypto.randomUUID(), retriage, state: 'queued' }
+        const job: BackfillJob = { jobId: randomUUID(), retriage, state: 'queued' }
         // Admission and insertion are one step, so two callers can never both believe no job is running.
         const admitted = yield* Ref.modify(jobs, current => {
           const running = [...current.values()].find(busy)

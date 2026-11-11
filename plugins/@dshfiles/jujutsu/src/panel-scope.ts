@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import * as Schema from 'effect/Schema'
 import { type Dispatch, type SetStateAction, useEffect, useState, useSyncExternalStore } from 'react'
 import { SchemaHelpers } from './schema-helpers.js'
@@ -72,7 +73,7 @@ export class PanelScopes {
   }
 
   static newMainTab(): string {
-    return `${MAIN_TAB_SCOPE_PREFIX}${crypto.randomUUID()}`
+    return `${MAIN_TAB_SCOPE_PREFIX}${randomUUID()}`
   }
 
   /** A scope announcement aimed at another panel is not ours. */

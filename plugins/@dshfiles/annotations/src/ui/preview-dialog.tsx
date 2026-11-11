@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { useEffect, useMemo, useState, type JSX } from 'react'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
@@ -26,7 +27,7 @@ export const PreviewDialog = ({
 }): JSX.Element => {
   const api = useApi(annotationsApi)
   const queryClient = useQueryClient()
-  const nonce = useMemo(() => crypto.randomUUID(), [])
+  const nonce = useMemo(() => randomUUID(), [])
   const [path, setPath] = useState('')
   const [document, setDocument] = useState<PreviewDocument | null>(null)
   const [picked, setPicked] = useState<AnnotationTarget | null>(null)

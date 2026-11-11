@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -317,7 +318,7 @@ export const DestinationBar = (props: {
   }, [destination.data])
   const settings = useSettings(jjIntegrationSettings).value
   const isolateByDefault = settings?.isolateByDefault ?? false
-  const [mountId] = useState(() => crypto.randomUUID())
+  const [mountId] = useState(() => randomUUID())
   const newThreadSessionId = composerWorkspace?.sessionId ?? null
   const newThreadId = composerWorkspace?.sessionId === undefined ? null : composerWorkspace.visitId
   const occupied = destination.data?.ownedByAnotherSession ?? composerWorkspace?.occupied ?? true

@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { DockviewApi, DockviewGroupPanel, IDockviewPanel } from 'dockview-react'
 import * as Schema from 'effect/Schema'
 import { WORKBENCH_COMPONENT } from './layout-store.js'
@@ -25,7 +26,7 @@ export class NewViewTabs {
   }
 
   static open(api: DockviewApi, group?: DockviewGroupPanel, direction: 'within' | 'right' | 'below' = 'within'): IDockviewPanel {
-    const options = { id: `${NEW_VIEW_PREFIX}${crypto.randomUUID()}`, title: 'New tab', component: WORKBENCH_COMPONENT }
+    const options = { id: `${NEW_VIEW_PREFIX}${randomUUID()}`, title: 'New tab', component: WORKBENCH_COMPONENT }
     return group === undefined ? api.addPanel(options) : api.addPanel({ ...options, position: { referenceGroup: group, direction } })
   }
 

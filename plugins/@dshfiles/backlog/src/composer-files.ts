@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { BacklogItems, type BacklogFileInput } from './item.js'
 
 export type ComposerFileKind = 'image' | 'file'
@@ -44,7 +45,7 @@ const readImage = async (file: File): Promise<ComposerFile> => {
     const bytes = bytesOfDataUrl(dataUrl)
     if (bytes > BacklogItems.maxFileBytes) throw new Error('That image is still larger than 16 MB after shrinking.')
     return {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       kind: 'image',
       name: file.name === '' ? `Screenshot ${new Date().toLocaleTimeString()}` : file.name.slice(0, 200),
       mediaType: dataUrl.startsWith('data:image/webp') ? 'image/webp' : 'image/png',
@@ -66,7 +67,7 @@ const readFile = async (file: File): Promise<ComposerFile> => {
     reader.readAsDataURL(file)
   })
   return {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     kind: 'file',
     name: file.name === '' ? 'Dropped file' : file.name.slice(0, 200),
     mediaType: file.type === '' ? 'application/octet-stream' : file.type,

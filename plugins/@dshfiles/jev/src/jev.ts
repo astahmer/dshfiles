@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { type JevUsageRecord, usageApi } from '@dshfiles/usage/api'
 import { Clock, Context, Duration, Effect, Layer, Redacted, Schema } from 'effect'
@@ -138,7 +139,7 @@ export class Jev extends Context.Service<
       })
 
       const ask = Effect.fn('jev ask')(function* (request: JevRequest) {
-        const requestId = globalThis.crypto.randomUUID()
+        const requestId = randomUUID()
         const startedAt = yield* Clock.currentTimeMillis
         const outcome = yield* Effect.exit(classify(request))
         const endedAt = yield* Clock.currentTimeMillis

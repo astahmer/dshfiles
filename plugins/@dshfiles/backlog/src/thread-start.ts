@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { PromptContentPart, SessionCreateRequest, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-client-file-upload'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
@@ -37,7 +38,7 @@ export const actorOf = (caller: ApiCaller): BacklogActor =>
   caller.kind === 'agent' ? { kind: 'agent', sessionId: caller.sessionId, cwd: caller.cwd } : { kind: 'user' }
 
 // SAFETY: SessionRequestId is a type-only brand over a Host-minted unique id.
-const requestId = (): SessionRequestId => globalThis.crypto.randomUUID() as SessionRequestId
+const requestId = (): SessionRequestId => randomUUID() as SessionRequestId
 // SAFETY: the same brand, for the id one recorded start already minted and reuses on every retry.
 const requestIdOf = (value: string): SessionRequestId => value as SessionRequestId
 
@@ -332,7 +333,7 @@ export class ThreadStart extends Context.Service<
         const create: StartIntentCreate =
           base.workspaceId === undefined ? (base.cwd === undefined ? {} : { cwd: base.cwd }) : { workspaceId: String(base.workspaceId) }
         const draft: StartIntentDraft = {
-          id: globalThis.crypto.randomUUID(),
+          id: randomUUID(),
           promptRequestId: requestId(),
           itemIds: input.ids,
           agent: agent === null ? null : agent.handle,

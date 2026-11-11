@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { Clock, Context, Effect, Layer, Option, PubSub, Ref, Semaphore, Stream } from 'effect'
 import type { BacklogDetailView, BacklogSummaryView } from './api.js'
 import { BacklogBackfill, type BackfillScope, type BackfillSelection } from './backfill.js'
@@ -1387,7 +1388,7 @@ export class BacklogStore extends Context.Service<
             const links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(input.text), ...callerLinks(input.actor)])
             const actor = input.actor
             const sourceThread = actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? { threadId: actor.sessionId } : {}
-            const commentId = globalThis.crypto.randomUUID()
+            const commentId = randomUUID()
             const event = {
               kind: 'commented' as const,
               detail: input.text.slice(0, BacklogItems.maxBodyChars),

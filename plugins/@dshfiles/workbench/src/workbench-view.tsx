@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { EllipsisIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
@@ -414,7 +415,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
       target.group?.api.setActive()
       if (selection !== undefined && definition.allowMultiple !== false && !definition.hiddenFromAdd && definition.tabId === undefined) {
         const options = {
-          id: `view/${definition.id}/${crypto.randomUUID()}`,
+          id: `view/${definition.id}/${randomUUID()}`,
           component: WORKBENCH_COMPONENT,
           title: definition.title,
           params: { sourceId: definition.id },

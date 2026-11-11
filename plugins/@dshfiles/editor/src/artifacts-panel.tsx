@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
@@ -268,7 +269,7 @@ const ThreadArtifacts = (props: {
 }
 
 export const ArtifactsPanel = (props: { readonly sessionId: string | undefined; readonly loadEngine: () => Promise<CodeEditorEngine> }): JSX.Element => {
-  const [occurrence] = useState(() => crypto.randomUUID())
+  const [occurrence] = useState(() => randomUUID())
   const [sessions, setSessions] = useState<readonly string[]>([])
   useEffect(() => {
     if (props.sessionId !== undefined) setSessions(current => (current.includes(props.sessionId ?? '') ? current : [...current, props.sessionId ?? '']))

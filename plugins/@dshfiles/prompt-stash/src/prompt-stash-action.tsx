@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { usePhoneThreadTool } from '@dshfiles/rich-composer/phone-thread-menu'
 import { BookmarkIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -47,7 +48,7 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
         const client = libraryClientRef.current
         return client === null ? { kind: 'unavailable' } : client.readLatest(options)
       },
-      createId: () => libraryClientRef.current?.createId() ?? globalThis.crypto.randomUUID(),
+      createId: () => libraryClientRef.current?.createId() ?? randomUUID(),
       now: () => libraryClientRef.current?.now() ?? Date.now(),
       insertText: (text, span) => inputActionsRef.current.insertText(text, span),
     }),

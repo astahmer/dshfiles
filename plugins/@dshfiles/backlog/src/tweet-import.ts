@@ -1,3 +1,4 @@
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { AttachmentId, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { tweetContextBacklogApi } from '@dshfiles/tweet-context/backlog-api'
@@ -60,7 +61,7 @@ export class TweetImport extends Context.Service<
               const stored = yield* images.readImage(reference)
               if (stored.data.byteLength !== image.bytes) return yield* new TweetImageInvalid({})
               const file: BacklogFileInput = {
-                id: globalThis.crypto.randomUUID(),
+                id: randomUUID(),
                 kind: 'image',
                 name: image.name,
                 mediaType: image.mediaType,
