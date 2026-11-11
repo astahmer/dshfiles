@@ -1,5 +1,5 @@
 {
-  "hostBundles": 84,
+  "hostBundles": 85,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -24,6 +24,7 @@
     "@dshfiles/conversation-cleanup",
     "@dshfiles/cordis-cards",
     "@dshfiles/cordis-client-runner",
+    "@dshfiles/deliverables",
     "@dshfiles/diff-viewed",
     "@dshfiles/diffs-review",
     "@dshfiles/editor",

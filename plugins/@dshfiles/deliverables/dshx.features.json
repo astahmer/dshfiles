@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "changed-files-card",
+      "title": "Changed-files card and review tab",
+      "summary": "The native \"Edited N files\" card under a turn, its per-file hover comparison, the right-sidebar review tab, delivery cards and closing-prose file mentions, from one owned fork of the stock row.",
+      "surfaces": ["client", "host"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "chat transcript: the card under a turn that edited files, and the review tab it opens",
+      "onboarding": {
+        "firstAction": "Ask the agent to edit a file, then open a row of the Edited files card under its reply.",
+        "doneWhen": "The file's changes show under the row or in the review tab."
+      },
+      "configuration": [],
+      "states": ["loading", "text-diff", "binary", "oversized", "missing", "error"],
+      "failureModes": [
+        "A summary the Host no longer serves (Session disposed, Host restarted) shows that the turn's changes are no longer available.",
+        "A failed comparison read shows a Retry button."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "The routes are the native ones registered through Connection's authenticated fetch; the comparisons are computed by core workspaceChanges, which owns their spans."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "deliverables.native-baseline",
+          "reason": "Every vendored file equals the pinned tag (node scripts/native-fork-diff.mjs deliverables)."
+        }
+      ]
+    }
+  ]
+}

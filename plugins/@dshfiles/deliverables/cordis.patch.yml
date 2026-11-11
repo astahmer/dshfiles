@@ -1,0 +1,5 @@
+- id: ui-deliverables
+  disabled: true
+- insert:
+    - id: dshfiles-deliverables
+      name: '@dshfiles/deliverables'
