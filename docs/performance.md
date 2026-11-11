@@ -16,8 +16,8 @@ baseline, not a controlled benchmark. The JSON attention unit was 313,423 bytes 
 
 A 60-second Host CPU profile reported 51.7 s busy and 22.9 s inclusive under agent-loop step. Machine contention and
 inclusive samples preclude attributing this as the cause of a particular switch. The inspector was closed afterward.
-A regression probe against the JSON backend also showed that deleting the final migrated record re-imports it from the
-retained legacy unit on reopen; the attention store must not switch layouts until that migration is safe.
+The follow-up migration probe (a deleted final record re-imported from the retained legacy unit) is fixed in the
+per-record backend and covered by its tests; the attention store now uses that layout, see below.
 
 ## Attention writes answer a delta, and the unit stores one record per thread (2026-11-11)
 
@@ -83,7 +83,29 @@ same thread leaves both the Jev-ask and the summarizer call counts unchanged.
 | H12 usage chart projections         | 0 `usage charts read` spans in the retained window                                                                                                    | Skipped: no measured cost                                                                          |
 | T02 remainder (slot registrations)  | Source calls `clientSlotRegistrations` twice per build; the recorded 471/72/401 → 147/49/104 ms receipt is not a slot measurement                     | Skipped: no measured slot cost                                                                     |
 | T06 scratch preparation             | Serial builds identified, no stage spans to attribute                                                                                                 | Skipped: no measured cost                                                                          |
-| cordis-client-runner catalogs       | 297 of 332 KB, evaluation p50 4.9 ms, first 6.7 ms (2026-11-04); lazy client chunks are feasible in dshx, but no current load shows the cost          | Skipped: a split build is a further dshx primitive for a 4.9 ms cost                               |
+| cordis-client-runner catalogs       | Entry `client.js` 331.7 KB; both generated catalogs parsed and evaluated at boot (cold 8.8 ms measured 2026-11-11)                                    | Done: catalogs load on first `cordis_inspect`; entry 38.9 KB (-88%), boot evaluation deferred      |
+
+## Cordis inspect catalogs load on demand (2026-11-11)
+
+The runner's generated Slot and API catalogs were 297 of its 332 KB Client entry and ran at boot; only a
+`cordis_inspect` call reads them. `providers.ts` now reaches each through a literal `import()`, which our dshx fork emits
+as a package-local lazy chunk fetched with `require.async` on the first query of that provider.
+
+| Measure                     | Before                 | After                                                                       |
+| --------------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| `dist/client.js`            | 331.7 KB               | 38.9 KB (-88 %)                                                             |
+| Same, gzip                  | 55 KB                  | 11.7 KB                                                                     |
+| Catalogs loaded at boot     | 297 KB (gzip 45 KB)    | none                                                                        |
+| Entry evaluation at boot    | includes both catalogs | catalogs deferred                                                           |
+| First inspect of a provider | 0                      | one chunk fetch (API 63.3 KB / 15.9 KB gzip, Slots 234.4 KB / 29.2 KB gzip) |
+
+Cold evaluation of the deferred chunks in a fresh `node:vm` context (parse + run, 2026-11-11, Node 22): API catalog
+2.2 ms, Slot catalog 6.6 ms, so ~8.8 ms of boot work moved to the first inspect. Repeats inside one process are much
+cheaper (V8 code cache) and are not a per-load number. The previous 4.9 ms p50 came from a different protocol, so treat
+8.8 ms as the cold figure.
+
+`native-fork.json` now lists `src/native/providers.ts` in the delta; `node scripts/native-fork-diff.mjs
+cordis-client-runner` reports no undeclared change.
 
 ## Workbench main-seat baseline (2026-10-26)
 

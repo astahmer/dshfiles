@@ -4,9 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
-import { queryEventApi, queryServiceApi } from './api-catalog.ts'
 import type { ClientCordisInspectProviderRegistration } from './inspect-registry.ts'
-import { CLIENT_SLOT_API } from './slot-catalog.ts'
 import type { ClientSlotEntry } from './slot-catalog.ts'
 
 /* jscpd:ignore-start */
@@ -80,7 +78,10 @@ export function clientInspectProviders(ctx: Context): ClientCordisInspectProvide
       'Service',
       'Progressive Client Service discovery: compact capability/signature directory, then one exact coding contract.',
       'listService',
-      input => queryServiceApi(readExact(input, 'service')) as unknown as JsonValue,
+      async input => {
+        const { queryServiceApi } = await import('./api-catalog.ts')
+        return queryServiceApi(readExact(input, 'service')) as unknown as JsonValue
+      },
       SERVICE_INPUT,
       SERVICE_OUTPUT,
     ),
@@ -88,7 +89,10 @@ export function clientInspectProviders(ctx: Context): ClientCordisInspectProvide
       'Event',
       'Progressive Client Event discovery: compact listener directory, then one exact event contract.',
       'listEvents',
-      input => queryEventApi(readExact(input, 'event')) as unknown as JsonValue,
+      async input => {
+        const { queryEventApi } = await import('./api-catalog.ts')
+        return queryEventApi(readExact(input, 'event')) as unknown as JsonValue
+      },
       EVENT_INPUT,
       EVENT_OUTPUT,
     ),
@@ -115,11 +119,14 @@ export function clientInspectProviders(ctx: Context): ClientCordisInspectProvide
           && typeof input.root === 'string' ? input.root : undefined
         const trees = slots.snapshot(root)
         const selected = trees[0]
-        return Promise.resolve({
-          ...root === undefined ? {} : { requestedRoot: { name: root, available: trees.length > 0 } },
-          trees: trees.map(compactSlotTree),
-          ...root === undefined || selected === undefined ? {} : { selected: inspectLiveSlot(selected) },
-          referencedTypes: [],
+        return import('./slot-catalog.ts').then(({ CLIENT_SLOT_API }) => {
+          const catalog = new Map(CLIENT_SLOT_API.map(entry => [entry.key, entry]))
+          return {
+            ...root === undefined ? {} : { requestedRoot: { name: root, available: trees.length > 0 } },
+            trees: trees.map(tree => compactSlotTree(tree, catalog)),
+            ...root === undefined || selected === undefined ? {} : { selected: inspectLiveSlot(selected, catalog) },
+            referencedTypes: [],
+          }
         })
       },
     },
@@ -171,7 +178,6 @@ function readExact(input: JsonValue | undefined, field: string): string | undefi
 
 type LiveCompositionNode = ReturnType<SlotRegistry['snapshot']>[number]
 
-const SLOT_CATALOG = new Map(CLIENT_SLOT_API.map(entry => [entry.key, entry]))
 const GUARDED_SLOT_KEYS = new Map<string, {
   description: string
   values: readonly { value: string; description: string }[]
@@ -185,16 +191,16 @@ const GUARDED_SLOT_KEYS = new Map<string, {
   }],
 ])
 
-function compactSlotTree(node: LiveCompositionNode): JsonValue {
+function compactSlotTree(node: LiveCompositionNode, catalogByKey: ReadonlyMap<string, ClientSlotEntry>): JsonValue {
   if (node.type === 'factory') {
     return {
       type: node.type,
       name: node.name,
       scope: node.scope,
-      children: node.children.map(compactSlotTree),
+      children: node.children.map(child => compactSlotTree(child, catalogByKey)),
     }
   }
-  const catalog = SLOT_CATALOG.get(node.name)
+  const catalog = catalogByKey.get(node.name)
   const guardedKeys = catalog === undefined ? undefined : GUARDED_SLOT_KEYS.get(catalog.key)
   return {
     type: node.type,
@@ -216,11 +222,11 @@ function compactSlotTree(node: LiveCompositionNode): JsonValue {
         ...guardedKeys === undefined ? {} : { allowedKeys: guardedKeys.values.map(value => ({ ...value })) },
       },
     },
-    children: node.children.map(compactSlotTree),
+    children: node.children.map(child => compactSlotTree(child, catalogByKey)),
   }
 }
 
-function inspectLiveSlot(node: LiveCompositionNode): JsonValue {
+function inspectLiveSlot(node: LiveCompositionNode, catalogByKey: ReadonlyMap<string, ClientSlotEntry>): JsonValue {
   if (node.type === 'factory') {
     return {
       type: node.type,
@@ -229,7 +235,7 @@ function inspectLiveSlot(node: LiveCompositionNode): JsonValue {
       ...node.registrant === undefined ? {} : { registrant: node.registrant },
     }
   }
-  const catalog = SLOT_CATALOG.get(node.name)
+  const catalog = catalogByKey.get(node.name)
   return {
     type: node.type,
     name: node.name,

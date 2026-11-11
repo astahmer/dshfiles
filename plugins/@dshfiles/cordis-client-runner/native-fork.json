@@ -21,5 +21,5 @@
       "local": "locale"
     }
   ],
-  "delta": ["src/native/index.ts"]
+  "delta": ["src/native/index.ts", "src/native/providers.ts"]
 }
