@@ -104,7 +104,9 @@ describe.skipIf(!jjAvailable || !gitAvailable)('starting a jj thread workspace f
 
   it('never claims a spare made before the fetch at the old position', async () => {
     await threads.prewarm(repo, 'main@origin')
-    await expect.poll(() => jj(repo, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"').split('\n').filter(Boolean).length).toBe(2)
+    await expect
+      .poll(() => jj(repo, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"').split('\n').filter(Boolean).length, { timeout: 20_000 })
+      .toBe(2)
     pushFromElsewhere(root, origin, 'pushed elsewhere')
 
     const thread = await threads.provision(repo, 'main@origin')

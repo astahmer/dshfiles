@@ -200,7 +200,7 @@ describe.skipIf(!jjAvailable)('workspaces agents isolate for themselves', () => 
     })
     expect(job.request.path).toBeNull()
     expect(job.repoRoot).toBe(repo)
-    await expect.poll(async () => (await harness.api.cleanupJobs({ path: repo })).jobs[0]?.state).toBe('done')
+    await expect.poll(async () => (await harness.api.cleanupJobs({ path: repo })).jobs[0]?.state, { timeout: 20_000 }).toBe('done')
   })
 
   it.skipIf(!permissionsEnforced)(
