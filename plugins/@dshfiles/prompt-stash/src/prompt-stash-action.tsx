@@ -15,11 +15,22 @@ import { PromptEditorForm, type PromptEditorSubmission } from './prompt-editor-f
 import { promptLibraryMachine, type PromptLibraryWorkflowClient } from './prompt-library-machine.js'
 import { promptSearchFilter } from './prompt-search.js'
 import { useDraftAttachmentRetention, type DraftAttachmentKeeper } from './draft-attachment-retention.js'
+import { PromptHistoryTab } from './prompt-history-tab.js'
+import { PromptHistoryTargets } from './prompt-history-targets.js'
+
+type PromptSource = 'saved' | 'recent' | 'history'
+
+const sourceTitle = { saved: 'Saved prompts', recent: 'Recent messages', history: 'Prompt history' } satisfies Record<PromptSource, string>
+const sourceNote = {
+  saved: 'Saved text is shared through the Host. Files and attachments are not included.',
+  recent: 'Recent text from this conversation only. Attachments are not included.',
+  history: 'Every prompt you sent, across threads. Star one to keep it in Saved.',
+} satisfies Record<PromptSource, string>
 
 const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeeper: DraftAttachmentKeeper<PromptActionProps['sessionId']> }): JSX.Element => {
   const input = props.useInput(state => state)
   useDraftAttachmentRetention({ keeper: props.attachmentKeeper, sessionId: props.sessionId, count: input.attachmentIds.length })
-  const [activeSource, setActiveSource] = useState<'saved' | 'recent'>('saved')
+  const [activeSource, setActiveSource] = useState<PromptSource>('saved')
   const libraryClientRef = useRef<PromptLibraryClient | null>(null)
   const inputActionsRef = useRef(props.inputActions)
   const workflowClient = useMemo<PromptLibraryWorkflowClient>(
@@ -72,12 +83,36 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
   const [recentPrompts, setRecentPrompts] = useState<readonly RecentPrompt[]>([])
   const triggerId = useId()
 
-  const openLibrary = (): void => {
-    setActiveSource('saved')
+  const openLibrary = (source: PromptSource = 'saved'): void => {
+    setActiveSource(source)
     send({ type: 'open', span: props.inputActions.captureInsertion() })
   }
 
-  const phoneTool = usePhoneThreadTool({ id: '@dshfiles/prompt-stash/prompts', label: 'Saved prompts', open: openLibrary, active: isOpen })
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const openHistoryRef = useRef(() => openLibrary('history'))
+  openHistoryRef.current = () => openLibrary('history')
+  useEffect(() => {
+    const target = { frame: () => triggerRef.current?.closest<HTMLElement>('[data-composer-card]') ?? null, open: () => openHistoryRef.current() }
+    const unregister = PromptHistoryTargets.register(target)
+    const card = target.frame()
+    const touch = (): void => PromptHistoryTargets.touch(target)
+    // Ctrl+R reloads the page anywhere else; inside this composer it opens the history instead.
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!PromptHistoryTargets.isHistoryKey(event)) return
+      event.preventDefault()
+      event.stopPropagation()
+      openHistoryRef.current()
+    }
+    card?.addEventListener('focusin', touch)
+    card?.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      card?.removeEventListener('focusin', touch)
+      card?.removeEventListener('keydown', onKeyDown, true)
+      unregister()
+    }
+  }, [])
+
+  const phoneTool = usePhoneThreadTool({ id: '@dshfiles/prompt-stash/prompts', label: 'Saved prompts', open: () => openLibrary(), active: isOpen })
 
   const closeLibrary = (): void => send({ type: 'close' })
 
@@ -100,6 +135,10 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
 
   const insertRecentPrompt = (prompt: { readonly text: string }): void => send({ type: 'recent.insert', text: prompt.text })
 
+  const savedTexts = useMemo(() => new Set(prompts.map(prompt => prompt.text)), [prompts])
+
+  const saveHistoryPrompt = (text: string): void => send({ type: 'current.save', text })
+
   const isConfirmingDelete = (prompt: SavedPrompt): boolean => deleteConfirmation?.id === prompt.id && deleteConfirmation.revision === prompt.revision
 
   const emptyLine = (text: string): JSX.Element => <p className="dshx:px-3 dshx:py-4 dshx:text-center dshx:text-xs dshx:text-muted-foreground">{text}</p>
@@ -114,6 +153,7 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
           size="sm"
           className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-foreground"
           id={triggerId}
+          ref={triggerRef}
           onMouseDown={event => event.preventDefault()}
         >
           <BookmarkIcon />
@@ -124,21 +164,17 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
         onCloseAutoFocus={phoneTool.onCloseAutoFocus}
         align="end"
         side="top"
-        className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-[26rem] dshx:flex-col dshx:overflow-y-auto dshx:p-0"
+        className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-[26rem] dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:overflow-y-auto dshx:p-0"
         aria-labelledby={triggerId}
       >
         {props.useChat === undefined ? null : (
           <ChatSource useChat={props.useChat} selector={selectRecentPrompts} isEqual={areRecentPromptsEqual} onChange={setRecentPrompts} />
         )}
-        <Tabs value={activeSource} onValueChange={value => setActiveSource(value === 'recent' ? 'recent' : 'saved')} className="dshx:gap-0">
+        <Tabs value={activeSource} onValueChange={value => setActiveSource(value === 'recent' || value === 'history' ? value : 'saved')} className="dshx:gap-0">
           <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3 dshx:px-3 dshx:pt-3">
             <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
-              <h2 className="dshx:text-sm dshx:font-semibold">{activeSource === 'recent' ? 'Recent messages' : 'Saved prompts'}</h2>
-              <p className="dshx:text-xs dshx:text-muted-foreground">
-                {activeSource === 'recent'
-                  ? 'Recent text from this conversation only. Attachments are not included.'
-                  : 'Saved text is shared through the Host. Files and attachments are not included.'}
-              </p>
+              <h2 className="dshx:text-sm dshx:font-semibold">{sourceTitle[activeSource]}</h2>
+              <p className="dshx:text-xs dshx:text-muted-foreground">{sourceNote[activeSource]}</p>
             </div>
             <Button type="button" variant="ghost" size="xs" onClick={closeLibrary}>
               Done
@@ -151,6 +187,9 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
               </TabsTrigger>
               <TabsTrigger value="recent" className="dshx:flex-none dshx:px-0 dshx:text-xs">
                 Recent here ({Math.min(recentPrompts.length, MAX_RECENT_PROMPTS)})
+              </TabsTrigger>
+              <TabsTrigger value="history" className="dshx:flex-none dshx:px-0 dshx:text-xs">
+                All threads
               </TabsTrigger>
             </TabsList>
             {activeSource === 'saved' && libraryState === 'ready' && editorTarget === null ? (
@@ -213,6 +252,17 @@ const PromptStashAction = (props: PromptActionProps & { readonly attachmentKeepe
                 </CommandList>
               </Command>
             )}
+          </TabsContent>
+
+          <TabsContent value="history" className="dshx:mt-0">
+            <PromptHistoryTab
+              active={isOpen && activeSource === 'history'}
+              insertDisabled={hasInserted}
+              isSaved={text => savedTexts.has(text)}
+              canSave={libraryState === 'ready' && prompts.length < MAX_PROMPTS && snapshot.matches('browsing')}
+              onInsert={text => insertRecentPrompt({ text })}
+              onSave={saveHistoryPrompt}
+            />
           </TabsContent>
 
           <TabsContent forceMount value="saved" className="dshx:mt-0">

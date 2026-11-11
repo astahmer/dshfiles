@@ -149,6 +149,88 @@
       ]
     },
     {
+      "id": "prompt-history",
+      "title": "Search every prompt sent across threads",
+      "summary": "Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_history_search agent tool reads the same Host method.",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Deploy the quartz service to staging\"",
+        "press Enter",
+        "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
+        "click button \"Prompts\"",
+        "click tab \"All threads\"",
+        "expect heading \"Prompt history\""
+      ],
+      "surfaces": ["client", "host", "api", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Prompts › All threads; Ctrl+R; palette: Search prompt history",
+      "configuration": [
+        {
+          "key": "promptHistory",
+          "defaultValue": "true",
+          "constraints": "Boolean; turns the history results on or off.",
+          "choices": ["true", "false"],
+          "coveredBy": ["prompt-stash.prompt-history-host-disabled"]
+        },
+        {
+          "key": "historyRetention",
+          "defaultValue": "5000",
+          "constraints": "Integer from 100 to 50000 newest prompts searched.",
+          "coveredBy": ["prompt-stash.prompt-history-across-threads"]
+        },
+        {
+          "key": "historyMaxChars",
+          "defaultValue": "8000",
+          "constraints": "Integer from 200 to 65536 characters; longer prompts are skipped.",
+          "coveredBy": ["prompt-stash.prompt-history-across-threads"]
+        }
+      ],
+      "states": ["ready", "no-match", "disabled", "unavailable"],
+      "failureModes": [
+        "Without @dshfiles/session-search serving the profile, the tab says to add it and restart DSH.",
+        "With promptHistory off, the tab says which setting turns it back on.",
+        "Ctrl+R outside a focused composer is left to the browser (page reload)."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "prompt-stash.prompt-history-across-threads",
+          "featureFile": "tooling/dshx/e2e/features/prompt-stash.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "prompt-stash.prompt-history-host-unavailable",
+          "file": "plugins/@dshfiles/prompt-stash/src/host.test.ts",
+          "testName": "answers prompt history as unavailable while no session-search index serves the profile"
+        },
+        {
+          "kind": "host-test",
+          "id": "prompt-stash.prompt-history-host-disabled",
+          "file": "plugins/@dshfiles/prompt-stash/src/host.test.ts",
+          "testName": "answers prompt history as disabled when the promptHistory setting is off"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.prompt-history-key-target",
+          "file": "plugins/@dshfiles/prompt-stash/src/prompt-history-targets.test.ts",
+          "testName": "treats only a bare Ctrl+R as the history key"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
       "id": "draft-attachment-retention",
       "title": "Keep draft attachments across thread navigation",
       "summary": "While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.",

@@ -59,3 +59,18 @@ Feature: Prompt stash
     Then the draft still reads "Draft with attachments" with its image and file attached
     When the attachments are removed from the draft
     Then the drafting thread holds no attachments after another round trip
+
+  @scenario:prompt-stash.prompt-history-across-threads
+  Scenario: Search prompts sent in other threads, star one and insert it
+    Given the isolated plugin composition of "@dshfiles/prompt-stash, @dshfiles/session-search, @dshfiles/command-palette, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread is started with the prompt "Deploy the quartz service to staging"
+    And the message "Review the release notes" is sent in that thread
+    When Ctrl+R is pressed in the composer
+    And the prompt history is searched for "quartz"
+    Then only the sent prompt "Deploy the quartz service to staging" is listed
+    When the sent prompt "Deploy the quartz service to staging" is starred
+    Then the saved prompts list "Deploy the quartz service to staging"
+    When the prompt history is opened from the command palette at phone width
+    And the sent prompt "Review the release notes" is inserted
+    Then the composer holds "Review the release notes" without sending it

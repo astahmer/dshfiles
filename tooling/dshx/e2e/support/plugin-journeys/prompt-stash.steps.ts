@@ -263,3 +263,73 @@ Then('the drafting thread holds no attachments after another round trip', async 
   })
   await finishJourneyAssertions(page)
 })
+
+const historyList = ({ page }: { page: Page }) => page.getByRole('listbox', { name: 'Prompt history', exact: true })
+const historyRow = ({ page, text }: { page: Page; text: string }) => historyList({ page }).getByRole('option').filter({ hasText: text })
+
+When('a thread is started with the prompt {string}', async ({ page }: { page: Page }, text: string) => {
+  await startThread({ page, text })
+})
+
+When('the message {string} is sent in that thread', async ({ page }: { page: Page }, text: string) => {
+  await threadComposer({ page }).fill(text)
+  await threadComposer({ page }).press('Enter')
+  await expect(threadComposer({ page })).toHaveText('')
+})
+
+When('Ctrl+R is pressed in the composer', async ({ page }: { page: Page }) => {
+  await threadComposer({ page }).click()
+  await page.keyboard.press('Control+r')
+  await expect(page.getByRole('heading', { name: 'Prompt history', exact: true })).toBeVisible()
+})
+
+When('the prompt history is searched for {string}', async ({ page }: { page: Page }, query: string) => {
+  await page.getByPlaceholder('Search every prompt you sent', { exact: true }).fill(query)
+})
+
+Then('only the sent prompt {string} is listed', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'prompt-history-search-across-threads', async () => {
+    // The index ingests a committed prompt within seconds; the open tab refreshes until it shows.
+    await expect(historyRow({ page, text })).toBeVisible({ timeout: 30_000 })
+    await expect(historyList({ page }).getByRole('option')).toHaveCount(1)
+  })
+})
+
+When('the sent prompt {string} is starred', async ({ page }: { page: Page }, text: string) => {
+  await historyRow({ page, text }).getByRole('button', { name: 'Save to prompts', exact: true }).click()
+  await expect(historyRow({ page, text }).getByRole('button', { name: 'Saved to prompts', exact: true })).toBeVisible()
+})
+
+Then('the saved prompts list {string}', async ({ page }: { page: Page }, text: string) => {
+  await page.getByRole('tab', { name: 'Saved', exact: true }).click()
+  await recordAssertion(page, 'prompt-history-star-saves-prompt', async () => {
+    await expect(promptOption({ page, title: text })).toBeVisible()
+  })
+  await page.getByRole('button', { name: 'Done', exact: true }).click()
+})
+
+When('the prompt history is opened from the command palette at phone width', async ({ page }: { page: Page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await threadComposer({ page }).click()
+  await page.keyboard.press('Meta+Shift+P')
+  const palette = page.getByRole('dialog', { name: 'Command palette' })
+  await palette.getByRole('combobox').fill('Search prompt history')
+  await palette
+    .getByRole('option', { name: /Search prompt history/ })
+    .first()
+    .click()
+  await expect(page.getByRole('heading', { name: 'Prompt history', exact: true })).toBeVisible()
+  const box = await historyList({ page }).boundingBox()
+  expect(box === null ? Number.POSITIVE_INFINITY : box.x + box.width).toBeLessThanOrEqual(390)
+})
+
+When('the sent prompt {string} is inserted', async ({ page }: { page: Page }, text: string) => {
+  await historyRow({ page, text }).click()
+})
+
+Then('the composer holds {string} without sending it', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'prompt-history-insert-without-sending', async () => {
+    await expect(threadComposer({ page })).toContainText(text)
+  })
+  await finishJourneyAssertions(page)
+})

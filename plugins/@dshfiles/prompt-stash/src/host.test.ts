@@ -20,31 +20,41 @@ const prompt = (index: number): SavedPrompt => ({
   updatedAt: 1_700_000_000_000 + index,
 })
 
-const mountedStash = Effect.gen(function* () {
-  const root = yield* Effect.acquireRelease(
-    Effect.promise(() => mkdtemp(join(tmpdir(), 'prompt-stash-host-'))),
-    directory => Effect.promise(() => rm(directory, { recursive: true, force: true })),
-  )
-  const host = yield* Effect.acquireRelease(
-    Effect.promise(async () => {
-      const created = await createTestHost()
-      await created.ctx.plugin(Storage)
-      await created.ctx.plugin(StorageJson, { root })
-      await created.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
-      return created
-    }),
-    created => Effect.promise(() => created.dispose()),
-  )
-  const plugin = yield* Effect.promise(() => host.mount(promptStashHost, { packageId: '@dshfiles/prompt-stash' }))
-  const client = createHostApiClient(host.ctx, promptStashApi, '@test/caller')
-  return { host, plugin, client }
-})
+const settingsValue = (promptHistory: boolean) => ({ promptHistory, historyRetention: 5_000, historyMaxChars: 8_000 })
+
+const mountedStash = (options: { readonly promptHistory: boolean } = { promptHistory: true }) =>
+  Effect.gen(function* () {
+    const root = yield* Effect.acquireRelease(
+      Effect.promise(() => mkdtemp(join(tmpdir(), 'prompt-stash-host-'))),
+      directory => Effect.promise(() => rm(directory, { recursive: true, force: true })),
+    )
+    const host = yield* Effect.acquireRelease(
+      Effect.promise(async () => {
+        const created = await createTestHost()
+        await created.ctx.plugin(Storage)
+        await created.ctx.plugin(StorageJson, { root })
+        await created.ctx.plugin(StorageDomainPlugin, { backend: 'json' })
+        // SAFETY: the plugin reads only its own namespace through describe(); the stored value is real, the forms are not.
+        created.ctx.provide('settings', {
+          describe: () => [{ ns: 'dshfiles-prompt-stash', value: settingsValue(options.promptHistory), revision: 1 }],
+          configure: () => () => undefined,
+          update: async () => undefined,
+          replace: async () => undefined,
+        } as never)
+        return created
+      }),
+      created => Effect.promise(() => created.dispose()),
+    )
+    const plugin = yield* Effect.promise(() => host.mount(promptStashHost, { packageId: '@dshfiles/prompt-stash' }))
+    const client = createHostApiClient(host.ctx, promptStashApi, '@test/caller')
+    return { host, plugin, client }
+  })
 
 describe('prompt-stash Host wiring', () => {
   it.effect('serves the shared prompt library and keeps it across a reload', () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const { plugin, client } = yield* mountedStash
+        const { plugin, client } = yield* mountedStash()
         expect((yield* Effect.promise(() => client.state())).prompts).toEqual([])
 
         const saved = yield* Effect.promise(() => client.save({ prompt: prompt(1), expectedRevision: null }))
@@ -60,7 +70,7 @@ describe('prompt-stash Host wiring', () => {
   it.effect('rejects a stale prompt write and removes a stored prompt', () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const { client } = yield* mountedStash
+        const { client } = yield* mountedStash()
         yield* Effect.promise(() => client.save({ prompt: prompt(1), expectedRevision: null }))
 
         const stale = yield* Effect.promise(() => client.save({ prompt: prompt(1), expectedRevision: '20000000-0000-4000-8000-000000000009' }))
@@ -69,6 +79,26 @@ describe('prompt-stash Host wiring', () => {
 
         const removed = yield* Effect.promise(() => client.remove({ id: prompt(1).id, expectedRevision: prompt(1).revision }))
         expect(removed).toMatchObject({ kind: 'applied', prompts: [] })
+      }),
+    ),
+  )
+
+  it.effect('answers prompt history as unavailable while no session-search index serves the profile', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { client } = yield* mountedStash()
+        const history = yield* Effect.promise(() => client.history({ text: 'deploy' }))
+        expect(history).toEqual({ status: 'unavailable', prompts: [] })
+      }),
+    ),
+  )
+
+  it.effect('answers prompt history as disabled when the promptHistory setting is off', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { client } = yield* mountedStash({ promptHistory: false })
+        const history = yield* Effect.promise(() => client.history({}))
+        expect(history).toEqual({ status: 'disabled', prompts: [] })
       }),
     ),
   )

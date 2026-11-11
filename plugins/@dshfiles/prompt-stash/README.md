@@ -12,6 +12,22 @@ The Prompts action manages up to 50 reusable text prompts, with up to 20,000 cha
 
 Its Recent tab reads up to 20 direct user-text messages from the loaded Chat snapshot, scanning no more than 1,000 nodes. Recent messages are not persisted. Unsupported content, references, and attachments are excluded.
 
+## Prompt history
+
+![Search every prompt sent across threads](docs/screenshots/prompt-history.png)
+
+The **All threads** tab searches every prompt you sent in a top-level thread, newest first, each text once. Open it from the Prompts menu, with **Ctrl+R** while a composer has focus (elsewhere Ctrl+R stays the browser's reload), or with **Search prompt history** in the command palette. Enter inserts the prompt at the cursor without sending it; the star saves it to the shared library (unstar by deleting it under Saved). The agent reads the same results with `prompt_history_search` (read-only).
+
+No second copy is stored: the rows come from `@dshfiles/session-search`'s index ([Prompt history](../session-search/README.md#prompt-history)), which leaves out subagent threads and messages a plugin or agent sent. Without that plugin the tab says so.
+
+| Setting (`dshfiles-prompt-stash`) | Default | Effect                                                           |
+| --------------------------------- | ------- | ---------------------------------------------------------------- |
+| `promptHistory`                   | on      | Turns the tab, Ctrl+R and the palette entry's results on or off. |
+| `historyRetention`                | 5,000   | How many of your newest prompts are searched.                    |
+| `historyMaxChars`                 | 8,000   | Longer prompts (pasted logs, large inline content) are skipped.  |
+
+Settings apply live; the Host method, tool and settings need a DSH restart after an update.
+
 ## Composer drafts
 
 Unsaved text remains owned by DSH's native per-thread composer. The plugin does not keep a second stash of in-progress drafts. Older saved-draft records and browser-local fallback data are left untouched; the plugin no longer reads or writes them.
