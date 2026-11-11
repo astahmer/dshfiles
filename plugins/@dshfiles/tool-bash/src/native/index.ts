@@ -12,7 +12,6 @@
  */
 
 import type {} from '@deepseek-ai/dsh-working-directory'
-import { FiberState } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { isAbsolute, sep } from 'node:path'
@@ -550,7 +549,8 @@ export function apply(ctx: Context, config: Config = {}): void {
     const unregister = ctx.tools.register(bashTool(jobCtx.jobs))
     jobCtx.effect(() => () => {
       unregister()
-      if (ctx.fiber.state === FiberState.ACTIVE) foregroundOnly = ctx.tools.register(bashTool(undefined))
+      // Cordis declares FiberState as an ambient `const enum`, which `verbatimModuleSyntax` cannot import: ACTIVE = 2.
+      if (ctx.fiber.state === 2) foregroundOnly = ctx.tools.register(bashTool(undefined))
     })
   })
 }
