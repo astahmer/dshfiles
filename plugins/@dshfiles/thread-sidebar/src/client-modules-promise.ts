@@ -19,13 +19,12 @@ interface LoadedRegistry {
 
 type RegistryUpdate = { readonly _tag: 'attached'; readonly loaded: LoadedRegistry } | { readonly _tag: 'changed' } | { readonly _tag: 'detached' }
 
-const loadedFrom = (source: ClientModuleRegistrySurface): Option.Option<LoadedRegistry> => {
-  const graph = source.graph
-  const clientPath = source.clientPath
-  if (graph === undefined || clientPath === undefined) return Option.none()
-  const entries = () => Option.match(decodeGraph(graph()), { onNone: () => [], onSome: decoded => decoded.entries })
+/** The registry's methods read its own fields (`this.composed`, `this.table`): call them on it, never detached. */
+export const loadedFrom = (source: ClientModuleRegistrySurface): Option.Option<LoadedRegistry> => {
+  if (source.graph === undefined || source.clientPath === undefined) return Option.none()
+  const entries = () => Option.match(decodeGraph(source.graph?.()), { onNone: () => [], onSome: decoded => decoded.entries })
   return Option.some({
-    registry: { ids: () => entries().map(entry => entry.id), clientPath },
+    registry: { ids: () => entries().map(entry => entry.id), clientPath: id => source.clientPath?.(id) },
     served: () => entries().flatMap(entry => (entry.rev === undefined ? [] : [{ id: entry.id, rev: entry.rev }])),
   })
 }
