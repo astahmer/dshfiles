@@ -166,6 +166,25 @@ active, paired Host/client updates may be deferred; without it, an old Host may
 receive a new client. Decode compatible snapshots and report unavailable methods
 honestly. See [plugin reload](plugin-reload.md).
 
+### Restart from the UI (2026-11-11)
+
+The live Host may already run under a supervisor: check read-only that its
+process has `DSH_RESTART_RUN_ID` and `DSH_RESTART_REQUEST_PATH`
+(`ps -E -o command= -p <host pid>`) and that the thread-sidebar
+`thread-sidebar-restart.availability` API answers `available: true`. On
+2026-11-11 it did (nixfiles `dsh-web-supervisor.mjs`), and on a scratch home the
+same supervisor restarted the Host through the API every time (the 10 s exit
+guard forces code 75, the page cookie survives, a new run id answers within
+~50 s). What failed was detection: since the Effect refactor (#26) thread-sidebar
+called the native client-module registry's `graph()`/`clientPath()` detached, so
+`thread-sidebar-plugin-updates.pending` threw (`API handler failed`), the
+sidebar stopped polling and only hmr-gate's deferrals ever reached the restart
+item. Fixed in `fix(thread-sidebar): call the client module registry on itself`.
+
+The opt-in `autoRestartWhenIdle` setting (thread-sidebar README, "Restarting by
+itself") applies pending Host updates on its own once nothing runs; it uses the
+same supervisor hand-off and does nothing without one.
+
 An external supervisor may implement health probes or restart policies. Neither
 its existence nor any machine-specific Nix configuration is guaranteed by this
 repository. Do not install or enable a restart policy while diagnosing without

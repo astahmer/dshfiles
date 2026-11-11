@@ -253,6 +253,29 @@ replay on localhost, and opens an authenticated browser WebSocket. The CI
 matrix covers Linux, macOS and Windows; non-Linux execution is unverified
 until those runners run. The user's running DSH is not restarted.
 
+## Automatic restart when idle — residual Host gaps (2026-11-11)
+
+thread-sidebar's `autoRestartWhenIdle` owns the policy in a Host plugin; these
+parts have no supported Host verb and stay approximations:
+
+1. **No native drain.** DSH has no "stop admitting prompts" verb. The policy
+   restarts only after a quiet period with no running Agent, job or open
+   question and re-checks right before the hand-off; a prompt admitted in the
+   ~1 s between the request file and `appExit` is cut and recorded by the
+   managed restart (`reason: restart`) for `resumeAfterRestart`.
+2. **`appExit` does not exit.** DSH 0.2.1-rc.2 finishes plugin disposal and
+   leaves the process alive (`PipeWrap, Timeout` still open, measured on every
+   scratch restart); thread-sidebar's 10 s exit guard forces code 75. Each
+   restart therefore costs ~10 s of a Host with no web server.
+3. **No Host-side "pending update" source of truth.** hmr-gate and
+   thread-sidebar hash Host files independently; the profile check hashes the
+   booted profile's `package.json` and `.dshfiles-profile-sync.json`.
+   `dshx checkout sync`'s "restart needed" verdict is not persisted anywhere a
+   Host can read, so it counts only through those file changes.
+4. **No resume of the open page.** The page reloads itself after a restart it
+   watched; an unsent composer draft survives only where the draft owner
+   persists it.
+
 ## Upstream tracker
 
 Reports the community already filed against the installed runtime. Read these
