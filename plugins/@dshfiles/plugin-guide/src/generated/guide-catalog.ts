@@ -705,7 +705,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "backlogApi",
       "importFrom": "@dshfiles/backlog/api",
       "owner": "@dshfiles/backlog",
-      "source": "plugins/@dshfiles/backlog/src/api.ts:611",
+      "source": "plugins/@dshfiles/backlog/src/api.ts:636",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/backlog:backlog",
@@ -1279,7 +1279,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:216",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:239",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -1728,7 +1728,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "pullRequestApi",
       "importFrom": "@dshfiles/pull-requests/api",
       "owner": "@dshfiles/pull-requests",
-      "source": "plugins/@dshfiles/pull-requests/src/api.ts:48",
+      "source": "plugins/@dshfiles/pull-requests/src/api.ts:56",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/pull-requests:pull-requests",
@@ -1741,7 +1741,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/pull-requests owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: search, link, unlink, list, watch, createPreview, create, unwatch",
+        "Methods: search, link, unlink, list, watch, createPreview, create, watchFor, unwatchFor, ownedWatches, issueStates, unwatch",
         "Agent tools: pull_request_search (read-only), pull_request_link, pull_request_unlink, pull_request_list (read-only), pull_request_watch, pull_request_create_preview (read-only), pull_request_create, pull_request_unwatch"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
@@ -2028,6 +2028,29 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "turnAdmissionApi",
+      "importFrom": "@dshfiles/session-controller/turn-admission-api",
+      "owner": "@dshfiles/session-controller",
+      "source": "plugins/@dshfiles/session-controller/src/turn-admission-api.ts:14",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "api:@dshfiles/session-controller:session-turn-admission",
+      "kind": "api",
+      "title": "turnAdmissionApi (session-turn-admission)",
+      "summary": "Cap on how many threads run a turn at once, with the FIFO queue of turns waiting for a free slot.",
+      "scope": "host, called from clients, other Host plugins and agents",
+      "mode": "host methods",
+      "registration": "useApi(turnAdmissionApi) in a Client slot, or createHostApiClient(ctx, turnAdmissionApi, packageId) on the Host",
+      "risk": "additive",
+      "riskNote": "Calling is additive; @dshfiles/session-controller owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
+      "details": [
+        "Methods: snapshot, configure, forceStart",
+        "Agent tools: thread_admission_status (read-only), thread_admission_configure, thread_admission_force_start"
+      ],
+      "docs": "tooling/dshx/docs/guides/api.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/session-search/search-worker",
       "kind": "module",
       "title": "@dshfiles/session-search/search-worker",
@@ -2051,7 +2074,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "sessionSearchApi",
       "importFrom": "@dshfiles/session-search/search-api",
       "owner": "@dshfiles/session-search",
-      "source": "plugins/@dshfiles/session-search/src/api.ts:33",
+      "source": "plugins/@dshfiles/session-search/src/api.ts:42",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/session-search:session-search",
@@ -2064,7 +2087,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/session-search owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: health, findInThread",
+        "Methods: health, findInThread, promptHistory",
         "Agent tools: session_search_health (read-only), thread_find (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
@@ -2398,7 +2421,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "usageApi",
       "importFrom": "@dshfiles/usage/api",
       "owner": "@dshfiles/usage",
-      "source": "plugins/@dshfiles/usage/src/api.ts:487",
+      "source": "plugins/@dshfiles/usage/src/api.ts:530",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/usage:dshfiles-usage",
@@ -2411,8 +2434,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/usage owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: requests, charts, status, jevUsage, recordJevUsage, refresh, activity, otelMetrics",
-        "Agent tools: usage_requests (read-only), usage_report (read-only), usage_status (read-only), usage_jev_report (read-only), usage_reindex, usage_activity_report (read-only), usage_otel_metrics (read-only)"
+        "Methods: requests, familyCost, charts, status, jevUsage, recordJevUsage, refresh, activity, otelMetrics",
+        "Agent tools: usage_requests (read-only), usage_thread_family_cost (read-only), usage_report (read-only), usage_status (read-only), usage_jev_report (read-only), usage_reindex, usage_activity_report (read-only), usage_otel_metrics (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2841,7 +2864,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/command-palette › palette-search"
       ],
       "details": [
-        "Used by 20 catalog feature(s)",
+        "Used by 21 catalog feature(s)",
         "Destinations in use: land, none, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3007,7 +3030,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 33 catalog feature(s)",
+        "Used by 34 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3035,7 +3058,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-preset › draft-preset-selection"
       ],
       "details": [
-        "Used by 65 catalog feature(s)",
+        "Used by 68 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3063,7 +3086,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/frame-layout › status-item-open"
       ],
       "details": [
-        "Used by 10 catalog feature(s)",
+        "Used by 11 catalog feature(s)",
         "Destinations in use: none, observe"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3119,7 +3142,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › cross-thread-question-inbox"
       ],
       "details": [
-        "Used by 18 catalog feature(s)",
+        "Used by 19 catalog feature(s)",
         "Destinations in use: inbox"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3175,7 +3198,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › bounded-batch-resolution"
       ],
       "details": [
-        "Used by 23 catalog feature(s)",
+        "Used by 26 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3198,12 +3221,12 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "static",
       "occupants": [
         "@dshfiles/agent-loop › settled-stream-size",
-        "@dshfiles/agent-telemetry › agent-turn-spans",
-        "@dshfiles/agent-telemetry › nested-tool-spans",
-        "@dshfiles/agent-telemetry › subagent-traces"
+        "@dshfiles/agent-loop › tool-argument-limit",
+        "@dshfiles/agent-loop › output-limit-continuation",
+        "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 112 catalog feature(s)",
+        "Used by 122 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
