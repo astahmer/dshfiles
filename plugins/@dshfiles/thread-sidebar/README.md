@@ -34,6 +34,10 @@
 
 ![The same history on a phone, with its row actions wrapping](docs/screenshots/notification-history-phone.png)
 
+![A thread row's Notify submenu: the open thread hears this row's turn ends at a chosen level](docs/screenshots/thread-subscription-notify.png)
+
+![The same Notify submenu for a batch of two selected threads](docs/screenshots/thread-subscription-notify-batch.png)
+
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
 activity, with pinned, active, parked, inactive, settled, and archived sections. Active
