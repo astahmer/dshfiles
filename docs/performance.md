@@ -1307,14 +1307,14 @@ terms — unfiltered and conversation-filtered — with one warm-up each, then 1
 digest matched the pre-migration digests. Node 22.23.3; load was 27–62 on 10 CPUs from unrelated work, so process
 CPU and same-round pairs are the meaningful figures, not wall time across rounds.
 
-| Signal                                       | Before (`DatabaseSync`) | After (`SqliteStore`) |
-| -------------------------------------------- | ----------------------- | --------------------- |
-| Replacement ingest, wall                     | 6.39 s                  | 5.92 s                |
-| Replacement ingest, process CPU              | 5.11 s                  | 5.42 s                |
-| Replacement ingest throughput                | 3,946 docs/s            | 4,259 docs/s          |
-| Search p50 / p95                              | 10.7 / 24.7 ms          | 10.0 / 21.7 ms        |
-| Search p50 / p95 (second pair)               | 10.4 / 30.5 ms          | 9.9 / 22.6 ms         |
-| Response digests, 10 fixed requests          | baseline                | identical             |
+| Signal                              | Before (`DatabaseSync`) | After (`SqliteStore`) |
+| ----------------------------------- | ----------------------- | --------------------- |
+| Replacement ingest, wall            | 6.39 s                  | 5.92 s                |
+| Replacement ingest, process CPU     | 5.11 s                  | 5.42 s                |
+| Replacement ingest throughput       | 3,946 docs/s            | 4,259 docs/s          |
+| Search p50 / p95                    | 10.7 / 24.7 ms          | 10.0 / 21.7 ms        |
+| Search p50 / p95 (second pair)      | 10.4 / 30.5 ms          | 9.9 / 22.6 ms         |
+| Response digests, 10 fixed requests | baseline                | identical             |
 
 The first port was not at parity: one SQL statement per document and one delete per mapped rowid cost 3.7× the CPU
 (28 s vs 7.5 s of process CPU) and 3–7× the wall time. Batching the FTS5 inserts (100 documents per statement),
@@ -1328,3 +1328,34 @@ To reproduce, take a read-only SQLite online backup of the live index (never ope
 `SearchIndex.searchSessions` through the same `SqliteStore.layer` while comparing response digests. The harnesses
 that produced this table were scratch files, removed with the private copy; the plugin suite remains the gate:
 `pnpm --dir plugins/@dshfiles/session-search test`.
+
+## Agent browser mirror cost (2026-11-11)
+
+The mirror (`preview/mirrorFrame`) polls a viewport JPEG at quality 55 every 500 ms while the Agent browser tab and the
+window are visible, and sends only a hash when the image did not change. Is that polling the cost? Probe
+`.agents/skills/live-performance-audit/scripts/mirror-probe.mjs` runs the exact frame work — `page.screenshot({ type:
+'jpeg', quality: 55 })`, SHA-1, image only when the hash changed — for four 60 s windows against a loopback fixture, and
+reports frames/s, KB/s, and the CPU of the process taking the screenshots (in DSH this is the Host) plus the Chromium
+process tree.
+
+| Window        | Content                          | Calls | Frames | Bytes/s  | Screenshot CPU | Chromium CPU |
+| ------------- | -------------------------------- | ----- | ------ | -------- | -------------- | ------------ |
+| idle          | still page, viewer not polling   | 0     | 0      | 0        | 0.4 %          | 0 %          |
+| still-poll    | still page, polling              | 115   | 1      | 0.1 kB   | 0.7 %          | 2.3 %        |
+| animated-poll | CSS spinner, every frame differs | 112   | 112    | 17.4 kB  | 0.6 %          | 6.7 %        |
+| dense-poll    | 24 text cards with animated bars | 112   | 112    | 209.7 kB | 0.9 %          | 11.1 %       |
+
+The standalone probe indicates that polling is modest for these fixtures: Chromium uses 7–11 % of one core, and bytes
+track page entropy, from ~17 kB/s for a spinner to ~210 kB/s for dense changing text. Its screenshot-process CPU is not
+a DSH Host measurement. The probe prints one JSON envelope; `SECONDS`/`--seconds` and `ONLY=<window>` narrow a run.
+
+A separate scratch DSH pass exercised the actual authenticated `mirrorFrame` Host API against an animated loopback CSS
+spinner. During 60 seconds without polling, the Host accumulated 0.04 seconds CPU (0.07 % of one core). During the next
+60 seconds, a browser called the API every 500 ms: 120 calls returned 120 changed frames, 1,392,176 response bytes
+(23.2 kB/s), and the Host accumulated 0.04 seconds CPU (0.07 % of one core). CPU totals use `ps` process time, with its
+coarse resolution; they exclude Chromium and cannot isolate small differences. This direct API driver did not mount the
+Agent browser tab, so it does not measure its rendering or prove the UI's polling behavior. A scratch free-model route
+returned 429; the page was opened through the authenticated preview API instead.
+
+These numbers do not name Host polling as a significant cost, so the mirror retains polling rather than switching to CDP
+`Page.startScreencast`. Full-rate video or canvas pages and real Agent browser tab rendering remain unmeasured.
