@@ -69,7 +69,10 @@ describe('shared input trigger detection', () => {
 
   it('detects a hash reference at the caret without matching URL fragments', () => {
     expect(detect('Review #123')).toMatchObject({
-      trigger: '#', query: '123', position: 'inline', span: { start: 7, end: 11 },
+      trigger: '#',
+      query: '123',
+      position: 'inline',
+      span: { start: 7, end: 11 },
     })
     expect(detect('#123 later', 2)).toMatchObject({ trigger: '#', query: '123', span: { start: 0, end: 4 } })
     expect(detect('https://example.com/path#anchor')).toBeNull()
