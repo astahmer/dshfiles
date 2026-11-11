@@ -111,9 +111,13 @@ export const sessionsApi = defineApi({
       output: Schema.Struct({ messageId: Schema.String }),
     }),
     compact: method({
-      description: "Compact the thread's history now (the /compact command).",
-      input: Schema.Struct({ sessionId }),
-      output: Schema.Struct({ kind: Schema.Literals(['success', 'error']), text: Schema.optional(Schema.String) }),
+      description:
+        "Compact the thread's history now (the /compact command). With minTokens, a thread below that prompt size is skipped instead of compacted.",
+      input: Schema.Struct({
+        sessionId,
+        minTokens: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(10_000_000))),
+      }),
+      output: Schema.Struct({ kind: Schema.Literals(['success', 'error', 'skipped']), text: Schema.optional(Schema.String) }),
     }),
     interrupt: method({
       description: 'Stop the running turn; queued prompts stay queued.',

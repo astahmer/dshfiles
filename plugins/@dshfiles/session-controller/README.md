@@ -98,7 +98,7 @@ const { value } = await sessions.generate({ prompt, jsonSchema: { type: 'object'
 | `prompt`                         | user prompt, `queue` (default) or `steer`                                                                                                                 |
 | `command`                        | one slash command line, as typed in the composer                                                                                                          |
 | `message`                        | a message recorded with the calling plugin as its source (`dshfiles-plugin-message`); `next-turn` or `next-step`, `wake` to start an idle thread          |
-| `compact`, `interrupt`           | `/compact`; stop the running turn, keeping the queue                                                                                                      |
+| `compact`, `interrupt`           | `/compact`; stop the running turn, keeping the queue. `compact` holds a cold thread's Agent for the whole command and, with `minTokens`, answers `skipped` below that prompt size |
 | `wait`                           | until idle with nothing queued, or `timeoutMs`                                                                                                            |
 | `selectModel`, `selectAgent`     | the thread's model; its agent preset                                                                                                                      |
 | `instructions`, `setInstruction` | keyed instructions every later request carries in its system prompt (a section, so a removed one leaves no trace in history), kept in dshx plugin storage |

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session-query'
+import type {} from '@deepseek-ai/dsh-token-meter'
 import { MessageId, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
@@ -327,7 +328,16 @@ export const sessionsHost = sessionControllerHostApi(sessionsApi, {
   ),
   compact: Effect.fn('sessions compact')(({ input, signal }) =>
     SessionControllerHostRuntime.use(runtime =>
-      trySessionControllerOperation('compact session', () => runCommand(runtime, input.sessionId, '/compact', signal)),
+      trySessionControllerOperation('compact session', async () => {
+        const agent = await agentOf(runtime, input.sessionId)
+        if (input.minTokens !== undefined) {
+          const tokens = runtime.ctx.get('tokenMeter')?.measure(agent.session).totalTokens
+          if (tokens === undefined || !Number.isFinite(tokens) || tokens < input.minTokens) return { kind: 'skipped' as const }
+        }
+        // A compaction resumes a cold thread and can outlive the controller's idle eviction, so it owns a hold for its
+        // whole command rather than only until the Agent is resolved.
+        return controllerOf(runtime).hold(SessionId(input.sessionId), () => runCommand(runtime, input.sessionId, '/compact', signal))
+      }),
     ),
   ),
   interrupt: Effect.fn('sessions interrupt')(({ input }) =>

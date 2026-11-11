@@ -808,7 +808,7 @@
         },
         {
           "name": "compact",
-          "description": "Compact the thread's history now (the /compact command).",
+          "description": "Compact the thread's history now (the /compact command). With minTokens, a thread below that prompt size is skipped instead of compacted.",
           "input": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
@@ -817,6 +817,18 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
+              },
+              "minTokens": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "maximum": 10000000,
+                    "exclusiveMinimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -832,7 +844,8 @@
                 "type": "string",
                 "enum": [
                   "success",
-                  "error"
+                  "error",
+                  "skipped"
                 ]
               },
               "text": {

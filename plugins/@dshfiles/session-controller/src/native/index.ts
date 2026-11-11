@@ -270,6 +270,16 @@ export class SessionController extends TypertRemoteService {
   }
 
   /**
+   * Keep a Session's Agent attached for one operation that may outlive the controller's idle eviction.
+   * @param sessionId - Session the operation addresses.
+   * @param operation - the operation to run under the hold.
+   * @returns the operation's result.
+   */
+  hold<Value>(sessionId: SessionId, operation: () => Promise<Value>): Promise<Value> {
+    return this.agents.hold(sessionId, operation)
+  }
+
+  /**
    * Inspect one attached or persisted Session without activating its Agent.
    * @param sessionId - durable Session identity.
    * @param signal - optional caller cancellation for persistence reads.
