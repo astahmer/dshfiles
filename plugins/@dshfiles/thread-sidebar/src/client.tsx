@@ -218,7 +218,7 @@ import {
   type ThreadFinishNotificationCategory,
   type ThreadNotificationPlacement,
 } from './thread-notifications.js'
-import { userNotificationApi } from './user-notification-api.js'
+import { userNotificationApi, type UserNotificationPageOutcome } from './user-notification-api.js'
 import { ViewedThreadModel } from './viewed-thread.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
@@ -2761,23 +2761,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     title: string,
     fallbackBody: string,
     message?: string,
-  ): void => {
+  ): UserNotificationPageOutcome => {
     const categoryPreferences = preferences.notificationCategories[category]
-    if (
-      storedNotificationsMuted.get() === true ||
-      !ThreadNotificationModel.threadNotificationHasOutput(categoryPreferences) ||
-      (sessionId !== null && isMuteActive(mutedThreads[sessionId], readNow()))
-    )
-      return
+    if (storedNotificationsMuted.get() === true) return 'snoozed'
+    if (!ThreadNotificationModel.threadNotificationHasOutput(categoryPreferences)) return 'category-off'
+    if (sessionId !== null && isMuteActive(mutedThreads[sessionId], readNow())) return 'thread-muted'
     const session = sessionId === null ? undefined : sessionState.byId[sessionId]
-    if (sessionId !== null && (session === undefined || !SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention))) return
+    if (sessionId !== null && (session === undefined || !SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)))
+      return 'subagent-hidden'
     const inApp = ThreadNotificationModel.notificationRouteHasInApp(categoryPreferences.delivery)
     const systemRequested = ThreadNotificationModel.notificationRouteHasSystem(categoryPreferences.delivery)
     const system = systemRequested && plugin.notifications.permission() === 'granted'
-    if (!inApp && !system && !categoryPreferences.sound) return
-    if (!ThreadNotificationModel.claimThreadNotification(eventId)) return
+    if (!inApp && !system && !categoryPreferences.sound) return systemRequested ? 'system-permission' : 'category-off'
+    if (!ThreadNotificationModel.claimThreadNotification(eventId)) return 'duplicate'
     // Already open in this focused window: claimed, so other tabs stay quiet too; the Host history still records it.
-    if (sessionId !== null && ViewedThreadModel.isWatched({ ...ViewedThreadModel.windowAttention(), sessionId, viewedSessionId: selectedSessionId })) return
+    if (sessionId !== null && ViewedThreadModel.isWatched({ ...ViewedThreadModel.windowAttention(), sessionId, viewedSessionId: selectedSessionId }))
+      return 'watched-thread'
     const open = sessionId === null ? undefined : () => openThread(sessionId)
     if (inApp) {
       dispatchNoticeQueue({
@@ -2793,6 +2792,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (system && !plugin.notifications.notify({ title, body: fallbackBody, ...(open !== undefined && { onClick: open }) }))
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
     if (categoryPreferences.sound) ThreadNotificationAudioModel.play(categoryPreferences.soundPreset, categoryPreferences.volume)
+    return 'shown'
   }
 
   const toggleParked = (sessionId: SessionSummary['id']): void => {
@@ -4846,11 +4846,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [attention.records, isPrimarySurface, selectedSession?.id, sessionStatus, sessions, tSidebar])
 
   // `notify_user`: the agent's own message, routed like a question that needs the user (the “Input needed” category).
+  const userNotifications = useApi(userNotificationApi)
   useApiEvent(userNotificationApi, 'sent', notification => {
     if (!isPrimarySurface) return
     const linked = notification.sessionId === null ? undefined : sessionState.byId[SessionId(notification.sessionId)]
     const body = notification.body === '' ? notification.title : notification.body
-    latestRowActions.current.notifyThread(
+    const outcome = latestRowActions.current.notifyThread(
       'input-needed',
       `user:${notification.id}`,
       linked?.id ?? null,
@@ -4858,6 +4859,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       body,
       `${notification.title}: ${body}`,
     )
+    // The Host tells the agent whether the user saw it; a Host from before acknowledge simply never asks.
+    void userNotifications.acknowledge({ id: notification.id, outcome }).catch(() => undefined)
   })
 
   const isTransientNotice =
