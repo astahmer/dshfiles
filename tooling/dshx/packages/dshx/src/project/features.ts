@@ -214,13 +214,13 @@ export interface ReachPosition {
  * read from the scratch backlog when the step runs; a plain `b:1` stays literal text.
  */
 const reachStepPattern = new RegExp(
-  `^(?:(?:click|rightclick|hover) [a-z]+ "[^"]+"(?: at \\d+,\\d+)?|expect [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "(?:[^"\\\\]|\\\\.)*"|press [A-Za-z0-9+]+|attach "(?!\\/)(?!.*\\.\\.)[^"]+"|seed (?:${REACH_SEEDS.join('|')}))$`,
+  `^(?:(?:click|rightclick|shiftclick|hover) [a-z]+ "[^"]+"(?: at \\d+,\\d+)?|expect [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "(?:[^"\\\\]|\\\\.)*"|press [A-Za-z0-9+]+|attach "(?!\\/)(?!.*\\.\\.)[^"]+"|seed (?:${REACH_SEEDS.join('|')}))$`,
 )
 
 export const parseReachStep = (
   step: string,
 ):
-  | { readonly action: 'click' | 'rightclick' | 'hover'; readonly by: string; readonly name: string; readonly position?: ReachPosition }
+  | { readonly action: 'click' | 'rightclick' | 'shiftclick' | 'hover'; readonly by: string; readonly name: string; readonly position?: ReachPosition }
   | { readonly action: 'expect' | 'fill'; readonly by: string; readonly name: string; readonly value?: string }
   | { readonly action: 'press'; readonly key: string }
   | { readonly action: 'seed'; readonly seed: ReachSeed }
@@ -233,12 +233,13 @@ export const parseReachStep = (
   if (press?.[1] !== undefined) return { action: 'press', key: press[1] }
   const seed = REACH_SEEDS.find(candidate => step === `seed ${candidate}`)
   if (seed !== undefined) return { action: 'seed', seed }
-  const match = /^(click|rightclick|hover|expect|fill) ([a-z]+) "([^"]+)"(?: "((?:[^"\\]|\\.)*)")?(?: at (\d+),(\d+))?$/.exec(step)
+  const match = /^(click|rightclick|shiftclick|hover|expect|fill) ([a-z]+) "([^"]+)"(?: "((?:[^"\\]|\\.)*)")?(?: at (\d+),(\d+))?$/.exec(step)
   const action = match?.[1]
   if (match === null || match[2] === undefined || match[3] === undefined) return undefined
-  if (action !== 'click' && action !== 'rightclick' && action !== 'hover' && action !== 'expect' && action !== 'fill') return undefined
+  if (action !== 'click' && action !== 'rightclick' && action !== 'shiftclick' && action !== 'hover' && action !== 'expect' && action !== 'fill')
+    return undefined
   if (action === 'fill' && match[2] === 'text') return undefined
-  if (action === 'click' || action === 'rightclick' || action === 'hover') {
+  if (action === 'click' || action === 'rightclick' || action === 'shiftclick' || action === 'hover') {
     const x = match[5]
     const y = match[6]
     return { action, by: match[2], name: match[3], ...(!(x === undefined || y === undefined) && { position: { x: Number(x), y: Number(y) } }) }
@@ -246,7 +247,7 @@ export const parseReachStep = (
   return { action, by: match[2], name: match[3], ...(match[4] !== undefined && { value: match[4].replace(/\\(.)/gu, '$1') }) }
 }
 
-const reachStepMessage = `reach steps are click/rightclick/hover <role|text|label|title> "<name>" (optionally "at <x>,<y>"), fill <role|label> "<name>" "<value>", press <key>, attach "<repository file>", or seed <${REACH_SEEDS.join('|')}>`
+const reachStepMessage = `reach steps are click/rightclick/shiftclick/hover <role|text|label|title> "<name>" (optionally "at <x>,<y>"), fill <role|label> "<name>" "<value>", press <key>, attach "<repository file>", or seed <${REACH_SEEDS.join('|')}>`
 
 const reachSchema = Schema.Array(Schema.String.check(Schema.makeFilter(step => parseReachStep(step) !== undefined || reachStepMessage))).check(
   Schema.isMinLength(1),

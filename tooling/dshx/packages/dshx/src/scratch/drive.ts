@@ -182,6 +182,9 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         else if (parsed.action === 'click') {
           filled = undefined
           await locate(page, parsed.by, parsed.name).click({ timeout: timeoutMs, ...pointerPosition(parsed) })
+        } else if (parsed.action === 'shiftclick') {
+          filled = undefined
+          await locate(page, parsed.by, parsed.name).click({ timeout: timeoutMs, modifiers: ['Shift'], ...pointerPosition(parsed) })
         } else if (parsed.action === 'hover') {
           filled = undefined
           await locate(page, parsed.by, parsed.name).hover({ timeout: timeoutMs, ...pointerPosition(parsed) })
