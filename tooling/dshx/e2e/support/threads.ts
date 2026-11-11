@@ -102,15 +102,19 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
     const projectPicker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
     const addDialog = page.getByRole('dialog', { name: 'Add workspace', exact: true })
     const addWorkspace = page.getByRole('menuitem', { name: /Add workspace/ })
+    const projectItem = page.getByRole('menuitem', { name: input.project, exact: true })
     // Which control opens is only known once one has: a profile with no projects goes straight to Add workspace, one
     // with projects lists them plus an Add workspace row.
     await expect(
       addDialog
         .or(projectPicker)
         .or(addWorkspace)
-        .or(page.getByRole('menuitem', { name: input.project, exact: true })),
+        .or(projectItem)
+        .first(),
     ).toBeVisible()
-    if (await addDialog.isVisible()) {
+    if (await projectItem.isVisible()) {
+      await projectItem.click()
+    } else if (await addDialog.isVisible()) {
       await addWorkspaceFolderThroughDialog(page, input.project)
     } else if (await addWorkspace.isVisible()) {
       await addWorkspace.click()
@@ -128,8 +132,6 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
         await expect(projectOption).toBeVisible()
         await projectOption.click()
       }
-    } else {
-      await page.getByRole('menuitem', { name: input.project, exact: true }).click()
     }
   }
   await expect(projectButton).toHaveText(expectedProject)
