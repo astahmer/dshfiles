@@ -1,7 +1,7 @@
 export * as Settings from './settings.js'
 
 import type z from '@deepseek-ai/schemastery'
-import { Context, Effect, Layer, Option, Queue, Schema, Stream, SubscriptionRef } from 'effect'
+import { Context, Deferred, Effect, Layer, Option, Queue, Schedule, Schema, Stream, SubscriptionRef } from 'effect'
 import type { SettingsContract, SettingsValue } from '../settings/types.js'
 import { detached } from './detached.js'
 import { HostContext, hostService } from './host-context.js'
@@ -46,6 +46,11 @@ export interface SettingsSnapshot<Value> {
 export interface SettingsService<Value extends object> {
   readonly namespace: string
   readonly get: Effect.Effect<Value>
+  /**
+   * The first value DSH serves. `get` answers the schema defaults while the plugin activates, because DSH describes an
+   * entry only once it is active; a one-time step that must see the stored value (a migration) waits on this instead.
+   */
+  readonly loaded: Effect.Effect<Value>
   readonly snapshot: Effect.Effect<SettingsSnapshot<Value>>
   /** The current value, then every committed change. */
   readonly changes: Stream.Stream<Value>
@@ -121,25 +126,42 @@ export const layer = <S extends z<any, object>>(
         ),
         dispose => Effect.sync(dispose),
       )
+      const loaded = yield* Deferred.make<Value>()
       const initial = yield* read.pipe(
+        Effect.tap(snapshot => Deferred.succeed(loaded, snapshot.value)),
         Effect.catch(error => Effect.logWarning(`${error.message} Using the schema defaults until they load.`).pipe(Effect.andThen(decode({}, 0)))),
       )
       const ref = yield* SubscriptionRef.make(initial)
+      const publish = (snapshot: SettingsSnapshot<Value>) => SubscriptionRef.set(ref, snapshot).pipe(Effect.andThen(Deferred.succeed(loaded, snapshot.value)))
 
       yield* Stream.fromQueue(committed).pipe(
         Stream.runForEach(() =>
           read.pipe(
-            Effect.flatMap(snapshot => SubscriptionRef.set(ref, snapshot)),
+            Effect.flatMap(publish),
             Effect.catch(error => Effect.logWarning('Settings refresh kept the previous value', error)),
           ),
         ),
         detached,
         Effect.forkScoped,
       )
+      // DSH describes an entry only once its plugin is active, after this layer is built, and announces that first
+      // revision only when something asks for a description: read again until the stored value is there.
+      // Without a settings service the schema defaults are all there is.
+      if (Option.isNone(optionalForms)) yield* Deferred.succeed(loaded, initial.value)
+      else if (!(yield* Deferred.isDone(loaded))) {
+        yield* read.pipe(
+          Effect.retry({ schedule: Schedule.spaced('250 millis'), times: 240 }),
+          Effect.flatMap(publish),
+          Effect.catch(error => Effect.logWarning('Settings never loaded; keeping the schema defaults', error)),
+          detached,
+          Effect.forkScoped,
+        )
+      }
 
       return service.of({
         namespace,
         get: Effect.map(SubscriptionRef.get(ref), snapshot => snapshot.value),
+        loaded: Deferred.await(loaded),
         snapshot: SubscriptionRef.get(ref),
         changes: Stream.map(SubscriptionRef.changes(ref), snapshot => snapshot.value),
         update: Effect.fn('settings update')(function* (patch, expectedRevision) {
@@ -171,6 +193,7 @@ export const layerTest = <Value extends object>(namespace: string, initial: Valu
       return service.of({
         namespace,
         get: Effect.map(SubscriptionRef.get(ref), snapshot => snapshot.value),
+        loaded: Effect.map(SubscriptionRef.get(ref), snapshot => snapshot.value),
         snapshot: SubscriptionRef.get(ref),
         changes: Stream.map(SubscriptionRef.changes(ref), snapshot => snapshot.value),
         update: (patch, expectedRevision) => write(current => ({ ...current, ...patch }), expectedRevision),

@@ -210,6 +210,7 @@ describe('Settings', () => {
       Effect.gen(function* () {
         const settings = yield* Settings.Tag<SettingsValue<(typeof fallbackSettings)['schema']>>('dshfiles-fallback')
         expect(yield* settings.get).toEqual({ rules: [], limit: 3 })
+        expect(yield* settings.loaded).toEqual({ rules: [], limit: 3 })
         expect(yield* settings.update({ limit: 4 }).pipe(Effect.flip)).toBeInstanceOf(SettingsWriteFailed)
       }),
     )
@@ -244,6 +245,37 @@ describe('Settings', () => {
         Stream.runHead,
       )
       expect(Option.getOrThrow(next)).toEqual({ limit: 2 })
+    }).pipe(Effect.scoped),
+  )
+
+  it.live('loads the stored value of an entry DSH describes only once its plugin is active', () =>
+    Effect.gen(function* () {
+      const namespace = 'dshfiles-activating'
+      const contract = defineSettings({
+        namespace,
+        schema: SchemaStery.object({ rows: SchemaStery.array(SchemaStery.string()).default([]) }),
+      })
+      let active = false
+      const context = yield* Layer.build(
+        Settings.layer(contract).pipe(
+          Layer.provideMerge(
+            cordisHost('@test/settings-activating', async ctx => {
+              ctx.provide('settings', {
+                configure: () => () => undefined,
+                describe: () => (active ? [{ ns: namespace, value: { rows: ['stored'] }, revision: 0 }] : []),
+                update: async () => undefined,
+                replace: async () => undefined,
+              })
+            }),
+          ),
+        ),
+      )
+      const settings = Context.get(context, Settings.Tag<SettingsValue<(typeof contract)['schema']>>(namespace))
+      yield* Effect.sleep('600 millis')
+      expect(yield* settings.get).toEqual({ rows: [] })
+      active = true
+      expect(yield* settings.loaded.pipe(Effect.timeout('5 seconds'))).toEqual({ rows: ['stored'] })
+      expect(yield* settings.get).toEqual({ rows: ['stored'] })
     }).pipe(Effect.scoped),
   )
 
