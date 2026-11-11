@@ -25,7 +25,7 @@ export const CURATED_BUNDLES: readonly CuratedBundle[] = [
   { plugin: 'ai-accounts', routeFrom: 'account-lifecycle' },
   // Land
   { plugin: 'jujutsu', routeFrom: 'revision-graph' },
-  { plugin: 'pulls-review', routeFrom: 'thread-review-scopes' },
+  { plugin: 'diffs-review', routeFrom: 'thread-review-scopes' },
   { plugin: 'git-worktrees' },
   // Work
   { plugin: 'project-automations' },

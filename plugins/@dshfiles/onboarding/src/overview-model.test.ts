@@ -89,14 +89,14 @@ describe('packs view', () => {
       catalog: FEATURE_CATALOG,
       states: new Map([
         ['pull-requests', 'enabled'],
-        ['pulls-review', 'disabled'],
+        ['diffs-review', 'disabled'],
       ]),
       checklist,
     })
     const github = packs.find(pack => pack.id === 'github')
     expect(github?.plugins.map(plugin => [plugin.name, plugin.state])).toEqual([
       ['pull-requests', 'enabled'],
-      ['pulls-review', 'disabled'],
+      ['diffs-review', 'disabled'],
       ['project-automations', 'not-installed'],
     ])
     expect(github?.prerequisites).toEqual([

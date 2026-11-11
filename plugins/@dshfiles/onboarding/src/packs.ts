@@ -48,7 +48,7 @@ export const PACKS: readonly Pack[] = [
     title: 'GitHub & review',
     summary: 'Open and watch pull requests, review a workspace before landing, and run project automations from GitHub events.',
     core: false,
-    plugins: ['pull-requests', 'pulls-review', 'project-automations'],
+    plugins: ['pull-requests', 'diffs-review', 'project-automations'],
     prerequisites: ['repository', 'github'],
     keySettings: [{ label: 'Refresh pull requests when a thread changes', entryId: 'dshfiles-pull-requests', fieldPath: ['refreshOnThreadEvents'] }],
   },
