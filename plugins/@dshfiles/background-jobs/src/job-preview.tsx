@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ChevronRightIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
+import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import type { ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-sections'
@@ -56,7 +57,7 @@ const Elapsed = (props: { readonly startedAt: number; readonly finishedAt: numbe
     const timer = setInterval(() => setNow(Date.now()), 1_000)
     return () => clearInterval(timer)
   }, [props.live])
-  return <span className="dshx:shrink-0 dshx:tabular-nums">{JobPreviewModel.formatElapsed((props.finishedAt ?? now) - props.startedAt)}</span>
+  return <span className="dshx:shrink-0 dshx:tabular-nums">{formatDurationMs((props.finishedAt ?? now) - props.startedAt)}</span>
 }
 
 /** Mounted only while the card is open: collapsing stops the stream, and the Host coalesces its frames. */

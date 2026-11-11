@@ -1,15 +1,11 @@
+import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import { describe, expect, test } from 'vitest'
 import { TraceFormat } from './format.js'
 
 describe('trace formatting', () => {
   test('formats durations across magnitudes', () => {
     expect(TraceFormat.duration(null)).toBe('—')
-    expect(TraceFormat.duration(0.25)).toBe('250 µs')
-    expect(TraceFormat.duration(4.5)).toBe('4.50 ms')
-    expect(TraceFormat.duration(42.25)).toBe('42.3 ms')
-    expect(TraceFormat.duration(420)).toBe('420 ms')
-    expect(TraceFormat.duration(1_500)).toBe('1.50 s')
-    expect(TraceFormat.duration(125_000)).toBe('2 m 5 s')
+    for (const ms of [0.25, 4.5, 42.25, 420, 1_500, 125_000]) expect(TraceFormat.duration(ms)).toBe(formatDurationMs(ms))
   })
 
   test('formats rates', () => {

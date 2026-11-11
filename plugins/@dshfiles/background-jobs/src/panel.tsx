@@ -25,6 +25,7 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import type { ISessions, SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -32,7 +33,6 @@ import { useApi, useApiEvent } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { backgroundJobsApi } from './api.js'
 import { jobCategoryValues, type JobCategory } from './classify.js'
-import { JobPreviewModel } from './job-preview-model.js'
 import { JobSelectionModel } from './job-selection.js'
 import type { BackgroundJobsKey, BackgroundJobsTranslate } from './locales.js'
 import { backgroundJobStopMachine } from './stop-machine.js'
@@ -81,7 +81,7 @@ const isLiveStatus = (status: JobStatus): boolean => status === 'running' || sta
 
 const durationLabel = (row: JobRow, now: number): string => {
   if (row.finishedAt === null && !isLiveStatus(row.status)) return '—'
-  return JobPreviewModel.formatElapsed((row.finishedAt ?? now) - row.startedAt)
+  return formatDurationMs((row.finishedAt ?? now) - row.startedAt)
 }
 
 /** A clock alone is ambiguous across days, so anything older than today carries its date. */

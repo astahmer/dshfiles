@@ -1,14 +1,8 @@
+import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import * as Schema from 'effect/Schema'
 import type { AttributeValue } from './types.js'
 
-const formatDuration = (milliseconds: number | null): string => {
-  if (milliseconds === null) return '—'
-  if (milliseconds < 1) return `${String(Math.round(milliseconds * 1000))} µs`
-  if (milliseconds < 1_000)
-    return `${milliseconds < 10 ? milliseconds.toFixed(2) : milliseconds < 100 ? milliseconds.toFixed(1) : Math.round(milliseconds).toString()} ms`
-  if (milliseconds < 60_000) return `${(milliseconds / 1_000).toFixed(2)} s`
-  return `${Math.floor(milliseconds / 60_000).toString()} m ${Math.round((milliseconds % 60_000) / 1_000).toString()} s`
-}
+const formatDuration = (milliseconds: number | null): string => (milliseconds === null ? '—' : formatDurationMs(milliseconds))
 
 const formatPercent = (fraction: number): string =>
   fraction === 0 ? '0%' : fraction < 0.001 ? '<0.1%' : `${(fraction * 100).toFixed(fraction < 0.1 ? 1 : 0)}%`

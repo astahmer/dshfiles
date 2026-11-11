@@ -33,6 +33,10 @@
       "types": "./src/lib/workspace-listed.ts",
       "default": "./src/lib/workspace-listed.ts"
     },
+    "./lib/format-duration": {
+      "types": "./src/lib/format-duration.ts",
+      "default": "./src/lib/format-duration.ts"
+    },
     "./motion": {
       "types": "./src/motion/index.ts",
       "default": "./src/motion/index.ts"

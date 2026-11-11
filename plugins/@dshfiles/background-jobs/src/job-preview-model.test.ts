@@ -33,12 +33,6 @@ describe('JobPreviewModel.viewOf', () => {
     expect(JobPreviewModel.isLive('failed')).toBe(false)
   })
 
-  it('formats elapsed time', () => {
-    expect(JobPreviewModel.formatElapsed(42_000)).toBe('42s')
-    expect(JobPreviewModel.formatElapsed(185_000)).toBe('3m 5s')
-    expect(JobPreviewModel.formatElapsed(7_800_000)).toBe('2h 10m')
-  })
-
   it('treats a roster frame that only moved the output offset as the same card', () => {
     const before = JobPreviewModel.viewOf(row({ output: { total: 10, earliest: 0 } }))
     const after = JobPreviewModel.viewOf(row({ output: { total: 900, earliest: 0 } }))

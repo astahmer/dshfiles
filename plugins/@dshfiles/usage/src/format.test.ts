@@ -1,4 +1,5 @@
 import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
+import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import { describe, expect, it } from 'vitest'
 import { UsageFormattingModel } from './format.js'
 
@@ -7,8 +8,7 @@ describe('UsageFormattingModel', () => {
     expect(UsageFormattingModel.formatCount(1_300)).toBe('1.3K')
     expect(UsageFormattingModel.formatCount(1_000_000)).toBe('1M')
     expect(UsageFormattingModel.formatCost(1_234)).toBe('$1,234')
-    expect(UsageFormattingModel.formatDuration(820)).toBe('820ms')
-    expect(UsageFormattingModel.formatDuration(84_000)).toBe('1m 24s')
+    for (const ms of [0.4, 820, 3_500, 84_000, 7_800_000]) expect(UsageFormattingModel.formatDuration(ms)).toBe(formatDurationMs(ms))
   })
 
   it('formats dollars with the AI Accounts rule', () => {

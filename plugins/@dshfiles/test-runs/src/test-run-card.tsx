@@ -7,6 +7,7 @@ import { ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { ChevronDownIcon, ChevronUpIcon, CircleCheckIcon, CopyIcon, RotateCwIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { animate, motionSafe, springs, staggers } from '@dshfiles/plugin-ui/motion'
 import { useSlidingIndicator } from '@dshfiles/plugin-ui/motion/react'
@@ -23,11 +24,7 @@ type OpenFile = (path: string, options?: { readonly line?: number }) => void
 
 const isFailing = (test: TestCase): boolean => test.status === 'failed' || test.status === 'timeout'
 
-const formatDuration = (milliseconds: number | undefined): string => {
-  if (milliseconds === undefined) return ''
-  if (milliseconds < 1000) return `${Math.round(milliseconds)}ms`
-  return `${(milliseconds / 1000).toFixed(1)}s`
-}
+const formatDuration = (milliseconds: number | undefined): string => (milliseconds === undefined ? '' : formatDurationMs(milliseconds))
 
 const matchesFilter = (test: TestCase, filter: Filter): boolean => {
   if (filter === 'failed') return isFailing(test)

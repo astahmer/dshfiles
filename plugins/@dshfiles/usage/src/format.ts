@@ -1,4 +1,5 @@
 import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
+import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
 import type { RequestPurpose } from './fold.js'
 
 export type OpenThread = (target: { readonly sessionId: string; readonly parentSessionId: string | null }) => 'opened' | 'parent' | 'missing'
@@ -27,14 +28,8 @@ export class UsageFormattingModel {
   /** The AI Accounts dollar rule; `–` when unpriced. */
   static readonly formatCost = (value: number | null): string => (value === null ? '–' : CostEstimateModel.formatUsd(value))
 
-  /** `820ms`, `3.5s`, `1m 24s`; `–` when unknown. */
-  static readonly formatDuration = (ms: number | null): string => {
-    if (ms === null) return '–'
-    if (ms < 1_000) return `${String(Math.round(ms))}ms`
-    if (ms < 60_000) return `${(ms / 1_000).toFixed(1)}s`
-    const minutes = Math.floor(ms / 60_000)
-    return `${String(minutes)}m ${String(Math.round((ms - minutes * 60_000) / 1_000))}s`
-  }
+  /** `–` when unknown. */
+  static readonly formatDuration = (ms: number | null): string => (ms === null ? '–' : formatDurationMs(ms))
 
   static readonly formatAgo = (
     at: number,

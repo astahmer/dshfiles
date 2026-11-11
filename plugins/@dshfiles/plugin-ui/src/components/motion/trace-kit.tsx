@@ -7,6 +7,7 @@ import * as React from 'react'
 import type { ValueAnimationTransition } from 'motion'
 import { animate, easings, everyFrame, motionSafe, springs, type AnimationOptions } from '../../motion/index.js'
 import { usePrefersReducedMotion } from '../../motion/react.js'
+import { formatDurationMs } from '../../lib/format-duration.js'
 import { cn } from '../../lib/utils.js'
 import {
   ChevronRightIcon,
@@ -92,17 +93,7 @@ export const hatchStyle: React.CSSProperties = { backgroundImage: hatchImage }
 
 /* ---------------------------------------------------------------- formatters */
 
-export const formatDuration = (seconds: number): string => {
-  const s = Math.max(0, seconds)
-  if (s < 0.001) return `${Math.round(s * 1_000_000)}µs`
-  if (s < 0.01) return `${Number((s * 1000).toFixed(1))}ms`
-  if (s < 1) return `${Math.round(s * 1000)}ms`
-  if (s < 10) return `${s.toFixed(1)}s`
-  if (s < 60) return `${Math.round(s)}s`
-  const minutes = Math.floor(s / 60)
-  const rest = Math.round(s % 60)
-  return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`
-}
+export const formatDuration = (seconds: number): string => formatDurationMs(seconds * 1000)
 
 export const formatCost = (usd: number): string => {
   if (usd <= 0) return '$0'
