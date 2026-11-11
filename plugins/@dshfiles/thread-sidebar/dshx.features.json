@@ -1566,7 +1566,7 @@
     {
       "id": "notification-delivery",
       "title": "Configure per-category thread notifications",
-      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure in-app notification placement and timeout, dismiss in-app notices, configure per-category sounds, mute tones separately, or silence and resume all notifications from Settings or the command palette; grant system permission explicitly.",
+      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure in-app notification placement and timeout, dismiss in-app notices, configure per-category sounds, mute tones separately, or silence and resume all notifications from Settings or the command palette; grant system permission explicitly. A thread open in a visible, focused window raises no alert; the same thread in a hidden tab or an unfocused window does.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
@@ -3730,6 +3730,58 @@
         {
           "kind": "automatic",
           "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "agent-user-notification",
+      "title": "Agent sends the user a notification",
+      "summary": "notify_user sends a title and optional body, linked to the calling thread by default, to every open page, which routes it through the Input needed category's delivery and sound, the global snooze and the thread mute, and skips a thread the user is watching in a focused window. Rate-limited to 3 per thread and 12 in total per 10 minutes.",
+      "surfaces": ["host", "client"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool notify_user; in-app toast and system notification",
+      "configuration": [],
+      "states": ["sent", "rate-limited"],
+      "failureModes": [
+        "A fourth send from one thread within 10 minutes, or a thirteenth in total, returns rate-limited with the seconds to wait and publishes nothing.",
+        "No open page means nothing is shown; the event is not queued or replayed and adds no history entry.",
+        "A Host from before the tool, or a page whose event stream is unavailable, shows nothing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.agent-user-notification-browser",
+          "reason": "Showing it needs a granted system-notification permission and a live agent turn; the Host tests cover routing input, rate limits and the published payload, and the client reuses the tested notification path."
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.agent-user-notification-rate",
+          "file": "plugins/@dshfiles/thread-sidebar/src/user-notification-host.test.ts",
+          "testName": "refuses a fourth notification from one thread without publishing it, then allows it after the window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.viewed-thread-quiet",
+          "file": "plugins/@dshfiles/thread-sidebar/src/viewed-thread.test.ts",
+          "testName": "still alerts for another thread, a blurred window or a hidden tab"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "thread-sidebar user notification send",
+          "file": "plugins/@dshfiles/thread-sidebar/src/user-notification-host.test.ts",
+          "testName": "links the calling thread by default, none with null, and records a span"
         }
       ]
     }

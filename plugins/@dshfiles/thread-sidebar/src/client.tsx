@@ -30,7 +30,7 @@ import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-ch
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
-import { useApi, useApiQuery, usePlugin, useRegistry } from '@dshfiles/dshx/client'
+import { useApi, useApiEvent, useApiQuery, usePlugin, useRegistry } from '@dshfiles/dshx/client'
 import { THREAD_NOTIFY_CHOICES, useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ThreadRowActions, type ThreadRowActionTarget } from './thread-row-actions.js'
@@ -218,6 +218,8 @@ import {
   type ThreadFinishNotificationCategory,
   type ThreadNotificationPlacement,
 } from './thread-notifications.js'
+import { userNotificationApi } from './user-notification-api.js'
+import { ViewedThreadModel } from './viewed-thread.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
@@ -2752,34 +2754,43 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
   }
 
-  const notifyThread = (category: ThreadNotificationCategory, eventId: string, sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
+  const notifyThread = (
+    category: ThreadNotificationCategory,
+    eventId: string,
+    sessionId: SessionSummary['id'] | null,
+    title: string,
+    fallbackBody: string,
+    message?: string,
+  ): void => {
     const categoryPreferences = preferences.notificationCategories[category]
     if (
       storedNotificationsMuted.get() === true ||
       !ThreadNotificationModel.threadNotificationHasOutput(categoryPreferences) ||
-      isMuteActive(mutedThreads[sessionId], readNow())
+      (sessionId !== null && isMuteActive(mutedThreads[sessionId], readNow()))
     )
       return
-    const session = sessionState.byId[sessionId]
-    if (session === undefined || !SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
+    const session = sessionId === null ? undefined : sessionState.byId[sessionId]
+    if (sessionId !== null && (session === undefined || !SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention))) return
     const inApp = ThreadNotificationModel.notificationRouteHasInApp(categoryPreferences.delivery)
     const systemRequested = ThreadNotificationModel.notificationRouteHasSystem(categoryPreferences.delivery)
     const system = systemRequested && plugin.notifications.permission() === 'granted'
     if (!inApp && !system && !categoryPreferences.sound) return
     if (!ThreadNotificationModel.claimThreadNotification(eventId)) return
+    // Already open in this focused window: claimed, so other tabs stay quiet too; the Host history still records it.
+    if (sessionId !== null && ViewedThreadModel.isWatched({ ...ViewedThreadModel.windowAttention(), sessionId, viewedSessionId: selectedSessionId })) return
+    const open = sessionId === null ? undefined : () => openThread(sessionId)
     if (inApp) {
       dispatchNoticeQueue({
         type: 'enqueue-notification',
         notice: {
           tone: notificationNoticeTones[category],
-          message: `${title}: ${session.displayTitle ?? fallbackBody}`,
+          message: message ?? `${title}: ${session?.displayTitle ?? fallbackBody}`,
           durationMs: preferences.notificationDurationSeconds * 1_000,
-          actionLabel: props.tSidebar('threadSidebarNotificationOpenThread'),
-          onAction: () => openThread(sessionId),
+          ...(open !== undefined && { actionLabel: props.tSidebar('threadSidebarNotificationOpenThread'), onAction: open }),
         },
       })
     }
-    if (system && !plugin.notifications.notify({ title, body: fallbackBody, onClick: () => openThread(sessionId) }))
+    if (system && !plugin.notifications.notify({ title, body: fallbackBody, ...(open !== undefined && { onClick: open }) }))
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
     if (categoryPreferences.sound) ThreadNotificationAudioModel.play(categoryPreferences.soundPreset, categoryPreferences.volume)
   }
@@ -4788,7 +4799,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const transitions = ThreadNotificationModel.threadInteractionTransitions(previousStatus.current, currentStatusEntries)
     previousStatus.current = currentStatus
     for (const sessionId of transitions.approvalNeeded) {
-      if (selectedSession?.id === sessionId) continue
       const interactionKey = sessionStatus.get(sessionId)?.pendingInteraction?.key
       if (interactionKey === undefined) continue
       latestRowActions.current.notifyThread(
@@ -4800,7 +4810,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       )
     }
     for (const sessionId of transitions.inputNeeded) {
-      if (selectedSession?.id === sessionId) continue
       const interactionKey = sessionStatus.get(sessionId)?.pendingInteraction?.key
       if (interactionKey === undefined) continue
       latestRowActions.current.notifyThread(
@@ -4820,7 +4829,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     previousAttention.current = attention.records
     if (previous === null) return
     for (const [sessionId, record] of attention.records) {
-      if (record.finishedAt === null || record.finishedSeq === null || selectedSession?.id === sessionId) continue
+      if (record.finishedAt === null || record.finishedSeq === null) continue
       if (previous.get(sessionId)?.finishedSeq === record.finishedSeq || record.finishedReason === null) continue
       const session = sessions.find(candidate => candidate.id === sessionId)
       if (session === undefined || sessionStatus.get(session.id)?.pendingInteraction !== undefined) continue
@@ -4835,6 +4844,21 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       )
     }
   }, [attention.records, isPrimarySurface, selectedSession?.id, sessionStatus, sessions, tSidebar])
+
+  // `notify_user`: the agent's own message, routed like a question that needs the user (the “Input needed” category).
+  useApiEvent(userNotificationApi, 'sent', notification => {
+    if (!isPrimarySurface) return
+    const linked = notification.sessionId === null ? undefined : sessionState.byId[SessionId(notification.sessionId)]
+    const body = notification.body === '' ? notification.title : notification.body
+    latestRowActions.current.notifyThread(
+      'input-needed',
+      `user:${notification.id}`,
+      linked?.id ?? null,
+      notification.title,
+      body,
+      `${notification.title}: ${body}`,
+    )
+  })
 
   const isTransientNotice =
     notice !== null && (notice.tone === 'success' || notice.durationMs !== undefined || (notice.actionLabel !== undefined && notice.onAction !== undefined))

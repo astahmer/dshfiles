@@ -51,6 +51,8 @@ import { threadActionsApi } from './thread-actions-api.js'
 import { ThreadActions, threadCommandsLayer } from './thread-host-promise.js'
 import { threadViewsApi } from './thread-views-api.js'
 import { ThreadViews } from './thread-views-host.js'
+import { userNotificationApi } from './user-notification-api.js'
+import { UserNotifications } from './user-notification-host.js'
 
 /**
  * A settled Session runs no model step until it is unsettled: a late wake (subagent settlement, queued follow-up,
@@ -117,6 +119,7 @@ const services = Layer.mergeAll(
   threads,
   ClientModules.layer.pipe(Layer.provideMerge(PluginUpdateWatch.layer)),
   MachineName.layer,
+  UserNotifications.layer,
 ).pipe(Layer.provideMerge(runtimeState))
 
 const workers = Layer.mergeAll(
@@ -269,6 +272,9 @@ export default DshxPlugin.make({
       state: (input, call) => ThreadSubscriptionActions.use(actions => actions.state(input, call.caller)),
       subscribe: (input, call) => ThreadSubscriptionActions.use(actions => actions.subscribe(input, call.caller)),
       unsubscribe: (input, call) => ThreadSubscriptionActions.use(actions => actions.unsubscribe(input, call.caller)),
+    }),
+    Api.bind(userNotificationApi, {
+      send: (input, call) => UserNotifications.use(notifications => notifications.send(input, call.caller)),
     }),
     Api.bind(threadSidebarAutoSettleApi, {
       status: () => AutoSettle.use(autoSettle => autoSettle.status),

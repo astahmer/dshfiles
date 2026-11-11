@@ -616,6 +616,24 @@ unlocked by the first user gesture and resumed before every tone, so an alert in
 background tab still rings. Existing desktop-alert choices migrate to system
 delivery.
 
+A thread open in a visible, focused window raises no toast, system notification
+or sound: you are already looking at it. The event is still claimed, so another
+tab stays quiet too, and Notification history still records it. The same thread
+in a hidden tab or an unfocused window notifies as usual.
+
+**Agent notifications.** `notify_user` (API `thread-user-notifications.send`)
+lets an agent send a title and an optional body, linked to its own thread by
+default (`sessionId: null` for none, or another thread's id). Its description
+limits it to when the user asked to be notified or a long task or routine needs
+their attention. Every open page routes it through the **Input needed** category's delivery and
+sound, the global snooze and the thread's mute,
+and skips a thread you are watching, as above; a click opens the linked thread.
+Unlike the generic thread alerts, the agent's own text is shown, so it must
+not carry secrets. Sends are limited to 3 per thread and 12 in total per 10
+minutes; a refused send returns `rate-limited` with the seconds to wait. Nothing
+is queued for pages that open later, and it adds no history entry. Each send
+leaves a `thread-sidebar user notification send` span.
+
 **Park vs settle vs mute.** Park files a finished thread away: it moves to the
 Parked section, is skipped by auto-settle, and stays parked until unparked, but
 its alerts still fire and it still runs steps when something wakes it. Settle
