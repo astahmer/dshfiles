@@ -5013,7 +5013,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "selection-context-menu",
       "title": "Apply every context-menu action to the selection",
-      "summary": "Right-clicking an item that belongs to a selection applies every repeatable action to all selected items, and each action shows the count as \"(N)\": start thread, copy IDs and links, status, kind, attention, project, pin, triage and permanent deletion, which confirms with the cou…",
+      "summary": "Right-clicking an item that belongs to a selection applies every repeatable action to all selected items, and each action shows the count as \"(N)\": start thread, copy IDs and links (Copy submenu), status, kind, attention, project, pin, triage and permanent deletion, which confir…",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › row menu",
       "reach": [
@@ -5102,17 +5102,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Copy item IDs (2)\"",
-          "action": "expect",
+          "text": "hover menuitem \"Copy (2)\"",
+          "action": "hover",
           "by": "menuitem",
-          "name": "Copy item IDs (2)",
+          "name": "Copy (2)",
           "value": null
         },
         {
-          "text": "expect menuitem \"Copy item links (2)\"",
+          "text": "expect menuitem \"Item IDs\"",
           "action": "expect",
           "by": "menuitem",
-          "name": "Copy item links (2)",
+          "name": "Item IDs",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Links\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Links",
           "value": null
         },
         {
@@ -6347,7 +6354,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "backlog",
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; copy the item ID or its clickable `b:<id>` reference; change status,…",
+      "summary": "Clicking a board card opens the item detail beside the board. Right-clicking an item in the feed, Inbox, Items, Board, Projects, search results, or its detail view opens the same actions: start a linked thread; copy the item ID, its clickable `b:<id>` reference or its Markdown f…",
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Start thread",
       "reach": [
@@ -6443,17 +6450,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Copy item ID\"",
+          "text": "expect menuitem \"Copy\"",
           "action": "expect",
           "by": "menuitem",
-          "name": "Copy item ID",
-          "value": null
-        },
-        {
-          "text": "expect menuitem \"Copy item link\"",
-          "action": "expect",
-          "by": "menuitem",
-          "name": "Copy item link",
+          "name": "Copy",
           "value": null
         },
         {
@@ -6676,17 +6676,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Copy item ID\"",
+          "text": "expect menuitem \"Copy\"",
           "action": "expect",
           "by": "menuitem",
-          "name": "Copy item ID",
-          "value": null
-        },
-        {
-          "text": "expect menuitem \"Copy item link\"",
-          "action": "expect",
-          "by": "menuitem",
-          "name": "Copy item link",
+          "name": "Copy",
           "value": null
         },
         {

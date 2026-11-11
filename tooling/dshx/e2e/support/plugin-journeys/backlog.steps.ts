@@ -117,7 +117,7 @@ const menuItemTextPosition = async (item: Locator, label: string): Promise<numbe
 
 const expectContextMenuLabelsAligned = async (menu: Locator, includeOpenItem: boolean): Promise<void> => {
   // Attention included: its glyph is an icon-column icon like Status and Kind, whether or not the item asks for something.
-  const labels = ['Start thread…', 'Copy item ID', 'Copy item link', 'Copy item as Markdown', 'Status', 'Priority', 'Kind', 'Attention', 'Project', 'Pin item']
+  const labels = ['Start thread…', 'Copy', 'Status', 'Priority', 'Kind', 'Attention', 'Project', 'Pin item']
   if (includeOpenItem) labels.push('Open item')
 
   const referencePosition = await menuItemTextPosition(menu.getByRole('menuitem', { name: 'Start thread…', exact: true }), 'Start thread…')
@@ -136,15 +136,21 @@ const expectItemActions = async (page: Page, includeOpenItem: boolean): Promise<
   await expect(menu.getByRole('menuitem', { name: 'Attention', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: 'Project', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: /^(Unpin item|Pin item)$/ })).toBeVisible()
-  await expect(menu.getByRole('menuitem', { name: 'Copy item ID', exact: true })).toBeVisible()
-  await expect(menu.getByRole('menuitem', { name: 'Copy item link', exact: true })).toBeVisible()
-  await expect(menu.getByRole('menuitem', { name: 'Copy item as Markdown', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Copy item ID', exact: true })).toHaveCount(0)
   await expect(menu.getByRole('menuitem', { name: 'Run triage', exact: true })).toHaveCount(0)
   if (includeOpenItem) await expect(menu.getByRole('menuitem', { name: 'Open item', exact: true })).toBeVisible()
   await expectContextMenuLabelsAligned(menu, includeOpenItem)
+  await menu.getByRole('menuitem', { name: 'Copy', exact: true }).hover()
+  const copyMenu = page.getByRole('menu').last()
+  for (const label of ['Item ID', 'Link', 'Markdown']) await expect(copyMenu.getByRole('menuitem', { name: label, exact: true })).toBeVisible()
   await menu.getByRole('menuitem', { name: 'Project', exact: true }).hover()
   await expect(page.getByRole('menu').last().getByRole('menuitemradio', { name: 'No project', exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
+}
+
+const copyFromContextMenu = async (page: Page, label: string): Promise<void> => {
+  await contextMenu(page).getByRole('menuitem', { name: 'Copy', exact: true }).hover()
+  await page.getByRole('menu').last().getByRole('menuitem', { name: label, exact: true }).click()
 }
 
 When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
@@ -784,13 +790,13 @@ When('backlog item b:{int} copies its ID and link from the context menu', async 
   const target = await contextTarget(page, id, 'feed')
 
   await target.click({ button: 'right' })
-  await contextMenu(page).getByRole('menuitem', { name: 'Copy item ID', exact: true }).click()
+  await copyFromContextMenu(page, 'Item ID')
   await recordAssertion(page, 'backlog-copy-item-id', async () => {
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(await backlogRef(page, id))
   })
 
   await target.click({ button: 'right' })
-  await contextMenu(page).getByRole('menuitem', { name: 'Copy item link', exact: true }).click()
+  await copyFromContextMenu(page, 'Link')
   await recordAssertion(page, 'backlog-copy-item-link', async () => {
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`${await backlogLabel(page, id)}`)
   })
@@ -802,7 +808,7 @@ When('backlog item b:{int} copies its Markdown from the context menu', async ({ 
   const target = await contextTarget(page, id, 'feed')
 
   await target.click({ button: 'right' })
-  await contextMenu(page).getByRole('menuitem', { name: 'Copy item as Markdown', exact: true }).click()
+  await copyFromContextMenu(page, 'Markdown')
   await recordAssertion(page, 'backlog-copy-item-markdown', async () => {
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(`${await backlogLabel(page, id)}`)
   })

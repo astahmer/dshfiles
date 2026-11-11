@@ -19,6 +19,7 @@ import {
   CalendarClockIcon,
   CalendarIcon,
   CopyIcon,
+  FileTextIcon,
   FolderIcon,
   MergeIcon,
   RepeatIcon,
@@ -39,7 +40,7 @@ import { ItemPickers } from './item-pickers.js'
 import { WorkGlyphs } from './work-glyphs.js'
 import { deleteSelection as deleteSelectedItems } from './delete-selection.js'
 import { startThreadItemOf, type StartThreadItem } from './start-thread.js'
-import { backlogItemMarkdown } from './item-markdown.js'
+import { itemCopyEntries } from './item-copy-entries.js'
 import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-actions.js'
 import { BacklogTweetContext } from './backlog-tweet-context.js'
 import { BacklogNotices } from './notices.js'
@@ -50,6 +51,7 @@ import { Recurrence } from './recurrence.js'
 import { nightlyTiming } from './scheduled-rule-timing.js'
 
 const NO_PROJECT = 'no-project'
+const copyEntryIcons = { id: CopyIcon, link: LinkIcon, markdown: FileTextIcon } as const
 type BacklogMenuItem = Pick<
   BacklogSummaryView,
   'id' | 'ref' | 'title' | 'kind' | 'status' | 'project' | 'pinned' | 'tags' | 'links' | 'tweetContextUrls' | 'attachments'
@@ -140,20 +142,24 @@ export const BacklogItemMenu = (props: {
               Open item
             </ContextMenuItem>
           )}
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(selection.map(BacklogReference.refOf).join(', '))}>
-            <CopyIcon aria-hidden className="dshx:size-3.5" />
-            {many ? 'Copy item IDs' : 'Copy item ID'}
-            {countSuffix}
-          </ContextMenuItem>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(selection.map(BacklogReference.labelOf).join(' '))}>
-            <LinkIcon aria-hidden className="dshx:size-3.5" />
-            {many ? 'Copy item links' : 'Copy item link'}
-            {countSuffix}
-          </ContextMenuItem>
-          <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(backlogItemMarkdown(item))}>
-            <CopyIcon aria-hidden className="dshx:size-3.5" />
-            Copy item as Markdown
-          </ContextMenuItem>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="dshx:gap-2 dshx:text-[13px]">
+              <CopyIcon aria-hidden className="dshx:size-3.5" />
+              Copy
+              {countSuffix}
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+              {itemCopyEntries({ item, selection }).map(entry => {
+                const Icon = copyEntryIcons[entry.key]
+                return (
+                  <ContextMenuItem key={entry.key} className="dshx:gap-2 dshx:text-[13px]" onSelect={() => void writeClipboard(entry.text())}>
+                    <Icon aria-hidden className="dshx:size-3.5" />
+                    {entry.label}
+                  </ContextMenuItem>
+                )
+              })}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
           {tweetUrl === undefined ? null : (
             <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" disabled={actions.enrichTweet.isPending} onSelect={() => void importTweet()}>
               <LinkIcon aria-hidden className="dshx:size-3.5" />
