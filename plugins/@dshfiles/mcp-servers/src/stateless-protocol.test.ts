@@ -1,3 +1,5 @@
+import { decodeJson } from '@dshfiles/dshx/json'
+import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { StatelessMcpModel } from './stateless-protocol.js'
 
@@ -43,7 +45,7 @@ describe('MCP 2026-07-28 request metadata', () => {
       'Mcp-Name': 'get_weather',
       Authorization: 'Bearer t',
     })
-    expect(JSON.parse(wire.body)).toMatchObject({
+    expect(decodeJson(Schema.Json, wire.body)).toMatchObject({
       id: 7,
       params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } },
     })
@@ -56,7 +58,7 @@ describe('MCP 2026-07-28 request metadata', () => {
       'io.modelcontextprotocol/clientInfo': { name: 'dshfiles-mcp-servers', version: '0.1.0' },
       'io.modelcontextprotocol/clientCapabilities': {},
     }
-    const request = (meta: unknown) => StatelessMcpModel.request({ id: 1, method: 'tools/list', params: { _meta: meta } }).body
+    const request = (meta: Schema.Json) => StatelessMcpModel.request({ id: 1, method: 'tools/list', params: { _meta: meta } }).body
     expect(request({ custom: 1, ['__proto__']: 'safe', 'io.modelcontextprotocol/protocolVersion': 'old' })).toBe(
       JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _meta: { custom: 1, ['__proto__']: 'safe', ...reserved } } }),
     )
