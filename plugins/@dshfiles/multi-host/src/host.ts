@@ -51,6 +51,7 @@ import { RuntimeIdentity } from './identity.js'
 import { LaunchFile } from './launch-file.js'
 import { LocalProjectFiles } from './local-project-files.js'
 import { readProjectOrigins } from './project-origins.js'
+import { redactSecrets } from './redact.js'
 import { NativeRpc } from './native-rpc.js'
 import { MultiHostPaths } from './paths.js'
 import { hostConnectorSchema, runtimeLocatorSchema, runtimeOriginPort, type HostRecord, type RuntimeRecord } from './records.js'
@@ -732,7 +733,7 @@ const handlers = Api.handlers(multiHostApi, {
         command: RemoteRuntime.logsCommand({ logFile, lines: input.lines }),
         timeoutMs: 20_000,
       })
-      return { ok: true as const, logFile, tail: result.stdout }
+      return { ok: true as const, logFile, tail: redactSecrets(result.stdout) }
     }).pipe(Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })))
   }),
   checkoutSync: Effect.fn('multi-host checkout sync')(function* (input) {

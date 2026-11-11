@@ -30,6 +30,7 @@ import {
   type GatewayStreamError,
   type PluginApiError,
 } from '../errors.js'
+import { redactSecrets } from '../redact.js'
 
 const maxNativeResponseBytes = 32 * 1024 * 1024
 const maxNativeRequestBytes = 48 * 1024 * 1024
@@ -67,11 +68,7 @@ const segmentPattern = /^[A-Za-z][A-Za-z0-9-]*$/
 /** The Gateway's own forwarded-event stream and the unary result it pairs with; neither is a Service method. */
 const remoteEventStream = '$events'
 
-const sanitizeRemoteMessage = (message: string): string =>
-  message
-    .replace(/([?&]token=)[^&\s"']*/gi, '$1[redacted]')
-    .replace(/(authorization|cookie)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
-    .slice(0, 1000)
+const sanitizeRemoteMessage = (message: string): string => redactSecrets(message).slice(0, 1000)
 
 /** What a connector provides under the gateway: an origin that reaches the runtime, for the gateway's Scope. */
 export interface GatewayTransport {
