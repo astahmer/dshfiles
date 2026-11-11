@@ -6,12 +6,15 @@ import { ReachModel } from './reach-model.js'
 
 const featureKey = Schema.String.check(Schema.isMaxLength(160), Schema.isPattern(/^[a-z0-9][a-z0-9-]*#[a-z0-9][a-z0-9-]*$/u))
 const packId = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
+const projectId = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
 
 export const tryItInputSchema = Schema.Struct({
   /** A catalogued feature (`<plugin>#<feature>`, from onboarding_overview); give this or `pack`. */
   feature: Schema.optional(featureKey),
   /** A plugin pack id from onboarding_overview; give this or `feature`. */
   pack: Schema.optional(packId),
+  /** A registered project id (project_list) to start the demo in; the Host refuses one it does not list. */
+  project: Schema.optional(projectId),
   /** No default: a request without it starts nothing. */
   confirm: Schema.Literal(true),
 })
@@ -29,7 +32,7 @@ export type TryItOutput = typeof tryItOutputSchema.Type
 /** The onboarding `tryIt` setting is off: no thread was started. */
 export class TryItOffError extends Schema.TaggedError<TryItOffError>()('TryItOffError', { message: Schema.String }, { dshxWireCode: 'try-it-off' }) {}
 
-/** The request names no catalogued feature or pack, or both: no thread was started. */
+/** The request names no catalogued feature or pack, or both, or a project the Host does not list: no thread was started. */
 export class TryItTargetError extends Schema.TaggedError<TryItTargetError>()(
   'TryItTargetError',
   { message: Schema.String },
@@ -128,6 +131,16 @@ const demoOf = (input: {
   return { title: titleOf(pack.title), text: packPrompt({ pack, plugins }) }
 }
 
+/** A registered project wins; otherwise an agent's demo runs in its own directory and a page click in the Host default directory. */
+const placementOf = (input: {
+  readonly projectId: string | undefined
+  readonly callerCwd: string | undefined
+}): { readonly projectId: string } | { readonly cwd: string } | Record<never, never> => {
+  if (input.projectId !== undefined) return { projectId: input.projectId }
+  if (input.callerCwd === undefined || input.callerCwd === '') return {}
+  return { cwd: input.callerCwd }
+}
+
 const render = (value: TryItOutput): string =>
   value.prompt === 'accepted'
     ? `Started the demo thread ${value.sessionId} (“${value.title}”); its first message was sent and it is running on the user's default model.`
@@ -137,5 +150,6 @@ export class TryItModel {
   static readonly featurePrompt = featurePrompt
   static readonly packPrompt = packPrompt
   static readonly demoOf = demoOf
+  static readonly placementOf = placementOf
   static readonly render = render
 }

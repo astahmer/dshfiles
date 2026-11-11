@@ -91,6 +91,7 @@ const renderPage = (input: { readonly registered: readonly string[]; readonly pa
         loadSuggestions={loadSuggestions}
         loadWhatsNew={loadWhatsNew}
         openThread={vi.fn()}
+        project={null}
         routes={services}
         settings={{ ...ONBOARDING_DEFAULTS, packs: input.packs ?? true, whatsNew: input.whatsNew ?? true }}
         showWhere={showWhere}

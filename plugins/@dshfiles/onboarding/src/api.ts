@@ -62,7 +62,7 @@ export const onboardingApi = defineApi({
       input: tryItInputSchema,
       output: tryItOutputSchema,
       description:
-        "Start a demo of one catalogued feature (`feature`, its key from onboarding_overview) or one plugin pack (`pack`): a new thread whose first message, built only from the feature catalog, asks the agent there to show that feature in this setup with read-only tools and to ask before any write. The message is sent at once, so the new thread runs on the user's default model and spends tokens on their account. Call only when the user asked for this demo; `confirm: true` is required and a call without it starts nothing. Refused while the onboarding `tryIt` setting is off (the default). Returns the new thread's id; stop or archive that thread to end the demo.",
+        "Start a demo of one catalogued feature (`feature`, its key from onboarding_overview) or one plugin pack (`pack`): a new thread whose first message, built only from the feature catalog, asks the agent there to show that feature in this setup with read-only tools and to ask before any write. The message is sent at once, so the new thread runs on the user's default model and spends tokens on their account. Call only when the user asked for this demo; `confirm: true` is required and a call without it starts nothing. Refused while the onboarding `tryIt` setting is off (the default). The thread starts in `project` when given (a registered project id from project_list; any other id is refused), otherwise in your own directory. Returns the new thread's id; stop or archive that thread to end the demo.",
       tool: { name: 'onboarding_try_it', render: TryItModel.render },
     }),
   },

@@ -120,12 +120,25 @@ export default DshxPlugin.make({
             })
           const hostApis = yield* HostApis
           if (!(yield* hostApis.isServed(threadActionsApi))) return yield* new TryItUnavailableError({ message: TRY_IT_UNAVAILABLE_MESSAGE })
-          // An agent's demo runs in its own project; a click on the page runs in the Host's default directory.
-          const cwd = call.caller.kind === 'agent' ? call.caller.cwd : undefined
-          const thread = cwd === undefined || cwd === '' ? { title: demo.title, text: demo.text } : { title: demo.title, text: demo.text, cwd }
-          const created = yield* hostApis
-            .client(threadActionsApi)
-            .create(thread)
+          const threadActions = hostApis.client(threadActionsApi)
+          // A named project must be one the Host registered; never a raw client path.
+          const project =
+            request.project === undefined
+              ? undefined
+              : (yield* threadActions
+                  .projectList({})
+                  .pipe(
+                    Effect.mapError(
+                      error => new TryItUnavailableError({ message: `Thread actions could not list the registered projects (${error.message}). Try again.` }),
+                    ),
+                  )).projects.find(candidate => candidate.projectId === request.project)
+          if (request.project !== undefined && project === undefined)
+            return yield* new TryItTargetError({
+              message: `Project ${request.project} is not a registered project on this Host, so no thread was started. Open a project from the sidebar (project_list names them), or start the demo with no project to use the Host default directory.`,
+            })
+          const placement = TryItModel.placementOf({ projectId: project?.projectId, callerCwd: call.caller.kind === 'agent' ? call.caller.cwd : undefined })
+          const created = yield* threadActions
+            .create({ title: demo.title, text: demo.text, ...placement })
             .pipe(
               Effect.mapError(error => new TryItUnavailableError({ message: `Thread actions could not start the demo thread (${error.message}). Try again.` })),
             )

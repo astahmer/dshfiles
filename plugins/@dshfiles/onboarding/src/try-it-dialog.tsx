@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import type { ReactNode } from 'react'
+import type { OnScreenProject } from './on-screen-project.js'
 import { TOUCH } from './touch.js'
 import type { TryItInput, TryItOutput } from './try-it-model.js'
 
@@ -12,6 +13,8 @@ export type TryItTarget = { readonly feature: string; readonly title: string } |
 
 export interface TryItDialogProps {
   readonly target: TryItTarget | null
+  /** The project on screen the demo starts in; `null` starts it in the Host default directory. */
+  readonly project: OnScreenProject | null
   /** Starts the demo thread and sends its first message; called only from the confirm button. */
   readonly startTryIt: (input: TryItInput) => Promise<TryItOutput>
   readonly openThread: (sessionId: TryItOutput['sessionId']) => void
@@ -21,13 +24,17 @@ export interface TryItDialogProps {
 export const TRY_IT_COST =
   'This starts a new thread and sends it a demo prompt right away. The agent there runs on your default model and spends tokens on your current AI account. It shows the feature with read-only tools and asks before changing anything.'
 
-const inputOf = (target: TryItTarget): TryItInput => ('feature' in target ? { feature: target.feature, confirm: true } : { pack: target.pack, confirm: true })
+const inputOf = (target: TryItTarget, project: OnScreenProject | null): TryItInput => ({
+  ...('feature' in target ? { feature: target.feature } : { pack: target.pack }),
+  ...(project === null ? undefined : { project: project.projectId }),
+  confirm: true,
+})
 
 const ConfirmBody = (props: TryItDialogProps & { readonly target: TryItTarget }): ReactNode => {
   const openThread = props.openThread
   const onClose = props.onClose
   const start = useMutation({
-    mutationFn: () => props.startTryIt(inputOf(props.target)),
+    mutationFn: () => props.startTryIt(inputOf(props.target, props.project)),
     onSuccess: started => {
       if (started.prompt === 'refused') return
       openThread(started.sessionId)
@@ -40,6 +47,9 @@ const ConfirmBody = (props: TryItDialogProps & { readonly target: TryItTarget })
       <DialogHeader>
         <DialogTitle>Try it: {props.target.title}</DialogTitle>
         <DialogDescription data-try-it-cost="">{TRY_IT_COST}</DialogDescription>
+        <p className="dshx:text-sm dshx:text-muted-foreground" data-try-it-project="">
+          {props.project === null ? 'Starts in the Host default directory.' : `Starts in ${props.project.title}.`}
+        </p>
       </DialogHeader>
       {start.isError ? (
         <Alert role="alert" variant="destructive">

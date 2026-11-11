@@ -146,7 +146,10 @@ thread**) opens the setting.
    `onboarding_overview` and `onboarding_reach`, show rather than change, and ask before any write.
 4. **Send.** The Host starts the thread through Thread actions (`@dshfiles/thread-sidebar`'s `thread-actions` API,
    the path behind `thread_create`): create, title `Try it · <feature>`, first message queued; then the page opens
-   it. A page click runs in the Host's default directory; the agent tool runs in the calling thread's directory.
+   it. A page click runs in the project on screen (the main view thread's project, found as Ask DSH finds it; a
+   thread workspace counts as the project it was cut from), which the dialog names; the Host starts it there only when
+   Thread actions lists that project, and refuses any other id. With no project on screen it runs in the Host's default
+   directory. The agent tool runs in `project` when given, else in the calling thread's directory.
 5. **Recovery.** Without thread-sidebar the dialog says to enable it (Settings › Plugins, Core pack) and restart. A
    refused first message keeps the dialog open with **Open thread**; send it again there or archive the thread. Stop
    or archive a demo thread to end it: the tokens it spent are not refundable.
@@ -212,8 +215,8 @@ All apply live; none needs a restart.
    feature row of each. While the `suggestions` setting is off it refuses with `suggestions-off` and reads nothing.
    Dismissing a suggestion is per browser and has no tool.
 6. `onboarding_try_it` (write, `onboarding/tryIt`) starts the same demo thread Try it starts, for one `feature` key or
-   one `pack`, and returns its thread id. It runs only when the user asked: `confirm: true` has no default, and it
-   refuses with `try-it-off` while the `tryIt` setting is off. Stop or archive the thread to end the demo.
+   one `pack`, optionally in a registered `project` (`project_list`), and returns its thread id. It runs only when the
+   user asked: `confirm: true` has no default, and it refuses with `try-it-off` while the `tryIt` setting is off. Stop or archive the thread to end the demo.
 7. Opening a page, replaying the wizard and walking Show me where are presentation and have no tool: the Agent gives
    the user the steps from `onboarding_reach`, and the user walks them.
 
@@ -238,6 +241,8 @@ All apply live; none needs a restart.
    buttons.
 3. Whether DSH runs under the managed launcher is not read here, so the restart guidance names both ways.
 4. Show me where cannot follow a right-click or shift-click, nor create the sample data a `seed` step stands for.
+5. Try it reads the project on screen from the thread the main view holds; a page with no thread behind it (a fresh
+   Host) starts the demo in the Host's default directory.
 
 ## Telemetry
 

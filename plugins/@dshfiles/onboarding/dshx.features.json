@@ -651,12 +651,13 @@
         "Thread actions refuses to create the thread: the dialog shows its reason with Try again.",
         "The thread starts but refuses its first message: the dialog says so and offers Open thread; send the message again there or archive the thread.",
         "An older Host without the method: the dialog shows the Host error with Try again; restart DSH to load the new Host half.",
-        "A page click runs the demo in the Host's default directory, not the project on screen; the agent tool runs it in the calling thread's directory."
+        "The project on screen is not one Thread actions lists (removed meanwhile, or the id was never registered): the Host refuses with try-it-target and starts nothing; open a registered project or none, then Try it again.",
+        "No thread in the main view belongs to a registered project: the dialog says Starts in the Host default directory and the demo runs there; the agent tool runs it in the calling thread's directory unless it names a project."
       ],
       "externalDependencies": [
         {
           "id": "thread-actions-create",
-          "boundary": "The @dshfiles/thread-sidebar thread-actions API create method (title and first message), called in process through HostApis; an absent owner is refused before anything starts.",
+          "boundary": "The @dshfiles/thread-sidebar thread-actions API create method (title, first message and a project its projectList method lists), called in process through HostApis; an absent owner is refused before anything starts.",
           "deterministicFake": "src/host.test.ts mounts a fake @dshfiles/thread-sidebar Host serving the same contract and records every create."
         }
       ],
@@ -711,10 +712,22 @@
           "testName": "starts exactly one confirmed demo for the feature and opens its thread"
         },
         {
+          "kind": "unit-test",
+          "id": "onboarding.try-it-project",
+          "file": "plugins/@dshfiles/onboarding/src/try-it.client.test.tsx",
+          "testName": "starts the demo in the project on screen and names it before Start demo"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.on-screen-project",
+          "file": "plugins/@dshfiles/onboarding/src/on-screen-project.test.ts",
+          "testName": "reads a thread workspace as the project it was cut from"
+        },
+        {
           "kind": "host-test",
           "id": "onboarding.try-it-tool",
           "file": "plugins/@dshfiles/onboarding/src/host.test.ts",
-          "testName": "starts no demo thread while tryIt is off or without confirm, and once on sends the catalog prompt through thread actions"
+          "testName": "starts no demo thread while tryIt is off or without confirm, and once on sends the catalog prompt through thread actions in a registered project only"
         }
       ]
     }

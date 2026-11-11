@@ -7,9 +7,10 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { CompassIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { DestinationSections } from '@dshfiles/thread-sidebar/destinations'
-import { useCallback, useEffect, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { onboardingApi } from './api.js'
 import { GettingStartedPage, type GettingStartedProps } from './getting-started-page.js'
+import { OnScreenProjects, type OnScreenProject } from './on-screen-project.js'
 import type { Overview, OverviewInput } from './overview-model.js'
 import { Routes, type RouteServices } from './routes.js'
 import { TOUCH } from './touch.js'
@@ -96,7 +97,7 @@ const useStartTryIt = (): GettingStartedProps['startTryIt'] => {
 
 export default defineClient({
   name: '@dshfiles/onboarding',
-  inject: ['slots', 'uiWorkspace'],
+  inject: ['slots', 'sessions', 'workspaces', 'uiWorkspace'],
   setup(ctx, decorate, metadata) {
     const plugin: PluginContext | undefined = metadata?.plugin
     metadata?.plugin?.add(DestinationSections, {
@@ -116,6 +117,17 @@ export default defineClient({
       openSettings: Routes.dispatchOpenSettings,
     }
     const copy = (text: string): Promise<boolean> => plugin?.system.copy(text) ?? Promise.resolve(false)
+
+    const subscribeSessions = (listener: () => void): (() => void) => ctx.sessions.list.subscribe(listener)
+    const readSessions = () => ctx.sessions.list.getSnapshot()
+    const subscribeWorkspaces = (listener: () => void): (() => void) => ctx.workspaces.list.subscribe(listener)
+    const readWorkspaces = () => ctx.workspaces.list.getSnapshot().items
+    /** Try it starts its demo in this project; the Host checks it is registered. */
+    const useOnScreenProject = (): OnScreenProject | null => {
+      const sessions = useSyncExternalStore(subscribeSessions, readSessions, readSessions)
+      const workspaces = useSyncExternalStore(subscribeWorkspaces, readWorkspaces, readWorkspaces)
+      return useMemo(() => OnScreenProjects.of({ sessions, workspaces }), [sessions, workspaces])
+    }
 
     /** Into the composer on screen, else a new thread draft; neither sends. */
     const useInsertPrompt = (): ((text: string) => boolean) => {
@@ -161,6 +173,7 @@ export default defineClient({
               loadSuggestions={useLoadSuggestions()}
               loadWhatsNew={useLoadWhatsNew()}
               openThread={sessionId => ctx.uiWorkspace.openSession(sessionId)}
+              project={useOnScreenProject()}
               routes={routes}
               settings={useOnboardingSettings()}
               showWhere={WalkStore.start}

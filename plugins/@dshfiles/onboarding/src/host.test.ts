@@ -444,8 +444,13 @@ describe('onboarding Host', () => {
     }
   })
 
-  it('starts no demo thread while tryIt is off or without confirm, and once on sends the catalog prompt through thread actions', async () => {
-    const created: { readonly title: string | undefined; readonly text: string | undefined; readonly cwd: string | undefined }[] = []
+  it('starts no demo thread while tryIt is off or without confirm, and once on sends the catalog prompt through thread actions in a registered project only', async () => {
+    const created: {
+      readonly title: string | undefined
+      readonly text: string | undefined
+      readonly cwd: string | undefined
+      readonly projectId: string | undefined
+    }[] = []
     const unused = (): never => {
       throw new Error('not called by onboarding')
     }
@@ -453,7 +458,7 @@ describe('onboarding Host', () => {
       apis: [
         threadActionsApi.host({
           create: ({ input }) => {
-            created.push({ title: input.title, text: input.text, cwd: input.cwd })
+            created.push({ title: input.title, text: input.text, cwd: input.cwd, projectId: input.projectId })
             return { sessionId: 'session-demo', title: input.title ?? 'untitled', prompt: 'accepted' as const }
           },
           list: unused,
@@ -472,7 +477,7 @@ describe('onboarding Host', () => {
           selectModel: unused,
           status: unused,
           references: unused,
-          projectList: unused,
+          projectList: () => ({ projects: [{ projectId: 'workspace-dshfiles', title: 'dshfiles', path: '/dev/dshfiles', threadCount: 1 }] }),
           projectRegister: unused,
           projectRename: unused,
           projectDelete: unused,
@@ -494,7 +499,10 @@ describe('onboarding Host', () => {
       await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
       return host
     }
-    const execute = (host: Awaited<ReturnType<typeof createTestHost>>, args: { readonly feature?: string; readonly pack?: string; readonly confirm?: true }) =>
+    const execute = (
+      host: Awaited<ReturnType<typeof createTestHost>>,
+      args: { readonly feature?: string; readonly pack?: string; readonly project?: string; readonly confirm?: true },
+    ) =>
       host.tools
         .execute({ callId: ToolCallId(`call-${String(created.length)}`), name: 'onboarding_try_it', arguments: args, signal: new AbortController().signal })
         .then(
@@ -541,6 +549,15 @@ describe('onboarding Host', () => {
         promptError: null,
       })
       expect(created[1]?.cwd).toBeUndefined()
+      expect(created[1]?.projectId).toBeUndefined()
+
+      await client.tryIt({ pack: 'observe', project: 'workspace-dshfiles', confirm: true })
+      expect(created[2]).toMatchObject({ projectId: 'workspace-dshfiles', cwd: undefined })
+      await expect(client.tryIt({ pack: 'observe', project: '/etc', confirm: true })).rejects.toThrow(
+        /Project \/etc is not a registered project on this Host, so no thread was started/u,
+      )
+      expect(await execute(on, { pack: 'observe', project: 'workspace-gone', confirm: true })).toMatch(/not a registered project/u)
+      expect(created).toHaveLength(3)
     } finally {
       await on.dispose()
     }

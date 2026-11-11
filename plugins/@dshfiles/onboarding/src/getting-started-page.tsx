@@ -76,6 +76,7 @@ export interface GettingStartedProps {
   readonly loadSuggestions: SuggestionsSectionProps['loadSuggestions']
   readonly startTryIt: TryItDialogProps['startTryIt']
   readonly openThread: TryItDialogProps['openThread']
+  readonly project: TryItDialogProps['project']
 }
 
 const ChecklistRow = (props: {
@@ -499,6 +500,7 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
           requestAnimationFrame(() => trigger.current?.focus())
         }}
         openThread={props.openThread}
+        project={props.project}
         startTryIt={props.startTryIt}
         target={tryIt ? tryItTarget : null}
       />
