@@ -48,6 +48,13 @@
           "deterministicFake": "Inject a fake CLI runner with synthetic alias metadata and values; never read a real vault or session credential."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Settings › Secrets and add a secret.",
+        "doneWhen": "The alias is listed in its scope without showing its value.",
+        "open": {
+          "panel": "secret-catalog"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -301,6 +301,15 @@
         "Native sections draw their own rows: a match on a section's name offers to open it, and the settings they draw stay searchable and open that section."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Settings and type a word in Search settings.",
+        "doneWhen": "Matching settings show as a list you can edit in place.",
+        "open": {
+          "settings": {
+            "section": "general"
+          }
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

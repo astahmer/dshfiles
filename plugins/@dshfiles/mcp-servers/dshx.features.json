@@ -87,6 +87,13 @@
           "deterministicFake": "Use an in-process local MCP server and injected fake subprocess; do not connect to customer endpoints."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Settings › MCP servers and add a server.",
+        "doneWhen": "The server shows as connected with its tools listed.",
+        "open": {
+          "panel": "mcp-servers"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

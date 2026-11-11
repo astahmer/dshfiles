@@ -300,6 +300,13 @@
         "Canceling removal keeps the profile intact; a failed removal stays visible and supports retry."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Settings › AI accounts and add an account for your provider.",
+        "doneWhen": "The account shows as connected and its models are listed.",
+        "open": {
+          "panel": "ai-accounts"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -798,6 +805,14 @@
           "deterministicFake": "Inject a fixed pricing catalog and simulated refresh timestamps; do not fetch models.dev in routine tests."
         }
       ],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Open Observe › Quota history after a few turns.",
+        "doneWhen": "The chart shows your accounts' usage over time.",
+        "open": {
+          "panel": "ai-accounts-usage"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -895,6 +910,14 @@
         "An older Host ignores the history bucket and returns its bounded series; the forecast still draws."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["account"],
+        "firstAction": "Open Observe › Quota forecast.",
+        "doneWhen": "Each account shows when it runs out at the current pace.",
+        "open": {
+          "panel": "ai-accounts-forecast"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -102,6 +102,15 @@
         "An old Host without the matching API displays an unavailable section rather than editable controls."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Settings › Network access and choose whether DSH is reachable on your LAN.",
+        "doneWhen": "The choice is saved and applies after the next restart.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-network-access"
+          }
+        }
+      },
       "verification": [
         { "kind": "gherkin", "id": "loopback-access.network-access-settings", "featureFile": "tooling/dshx/e2e/features/loopback-access.feature" },
         {

@@ -320,6 +320,15 @@
       "states": ["default-order", "reordered", "item-hidden", "host-without-namespace"],
       "failureModes": ["A Host that predates the namespace shows the list read-only with a restart hint; the strip keeps its default order."],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open the Status bar settings and hide or move an item.",
+        "doneWhen": "The status strip shows your order.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-status-bar"
+          }
+        }
+      },
       "verification": [
         {
           "kind": "unit-test",

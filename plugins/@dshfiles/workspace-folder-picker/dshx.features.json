@@ -45,6 +45,10 @@
         "The project settings section only reads dsh.project.json: it never imports a script or runs a command from the file."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Open Choose workspace from the composer, then Add workspace, and pick a folder.",
+        "doneWhen": "The folder is a project you can start threads in."
+      },
       "verification": [
         {
           "kind": "gherkin",
@@ -571,6 +575,16 @@
         "An old Host without the projects method shows the read failure with a retry instead of an empty project list."
       ],
       "externalDependencies": [],
+      "onboarding": {
+        "prerequisites": ["project"],
+        "firstAction": "Open Settings › Projects and pick a project.",
+        "doneWhen": "The project's settings, such as its main branch, show.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-workspace-folder-picker-projects"
+          }
+        }
+      },
       "verification": [
         {
           "kind": "unit-test",

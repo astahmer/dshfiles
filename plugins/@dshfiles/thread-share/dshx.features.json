@@ -45,6 +45,15 @@
           "testName": "serves only the shared thread: another session and other paths are unreachable"
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Settings › Thread sharing and create a link for a thread.",
+        "doneWhen": "The link opens a read-only copy of the thread.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-thread-share"
+          }
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

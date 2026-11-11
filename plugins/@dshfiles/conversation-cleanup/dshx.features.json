@@ -30,6 +30,15 @@
         { "kind": "automatic", "source": "api-dispatch" },
         { "kind": "automatic", "source": "agent-tool" }
       ],
+      "onboarding": {
+        "firstAction": "Open Settings › Conversation cleanup and preview what it would delete.",
+        "doneWhen": "The preview lists the cold settled or archived conversations, and nothing is deleted until you confirm.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-conversation-cleanup"
+          }
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

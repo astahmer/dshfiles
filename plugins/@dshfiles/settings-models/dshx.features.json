@@ -30,6 +30,15 @@
           "reason": "Client-only fork: it calls native llm, credentials, settings and session Remote methods whose Host spans belong to core."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Settings › Models and review your model providers.",
+        "doneWhen": "The providers you use are listed with their models.",
+        "open": {
+          "settings": {
+            "section": "models"
+          }
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -104,6 +104,15 @@
           "source": "agent-tool"
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Settings › MCP endpoint and generate a token.",
+        "doneWhen": "You copied the claude mcp add command that connects a terminal agent to DSH.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-mcp-endpoint"
+          }
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

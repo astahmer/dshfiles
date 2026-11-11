@@ -23,6 +23,13 @@
         { "kind": "automatic", "source": "api-dispatch" },
         { "kind": "automatic", "source": "agent-tool" }
       ],
+      "onboarding": {
+        "firstAction": "Open Settings › Plugin guide and search for a slot or API.",
+        "doneWhen": "The entry shows its scope, risk and source link.",
+        "open": {
+          "panel": "dshfiles-plugin-guide"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",

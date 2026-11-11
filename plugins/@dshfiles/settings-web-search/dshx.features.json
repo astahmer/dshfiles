@@ -29,6 +29,10 @@
           "reason": "Client-only fork: it calls native credentials and settings Remote methods whose Host spans belong to core."
         }
       ],
+      "onboarding": {
+        "firstAction": "Open Settings › Plugins › Web search and choose a provider.",
+        "doneWhen": "The agent's web_search uses that provider."
+      },
       "verification": [
         {
           "kind": "gherkin",

@@ -29,6 +29,13 @@
         { "kind": "automatic", "source": "api-dispatch" },
         { "kind": "automatic", "source": "agent-tool" }
       ],
+      "onboarding": {
+        "firstAction": "Open Settings › Capabilities hub and pick skills, MCP servers or plugins.",
+        "doneWhen": "That kind's own manager opens.",
+        "open": {
+          "panel": "dshfiles-capabilities-hub"
+        }
+      },
       "verification": [
         {
           "kind": "gherkin",
