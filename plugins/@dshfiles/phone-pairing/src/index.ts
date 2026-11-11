@@ -16,7 +16,7 @@ import { definePlugin } from '@dshfiles/dshx/host'
 import { Layer, ManagedRuntime, type Effect } from 'effect'
 import { phonePairingApi, type PairingOffer } from './api.ts'
 import { createPairingGateway, mintNativeCookie, type NativeCookie } from './gateway.ts'
-import { resolveProvider } from './providers.ts'
+import { decodeEnableArgs, providers, resolveProvider, type Provider } from './providers.ts'
 import { renderTerminalQr } from './qr.ts'
 import { PhoneAccessSettings } from './settings.ts'
 import { createPairingStore } from './store.ts'
@@ -115,7 +115,7 @@ export default definePlugin({
     }
     api.rpc.register(phonePairingApi.host({ offer: () => nextOffer() }))
 
-    const start = async (): Promise<{ provider: string; origin: string }> => {
+    const start = async (requested?: Provider): Promise<{ provider: string; origin: string }> => {
       if (gateway !== undefined && publicOrigin !== undefined) return { provider: 'running', origin: publicOrigin }
       const settings = settingStore?.current
       pairing ??= await createPairingStore({
@@ -123,7 +123,7 @@ export default definePlugin({
         deviceTtlMs: (config.deviceTtlDays ?? 365) * 24 * 3_600_000,
         offerTtlMs: (config.offerTtlSeconds ?? 300) * 1_000,
       })
-      const { provider } = await runtime.runPromise(resolveProvider(settings?.provider))
+      const { provider } = await runtime.runPromise(resolveProvider(requested ?? settings?.provider))
       const tunnel = settings?.origin === undefined ? await runtime.runPromise(startTunnel(gatewayPort, provider)) : undefined
       const origin = settings?.origin ?? tunnel?.origin
       const upstream = serverPort()
@@ -135,8 +135,8 @@ export default definePlugin({
       await gateway.listen()
       await settingStore?.save(
         settings?.origin === undefined
-          ? { enabled: true, provider: provider as never }
-          : { enabled: true, provider: provider as never, origin: settings.origin },
+          ? { enabled: true, provider }
+          : { enabled: true, provider, origin: settings.origin },
       )
       printOffer()
       return { provider, origin }
@@ -168,10 +168,10 @@ export default definePlugin({
         name: 'phone_pairing_enable',
         description:
           'Enable phone access: starts the gateway and the tunnel, prints a QR, and persists the choice. Call only when the user asked to enable phone access.',
-        parameters: { provider: { type: 'string', description: 'Optional: tailscale-serve, tailscale-funnel, cloudflared or manual' } },
+        parameters: { provider: { type: 'string', enum: [...providers], description: 'Optional; omitted keeps the saved choice or picks the best available.' } },
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
-        execute: async () => {
-          const started = await start()
+        execute: async args => {
+          const started = await start(decodeEnableArgs(args).provider)
           return `phone access is on via ${started.provider}; the pairing QR is in the sidebar footer and the DSH terminal`
         },
       }),

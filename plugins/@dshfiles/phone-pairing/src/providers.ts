@@ -1,8 +1,11 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import type { ChildProcessSpawner } from 'effect/process'
 import { commandExists } from './commands.ts'
 
-export type Provider = 'tailscale-funnel' | 'tailscale-serve' | 'cloudflared' | 'manual'
+export const providers = ['tailscale-funnel', 'tailscale-serve', 'cloudflared', 'manual'] as const
+export type Provider = (typeof providers)[number]
+
+export const decodeEnableArgs = Schema.decodeUnknownSync(Schema.Struct({ provider: Schema.optionalKey(Schema.Literals(providers)) }))
 
 export interface Availability {
   readonly provider: Provider
