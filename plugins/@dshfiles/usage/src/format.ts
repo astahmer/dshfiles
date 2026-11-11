@@ -1,3 +1,4 @@
+import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import type { RequestPurpose } from './fold.js'
 
 export type OpenThread = (target: { readonly sessionId: string; readonly parentSessionId: string | null }) => 'opened' | 'parent' | 'missing'
@@ -23,15 +24,8 @@ export class UsageFormattingModel {
     return `${scaled < 10 ? scaled.toFixed(1).replace(/\.0$/, '') : String(Math.round(scaled))}${suffix}`
   }
 
-  /** `$0.0456` below a dollar, `$12.34` below a hundred, `$1,234` above; `–` when unpriced. */
-  static readonly formatCost = (value: number | null): string => {
-    if (value === null) return '–'
-    if (value === 0) return '$0'
-    if (value < 0.0001) return '<$0.0001'
-    if (value < 1) return `$${value.toFixed(4)}`
-    if (value < 100) return `$${value.toFixed(2)}`
-    return `$${Math.round(value).toLocaleString('en-US')}`
-  }
+  /** The AI Accounts dollar rule; `–` when unpriced. */
+  static readonly formatCost = (value: number | null): string => (value === null ? '–' : CostEstimateModel.formatUsd(value))
 
   /** `820ms`, `3.5s`, `1m 24s`; `–` when unknown. */
   static readonly formatDuration = (ms: number | null): string => {

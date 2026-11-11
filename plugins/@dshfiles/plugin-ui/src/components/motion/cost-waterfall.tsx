@@ -50,6 +50,8 @@ export interface CostWaterfallProps extends Omit<React.HTMLAttributes<HTMLElemen
   readonly defaultMetric?: CostMetric
   readonly onMetricChange?: ((metric: CostMetric) => void) | undefined
   readonly defaultCollapsed?: readonly string[]
+  /** Dollar formatter of the host screen, so the waterfall matches its other amounts. */
+  readonly formatCost?: ((usd: number) => string) | undefined
 }
 
 interface Totals {
@@ -71,6 +73,7 @@ export function CostWaterfall({
   defaultMetric = 'cost',
   onMetricChange,
   defaultCollapsed,
+  formatCost: formatUsd = formatCost,
   className,
   ...props
 }: CostWaterfallProps) {
@@ -129,7 +132,7 @@ export function CostWaterfall({
   const domain = useSpringNumber(Math.max(Math.ceil((Math.max(total, 1e-6) * 1.08) / step) * step, step), springs.gentle)
   const ticks: number[] = []
   for (let tick = 0; tick <= domain + 1e-9; tick += step) ticks.push(tick)
-  const formatValue = metric === 'cost' ? formatCost : formatTokens
+  const formatValue = metric === 'cost' ? formatUsd : formatTokens
   const failed = steps.some(item => item.error !== undefined)
 
   // Rows hidden by a collapse fold away instead of vanishing, so the rows below slide up.
@@ -209,7 +212,7 @@ export function CostWaterfall({
           {t.output > 0 ? formatTokens(t.output) : '–'}
         </div>
         <div role="cell" className="dshx:w-16 dshx:shrink-0 dshx:pr-2 dshx:text-right dshx:@max-pane-narrow:pr-3 dshx:font-medium dshx:tabular-nums">
-          {t.cost > 0 ? <RollingNumber value={t.cost} format={formatCost} /> : '–'}
+          {t.cost > 0 ? <RollingNumber value={t.cost} format={formatUsd} /> : '–'}
         </div>
         <div
           role="cell"
@@ -287,12 +290,12 @@ export function CostWaterfall({
 
       <dl className="dshx:grid dshx:grid-cols-3 dshx:divide-x dshx:divide-border dshx:border-b dshx:border-border dshx:px-4 dshx:py-2.5 dshx:@max-pane-narrow:grid-cols-2 dshx:@max-pane-narrow:px-3">
         <Summary label="Total cost">
-          <RollingNumber value={grand.cost} format={formatCost} />
+          <RollingNumber value={grand.cost} format={formatUsd} />
         </Summary>
         <Summary label="Total tokens" hint={`${formatTokens(grand.input)} in · ${formatTokens(grand.output)} out`}>
           <RollingNumber value={grand.input + grand.output} format={formatTokens} />
         </Summary>
-        <Summary label="Most expensive" hint={top ? formatCost(top.cost ?? 0) : undefined} className="dshx:@max-pane-narrow:hidden">
+        <Summary label="Most expensive" hint={top ? formatUsd(top.cost ?? 0) : undefined} className="dshx:@max-pane-narrow:hidden">
           <MostExpensive name={top?.name ?? '–'} />
         </Summary>
       </dl>

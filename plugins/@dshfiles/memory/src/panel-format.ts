@@ -1,3 +1,4 @@
+import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import { BookOpenIcon, Settings2Icon, ShieldIcon, UsersIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
 
 import type { MemoryNoteType, PanelNote, PanelThread } from './api.ts'
@@ -68,7 +69,7 @@ export class PanelFormat {
 
   static readonly formatCount = (value: number): string => new Intl.NumberFormat().format(value)
 
-  static readonly formatUsd = (value: number | null): string => (value === null ? 'unpriced' : `$${value.toFixed(value > 0 && value < 0.01 ? 4 : 2)}`)
+  static readonly formatUsd = (value: number | null): string => (value === null ? 'unpriced' : CostEstimateModel.formatUsd(value))
 
   static readonly formatPercent = (ratio: number | null): string => (ratio === null ? '—' : `${String(Math.round(ratio * 100))}%`)
 

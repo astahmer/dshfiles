@@ -1,3 +1,4 @@
+import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import { useApi } from '@dshfiles/dshx/client'
 import { CostWaterfall } from '@dshfiles/plugin-ui/components/motion/cost-waterfall'
 import { EmptyState, PageSection } from '@dshfiles/plugin-ui/components/page'
@@ -211,7 +212,7 @@ export const ThreadCostFacet = (props: {
       ) : null}
       {waterfall.steps.length === 0 ? null : (
         <PageSection heading="Cost waterfall" description="Where this thread's spend went, turn by turn.">
-          <CostWaterfall steps={waterfall.steps} live={false} />
+          <CostWaterfall steps={waterfall.steps} live={false} formatCost={CostEstimateModel.formatUsd} />
           {waterfall.hiddenTurns > 0 ? (
             <p className="dshx:text-xs dshx:text-muted-foreground">
               Showing the latest {WATERFALL_TURN_LIMIT} turns; {waterfall.hiddenTurns} older turns are in Per turn below.
