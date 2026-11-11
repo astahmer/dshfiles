@@ -24,6 +24,8 @@ const legacyEntryFields = {
 const recoveryEntrySchema = Schema.Struct({
   ...legacyEntryFields,
   reason: Schema.Literals(['restart', 'interrupted']).pipe(Schema.withDecodingDefaultKey(Effect.succeed('restart' as const))),
+  /** Tool calls the managed restart cut off (started, never answered), as their tool names. */
+  openTools: Schema.optionalKey(Schema.Array(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(128))).check(Schema.isMaxLength(20))),
 })
 
 const persistedRecoverySchema = Schema.Struct({
@@ -59,6 +61,7 @@ export class RecoveryStore extends Context.Service<
     readonly record: (input: {
       readonly sessionIds: readonly string[]
       readonly reason: RecoveryReason
+      readonly openTools?: ReadonlyMap<string, ReadonlyArray<string>>
     }) => Effect.Effect<void, RuntimeStateFailed | RuntimeStateInvalid>
     readonly remove: (sessionIds: ReadonlySet<string>) => Effect.Effect<void, RuntimeStateFailed | RuntimeStateInvalid>
   }
@@ -100,7 +103,11 @@ export class RecoveryStore extends Context.Service<
               const now = yield* Clock.currentTimeMillis
               const added = [...new Set(input.sessionIds)]
                 .filter(sessionId => sessionId.length > 0 && sessionId.length <= 256 && !known.has(sessionId))
-                .map(sessionId => ({ sessionId, requestId: randomUUID(), interruptedAt: now, reason: input.reason }))
+                .map((sessionId): RestartRecoveryEntry => {
+                  const openTools = input.openTools?.get(sessionId)
+                  const entry = { sessionId, requestId: randomUUID(), interruptedAt: now, reason: input.reason }
+                  return openTools === undefined || openTools.length === 0 ? entry : { ...entry, openTools: [...openTools] }
+                })
               if (added.length > 0) yield* write([...entries, ...added].slice(-MAX_RECOVERY_ENTRIES))
             }),
           )

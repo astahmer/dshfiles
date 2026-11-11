@@ -628,7 +628,12 @@ limits it to when the user asked to be notified or a long task or routine needs
 their attention. Every open page routes it through the **Input needed** category's delivery and
 sound, the global snooze and the thread's mute,
 and skips a thread you are watching, as above; a click opens the linked thread.
-Unlike the generic thread alerts, the agent's own text is shown, so it must
+Each page reports back what it did, and the tool waits up to
+1.5 s for that: it returns `delivered: true` once a page showed it, or
+`delivered: false` with a `reason` (`category-off`, `snoozed`, `thread-muted`,
+`watched-thread`, `system-permission`, `subagent-hidden`, `no-open-page`) and a
+`recovery` naming the setting that turns it on, so the agent tells the user in
+chat instead. Unlike the generic thread alerts, the agent's own text is shown, so it must
 not carry secrets. Sends are limited to 3 per thread and 12 in total per 10
 minutes; a refused send returns `rate-limited` with the seconds to wait. Nothing
 is queued for pages that open later, and it adds no history entry. Each send
@@ -665,7 +670,19 @@ group offer the same verb, so every list of blocked threads can resume them toge
 continuation prompt that directs the agent to inspect its transcript and
 workspace before continuing; it does not replay the interrupted model/tool call.
 A row leaves its group as soon as that thread runs again, and dismissing drops it
-by hand. Approval, Input, and Turn finished can be configured independently as a
+by hand.
+
+**Automatic resume after a restart** is opt-in (`resumeAfterRestart`, off by default: each resume is one turn nobody
+asked for). When on, after a managed restart the new Host waits `resumeAfterRestartDelaySeconds` (default 10) and for
+the Session controller to answer, then sends each **Needs resume** row of that restart its continuation prompt once,
+newest first, at most `resumeAfterRestartMaxThreads` (default 5), three at a time. The restart capture also records
+the tool calls each thread had started and not finished, so the prompt says what was cut off, including a background
+command the agent was waiting on. It never resumes **Interrupted** rows (a crash has no such capture), a thread that ran
+again since boot (the user continued or stopped it), or rows over the limit; those wait for **Resume** or **Resume
+all**. Each resumed thread, and each one left over the limit, gets a line in the Activity log, and `thread_recoveries`
+reports what the automatic resume did after this boot.
+
+Approval, Input, and Turn finished can be configured independently as a
 separate group or inline thread-row label.
 Approval and Input default to groups; Turn finished defaults to an inline
 label. Each status has an independently configurable semantic color in Sidebar

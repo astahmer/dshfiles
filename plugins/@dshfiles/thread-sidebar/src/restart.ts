@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Clock, Context, Effect, FiberHandle, FileSystem, Layer, Option, Path, Ref } from 'effect'
 import { restartExitGuard } from './restart-exit-guard.js'
+import { OpenToolCalls } from './open-tool-calls.js'
 import { RecoveryStore } from './restart-recovery.js'
 import { RestartRecordFailed, RestartRequestFailed, RestartUnavailable } from './sidebar-errors.js'
 import { SidebarHost } from './sidebar-host-promise.js'
@@ -48,6 +49,7 @@ export class RestartControl extends Context.Service<
         const path = yield* Path.Path
         const host = yield* SidebarHost
         const recovery = yield* RecoveryStore
+        const openToolCalls = yield* OpenToolCalls
         const scope = yield* Effect.scope
         const env = input.env
         const dshHome = path.resolve(env.DSH_HOME?.trim() || path.join(input.homeDirectory, '.dsh'))
@@ -71,7 +73,7 @@ export class RestartControl extends Context.Service<
         const recordRunning = Effect.gen(function* () {
           yield* host.flushPersistence
           const sessionIds = yield* host.runningSessionIds
-          yield* recovery.record({ sessionIds, reason: 'restart' })
+          yield* recovery.record({ sessionIds, reason: 'restart', openTools: yield* openToolCalls.namesOf(sessionIds) })
           yield* Effect.annotateCurrentSpan('dshx.restart.recorded_sessions', sessionIds.length)
           return sessionIds.length
         }).pipe(Effect.mapError(cause => new RestartRecordFailed({ cause })))

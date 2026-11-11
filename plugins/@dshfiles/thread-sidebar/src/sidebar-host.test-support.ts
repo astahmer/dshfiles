@@ -9,14 +9,14 @@ export interface FakeHost {
   /** The exit codes DSH was asked to exit with; the exit hook is a plain callback, so it records synchronously. */
   readonly exits: Effect.Effect<ReadonlyArray<number>>
   readonly recordExit: (code: number) => void
-  readonly prompts: Ref.Ref<ReadonlyArray<{ readonly sessionId: string; readonly requestId: string }>>
+  readonly prompts: Ref.Ref<ReadonlyArray<{ readonly sessionId: string; readonly requestId: string; readonly text: string }>>
   readonly persistenceFails: Ref.Ref<boolean>
 }
 
 export const makeFakeHost = Effect.all({
   running: Ref.make<ReadonlyArray<string>>([]),
   sessions: Ref.make<ReadonlyArray<HostSession>>([]),
-  prompts: Ref.make<ReadonlyArray<{ readonly sessionId: string; readonly requestId: string }>>([]),
+  prompts: Ref.make<ReadonlyArray<{ readonly sessionId: string; readonly requestId: string; readonly text: string }>>([]),
   persistenceFails: Ref.make(false),
 }).pipe(
   Effect.map(refs => {
@@ -46,7 +46,7 @@ export const fakeSidebarHost = (fake: FakeHost, options: { readonly exitHook?: b
       ),
       queuePrompt: input =>
         Effect.flatMap(Ref.get(fake.running), () =>
-          Ref.update(fake.prompts, prompts => [...prompts, { sessionId: input.sessionId, requestId: input.requestId }]),
+          Ref.update(fake.prompts, prompts => [...prompts, { sessionId: input.sessionId, requestId: input.requestId, text: input.text }]),
         ),
       updateQueue: () => Effect.fail(new HostCapabilityMissing({ capability: 'session-controller' })),
       rebasedThreads: Effect.succeedNone,

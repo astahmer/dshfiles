@@ -2466,6 +2466,97 @@
       ]
     },
     {
+      "id": "auto-resume-after-restart",
+      "title": "Resume threads a managed restart cut off",
+      "summary": "Opt-in, off by default. After a managed restart (Restart DSH, Restart when idle), the new Host waits resumeAfterRestartDelaySeconds and for the Session controller, then sends each thread the restart cut off one continuation prompt, newest first, at most resumeAfterRestartMaxThreads, three at a time. The prompt names the tool calls the restart cut off (recorded at capture from the live event stream), including a background command the agent was waiting on. Crash and forced-stop rows, threads that ran again since boot and threads over the limit stay in Needs resume or Interrupted. Each resumed or skipped-over-limit thread gets an Activity log line, and thread_recoveries reports what the automatic resume did.",
+      "surfaces": ["host", "api", "tool", "storage"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "activity: Resumed automatically after the restart",
+      "configuration": [
+        {
+          "key": "resumeAfterRestart",
+          "defaultValue": "false",
+          "constraints": "Spends one turn per resumed thread without a user prompt, so it ships off.",
+          "coveredBy": ["thread-sidebar.auto-resume-default-off"]
+        },
+        {
+          "key": "resumeAfterRestartMaxThreads",
+          "defaultValue": "5",
+          "constraints": "Integer 1-20; newest rows first, the rest wait in Needs resume.",
+          "coveredBy": ["thread-sidebar.auto-resume-restart-rows"]
+        },
+        {
+          "key": "resumeAfterRestartDelaySeconds",
+          "defaultValue": "10",
+          "constraints": "Integer 0-600 seconds after boot; then up to 15 Session-controller probes 2 s apart.",
+          "coveredBy": ["thread-sidebar.auto-resume-restart-rows"]
+        }
+      ],
+      "states": ["off", "waiting-for-boot", "resumed", "skipped-over-limit", "skipped-continued", "skipped-crash", "failed"],
+      "failureModes": [
+        "A crash or forced stop has no capture of what ran, so its Interrupted rows are never resumed automatically; Resume all still takes them.",
+        "A thread that started a turn after boot (the user continued or stopped it) is left alone.",
+        "Each row resumes once: its stable request id makes a repeat a no-op and the row is removed after the prompt is queued.",
+        "Without the Inbox owner (activity-timeline) nothing reaches the Activity log; the outcome still shows in thread_recoveries.",
+        "A recovery file with openTools is not readable by a Host older than this change (strict decode); downgrading leaves Needs resume empty until the file is removed."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.auto-resume-default-off",
+          "file": "plugins/@dshfiles/thread-sidebar/src/host.test.ts",
+          "testName": "ships the automatic resume after a restart off"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-sidebar.auto-resume-restart-rows",
+          "file": "plugins/@dshfiles/thread-sidebar/src/host.test.ts",
+          "testName": "resumes the threads a managed restart cut off once, newest first, within the limit, naming what was cut off"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-sidebar.auto-resume-never-crash",
+          "file": "plugins/@dshfiles/thread-sidebar/src/host.test.ts",
+          "testName": "promotes the turns a crash left open as interrupted rows and never resumes them on its own"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-sidebar.auto-resume-off",
+          "file": "plugins/@dshfiles/thread-sidebar/src/host.test.ts",
+          "testName": "does nothing after a restart when the automatic resume is off"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-sidebar.auto-resume-open-tools",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart.test.ts",
+          "testName": "the restart capture records the tool calls it cuts off, not the ones that already returned"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.auto-resume-no-browser-journey",
+          "reason": "Needs a managed supervisor restart, which a scratch DSH journey cannot drive; the Activity line is an Inbox info item rendered by activity-timeline."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "recoveries auto resume",
+          "file": "plugins/@dshfiles/thread-sidebar/src/host.test.ts",
+          "testName": "records one automatic resume span with its counts"
+        },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
       "id": "thread-reference-mention",
       "title": "Mention another thread from its row, its tab, or a drag into the composer",
       "summary": "Resolve a target Host session and insert its native reference chip at the active composer's caret, from the sidebar row menu, from a main-view tab's menu, or by dragging a thread row or thread tab and dropping it on a composer. A drag carries only the plugin's own thread-mention type, so a rich editor never receives stray plain text; the composer under the pointer outlines and shows a drop hint, and only that composer inserts. Resolving, unavailable, and draft-changed outcomes surface as notices instead of changing the draft.",
@@ -3719,7 +3810,7 @@
         {
           "kind": "not-applicable",
           "id": "thread-sidebar.subscription-browser-menu",
-          "reason": "The affordance is one checkbox in the thread row context menu plus a meta badge on a row that has subscribers; no Gherkin journey drives a row context menu yet, and no two-thread completion is produced by the scratch fake provider in one walk. The state transitions are covered by the store and notifier unit tests listed here."
+          "reason": "The affordance is the Notify submenu in the thread row context menu (one row or a multi-selection) plus a meta badge on a row that has subscribers; no Gherkin journey drives a row context menu yet, and no two-thread completion is produced by the scratch fake provider in one walk. The reach opens the submenu in a scratch DSH; the state transitions are covered by the store and notifier unit tests listed here."
         }
       ],
       "telemetry": [
@@ -3731,21 +3822,39 @@
           "kind": "automatic",
           "source": "agent-tool"
         }
+      ],
+      "reach": [
+        "click button \"All threads\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify spare\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify target\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify supervisor\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "rightclick text \"Notify target\" at 8,8",
+        "click menuitem \"Notify “Notify supervisor” when this thread finishes\"",
+        "expect menuitemradio \"Only when stuck\""
       ]
     },
     {
       "id": "agent-user-notification",
       "title": "Agent sends the user a notification",
-      "summary": "notify_user sends a title and optional body, linked to the calling thread by default, to every open page, which routes it through the Input needed category's delivery and sound, the global snooze and the thread mute, and skips a thread the user is watching in a focused window. Rate-limited to 3 per thread and 12 in total per 10 minutes.",
+      "summary": "notify_user sends a title and optional body, linked to the calling thread by default, to every open page, which routes it through the Input needed category's delivery and sound, the global snooze and the thread mute, and skips a thread the user is watching in a focused window. Rate-limited to 3 per thread and 12 in total per 10 minutes. Pages report what they did, so the result says delivered: false with the reason and the setting that turns it on when nothing was shown.",
       "surfaces": ["host", "client"],
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tool notify_user; in-app toast and system notification",
       "configuration": [],
-      "states": ["sent", "rate-limited"],
+      "states": ["delivered", "not-delivered", "rate-limited"],
       "failureModes": [
         "A fourth send from one thread within 10 minutes, or a thirteenth in total, returns rate-limited with the seconds to wait and publishes nothing.",
-        "No open page means nothing is shown; the event is not queued or replayed and adds no history entry.",
+        "No open page answering within 1.5 s returns delivered: false (no-open-page); the event is not queued or replayed and adds no history entry.",
         "A Host from before the tool, or a page whose event stream is unavailable, shows nothing."
       ],
       "externalDependencies": [],
@@ -3760,6 +3869,12 @@
           "id": "thread-sidebar.agent-user-notification-rate",
           "file": "plugins/@dshfiles/thread-sidebar/src/user-notification-host.test.ts",
           "testName": "refuses a fourth notification from one thread without publishing it, then allows it after the window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.agent-user-notification-not-delivered",
+          "file": "plugins/@dshfiles/thread-sidebar/src/user-notification-host.test.ts",
+          "testName": "reports delivered: false with the reason and how to turn it on when every page skipped it"
         },
         {
           "kind": "unit-test",

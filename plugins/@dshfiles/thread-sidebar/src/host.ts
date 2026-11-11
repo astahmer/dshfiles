@@ -8,7 +8,7 @@ import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Option } from 'effect'
 import { homedir } from 'node:os'
 import { threadSidebarAttentionApi } from './attention-api.js'
 import { ThreadAttention } from './attention-store.js'
@@ -30,7 +30,8 @@ import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { PluginUpdateWatch } from './plugin-updates.js'
 import { threadQueueApi } from './queue-api.js'
 import { threadQueueHandlers } from './queue-host.js'
-import { Recoveries, bootRecovery } from './recoveries.js'
+import { OpenToolCalls } from './open-tool-calls.js'
+import { AutoResumeReport, Recoveries, bootRecovery } from './recoveries.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { threadSidebarRestartApi } from './restart-api.js'
 import { RecoveryStore } from './restart-recovery.js'
@@ -98,7 +99,7 @@ const hostEdge = Layer.mergeAll(
   SidebarSettings.layer.pipe(Layer.provideMerge(Settings.layer(threadSidebarSettings))),
 ).pipe(Layer.provideMerge(platform))
 
-const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, NavigationCounter.layer).pipe(
+const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, NavigationCounter.layer, OpenToolCalls.layer).pipe(
   Layer.provideMerge(RecoveryStore.layer),
   Layer.provideMerge(StateFiles.layer),
 )
@@ -126,7 +127,7 @@ const workers = Layer.mergeAll(
   attentionRecorder,
   notificationHistoryRecorder,
   inflightTracker,
-  bootRecovery,
+  bootRecovery.pipe(Layer.provide(AutoResumeReport.layer)),
   settledGate,
   modelRouteProjection,
   subscriptionNoticer,
@@ -174,10 +175,28 @@ export default DshxPlugin.make({
     Api.bind(threadSidebarRecoveryApi, {
       pending: () =>
         Recoveries.use(recoveries =>
-          Effect.map(recoveries.pending, entries => ({
-            sessionIds: entries.map(entry => entry.sessionId),
-            entries: entries.map(entry => ({ sessionId: entry.sessionId, reason: entry.reason, interruptedAt: entry.interruptedAt })),
-          })),
+          Effect.gen(function* () {
+            const entries = yield* recoveries.pending
+            const autoResume = yield* recoveries.lastAutoResume
+            return {
+              sessionIds: entries.map(entry => entry.sessionId),
+              entries: entries.map(entry => ({
+                sessionId: entry.sessionId,
+                reason: entry.reason,
+                interruptedAt: entry.interruptedAt,
+                ...(entry.openTools === undefined ? {} : { openTools: [...entry.openTools] }),
+              })),
+              ...(Option.isSome(autoResume)
+                ? {
+                    autoResume: {
+                      at: autoResume.value.at,
+                      resumed: autoResume.value.resumed.map(entry => ({ sessionId: entry.sessionId, openTools: [...entry.openTools] })),
+                      skipped: autoResume.value.skipped.map(entry => ({ sessionId: entry.sessionId, reason: entry.reason })),
+                    },
+                  }
+                : {}),
+            }
+          }),
         ),
       resume: input => Recoveries.use(recoveries => Effect.map(recoveries.resume(input.sessionId), accepted => ({ accepted }))),
       dismiss: input => Recoveries.use(recoveries => Effect.map(recoveries.dismiss(input.sessionId), dismissed => ({ dismissed }))),
@@ -275,6 +294,7 @@ export default DshxPlugin.make({
     }),
     Api.bind(userNotificationApi, {
       send: (input, call) => UserNotifications.use(notifications => notifications.send(input, call.caller)),
+      acknowledge: input => UserNotifications.use(notifications => notifications.acknowledge(input)),
     }),
     Api.bind(threadSidebarAutoSettleApi, {
       status: () => AutoSettle.use(autoSettle => autoSettle.status),

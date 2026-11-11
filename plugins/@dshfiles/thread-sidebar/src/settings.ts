@@ -125,7 +125,18 @@ export const threadSidebarSettings = defineSettings({
     notificationDurationSeconds: Schema.natural().max(60).default(DEFAULT_PREFERENCES.notificationDurationSeconds).hidden(),
     resumeAfterRestart: Schema.boolean()
       .default(DEFAULT_PREFERENCES.resumeAfterRestart)
-      .description('When DSH starts again, continue the threads that were working when it stopped (a restart, a crash or a forced stop).'),
+      .description(
+        'After a managed restart (Restart DSH, Restart when idle), continue each thread whose turn the restart cut off, once, with a note naming what was cut off. Off by default: each resume is one turn nobody asked for. Crashes and forced stops stay in Interrupted for a manual Resume.',
+      ),
+    resumeAfterRestartMaxThreads: Schema.natural()
+      .min(1)
+      .max(20)
+      .default(DEFAULT_PREFERENCES.resumeAfterRestartMaxThreads)
+      .description('Most threads resumed automatically after one restart, newest first; the rest stay in Needs resume.'),
+    resumeAfterRestartDelaySeconds: Schema.natural()
+      .max(600)
+      .default(DEFAULT_PREFERENCES.resumeAfterRestartDelaySeconds)
+      .description('Seconds to wait after DSH starts before the automatic resume, so plugins and providers finish loading.'),
     subscriptionNoticeLevel: Schema.union(SUBSCRIPTION_NOTICE_LEVELS)
       .default('all')
       .description(

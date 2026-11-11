@@ -1,9 +1,11 @@
 import { describe, expect, it } from '@effect/vitest'
-import { Effect, FileSystem, Layer, Path, Ref } from 'effect'
+import { Effect, FileSystem, Layer, Path, PubSub, Ref } from 'effect'
 import { TestClock } from 'effect/testing'
+import { OpenToolCalls } from './open-tool-calls.js'
 import { RecoveryStore } from './restart-recovery.js'
 import { RestartControl, RestartDrain, type RestartEnvironment } from './restart.js'
 import { StateFiles } from './runtime-files.js'
+import { SessionEvents, type SessionEvent } from './session-events.js'
 import { fakeSidebarHost, makeFakeHost, type FakeHost } from './sidebar-host.test-support.js'
 import { temporaryStateFiles } from './state-files.test-support.js'
 
@@ -24,7 +26,8 @@ const withRestart = <A, E>(
     readonly home: string
     /** Exit codes the post-appExit guard was armed with; the real guard would call process.exit in the test worker. */
     readonly guards: ReadonlyArray<number>
-  }) => Effect.Effect<A, E, RestartControl | RestartDrain | RecoveryStore | FileSystem.FileSystem | Path.Path>,
+    readonly publish: (sessionId: string, event: SessionEvent['event'] & { readonly data?: unknown }) => Effect.Effect<void>
+  }) => Effect.Effect<A, E, RestartControl | RestartDrain | RecoveryStore | OpenToolCalls | FileSystem.FileSystem | Path.Path>,
 ) =>
   Effect.gen(function* () {
     const files = yield* StateFiles
@@ -32,12 +35,16 @@ const withRestart = <A, E>(
     const fake = yield* makeFakeHost
     const env = (options.env ?? managed)(files.home, path)
     const guards: number[] = []
+    const pubsub = yield* PubSub.unbounded<SessionEvent>()
+    const publish = (sessionId: string, event: SessionEvent['event']) =>
+      PubSub.publish(pubsub, { sessionId, origin: undefined, parentSessionId: undefined, event }).pipe(Effect.asVoid)
     const layer = RestartDrain.layer.pipe(
       Layer.provideMerge(RestartControl.layerWith({ env, homeDirectory: files.home, armExitGuard: code => Effect.sync(() => void guards.push(code)) })),
+      Layer.provideMerge(OpenToolCalls.layer.pipe(Layer.provide(SessionEvents.layerTest(pubsub)))),
       Layer.provideMerge(fakeSidebarHost(fake, { exitHook: options.exitHook ?? true })),
       Layer.provideMerge(RecoveryStore.layer.pipe(Layer.provide(Layer.succeed(StateFiles, files)))),
     )
-    return yield* body({ fake, requestPath: path.join(files.home, 'runtime', `dsh-web-restart-${RUN_ID}.request`), home: files.home, guards }).pipe(
+    return yield* body({ fake, requestPath: path.join(files.home, 'runtime', `dsh-web-restart-${RUN_ID}.request`), home: files.home, guards, publish }).pipe(
       Effect.provide(layer),
     )
   }).pipe(Effect.provide(temporaryStateFiles))
@@ -86,6 +93,35 @@ describe('managed restart', () => {
         expect(guards).toEqual([75])
         expect((yield* RecoveryStore.use(store => store.list)).map(entry => [entry.sessionId, entry.reason])).toEqual([['working', 'restart']])
         expect((yield* Effect.flip(control.request))._tag).toBe('RestartRequestFailed')
+      }),
+    ),
+  )
+
+  it.effect('the restart capture records the tool calls it cuts off, not the ones that already returned', () =>
+    withRestart({}, ({ fake, publish }) =>
+      Effect.gen(function* () {
+        const call = (seq: number, callId: string, name: string) => ({
+          type: 'tool/call',
+          seq,
+          time: seq,
+          data: { turn: 1, step: 1, callId, name, arguments: '{}' },
+        })
+        yield* publish('working', call(1, 'c1', 'bash'))
+        yield* publish('working', call(2, 'c2', 'background_jobs_wait'))
+        yield* publish('working', { type: 'tool/result', seq: 3, time: 3, data: { turn: 1, step: 1, message: { toolCallId: 'c1' } } })
+        yield* publish('finished', call(4, 'c3', 'read'))
+        yield* publish('finished', { type: 'turn/end', seq: 5, time: 5, data: { turn: 1, reason: { kind: 'completed' } } })
+        const names = yield* eventually(
+          OpenToolCalls.use(open => open.namesOf(['working', 'finished'])),
+          open => open.get('working')?.length === 1 && !open.has('finished'),
+        )
+        expect([...names]).toEqual([['working', ['background_jobs_wait']]])
+        yield* Ref.set(fake.running, ['working'])
+        yield* RestartControl.use(control => control.request)
+        yield* eventually(Effect.andThen(TestClock.adjust('1 second'), fake.exits), exits => exits.length > 0)
+        expect((yield* RecoveryStore.use(store => store.list)).map(entry => [entry.sessionId, entry.openTools])).toEqual([
+          ['working', ['background_jobs_wait']],
+        ])
       }),
     ),
   )

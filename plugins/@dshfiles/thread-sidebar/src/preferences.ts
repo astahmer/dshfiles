@@ -200,6 +200,14 @@ const preferencesInputFields = {
   ),
   applyActionsToChildThreads: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.applyActionsToChildThreads),
   resumeAfterRestart: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.resumeAfterRestart),
+  resumeAfterRestartMaxThreads: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(20)),
+    () => DEFAULT_PREFERENCES.resumeAfterRestartMaxThreads,
+  ),
+  resumeAfterRestartDelaySeconds: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(600)),
+    () => DEFAULT_PREFERENCES.resumeAfterRestartDelaySeconds,
+  ),
   subscriptionNoticeLevel: SchemaHelpers.withDecodedDefault(Schema.Literals(SUBSCRIPTION_NOTICE_LEVELS), () => DEFAULT_PREFERENCES.subscriptionNoticeLevel),
   subscriptionDelivery: SchemaHelpers.withDecodedDefault(Schema.Literals(SUBSCRIPTION_DELIVERY_MODES), () => DEFAULT_PREFERENCES.subscriptionDelivery),
   maxChildren: SchemaHelpers.withDecodedDefault(

@@ -156,6 +156,10 @@ export interface SidebarPreferences {
   applyActionsToChildThreads: boolean
   /** Continue the threads a stopped Host cut off once it starts again. */
   resumeAfterRestart: boolean
+  /** Most threads one automatic resume continues; the rest wait in Needs resume. */
+  resumeAfterRestartMaxThreads: number
+  /** Seconds after boot before the automatic resume, so plugins and providers finish loading. */
+  resumeAfterRestartDelaySeconds: number
   /** The level of a thread subscription that sets none. */
   subscriptionNoticeLevel: SubscriptionNoticeLevel
   /** How a running subscriber hears a notice: steered into its live turn, or queued behind it. */
@@ -233,6 +237,8 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   notificationDurationSeconds: 5,
   applyActionsToChildThreads: true,
   resumeAfterRestart: false,
+  resumeAfterRestartMaxThreads: 5,
+  resumeAfterRestartDelaySeconds: 10,
   subscriptionNoticeLevel: 'all',
   subscriptionDelivery: 'steer',
   maxChildren: 3,

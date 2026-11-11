@@ -10,6 +10,13 @@ import type { SubscriptionDeliveryMode, SubscriptionNoticeLevel } from './subscr
 
 export type SidebarSettingsValue = SettingsValue<typeof threadSidebarSettings.schema>
 
+/** The opt-in resume after a managed restart: whether it runs, how many threads at most, and how long after boot. */
+export interface AutoResumePolicy {
+  readonly enabled: boolean
+  readonly maxThreads: number
+  readonly delaySeconds: number
+}
+
 export const ThreadSidebarSettings = Settings.Tag<SidebarSettingsValue>(threadSidebarSettings.namespace)
 
 const policyOf = (value: SidebarSettingsValue): AutoSettlePolicy => ({
@@ -46,7 +53,7 @@ export class SidebarSettings extends Context.Service<
     readonly policy: Effect.Effect<AutoSettlePolicy>
     /** Every change of the auto-settle policy after the current one; other sidebar writes do not emit. */
     readonly policyChanges: Stream.Stream<AutoSettlePolicy>
-    readonly resumeAfterRestart: Effect.Effect<boolean>
+    readonly autoResume: Effect.Effect<AutoResumePolicy>
     readonly subscriptionNoticeLevel: Effect.Effect<SubscriptionNoticeLevel>
     readonly subscriptionDelivery: Effect.Effect<SubscriptionDeliveryMode>
     /** Settle several threads in one write, keeping the first settle instant of each and dropping their parked mark. */
@@ -92,7 +99,11 @@ export class SidebarSettings extends Context.Service<
           Stream.changesWith((left, right) => autoSettlePolicyKey(left) === autoSettlePolicyKey(right)),
           Stream.drop(1),
         ),
-        resumeAfterRestart: Effect.map(settings.get, value => value.resumeAfterRestart),
+        autoResume: Effect.map(settings.get, value => ({
+          enabled: value.resumeAfterRestart,
+          maxThreads: value.resumeAfterRestartMaxThreads,
+          delaySeconds: value.resumeAfterRestartDelaySeconds,
+        })),
         subscriptionNoticeLevel: Effect.map(settings.get, value => value.subscriptionNoticeLevel),
         subscriptionDelivery: Effect.map(settings.get, value => value.subscriptionDelivery),
         settle: Effect.fn('settled threads settle')(function* (sessionIds) {
