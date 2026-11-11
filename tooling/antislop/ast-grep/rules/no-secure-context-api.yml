@@ -1,0 +1,41 @@
+id: no-secure-context-api
+language: TypeScript
+message: crypto.randomUUID, crypto.subtle and navigator.clipboard exist only in a secure context, so they are missing when DSH is opened over plain HTTP from a LAN or tailnet address. Use randomUUID from @deepseek-ai/dsh-util-crypto, writeClipboard from @deepseek-ai/dsh-client-ui-primitives, or (Host code) the node:crypto import.
+severity: error
+ignores:
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.ts'
+  - '**/*.spec.tsx'
+  - '**/tests/**'
+  - '**/testing/**'
+  - '**/test-fixtures/**'
+rule:
+  any:
+    - pattern: crypto.randomUUID
+    - pattern: globalThis.crypto.randomUUID
+    - pattern: window.crypto.randomUUID
+    - pattern: crypto.subtle
+    - pattern: globalThis.crypto.subtle
+    - pattern: navigator.clipboard
+---
+id: no-secure-context-api-tsx
+language: Tsx
+message: crypto.randomUUID, crypto.subtle and navigator.clipboard exist only in a secure context, so they are missing when DSH is opened over plain HTTP from a LAN or tailnet address. Use randomUUID from @deepseek-ai/dsh-util-crypto, writeClipboard from @deepseek-ai/dsh-client-ui-primitives, or (Host code) the node:crypto import.
+severity: error
+ignores:
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.ts'
+  - '**/*.spec.tsx'
+  - '**/tests/**'
+  - '**/testing/**'
+  - '**/test-fixtures/**'
+rule:
+  any:
+    - pattern: crypto.randomUUID
+    - pattern: globalThis.crypto.randomUUID
+    - pattern: window.crypto.randomUUID
+    - pattern: crypto.subtle
+    - pattern: globalThis.crypto.subtle
+    - pattern: navigator.clipboard

@@ -21,6 +21,8 @@
     "no-identity-hook-selector": 0,
     "no-identity-hook-selector-tsx": 0,
     "no-native-select": 0,
+    "no-secure-context-api": 0,
+    "no-secure-context-api-tsx": 0,
     "no-wildcard-export": 0
   }
 }
