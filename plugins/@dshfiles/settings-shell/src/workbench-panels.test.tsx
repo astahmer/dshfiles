@@ -84,6 +84,21 @@ describe('Settings workbench sources', () => {
     expect(router.open({})).toBe(false)
   })
 
+  it('prefers the most recently activated visible hub', () => {
+    const router = createSettingsHubRouter()
+    const first = { visible: () => true, open: vi.fn() }
+    const second = { visible: () => true, open: vi.fn() }
+    router.register(first)
+    router.register(second)
+    router.activate(second)
+    expect(router.open({ sectionId: 'models' })).toBe(true)
+    expect(second.open).toHaveBeenCalledWith({ sectionId: 'models' })
+    expect(first.open).not.toHaveBeenCalled()
+    router.activate(first)
+    router.open({ sectionId: 'general' })
+    expect(first.open).toHaveBeenCalledWith({ sectionId: 'general' })
+  })
+
   it('keeps navigation inside each hub and renders the original section and plugin-page controls', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
     const groups = createSnapshotStore<readonly GroupedEntries[]>(
@@ -153,8 +168,8 @@ describe('Settings workbench sources', () => {
       await act(async () => {
         router.open({ sectionId: 'plugin:example' })
       })
-      expect(first.querySelector('input[aria-label="Original plugin control"]')).not.toBeNull()
-      expect(second.querySelector('input[aria-label="Original General control"]')).not.toBeNull()
+      expect(second.querySelector('input[aria-label="Original plugin control"]')).not.toBeNull()
+      expect(first.querySelector('input[aria-label="Original General control"]')).not.toBeNull()
     } finally {
       await act(async () => root.unmount())
       host.remove()

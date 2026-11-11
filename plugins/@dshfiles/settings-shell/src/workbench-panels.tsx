@@ -37,7 +37,7 @@ interface SettingsHubRegistration {
  * for instead of the section it happened to hold.
  */
 export const createSettingsHubRouter = () => {
-  const hubs = new Set<SettingsHubRegistration>()
+  let hubs = new Set<SettingsHubRegistration>()
   let pending: SettingsOpenRequest | undefined
   const deliver = (hub: SettingsHubRegistration): void => {
     if (pending === undefined) return
@@ -51,7 +51,7 @@ export const createSettingsHubRouter = () => {
         hubs.delete(hub)
       }
     },
-    /** True when a visible hub took it; false leaves it pending for the hub that becomes visible next. */
+    /** True when the most recently activated visible hub took it; false leaves it pending for the hub that becomes visible next. */
     open: (request: SettingsOpenRequest): boolean => {
       const hub = [...hubs].find(candidate => candidate.visible())
       if (hub === undefined) {
@@ -64,7 +64,9 @@ export const createSettingsHubRouter = () => {
     },
     /** The hub just became the Settings surface: hand it the request that could not be delivered earlier. */
     activate: (hub: SettingsHubRegistration): void => {
-      if (hubs.has(hub)) deliver(hub)
+      if (!hubs.has(hub)) return
+      hubs = new Set([hub, ...hubs])
+      deliver(hub)
     },
   }
 }
