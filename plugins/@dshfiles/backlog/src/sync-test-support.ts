@@ -1,8 +1,9 @@
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
-import { Layer } from 'effect'
+import { Effect, Layer } from 'effect'
 import { HttpClient } from 'effect/http'
 import { builtInProviderRegistry } from './provider-builtins.js'
+import { BacklogSettingsTag, backlogSettingsTestLayer } from './backlog-settings.js'
 import { ProviderCredentials } from './provider-credentials.js'
 import { ExternalProviderEndpoints, type ExternalProviderEndpoint } from './provider-registry.js'
 import type { BacklogSettings } from './settings.js'
@@ -34,6 +35,18 @@ export const legacyGithubRow: LegacySyncRow = {
   pushAgentComments: false,
 }
 
+/** Settings as DSH serves them while the plugin activates: the schema defaults, with the stored `rows` loading later. */
+const activatingSettings = (rows: readonly LegacySyncRow[]) =>
+  Layer.effect(
+    BacklogSettingsTag,
+    Effect.map(BacklogSettingsTag, defaults =>
+      BacklogSettingsTag.of({
+        ...defaults,
+        loaded: Effect.map(defaults.get, value => ({ ...value, syncBackends: [...rows] })).pipe(Effect.delay('20 millis')),
+      }),
+    ),
+  ).pipe(Layer.provide(backlogSettingsTestLayer()))
+
 /**
  * The real sync stack (service, engine, SQLite sources, built-in providers, store) over a fake HTTP client. `rows` are
  * the legacy `syncBackends` settings the first open migrates; `secrets` answers each `secret:ALIAS` by alias.
@@ -45,8 +58,11 @@ export const syncTestLayer = (input: {
   readonly storage?: BacklogTestRows
   readonly probes?: { readonly repository?: string; readonly cliToken?: string }
   readonly external?: readonly ExternalProviderEndpoint[]
+  /** Serve `rows` only once the plugin is active, as DSH does, instead of from the first read. */
+  readonly rowsAfterActivation?: boolean
 }) =>
   BacklogSync.layer.pipe(
+    input.rowsAfterActivation === true ? Layer.provide(activatingSettings(input.rows ?? [])) : layer => layer,
     Layer.provideMerge(BacklogSyncEngine.layer),
     Layer.provideMerge(SyncSources.layer),
     Layer.provideMerge(builtInProviderRegistry),

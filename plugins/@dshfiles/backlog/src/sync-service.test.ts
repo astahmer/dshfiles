@@ -371,6 +371,16 @@ describe('BacklogSync with Linear', () => {
 })
 
 describe('Remote sync setup', () => {
+  it.live('migrates the stored settings rows that load only once the plugin is active, not the schema defaults', () => {
+    const linear = fakeLinear()
+    return Effect.gen(function* () {
+      const sync = yield* BacklogSync
+      const status = yield* sync.status({})
+      expect(status.connections.map(view => view.connection.credential)).toEqual(['secret:LINEAR_KEY'])
+      expect(status.bindings.map(view => view.binding.container)).toEqual(['ENG'])
+    }).pipe(Effect.scoped, Effect.provide(syncTestLayer({ client: linear.client, rows: [legacyLinearRow], rowsAfterActivation: true })))
+  })
+
   it.effect('migrates settings rows and per-item mappings to connections, bindings and refs once, keeping every link', () => {
     const linear = fakeLinear()
     const github = fakeGithub()

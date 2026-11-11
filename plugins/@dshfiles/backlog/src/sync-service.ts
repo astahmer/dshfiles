@@ -1,5 +1,5 @@
 import { DshxPlugin } from '@dshfiles/dshx/effect'
-import { Cause, Clock, Context, Effect, Layer, Option, Ref, Schedule, Schema } from 'effect'
+import { Cause, Clock, Context, Deferred, Effect, Layer, Option, Ref, Schedule, Schema } from 'effect'
 import type { BacklogDetailView } from './api.js'
 import { BacklogRepo } from './backlog-repo.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
@@ -201,16 +201,18 @@ export class BacklogSync extends Context.Service<
       const itemOf = (id: number) => Effect.map(store.get(id), found => (found.ok ? found.value.item : undefined))
       const refFor = (id: number) => Effect.map(itemOf(id), item => (item === undefined ? undefined : BacklogReference.refOf(item)))
       const configWrite = <A, E, R>(effect: Effect.Effect<A, E, R>) => effect.pipe(Effect.mapError(cause => new SyncConfigWriteFailed({ cause })))
-      const snapshot = sources.snapshot.pipe(Effect.orDie)
+      const migrated = yield* Deferred.make<void>()
+      const storedSnapshot = sources.snapshot.pipe(Effect.orDie)
+      const snapshot = Deferred.await(migrated).pipe(Effect.andThen(storedSnapshot))
 
       /** Settings rows and per-item mappings become connections, bindings and refs, once. */
       const migrate = Effect.fn('backlog sync migrate')(function* () {
         if (Option.isSome(yield* sources.marker(SyncMigration.marker).pipe(Effect.orDie))) return
-        const rows = (yield* settings.get).syncBackends
+        const rows = (yield* settings.loaded).syncBackends
         const mappings = (yield* repo.mappings.entries.pipe(Effect.orDie)).map(([, mapping]) => mapping)
         const items = new Map((yield* repo.loadItems.pipe(Effect.orDie)).map(item => [item.id, item.project] as const))
         const plan = SyncMigration.plan({ rows, mappings, projectOf: id => items.get(id), hostId: sources.hostId })
-        const current = yield* snapshot
+        const current = yield* storedSnapshot
         yield* sources
           .replace({ connections: [...current.connections, ...plan.connections], bindings: [...current.bindings, ...plan.bindings] })
           .pipe(Effect.orDie)
@@ -229,7 +231,14 @@ export class BacklogSync extends Context.Service<
           'dshx.backlog.sync.migrated_refs': plan.refs.length,
         })
       })
-      yield* migrate()
+      // The stored rows arrive only once the plugin is active, after this layer is built: migrating on the schema
+      // defaults would stamp the one-time marker over nothing and drop every legacy row.
+      yield* migrate().pipe(
+        Effect.catchCause(cause => Effect.logError('backlog: remote sync migration failed', cause)),
+        Effect.ensuring(Deferred.succeed(migrated, undefined)),
+        DshxPlugin.detached,
+        Effect.forkScoped,
+      )
 
       const contextOf = Effect.fnUntraced(function* (binding: SyncBinding) {
         const current = yield* snapshot
