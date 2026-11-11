@@ -8,6 +8,7 @@ import { SessionId } from '@dshfiles/dshx/ids'
 import { Context, Effect, Layer, Option, Schema } from 'effect'
 
 import { readRecentLogEvents } from './session-log-promise.js'
+import { statStoredSession } from './session-persistence-promise.js'
 import { sessionQueryReads } from './session-query-promise.js'
 
 export interface ThreadMessage {
@@ -105,9 +106,8 @@ export class ThreadContext extends Context.Service<
 
       const cwdOf = Effect.fn('pull-requests thread cwd')(function* (sessionId: string) {
         const id = sessionIdOf(sessionId)
-        const persistence = ctx.get('sessionPersistence')
-        if (Option.isNone(id) || persistence === undefined) return undefined
-        const stat = yield* Effect.tryPromise(signal => persistence.stat(id.value, { signal }))
+        if (Option.isNone(id)) return undefined
+        const stat = yield* statStoredSession(ctx, id.value)
         return stat?.header.cwd
       })
 

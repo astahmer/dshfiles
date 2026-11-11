@@ -41,6 +41,7 @@
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
     "@deepseek-ai/dsh-agent": "catalog:",
+    "@deepseek-ai/dsh-agent-loop": "catalog:",
     "@deepseek-ai/dsh-commands": "catalog:",
     "@deepseek-ai/dsh-compaction": "catalog:",
     "@deepseek-ai/dsh-compaction-basic": "catalog:",

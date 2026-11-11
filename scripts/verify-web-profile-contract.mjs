@@ -29,12 +29,16 @@ const packageIdFromExternal = external => /^@dshfiles\/[^/]+/.exec(external)?.[0
 // thread-share serves an unauthenticated read-only route and can start a public tunnel, so it is security-sensitive.
 // mermaid-diagrams changes how every ```mermaid fence renders, so a profile owner enables it deliberately.
 // conversation-cleanup permanently deletes conversation logs, so it stays out of the shared Web profile (see its README).
+// tool-bash and tool-fs replace the stock bash and filesystem tools; measured Sessions showed too little gain to seed
+// them (docs/tool-diet.md), so the web seed keeps the stock tools and a profile owner opts into the forks.
 const optInWebBundles = new Set([
   '@dshfiles/tool-search',
   '@dshfiles/resource-packs',
   '@dshfiles/thread-share',
   '@dshfiles/mermaid-diagrams',
   '@dshfiles/conversation-cleanup',
+  '@dshfiles/tool-bash',
+  '@dshfiles/tool-fs',
 ])
 
 /** A seeded profile reconciles only this region, so a stock-row override above it never reaches an existing profile. */

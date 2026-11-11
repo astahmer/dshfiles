@@ -15,6 +15,11 @@
     "plugins/@dshfiles/chat/src/native/model/tool-call-tree.ts",
     // The vendored no-op Host body of ui-sidebar-right, kept byte-identical; the fork's Host entry is src/host.ts.
     "plugins/@dshfiles/sidebar-right/src/native/index.ts",
+    // The same for ui-sidebar-terminal, plus the recovery header action and cleanup overlay its fork delta unregisters
+    // in src/native/client/index.ts; they stay vendored byte-identical for native-fork-diff.
+    "plugins/@dshfiles/sidebar-terminal/src/native/index.ts",
+    "plugins/@dshfiles/sidebar-terminal/src/native/client/TerminalCleanup.tsx",
+    "plugins/@dshfiles/sidebar-terminal/src/native/client/TerminalRecovery.tsx",
     "plugins/@dshfiles/annotations/extension/**",
     "plugins/@dshfiles/project-checks/src/test-fixtures/**",
     "tooling/antislop/repo-rules/fixtures/**",
@@ -83,6 +88,26 @@
       // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "src/native/index.ts!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+    "plugins/@dshfiles/tool-bash": {
+      // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts. No source imports the
+      // forked stock package dsh-tool-bash, but removing it re-resolves the @deepseek-ai/dsh peer variants across the
+      // whole lockfile.
+      "entry": ["dshx.config.ts", "src/native/index.ts!"],
+      "ignoreDependencies": ["@deepseek-ai/dsh", "@deepseek-ai/dsh-tool-bash"],
+    },
+    "plugins/@dshfiles/tool-fs": {
+      // The Host entry is the vendored native module dshx.config names, not a forwarding host.ts. No source imports the
+      // forked stock package dsh-tool-fs, but removing it re-resolves the @deepseek-ai/dsh peer variants across the
+      // whole lockfile.
+      "entry": ["dshx.config.ts", "src/native/index.ts!"],
+      "ignoreDependencies": ["@deepseek-ai/dsh", "@deepseek-ai/dsh-tool-fs"],
+    },
+    "plugins/@dshfiles/sidebar-terminal": {
+      // devDependency copy of a peerDependency the Host provides (upstream ui-sidebar-terminal lists it too); no source
+      // imports it, and removing it re-resolves the @deepseek-ai/dsh peer variants across the whole lockfile.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
     },
     "plugins/@dshfiles/whiteboard": {
       // The Excalidraw editor is its own Vite build (vite.editor.config.ts → src/editor/entry.tsx) the Host serves
