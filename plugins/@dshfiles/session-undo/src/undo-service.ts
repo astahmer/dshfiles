@@ -403,13 +403,15 @@ export class SessionUndo extends Context.Service<
       const history = Effect.fn('session undo history read')(function* (sessionId: string) {
         const current = yield* record(sessionId)
         return {
-          checkpoints: current.checkpoints.map(checkpoint => ({
-            turn: checkpoint.turn,
-            prompt: checkpoint.prompt,
-            at: checkpoint.at,
-            files: checkpoint.snapshot !== null,
-            ...(checkpoint.revision === undefined ? {} : { revision: checkpoint.revision }),
-          })),
+          checkpoints: current.checkpoints.map(checkpoint => {
+            const listed = {
+              turn: checkpoint.turn,
+              prompt: checkpoint.prompt,
+              at: checkpoint.at,
+              files: checkpoint.snapshot !== null,
+            }
+            return checkpoint.revision === undefined ? listed : { ...listed, revision: checkpoint.revision }
+          }),
           redoTo: current.redo?.sessionId ?? null,
         }
       })
