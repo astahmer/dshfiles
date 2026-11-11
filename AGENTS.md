@@ -384,6 +384,11 @@ dshx inspect slots --root sidebar     # read the live composition instead of gue
    change or do next, with a direct control or exact command when available. No
    safe recovery? Explain the limitation and the next practical alternative.
    Never a dead-end message.
+10. A UI plugin ships an `onboarding` block in `dshx.features.json` on its most
+    user-facing feature: `firstAction` and `doneWhen`, one plain sentence each;
+    `open` only for a panel, command or Settings section it really registers.
+    `features:check` fails without one unless every client feature is
+    `surface: infrastructure`.
 
 ### Plugin UI and state
 

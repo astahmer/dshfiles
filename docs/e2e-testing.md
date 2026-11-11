@@ -120,14 +120,20 @@ bottom tab bar (**Threads**, **Inbox**, **New**, **More**; other destinations ar
 `click button "More"` then their row, named by label and description), Settings picks its section from a
 **Sections** combobox, and the palette opens from **Threads** → **Search
 threads**. `dshx dev open --narrow` and onboarding's Show me where walk
-`reachNarrow` at that width and fall back to `reach` without it. `dshx create` scaffolds a
+`reachNarrow` at that width and fall back to `reach` without it. An optional
+`onboarding` block (`firstAction` and `doneWhen`, one sentence each for a new
+user; `prerequisites` from `account`, `project`, `repository`, `github`; `open`
+only for a main panel, command or Settings section the plugin registers) feeds
+onboarding's Getting started. `dshx create` scaffolds a
 catalog with a new plugin (`create-dshx/src/templates.ts`), so a plugin starts
 linked from its manifest's `dshx.features`.
 
 `features:check` fails on a bundle feature with neither a scenario nor a
 `not-applicable` reason, a library feature without a unit test, a missing,
 duplicated or misplaced tag, a test name no longer found in its file, an
-orphan tag, or a broken telemetry entry (see
+orphan tag, a UI plugin (a feature lists a `client` surface) with no
+`onboarding` block unless every client feature is `surface: infrastructure`, or
+a broken telemetry entry (see
 [the telemetry contract](observability.md#the-telemetry-contract-checked)). It proves the catalog is
 consistent, not that it is exhaustive: whether every behavior is listed is a
 review question.
