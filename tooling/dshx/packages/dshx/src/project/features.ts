@@ -308,6 +308,12 @@ export const DshxFeatureSchema = strictStruct({
     ),
   ),
   reach: Schema.optional(reachSchema),
+  /**
+   * The same walk on a phone-width viewport (narrower than 640 px), where the rail is a bottom tab bar (Threads, Inbox,
+   * New, More) and Settings picks its section from a Sections combobox. Same grammar and rules as `reach`; a feature
+   * without it walks `reach` on a phone too. `dshx dev open --narrow` and Show me where pick it at that width.
+   */
+  reachNarrow: Schema.optional(reachSchema),
   /** Presentation contract kind in the unified shell; see {@link DSHX_PRESENTATION_SURFACES}. */
   surface: Schema.optional(DshxPresentationSurfaceSchema),
   /** Shell destination the feature lands in; see {@link DSHX_DESTINATIONS}. */

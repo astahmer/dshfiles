@@ -101,6 +101,22 @@ describe('plugin feature metadata', () => {
     expect(withReach(['click button "Queue"'])).toEqual(expect.arrayContaining([expect.stringContaining('must end with an expect step')]))
   })
 
+  it('accepts a phone-width reachNarrow under the same grammar and rules as reach', () => {
+    const withNarrow = (reachNarrow: readonly string[], reach?: readonly string[]) =>
+      featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, ...(reach !== undefined && { reach }), reachNarrow }] })
+    expect(
+      withNarrow(
+        ['click button "More"', 'click button "Knowledge"', 'click button "Memory"', 'expect tab "Notes"'],
+        ['click tab "Knowledge"', 'click button "Memory"', 'expect tab "Notes"'],
+      ),
+    ).toEqual([])
+    expect(withNarrow(['seed tool-call-thread', 'click button "Threads"', 'expect text "x"'])).toEqual([])
+    expect(withNarrow([])).toEqual([expect.stringContaining('reachNarrow')])
+    expect(withNarrow(['open the More tab', 'expect text "x"'])).toEqual([expect.stringContaining('reach steps are')])
+    expect(withNarrow(['click button "More"'])).toEqual([expect.stringContaining('must end with an expect step')])
+    expect(withNarrow(['click button "More"', 'seed tool-call-thread', 'expect text "x"'])).toEqual([expect.stringContaining('seed steps come first')])
+  })
+
   it('accepts context-menu clicks and seeds that come before the walk', () => {
     const withReach = (reach: readonly string[]) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
     expect(withReach(['seed rebase-ready-thread', 'seed pending-restart', 'rightclick text "Seeded*"', 'expect menuitem "Mark unread"'])).toEqual([])
