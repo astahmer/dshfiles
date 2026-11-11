@@ -58,7 +58,7 @@ test('bounds remote recall by message count and text size', () => {
 test('traces bounded remote reference resolution without recording content', async () => {
   using recorder = recordSpans()
 
-  await RemoteReferenceContext.withRemoteReferenceSpan({ referenceCount: 2, work: async () => 'ready' })
+  await RemoteReferenceContext.withRemoteReferenceSpan({ referenceCount: 2, work: () => Promise.allSettled([Promise.resolve('ready')]) })
 
   expect(recorder.span('multi-host remote thread reference resolve').attributes).toEqual({ 'multi_host.reference_count': 2 })
 })

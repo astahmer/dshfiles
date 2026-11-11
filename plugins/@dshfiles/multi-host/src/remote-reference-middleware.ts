@@ -65,10 +65,10 @@ export const registerRemoteReferenceMiddleware = (input: {
       const uniqueReferences = [...new Map(remoteReferences.map(item => [item.reference.sessionId, item])).values()]
       if (uniqueReferences.length === 0 || uniqueReferences.length > 3) return next()
 
-      const contexts = await RemoteReferenceContext.withRemoteReferenceSpan({
+      const settled = await RemoteReferenceContext.withRemoteReferenceSpan({
         referenceCount: uniqueReferences.length,
         work: () =>
-          Promise.all(
+          Promise.allSettled(
             uniqueReferences.map(async ({ reference, runtimeId }) => {
               const authorization = await authorizeRemoteSessionRuntime({
                 sessionId: reference.sessionId,
@@ -104,7 +104,19 @@ export const registerRemoteReferenceMiddleware = (input: {
             }),
           ),
       })
-      if (contexts === undefined) return next()
+      const contexts = settled.flatMap(result => (result.status === 'fulfilled' ? [result.value] : []))
+      const unavailableLabels = uniqueReferences.flatMap((item, index) =>
+        settled[index]?.status === 'rejected' ? [item.reference.label ?? item.reference.sessionId] : [],
+      )
+      const notices =
+        unavailableLabels.length === 0
+          ? []
+          : [
+              createUserMessage({
+                source: { kind: 'multi-host-remote-reference-notice', labels: unavailableLabels },
+                content: [{ type: 'text', text: RemoteReferenceContext.unavailableReferencesNotice(unavailableLabels) }],
+              }),
+            ]
 
       const rewrittenMessages = messages.map(message => {
         if (message.source.kind !== 'user') return message
@@ -114,7 +126,7 @@ export const registerRemoteReferenceMiddleware = (input: {
       messages.splice(0, messages.length, ...rewrittenMessages)
       const decision = await next()
       if (decision.kind === 'reject' || signal.aborted) return decision
-      return { ...decision, messages: [...decision.messages, ...contexts] }
+      return { ...decision, messages: [...decision.messages, ...contexts, ...notices] }
     },
     { prepend: true },
   )

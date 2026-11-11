@@ -172,6 +172,10 @@ declare module '@deepseek-ai/dsh-llm' {
         readonly capturedThroughSeq: number
       }[]
     }
+    'multi-host-remote-reference-notice': {
+      readonly kind: 'multi-host-remote-reference-notice'
+      readonly labels: readonly string[]
+    }
   }
 }
 

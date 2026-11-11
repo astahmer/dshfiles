@@ -125,19 +125,26 @@ export class RemoteReferenceContext {
     ].join('\n\n')
   }
 
-  static withRemoteReferenceSpan<Value>(input: { readonly referenceCount: number; readonly work: () => Promise<Value> }): Promise<Value | undefined> {
+  static withRemoteReferenceSpan<Value>(input: {
+    readonly referenceCount: number
+    readonly work: () => Promise<readonly PromiseSettledResult<Value>[]>
+  }): Promise<readonly PromiseSettledResult<Value>[]> {
     return withSpan(
       'multi-host remote thread reference resolve',
       { kind: 'internal', attributes: { 'multi_host.reference_count': input.referenceCount } },
       async span => {
-        try {
-          return await input.work()
-        } catch {
-          span.setStatus('error', 'remote-reference-unavailable')
-          return undefined
-        }
+        const settled = await input.work()
+        if (settled.some(result => result.status === 'rejected')) span.setStatus('error', 'remote-reference-unavailable')
+        return settled
       },
     )
+  }
+
+  static unavailableReferencesNotice(labels: readonly string[]): string {
+    return [
+      `Could not read the referenced remote session${labels.length === 1 ? '' : 's'} ${labels.map(label => JSON.stringify(label.slice(0, 512))).join(', ')}: the host is unreachable, the thread is no longer recorded, or it has no readable text yet.`,
+      'Tell the user, and suggest checking the host with multi_host_runtime_status (start it with multi_host_runtime_control if it is down), then sending the message again.',
+    ].join(' ')
   }
 
   static readonly limits = {

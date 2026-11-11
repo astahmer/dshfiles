@@ -45,7 +45,13 @@ const remoteSnapshot = {
   ],
 }
 
-const runAgent = async (input: { readonly recordedThreads: readonly { readonly sessionId: string; readonly runtimeId: string }[] }) => {
+const offlineSessionId = SessionId('offline-session')
+const offlineMention = formatSessionReferenceMention({ sessionId: offlineSessionId, label: 'Offline host' })
+
+const runAgent = async (input: {
+  readonly recordedThreads: readonly { readonly sessionId: string; readonly runtimeId: string }[]
+  readonly text?: string
+}) => {
   const ctx = new Context()
   let disposeAgent: (() => Promise<void>) | undefined
   const adapter = new ReferenceCaptureAdapter()
@@ -68,7 +74,7 @@ const runAgent = async (input: { readonly recordedThreads: readonly { readonly s
       sessionSources: () => [],
       follow: async ({ runtimeId, sessionId, maxMessages }) => {
         follows.push({ runtimeId, sessionId, maxMessages })
-        return remoteSnapshot
+        return runtimeId === 'offline-runtime' ? undefined : remoteSnapshot
       },
     })
 
@@ -77,7 +83,7 @@ const runAgent = async (input: { readonly recordedThreads: readonly { readonly s
       agentOptions: { provider: 'remote-reference-test', model: 'scripted' },
     })
     disposeAgent = () => handle.dispose()
-    await handle.agent.followup(createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: `Review ${remoteMention}.` }] }))
+    await handle.agent.followup(createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: input.text ?? `Review ${remoteMention}.` }] }))
     await handle.agent.whenIdle()
 
     return { messages: adapter.requests[0] ?? [], follows }
@@ -105,6 +111,30 @@ test('injects only authorized remote Session context into the actual model reque
   expect(contextText).toContain('remote-user-fact-7f3a')
   expect(contextText).toContain('remote-assistant-fact-91bd')
   expect(contextText).toContain('untrusted, read-only snapshot')
+})
+
+test('keeps the remote references that resolved and names the ones that did not', async () => {
+  const result = await runAgent({
+    recordedThreads: [
+      { sessionId: remoteSessionId, runtimeId: 'remote-runtime' },
+      { sessionId: offlineSessionId, runtimeId: 'offline-runtime' },
+    ],
+    text: `Compare ${remoteMention} with ${offlineMention}.`,
+  })
+  const textOf = (kind: string) =>
+    result.messages
+      .filter(message => message.source?.kind === kind)
+      .flatMap(message => message.content.flatMap(block => (block.type === 'text' ? [block.text] : [])))
+      .join('\n')
+
+  expect(result.messages.find(message => message.source?.kind === 'user')?.content).toEqual([
+    { type: 'text', text: 'Compare @Remote design with @Offline host.' },
+  ])
+  expect(textOf('multi-host-remote-reference')).toContain('remote-assistant-fact-91bd')
+  const notice = textOf('multi-host-remote-reference-notice')
+  expect(notice).toContain('Offline host')
+  expect(notice).not.toContain('Remote design')
+  expect(notice).toContain('multi_host_runtime_status')
 })
 
 test('does not resolve or rewrite a reference that the manager has not recorded', async () => {
