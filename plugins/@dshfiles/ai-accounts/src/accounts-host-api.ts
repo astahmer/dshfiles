@@ -33,7 +33,7 @@ import { AccountProfilesModel } from './account-store.js'
 import type { AccountStorePromise } from './account-store-promise.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
 import { ModelCurationModel } from './model-curation-model.js'
-import { readAccountUsage } from './account-usage.js'
+import { boundedUsageRead, readAccountUsage } from './account-usage.js'
 import { ExtraUsageGuardModel } from './extra-usage-guard.js'
 import { ProviderUsageModel } from './usage.js'
 import { resolveKeyFromContext } from './credentials.js'
@@ -448,6 +448,8 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
 
 /** Provider reads are independent; bound them so a profile with 64 accounts is not a 64-request burst. */
 const ACCOUNT_USAGE_READ_CONCURRENCY = 4
+/** Below the sweep's 30 s timeout with room for two waves, so one slow provider never fails every account's card. */
+const ACCOUNT_USAGE_READ_TIMEOUT_MS = 8_000
 
 const readQuotaResetAt = async (ctx: Context, store: AccountStorePromise, accountId: string): Promise<number | null> => {
   const file = await accountsFile(ctx, store)
@@ -486,7 +488,11 @@ const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signa
       kind: account.kind,
       enabled: account.enabled,
       usage: ProviderUsageModel.stamped(
-        await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential, readCopilotCredential, signal }),
+        await boundedUsageRead({
+          read: readSignal => readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential, readCopilotCredential, signal: readSignal }),
+          timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,
+          signal,
+        }),
         Date.now(),
       ),
     }),

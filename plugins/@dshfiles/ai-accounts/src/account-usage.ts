@@ -13,6 +13,32 @@ import { ProviderUsageModel, readCodexUsage, readOpenCodeUsage } from './usage.j
 type UsageReadAccount = Pick<AccountProfile, 'instanceId' | 'kind' | 'homePath' | 'shadowHomePath' | 'apiKeyEnv' | 'authSource' | 'apiBaseUrl'>
 
 /**
+ * One provider read held to its own budget, so a slow provider costs its own card instead of the whole sweep: on time
+ * out the read is aborted and the card says so, while every other account keeps its fresh answer.
+ */
+export const boundedUsageRead = (input: {
+  readonly read: (signal: AbortSignal) => Promise<UsageCard>
+  readonly timeoutMs: number
+  readonly signal?: AbortSignal | undefined
+}): Promise<UsageCard> => {
+  const budget = AbortSignal.timeout(input.timeoutMs)
+  const timedOut = new Promise<UsageCard>(resolve =>
+    budget.addEventListener(
+      'abort',
+      () =>
+        resolve(
+          ProviderUsageModel.emptyUsage(
+            'error',
+            `The provider did not answer within ${String(Math.max(1, Math.round(input.timeoutMs / 1000)))} s. Refresh to try again; if it keeps timing out, check the provider's status or this account's sign-in.`,
+          ),
+        ),
+      { once: true },
+    ),
+  )
+  return Promise.race([input.read(input.signal === undefined ? budget : AbortSignal.any([input.signal, budget])), timedOut])
+}
+
+/**
  * One account's live quota, read with that account's own credential. The page,
  * the footer and the history recorder all go through here, so a provider is
  * read one way everywhere.
