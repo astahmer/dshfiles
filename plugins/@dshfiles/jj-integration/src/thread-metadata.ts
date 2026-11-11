@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
-import { Clock, Context, Effect, FileSystem, Layer, Option, Path, type PlatformError, Random, Schema } from 'effect'
+import { Clock, Context, Effect, FileSystem, Layer, Option, Path, type PlatformError, Random, Schema, Semaphore } from 'effect'
+import { WorkspaceFilesFailed } from './errors.js'
 import { JjSettings } from './jj-settings.js'
 import { ThreadWorkspaceModel } from './thread-workspace-model.js'
 
@@ -18,9 +19,9 @@ const rebaseMetadataEntrySchema = Schema.Struct({
   sessionId: Schema.optional(metadataIdentifierSchema),
   history: Schema.optional(Schema.Array(integrationRecordSchema)),
 })
-const decodeRebaseMetadata = Schema.decodeUnknownOption(
-  Schema.fromJsonString(Schema.Record(Schema.String, Schema.Union([rebaseTimestampSchema, rebaseMetadataEntrySchema]))),
-)
+const storedMetadataSchema = Schema.Record(Schema.String, Schema.Unknown)
+const decodeMetadataFile = Schema.decodeUnknownOption(Schema.fromJsonString(storedMetadataSchema))
+const decodeMetadataEntry = Schema.decodeUnknownOption(Schema.Union([rebaseTimestampSchema, rebaseMetadataEntrySchema]))
 export type RebaseMetadataEntry = typeof rebaseMetadataEntrySchema.Type
 export type IntegrationRecord = typeof integrationRecordSchema.Type
 /** A thread lands again and again while it keeps working; the oldest landings stop mattering long before this many. */
@@ -59,7 +60,7 @@ export class ThreadMetadata extends Context.Service<
       repoRoot: string,
       name: string,
       input: { readonly tipChangeId: string | undefined; readonly baseChangeId: string | undefined; readonly sessionId: string | undefined },
-    ) => Effect.Effect<number, PlatformError.PlatformError>
+    ) => Effect.Effect<number, PlatformError.PlatformError | WorkspaceFilesFailed>
     readonly writeAtomically: (target: string, text: string) => Effect.Effect<void, PlatformError.PlatformError>
   }
 >()('@dshfiles/jj-integration/ThreadMetadata') {
@@ -81,17 +82,34 @@ export class ThreadMetadata extends Context.Service<
       })
 
       const timestampFile = (repoRoot: string) => Effect.map(threadsDirectory(repoRoot), directory => path.join(directory, '.dshfiles-rebase-timestamps.json'))
+      const recording = yield* Semaphore.make(1)
 
-      const read = Effect.fnUntraced(function* (repoRoot: string) {
-        const text = yield* fileSystem.readFileString(yield* timestampFile(repoRoot)).pipe(Effect.option)
-        const parsed = Option.flatMap(text, content => decodeRebaseMetadata(content, { onExcessProperty: 'error' }))
-        if (Option.isNone(parsed)) return {}
-        return Object.fromEntries(
-          Object.entries(parsed.value)
-            .filter(([name]) => name.startsWith('thread-'))
-            .map(([name, value]) => [name, typeof value === 'number' ? { at: value } : value]),
-        ) satisfies Readonly<Record<string, RebaseMetadataEntry>>
+      /** The file as stored, bad entries included, so a write never drops what it could not decode. */
+      const readStored = Effect.fnUntraced(function* (file: string) {
+        if (!(yield* fileSystem.exists(file))) return {}
+        const parsed = decodeMetadataFile(yield* fileSystem.readFileString(file))
+        if (Option.isNone(parsed)) {
+          return yield* new WorkspaceFilesFailed({ detail: `${file} is not a JSON object of land records. Fix or remove it, then land again.` })
+        }
+        return parsed.value
       })
+
+      const entriesOf = (stored: typeof storedMetadataSchema.Type): Readonly<Record<string, RebaseMetadataEntry>> =>
+        Object.fromEntries(
+          Object.entries(stored).flatMap(([name, value]) => {
+            if (!name.startsWith('thread-')) return []
+            const entry = decodeMetadataEntry(value, { onExcessProperty: 'error' })
+            if (Option.isNone(entry)) return []
+            return [[name, typeof entry.value === 'number' ? { at: entry.value } : entry.value]]
+          }),
+        )
+
+      const read = (repoRoot: string) =>
+        timestampFile(repoRoot).pipe(
+          Effect.flatMap(readStored),
+          Effect.map(entriesOf),
+          Effect.orElseSucceed(() => ({})),
+        )
 
       const writeAtomically = Effect.fnUntraced(function* (target: string, text: string) {
         const temporaryPath = `${target}.${yield* randomHex(4)}.tmp`
@@ -112,13 +130,14 @@ export class ThreadMetadata extends Context.Service<
           ...(input.baseChangeId !== undefined && { baseChangeId: input.baseChangeId }),
           ...(input.sessionId !== undefined && { sessionId: input.sessionId }),
         }
-        const existing = yield* read(repoRoot)
-        const history = [...integrationHistory(existing[name]), entry].slice(-MAX_INTEGRATION_HISTORY)
-        yield* writeAtomically(yield* timestampFile(repoRoot), JSON.stringify({ ...existing, [name]: { ...entry, history } }))
+        const file = yield* timestampFile(repoRoot)
+        const stored = yield* readStored(file)
+        const history = [...integrationHistory(entriesOf(stored)[name]), entry].slice(-MAX_INTEGRATION_HISTORY)
+        yield* writeAtomically(file, JSON.stringify({ ...stored, [name]: { ...entry, history } }))
         return at
       })
 
-      return ThreadMetadata.of({ threadsDirectory, read, record, writeAtomically })
+      return ThreadMetadata.of({ threadsDirectory, read, record: (...input) => recording.withPermits(1)(record(...input)), writeAtomically })
     }),
   )
 }
