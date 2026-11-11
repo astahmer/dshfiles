@@ -1,5 +1,6 @@
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
 import { SharedJevKey } from '@dshfiles/credential-port/jev-key'
+import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { settingsShellSettings, type SettingsShellSettings } from '@dshfiles/settings-shell/settings'
 import { Jev, type JevCredential, type JevError, type JevQuestion, type JevVerdict } from '@dshfiles/jev'
@@ -71,13 +72,21 @@ export class MemoryJev extends Context.Service<
       // The one shared key (Settings › Tools & MCP › Jev) wins; Memory's earlier key stays the fallback. Absent in a
       // composition without settings-shell, where only the earlier key and the environment apply.
       const shared = yield* Effect.serviceOption(SharedJevSettingsTag)
+      // Both keys load only once the plugin is active, after this layer is built: adopting from the schema defaults would
+      // find no earlier key, so wait for the stored values.
       if (Option.isSome(shared)) {
-        yield* SharedJevKey.adopt(shared.value, (yield* settings.get).jevSecret).pipe(
+        const sharedSettings = shared.value
+        yield* Effect.gen(function* () {
+          const legacy = (yield* settings.loaded).jevSecret
+          yield* sharedSettings.loaded
+          return yield* SharedJevKey.adopt(sharedSettings, legacy)
+        }).pipe(
           Effect.tap(result =>
             result.kind === 'deferred'
               ? Effect.logWarning('memory: the earlier Jev key stays in Memory settings until the shared key can be written', result.cause)
               : Effect.void,
           ),
+          DshxPlugin.detached,
           Effect.forkScoped,
         )
       }
