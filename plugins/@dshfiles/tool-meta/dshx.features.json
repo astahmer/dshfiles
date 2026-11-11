@@ -125,6 +125,11 @@
           "id": "tool-meta.read-card-renders",
           "file": "plugins/@dshfiles/tool-meta/src/read-tool-card.test.tsx",
           "testName": "numbers the window from the offset once opened, and opens the file where the call looked"
+        },
+        {
+          "kind": "gherkin",
+          "id": "tool-meta.read-code-card",
+          "featureFile": "tooling/dshx/e2e/features/tool-meta.feature"
         }
       ],
       "telemetry": [
@@ -177,6 +182,11 @@
           "id": "tool-meta.diff-card-patch",
           "file": "plugins/@dshfiles/tool-meta/src/diff-tool-card.test.tsx",
           "testName": "shows every hunk of an apply_patch call, which has no native row to fall back to"
+        },
+        {
+          "kind": "gherkin",
+          "id": "tool-meta.file-diff-card",
+          "featureFile": "tooling/dshx/e2e/features/tool-meta.feature"
         }
       ],
       "telemetry": [
@@ -222,6 +232,11 @@
           "id": "tool-meta.approval-risk",
           "file": "plugins/@dshfiles/tool-meta/src/approval-risk.test.ts",
           "testName": "rates destroying or publishing commands high"
+        },
+        {
+          "kind": "gherkin",
+          "id": "tool-meta.approval-card",
+          "featureFile": "tooling/dshx/e2e/features/tool-meta.feature"
         }
       ],
       "telemetry": [

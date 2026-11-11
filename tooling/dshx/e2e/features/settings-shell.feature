@@ -163,3 +163,9 @@ Feature: Settings shell
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/settings-web-search" is booted
     When the Web search plugin page is opened in Settings
     Then the Web search page renders the owned fork instead of a placeholder
+
+  @scenario:settings-subagent.subagent-settings
+  Scenario: The Subagent plugin page comes from the owned fork
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/settings-subagent" is booted
+    When the Subagent plugin page is opened in Settings
+    Then the Subagent page renders the owned fork instead of a placeholder

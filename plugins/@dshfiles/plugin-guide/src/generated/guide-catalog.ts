@@ -3083,11 +3083,11 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › disabled-account-preview",
         "@dshfiles/ai-accounts › active-chat-account",
         "@dshfiles/ai-accounts › extra-usage-guard",
-        "@dshfiles/frame-layout › status-item-open"
+        "@dshfiles/cordis-cards › inventory-read-once"
       ],
       "details": [
-        "Used by 11 catalog feature(s)",
-        "Destinations in use: none, observe"
+        "Used by 12 catalog feature(s)",
+        "Destinations in use: none, observe, threads"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
       "docs": "docs/observability.md",
@@ -3114,7 +3114,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › model-routing"
       ],
       "details": [
-        "Used by 57 catalog feature(s)",
+        "Used by 58 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3226,7 +3226,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 122 catalog feature(s)",
+        "Used by 123 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

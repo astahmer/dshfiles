@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "inventory-read-once",
+      "title": "Cordis panel and cards read the inventory once per connection",
+      "summary": "The native Cordis sidebar panel and the cordis_define, cordis_run, cordis_stop and cordis_undefine tool cards from one owned fork of the stock row. Behaviour is the native one; the dynamic-plugin inventory read waits for the page's first connected generation instead of being discarded and repeated by its first reset, and later resets still drop and reread it.",
+      "surfaces": ["client"],
+      "surface": "statusItem",
+      "destination": "threads",
+      "currentSurface": "sidebar footer: Cordis panel, and Cordis tool cards in the transcript",
+      "configuration": [],
+      "states": ["awaiting-connection", "read", "reset-reread"],
+      "failureModes": [
+        "A refused inventory read is logged by the native panel and the next Cordis event or connection reset reads again.",
+        "A page already connected at setup reads at setup, as natively."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/cordis-client-runner",
+          "boundary": "The dynamicCordisRunner service and Remote methods the panel and cards read; the fork reaches them unchanged.",
+          "deterministicFake": "tests/inventory-read.test.ts drives the apply() with a typed remote, runner and connection fake."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only fork: it calls the native dynamicCordisRunner Remote methods whose Host spans belong to core; the Host half is the native no-op."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "cordis-cards.inventory-read-once",
+          "file": "plugins/@dshfiles/cordis-cards/tests/inventory-read.test.ts",
+          "testName": "is read once at boot: the read waits for the first connected generation, a later one reads again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "cordis-cards.inventory-read-connected",
+          "file": "plugins/@dshfiles/cordis-cards/tests/inventory-read.test.ts",
+          "testName": "is read at setup when the page is already connected"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "cordis-cards.no-browser-delta",
+          "reason": "The panel and cards are the upstream components byte-identical (node scripts/native-fork-diff.mjs cordis-cards); the delta is how many inventory reads a page load sends, which tests/inventory-read.test.ts counts. A browser walk of the cards needs a dynamic Cordis package defined by a model turn, which no scratch fixture provides yet."
+        }
+      ]
+    }
+  ]
+}

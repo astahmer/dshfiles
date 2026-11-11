@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { mkdir } from 'node:fs/promises'
+import { access, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Then, When } from '../bdd.js'
@@ -12,6 +12,18 @@ const LONG_BASH_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 20 &
 const WAIT_DIRECTIVE = `[[call background_jobs_wait ${JSON.stringify({ timeoutMs: 12_000 })}]]`
 const WAIT_TIMER_SCREENSHOT = join(tmpdir(), 'dshfiles-tool-meta-wait-timer.png')
 const waitProjects = new WeakMap<Page, string>()
+const approvalWorkspaces = new WeakMap<Page, string>()
+const READ_WINDOW_LINES = Array.from({ length: 30 }, (_, index) => `window line ${String(index + 1).padStart(2, '0')}`)
+const FILE_TOOLS_DIRECTIVE = [
+  `[[call read ${JSON.stringify({ file_path: 'window.txt', offset: 5, limit: 10 })}]]`,
+  `[[call write ${JSON.stringify({ file_path: 'added.md', content: 'alpha\nbeta\ngamma\n' })}]]`,
+].join('\n')
+const APPROVAL_DIRECTIVE = `[[call bash ${JSON.stringify({
+  command: 'rm -rf keep',
+  description: 'Remove the kept folder',
+  sandbox_permissions: 'danger-full-access',
+  justification: 'Remove the kept folder outside the sandbox',
+})}]]`
 
 const timingLine = (page: Page) => page.locator('[data-dshfiles-tool-meta]')
 
@@ -89,6 +101,105 @@ Then('the wait tool card names its target and shows an accessible timeout progre
     }).toPass({ timeout: 5_000 })
   })
   await page.screenshot({ path: WAIT_TIMER_SCREENSHOT })
+  await finishJourneyAssertions(page)
+})
+
+/** A settled turn folds its steps into one summary and its file calls into groups; reopen both until `target` shows. */
+const revealSettled = async (page: Page, target: ReturnType<Page['locator']>): Promise<void> => {
+  await expect(page.getByRole('status').filter({ hasText: /^(Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(async () => {
+    if (await target.first().isVisible()) return
+    const summary = page.getByText(/^Completed in /).last()
+    if (await summary.isVisible()) await summary.click()
+    for (const group of await page
+      .locator('[aria-expanded="false"]')
+      .filter({ hasText: /^(Read|Explored|Edited|Wrote|Created|Changed)\b/ })
+      .all())
+      if (await group.isVisible()) await group.click()
+    await expect(target.first()).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
+}
+
+When('the fake model reads a window of one file and writes another in a fresh workspace', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-tool-meta-files-e2e-')
+  const workspace = join(root, 'files-project')
+  await mkdir(workspace)
+  await writeFile(join(workspace, 'window.txt'), `${READ_WINDOW_LINES.join('\n')}\n`)
+  await registerWorkspaceFolder(page, workspace)
+  await startThreadWithModel(page, { project: 'files-project', model: 'commandcode_work/gpt-6-luna' })
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await composer.fill(FILE_TOOLS_DIRECTIVE)
+  await composer.press('Enter')
+})
+
+Then('the read card names the file and numbers the window from the requested offset', async ({ page }: { page: Page }) => {
+  const open = page.getByRole('button', { name: 'Open window.txt', exact: true })
+  await revealSettled(page, open)
+  await recordAssertion(page, 'tool-meta-read-card-window', async () => {
+    const row = page.locator('[data-chat-call-id]').filter({ has: open })
+    await expect(row).toContainText('Showing 10 of 30 lines')
+    // The tool-meta timing note sits over the row's right edge, so the card opens from its title.
+    await row.getByText('Read', { exact: true }).click()
+    await expect(row.getByText(/window line 05/)).toBeVisible()
+    await expect(row.getByText(/window line 14/)).toBeVisible()
+    await expect(row).not.toContainText('window line 04')
+    await expect(row).not.toContainText('window line 15')
+  })
+})
+
+Then('the write card shows the added lines as a collapsible diff', async ({ page }: { page: Page }) => {
+  const totals = page.getByText('+3 −0', { exact: true })
+  await revealSettled(page, totals)
+  await recordAssertion(page, 'tool-meta-write-card-diff', async () => {
+    const row = page.locator('[data-chat-call-id]').filter({ has: totals })
+    await expect(row).toContainText('added.md')
+    await expect(row.locator('[data-diff-path]')).toHaveCount(0)
+    await row.getByText('Write', { exact: true }).click()
+    await expect(row.locator('[data-diff-path]')).toHaveCount(1)
+    await expect(row).toContainText('gamma')
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the fake model asks to run a deleting command with more access in a fresh workspace', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-tool-meta-approval-e2e-')
+  const workspace = join(root, 'approval-project')
+  await mkdir(join(workspace, 'keep'), { recursive: true })
+  await writeFile(join(workspace, 'keep', 'marker.txt'), 'kept\n')
+  approvalWorkspaces.set(page, workspace)
+  await registerWorkspaceFolder(page, workspace)
+  await startThreadWithModel(page, { project: 'approval-project', model: 'commandcode_work/gpt-6-luna' })
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await composer.fill(APPROVAL_DIRECTIVE)
+  await composer.press('Enter')
+})
+
+const approvalCard = (page: Page) => page.locator('[data-approval-card]')
+
+Then('the approval card rates the command destructive and shows the tool, its reason and the command', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'tool-meta-approval-card-risk', async () => {
+    await expect(approvalCard(page)).toBeVisible({ timeout: 30_000 })
+    await expect(approvalCard(page).locator('[data-approval-risk="riskHigh"]')).toHaveText('Destructive')
+    await expect(approvalCard(page).locator('code')).toHaveText('bash')
+    await expect(approvalCard(page).locator('[data-approval-command]')).toHaveText('rm -rf keep')
+    await expect(approvalCard(page)).toContainText(/Remove the kept folder outside the sandbox|bash asks to run with more access/)
+    await expect(approvalCard(page).getByRole('button', { name: /^Allow once/ })).toBeVisible()
+  })
+})
+
+When('the approval card is rejected with Escape', async ({ page }: { page: Page }) => {
+  await approvalCard(page).getByRole('group', { name: 'Approval details: Enter allows once, Escape rejects', exact: true }).focus()
+  await page.keyboard.press('Escape')
+})
+
+Then('the approval card is gone and the command never ran', async ({ page }: { page: Page }) => {
+  const workspace = approvalWorkspaces.get(page)
+  if (workspace === undefined) throw new Error('The approval workspace was not created.')
+  await recordAssertion(page, 'tool-meta-approval-card-rejected', async () => {
+    await expect(approvalCard(page)).toHaveCount(0, { timeout: 30_000 })
+    await expect(page.getByRole('status').filter({ hasText: /^(Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+    await access(join(workspace, 'keep', 'marker.txt'))
+  })
   await finishJourneyAssertions(page)
 })
 
