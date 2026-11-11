@@ -38,6 +38,10 @@
       "types": "./src/sessions-api.ts",
       "default": "./dist/sessions-api.js"
     },
+    "./turn-admission-api": {
+      "types": "./src/turn-admission-api.ts",
+      "default": "./dist/turn-admission-api.js"
+    },
     "./typert": "./typert/host.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"

@@ -6,6 +6,7 @@ import { continuationHost } from './continuation-host.ts'
 import { interruptionHost } from './interruption-host.ts'
 import { threadModelHost } from './thread-model-host.ts'
 import { loadSessionInstructions, sessionInstructionsSection, sessionsHost } from './sessions-host.ts'
+import { loadTurnAdmissionPolicy, turnAdmissionHost } from './turn-admission-host.ts'
 
 const defaultConfig = { listWorkSliceMs: 16 }
 const configSchema = Schema.Struct({
@@ -19,13 +20,14 @@ export default defineHost({
   name: '@dshfiles/session-controller',
   Config: configStandardSchema,
   inject: [...SessionController.inject, 'remoteAccess'],
-  apis: [interruptionHost, continuationHost, threadModelHost, sessionsHost],
+  apis: [interruptionHost, continuationHost, threadModelHost, sessionsHost, turnAdmissionHost],
   prompts: [sessionInstructionsSection],
   setup: async (ctx, config: unknown) => {
     // Wait for the forked native controller to finish activating: the root layer below reads `sessionController`
     // once, and an unfinished activation left every sessions call answering `controller-unavailable` on a slow start.
     await ctx.plugin(SessionController, SessionController.Config(Schema.decodeUnknownSync(configSchema)(config)))
     loadSessionInstructions(ctx)
+    void loadTurnAdmissionPolicy(ctx)
     return sessionControllerEffectPlugin.setup(ctx, config)
   },
 })

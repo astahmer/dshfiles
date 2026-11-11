@@ -8,6 +8,7 @@ export default defineConfig({
     'continuation-api': 'src/continuation-api.ts',
     'thread-model-api': 'src/thread-model-api.ts',
     'sessions-api': 'src/sessions-api.ts',
+    'turn-admission-api': 'src/turn-admission-api.ts',
   },
   // tsc lowers the Host's TC39 `@Remote` decorators first, as the native build does; the bundler keeps them as is.
   host: { dshxRuntime: 'snapshot', entry: 'build/host/host.js', bundleDependencies: ['@dshfiles/session-log-window'] },

@@ -220,6 +220,60 @@
           "testName": "lists and announces a Session another process stored after the corpus was read"
         }
       ]
+    },
+    {
+      "id": "turn-admission",
+      "title": "Limit how many threads run at once",
+      "summary": "Settings › General › Running threads limit caps how many threads run a turn at once (0, the default, is no limit; Subagents take a slot decides whether running subagents count). Once the cap is reached, a new turn for an idle thread waits in its inbox and its composer shows Waiting for a free slot · N ahead with Start now; waiting turns start first in, first out when a running turn ends. thread_admission_status reads the limit and queue, thread_admission_configure sets it and thread_admission_force_start starts one thread past it.",
+      "surfaces": ["client", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer dock: Waiting for a free slot; Settings › General: Running threads limit",
+      "configuration": [
+        {
+          "key": "turn-admission/policy",
+          "defaultValue": "{ maxRunningThreads: 0, countSubagents: false }",
+          "constraints": "Plugin storage of @dshfiles/session-controller; maxRunningThreads 0–64. Live, no restart.",
+          "coveredBy": ["session-controller.turn-admission"]
+        }
+      ],
+      "states": ["unlimited", "waiting", "released", "force-started"],
+      "failureModes": [
+        "Waiting turns are kept in the thread's inbox, but the queue order is in memory: after a Host restart they stay queued in their threads until resumed or prompted again.",
+        "A follow-up to an already running thread is never held; the native queue runs it after the current turn.",
+        "A notice or wake that starts a parked thread's turn some other way runs it past the limit and the queue skips it."
+      ],
+      "externalDependencies": [],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "session-controller.turn-admission",
+          "featureFile": "tooling/dshx/e2e/features/turn-admission.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "session-controller.turn-admission-hold",
+          "file": "plugins/@dshfiles/session-controller/tests/host/turn-admission.test.ts",
+          "testName": "holds a second thread while one runs under a limit of one, then starts it when the first turn ends"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-controller.turn-admission-fifo",
+          "file": "plugins/@dshfiles/session-controller/tests/turn-admission.test.ts",
+          "testName": "releases strictly first in, first out, and keeps later prompts behind earlier ones"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
     }
   ]
 }

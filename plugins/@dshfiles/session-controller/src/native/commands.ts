@@ -7,6 +7,7 @@ import type { ThreadModelSelect, ThreadModelSnapshot } from '../thread-model-api
 import { underArchivedSession } from './archived-session-gate.ts'
 import { latestInterruptedTurn, latestStoppedTurn } from '../interrupted-turn.ts'
 import { turnRetryMessage } from '../turn-retry.ts'
+import type { TurnAdmissionQueue } from '../turn-admission.ts'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
@@ -108,6 +109,7 @@ export class SessionCommandController {
     private readonly ctx: Context,
     private readonly agents: ApiSessionAgentController,
     private readonly defaultCwd: string,
+    private readonly admission?: TurnAdmissionQueue,
   ) {}
 
   /**
@@ -403,7 +405,17 @@ export class SessionCommandController {
           throw new RemoteError('session/interruption-superseded', 'That stopped task is no longer waiting to be resumed.', {})
         }
         using binding = this.ctx.fileUploads.bindPrompt(agent, admission.receiptIds, request.requestId)
-        if (request.mode === 'steer') agent.steer(message)
+        // dshfiles: a new turn waits for a free slot under the running-thread limit, parked durably in its inbox.
+        if (this.admission !== undefined && agent.status === 'idle' && this.admission.shouldHold()) {
+          agent.send(message, 'next-turn', false)
+          this.admission.hold({
+            sessionId: agent.id,
+            messageId: message.id,
+            mode: request.mode === 'steer' ? 'steer' : 'followup',
+            heldAt: Date.now(),
+          })
+          this.admission.pump()
+        } else if (request.mode === 'steer') agent.steer(message)
         else agent.followup(message)
         binding.commit()
       } catch (error) {

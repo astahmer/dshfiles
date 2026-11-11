@@ -5,6 +5,8 @@ import { apply, inject } from './native/index.ts'
 import { PinnedToolCalls } from './pinned-tool-calls.ts'
 import { PinnedToolNames } from './pinned-tool-names.ts'
 import { TranscriptFind } from './transcript-find.ts'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { TurnAdmissionDock, TurnAdmissionSettingsRow } from './turn-admission-panel.tsx'
 
 const BROWSER_KIND = 'browser'
 const WEB_PROTOCOLS = new Set(['http:', 'https:'])
@@ -14,6 +16,28 @@ export default defineClient({
   inject: [...inject, 'connection'],
   setup(ctx, decorate, metadata) {
     apply(ctx, decorate)
+    // The running-thread limit belongs to @dshfiles/session-controller; its Settings row and waiting notice live here,
+    // beside the composer, and hide themselves while that Host API is absent.
+    ctx.slots.inject('settings.general.item', () =>
+      ctx.slots.register(
+        { name: 'settings.general.item', id: 'dshfiles-running-threads-limit', order: 40 },
+        decorate(() => (
+          <PluginQueryProvider>
+            <TurnAdmissionSettingsRow />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('conversation.input.dock', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.dock', id: 'dshfiles-turn-admission-waiting', order: 1, inject: (sessionId: string) => ({ sessionId }) },
+        decorate((props: { readonly sessionId: string }) => (
+          <PluginQueryProvider>
+            <TurnAdmissionDock sessionId={props.sessionId} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     const plugin = metadata?.plugin
     if (plugin === undefined) return
     plugin.add(Command, {

@@ -2,6 +2,8 @@
 
 ![Send the browser only what a thread renders](docs/screenshots/lean-session-follow.png)
 
+![A new turn waits for a free slot under the running-thread limit](docs/screenshots/turn-admission.png)
+
 Owned fork of DSH's native Session controller row (Host commands, `session/follow`, history pages, and the browser
 Session client). It keeps the native behaviour and changes what a thread costs to open (see Local delta): on the live
 profile one Anthropic thread opened with a 26 MB snapshot, 17 MB of it thinking signatures the browser never reads.
@@ -106,6 +108,26 @@ const { value } = await sessions.generate({ prompt, jsonSchema: { type: 'object'
 
 None of these is an agent tool: what the agent may do to other threads is thread-sidebar's thread tools, which now
 call this API for create, prompt, stop and model selection.
+
+### Running-thread limit
+
+Fan-outs, routines and webhooks can start many turns on one Host at once. **Settings › General › Running threads
+limit** caps how many threads run a turn at the same time; `0`, the default, keeps the native behaviour (no limit).
+**Subagents take a slot** (off by default) decides whether running subagent sessions count; subagents themselves are
+never held, since delegation starts them.
+
+Once the cap is reached, a new turn for an idle thread is accepted but parked in that thread's inbox
+(`agent.send(…, 'next-turn', false)`), so it is durable and visible in the native queue. Its composer shows
+**Waiting for a free slot · N ahead · running/limit** with **Start now**, which starts it past the limit. Waiting
+turns start first in, first out whenever an Agent goes idle or leaves, or when the limit is raised or set to 0. A
+follow-up to a thread that is already running is never held: the native queue runs it after the current turn.
+
+The limit is stored in this plugin's storage (`turn-admission/policy`) and applies live, without a restart. The
+queue order is in memory: after a Host restart, parked turns stay queued in their threads until resumed or prompted
+again. The `session-turn-admission` API (dshx module `@dshfiles/session-controller/turn-admission-api`) backs the UI
+and the Agent tools `thread_admission_status` (read), `thread_admission_configure` and `thread_admission_force_start`
+(only when the user asked). The Settings row and the waiting notice are rendered by `@dshfiles/chat`, which already
+depends on this package; both hide while the API is absent.
 
 ### Live model catalog
 

@@ -39,6 +39,8 @@ import { SessionSkillCatalog } from './skill-catalog.ts'
 import { SessionMediaReferences } from './media-references.ts'
 import { ArchivedSessionGate } from './archived-session-gate.ts'
 import { MirroredSessions } from '../mirrored-sessions.ts'
+import type { TurnAdmissionQueue } from '../turn-admission.ts'
+import { installTurnAdmission } from './turn-admission-ports.ts'
 import type {
   ModelCatalog,
   SessionWorkspacePathApplication,
@@ -158,6 +160,8 @@ export class SessionController extends TypertRemoteService {
   private readonly mirrored: MirroredSessions
   private readonly modelCatalogState: SessionModelCatalog
   private readonly promotions = new Set<Promise<void>>()
+  /** dshfiles: the running-thread limit and its FIFO queue of turns waiting for a free slot. */
+  readonly turnAdmission: TurnAdmissionQueue
 
   /**
    * @param ctx - Host context containing the Session capability assembly.
@@ -172,7 +176,8 @@ export class SessionController extends TypertRemoteService {
     installModelSelectionProjection(ctx)
     ctx.sessionProjections.register(threadModelPolicyProjection)
     this.agents = new ApiSessionAgentController(ctx)
-    this.commands = new SessionCommandController(ctx, this.agents, process.cwd())
+    this.turnAdmission = installTurnAdmission(ctx)
+    this.commands = new SessionCommandController(ctx, this.agents, process.cwd(), this.turnAdmission)
     ctx.effect(() => ctx.fileUploads.registerAgentResolver(async (sessionId) => {
       const result = await this.agents.resolveAgent(sessionId)
       if ('error' in result) throw result.error
