@@ -543,7 +543,7 @@
     {
       "id": "quota-dashboard",
       "title": "Read provider quota and usage status",
-      "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. Refresh bypasses the Host's 30-second sweep cache. Every card says when its own content was read: a reading kept through a failed read keeps its original time and names why, with Retry, and a shared Claude reading says when the next one can reach the provider. A failed read of the whole sweep shows a retryable notice beside the last reading on every quota surface. Claude cards add an Extra usage meter (spent vs monthly cap, percent, currency, reset when reported, or Extra usage off), also in the quota agent tool and recorded history. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
+      "summary": "Keep enabled non-hidden accounts visible in canonical order, including accounts whose quota is unavailable. Show Sign in again or Quota unavailable with the provider reason instead of inventing a percentage. Real quota meters retain tags, reset tooltips, active-wire highlighting and last-good transient-error policy; only explicit user hiding collapses an account. Refresh bypasses the Host's 30-second sweep cache. Every card says when its own content was read: a reading kept through a failed read keeps its original time and names why, with Retry, and a shared Claude reading says when the next one can reach the provider. A failed read of the whole sweep shows a retryable notice beside the last reading on every quota surface. Claude cards add an Extra usage meter (spent vs monthly cap, percent, currency, reset when reported, or Extra usage off), and an account whose quota reports extra usage carries a “Use extra usage” switch there and in its Settings tab, off by default; the guard behind it is a separate feature. The same `extraUsage` object also appears in the quota agent tool and recorded history. A compact settings button beside Add opens the AI Accounts page and closes any open usage popover.",
       "reach": ["expect group \"AI accounts usage\"", "click button \"AI accounts usage\"", "expect region \"AI account usage\""],
       "surfaces": ["client", "host", "settings"],
       "surface": "destinationSection",
@@ -949,6 +949,67 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "extra-usage-guard",
+      "title": "Stop at the plan limits instead of drawing paid extra usage",
+      "summary": "A provider that reports extra usage (Claude's pay-as-you-go spend past the plan) gets a per-account “Use extra usage” switch on its usage card and in AI Accounts settings, off by default. With it off, a reading that spends the session or weekly plan window blocks the account: request routing skips it and fails over to an enabled compatible account, and a turn that would still run on it stops with a message naming the spent window, the reset time, the setting to turn on and the alternative of switching the thread. The block lifts at the reported reset, or after a bounded hold when the provider names none. The guard decides from the last quota sweep, so a request can still start a few minutes into overage between readings.",
+      "surfaces": ["client", "host", "settings", "storage"],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "status-strip: Quota popover › account card › Use extra usage",
+      "configuration": [],
+      "states": ["allowed", "blocked-at-plan-limit", "reset-known", "reset-unknown", "failing-over", "stopped"],
+      "failureModes": [
+        "The guard follows the last quota reading, so a request can still start a few minutes into overage between readings.",
+        "A provider that reports extra usage off, or no extra usage at all, is never blocked by this rule.",
+        "A spent model-scoped window (Claude's Weekly Opus or Sonnet) or a spent Reserve window does not block the account, because another plan window can still serve it.",
+        "Turning the switch on leaves the provider's own monthly cap in charge; a reached cap still refuses overage.",
+        "A block without a reported reset lasts at most the bounded hold, so a stale reading cannot wedge an account forever.",
+        "Side requests (title, compaction) still follow their routed account; the turn guard covers the Agent's own steps."
+      ],
+      "externalDependencies": [
+        {
+          "id": "provider-extra-usage",
+          "boundary": "Claude's `/api/oauth/usage` extra_usage block: whether overage is on, its monthly cap and the plan windows that precede it.",
+          "deterministicFake": "Usage cards are built in unit tests; the fixture Claude login cannot be replayed because the usage endpoint is a fixed Anthropic URL with no base-URL override."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.extra-usage-block-rule",
+          "file": "plugins/@dshfiles/ai-accounts/src/extra-usage-guard.test.ts",
+          "testName": "blocks a spent plan window while the account may not draw paid overage"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.extra-usage-pool-block",
+          "file": "plugins/@dshfiles/ai-accounts/src/extra-usage-guard.test.ts",
+          "testName": "keeps routing off the account until its reset, then lets it back in"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.extra-usage-toggle-save",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-footer.test.tsx",
+          "testName": "shows Use extra usage only on the account whose quota reports it and saves the switch"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "ai-accounts.extra-usage-browser-journey",
+          "reason": "The switch only renders on an account whose quota reports extra_usage, and Claude's usage endpoint is a fixed api.anthropic.com URL with no base-URL override, so a scratch DSH would need a real Max/Team subscription already past its plan windows. The rule, the pool block and the switch itself are covered by extra-usage-guard.test.ts and quota-footer.test.tsx instead."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     },

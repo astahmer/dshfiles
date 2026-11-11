@@ -164,6 +164,36 @@ windows still show. The same `extraUsage` object (`enabled`, `used`,
 `ai_accounts_quota` agent tool output and in each recorded quota history point
 (`ai_accounts_history`).
 
+### Stop at the plan limits
+
+A provider reports extra usage on its card only where it may bill it. Each account
+whose quota carries that meter gets a **Use extra usage** switch, on the account
+card in the quota popover and in the account's Settings tab. It is **off by
+default**, because on it spends money.
+
+With it off, a reading whose session or weekly plan window is spent marks the
+account exhausted instead of letting the next request draw overage: the account
+row says **Plan limits spent**, request routing skips the account and fails over
+to another enabled account that offers the same model, and a turn that would
+still run on it stops before it can spend anything, with one message naming the
+spent window, the reset time, the switch to turn on and the alternative of
+switching the thread to another account. The block lifts at the reported reset,
+or after 15 minutes when the provider reports none, so a stale reading cannot
+wedge an account. A spent model-scoped window (Claude's Weekly Opus or Sonnet)
+or a spent Luna Reserve window is not a spent plan: another plan window can
+still serve the account. A provider that reports extra usage off, or none at
+all, is never blocked by this rule; its own error stays in charge.
+
+The guard works from the **last quota reading**, so it is as fresh as the sweep:
+30 seconds of shared cache, and one minute by default on the usage surfaces. A
+request can still start a few minutes into overage between readings. Only the
+Agent's own steps are stopped; a side request (thread title, compaction) still
+follows its routed account.
+
+Agents change the same setting with the `ai_accounts_set_extra_usage` tool,
+which runs only when the user asks. It is stored in the accounts file as
+`useExtraUsage` next to the other per-account settings.
+
 Cursor publishes no usage API,
 so the plugin reads the dashboard's own endpoint. If Cursor changes that
 endpoint, the card reports "unsupported" instead of a guessed number.
