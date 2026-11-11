@@ -36,9 +36,16 @@ owner.
       every record of the thread (`fix(thread-sidebar): keep the unread dot and its Inbox item in step`).
 - [x] ~~`⌥J` jumps to the next Needs-you item~~ (`feat(activity-timeline)`; a capture listener, since the Web registry
       refuses ⌥-letter defaults).
-- [ ] Browser push for blocking items (needs a Host/service-worker feasibility check; record a Host gap only if no
-      plugin route works).
-- [ ] Native `ask_user_question` forms reach the Inbox in scratch (provider covers timed-schema forms only).
+- [x] ~~Browser push for blocking items~~: no Host gap. A plugin can serve its own service worker and subscribe route
+      through `ctx.webServer.register`, add the manifest link with `webserver/index-inject`, keep the VAPID key as a
+      `secret:ALIAS` reference and send from the Host; the iOS install and Electron `file://` limits are listed in
+      [the attention model](../docs/ade-ux/README.md#48-the-attention-model). Shipping it is a new plugin, not a
+      core change.
+- [ ] Native `ask_user_question` forms stay unproven in scratch: the Inbox provider and its answer path are covered
+      Host-side (`native-question-attention.test.ts`, `attention-inbox.integration.test.ts`), but the composed
+      scratch profile never reaches the New thread composer — after the fake account is added, `New session` leaves
+      the AI Accounts page open, and the same failure hits the untouched timed-question journeys. Not a regression of
+      the Inbox provider; fix the composition first, then add the journey.
 
 **Thread list and shell (Phase 3)**
 
@@ -337,6 +344,15 @@ states onto it and may add detail text, never new colours.
 - **Toasts** only confirm the user's own action. **Agents never open modals.** Push (browser now, phone later) only
   for blocking items, per source, opt-in.
 - **Jump to next waiting** (`⌥J`) cycles through Needs you items.
+
+**Browser push: no Host gap.** A plugin can own the whole delivery path: `@deepseek-ai/dsh-host-webserver` gives every
+plugin `ctx.webServer.register`, an exact or prefix route whose handler owns the response, so a plugin can serve
+`/dshfiles-push-sw.js` with `Service-Worker-Allowed: /` and a `/dshfiles-push/subscribe` endpoint; `webserver/index-inject` adds the `<link rel="manifest">` row in the served
+head; the VAPID private key is a `secret:ALIAS` reference resolved through `secretCatalogValues`, subscriptions live
+in a plugin storage domain, and the send itself is an ordinary Host fetch to the push service. hmr-gate and
+annotations already register routes this way. Limits that remain, and that the plan may not fix: iOS needs the app
+installed from the browser (Safari 16.4+ Home Screen web app) before push exists, the service worker needs a real
+`http(s)` origin (an Electron `file://` shell has none), and a notification only appears while the Host runs.
 
 ## 5. The plugin presentation contract
 

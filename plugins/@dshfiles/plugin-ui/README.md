@@ -295,6 +295,20 @@ component library, which this package is. So blocks are only ever rebuilt here f
 HextaUI code is vendored in this package. HextaUI builds on Base UI and Tabler icons; ports land on the Radix parts and
 lucide icons this package already has rather than adding Base UI.
 
+Its other blocks were compared against what this repository already ships, and no port is left to do:
+
+| Block                | Where the behaviour lives here                                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Subagents            | `thread-sidebar` subagent lineage header (mode, activity, duration, tokens) plus the state on the subagent tool row.                                                                       |
+| Tool Calls           | `tool-meta`: the native call tree wrapped with section rows and timings, and the approval card with its risk level.                                                                        |
+| Prompt Input         | `rich-composer` uploads row, model chip and the Stop/retry controls in its input bar.                                                                                                      |
+| Chat Sidebar         | `thread-sidebar`: status groups with headers, per-filter empty copy, unread and archived handling.                                                                                         |
+| Settings, Appearance | `settings-shell`: one Settings page grouped by task, with `settings-search` over sections, plugin pages, controls and key bindings.                                                        |
+| API keys             | `secret-catalog` rows show alias, scope and last use; a value can never be masked and shown, because DSH stores references only ([secret references](../../../docs/secret-references.md)). |
+| Models               | `model-effort-picker`: model groups per provider, provider labels on the chips and the per-model fallback list.                                                                            |
+| Notifications        | `thread-sidebar` notification settings: per-category toggles, placement and duration, plus desktop notification support.                                                                   |
+| Billing              | `usage`: cost and quota bars, tool share bars and the per-account usage history; there is no billing data to summarise.                                                                    |
+
 ## Diff
 
 `@dshfiles/plugin-ui/diff` wraps `@pierre/diffs` 1.5.2 (Shiki-based, Apache-2.0). `PatchView` takes a git patch

@@ -3,15 +3,20 @@
 Phases 0–6 shipped. The design, decisions, per-phase evidence and the migration map now live in
 [docs/ade-ux](../../docs/ade-ux/README.md); this plan tracks only the open items below. When all of them close, delete it.
 
+Browser push closed as a feasibility answer rather than shipped work: no Host gap, a plugin can serve its own service
+worker and subscribe route, inject the manifest and send from the Host (see
+[the attention model](../../docs/ade-ux/README.md#48-the-attention-model)).
+
 The live `web` Host restarted on 2026-11-10 with every Host half these phases changed, so the rollout item is closed;
 Done / Restore releasing and recreating the workspace is shipped (settle cleanup plus the restore-on-next-turn hook in
 [jj-integration](../../plugins/@dshfiles/jj-integration/README.md#settle-cleanup)). The re-run items below were not
 re-run after that restart.
 
-- [ ] Browser push for blocking items (needs a Host/service-worker feasibility check; record a Host gap only if no
-      plugin route works). No plugin registers a service worker or push subscription yet.
-
-- [ ] Native `ask_user_question` forms reach the Inbox in scratch (provider covers timed-schema forms only).
+- [ ] Native `ask_user_question` forms stay unproven in scratch: the Inbox provider and its answer path are covered
+      Host-side (`native-question-attention.test.ts`, `attention-inbox.integration.test.ts`), but the composed scratch
+      profile never reaches the New thread composer — after the fake account is added, `New session` leaves the
+      AI Accounts page open, and the untouched timed-question journeys fail the same way. Fix the composition, then
+      add the journey; the catalog records the same reason.
 
 - [ ] git-worktree workspaces get only the This-turn Changes scope (the VCS port has no diff verb); no
       rebase-without-land verb (History's previewed rebase stands in).
