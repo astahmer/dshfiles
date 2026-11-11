@@ -8,7 +8,8 @@ const mount = (
   config:
     | {
         readonly maxTokens?: number
-        readonly idleCacheStrategy?: 'off' | 'compact'
+        /** A raw row value: `warm` is one the Host refuses. */
+        readonly idleCacheStrategy?: 'off' | 'compact' | 'warm'
         readonly idle?: { readonly enabled?: boolean; readonly minTokens?: number; readonly lifetimeMinutes?: number; readonly leadMinutes?: number }
       }
     | undefined,
@@ -50,7 +51,7 @@ describe('the context-compaction Host', () => {
       const compact = yield* mount({ idleCacheStrategy: 'compact' })
       expect(compact.fiber.state).toBe(2)
       yield* Effect.promise(() => compact.dispose())
-      const warm = yield* mount({ idleCacheStrategy: 'warm' as 'off' }).pipe(Effect.exit)
+      const warm = yield* mount({ idleCacheStrategy: 'warm' }).pipe(Effect.exit)
       expect(warm._tag).toBe('Failure')
     }).pipe(Effect.scoped),
   )

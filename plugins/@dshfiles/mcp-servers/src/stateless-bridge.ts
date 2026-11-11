@@ -2,6 +2,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import { createMcpToolDefinition } from '@deepseek-ai/dsh-mcp-client'
 import type {} from '@deepseek-ai/dsh-tools'
 import { createHash } from 'node:crypto'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { StatelessMcpModel, type Discovery, type JsonRecord } from './stateless-protocol.js'
 
 /** One stateless request, run by the Host's `StatelessMcp` service; an abort interrupts it. */
@@ -44,7 +46,7 @@ const isRecord = (value: unknown): value is JsonRecord => typeof value === 'obje
 interface ListedTool {
   readonly name: string
   readonly description: string
-  readonly inputSchema: Record<string, unknown>
+  readonly inputSchema: JsonRecord
   readonly outputSchema: unknown
   readonly taskRequired: boolean
 }
@@ -74,9 +76,12 @@ const listTools = async (call: StatelessCall): Promise<ReadonlyArray<ListedTool>
 }
 
 interface SystemPromptService {
-  section(input: { readonly name: string; readonly order: number; readonly interpolate: boolean; readonly text: () => string }): unknown
+  section(input: { readonly name: string; readonly order: number; readonly interpolate: boolean; readonly text: () => string }): void
   getSectionOrder(name: string): number
 }
+
+/** Tool arguments the ToolRuntime admitted, read as the JSON object the request body and `Mcp-Param-*` headers carry. */
+const decodeArguments = Schema.decodeUnknownOption(Schema.JsonObject)
 
 const isSystemPrompt = (value: unknown): value is SystemPromptService =>
   isRecord(value) && typeof value['section'] === 'function' && typeof value['getSectionOrder'] === 'function'
@@ -139,13 +144,16 @@ export async function apply(ctx: Context, config: StatelessBridgeConfig): Promis
               inputSchema: tool.inputSchema,
               outputSchema: tool.outputSchema,
               taskRequired: tool.taskRequired,
-              call: (args, execution) =>
-                config.call(
+              call: (input, execution) => {
+                const args = decodeArguments(input)
+                if (Option.isNone(args)) return Promise.reject(new Error(`tool "${tool.name}" was called with arguments that are not a JSON object`))
+                return config.call(
                   { signal: execution.signal },
                   'tools/call',
-                  { name: tool.name, arguments: args },
-                  StatelessMcpModel.paramHeaderValues(headers.headers, args),
-                ),
+                  { name: tool.name, arguments: args.value },
+                  StatelessMcpModel.paramHeaderValues(headers.headers, args.value),
+                )
+              },
             }),
           ),
         )

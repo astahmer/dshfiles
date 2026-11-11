@@ -82,14 +82,19 @@ class ScriptedAdapter extends LlmAdapter {
   }
 }
 
+/** The profile-row fields these journeys set; the Host fills every other field with its default. */
+interface CompactionRowConfig {
+  readonly backgroundSummary?: { readonly enabled: boolean; readonly startRatio: number }
+}
+
 const withAgent = async (
-  config: Record<string, unknown>,
+  config: CompactionRowConfig,
   run: (input: {
     readonly adapter: ScriptedAdapter
     readonly send: (text: string) => Promise<void>
     readonly summaries: () => number
     /** The `/compact` command's engine call: the whole history up to the newest exchange. */
-    readonly compactNow: () => Promise<unknown>
+    readonly compactNow: () => Promise<void>
   }) => Promise<void>,
 ) => {
   const host = await createTestHost()
@@ -122,7 +127,9 @@ const withAgent = async (
           session()
             .snapshotEvents()
             .filter(event => event.type === 'compaction/summary').length,
-        compactNow: () => host.ctx.compaction.compactNow(handle.agent, new AbortController().signal),
+        compactNow: async () => {
+          await host.ctx.compaction.compactNow(handle.agent, new AbortController().signal)
+        },
       })
     } finally {
       await handle.dispose()

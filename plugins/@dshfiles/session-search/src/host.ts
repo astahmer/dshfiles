@@ -151,7 +151,7 @@ export default DshxPlugin.make({
           const query = text.length === 0 ? null : findExpression(text)
           if (text.length > 0 && query === null) return { ownsService: true, prompts: [] }
           const found = yield* (yield* SearchWorker).promptHistory({
-            ...(query === null ? {} : { query }),
+            query: query ?? undefined,
             limit: input.limit,
             window: input.window,
             maxChars: input.maxChars,

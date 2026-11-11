@@ -111,6 +111,12 @@ const shortenMessage = (message: Message): Message => {
   return { ...message, content: message.content.map(block => (block.type === 'text' ? { ...block, text: shortenText(block.text) } : block)) }
 }
 
+/** The messages after shortening, and how many of them were shortened. */
+interface ShortenedMessages {
+  readonly messages: readonly Message[]
+  readonly shortened: number
+}
+
 /**
  * Shorten long text in `messages`, oldest first, until they fit `targetBytes`: tool outputs first, then the text of
  * older exchanges. Each shortened block keeps its head and tail. The last `protectedCount` messages stay intact.
@@ -121,7 +127,7 @@ const shortenOldest = (options: {
   readonly protectedCount: number
   readonly targetBytes: number
   readonly messageBytes: (message: Message) => number
-}): { readonly messages: readonly Message[]; readonly shortened: number } => {
+}): ShortenedMessages => {
   const messages = [...options.messages]
   const shortenable = messages.length - options.protectedCount
   let total = messages.reduce((sum, message) => sum + options.messageBytes(message), 0)

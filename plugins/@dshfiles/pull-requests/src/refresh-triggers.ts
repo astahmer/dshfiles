@@ -47,7 +47,7 @@ export interface ThreadEvent {
  * Which thread a Session event asks to refresh: one whose publishing command (a `jj git push`, `git push`, `gh pr …`)
  * just returned, or whose turn just ended. Everything else — and a turn the Host's own shutdown disposed — is null.
  */
-export const makeRefreshTriggers = () => {
+const makeRefreshTriggers = () => {
   const publishingCalls = new Map<string, string>()
   return (input: ThreadEvent): string | null => {
     const call = decodeToolCall(input.event)
@@ -77,7 +77,7 @@ type Monitor = Pick<PullRequestMonitor['Service'], 'refresh' | 'pollAll'>
  * Thread events, debounced, refresh the pull requests of the threads they name; nothing else polls between sweeps. The
  * first trigger of a burst starts the debounce, and everything that arrived by its end becomes one refresh.
  */
-export const refreshOnThreadEvents = (input: {
+const refreshOnThreadEvents = (input: {
   readonly monitor: Monitor
   readonly events: Stream.Stream<ThreadEvent>
   readonly config?: Effect.Effect<EventRefreshConfig>
@@ -107,10 +107,17 @@ export const refreshOnThreadEvents = (input: {
   })
 
 /** The slow fallback: every watched pull request once per interval, for changes no thread event announces. */
-export const sweepWatched = (input: { readonly monitor: Monitor; readonly every?: Effect.Effect<Duration.Input> }) =>
+const sweepWatched = (input: { readonly monitor: Monitor; readonly every?: Effect.Effect<Duration.Input> }) =>
   input.monitor.pollAll.pipe(
     Effect.catchCause(() => Effect.logWarning('pull-requests: scheduled poll failed; polling will continue')),
     Effect.andThen(input.every ?? Effect.succeed(DEFAULT_SWEEP_INTERVAL)),
     Effect.flatMap(every => Effect.sleep(every)),
     Effect.forever,
   )
+
+/** What makes the monitor refresh: thread events that ask for it, and the slow sweep behind them. */
+export class PullRequestRefreshTriggers {
+  static readonly make = makeRefreshTriggers
+  static readonly refreshOnThreadEvents = refreshOnThreadEvents
+  static readonly sweepWatched = sweepWatched
+}

@@ -6,6 +6,9 @@
  * Spec: https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
  */
 
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+
 /** The only modern revision this client speaks. */
 const MODERN_PROTOCOL_VERSION = '2026-07-28'
 
@@ -17,20 +20,18 @@ const MODERN_ERROR_CODES = { headerMismatch: -32020, missingClientCapability: -3
 
 const MODERN_CODES: ReadonlySet<number> = new Set(Object.values(MODERN_ERROR_CODES))
 
-export type JsonRecord = Readonly<Record<string, unknown>>
+/** One JSON object of an MCP message: a request's params, a result, a tool's input schema. */
+export type JsonRecord = Schema.JsonObject
+
+/** A JSON value read out of a {@link JsonRecord}; undefined where the key is absent. */
+type JsonField = Schema.Json | undefined
 
 const isRecord = (value: unknown): value is JsonRecord => typeof value === 'object' && value !== null && !Array.isArray(value)
 
+const decodeJsonObject = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.JsonObject))
+
 /** One JSON message body as a JSON object; undefined when it is not JSON or not an object (a bare array, a string, …). */
-const parseJsonObject = (text: string): JsonRecord | undefined => {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch {
-    return undefined
-  }
-  return isRecord(parsed) ? parsed : undefined
-}
+const parseJsonObject = (text: string): JsonRecord | undefined => Option.getOrUndefined(decodeJsonObject(text))
 
 /** What one `server/discover` answer says; `serverInfo` is display-only. */
 export interface Discovery {
@@ -52,14 +53,14 @@ export type ProbeOutcome =
   | { readonly kind: 'incompatible'; readonly reason: string }
 
 /** A JSON-RPC error object, when `body` is one. */
-const jsonRpcError = (body: JsonRecord | undefined): { readonly code: number; readonly message: string; readonly data: unknown } | undefined => {
+const jsonRpcError = (body: JsonRecord | undefined): { readonly code: number; readonly message: string; readonly data: JsonField } | undefined => {
   if (body === undefined || !isRecord(body['error'])) return undefined
   const { code, message, data } = body['error']
   if (typeof code !== 'number') return undefined
   return { code, message: typeof message === 'string' ? message.slice(0, 240) : '', data }
 }
 
-const stringList = (value: unknown): ReadonlyArray<string> => (Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [])
+const stringList = (value: JsonField): ReadonlyArray<string> => (Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [])
 
 /** Classify the probe's HTTP status and parsed JSON body (undefined when the body was empty, not JSON or not an object). */
 const classifyProbe = (status: number, body: JsonRecord | undefined): ProbeOutcome => {
@@ -115,8 +116,8 @@ const paramHeaders = (
   inputSchema: JsonRecord,
 ): { readonly ok: true; readonly headers: ReadonlyArray<ParamHeader> } | { readonly ok: false; readonly reason: string } => {
   const found: Array<ParamHeader> = []
-  const allowed = new Set<unknown>()
-  const reachable = (schema: unknown, path: ReadonlyArray<string>): string | undefined => {
+  const allowed = new Set<JsonRecord>()
+  const reachable = (schema: JsonField, path: ReadonlyArray<string>): string | undefined => {
     if (!isRecord(schema)) return undefined
     allowed.add(schema)
     const properties = schema['properties']
@@ -136,7 +137,7 @@ const paramHeaders = (
   const failure = reachable(inputSchema, [])
   if (failure !== undefined) return { ok: false, reason: failure }
   // An annotation anywhere else (items, anyOf, $ref, …) invalidates the tool.
-  const stray = (value: unknown): boolean => {
+  const stray = (value: JsonField): boolean => {
     if (Array.isArray(value)) return value.some(stray)
     if (!isRecord(value)) return false
     if (!allowed.has(value) && value['x-mcp-header'] !== undefined) return true
@@ -150,7 +151,7 @@ const paramHeaders = (
 const paramHeaderValues = (headers: ReadonlyArray<ParamHeader>, args: JsonRecord) => {
   const values: Record<string, string> = {}
   for (const { path, header } of headers) {
-    let value: unknown = args
+    let value: JsonField = args
     for (const key of path) value = isRecord(value) ? value[key] : undefined
     if (value === undefined || value === null) continue
     if (typeof value === 'string') values[`Mcp-Param-${header}`] = encodeHeaderValue(value)
@@ -226,7 +227,7 @@ const sseDecoder = () => {
 }
 
 /** A modern result: `resultType` absent or `complete`; `input_required` (MRTR) needs elicitation/sampling DSH lacks. */
-const completeResult = (result: unknown): { readonly ok: true; readonly result: JsonRecord } | { readonly ok: false; readonly reason: string } => {
+const completeResult = (result: JsonField): { readonly ok: true; readonly result: JsonRecord } | { readonly ok: false; readonly reason: string } => {
   if (!isRecord(result)) return { ok: false, reason: 'the server returned a result that is not an object' }
   const { resultType, ...rest } = result
   if (resultType === undefined || resultType === 'complete') return { ok: true, result: rest }

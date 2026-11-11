@@ -25,7 +25,7 @@ export class PromptHistoryService extends Context.Service<
         if (!current.promptHistory) return { status: 'disabled' as const, prompts: [] }
         const found = yield* index
           .promptHistory({
-            ...(input.text === undefined ? {} : { text: input.text }),
+            text: input.text,
             limit: input.limit ?? DEFAULT_LIMIT,
             window: current.historyRetention,
             maxChars: current.historyMaxChars,

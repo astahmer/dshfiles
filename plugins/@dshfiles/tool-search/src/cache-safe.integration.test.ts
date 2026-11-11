@@ -8,10 +8,12 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { ToolRuntime, defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
+import type { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import toolSearch from './host.js'
 
-type Step = { readonly call: string; readonly args: Record<string, unknown> } | { readonly text: string }
+/** One scripted model step: a tool call with the JSON arguments the model sends, or a final text. */
+type Step = { readonly call: string; readonly args: Schema.JsonObject } | { readonly text: string }
 
 interface ObservedRequest {
   readonly tools: string

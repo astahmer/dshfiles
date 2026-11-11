@@ -6,32 +6,61 @@ import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Plugin } from 'vite'
 import { buildClient, watchClient } from '../src/compiler/client/build.js'
+import { decodeJson } from '../src/json.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
 
-const FunctionSchema = Schema.declare((value): value is (...arguments_: ReadonlyArray<unknown>) => unknown => typeof value === 'function')
+/** A function read from a bundle; a test that reads its result decodes it there. */
+const FunctionSchema = Schema.declare((value): value is (...arguments_: ReadonlyArray<unknown>) => void => typeof value === 'function')
+/** A bundled module's exports, as its compiler-emitted factory returns them; tests decode what they read from it. */
+type ModuleExports = object
+/** The `require` the Module Loader hands a factory. */
+type ModuleRequire = (id: string) => ModuleExports | undefined
+/** The compiler-emitted `(require) => module.exports` wrapper a bundle registers. */
+type ModuleFactory = (requireModule: ModuleRequire) => ModuleExports
+const ModuleFactorySchema = Schema.declare((value): value is ModuleFactory => Schema.is(FunctionSchema)(value))
 const clientPluginShape = Schema.Struct({
   name: Schema.String,
   inject: Schema.Array(Schema.String),
   Config: Schema.optionalKey(Schema.Unknown),
   apply: FunctionSchema,
 })
-const clientRegistrationShape = Schema.Struct({ factory: FunctionSchema })
+const clientRegistrationShape = Schema.Struct({ factory: ModuleFactorySchema })
+const identifiedRegistrationShape = Schema.Struct({ id: Schema.String, factory: ModuleFactorySchema })
 type ClientPlugin = Schema.Schema.Type<typeof clientPluginShape>
 
-function evaluateClientRegistration(code: string) {
+/** A `<style>` element the bundle's CSS injection writes. */
+interface FakeStyle {
+  dataset: Record<string, string>
+  textContent: string
+}
+
+/** The slice of `document` a Client bundle's CSS injection uses. */
+interface FakeStyleDocument {
+  querySelector(selector: string): FakeStyle | null
+  createElement(tag: string): FakeStyle
+  readonly head: { appendChild(style: FakeStyle): void }
+}
+
+/** Run a Client bundle and capture what it hands the Module Loader. */
+function captureRegistration(code: string, globals: { readonly document?: FakeStyleDocument } = {}) {
   let registration: unknown
   vm.runInNewContext(code, {
+    ...globals,
     window: {
       __ModuleLoader__: {
-        load: (value: unknown) => {
+        load: <Registration>(value: Registration) => {
           registration = value
         },
       },
     },
   })
-  return Schema.decodeUnknownSync(clientRegistrationShape)(registration)
+  return registration
+}
+
+function evaluateClientRegistration(code: string) {
+  return Schema.decodeUnknownSync(clientRegistrationShape)(captureRegistration(code))
 }
 const isClientPlugin = (value: unknown): value is ClientPlugin => Schema.decodeUnknownOption(clientPluginShape)(value)._tag === 'Some'
 
@@ -76,8 +105,9 @@ describe('client compiler', () => {
     await writeFile(resolve(root, 'src/helper.ts'), 'export const helper = "manifest-helper"\n')
     await writeFile(resolve(root, 'src/client.tsx'), "import { helper } from './helper'\nexport const name = helper\nexport function apply() {}\n")
     await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
-    const manifest = Schema.decodeUnknownSync(Schema.Struct({ version: Schema.Number, face: Schema.String, sources: Schema.Array(Schema.String) }))(
-      JSON.parse(await readFile(resolve(root, 'dist/client.js.deps.json'), 'utf8')),
+    const manifest = decodeJson(
+      Schema.Struct({ version: Schema.Number, face: Schema.String, sources: Schema.Array(Schema.String) }),
+      await readFile(resolve(root, 'dist/client.js.deps.json'), 'utf8'),
     )
     expect(manifest.version).toBe(1)
     expect(manifest.face).toBe('client')
@@ -97,12 +127,13 @@ describe('client compiler', () => {
     })
 
     const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
-    const map = Schema.decodeUnknownSync(
+    const map = decodeJson(
       Schema.Struct({
         sources: Schema.Array(Schema.String),
         sourcesContent: Schema.optionalKey(Schema.Array(Schema.NullOr(Schema.String))),
       }),
-    )(JSON.parse(await readFile(resolve(root, 'dist/client.js.map'), 'utf8')))
+      await readFile(resolve(root, 'dist/client.js.map'), 'utf8'),
+    )
     expect(code).toMatch(/window\.__ModuleLoader__\.load\(\{\s*id: "@dshx\/fixture-plugin"/)
     expect(code).not.toContain(JSON.stringify(root))
     expect(JSON.stringify(map)).not.toContain(root)
@@ -113,38 +144,22 @@ describe('client compiler', () => {
     expect(map.sources.some(source => source.endsWith('/src/client.tsx') || source.endsWith('src/client.tsx'))).toBe(true)
     expect(map.sourcesContent?.some(source => source?.includes('Build. Ship. Observe.') === true)).toBe(true)
 
-    let registration:
-      | {
-          id: string
-          factory: (requireModule: (id: string) => unknown) => Record<string, unknown>
-        }
-      | undefined
-    const styles: Array<{
-      dataset: Record<string, string>
-      textContent: string
-    }> = []
-    const document = {
-      querySelector: (selector: string) => {
+    const styles: FakeStyle[] = []
+    const document: FakeStyleDocument = {
+      querySelector: selector => {
         const match = /^style\[data-([\w-]+)="(.*)"\]$/.exec(selector)
         const key = match?.[1]?.replace(/-(\w)/g, (_, letter: string) => letter.toUpperCase())
         return styles.find(style => key !== undefined && style.dataset[key] === match?.[2]) ?? null
       },
       createElement: () => ({ dataset: {}, textContent: '' }),
       head: {
-        appendChild: (style: { dataset: Record<string, string>; textContent: string }) => styles.push(style),
-      },
-    }
-    vm.runInNewContext(code, {
-      document,
-      window: {
-        __ModuleLoader__: {
-          load: (value: typeof registration) => {
-            registration = value
-          },
+        appendChild: style => {
+          styles.push(style)
         },
       },
-    })
-    expect(registration?.id).toBe('@dshx/fixture-plugin')
+    }
+    const registration = Schema.decodeUnknownSync(identifiedRegistrationShape)(captureRegistration(code, { document }))
+    expect(registration.id).toBe('@dshx/fixture-plugin')
     expect(styles).toHaveLength(0)
 
     const requireModule = (id: string) => {
@@ -152,26 +167,26 @@ describe('client compiler', () => {
         const context = { Provider: 'provider' }
         return {
           createContext: () => context,
-          createElement: (type: unknown, props: unknown, child: unknown) => ({
+          createElement: <Type, Props extends object | null, Child>(type: Type, props: Props, child: Child) => ({
             type,
-            props: { ...(props as object), children: child },
+            props: { ...props, children: child },
           }),
           useContext: () => undefined,
           useEffect: () => undefined,
-          useMemo: (factory: () => unknown) => factory(),
-          useState: (value: unknown) => [value, () => undefined],
+          useMemo: <Value>(factory: () => Value) => factory(),
+          useState: <Value>(value: Value) => [value, () => undefined],
         }
       }
       if (id === 'react/jsx-runtime') {
         return {
-          jsx: (type: unknown, props: unknown) => ({ type, props }),
-          jsxs: (type: unknown, props: unknown) => ({ type, props }),
+          jsx: <Type, Props>(type: Type, props: Props) => ({ type, props }),
+          jsxs: <Type, Props>(type: Type, props: Props) => ({ type, props }),
         }
       }
       throw new Error(`unexpected require: ${id}`)
     }
-    const plugin = registration?.factory(requireModule)
-    registration?.factory(requireModule)
+    const plugin = registration.factory(requireModule)
+    registration.factory(requireModule)
     expect(styles).toHaveLength(2)
     const [marker, sheet] = styles
     expect(marker?.dataset.plugin).toBe('@dshx/fixture-plugin')
@@ -180,31 +195,26 @@ describe('client compiler', () => {
     expect(sheet?.dataset.plugin).toBe('dshx:shared-css')
     expect(sheet?.dataset.dshxSharedCss).toBe(marker?.dataset.dshxCss)
     expect(sheet?.textContent).toContain('background: #101b2a')
-    const registered: unknown[] = []
+    const registered: Array<{ readonly options: unknown; readonly component: unknown }> = []
     if (!isClientPlugin(plugin)) throw new Error('The built client module did not export a Client plugin.')
     expect(plugin.name).toBe('@dshx/fixture-plugin')
     expect(plugin.inject).toEqual(['slots', 'connection'])
     await plugin.apply({
       slots: {
-        inject: (_name: string, register: () => unknown) => register(),
-        register: (options: unknown, component: unknown) => {
+        inject: <Registration>(_name: string, register: () => Registration) => register(),
+        register: <Options, Component>(options: Options, component: Component) => {
           registered.push({ options, component })
           return component
         },
       },
     })
     expect(registered).toHaveLength(1)
-    const component = (
-      registered[0] as {
-        component: () => {
-          type: unknown
-          props: { children: { type: string; props: { className: string } } }
-        }
-      }
-    ).component
-    const element = component()
+    const component = Schema.decodeUnknownSync(FunctionSchema)(registered[0]?.component)
+    const element = Schema.decodeUnknownSync(
+      Schema.Struct({ type: Schema.Unknown, props: Schema.Struct({ children: Schema.Struct({ type: Schema.Unknown }) }) }),
+    )(component())
     expect(element.type).toBe('provider')
-    expect(typeof element.props.children.type).toBe('function')
+    expect(element.props.children.type).toBeTypeOf('function')
   })
 
   it('adapts a defineClient default export and keeps the logical name in the bundle', async () => {
@@ -339,7 +349,7 @@ describe('client compiler', () => {
     const register = vi.fn(() => vi.fn())
     const bind = vi.fn()
     plugin.apply({
-      effect: (callback: () => unknown) => callback(),
+      effect: <Result>(callback: () => Result) => callback(),
       locale: { register, bind },
     })
     expect(register).toHaveBeenCalledWith('demo', {
@@ -1225,11 +1235,10 @@ describe('client compiler', () => {
       [],
     )
     await buildClient({ packageId: '@dshx/shared-runtime', root: supplierRoot, entry: 'src/client.ts', outDir: 'dist', sharedRuntime: ['shared-lib'] })
-    const manifest = JSON.parse(await readFile(resolve(supplierRoot, 'dist/shared-runtime.json'), 'utf8')) as {
-      supplier: string
-      modules: Record<string, string[]>
-      cssHash: string
-    }
+    const manifest = decodeJson(
+      Schema.Struct({ supplier: Schema.String, modules: Schema.Record(Schema.String, Schema.Array(Schema.String)), cssHash: Schema.String }),
+      await readFile(resolve(supplierRoot, 'dist/shared-runtime.json'), 'utf8'),
+    )
     expect(manifest).toMatchObject({ supplier: '@dshx/shared-runtime', modules: { 'shared-lib': ['default', 'named'] } })
     expect(manifest.cssHash).toMatch(/^[0-9a-f]{16}$/)
     // A supplier that also serves a DSHX Client runtime snapshot must not stop a consumer that inlines its own.
@@ -1258,9 +1267,9 @@ describe('client compiler', () => {
     expect(consumerCode).not.toContain('named-from-@dshx/consumer')
     expect(consumerCode).not.toContain('#123456')
 
-    const factories = new Map<string, (requireModule: (id: string) => unknown) => unknown>()
-    const materialized = new Map<string, unknown>()
-    const requireModule = (id: string) => {
+    const factories = new Map<string, ModuleFactory>()
+    const materialized = new Map<string, ModuleExports | undefined>()
+    const requireModule: ModuleRequire = id => {
       if (!materialized.has(id)) materialized.set(id, factories.get(id)?.(requireModule))
       return materialized.get(id)
     }
@@ -1277,7 +1286,10 @@ describe('client compiler', () => {
       },
       window: {
         __ModuleLoader__: {
-          load: (value: { id: string; factory: (requireModule: (id: string) => unknown) => unknown }) => factories.set(value.id, value.factory),
+          load: <Registration>(value: Registration) => {
+            const registration = Schema.decodeUnknownSync(identifiedRegistrationShape)(value)
+            factories.set(registration.id, registration.factory)
+          },
         },
       },
       globalThis: {},
@@ -1471,7 +1483,7 @@ describe('client compiler', () => {
           const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
           if (predicate(code)) return code
         } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+          if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
         }
         await new Promise(resolveTimer => setTimeout(resolveTimer, 20))
       }
@@ -1602,21 +1614,15 @@ describe('client lazy chunks', () => {
     '',
   ].join('\n')
 
+  /** The fixture entry exports `apply`, which resolves the lazy module's value. */
+  const lazyEntryShape = Schema.Struct({ apply: FunctionSchema })
+
   const loadChunks = (files: Readonly<Record<string, string>>) => {
-    const factories = new Map<string, (require: unknown) => { readonly [key: string]: unknown }>()
-    const registrationShape = Schema.Struct({ id: Schema.String, chunk: Schema.optional(Schema.String), factory: FunctionSchema })
+    const factories = new Map<string, ModuleFactory>()
+    const registrationShape = Schema.Struct({ id: Schema.String, chunk: Schema.optional(Schema.String), factory: ModuleFactorySchema })
     for (const code of Object.values(files)) {
-      vm.runInNewContext(code, {
-        window: {
-          __ModuleLoader__: {
-            load: (value: unknown) => {
-              const registration = Schema.decodeUnknownSync(registrationShape)(value)
-              // SAFETY: the decoded factory is the compiler-emitted `(require) => module.exports` wrapper.
-              factories.set(registration.chunk ?? 'client.js', registration.factory as (require: unknown) => { readonly [key: string]: unknown })
-            },
-          },
-        },
-      })
+      const registration = Schema.decodeUnknownSync(registrationShape)(captureRegistration(code))
+      factories.set(registration.chunk ?? 'client.js', registration.factory)
     }
     const require = Object.assign(
       (spec: string) => {
@@ -1625,7 +1631,7 @@ describe('client lazy chunks', () => {
       },
       { async: async (spec: string) => factories.get(spec.replace(/^\.\//u, ''))!(require) },
     )
-    return { entry: factories.get('client.js')!(require), factories }
+    return { entry: Schema.decodeUnknownSync(lazyEntryShape)(factories.get('client.js')!(require)), factories }
   }
 
   it('emits a self-contained chunk loaded through require.async and runs it', async () => {
@@ -1644,11 +1650,8 @@ describe('client lazy chunks', () => {
       expect(chunkCode).toMatch(new RegExp(`chunk:\\s*["'\`]${chunkFile!.replaceAll('.', '\\.')}["'\`]`, 'u'))
       expect(chunkCode.match(/\/\/# sourceMappingURL=.*$/gmu)).toEqual([`//# sourceMappingURL=${chunkFile}.map`])
       const { entry } = loadChunks({ entry: entryCode, chunk: chunkCode })
-      // SAFETY: the fixture entry exports apply returning the lazy module's value.
-      await expect((entry.apply as () => Promise<string>)()).resolves.toBe('heavy-lazyonlylazyonlylazyonly')
-      const manifest = Schema.decodeUnknownSync(Schema.Struct({ sources: Schema.Array(Schema.String) }))(
-        JSON.parse(await readFile(resolve(root, 'dist/client.js.deps.json'), 'utf8')),
-      )
+      await expect(entry.apply()).resolves.toBe('heavy-lazyonlylazyonlylazyonly')
+      const manifest = decodeJson(Schema.Struct({ sources: Schema.Array(Schema.String) }), await readFile(resolve(root, 'dist/client.js.deps.json'), 'utf8'))
       expect(manifest.sources).toContain('src/heavy.ts')
     }
   })
@@ -1678,8 +1681,7 @@ describe('client lazy chunks', () => {
     const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
     expect(report.output.filter(item => item.fileName.startsWith('client.heavy.'))).toEqual([])
     const { entry } = loadChunks({ entry: await readFile(resolve(root, 'dist/client.js'), 'utf8') })
-    // SAFETY: the fixture entry exports apply returning the lazy module's value.
-    await expect((entry.apply as () => Promise<string>)()).resolves.toBe('shared-state')
+    await expect(entry.apply()).resolves.toBe('shared-state')
   })
 
   it('keeps a target that imports CSS inlined so the entry still owns the sheet', async () => {

@@ -29,6 +29,9 @@ const dependencyMapsSchema = Schema.Struct({
   peerDependencies: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 })
 
+/** A Loader row anywhere in cordis.patch.yml; only its id and package name are read. */
+const isPatchRow = Schema.is(Schema.Struct({ id: Schema.String, name: Schema.String }))
+
 const VIRTUAL_CLIENT_ENTRY = '\0virtual:dshx-client-entry'
 const VIRTUAL_CLIENT_PUBLIC = '\0virtual:dshx-client-public'
 const VIRTUAL_CLIENT_API_HOOKS = '\0virtual:dshx-client-api-hooks'
@@ -196,17 +199,16 @@ async function pluginPageNamespaces(root: string, entry: string, packageId: stri
     return []
   }
   const ids = new Set<string>()
-  const visit = (value: unknown): void => {
+  const readPatchRowIds = (value: unknown): void => {
     if (Array.isArray(value)) {
-      value.forEach(visit)
+      value.forEach(readPatchRowIds)
       return
     }
     if (typeof value !== 'object' || value === null) return
-    const row = value as Record<string, unknown>
-    if (typeof row.id === 'string' && typeof row.name === 'string' && (row.name === packageId || row.name.startsWith(`${packageId}/`))) ids.add(row.id)
-    Object.values(row).forEach(visit)
+    if (isPatchRow(value) && (value.name === packageId || value.name.startsWith(`${packageId}/`))) ids.add(value.id)
+    Object.values(value).forEach(readPatchRowIds)
   }
-  visit(patch)
+  readPatchRowIds(patch)
   if (ids.size === 0) return []
   const registrations = await clientSlotRegistrations(entry, root)
   return registrations.some(registration => registration.slot === PLUGIN_PAGE_SLOT) ? [] : [...ids]
@@ -481,7 +483,7 @@ async function validateInjectPackages(paths: Awaited<ReturnType<typeof resolveOp
   const missing = inject.filter(name => !installed(name))
   if (missing.length === 0) return
   const manifest = decodeJson(dependencyMapsSchema, await readFile(resolve(paths.root, 'package.json'), 'utf8').catch(() => '{}'))
-  const scoped = await readdir(resolve(paths.root, 'node_modules/@deepseek-ai')).catch(() => [] as string[])
+  const scoped = await readdir(resolve(paths.root, 'node_modules/@deepseek-ai')).catch((): string[] => [])
   const candidates = [
     ...new Set([
       ...Object.keys(manifest.peerDependencies ?? {}),

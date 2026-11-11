@@ -222,8 +222,8 @@ const fullNodeSchema = Schema.Struct({
   comments: Schema.Struct({ totalCount: Schema.Number, nodes: Schema.Array(commentSchema) }),
   reviews: Schema.Struct({ totalCount: Schema.Number, nodes: Schema.Array(reviewSchema) }),
 })
-const decodeFingerprintAlias = Schema.decodeUnknownOption(Schema.Struct({ pullRequest: Schema.NullOr(fingerprintNodeSchema) }))
-const decodeFullAlias = Schema.decodeUnknownOption(Schema.Struct({ pullRequest: Schema.NullOr(fullNodeSchema) }))
+const fingerprintAliasSchema = Schema.Struct({ pullRequest: Schema.NullOr(fingerprintNodeSchema) })
+const fullAliasSchema = Schema.Struct({ pullRequest: Schema.NullOr(fullNodeSchema) })
 const rateLimitSchema = Schema.Struct({ cost: Schema.Number, remaining: Schema.Number, resetAt: Schema.String })
 const pullRequestBatchSchema = Schema.Struct({
   data: Schema.NullOr(Schema.Record(Schema.String, Schema.Unknown)),
@@ -521,9 +521,10 @@ export class GitHubCli extends Context.Service<
       const readPass = <Node>(input: {
         readonly targets: readonly Indexed[]
         readonly full: boolean
-        readonly decodeAlias: (value: unknown) => Option.Option<{ readonly pullRequest: Node | null }>
-      }) =>
-        provide(
+        readonly aliasSchema: Schema.Decoder<{ readonly pullRequest: Node | null }>
+      }) => {
+        const decodeAlias = Schema.decodeUnknownOption(input.aliasSchema)
+        return provide(
           runGh({
             operation: 'pr-batch',
             args: ['api', 'graphql', '-f', `query=${pullRequestQueryOf(input)}`],
@@ -544,7 +545,7 @@ export class GitHubCli extends Context.Service<
                 return Number.isFinite(resetAt) ? { cost: value.cost, remaining: value.remaining, resetAt } : null
               },
             })
-            const nodes = input.targets.map((_, alias) => Option.getOrUndefined(input.decodeAlias(data[`p${String(alias)}`]))?.pullRequest ?? undefined)
+            const nodes = input.targets.map((_, alias) => Option.getOrUndefined(decodeAlias(data[`p${String(alias)}`]))?.pullRequest ?? undefined)
             return { kind: 'ok', nodes, rateLimit }
           }),
           Effect.catch((error): Effect.Effect<BatchPass<Node>> =>
@@ -555,6 +556,7 @@ export class GitHubCli extends Context.Service<
             }),
           ),
         )
+      }
       const pullRequests = Effect.fn('pull-requests gh pull requests')(function* (input: {
         readonly targets: readonly GitHubPullRequestTarget[]
         readonly minRemaining: number
@@ -573,14 +575,14 @@ export class GitHubCli extends Context.Service<
         const fail = (targets: readonly Indexed[], read: PullRequestRead) => {
           for (const target of targets) reads[target.index] = read
         }
-        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- batches run one at a time so a rate limit or a low budget stops the rest.
+        // Batches run one at a time so a rate limit or a low budget stops the rest.
         for (let start = 0; start < indexed.length; start += PULL_REQUEST_BATCH) {
           if (rateLimited || (rateLimit !== null && rateLimit.remaining < input.minRemaining)) break
           const batch = indexed.slice(start, start + PULL_REQUEST_BATCH)
           const known = batch.filter(target => target.known !== null)
           const toRead = batch.filter(target => target.known === null)
           if (known.length > 0) {
-            const cheap = yield* readPass({ targets: known, full: false, decodeAlias: decodeFingerprintAlias })
+            const cheap = yield* readPass({ targets: known, full: false, aliasSchema: fingerprintAliasSchema })
             if (cheap.kind === 'failed' && cheap.rateLimited) {
               rateLimited = true
               break
@@ -597,7 +599,7 @@ export class GitHubCli extends Context.Service<
             }
           }
           if (toRead.length === 0) continue
-          const full = yield* readPass({ targets: toRead, full: true, decodeAlias: decodeFullAlias })
+          const full = yield* readPass({ targets: toRead, full: true, aliasSchema: fullAliasSchema })
           if (full.kind === 'failed' && full.rateLimited) {
             rateLimited = true
             break

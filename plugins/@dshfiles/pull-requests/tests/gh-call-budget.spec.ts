@@ -12,8 +12,9 @@ import { layer as nodeChildProcessSpawnerLayer } from '@effect/platform-node/Nod
 import { layer as nodeFileSystemLayer } from '@effect/platform-node/NodeFileSystem'
 import { layer as nodePathLayer } from '@effect/platform-node/NodePath'
 import { DshxEffect } from '@dshfiles/dshx/effect'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ForgePullRequests } from '../src/forge-port.js'
 import { GitHubCli } from '../src/github-cli.js'
@@ -80,11 +81,9 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-interface GhCall {
-  readonly kind: string
-  readonly points: number
-  readonly aliases?: number
-}
+/** One line of the fake `gh` log. */
+const ghCallSchema = Schema.Struct({ kind: Schema.String, points: Schema.Number, aliases: Schema.optionalKey(Schema.Number) })
+type GhCall = typeof ghCallSchema.Type
 
 const setState = (state: {
   readonly states?: Record<string, string>
@@ -100,7 +99,7 @@ const readCalls = async (): Promise<readonly GhCall[]> => {
   return text
     .split('\n')
     .filter(line => line.length > 0)
-    .map(line => JSON.parse(line) as GhCall)
+    .map(line => decodeJson(ghCallSchema, line))
 }
 
 const link = (number: number): PullRequestRecord => ({

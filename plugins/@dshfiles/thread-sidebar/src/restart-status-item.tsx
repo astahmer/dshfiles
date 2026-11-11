@@ -23,12 +23,35 @@ export interface RestartStatusText {
 
 const AUTO_RESTART_POLL_MS = 5_000
 
+/** What the strip item reads of the automatic restart. */
+interface AutoRestartView {
+  /** Undefined on a Host without automatic restarts. */
+  readonly status: AutoRestartStatusWire | undefined
+  /** Seconds until the counted-down restart; null while nothing counts down. */
+  readonly secondsLeft: number | null
+  readonly refetch: () => void
+}
+
+/**
+ * The current time, ticking once a second while `active`; while inactive it holds the time it stopped ticking, so
+ * render stays pure.
+ */
+const useNow = (active: boolean): number => {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    setNow(Date.now())
+    if (!active) return
+    const tick = window.setInterval(() => setNow(Date.now()), 1_000)
+    return () => window.clearInterval(tick)
+  }, [active])
+  return now
+}
+
 /** The Host's automatic-restart state, polled while the item is mounted; undefined on a Host without it. */
-const useAutoRestart = (): { readonly status: AutoRestartStatusWire | undefined; readonly secondsLeft: number | null; readonly refetch: () => void } => {
+const useAutoRestart = (): AutoRestartView => {
   const query = useApiQuery(threadSidebarRestartApi, 'autoRestartStatus', { input: {} })
   const refetch = query.refetch
   const status = query.status === 'error' ? undefined : query.data
-  const [, setTick] = useState(0)
   useEffect(() => {
     const poll = window.setInterval(() => {
       if (!document.hidden) refetch()
@@ -36,11 +59,7 @@ const useAutoRestart = (): { readonly status: AutoRestartStatusWire | undefined;
     return () => window.clearInterval(poll)
   }, [refetch])
   const counting = status?.phase === 'countdown'
-  useEffect(() => {
-    if (!counting) return
-    const tick = window.setInterval(() => setTick(count => count + 1), 1_000)
-    return () => window.clearInterval(tick)
-  }, [counting])
+  const now = useNow(counting)
   // A page that saw the automatic restart begin reloads once the new Host answers: the Host halves it held back
   // only take effect in the page with their client bundles, and the page would otherwise keep showing the old notice.
   const followed = useRef<{ readonly run: string; readonly restarting: boolean } | null>(null)
@@ -54,7 +73,7 @@ const useAutoRestart = (): { readonly status: AutoRestartStatusWire | undefined;
     const restarting = status.phase === 'countdown' || status.phase === 'restarting' || (previous?.restarting === true && previous.run === status.run)
     followed.current = { run: status.run, restarting }
   }, [status])
-  const secondsLeft = counting && status.restartAt !== null ? Math.max(0, Math.ceil((status.restartAt - Date.now()) / 1000)) : null
+  const secondsLeft = counting && status.restartAt !== null ? Math.max(0, Math.ceil((status.restartAt - now) / 1000)) : null
   return { status, secondsLeft, refetch }
 }
 

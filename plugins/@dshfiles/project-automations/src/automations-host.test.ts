@@ -7,6 +7,7 @@ import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
+import type { ApiHostInput } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineHost, pluginStorage } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
@@ -87,8 +88,8 @@ const fixture = async (input: { readonly githubDeliveryWindowHours?: number } = 
       return () => routes.splice(routes.indexOf(route), 1)
     },
   })
-  const created: Array<Record<string, unknown>> = []
-  const prompted: Array<Record<string, unknown>> = []
+  const created: Array<ApiHostInput<typeof sessionsApi.methods.create>> = []
+  const prompted: Array<ApiHostInput<typeof sessionsApi.methods.prompt>> = []
   await host.mount(
     defineHost({
       name: '@dshfiles/session-controller',
@@ -415,13 +416,18 @@ it('accepts GitHub webhook signatures over the raw body and refuses tampered, do
   const url = `${origin}${saved.webhookPath ?? ''}`
   const body = JSON.stringify({ ref: 'refs/heads/main' })
   const signatureOf = (text: string) => WebhookSignature.signGitHub({ secret: HOOK_SECRET, body: Buffer.from(text) })
+  /** A GitHub delivery id header: a fixed id by default, the given one, or none at all for `null`. */
+  const deliveryHeader = (delivery: string | null | undefined) => {
+    if (delivery === null) return {}
+    return { 'x-github-delivery': delivery ?? '6f5b0a2e-3c4d-4a8f-9f0e-1c2d3e4f5a6b' }
+  }
   const send = (input: { readonly body: string; readonly delivery?: string | null; readonly signature?: string; readonly timestamped?: boolean }) =>
     fetch(url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'x-github-event': 'push',
-        ...(input.delivery === null ? {} : { 'x-github-delivery': input.delivery ?? '6f5b0a2e-3c4d-4a8f-9f0e-1c2d3e4f5a6b' }),
+        ...deliveryHeader(input.delivery),
         ...(input.timestamped === true
           ? (() => {
               const timestamp = String(Math.floor(Date.now() / 1000))

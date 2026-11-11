@@ -9,6 +9,8 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { AlarmClockIcon, PencilIcon, SendIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
 import { useEffect, useId, useMemo, useState, type CSSProperties } from 'react'
 import { scheduledSendApi, type ScheduledSend, type SendModel } from './scheduled-send-api.js'
 import { SendTime } from './send-time.js'
@@ -64,7 +66,8 @@ export const SendLaterAction = (props: {
   const [custom, setCustom] = useState('')
   const [notice, setNotice] = useState('')
   const customId = useId()
-  const now = useMemo(() => new Date(), [open])
+  // The presets read the time the popover opened, so their labels hold still while it stays open.
+  const [now, setNow] = useState(() => new Date())
 
   const schedule = useMutation({
     mutationFn: async (sendAt: number) => {
@@ -93,7 +96,10 @@ export const SendLaterAction = (props: {
       open={open}
       onOpenChange={next => {
         setOpen(next)
-        if (next) setCustom(SendTime.toLocalInput(Date.now() + 60 * 60_000))
+        if (!next) return
+        const opened = new Date()
+        setNow(opened)
+        setCustom(SendTime.toLocalInput(opened.getTime() + 60 * 60_000))
       }}
     >
       <PopoverTrigger asChild>
@@ -155,11 +161,18 @@ export const SendLaterAction = (props: {
 
 const THREAD_MODEL = 'thread'
 const DEFAULT_EFFORT = 'default'
-const modelValue = (model: Pick<SendModel, 'provider' | 'model'>): string => JSON.stringify([model.provider, model.model])
-const parseModelValue = (value: string): Pick<SendModel, 'provider' | 'model'> | undefined => {
+type ModelRoute = Pick<SendModel, 'provider' | 'model'>
+/** A model route as one Select value: the JSON `[provider, model]` pair, so neither part needs escaping. */
+const modelValueSchema = Schema.fromJsonString(Schema.Tuple([Schema.String, Schema.String]))
+const decodeModelValue = Schema.decodeUnknownOption(modelValueSchema)
+const modelValue = (model: ModelRoute): string => JSON.stringify([model.provider, model.model])
+const parseModelValue = (value: string): ModelRoute | undefined => {
   if (value === THREAD_MODEL) return undefined
-  const parsed: unknown = JSON.parse(value)
-  return Array.isArray(parsed) && typeof parsed[0] === 'string' && typeof parsed[1] === 'string' ? { provider: parsed[0], model: parsed[1] } : undefined
+  return Option.getOrUndefined(Option.map(decodeModelValue(value), ([provider, model]) => ({ provider, model })))
+}
+const sendModelOf = (route: ModelRoute, effort: string | undefined): SendModel => {
+  if (effort === undefined) return { ...route }
+  return { ...route, reasoningEffort: effort }
 }
 
 /** Edit one scheduled send: text, time, and the model and effort the thread switches to first. */
@@ -181,25 +194,20 @@ const ScheduledSendDialog = (props: {
     queryFn: async () => (props.loadModels === undefined ? [] : props.loadModels()),
     staleTime: 60_000,
   })
-  const chosen = parseModelValue(model)
+  const chosen = useMemo(() => parseModelValue(model), [model])
   const efforts = useMemo(() => {
     if (chosen === undefined) return []
     const group = models.data?.find(item => item.id === chosen.provider)
     return group?.models.find(item => item.id === chosen.model)?.reasoning?.efforts ?? []
-  }, [chosen?.provider, chosen?.model, models.data])
+  }, [chosen, models.data])
   const sendAt = SendTime.fromLocalInput(time)
 
   const save = useMutation({
-    mutationFn: () =>
-      api.update({
-        id: props.send.id,
-        text,
-        ...(sendAt === undefined || sendAt === props.send.sendAt ? {} : { sendAt }),
-        model:
-          chosen === undefined
-            ? null
-            : { ...chosen, ...(effort === DEFAULT_EFFORT || !efforts.some(item => item.id === effort) ? {} : { reasoningEffort: effort }) },
-      }),
+    mutationFn: () => {
+      const chosenEffort = effort === DEFAULT_EFFORT || !efforts.some(item => item.id === effort) ? undefined : effort
+      const update = { id: props.send.id, text, model: chosen === undefined ? null : sendModelOf(chosen, chosenEffort) }
+      return api.update(sendAt === undefined || sendAt === props.send.sendAt ? update : { ...update, sendAt })
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: sendsKey(props.send.sessionId) })
       props.onClose()

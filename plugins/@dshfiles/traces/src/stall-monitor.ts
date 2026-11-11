@@ -39,9 +39,9 @@ const createStallDetector = (input: { readonly intervalMs: number; readonly thre
       return undefined
     }
     reported++
-    const droppedBefore = dropped
+    const stall: EventLoopStall = { startMs: nowMs - lateness, endMs: nowMs, stallMs: Math.round(lateness), droppedBefore: dropped }
     dropped = 0
-    return { startMs: nowMs - lateness, endMs: nowMs, stallMs: Math.round(lateness), droppedBefore }
+    return stall
   }
 }
 
@@ -66,25 +66,22 @@ const recordStall = (input: { readonly tracer: Tracer.Tracer; readonly stall: Ev
   span.end(nanosOf(input.stall.endMs), Exit.void)
 }
 
+/** Sleeps one interval at a time and measures how late each wake-up came; interrupting the fiber stops it. */
 const probe = (input: { readonly tracer: Tracer.Tracer; readonly thresholdMs: number }) =>
-  Effect.acquireRelease(
-    Effect.sync(() => {
-      const origin = performance.timeOrigin
-      const detect = createStallDetector({
-        intervalMs: PROBE_INTERVAL_MS,
-        thresholdMs: input.thresholdMs,
-        maxPerMinute: MAX_STALLS_PER_MINUTE,
-        startMs: origin + performance.now(),
-      })
-      const timer = setInterval(() => {
-        const stall = detect(origin + performance.now())
-        if (stall !== undefined) recordStall({ tracer: input.tracer, stall, thresholdMs: input.thresholdMs })
-      }, PROBE_INTERVAL_MS)
-      timer.unref()
-      return timer
-    }),
-    timer => Effect.sync(() => clearInterval(timer)),
-  ).pipe(Effect.andThen(Effect.never), Effect.scoped)
+  Effect.suspend(() => {
+    const origin = performance.timeOrigin
+    const detect = createStallDetector({
+      intervalMs: PROBE_INTERVAL_MS,
+      thresholdMs: input.thresholdMs,
+      maxPerMinute: MAX_STALLS_PER_MINUTE,
+      startMs: origin + performance.now(),
+    })
+    const tick = Effect.sync(() => {
+      const stall = detect(origin + performance.now())
+      if (stall !== undefined) recordStall({ tracer: input.tracer, stall, thresholdMs: input.thresholdMs })
+    })
+    return Effect.forever(Effect.andThen(Effect.sleep(PROBE_INTERVAL_MS), tick))
+  })
 
 /** Runs the probe while `eventLoopStallMs` is above 0, restarting it when the threshold changes. */
 const layer = Layer.effectDiscard(

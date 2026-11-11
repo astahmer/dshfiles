@@ -1,20 +1,25 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Duration, Effect, Fiber, Queue, Stream } from 'effect'
 import { TestClock } from 'effect/testing'
-import { makeRefreshTriggers, refreshOnThreadEvents, sweepWatched, type ThreadEvent } from '../src/refresh-triggers.js'
+import { PullRequestRefreshTriggers, type ThreadEvent } from '../src/refresh-triggers.js'
 
-const call = (sessionId: string, callId: string, command: string): ThreadEvent => ({
-  sessionId,
-  event: { type: 'tool/call', data: { callId, name: 'bash', arguments: JSON.stringify({ command }) } } as ThreadEvent['event'],
-})
-const result = (sessionId: string, callId: string): ThreadEvent => ({
-  sessionId,
-  event: { type: 'tool/result', data: { message: { toolCallId: callId } } } as ThreadEvent['event'],
-})
-const turnEnd = (sessionId: string, kind = 'completed', reason?: string): ThreadEvent => ({
-  sessionId,
-  event: { type: 'turn/end', data: { reason: reason === undefined ? { kind } : { kind, reason: { kind: reason } } } } as ThreadEvent['event'],
-})
+const { make: makeRefreshTriggers, refreshOnThreadEvents, sweepWatched } = PullRequestRefreshTriggers
+
+/** A Session event keeps its payload: `ThreadEvent` names only the `type` every event carries. */
+const threadEvent = (sessionId: string, event: ThreadEvent['event']): ThreadEvent => ({ sessionId, event })
+
+const call = (sessionId: string, callId: string, command: string): ThreadEvent => {
+  const event = { type: 'tool/call', data: { callId, name: 'bash', arguments: JSON.stringify({ command }) } }
+  return threadEvent(sessionId, event)
+}
+const result = (sessionId: string, callId: string): ThreadEvent => {
+  const event = { type: 'tool/result', data: { message: { toolCallId: callId } } }
+  return threadEvent(sessionId, event)
+}
+const turnEnd = (sessionId: string, kind = 'completed', reason?: string): ThreadEvent => {
+  const event = { type: 'turn/end', data: { reason: reason === undefined ? { kind } : { kind, reason: { kind: reason } } } }
+  return threadEvent(sessionId, event)
+}
 
 /** Lets the forked listener move every offered event into its burst before the test clock moves. */
 const drained = Effect.repeat(Effect.yieldNow, { times: 10 })

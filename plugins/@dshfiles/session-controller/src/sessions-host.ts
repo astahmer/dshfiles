@@ -176,17 +176,21 @@ const readTitles = async (
 const isSessionQueryNotFound = (error: unknown): boolean =>
   Schema.decodeUnknownResult(Schema.Struct({ code: Schema.Literal('SESSION_QUERY_SESSION_NOT_FOUND') }))(error)._tag === 'Success'
 
+/** The Standard Schema `generate` validates a structured reply with; its `validate` receives the model's raw reply. */
+type ReplySchema = NonNullable<Parameters<typeof generate>[1]['schema']>
+
 /** A caller's JSON Schema as the standard schema `generate` publishes and validates the reply with. */
 const standardSchemaOf = (jsonSchema: Record<string, Schema.Schema.Type<typeof Schema.Json>>) => {
   assertSupportedJsonSchema(jsonSchema)
+  const validate: ReplySchema['~standard']['validate'] = value => {
+    const violations = validateJsonSchemaValue(jsonSchema, value)
+    return violations.length === 0 ? { value } : { issues: violations.map(message => ({ message })) }
+  }
   return {
     '~standard': {
       version: 1 as const,
       vendor: 'dsh',
-      validate: (value: unknown) => {
-        const violations = validateJsonSchemaValue(jsonSchema, value)
-        return violations.length === 0 ? { value } : { issues: violations.map(message => ({ message })) }
-      },
+      validate,
       jsonSchema: { input: () => jsonSchema, output: () => jsonSchema },
     },
   }

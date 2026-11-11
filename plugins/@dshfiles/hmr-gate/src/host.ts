@@ -10,7 +10,7 @@ import { hmrGateApi, type DeferredPackage, type HmrGateStatus } from './api.js'
 import { DeferredUpdateAttention } from './host/attention.js'
 import { BundleWatch, type BundleWatcherHandle } from './host/bundle-watcher-promise.js'
 import type { BundleRead, BundleStat } from './host/bundle-watcher.js'
-import { HmrGateModel, digestOf, hostArtifactOf } from './host/gate.js'
+import { HmrGateModel, HostArtifacts } from './host/gate.js'
 import { HostReload, type HostReloadOutcome } from './host/host-reload.js'
 
 /**
@@ -57,6 +57,7 @@ interface GateRuntime {
 
 /** Loader row config. `hostReload` is the experimental in-process Host reload; off unless the profile row sets it. */
 const gateConfigSchema = Schema.Struct({ hostReload: Schema.optional(Schema.Boolean) }).pipe(Schema.withDecodingDefault(Effect.succeed({})))
+type GateConfig = typeof gateConfigSchema.Type
 const gateConfigStandardSchema = { '~standard': Schema.toStandardSchemaV1(gateConfigSchema)['~standard'] }
 
 const HOST_RELOAD_HISTORY = 16
@@ -127,8 +128,8 @@ const registerGate = (ctx: Context, hostReloadEnabled: boolean): GateRuntime => 
   }
 
   const trackRow = (id: string, path: string, baseline: BundleStat): void => {
-    const hostPath = hostArtifactOf(path)
-    gate.track(id, hostPath, hostPath === undefined ? undefined : digestOf(hostPath))
+    const hostPath = HostArtifacts.hostArtifactOf(path)
+    gate.track(id, hostPath, hostPath === undefined ? undefined : HostArtifacts.digestOf(hostPath))
     watched.set(id, { path, mtimeMs: baseline.mtimeMs, ctimeMs: baseline.ctimeMs, size: baseline.size, dirty: false })
   }
 
@@ -147,7 +148,7 @@ const registerGate = (ctx: Context, hostReloadEnabled: boolean): GateRuntime => 
     row.size = current.size
     row.dirty = false
     const facts = gate.facts(id)
-    const verdict = gate.observe(id, facts?.hostPath === undefined ? undefined : digestOf(facts.hostPath))
+    const verdict = gate.observe(id, facts?.hostPath === undefined ? undefined : HostArtifacts.digestOf(facts.hostPath))
     if (verdict.action === 'apply') {
       applyRebuild(id)
       // A failed apply leaves the row dirty; read it again soon instead of waiting for the next event.
@@ -277,7 +278,8 @@ export default defineHost({
   apis: [hmrGateHostApi],
   inject: ['clientModules', 'webServer'],
   Config: gateConfigStandardSchema,
-  setup: (ctx: Context, config: unknown) => {
+  setup: (ctx: Context, config: GateConfig) => {
+    // Decoded again, so a row config that never went through the Config schema still reads as the default.
     const decoded = Schema.decodeUnknownOption(gateConfigSchema)(config)
     runtime = registerGate(ctx, Option.isSome(decoded) && decoded.value.hostReload === true)
   },

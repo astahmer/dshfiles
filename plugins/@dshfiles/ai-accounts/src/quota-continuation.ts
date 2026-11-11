@@ -124,7 +124,10 @@ const turnCompletedSince = (agent: Pick<QuotaFailureAgent, 'session'>, seq: numb
  * The thread's one recovery a new failure takes up instead of opening another: the pending one, or the latest one
  * newer work overtook while no turn has completed since. A dismissed, stopped or finished recovery is never reused.
  */
-const reusableRecovery = (agent: Pick<QuotaFailureAgent, 'id' | 'session'>, records: readonly QuotaContinuationRecord[]): QuotaContinuationRecord | undefined => {
+const reusableRecovery = (
+  agent: Pick<QuotaFailureAgent, 'id' | 'session'>,
+  records: readonly QuotaContinuationRecord[],
+): QuotaContinuationRecord | undefined => {
   const latest = records.filter(record => record.sessionId === agent.id).sort((left, right) => right.failedAt - left.failedAt)[0]
   if (latest === undefined) return undefined
   if (isActive(latest)) return latest
@@ -177,14 +180,12 @@ const createQuotaContinuationService = ({
   const serialize = <T>(sessionId: string, action: () => Promise<T>): Promise<T> => {
     const previous = sessionChains.get(sessionId) ?? Promise.resolve()
     const current = previous.then(action, action)
-    const settled = current.then(
-      () => undefined,
-      () => undefined,
-    )
-    sessionChains.set(sessionId, settled)
-    void settled.then(() => {
+    // The chain forgets itself once it settles, unless a later action already extended it.
+    const forget = (): void => {
       if (sessionChains.get(sessionId) === settled) sessionChains.delete(sessionId)
-    })
+    }
+    const settled: Promise<void> = current.then(forget, forget)
+    sessionChains.set(sessionId, settled)
     return current
   }
 
@@ -731,16 +732,20 @@ const createQuotaContinuationService = ({
     })
     const offActivity = context.on('workspace/session-activity', reportActivity)
     const offStop = context.on('workspace/session-stop', ({ sessionId }) => stopSession(sessionId))
-    void allRecords()
-      .then(async records => {
+    const reconcile = async (): Promise<void> => {
+      try {
+        const records = await allRecords()
         const subagents = records.some(isActive) ? await subagentSessionIds() : new Set<string>()
         for (const record of records) {
           if (record.state === 'invalidated') await cancelScheduled(record)
           else if (subagents.has(record.sessionId)) await invalidate(record)
           else if (record.state === 'waiting') await serialize(record.sessionId, () => ensureScheduled(record))
         }
-      })
-      .catch(() => context.logger.warn('ai-accounts: quota recovery startup reconciliation failed'))
+      } catch {
+        context.logger.warn('ai-accounts: quota recovery startup reconciliation failed')
+      }
+    }
+    void reconcile()
 
     return () => {
       offCreated()

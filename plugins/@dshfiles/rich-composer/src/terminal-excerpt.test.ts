@@ -1,3 +1,5 @@
+import { decodeJson } from '@dshfiles/dshx/json'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { ComposerSnippets } from './composer-snippets.ts'
 
@@ -13,7 +15,7 @@ describe('terminal excerpt', () => {
   it('labels the chip with the terminal line range it came from', () => {
     const reference = ComposerSnippets.reference({ kind: 'terminal-excerpt', text: 'first\nsecond', label: 'Terminal 3-4' })
     expect(reference.label).toBe('Terminal 3-4')
-    expect(JSON.parse(reference.ref)).toEqual({ kind: 'terminal-excerpt', text: 'first\nsecond' })
+    expect(decodeJson(Schema.Json, reference.ref)).toEqual({ kind: 'terminal-excerpt', text: 'first\nsecond' })
     expect(ComposerSnippets.terminalExcerpt(reference.ref)).toBe('first\nsecond')
     expect(reference.clipboardText).toBe('first\nsecond')
   })

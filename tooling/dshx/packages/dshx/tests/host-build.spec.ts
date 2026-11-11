@@ -10,6 +10,7 @@ import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
 import type { PromptContext, PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { buildHost, watchHost } from '../src/compiler/host/build.js'
+import { decodeJson } from '../src/json.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
@@ -20,6 +21,11 @@ const hostPluginShape = Schema.Struct({
   Config: Schema.optionalKey(Schema.Unknown),
   apply: FunctionSchema,
 })
+
+/** A fixture package.json: every field is kept, and its peer dependency ranges are read. */
+const fixtureManifestSchema = Schema.StructWithRest(Schema.Struct({ peerDependencies: Schema.optional(Schema.Record(Schema.String, Schema.String)) }), [
+  Schema.Record(Schema.String, Schema.Unknown),
+])
 
 interface ApplyContext {
   received?: unknown
@@ -42,7 +48,7 @@ describe('host compiler', () => {
     const root = await temporaryProject()
     // `generate` loads dsh-llm on its first call, so a Host that uses it declares the peer.
     const manifestFile = resolve(root, 'package.json')
-    const manifest = JSON.parse(await readFile(manifestFile, 'utf8'))
+    const manifest = decodeJson(fixtureManifestSchema, await readFile(manifestFile, 'utf8'))
     await writeFile(manifestFile, JSON.stringify({ ...manifest, peerDependencies: { ...manifest.peerDependencies, '@deepseek-ai/dsh-llm': '*' } }))
     await writeFile(
       resolve(root, 'src/host.ts'),
@@ -404,12 +410,13 @@ describe('host compiler', () => {
     })
 
     const code = await readFile(resolve(root, 'dist/index.js'), 'utf8')
-    const map = Schema.decodeUnknownSync(
+    const map = decodeJson(
       Schema.Struct({
         sources: Schema.Array(Schema.String),
         sourcesContent: Schema.optionalKey(Schema.Array(Schema.NullOr(Schema.String))),
       }),
-    )(JSON.parse(await readFile(resolve(root, 'dist/index.js.map'), 'utf8')))
+      await readFile(resolve(root, 'dist/index.js.map'), 'utf8'),
+    )
     expect(code).toMatch(/from ['"]node:path['"]/)
     expect(code).toContain('dshx-host')
     expect(code).toMatch(/sourceMappingURL=index\.js\.map/)
@@ -484,14 +491,9 @@ describe('host compiler', () => {
     })
 
     const packageFile = resolve(root, 'package.json')
-    const manifest: unknown = JSON.parse(await readFile(packageFile, 'utf8'))
-    if (typeof manifest !== 'object' || manifest === null || Array.isArray(manifest) || !('peerDependencies' in manifest)) {
-      throw new TypeError('Host fixture package.json has no peerDependencies object.')
-    }
+    const manifest = decodeJson(fixtureManifestSchema, await readFile(packageFile, 'utf8'))
     const peerDependencies = manifest.peerDependencies
-    if (typeof peerDependencies !== 'object' || peerDependencies === null || Array.isArray(peerDependencies)) {
-      throw new TypeError('Host fixture peerDependencies must be an object.')
-    }
+    if (peerDependencies === undefined) throw new TypeError('Host fixture package.json has no peerDependencies object.')
     const updatedManifest = {
       ...manifest,
       peerDependencies: {
@@ -677,7 +679,7 @@ describe('host compiler', () => {
           const code = await readFile(resolve(root, 'dist/index.js'), 'utf8')
           if (predicate(code)) return code
         } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+          if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
         }
         await new Promise(resolveTimer => setTimeout(resolveTimer, 20))
       }
@@ -768,13 +770,14 @@ describe('host compiler', () => {
     expect(wrapper).toContain('createGenerationManager')
     expect(wrapper).toContain(`generation: ${JSON.stringify(generation)}`)
 
-    const manifest = Schema.decodeUnknownSync(
+    const manifest = decodeJson(
       Schema.Struct({
         version: Schema.Literal(1),
         generation: Schema.String,
         hostContractVersion: Schema.String,
       }),
-    )(JSON.parse(await readFile(resolve(root, 'dist/.dshx-host-manifest.json'), 'utf8')))
+      await readFile(resolve(root, 'dist/.dshx-host-manifest.json'), 'utf8'),
+    )
     expect(manifest).toEqual({ version: 1, generation, hostContractVersion: 'v1' })
 
     const generationCode = await readFile(resolve(root, 'dist/.dshx-host-generations', `${generation}.js`), 'utf8')

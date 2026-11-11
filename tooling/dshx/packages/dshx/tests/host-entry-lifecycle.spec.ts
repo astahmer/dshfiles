@@ -21,7 +21,8 @@ declare global {
 }
 const lifecycle = (): string[] => (globalThis.__dshxLifecycle ??= [])
 const builtApply = Schema.Struct({
-  apply: Schema.declare((value): value is (...arguments_: ReadonlyArray<unknown>) => unknown => typeof value === 'function'),
+  // Only the function's own `prototype` is inspected; it is never called here.
+  apply: Schema.declare((value): value is (...arguments_: ReadonlyArray<unknown>) => void => typeof value === 'function'),
 })
 
 afterEach(async () => {
@@ -161,7 +162,7 @@ describe('built Host entry under the Cordis Loader', () => {
       '})',
     ])
     const unhandled: unknown[] = []
-    const record = (reason: unknown) => unhandled.push(reason)
+    const record: NodeJS.UnhandledRejectionListener = reason => unhandled.push(reason)
     process.on('unhandledRejection', record)
     const host = await createTestHost()
     try {
