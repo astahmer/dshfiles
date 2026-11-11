@@ -108,6 +108,7 @@ const IdleCacheWarning = (props: {
           modelsDevId: quote?.modelsDevId ?? null,
           overrides: preferences.promptCacheMinutes,
           retention: preferences.promptCacheRetention,
+          longCacheMinutes: quote?.longCacheMinutes,
         })
   const expiresAt = lastUsedAt === null ? null : IdleCacheModel.expiresAt({ lastUsedAt, lifetime })
   useEffect(() => {

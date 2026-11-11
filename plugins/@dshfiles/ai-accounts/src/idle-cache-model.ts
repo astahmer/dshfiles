@@ -57,10 +57,9 @@ export class IdleCacheModel {
     const override = input.overrides[`${input.provider}/${input.model}`] ?? input.overrides[`${input.provider}/*`]
     if (override !== undefined && override > 0) return { minutes: override, source: 'override' }
     const vendor = vendorOf(input)
-    if (vendor !== null && cacheRetentionFor({ ...input, settings: input.retention ?? {} }) === 'long') {
+    if (cacheRetentionFor({ ...input, settings: input.retention ?? {} }) === 'long') {
       const declared = input.longCacheMinutes
       if (typeof declared === 'number') return { minutes: declared, source: 'retention' }
-      if (vendor === 'anthropic') return { minutes: 60, source: 'retention' }
     }
     return vendor === null ? null : { minutes: KNOWN_LIFETIME_MINUTES[vendor], source: 'known' }
   }
