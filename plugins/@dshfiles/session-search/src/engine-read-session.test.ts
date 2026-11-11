@@ -2,7 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import SessionStore from '@deepseek-ai/dsh-session'
 import { SessionQueryEngine, type SessionLogSnapshot } from '@deepseek-ai/dsh-session-query'
 import { SessionId, type SessionHeader } from '@deepseek-ai/dsh-session/types'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, expect, it } from 'vitest'
 import { SessionSearchEngine } from './engine.js'
 import { openSearchWorker } from './worker-port-promise.js'
 
@@ -10,7 +10,6 @@ const contexts: Context[] = []
 
 afterEach(async () => {
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
-  vi.restoreAllMocks()
 })
 
 const stored = SessionId('stored-one')
@@ -27,10 +26,14 @@ const engineWithStore = async () => {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(SessionStore)
-  const list = vi.fn(async () => [{ header, formatStatus: 'current', revision: 'r' }])
+  /** How often the stand-in store was asked to list its whole corpus. */
+  const listed = { count: 0 }
   // SAFETY: a read touches only stat, list and one read handle; the handle answers the stored log above.
   ctx.provide('sessionPersistence', {
-    list,
+    list: async () => {
+      listed.count += 1
+      return [{ header, formatStatus: 'current', revision: 'r' }]
+    },
     stat: async (id: SessionId) => (id === stored ? { header, formatStatus: 'current', revision: 'r' } : undefined),
     open: async () => ({
       header,
@@ -40,7 +43,7 @@ const engineWithStore = async () => {
     }),
   } as never)
   const engine = new SessionSearchEngine(ctx, { client: openSearchWorker({ indexPath: ':memory:' }).port })
-  return { engine, list }
+  return { engine, listed }
 }
 
 /** Core's own read, through the engine's real corpus that lists every stored Session first. */
@@ -48,22 +51,22 @@ const coreReadSession = (engine: SessionSearchEngine, sessionId: SessionId): Pro
   SessionQueryEngine.prototype.readSession.call(engine, sessionId)
 
 it('reads one stored Session without listing the corpus, as core reads it', async () => {
-  const { engine, list } = await engineWithStore()
+  const { engine, listed } = await engineWithStore()
 
   const read = await engine.readSession(stored)
 
-  expect(list).not.toHaveBeenCalled()
+  expect(listed.count).toBe(0)
   expect(read).toEqual(await coreReadSession(engine, stored))
-  expect(list).toHaveBeenCalledTimes(1)
+  expect(listed.count).toBe(1)
 })
 
 it('refuses an unknown Session with core’s not-found error and without listing', async () => {
-  const { engine, list } = await engineWithStore()
+  const { engine, listed } = await engineWithStore()
   const missing = SessionId('missing')
 
   const refusal = await engine.readSession(missing).catch((error: unknown) => error)
 
-  expect(list).not.toHaveBeenCalled()
+  expect(listed.count).toBe(0)
   const coreRefusal = await coreReadSession(engine, missing).catch((error: unknown) => error)
   expect(refusal).toMatchObject({ code: 'SESSION_QUERY_SESSION_NOT_FOUND' })
   expect(refusal).toEqual(coreRefusal)
