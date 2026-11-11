@@ -594,6 +594,21 @@
         "expect menuitem \"Pin items (2)\"",
         "expect menuitem \"Delete permanently (2)\u2026\""
       ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Work Backlog items and schedules that start threads.\"",
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "fill textbox \"Capture\" \"Narrow menu item\"",
+        "press Enter",
+        "expect text \"Narrow menu item\"",
+        "rightclick article \"Item b:#1\"",
+        "expect menuitem \"Status\"",
+        "hover menuitem \"Copy\"",
+        "expect menuitem \"Item ID\"",
+        "expect menuitem \"Link\"",
+        "expect menuitem \"Markdown\""
+      ],
       "surfaces": ["client"],
       "surface": "rowAction",
       "destination": "work",

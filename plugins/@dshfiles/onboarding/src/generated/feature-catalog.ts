@@ -5150,7 +5150,99 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "reachNarrow": null,
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Narrow menu item\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Narrow menu item"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Narrow menu item\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Narrow menu item",
+          "value": null
+        },
+        {
+          "text": "rightclick article \"Item b:#1\"",
+          "action": "rightclick",
+          "by": "article",
+          "name": "Item b:#1",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Status\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Copy\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Copy",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Item ID\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Item ID",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Link\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Link",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Markdown\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Markdown",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
