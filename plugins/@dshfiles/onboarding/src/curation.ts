@@ -1,65 +1,60 @@
 import type { CatalogFeature, Route } from './catalog-model.js'
 
 /**
- * The curated "major features" (plan Appendix A): one row per bundle, with the route its page opens. A feature's own
- * `onboarding.open` wins; a bundle without a page keeps no route and shows no Open button. Until every UI plugin ships an
- * `onboarding` block (plan P5), this is where a curated bundle's route lives.
+ * The curated "major features" (plan Appendix A): one row per bundle. Curation is this list alone; an `onboarding` block
+ * carries copy and a route, never curation. A curated bundle's features open where their own `onboarding.open` points,
+ * else at the bundle's route: `routeFrom` names the bundle's feature whose block route they share, `open` is a route no
+ * block carries (the plugin has no block for it). A bundle with neither shows no Open button on block-less rows.
  */
-export interface CuratedBundle {
-  readonly plugin: string
-  readonly open?: Route
-}
-
-const panel = (id: string): Route => ({ panel: id })
-const settingsSection = (section: string): Route => ({ settings: { section } })
+export type CuratedBundle = { readonly plugin: string; readonly open?: Route } | { readonly plugin: string; readonly routeFrom: string }
 
 export const CURATED_BUNDLES: readonly CuratedBundle[] = [
   // Threads
   { plugin: 'main-tabs' },
-  { plugin: 'thread-sidebar', open: panel('dshfiles-thread-board') },
-  { plugin: 'jj-integration', open: panel('jj-integration') },
+  { plugin: 'thread-sidebar', routeFrom: 'thread-classification' },
+  { plugin: 'jj-integration', routeFrom: 'thread-workspaces-panel' },
   { plugin: 'btw' },
   { plugin: 'queue-reorder' },
   { plugin: 'rich-composer' },
   { plugin: 'session-search' },
   // Inbox
-  { plugin: 'activity-timeline', open: panel('attention-inbox') },
-  { plugin: 'agent-questions', open: panel('attention-inbox') },
-  { plugin: 'backlog', open: panel('dshfiles-backlog-panel') },
+  { plugin: 'activity-timeline', routeFrom: 'inbox-panel' },
+  { plugin: 'agent-questions', open: { panel: 'attention-inbox' } },
+  { plugin: 'backlog', routeFrom: 'capture-and-triage' },
   { plugin: 'pull-requests' },
-  { plugin: 'ai-accounts', open: panel('ai-accounts') },
+  { plugin: 'ai-accounts', routeFrom: 'account-lifecycle' },
   // Land
-  { plugin: 'jujutsu', open: panel('dshfiles-jujutsu') },
-  { plugin: 'pulls-review', open: panel('pulls-review') },
+  { plugin: 'jujutsu', routeFrom: 'revision-graph' },
+  { plugin: 'pulls-review', routeFrom: 'thread-review-scopes' },
   { plugin: 'git-worktrees' },
   // Work
   { plugin: 'project-automations' },
   { plugin: 'goal-tool' },
-  { plugin: 'schedule', open: panel('schedules') },
+  { plugin: 'schedule', open: { panel: 'schedules' } },
   // Agents
-  { plugin: 'agents', open: panel('dshfiles-agents') },
-  { plugin: 'agent-communication', open: panel('agent-communication') },
+  { plugin: 'agents', routeFrom: 'agent-registry' },
+  { plugin: 'agent-communication', routeFrom: 'passive-messaging' },
   { plugin: 'agent-preset' },
-  { plugin: 'agent-toolkit', open: panel('dshfiles-agent-toolkit') },
-  { plugin: 'multi-host', open: panel('dshfiles-multi-host-hosts') },
+  { plugin: 'agent-toolkit', routeFrom: 'agent-toolkit-page' },
+  { plugin: 'multi-host', routeFrom: 'host-management' },
   // Observe
-  { plugin: 'usage', open: panel('dshfiles-usage') },
-  { plugin: 'traces', open: panel('traces') },
-  { plugin: 'background-jobs', open: panel('dshfiles-background-jobs') },
+  { plugin: 'usage', routeFrom: 'usage-request-log' },
+  { plugin: 'traces', routeFrom: 'trace-explorer' },
+  { plugin: 'background-jobs', routeFrom: 'jobs-board' },
   { plugin: 'preview' },
   // Knowledge
-  { plugin: 'memory', open: panel('dshfiles-memory-panel') },
+  { plugin: 'memory', routeFrom: 'memory-panel' },
   { plugin: 'references' },
   { plugin: 'fff-search' },
-  { plugin: 'agentsview', open: panel('dshfiles-agentsview') },
+  { plugin: 'agentsview', routeFrom: 'agent-sessions-panel' },
   // Settings
   { plugin: 'settings-shell' },
-  { plugin: 'capabilities-hub', open: panel('dshfiles-capabilities-hub') },
-  { plugin: 'plugin-guide', open: panel('dshfiles-plugin-guide') },
-  { plugin: 'secret-catalog', open: panel('secret-catalog') },
-  { plugin: 'mcp-servers', open: panel('mcp-servers') },
+  { plugin: 'capabilities-hub', routeFrom: 'capabilities-hub' },
+  { plugin: 'plugin-guide', routeFrom: 'plugin-guide' },
+  { plugin: 'secret-catalog', routeFrom: 'scoped-alias-catalog' },
+  { plugin: 'mcp-servers', routeFrom: 'server-configuration' },
   { plugin: 'policies' },
-  { plugin: 'workspace-folder-picker', open: settingsSection('dshfiles-workspace-folder-picker-projects') },
+  { plugin: 'workspace-folder-picker', routeFrom: 'project-settings-section' },
   // Composer and transcript
   { plugin: 'mentions' },
   { plugin: 'model-effort-picker' },
@@ -71,6 +66,8 @@ export const CURATED_BUNDLES: readonly CuratedBundle[] = [
   // Agent tools
   { plugin: 'apply-patch' },
   { plugin: 'tool-search' },
+  // Getting started itself
+  { plugin: 'onboarding' },
 ]
 
 const curatedBundles = new Map(CURATED_BUNDLES.map(bundle => [bundle.plugin, bundle]))
@@ -81,12 +78,24 @@ interface Curation {
   readonly route: Route | null
 }
 
+type CuratedFeature = Pick<CatalogFeature, 'plugin' | 'id' | 'destination' | 'onboarding'>
+
+const bundleRoute = (input: { readonly bundle: CuratedBundle; readonly features: readonly CuratedFeature[] }): Route | null => {
+  const bundle = input.bundle
+  if (!('routeFrom' in bundle)) return bundle.open ?? null
+  return input.features.find(candidate => candidate.plugin === bundle.plugin && candidate.id === bundle.routeFrom)?.onboarding?.open ?? null
+}
+
 /**
- * The one "curated" rule, shared by the Getting started gallery (overview-model.ts) and `scripts/pack-docs.ts`: a feature
- * with an `onboarding` block, or a curated bundle's feature that lives somewhere (`destination` is not `none`). Only
- * type imports, so plain `node --experimental-strip-types` loads it.
+ * The one "curated" rule, shared by the Getting started gallery (overview-model.ts) and `scripts/pack-docs.ts`: a curated
+ * bundle's feature that lives somewhere (`destination` is not `none`). `features` is the catalog `routeFrom` resolves in.
+ * Only type imports, so plain `node --experimental-strip-types` loads it.
  */
-export const curationOf = (feature: Pick<CatalogFeature, 'plugin' | 'destination' | 'onboarding'>): Curation => {
+export const curationOf = (input: { readonly feature: CuratedFeature; readonly features: readonly CuratedFeature[] }): Curation => {
+  const feature = input.feature
   const bundle = feature.destination === 'none' ? undefined : curatedBundles.get(feature.plugin)
-  return { curated: feature.onboarding !== null || bundle !== undefined, route: feature.onboarding?.open ?? bundle?.open ?? null }
+  return {
+    curated: bundle !== undefined,
+    route: feature.onboarding?.open ?? (bundle === undefined ? null : bundleRoute({ bundle, features: input.features })),
+  }
 }

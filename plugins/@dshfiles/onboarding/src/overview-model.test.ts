@@ -115,6 +115,18 @@ const tinyCatalog: FeatureCatalog = {
   plugins: [],
   features: [
     {
+      key: 'backlog#capture-and-triage',
+      plugin: 'backlog',
+      id: 'capture-and-triage',
+      title: 'Capture anything',
+      summary: 'One box for notes.',
+      destination: 'work',
+      currentSurface: null,
+      reach: [],
+      reachNarrow: null,
+      onboarding: { firstAction: 'Type a note.', doneWhen: 'It shows in the feed.', open: { panel: 'dshfiles-backlog-panel' } },
+    },
+    {
       key: 'backlog#items',
       plugin: 'backlog',
       id: 'items',
@@ -164,28 +176,42 @@ describe('feature search', () => {
     const curated = OnboardingOverview.features(tinyCatalog, { curatedDefault: true })
     expect(curated.curatedOnly).toBe(true)
     expect(curated.rows.map(row => [row.key, row.route])).toEqual([
-      ['btw#side', { command: '@dshfiles/btw.open' }],
+      ['backlog#capture-and-triage', { panel: 'dshfiles-backlog-panel' }],
       ['backlog#items', { panel: 'dshfiles-backlog-panel' }],
     ])
-    expect(curated.rows[0]).toMatchObject({ firstAction: 'Type /btw.', prerequisites: ['account'], walkable: false })
-    expect(curated.rows[1]).toMatchObject({ reachSteps: 2, walkable: true })
+    expect(curated.rows[0]).toMatchObject({ firstAction: 'Type a note.', doneWhen: 'It shows in the feed.', walkable: false })
+    expect(curated.rows[1]).toMatchObject({ firstAction: null, reachSteps: 2, walkable: true })
 
     const searched = OnboardingOverview.features(tinyCatalog, { query: 'backlog', curatedDefault: true })
     expect(searched.curatedOnly).toBe(false)
     expect(searched.rows.map(row => [row.key, row.route])).toEqual([
+      ['backlog#capture-and-triage', { panel: 'dshfiles-backlog-panel' }],
       ['backlog#items', { panel: 'dshfiles-backlog-panel' }],
       ['backlog#tool', null],
     ])
+  })
+
+  it('never curates from a block alone: a plugin outside the curated list keeps its own route, uncurated', () => {
+    const side = OnboardingOverview.features(tinyCatalog, { query: 'side', curatedDefault: true }).rows
+    expect(side).toMatchObject([
+      { key: 'btw#side', curated: false, route: { command: '@dshfiles/btw.open' }, firstAction: 'Type /btw.', prerequisites: ['account'] },
+    ])
+  })
+
+  it('loses the shared route when the bundle feature named by routeFrom has no block route', () => {
+    const withoutBlock: FeatureCatalog = { ...tinyCatalog, features: tinyCatalog.features.filter(feature => feature.key !== 'backlog#capture-and-triage') }
+    expect(OnboardingOverview.features(withoutBlock, { curatedDefault: true }).rows.map(row => [row.key, row.route])).toEqual([['backlog#items', null]])
   })
 
   it('narrows by destination, counts by destination and bounds the rows', () => {
     const all = OnboardingOverview.features(tinyCatalog, { curatedOnly: false, curatedDefault: true })
     expect(all.destinations).toEqual([
       { id: 'threads', count: 1 },
-      { id: 'work', count: 1 },
+      { id: 'work', count: 2 },
       { id: 'none', count: 1 },
     ])
     expect(OnboardingOverview.features(tinyCatalog, { destination: 'work', curatedOnly: false, curatedDefault: true }).rows.map(row => row.key)).toEqual([
+      'backlog#capture-and-triage',
       'backlog#items',
     ])
     expect(OnboardingOverview.features(FEATURE_CATALOG, { curatedOnly: false, limit: 5, curatedDefault: true })).toMatchObject({ rows: { length: 5 } })
@@ -223,7 +249,7 @@ describe('curated rule', () => {
     onTestFinished(() => rmSync(out, { recursive: true, force: true }))
     const result = spawnSync(process.execPath, ['--experimental-strip-types', packDocsScript, '--out', out], { encoding: 'utf8' })
     expect(result.status, result.stderr).toBe(0)
-    const rows = FEATURE_CATALOG.features.map(OnboardingOverview.rowOf)
+    const rows = FEATURE_CATALOG.features.map(feature => OnboardingOverview.rowOf({ feature, catalog: FEATURE_CATALOG }))
     for (const pack of PACKS) {
       const gallery = pack.plugins.flatMap(plugin => rows.filter(row => row.plugin === plugin && row.curated).map(row => `${row.plugin}/${row.title}`))
       expect(packDocsCurated(readFileSync(join(out, `${pack.id}.md`), 'utf8')), pack.id).toEqual(gallery)

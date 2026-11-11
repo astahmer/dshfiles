@@ -56,6 +56,16 @@ describe('onboarding feature catalog', () => {
     const known = new Set(FEATURE_CATALOG.plugins.map(plugin => plugin.name))
     expect(CURATED_BUNDLES.filter(bundle => !known.has(bundle.plugin)).map(bundle => bundle.plugin)).toEqual([])
   })
+
+  it('shares a bundle route only from a feature of that bundle whose onboarding block names one', () => {
+    const unresolved = CURATED_BUNDLES.flatMap(bundle =>
+      'routeFrom' in bundle &&
+      FEATURE_CATALOG.features.find(feature => feature.plugin === bundle.plugin && feature.id === bundle.routeFrom)?.onboarding?.open === undefined
+        ? [`${bundle.plugin}#${bundle.routeFrom}`]
+        : [],
+    )
+    expect(unresolved).toEqual([])
+  })
 })
 
 /** The `defineSettings` source of a plugin, read as text: tests may not import another plugin's private modules. */

@@ -209,8 +209,10 @@ const packs = (input: {
     keySettings: pack.keySettings,
   }))
 
-const rowOf = (feature: CatalogFeature): FeatureRow => {
-  const curation = curationOf(feature)
+/** One gallery row; `catalog` is where a curated bundle's shared route resolves. */
+const rowOf = (input: { readonly feature: CatalogFeature; readonly catalog: FeatureCatalog }): FeatureRow => {
+  const feature = input.feature
+  const curation = curationOf({ feature, features: input.catalog.features })
   return {
     key: feature.key,
     plugin: feature.plugin,
@@ -243,7 +245,7 @@ const features = (catalog: FeatureCatalog, input: OverviewInput & { readonly cur
     .filter(word => word.length > 0)
   const curatedOnly = words.length === 0 && (input.curatedOnly ?? input.curatedDefault)
   const matching = catalog.features
-    .map(rowOf)
+    .map(feature => rowOf({ feature, catalog }))
     .filter(row => !curatedOnly || row.curated)
     .filter(row => {
       const haystack = `${row.title} ${row.plugin} ${row.summary} ${row.currentSurface ?? ''}`.toLocaleLowerCase()

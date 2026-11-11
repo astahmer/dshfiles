@@ -91,7 +91,13 @@ export default DshxPlugin.make({
           })
         }),
       reach: request =>
-        Effect.succeed(ReachModel.reach({ catalog: FEATURE_CATALOG, key: request.key, routeOf: feature => OnboardingOverview.rowOf(feature).route })),
+        Effect.succeed(
+          ReachModel.reach({
+            catalog: FEATURE_CATALOG,
+            key: request.key,
+            routeOf: feature => OnboardingOverview.rowOf({ feature, catalog: FEATURE_CATALOG }).route,
+          }),
+        ),
       whatsNew: request =>
         Effect.gen(function* () {
           const settings = yield* SetupFacts.use(setup => setup.settings)

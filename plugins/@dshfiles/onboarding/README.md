@@ -225,9 +225,10 @@ All apply live; none needs a restart.
 1. `src/generated/feature-catalog.ts` is generated at build time by `scripts/generate-catalog.ts` from every
    `plugins/@dshfiles/*/package.json` description and `dshx.features.json`, validated with the dshx feature schema.
    `pnpm --dir plugins/@dshfiles/onboarding generate` regenerates it; a test fails while it is stale.
-2. A feature's optional `onboarding` block in `dshx.features.json` (`prerequisites`, `firstAction`, `doneWhen`, one
-   `open` route) wins over `src/curation.ts`, which holds the curated bundles and their routes until every UI plugin
-   ships a block.
+2. A feature's `onboarding` block in `dshx.features.json` (`prerequisites`, `firstAction`, `doneWhen`, one `open`
+   route) gives its row copy and an Open button; every UI plugin ships at least one (`features:check`). Curation is the
+   list in `src/curation.ts` alone: a curated bundle's block-less rows open at the route named by `routeFrom` (the
+   bundle's feature whose block carries it) or its own `open` when no block carries one.
 3. `src/packs.ts` defines the packs once; a test fails when a pack names a plugin directory or a setting that does not
    exist.
 4. Nothing is stored on the Host. The wizard outcome and What's new's last visit live in browser storage

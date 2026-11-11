@@ -11,7 +11,7 @@ const isVisible = (element: Element): boolean => element.closest('[data-off-scre
 
 /** A real catalog feature, served as the Host serves it. */
 const reachOf = (key: string): FeatureReach => {
-  const value = ReachModel.reach({ catalog: FEATURE_CATALOG, key, routeOf: feature => OnboardingOverview.rowOf(feature).route })
+  const value = ReachModel.reach({ catalog: FEATURE_CATALOG, key, routeOf: feature => OnboardingOverview.rowOf({ feature, catalog: FEATURE_CATALOG }).route })
   if (value.feature === null) throw new Error(`no ${key}`)
   return value.feature
 }

@@ -192,7 +192,7 @@ const suggest = (input: {
     if (feature === undefined || rule.used(input.signals)) return []
     const count = rule.measure(input.signals)
     if (count < rule.threshold) return []
-    return [{ rule: rule.id, why: rule.why, evidence: rule.evidence(count), feature: OnboardingOverview.rowOf(feature) }]
+    return [{ rule: rule.id, why: rule.why, evidence: rule.evidence(count), feature: OnboardingOverview.rowOf({ feature, catalog: input.catalog }) }]
   })
 
 const render = (value: Suggestions): string => {

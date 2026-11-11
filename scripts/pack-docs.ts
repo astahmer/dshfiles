@@ -23,7 +23,7 @@ const prerequisiteLabels = {
   github: 'The GitHub CLI is signed in (`gh auth login`).',
 } satisfies Record<Prerequisite, string>
 
-const isCurated = (feature: CatalogFeature): boolean => curationOf(feature).curated
+const isCurated = (feature: CatalogFeature): boolean => curationOf({ feature, features: FEATURE_CATALOG.features }).curated
 
 const description = (plugin: string): string => {
   const entry = FEATURE_CATALOG.plugins.find(candidate => candidate.name === plugin)
