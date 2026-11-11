@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "bash-tool",
+      "title": "bash tool",
+      "summary": "The forked bash tool keeps upstream execution, sandboxing, approvals and background-job hand-off.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["completed", "timed-out", "backgrounded"],
+      "failureModes": ["A profile whose preset-standard row still names @deepseek-ai/dsh-tool-bash keeps the native tool."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "tool-bash.vendored",
+          "reason": "Vendored upstream source with no local delta yet; scripts/native-fork-diff.mjs proves it equals the pinned tag."
+        }
+      ],
+      "telemetry": [{ "kind": "automatic", "source": "agent-tool" }],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: bash"
+    }
+  ]
+}

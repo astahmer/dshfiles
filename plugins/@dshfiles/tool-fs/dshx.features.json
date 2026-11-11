@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "file-tools",
+      "title": "read, write, edit and read_image tools",
+      "summary": "The forked filesystem tools keep upstream's sandbox checks, approvals and fs/observed receipts.",
+      "surfaces": ["host"],
+      "configuration": [],
+      "states": ["read", "written", "edited"],
+      "failureModes": ["A profile whose preset-standard row still names @deepseek-ai/dsh-tool-fs keeps the native tools."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "tool-fs.vendored",
+          "reason": "Vendored upstream source with no local delta yet; scripts/native-fork-diff.mjs proves it equals the pinned tag."
+        }
+      ],
+      "telemetry": [{ "kind": "automatic", "source": "agent-tool" }],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tools: read, write, edit, read_image"
+    }
+  ]
+}
