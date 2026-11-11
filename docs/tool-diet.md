@@ -256,6 +256,57 @@ Adopting it in `web` is the user's call and a Host restart: add `@dshfiles/tool-
 was at 9 % of its session quota), long multi-turn Sessions, more than one repetition per task, and real tool bodies
 (fixtures stand in for them; the run is in-process, not in a scratch DSH).
 
+## The read and bash forks on real Sessions, 2026-11-11
+
+Question: does switching `web` from stock `dsh-tool-fs` / `dsh-tool-bash` to the owned forks (`@dshfiles/tool-fs`:
+negative `offset`, past-end offset returns the last lines, "Did you mean" on a missing file, no split surrogate;
+`@dshfiles/tool-bash`: timeout hint, exact truncation notice) pay for itself? Decision rule set beforehand:
+"significantly better" means removing at least 2 % of failed or retried tool calls, or at least 1 wasted turn per 100
+tool calls, with no regression in a replay sample.
+
+Data: every live Session log under `~/.dsh/sessions` touched in the 14 days to 2026-11-11 (1,047 logs, 909 with tool
+calls), decompressed in memory: 126,052 tool calls (1,967 `isError`), 16,580 `read`, 62,740 `bash`, about 105k model
+requests. A turn's cost is the usage of the request right after it (input + cache read + output; "fresh" leaves out
+cache reads). Missing-file hints were replayed through the fork's own `suggestMissingPaths`
+(`plugins/@dshfiles/tool-fs/src/missing-path.ts`) against today's disk; only 118 of the 190 Session cwds still exist.
+
+| Signal (14 days) | Count | Per 1,000 calls | Fork effect | Turns saved | Tokens saved, total / fresh |
+| --- | --- | --- | --- | --- | --- |
+| `read` offset past the end | 12 | 0.72 read | failure removed; 9 were re-read next | 9 | 1.35M / 18k |
+| `read` offset ≤ 0 | 1 | 0.06 read | failure removed | 1 | 0.12M / 3k |
+| `read` file not found | 190 | 11.5 read | still fails, now with suggestions | — | — |
+| … recovered by reading a close name | 80 | 4.8 read | 52 recovered in the very next step: nothing to save | 0 | 0 |
+| … recovered only after searching (87 steps) | 28 | 1.7 read | fork suggested the right file in 6 of the 13 still checkable | 15 measured, ~32 extrapolated | 2.0M / 58k (~4.3M / 125k) |
+| … fork suggested something, agent never used a close name | 32 | 1.9 read | likely noise (`index.ts` elsewhere); 50 of 73 suggestions missed | — | — |
+| `read` then a jump to the tail of the same file | 155 (89 a step later) | 9.3 read | negative offset could skip the first read | 0 to 89 (upper bound) | 0 to 16.6M / 1.0M |
+| `bash` timed out and killed | 6 | 0.10 bash | hint shown; none re-ran the command | 0 | 0 |
+| `bash` still running, moved to a job | 697 | 11.1 bash | hint never shown (promotion path is unchanged) | 0 | 0 |
+| `bash` output truncated | 176 | 2.8 bash | notice wording only | 0 | 0 |
+| Split surrogate in a truncated `read` line | 0 | 0 | — | 0 | 0 |
+
+Totals: 13 failed calls removed, 25 wasted turns saved as measured (1.8 a day), at most 131 with every upper bound
+(9.4 a day).
+
+1. **Failed or retried calls removed:** 13 of 1,967 failed tool calls, 0.66 %. Crediting the 9 re-reads and 39 search
+   calls on the 6 suggestion hits while counting no other retries: 61 of 2,015, 3.0 %; that over-credits, since
+   most of the other 1,954 failures also had a retry. Only on read and bash hard errors alone (289) do the 13 reach
+   4.5 %.
+2. **Wasted turns:** 25 per 126,052 calls, 0.02 per 100 tool calls; 0.10 per 100 with every upper bound. The bar was 1.
+3. **Tokens:** about 3.5M total (79k fresh) over 14 days, 0.015 % of the 22.7 billion processed.
+4. **Replay, no content regression in `read`:** 20 real successful reads (files that still exist, mixed offset and
+   limit) rendered through the stock and fork `buildWindow` + `formatReadOutput`: 20/20 byte-identical.
+5. **Replay, `bash` output changes on every call:** 16 real successful results through both `renderResult`: 16/16
+   differ only by an appended `[exit code: 0]` (14 to 15 bytes, about 62,700 times per 14 days). On 4 truncated
+   results the fork drops the partial first line of the kept tail and names the exact line count. Both are
+   intended, but they change every bash result for no measured saving. The missing-file walk adds 255 ms (p50,
+   2.8 s max) to each not-found read; it walks the Session cwd, so in thread workspaces it often suggests the file
+   in the wrong checkout.
+
+**Verdict: don't switch.** Neither fork meets the bar. `tool-bash` saves nothing measurable: the live profile promotes
+a timed-out command to a background job, a path the hint never reaches. `tool-fs` is safe (no read regression) but
+removes 0.66 % of failed calls and 0.02 wasted turns per 100 calls, fifty times under the turn bar. Revisit
+`tool-fs` alone if past-end and tail-jump reads grow, or if the not-found suggestions learn the agent's workspace.
+
 ## Next levers, by size
 
 1. **Fewer schemas per request.** tool-search in `cache-safe` mode, measured above: 36 tools instead of 468, 56 %
