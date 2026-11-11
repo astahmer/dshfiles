@@ -282,6 +282,120 @@
           "testName": "walks account, project and first task, inserts the prompt without sending, and reports skip"
         }
       ]
+    },
+    {
+      "id": "show-me-where",
+      "title": "Show me where a feature lives, one step at a time",
+      "summary": "Each Getting started feature row whose first reach step the app can replay has Show me where. It opens a non-modal walk: a ring around the next control (by ARIA role and accessible name, text, label or title; an exact name first, a substring only for a name ending in *, the first visible match), a chip such as Step 2 of 5 · Click \"Settings\", the feature title and a footer with Next and End. It never clicks, types, hovers or presses for the user: a step advances when that control is clicked, pointed at, changed or the key is pressed, an expect passes when its target shows, and Next always advances. Seed, attach, right-click and shift-click steps are E2E-only: the walk stops there, says why and links the plugin docs. A target missing for 10 s names the destination and offers Open through the row's registered route. Escape or End ends it; nothing is stored and nothing is sent.",
+      "reach": [
+        "click tab \"Knowledge\"",
+        "click button \"Getting started\"",
+        "fill textbox \"Search features\" \"Native Settings shell\"",
+        "click button \"Show me where: Native Settings shell, ported\"",
+        "expect region \"Show me where\""
+      ],
+      "surfaces": ["client"],
+      "surface": "rowAction",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › Features › Show me where",
+      "configuration": [],
+      "states": ["seeking", "found", "missing", "waiting-key", "unsupported", "arrived", "ended", "host-unreadable"],
+      "failureModes": [
+        "A target missing for 10 s: the walk names the destination the feature lives in and offers Open when the row's panel, command or Settings place is registered, otherwise says to go there; Next still advances.",
+        "A seed, attach, right-click or shift-click step, or a name holding a scratch backlog ordinal: the walk stops there with the reason and a link to the plugin README, and keeps the ring on the last control it found.",
+        "The Host does not answer the steps read: the card says so with Try again and End.",
+        "A Host modal opens over the target: the ring and card stay under it (z-index 999) unless the target lives inside that layer."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only overlay: it watches the page and reads its steps through onboarding/reach, whose api-dispatch span the feature-reach feature lists."
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and press Show me where on a feature.",
+        "doneWhen": "The walk rings the feature's final control and says you reached it.",
+        "open": {
+          "panel": "dshfiles-onboarding"
+        }
+      },
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "onboarding.show-me-where",
+          "featureFile": "tooling/dshx/e2e/features/onboarding.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.reach-resolver",
+          "file": "plugins/@dshfiles/onboarding/src/reach-resolver.test.ts",
+          "testName": "prefers an exact name over an earlier substring match, and matches a substring only when the step asks for one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.walk-evidence",
+          "file": "plugins/@dshfiles/onboarding/src/walk-controller.test.ts",
+          "testName": "advances a click step only when that element is clicked, never for another one or twice for one gesture"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.walk-cleanup",
+          "file": "plugins/@dshfiles/onboarding/src/walk-controller.test.ts",
+          "testName": "ends on Escape unless a menu or dialog already handled it, and releases every listener, observer and timer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.walk-missing",
+          "file": "plugins/@dshfiles/onboarding/src/show-me-where.test.tsx",
+          "testName": "after 10 s without the target names the destination and offers Open through the registered route"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.walk-unsupported",
+          "file": "plugins/@dshfiles/onboarding/src/show-me-where.test.tsx",
+          "testName": "stops at a right-click step with the reason and the docs, never faking progress"
+        }
+      ]
+    },
+    {
+      "id": "feature-reach",
+      "title": "Ask how to get to a feature",
+      "summary": "The read-only onboarding_reach agent tool (onboarding/reach) returns one catalogued feature's reach steps as the dshx grammar parses them: each action, its locator (ARIA role, text, label or title) and accessible name, the fill value or key, which steps this app cannot replay (seed, attach, right-click, shift-click) and why, plus the destination the feature lives in, its Open route and its docs. Show me where reads the same method, so the Agent and the page give one answer. The catalog stays on the Host; it changes nothing.",
+      "surfaces": ["host", "api", "tool"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: onboarding_reach; read by Show me where on Knowledge › Getting started",
+      "configuration": [],
+      "states": ["found", "walkable", "not-walkable", "unknown-key"],
+      "failureModes": [
+        "An unknown key returns no feature and tells the Agent to find the key with onboarding_overview.",
+        "A key outside the <plugin>#<feature> pattern is refused at the API boundary."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "onboarding.reach-browser",
+          "reason": "Agent tool and API with no UI of its own; the onboarding.show-me-where scenario reads it in the browser for every walk."
+        },
+        {
+          "kind": "host-test",
+          "id": "onboarding.host-reach",
+          "file": "plugins/@dshfiles/onboarding/src/host.test.ts",
+          "testName": "serves one feature reach steps over its API and as the read-only onboarding_reach tool"
+        }
+      ]
     }
   ]
 }

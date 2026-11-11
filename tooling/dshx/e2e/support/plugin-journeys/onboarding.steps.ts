@@ -56,7 +56,7 @@ Then('a feature whose page is not loaded has no Open button', async ({ page }: {
     await gettingStarted(page).getByLabel('Search features').fill('memory panel')
     const memory = gettingStarted(page).locator('[data-feature^="memory#"]').first()
     await expect(memory).toBeVisible()
-    await expect(memory.getByRole('button')).toHaveCount(0)
+    await expect(memory.getByRole('button', { name: /^Open / })).toHaveCount(0)
   })
 })
 
@@ -162,6 +162,179 @@ Then('the palette opened Getting started with its eight packs', async ({ page }:
     ).toHaveCount(8)
   })
   await finishJourneyAssertions(page)
+})
+
+const walkCard = (page: Page) => page.locator('[data-walk-card]')
+const walkRing = (page: Page) => page.locator('[data-walk-ring]')
+const WALK_EVENTS = ['pointerdown', 'click', 'pointerover', 'input', 'keydown']
+
+/**
+ * Passive listeners on document and window by type, read through CDP. The walk registers only passive ones; the app's
+ * own click and key handlers are not passive and come and go with focus, so they stay out of the count.
+ */
+const listenerCounts = async (page: Page): Promise<Record<string, number>> => {
+  const cdp = await page.context().newCDPSession(page)
+  const counts: Record<string, number> = {}
+  for (const expression of ['document', 'window']) {
+    const handle = await cdp.send('Runtime.evaluate', { expression })
+    const objectId = handle.result.objectId
+    if (objectId === undefined) continue
+    const { listeners } = await cdp.send('DOMDebugger.getEventListeners', { objectId })
+    for (const listener of listeners)
+      if (listener.passive && WALK_EVENTS.includes(listener.type))
+        counts[`${expression}.${listener.type}`] = (counts[`${expression}.${listener.type}`] ?? 0) + 1
+  }
+  await cdp.detach()
+  return counts
+}
+/** What one walk adds: capture listeners on document for its evidence, and the Escape listener on window. */
+const WALK_LISTENERS = {
+  'document.pointerdown': 1,
+  'document.click': 1,
+  'document.pointerover': 1,
+  'document.input': 1,
+  'document.keydown': 1,
+  'window.keydown': 1,
+} as const satisfies Record<string, number>
+const listenersBeforeEnd = new WeakMap<Page, Record<string, number>>()
+const difference = (from: Record<string, number>, to: Record<string, number>): Record<string, number> =>
+  Object.fromEntries(
+    [...new Set([...Object.keys(from), ...Object.keys(to)])].flatMap(key => {
+      const delta = (from[key] ?? 0) - (to[key] ?? 0)
+      return delta === 0 ? [] : [[key, delta]]
+    }),
+  )
+const walksEnded = new WeakMap<Page, number>()
+
+When('Show me where is started on {string}', async ({ page }: { page: Page }, title: string) => {
+  // Programmatic (untrusted) events would mean something other than the user acted.
+  await page.evaluate(() => {
+    if (document.documentElement.dataset.untrustedInput !== undefined) return
+    document.documentElement.dataset.untrustedInput = '0'
+    const record = (event: Event): void => {
+      if (!event.isTrusted) document.documentElement.dataset.untrustedInput = String(Number(document.documentElement.dataset.untrustedInput) + 1)
+    }
+    for (const type of ['click', 'pointerdown', 'pointerover', 'input', 'keydown']) window.addEventListener(type, record, { capture: true })
+  })
+  await gettingStarted(page).getByLabel('Search features').fill(title)
+  const before = await listenerCounts(page)
+  const show = gettingStarted(page).getByRole('button', { name: `Show me where: ${title}`, exact: true })
+  await show.focus()
+  await page.keyboard.press('Enter')
+  await expect(walkCard(page)).toBeVisible()
+  await expect.poll(async () => difference(await listenerCounts(page), before)).toEqual(WALK_LISTENERS)
+})
+
+Then(
+  'the walk rings {string} as step 1 of {int} without covering it, with 44 pixel controls',
+  async ({ page }: { page: Page }, name: string, total: number) => {
+    await recordAssertion(page, 'onboarding-walk-first-step', async () => {
+      await expect(walkCard(page).locator('[data-walk-chip]')).toHaveText(`Step 1 of ${String(total)} · Click "${name}"`)
+      await expect(walkCard(page).locator('[aria-live="polite"]')).toContainText(`button "${name}"`)
+      await expect(walkCard(page)).toHaveAttribute('data-walk-phase', 'found')
+      await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeFocused()
+      const target = await page.getByRole('button', { name, exact: true }).first().boundingBox()
+      const ring = await walkRing(page).boundingBox()
+      const card = await walkCard(page).boundingBox()
+      if (target === null || ring === null || card === null) throw new Error('target, ring or card has no box')
+      expect(ring.x).toBeLessThanOrEqual(target.x)
+      expect(ring.y).toBeLessThanOrEqual(target.y)
+      expect(ring.x + ring.width).toBeGreaterThanOrEqual(target.x + target.width)
+      expect(ring.y + ring.height).toBeGreaterThanOrEqual(target.y + target.height)
+      const overlaps =
+        card.x < target.x + target.width && target.x < card.x + card.width && card.y < target.y + target.height && target.y < card.y + card.height
+      expect(overlaps).toBe(false)
+      expect(card.x + card.width).toBeLessThanOrEqual(390)
+      expect(await walkRing(page).evaluate(element => getComputedStyle(element).pointerEvents)).toBe('none')
+      const heights = await walkCard(page)
+        .locator('button, a')
+        .evaluateAll(elements => elements.map(element => element.getBoundingClientRect().height))
+      expect(heights.length).toBeGreaterThan(0)
+      expect(heights.filter(height => height < 44)).toEqual([])
+    })
+    await page.screenshot({ path: test.info().outputPath('show-me-where.png'), animations: 'disabled' })
+  },
+)
+
+/** A real pointer click at the ring's centre: the ring ignores the pointer, so the control under it gets the click. */
+When('each ringed control is clicked in turn', async ({ page }: { page: Page }) => {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    // A control that renders after the last click (a menu item) is found within a moment; one that never shows is not.
+    const shown = await expect(walkCard(page))
+      .toHaveAttribute('data-walk-phase', 'found', { timeout: 3_000 })
+      .then(
+        () => true,
+        () => false,
+      )
+    if (!shown) return
+    const chip = await walkCard(page).locator('[data-walk-chip]').textContent()
+    // A menu slides in: click once the ring stopped following it (two reads a frame apart agree).
+    let ring = await walkRing(page).boundingBox()
+    await expect
+      .poll(
+        async () => {
+          const previous = JSON.stringify(ring)
+          await page.waitForTimeout(50)
+          ring = await walkRing(page).boundingBox()
+          return JSON.stringify(ring) === previous
+        },
+        { intervals: [100, 100, 200, 200] },
+      )
+      .toBe(true)
+    if (ring === null) throw new Error('no ring')
+    await page.mouse.click(ring.x + ring.width / 2, ring.y + ring.height / 2)
+    await expect(walkCard(page).locator('[data-walk-chip]')).not.toHaveText(chip ?? '')
+  }
+})
+
+Then('the walk reaches {string}, announces it, and clicked nothing by itself', async ({ page }: { page: Page }, name: string) => {
+  await recordAssertion(page, 'onboarding-walk-arrives', async () => {
+    await expect(walkCard(page)).toHaveAttribute('data-walk-phase', 'arrived')
+    await expect(walkCard(page).locator('[data-walk-chip]')).toHaveText(new RegExp(`^Step (\\d+) of \\1 · Here: "${name}"$`, 'u'))
+    await expect(walkCard(page).locator('[aria-live="polite"]')).toContainText('You reached')
+    await expect(walkRing(page)).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.dataset.untrustedInput ?? '0')).toBe('0')
+  })
+})
+
+When('Next is pressed from the keyboard on the walk', async ({ page }: { page: Page }) => {
+  await expect(walkCard(page).getByRole('button', { name: 'Next', exact: true })).toBeFocused()
+  await page.keyboard.press('Enter')
+})
+
+When('the walk is ended', async ({ page }: { page: Page }) => {
+  listenersBeforeEnd.set(page, await listenerCounts(page))
+  await walkCard(page).getByRole('button', { name: 'End', exact: true }).click()
+})
+
+When('the walk is ended with Escape', async ({ page }: { page: Page }) => {
+  await walkCard(page).getByRole('button', { name: 'End', exact: true }).focus()
+  listenersBeforeEnd.set(page, await listenerCounts(page))
+  await page.keyboard.press('Escape')
+})
+
+Then('no walk overlay or walk listener is left', async ({ page }: { page: Page }) => {
+  const ended = (walksEnded.get(page) ?? 0) + 1
+  walksEnded.set(page, ended)
+  await recordAssertion(page, `onboarding-walk-cleanup-${String(ended)}`, async () => {
+    await expect(walkCard(page)).toHaveCount(0)
+    await expect(walkRing(page)).toHaveCount(0)
+    // Ending removes exactly what the walk added, whatever the page it led to registered meanwhile.
+    await expect.poll(async () => difference(listenersBeforeEnd.get(page) ?? {}, await listenerCounts(page))).toEqual(WALK_LISTENERS)
+  })
+})
+
+Then('after 10 seconds the walk says the Memory button is not on screen and names Knowledge', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'onboarding-walk-missing', async () => {
+    await expect(walkCard(page).locator('[data-walk-chip]')).toHaveText('Step 2 of 3 · Click "Memory"')
+    await expect(walkCard(page)).toHaveAttribute('data-walk-phase', 'seeking')
+    await expect(walkCard(page)).toHaveAttribute('data-walk-phase', 'missing', { timeout: 12_000 })
+    await expect(walkCard(page).getByRole('note')).toContainText('button "Memory" is not on screen.')
+    await expect(walkCard(page).getByRole('note')).toContainText('lives in Knowledge')
+    await expect(walkCard(page).getByRole('button', { name: 'Next', exact: true })).toBeVisible()
+    await expect(walkCard(page).getByRole('button', { name: 'Open', exact: true })).toHaveCount(0)
+  })
+  await page.screenshot({ path: test.info().outputPath('show-me-where-missing.png'), animations: 'disabled' })
 })
 
 /** Requests that would change the profile or restart DSH; the preview journey must send none. */

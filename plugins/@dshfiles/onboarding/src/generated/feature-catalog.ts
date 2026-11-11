@@ -336,7 +336,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "onboarding",
       "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and a read-only onboarding_overview agent tool.",
       "ui": true,
-      "features": 3
+      "features": 5
     },
     {
       "name": "optmem-core",
@@ -13665,6 +13665,70 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "command": "@dshfiles/onboarding.wizard"
         }
       }
+    },
+    {
+      "key": "onboarding#show-me-where",
+      "plugin": "onboarding",
+      "id": "show-me-where",
+      "title": "Show me where a feature lives, one step at a time",
+      "summary": "Each Getting started feature row whose first reach step the app can replay has Show me where. It opens a non-modal walk: a ring around the next control (by ARIA role and accessible name, text, label or title; an exact name first, a substring only for a name ending in *, the firs…",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › Features › Show me where",
+      "reach": [
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Getting started\"",
+          "action": "click",
+          "by": "button",
+          "name": "Getting started",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search features\" \"Native Settings shell\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search features",
+          "value": "Native Settings shell"
+        },
+        {
+          "text": "click button \"Show me where: Native Settings shell, ported\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show me where: Native Settings shell, ported",
+          "value": null
+        },
+        {
+          "text": "expect region \"Show me where\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Show me where",
+          "value": null
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and press Show me where on a feature.",
+        "doneWhen": "The walk rings the feature's final control and says you reached it.",
+        "open": {
+          "panel": "dshfiles-onboarding"
+        }
+      }
+    },
+    {
+      "key": "onboarding#feature-reach",
+      "plugin": "onboarding",
+      "id": "feature-reach",
+      "title": "Ask how to get to a feature",
+      "summary": "The read-only onboarding_reach agent tool (onboarding/reach) returns one catalogued feature's reach steps as the dshx grammar parses them: each action, its locator (ARIA role, text, label or title) and accessible name, the fill value or key, which steps this app cannot replay (s…",
+      "destination": "none",
+      "currentSurface": "agent tool: onboarding_reach; read by Show me where on Knowledge › Getting started",
+      "reach": [],
+      "onboarding": null
     },
     {
       "key": "optmem-core#credential-redaction",
