@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { seedRowsComposingNestedBundles } from '../src/project/seed-nested-rows.js'
+import { seedRowsComposingNestedBundles, seedRowsSwappingNestedForks } from '../src/project/seed-nested-rows.js'
 
 const seed = [
   '# comment',
@@ -35,5 +35,22 @@ describe('seedRowsComposingNestedBundles', () => {
   it("leaves a bundle's own top-level row to its bundle patch", () => {
     expect(seedRowsComposingNestedBundles(seed, ['@dshfiles/jujutsu'])).toBe('')
     expect(seedRowsComposingNestedBundles(seed, [])).toBe('')
+  })
+})
+
+describe('seedRowsSwappingNestedForks', () => {
+  it("copies the preset row with only the fork's upstream child renamed to the fork", () => {
+    const rows = seedRowsSwappingNestedForks(seed, [{ packageId: '@dshfiles/tool-bash', upstreamPackage: '@deepseek-ai/dsh-tool-bash' }])
+    expect(rows.startsWith('- id: preset-standard\n')).toBe(true)
+    expect(rows).toContain("        name: '@dshfiles/tool-bash'")
+    expect(rows).not.toContain('@deepseek-ai/dsh-tool-bash')
+    expect(rows).toContain("disabled: !!js process.platform === 'win32'")
+    expect(rows).toContain("  name: '@deepseek-ai/dsh-agent-preset'")
+    expect(rows).not.toContain('dshfiles-jujutsu')
+  })
+
+  it('returns nothing when no seed row nests the upstream package', () => {
+    expect(seedRowsSwappingNestedForks(seed, [{ packageId: '@dshfiles/tool-fs', upstreamPackage: '@deepseek-ai/dsh-tool-fs' }])).toBe('')
+    expect(seedRowsSwappingNestedForks(seed, [])).toBe('')
   })
 })

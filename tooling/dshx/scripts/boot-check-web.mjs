@@ -67,7 +67,8 @@ const buildPlugin = plugin =>
   })
 
 const bootAlone = async plugin => {
-  const profile = await prepareComposedBootProfile([{ projectRoot: plugin.dir, packageId: plugin.id }], { sourceProfileRoot })
+  // A preset-child fork the seed keeps on the stock package boots alone the way opting in composes it.
+  const profile = await prepareComposedBootProfile([{ projectRoot: plugin.dir, packageId: plugin.id }], { sourceProfileRoot, swapNestedNativeForks: true })
   try {
     return await checkClientBoot({
       projectRoot: workspace,

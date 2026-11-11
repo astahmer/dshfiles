@@ -11,7 +11,7 @@ import { withUnknownProperties } from '../schema.js'
 import { parse } from 'yaml'
 import { CORDIS_IDENTITY_DEPENDENCIES } from 'create-dshx/capabilities'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
-import { seedRowsComposingNestedBundles } from './seed-nested-rows.js'
+import { seedRowsComposingNestedBundles, seedRowsSwappingNestedForks, type NestedForkSwap } from './seed-nested-rows.js'
 import { BundleSuppliers } from './bundle-suppliers.js'
 
 const WORKSPACE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../../')
@@ -25,6 +25,7 @@ const ProfilePackage = withUnknownProperties({
 })
 const WorkspacePackage = withUnknownProperties({ packageManager: Schema.String })
 const ProjectPackage = withUnknownProperties({ dsh: Schema.Unknown })
+const NativeForkRecord = withUnknownProperties({ upstream: withUnknownProperties({ package: Schema.String }) })
 const PnpmModules = withUnknownProperties({ packageManager: Schema.String, storeDir: Schema.String.check(Schema.isMinLength(1)) })
 const SHARED_CORDIS_PACKAGES = Object.keys(CORDIS_IDENTITY_DEPENDENCIES)
 
@@ -152,6 +153,26 @@ interface PrepareBootProfilesOptions {
   readonly includeSourceProfileBundles?: boolean
   /** The profile's own `cordis.patch.yml`, for Loader rows no bundle composes (e.g. the session-content index). */
   readonly cordisPatch?: string
+  /**
+   * Compose a native fork that has no Loader row of its own, and that no seed row names, in place of the upstream
+   * package a seed row nests: the per-plugin boot of a preset-child fork the seed keeps on the stock package.
+   */
+  readonly swapNestedNativeForks?: boolean
+}
+
+/** The local forks a seed row can only compose by swapping their upstream package (see `swapNestedNativeForks`). */
+const nestedForkSwaps = async (bundles: readonly BootProfileBundle[], seedPatch: string): Promise<NestedForkSwap[]> => {
+  const swaps: NestedForkSwap[] = []
+  for (const bundle of bundles) {
+    if (seedRowsComposingNestedBundles(seedPatch, [bundle.packageId]) !== '') continue
+    const ownPatch = await readFile(join(bundle.projectRoot, 'cordis.patch.yml'), 'utf8').catch(() => '')
+    if (ownPatch.split(/\r?\n/u).some(line => line.startsWith('- '))) continue
+    const record = await readFile(join(bundle.projectRoot, 'native-fork.json'), 'utf8').catch(() => undefined)
+    if (record === undefined) continue
+    const fork = Schema.decodeUnknownSync(NativeForkRecord)(decodeJson(jsonValueSchema, record))
+    swaps.push({ packageId: bundle.packageId, upstreamPackage: fork.upstream.package })
+  }
+  return swaps
 }
 
 const prepareBootProfiles = async (
@@ -224,8 +245,10 @@ const prepareBootProfiles = async (
     await writeFile(join(profileRoot, 'pnpm-workspace.yaml'), pnpmWorkspace)
     // A bundle composed as a preset child has no row of its own; the seed's row that composes it comes along.
     const seedPatchPath = join(WORKSPACE_ROOT, 'profiles/web/cordis.patch.yml')
-    const seedRows = existsSync(seedPatchPath) ? seedRowsComposingNestedBundles(await readFile(seedPatchPath, 'utf8'), packageIds) : ''
-    const cordisPatch = [options.cordisPatch, seedRows].filter(part => part !== undefined && part.trim() !== '').join('\n')
+    const seedPatch = existsSync(seedPatchPath) ? await readFile(seedPatchPath, 'utf8') : ''
+    const seedRows = seedRowsComposingNestedBundles(seedPatch, packageIds)
+    const forkRows = options.swapNestedNativeForks === true ? seedRowsSwappingNestedForks(seedPatch, await nestedForkSwaps(composedBundles, seedPatch)) : ''
+    const cordisPatch = [options.cordisPatch, seedRows, forkRows].filter(part => part !== undefined && part.trim() !== '').join('\n')
     if (cordisPatch !== '') await writeFile(join(profileRoot, 'cordis.patch.yml'), `${cordisPatch}\n`)
     await installProfile(profileRoot, homeRoot, workspaceManifest.packageManager)
     return {
