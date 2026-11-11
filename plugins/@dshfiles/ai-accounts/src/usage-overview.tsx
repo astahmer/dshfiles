@@ -12,6 +12,7 @@ import type { AccountsUsage } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { UsagePlanBadge } from './usage-plan-badge.js'
 import { AccountEnabledToggle } from './account-enabled-toggle.js'
+import { AccountExtraUsageToggle } from './account-extra-usage-toggle.js'
 import { ExtraUsageMeter } from './extra-usage-view.js'
 import { useQuotaClock } from './quota-clock.js'
 import { usePreferences } from './use-preferences.js'
@@ -148,6 +149,7 @@ const AccountUsageCard = (props: {
           )
         })}
         {extraUsage === undefined ? null : <ExtraUsageMeter extra={extraUsage} muted={!props.card.enabled} now={props.now} />}
+        {extraUsage === undefined ? null : <AccountExtraUsageToggle instanceId={props.card.instanceId} name={props.card.displayName} />}
         <UsageReadStatus onRetry={props.onRefresh} refreshing={props.refreshing} sweepReadAt={props.readAt} usage={usage} />
         {usage.bankedResets > 0 ? <BankedResets count={usage.bankedResets} expiries={usage.bankedResetExpiries} /> : null}
         {limited && usage.bankedResets > 0 && props.card.kind === 'codex' ? (

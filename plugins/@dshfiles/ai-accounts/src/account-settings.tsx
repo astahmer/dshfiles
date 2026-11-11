@@ -2,12 +2,13 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
-import { BarChart3Icon, CheckIcon, CopyIcon, PencilIcon, RefreshCwIcon, SlidersHorizontalIcon, UserRoundIcon } from '@dshfiles/plugin-ui/icons'
+import { BarChart3Icon, CheckIcon, CoinsIcon, CopyIcon, PencilIcon, RefreshCwIcon, SlidersHorizontalIcon, UserRoundIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { KIND_LABEL, routedKind } from './account-labels.js'
 import { accountAuthenticationLabel, accountConnectionStatus } from './account-connection-status.js'
 import { AccountIdentitySection } from './account-identity-section.js'
+import { ExtraUsageMeter } from './extra-usage-view.js'
 import { AccountDefaultReasoningControl, AccountInheritanceControl } from './account-model-defaults.js'
 import { RuntimePathsSection } from './runtime-paths-section.js'
 import type { AccountDraft, AccountsFile } from './api.js'
@@ -83,6 +84,43 @@ const AccountRoutingSettings = (props: SettingsProps): JSX.Element => (
     <RoutingSwitch draft={props.draft} state={props.state} />
   </section>
 )
+
+const ExtraUsageSettings = (props: SettingsProps): JSX.Element | null => {
+  const usage = props.state.usage
+  const card = usage?.cards.find(candidate => candidate.instanceId === props.draft.instanceId)?.usage
+  if (card?.status !== 'ok' || card.extraUsage === undefined) return null
+  const allowed = props.draft.useExtraUsage === true
+  return (
+    <section aria-label="Extra usage" className={cardClass}>
+      <header className="dshx:flex dshx:items-start dshx:gap-3">
+        <CoinsIcon className="dshx:mt-0.5 dshx:size-5 dshx:shrink-0" />
+        <div>
+          <h3 className="dshx:text-sm dshx:font-semibold">Extra usage</h3>
+          <p className="dshx:mt-1 dshx:text-xs dshx:text-muted-foreground">Paid overage past the plan limits, as this account's quota reports it.</p>
+        </div>
+      </header>
+      <div className="dshx:border-t dshx:pt-4">
+        <ExtraUsageMeter extra={card.extraUsage} now={usage?.readAt ?? 0} />
+      </div>
+      <label className="dshx:flex dshx:items-start dshx:gap-3">
+        <Switch
+          aria-label="Use extra usage"
+          checked={allowed}
+          className="dshx:mt-0.5 dshx:data-[state=checked]:bg-warning"
+          onCheckedChange={enabled => void props.state.persist({ useExtraUsage: enabled })}
+        />
+        <span>
+          <span className="dshx:block dshx:text-sm">Use extra usage</span>
+          <span className="dshx:mt-1 dshx:block dshx:text-xs dshx:text-muted-foreground">
+            {allowed
+              ? 'A spent session or weekly window draws the provider’s extra usage.'
+              : 'Off: once the session or weekly window is spent, routing skips this account and a turn stops with its reset time.'}
+          </span>
+        </span>
+      </label>
+    </section>
+  )
+}
 
 const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'state'> & { readonly onConnect: () => void }): JSX.Element => {
   const profile = props.state.selected
@@ -230,6 +268,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
         </div>
       </section>
       <AccountRoutingSettings {...props} />
+      <ExtraUsageSettings {...props} />
       <details className="dshx:rounded-lg dshx:border dshx:bg-card">
         <summary className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:p-5">
           <SlidersHorizontalIcon className="dshx:size-5" />
