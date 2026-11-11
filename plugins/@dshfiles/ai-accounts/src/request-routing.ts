@@ -1,6 +1,6 @@
 import type { Agent, RequestErrorAction } from '@deepseek-ai/dsh-agent'
 import type { GenerateOptions, LlmCallConfig, LlmFailure, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { DshxPlugin, HostContext, HostEvents } from '@dshfiles/dshx/effect'
 import { threadModelPolicySchema, type ThreadModelPolicy, type ThreadModelSelection } from '@dshfiles/session-controller/thread-model-api'
 import { Context, Effect, FiberMap, HashMap, Layer, Option, Ref, type Scope } from 'effect'
@@ -44,6 +44,8 @@ export interface RoutingWorld {
   readonly offersModel: (provider: string, model: string) => boolean
   readonly modelsCompatible: (sourceProvider: string, candidateProvider: string, model: string) => boolean
   readonly nativeProviders: () => readonly string[]
+  /** Whether this account may not draw paid overage right now, when its reset lifts that, and the message a stopped turn carries. */
+  readonly planBlockFor: (accountId: string) => { readonly blocked: boolean; readonly until: number | null; readonly message: string }
   readonly fallbackRouter: ModelFallbackRouter
   readonly recovery: FailureRecovery
   readonly servingAccount: ServingAccountService
@@ -152,7 +154,7 @@ export class RequestRouting extends Context.Service<
           world.servingAccount.forget(id)
           return request
         }
-        const recoverySettings = (yield* settings.current).recovery
+        const recovering = (yield* settings.current).recovery
         // A fallback chain is the whole fail-over order, so its routes are not spread across accounts.
         const accountId = yield* pool.transact(view => {
           if (view.distribution() !== 'sticky') view.bindRoute(id, request.provider, request.provider)
@@ -165,10 +167,26 @@ export class RequestRouting extends Context.Service<
             modelsCompatible: world.modelsCompatible,
             chainWalking: world.fallbackRouter.walksChain(id),
             preferSelectedProvider: prefersSelectedProvider(agent, request.provider, request.model),
-            usageOrder: recoverySettings.usageOrder,
-            hiddenAccountIds: recoverySettings.hiddenUsageAccounts,
+            usageOrder: recovering.usageOrder,
+            hiddenAccountIds: recovering.hiddenUsageAccounts,
           })
         })
+        // Routing already skips such an account; reaching it means nothing else could serve the request, so stop here
+        // instead of letting the provider bill overage the user refused.
+        const planBlock = world.planBlockFor(accountId)
+        if (planBlock.blocked) {
+          const now = Date.now()
+          if (planBlock.until !== null) pool.view.noteDeclaredReset(accountId, Math.max(planBlock.until - now, 1), now)
+          yield* Effect.logInfo(`ai-accounts: ${planBlock.message}`)
+          yield* world.recordQuotaFailure({
+            agent,
+            accountId,
+            autoRetry: (yield* settings.current).quotaRetry.autoRetryDefault,
+            failedSelection: { provider: request.provider, model: request.model },
+            message: planBlock.message,
+          })
+          return yield* Effect.fail(new LlmError(planBlock.message, 'QUOTA_EXCEEDED'))
+        }
         yield* Ref.update(activeRoutes, active =>
           HashMap.set(active, id, {
             turn: position.turn,

@@ -4,7 +4,7 @@ import { accountDraftSchema, accountsFileSchema, type AccountDraft, type Account
 
 import { AiAccountsSchema } from './effect-schema.js'
 import { CodexHomeModel, describeCodexAuth, materializeCodexShadowHome, CodexHomeError } from './codex-home.js'
-import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
+import { DEFAULT_DISTRIBUTION, type AccountState, type AccountStatus } from './account-pool.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { KIND_LABEL } from './account-labels.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
@@ -56,15 +56,16 @@ const layoutFor = (profile: AccountDraft, file: AccountStoreFile) => AccountHome
 const defaultName = (draft: AccountDraft): string =>
   draft.displayName.trim().length > 0 ? draft.displayName.trim() : `${KIND_LABEL[draft.kind]} (${draft.instanceId})`
 
-const profileState = (facts: { readonly enabled: boolean; readonly cooling: boolean; readonly signedIn: boolean }): AccountProfile['state'] => {
+const profileState = (facts: { readonly enabled: boolean; readonly pool: AccountState | undefined; readonly signedIn: boolean }): AccountProfile['state'] => {
   if (!facts.enabled) return 'disabled'
-  if (facts.cooling) return 'cooling'
+  if (facts.pool === 'cooling') return 'cooling'
+  if (facts.pool === 'exhausted') return 'exhausted'
   return facts.signedIn ? 'healthy' : 'unconfigured'
 }
 
 const observed = (
   draft: AccountDraft,
-  facts: Pick<AccountProfile, 'signedIn' | 'identity' | 'plan' | 'loginHint' | 'detail'> & { readonly cooling: boolean },
+  facts: Pick<AccountProfile, 'signedIn' | 'identity' | 'plan' | 'loginHint' | 'detail'> & { readonly pool: AccountState | undefined },
 ): AccountProfile => ({
   ...draft,
   displayName: defaultName(draft),
@@ -72,7 +73,7 @@ const observed = (
   signedIn: facts.signedIn,
   identity: facts.identity,
   plan: facts.plan,
-  state: profileState({ enabled: draft.enabled, cooling: facts.cooling, signedIn: facts.signedIn }),
+  state: profileState({ enabled: draft.enabled, pool: facts.pool, signedIn: facts.signedIn }),
   loginHint: facts.loginHint,
   detail: facts.detail,
 })
@@ -88,12 +89,12 @@ const observe = async (
   resolveCredential?: CredentialValueResolver,
   isCopilotSignedIn?: (instanceId: string) => Promise<boolean>,
 ): Promise<AccountProfile> => {
-  const cooling = status?.state === 'cooling'
+  const pool = status?.state
   const resolveKey = async (name: string): Promise<string> => (resolveCredential === undefined ? CredentialModel.readKeyFromEnv(name) : resolveCredential(name))
   if (draft.kind === 'opencode-go') {
     const hasKey = (await resolveKey(draft.apiKeyEnv)).length > 0
     return observed(draft, {
-      cooling,
+      pool,
       signedIn: hasKey,
       identity: null,
       plan: null,
@@ -107,7 +108,7 @@ const observe = async (
   if (draft.kind === 'commandcode') {
     const hasKey = (await readCommandCodeKey(draft.apiKeyEnv, resolveCredential, draft.authSource)).length > 0
     return observed(draft, {
-      cooling,
+      pool,
       signedIn: hasKey,
       identity: null,
       plan: null,
@@ -118,7 +119,7 @@ const observe = async (
   if (draft.kind === 'mistral') {
     const hasKey = (await MistralAccountModel.readKey(draft.apiKeyEnv, resolveCredential, draft.authSource)).length > 0
     return observed(draft, {
-      cooling,
+      pool,
       signedIn: hasKey,
       identity: null,
       plan: null,
@@ -130,7 +131,7 @@ const observe = async (
     const configDir = ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)
     const auth = await claudeAccountService.describeAuth({ configDir, keyEnv: draft.apiKeyEnv, now: Date.now(), resolveCredential })
     return observed(draft, {
-      cooling,
+      pool,
       signedIn: auth.signedIn,
       identity: auth.identity ?? null,
       plan: auth.plan ?? null,
@@ -141,7 +142,7 @@ const observe = async (
   if (draft.kind === 'github-copilot') {
     const signedIn = await (isCopilotSignedIn?.(draft.instanceId) ?? Promise.resolve(false))
     return observed(draft, {
-      cooling,
+      pool,
       signedIn,
       identity: null,
       plan: null,
@@ -152,7 +153,7 @@ const observe = async (
   if (draft.kind === 'cursor') {
     const token = await readCursorToken(draft.apiKeyEnv, resolveCredential, draft.authSource)
     return observed(draft, {
-      cooling: false,
+      pool: undefined,
       signedIn: token !== undefined,
       identity: null,
       plan: null,
@@ -191,7 +192,7 @@ const observe = async (
     signedIn: auth.signedIn,
     identity: auth.identity ?? null,
     plan: auth.plan ?? null,
-    state: profileState({ enabled: draft.enabled, cooling, signedIn: auth.signedIn }),
+    state: profileState({ enabled: draft.enabled, pool, signedIn: auth.signedIn }),
     loginHint: CodexHomeModel.loginHint(layout),
     detail: auth.error ?? null,
   }

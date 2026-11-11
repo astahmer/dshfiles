@@ -29,6 +29,7 @@ export const routedKind = (kind: AccountProfile['kind']): boolean => kind !== 'c
 export const STATE_LABEL = {
   healthy: 'Authenticated',
   cooling: 'Rate limited',
+  exhausted: 'Plan limits spent',
   disabled: 'Off',
   unconfigured: 'Not signed in',
 } satisfies Record<AccountProfile['state'], string>

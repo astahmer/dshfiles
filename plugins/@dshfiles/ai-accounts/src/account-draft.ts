@@ -56,6 +56,7 @@ export class AccountDraftModel {
     hiddenModelIds: profile.hiddenModelIds,
     favoriteModelIds: profile.favoriteModelIds,
     modelOrder: profile.modelOrder,
+    ...(profile.useExtraUsage !== undefined && { useExtraUsage: profile.useExtraUsage }),
   })
 
   private static sameList = (left: readonly string[], right: readonly string[]): boolean =>
@@ -79,6 +80,7 @@ export class AccountDraftModel {
     left.badge === right.badge &&
     left.accentColor === right.accentColor &&
     left.providerIcon === right.providerIcon &&
+    left.useExtraUsage === right.useExtraUsage &&
     left.inheritModelSettings === right.inheritModelSettings &&
     left.defaultReasoningEffort === right.defaultReasoningEffort &&
     AccountDraftModel.sameList(left.additionalModelIds, right.additionalModelIds) &&

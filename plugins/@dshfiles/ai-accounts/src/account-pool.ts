@@ -24,7 +24,7 @@ export const DEFAULT_DISTRIBUTION: Distribution = 'sticky'
 const STICKY_AFFINITY_LIMIT = 512
 const DEFAULT_COOLDOWN_MS = 5 * 60_000
 
-export type AccountState = 'healthy' | 'cooling' | 'disabled'
+export type AccountState = 'healthy' | 'cooling' | 'exhausted' | 'disabled'
 
 export interface PoolAccountInput {
   readonly id: string
@@ -40,6 +40,8 @@ export interface PoolAccount {
   readonly enabled: boolean
   readonly cooldownUntil: number
   readonly cooldownMs: number | undefined
+  /** Set while the plan windows are spent and the account may not draw paid extra usage; see extra-usage-guard.ts. */
+  readonly planBlockedUntil: number
   readonly lastUsedAt: number
 }
 
@@ -94,6 +96,10 @@ export interface AccountPoolView {
   /** Cool an account until the reset its provider declared, floored at the configured cooldown and capped at a day. */
   noteDeclaredReset(accountId: string, waitMs: number, now?: number): void
   isHealthy(accountId: string, now?: number): boolean
+  /** Keep the account out of routing until `until`, like a cooldown this plugin decided on. */
+  planBlock(accountId: string, until: number): void
+  clearPlanBlock(accountId: string): void
+  planBlocked(accountId: string, now?: number): boolean
   bindRoute(conversationKey: string, from: string, to: string, failedAccountId?: string): void
   routeFor(conversationKey: string | undefined, provider: string, now?: number): string
   unbind(conversationKey: string | undefined): void
@@ -127,8 +133,12 @@ const freshAccount = (input: PoolAccountInput): PoolAccount => ({
   enabled: input.enabled !== false,
   cooldownUntil: 0,
   cooldownMs: undefined,
+  planBlockedUntil: 0,
   lastUsedAt: 0,
 })
+
+/** The one eligibility rule: enabled, not cooling, and not blocked from drawing overage. */
+const usable = (account: PoolAccount, now: number): boolean => account.enabled && account.cooldownUntil <= now && account.planBlockedUntil <= now
 
 const updateAccount = (state: PoolState, accountId: string, change: (account: PoolAccount) => PoolAccount): PoolState => {
   const account = state.accounts.get(accountId)
@@ -141,9 +151,7 @@ const cool = (state: PoolState, accountId: string, wait: number, now: number): P
 
 const eligible = (state: PoolState, now: number, candidateIds?: readonly string[]): PoolAccount[] => {
   const candidates = candidateIds === undefined ? undefined : new Set(candidateIds)
-  return [...state.accounts.values()].filter(
-    account => account.enabled && account.cooldownUntil <= now && (candidates === undefined || candidates.has(account.id)),
-  )
+  return [...state.accounts.values()].filter(account => usable(account, now) && (candidates === undefined || candidates.has(account.id)))
 }
 
 const bindAffinity = (state: PoolState, conversationKey: string | undefined, accountId: string): PoolState => {
@@ -262,7 +270,28 @@ export class AccountPoolModel {
 
   static isHealthy(state: PoolState, accountId: string, now: number): boolean {
     const account = state.accounts.get(accountId)
-    return account !== undefined && account.enabled && account.cooldownUntil <= now
+    return account !== undefined && usable(account, now)
+  }
+
+  static planBlock(state: PoolState, accountId: string, until: number): PoolState {
+    if (!Number.isFinite(until)) return state
+    return updateAccount(state, accountId, account => ({ ...account, planBlockedUntil: until }))
+  }
+
+  static clearPlanBlock(state: PoolState, accountId: string): PoolState {
+    return updateAccount(state, accountId, account => (account.planBlockedUntil === 0 ? account : { ...account, planBlockedUntil: 0 }))
+  }
+
+  static planBlocked(state: PoolState, accountId: string, now: number): boolean {
+    const account = state.accounts.get(accountId)
+    return account !== undefined && account.planBlockedUntil > now
+  }
+
+  static stateOf(account: PoolAccount, now: number): AccountState {
+    if (!account.enabled) return 'disabled'
+    if (account.planBlockedUntil > now) return 'exhausted'
+    if (account.cooldownUntil > now) return 'cooling'
+    return 'healthy'
   }
 
   static bindRoute(state: PoolState, conversationKey: string, from: string, to: string, failed: string): PoolState {
@@ -285,7 +314,8 @@ export class AccountPoolModel {
     if (binding === undefined || binding.from !== provider) return [provider, state]
     const failed = state.accounts.get(binding.failed)
     const standIn = state.accounts.get(binding.to)
-    if (failed?.enabled !== true || failed.cooldownUntil <= now || standIn?.enabled !== true) {
+    const failedHeld = failed !== undefined && failed.enabled && (failed.cooldownUntil > now || failed.planBlockedUntil > now)
+    if (!failedHeld || standIn === undefined || !usable(standIn, now)) {
       return [provider, { ...state, routeBindings: edited(state.routeBindings, draft => draft.delete(conversationKey)) }]
     }
     return [binding.to, state]
@@ -318,8 +348,8 @@ export class AccountPoolModel {
       kind: account.kind,
       label: account.label,
       enabled: account.enabled,
-      state: !account.enabled ? ('disabled' as const) : account.cooldownUntil > now ? ('cooling' as const) : ('healthy' as const),
-      cooldownUntil: account.cooldownUntil > now ? account.cooldownUntil : undefined,
+      state: AccountPoolModel.stateOf(account, now),
+      cooldownUntil: Math.max(account.cooldownUntil, account.planBlockedUntil) > now ? Math.max(account.cooldownUntil, account.planBlockedUntil) : undefined,
       cooldownMs: account.cooldownMs,
       lastUsedAt: account.lastUsedAt || undefined,
     }))
@@ -342,6 +372,9 @@ export class AccountPoolModel {
         apply(state => AccountPoolModel.noteRateLimited(state, accountId, retryAfterMs, now)),
       noteDeclaredReset: (accountId, waitMs, now = environment.now()) => apply(state => AccountPoolModel.noteDeclaredReset(state, accountId, waitMs, now)),
       isHealthy: (accountId, now = environment.now()) => AccountPoolModel.isHealthy(cell.get(), accountId, now),
+      planBlock: (accountId, until) => apply(state => AccountPoolModel.planBlock(state, accountId, until)),
+      clearPlanBlock: accountId => apply(state => AccountPoolModel.clearPlanBlock(state, accountId)),
+      planBlocked: (accountId, now = environment.now()) => AccountPoolModel.planBlocked(cell.get(), accountId, now),
       bindRoute: (conversationKey, from, to, failedAccountId = from) =>
         apply(state => AccountPoolModel.bindRoute(state, conversationKey, from, to, failedAccountId)),
       routeFor: (conversationKey, provider, now = environment.now()) => decide(state => AccountPoolModel.routeFor(state, conversationKey, provider, now)),

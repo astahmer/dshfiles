@@ -1,5 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import {
+  AccountNotFound,
   AccountSignInActive,
   AccountUnsuitable,
   BrowserOnlyCredential,
@@ -33,6 +34,7 @@ import type { AccountStorePromise } from './account-store-promise.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
 import { ModelCurationModel } from './model-curation-model.js'
 import { readAccountUsage } from './account-usage.js'
+import { ExtraUsageGuardModel } from './extra-usage-guard.js'
 import { ProviderUsageModel } from './usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { createUsageHistoryService } from './usage-recorder.js'
@@ -291,6 +293,18 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
     await refreshRoutes(ctx, store)
     return accountsFile(ctx, store)
   }),
+  setExtraUsage: lockedHandler(
+    aiAccountsApi,
+    'setExtraUsage',
+    ({ input }) => [input.instanceId],
+    async ({ input, ctx, store }) => {
+      const account = (await store.readAccountFile()).accounts.find(profile => profile.instanceId === input.instanceId)
+      if (account === undefined) throw new AccountNotFound({ instanceId: input.instanceId })
+      await store.upsertAccount({ ...account, useExtraUsage: input.enabled }, undefined, true)
+      await refreshRoutes(ctx, store)
+      return accountsFile(ctx, store)
+    },
+  ),
   identity: effectHandler(aiAccountsApi, 'identity', async ({ input, store }) =>
     AccountProfilesModel.readAccountIdentity(await store.readAccountFile(), input.instanceId),
   ),
@@ -470,7 +484,16 @@ const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signa
       ),
     }),
   })
-  return { readAt: Date.now(), hostName: hostname(), cards }
+  const usage = { readAt: Date.now(), hostName: hostname(), cards }
+  // Every surface polls this sweep, so it is where a spent plan starts keeping requests off an account that may not draw
+  // paid extra usage. The reading is kept past a cache invalidation, so a settings save still decides from it.
+  const runtime = accountRuntime(ctx)
+  if (runtime !== undefined) {
+    runtime.lastUsage = usage
+    const pool = runtime.accounts?.pool
+    if (pool !== undefined) ExtraUsageGuardModel.apply({ pool, accounts: file.accounts, usage, now: Date.now() })
+  }
+  return usage
 }
 
 /**

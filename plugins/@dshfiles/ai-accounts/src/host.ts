@@ -74,6 +74,7 @@ import { AccountPool } from './account-pool.js'
 import { RequestRouting, type RoutingWorld } from './request-routing.js'
 import { RequestRoutingHooks } from './request-routing-promise.js'
 import { FailureRecoveryModel } from './failure-recovery.js'
+import { ExtraUsageGuardModel } from './extra-usage-guard.js'
 import { RequestAccountRouting } from './request-account-routing.js'
 import { randomUUID } from 'node:crypto'
 import { CodexCredentialStore } from './codex-credential.js'
@@ -411,13 +412,17 @@ const startAccountsHost = (input: {
   runtime.longCacheMinutes = (provider, model) => {
     const route = routes.get(provider)
     if (route === undefined || (route.kind === CLAUDE_KIND && ClaudeAccountModel.usesCliTransport(route))) return null
-    const candidate = profiles.get(provider)?.piProvider?.getModels().find(item => item.id === model)
+    const candidate = profiles
+      .get(provider)
+      ?.piProvider?.getModels()
+      .find(item => item.id === model)
     if (candidate === undefined) return null
     const compat = candidate.compat
     const supportsLong = compat !== undefined && 'supportsLongCacheRetention' in compat && compat.supportsLongCacheRetention === false ? false : undefined
     if (supportsLong === false) return null
     if (candidate.api === 'anthropic-messages') return 60
-    if (candidate.api === 'openai-responses') return compat !== undefined && 'supportsExplicitPromptCacheMode' in compat && compat.supportsExplicitPromptCacheMode === true ? 30 : 1_440
+    if (candidate.api === 'openai-responses')
+      return compat !== undefined && 'supportsExplicitPromptCacheMode' in compat && compat.supportsExplicitPromptCacheMode === true ? 30 : 1_440
     return null
   }
   const reasoningDefaults = buildReasoningDefaults()
@@ -735,6 +740,8 @@ const startAccountsHost = (input: {
     }
 
     pool.replace([...nextRoutes].map(([id, route]) => ({ id, kind: route.kind, label: route.displayName, enabled: route.enabled })))
+    // A settings save can lift or add the overage block at once, without waiting for the next quota sweep.
+    ExtraUsageGuardModel.apply({ pool, accounts: sourceFile.accounts, usage: runtime.lastUsage, now: Date.now() })
     pool.setDistribution(nextConfig.distribution)
     config = nextConfig
     routes = nextRoutes
@@ -786,6 +793,22 @@ const startAccountsHost = (input: {
     offersModel: (provider, model) => modelForRoute(provider, model) !== undefined,
     modelsCompatible,
     nativeProviders: () => llm.listProviders().map(provider => provider.id),
+    planBlockFor: accountId => {
+      const account = store.current().accounts.find(candidate => candidate.instanceId === accountId)
+      const card = runtime.lastUsage?.cards.find(candidate => candidate.instanceId === accountId)
+      const now = Date.now()
+      const block = ExtraUsageGuardModel.block({ usage: card?.usage, useExtraUsage: account?.useExtraUsage === true, now })
+      if (!block.blocked) return { blocked: false, until: null, message: '' }
+      return {
+        blocked: true,
+        until: ExtraUsageGuardModel.until({ block, now }),
+        message: ExtraUsageGuardModel.recoveryMessage({
+          displayName: routes.get(accountId)?.displayName ?? account?.displayName ?? accountId,
+          block,
+          formatReset: resetsAt => new Date(resetsAt).toLocaleString(),
+        }),
+      }
+    },
     fallbackRouter,
     recovery,
     servingAccount,

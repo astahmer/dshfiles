@@ -36,6 +36,7 @@ describe('ai-accounts tool exposure', () => {
       'ai_accounts_save_account',
       'ai_accounts_set_auto_retry',
       'ai_accounts_set_distribution',
+      'ai_accounts_set_extra_usage',
       'ai_accounts_set_native_provider',
       'ai_accounts_snooze_continuation',
     ])

@@ -7,6 +7,15 @@ export const accountConnectionStatus = (account: AccountProfile, usage: Accounts
   const checkedAt = card === undefined ? null : (card.usage.readAt ?? usage?.readAt ?? null)
   if (card?.usage.status === 'unauthenticated')
     return { label: 'Not signed in', tone: 'muted' as const, detail: card.usage.message, checkedAt, authenticated: false }
+  // A spent plan that may not draw extra usage is unavailable on purpose, not rate-limited.
+  if (account.state === 'exhausted')
+    return {
+      label: 'Plan limits spent',
+      tone: 'warning' as const,
+      detail: 'Extra usage is off for this account: routing skips it until the plan window resets. Turn on “Use extra usage” in its settings to draw overage.',
+      checkedAt,
+      authenticated: false,
+    }
   // Current routing health wins over a previously authenticated quota reading.
   if (account.state === 'cooling' || card?.usage.status === 'rate-limited')
     return {

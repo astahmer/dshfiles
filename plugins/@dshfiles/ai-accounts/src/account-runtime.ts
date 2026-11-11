@@ -3,6 +3,7 @@ import type { AiAccountsConfig } from './account-config.js'
 import type { AccountPoolView } from './account-pool.js'
 import type { QuotaContinuationService } from './quota-continuation.js'
 import type { UsageSnapshotPromise } from './usage-snapshot-promise.js'
+import type { AccountsUsage } from './api.js'
 import type { LlmResolvedModelInfo } from '@deepseek-ai/dsh-llm'
 import type { PricingCatalog } from './pricing-catalog.js'
 import type { CopilotLoginService } from './copilot-login.js'
@@ -24,6 +25,8 @@ interface AccountRuntime {
   /** Uncurated metadata for editing, including hidden model efforts and native provider defaults. */
   modelCatalogForEditing?: (instanceId: string) => Promise<readonly (LlmResolvedModelInfo & { readonly accountAdditional: boolean })[]>
   usageCache?: UsageSnapshotPromise
+  /** The last quota sweep, kept past a cache invalidation: the overage guard follows the last reading, not a cache state. */
+  lastUsage?: AccountsUsage
   pricing?: PricingCatalog
   longCacheMinutes?: (provider: string, model: string) => number | null
   copilotLogin?: CopilotLoginService

@@ -43,7 +43,7 @@ export type AccountReorder = typeof accountReorderSchema.Type
 
 export const accountModeSchema = Schema.Literals(['direct', 'authOverlay'])
 
-export const accountStateSchema = Schema.Literals(['healthy', 'cooling', 'disabled', 'unconfigured'])
+export const accountStateSchema = Schema.Literals(['healthy', 'cooling', 'exhausted', 'disabled', 'unconfigured'])
 
 /**
  * A keyed account names the variable holding its key, and the Host sends that
@@ -164,6 +164,11 @@ export const accountProfileSchema = Schema.Struct({
   accentColor: Schema.String.check(Schema.isMaxLength(32)),
   providerIcon: Schema.String.check(Schema.isMaxLength(32)),
   mode: accountModeSchema,
+  /**
+   * Whether requests may draw the provider's pay-as-you-go extra usage once the plan windows are spent. Absent means
+   * off: an account whose quota reports extra usage stops at the plan limits until the user turns this on.
+   */
+  useExtraUsage: Schema.optional(Schema.Boolean),
   signedIn: Schema.Boolean,
   identity: Schema.NullOr(Schema.String.check(Schema.isMaxLength(320))),
   plan: Schema.NullOr(Schema.String.check(Schema.isMaxLength(64))),
@@ -227,6 +232,7 @@ export const accountDraftSchema = Schema.Struct({
   hiddenModelIds: accountProfileSchema.fields.hiddenModelIds,
   favoriteModelIds: accountProfileSchema.fields.favoriteModelIds,
   modelOrder: accountProfileSchema.fields.modelOrder,
+  useExtraUsage: accountProfileSchema.fields.useExtraUsage,
 })
 
 export const accountConnectionMethodSchema = Schema.Literals(['device', 'subscription', 'key', 'cli', 'reference'])
@@ -590,6 +596,21 @@ export const aiAccountsApi = defineApi({
       tool: {
         name: 'ai_accounts_set_distribution',
         render: output => `Request distribution is now ${output.distribution}.`,
+      },
+    }),
+    /**
+     * Allow or refuse the provider's paid overage for one account. Off is the default: once a plan window is spent, the
+     * account counts as exhausted and routing skips it instead of drawing extra usage.
+     */
+    setExtraUsage: method({
+      input: Schema.Struct({ instanceId: AiAccountsSchema.id(64), enabled: Schema.Boolean }),
+      output: accountsFileSchema,
+      description:
+        'Allow or refuse a provider’s paid extra usage (overage credits) for one account. With it off, the account stops at its plan limits: routing skips it once a plan window is spent and a turn that would run on it stops with a recovery message. Only accounts whose quota reports extra usage honor it. Call only when the user asked to change that account.',
+      tool: {
+        name: 'ai_accounts_set_extra_usage',
+        render: output =>
+          `Extra usage is now ${output.accounts.some(account => account.useExtraUsage === true) ? 'allowed on at least one account' : 'off on every account'} (${String(output.accounts.length)} account(s)).`,
       },
     }),
     /**
