@@ -2397,12 +2397,110 @@
           "id": "thread-sidebar.pending-host-restart-unit-idle-restart-watched",
           "file": "plugins/@dshfiles/thread-sidebar/src/restart-machine.test.ts",
           "testName": "follows a pending restart this page did not request"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.pending-host-restart-unit-registry-bound",
+          "file": "plugins/@dshfiles/thread-sidebar/src/client-modules.test.ts",
+          "testName": "calls the registry methods on the registry, so a field-backed native registry answers"
         }
       ],
       "telemetry": [
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "auto-restart-when-idle",
+      "title": "Restart by itself to apply updates when idle",
+      "summary": "With autoRestartWhenIdle (on by default), a pending Host update (a plugin whose Host files changed since boot, which is what hmr-gate holds back, or a changed profile manifest after a profile sync) restarts DSH through the supervisor once no turn, subagent, background job or open user question ran for the quiet period; the last 30 s show Restarting to apply updates in N s with Postpone in the status strip, a check right before restarting cancels it when work started, a turn cut anyway is recorded for the bounded resume, and the page reloads onto the new Host. Without a supervisor nothing restarts and the item shows the launcher command.",
+      "surfaces": ["client", "host", "api", "tool"],
+      "surface": "statusItem",
+      "destination": "none",
+      "currentSurface": "status-strip: Restarting to apply updates",
+      "configuration": [
+        {
+          "key": "autoRestartWhenIdle",
+          "defaultValue": "true",
+          "constraints": "Boolean; restart by itself to apply pending Host updates when idle.",
+          "choices": ["true", "false"],
+          "coveredBy": ["thread-sidebar.auto-restart-unit-idle-restart"]
+        },
+        {
+          "key": "autoRestartQuietSeconds",
+          "defaultValue": "60",
+          "constraints": "Whole seconds from 30 to 3600 of idleness before the restart; the last 30 s show the notice.",
+          "coveredBy": ["thread-sidebar.auto-restart-unit-idle-restart"]
+        }
+      ],
+      "states": ["none", "disabled", "unsupervised", "waiting", "quiet", "countdown", "postponed", "restarting"],
+      "failureModes": [
+        "A running turn, a live subagent, a running background job or an open user question keeps it waiting; one that starts during the countdown cancels it and the quiet period starts over.",
+        "Without the supervisor hand-off it never exits DSH and names the launcher command instead.",
+        "A turn that starts in the second between the request and the exit is recorded by the managed restart and resumed after boot when resumeAfterRestart is on.",
+        "Postpone holds it for 60 minutes (agent: any 1 to 1440); resume drops the hold.",
+        "A Host without the automatic restart answers no status; the client then shows only the manual restart item."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.auto-restart-unit-idle-restart",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-restart.test.ts",
+          "testName": "waits while a turn runs, then restarts once DSH stayed idle for the quiet period"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.auto-restart-unit-busy-jobs-questions",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-restart.test.ts",
+          "testName": "a running background job or an open user question blocks it like a turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.auto-restart-unit-countdown-canceled",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-restart.test.ts",
+          "testName": "a turn that starts during the countdown cancels it, and a later idle period starts over"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.auto-restart-unit-postpone",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-restart.test.ts",
+          "testName": "postpone holds it, resume lets the next quiet period restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.auto-restart-unit-unsupervised",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-restart.test.ts",
+          "testName": "without a supervisor or with the setting off it never restarts; unsupervised names the launcher"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.auto-restart-unit-cut-turn-recorded",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-restart.test.ts",
+          "testName": "a turn cut off anyway is recorded for the resume after boot"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.auto-restart-scratch-supervisor",
+          "reason": "Needs the real supervisor restarting a Host, which the Gherkin fixture does not run: walked on a scratch DSH under the nixfiles dsh-web-supervisor (countdown notice, Postpone click, page reload onto the new Host, busy turn and background job holding it, unsupervised command); evidence in docs/recovery.md. No Gherkin scenario yet."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "auto restart check",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-restart.test.ts",
+          "testName": "records one auto restart check span per tick"
         }
       ]
     },

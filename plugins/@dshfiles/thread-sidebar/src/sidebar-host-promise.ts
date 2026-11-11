@@ -58,6 +58,8 @@ export class SidebarHost extends Context.Service<
   SidebarHost,
   {
     readonly runningSessionIds: Effect.Effect<ReadonlyArray<string>>
+    /** Background jobs still running or stopping, owned by a live Agent or by nobody. */
+    readonly runningJobCount: Effect.Effect<number>
     readonly sessions: Effect.Effect<ReadonlyArray<HostSession>, HostCallFailed>
     readonly workspaces: Effect.Effect<ReadonlyArray<HostWorkspace>>
     readonly archivedSessionIds: Effect.Effect<ReadonlyArray<string>>
@@ -102,6 +104,15 @@ export class SidebarHost extends Context.Service<
               .map(agent => String(agent.id)),
           ),
         ]),
+        runningJobCount: Effect.sync(() => {
+          const jobs = ctx.get('jobs')
+          if (jobs === undefined || jobs === null) return 0
+          const callers = [undefined, ...new Set(ctx.agents.list().map(agent => SessionId(String(agent.id))))]
+          const running = new Set(
+            callers.flatMap(caller => jobs.list(caller).flatMap(job => (job.status === 'running' || job.status === 'stopping' ? [String(job.id)] : []))),
+          )
+          return running.size
+        }),
         sessions: call('list sessions', signal => ctx.sessionController.list({}, signal)).pipe(
           Effect.map(listed => listed.items.map(hostSession)),
           Effect.withSpan('host sessions list'),

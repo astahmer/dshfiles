@@ -523,6 +523,26 @@ restart, so it reconnects without a new launch URL. After two minutes without
 a new Host the dialog says so, points at those log lines and offers Keep waiting
 and Reload page.
 
+**Restarting by itself (`autoRestartWhenIdle`, on by default).** A pending
+Host update restarts DSH without anyone asking: a plugin whose Host
+files changed since boot (the same set hmr-gate holds back) or a changed
+booted-profile manifest (`package.json` or `.dshfiles-profile-sync.json`, what
+`profile:sync` and `dshx checkout sync` rewrite; listed as `profile`). Every 5 s
+the Host checks that no Agent turn runs (subagents are Agents too), no
+background job is running or stopping, and no thread has an open user question.
+Once that held for `autoRestartQuietSeconds` (default 60, 30–3600), it reads
+everything again and hands off through the managed restart above, which records
+any turn that still started so `resumeAfterRestart` can pick it up. The last
+30 s show **Restarting to apply updates in N s** in the status strip with
+**Postpone** (60 min); work that starts during the countdown cancels it and the
+quiet period starts over. A page that saw the countdown reloads once the new
+Host answers. Without the supervisor hand-off nothing restarts: the item's
+popover shows the launcher command (`$DSHFILES_DIR/scripts/dsh-launcher`).
+Agent tools: `auto_restart_status` (read), `auto_restart_postpone` and
+`auto_restart_resume` (only when the user asked). The policy runs in the Host:
+a Host started before this version needs one restart to load it. Turn the
+setting off to keep restarts manual.
+
 Keyboard entry points:
 
 - Capture-phase chords claimed before the browser: ⌘K / Ctrl+K palette,

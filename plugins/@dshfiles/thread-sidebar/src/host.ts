@@ -10,6 +10,8 @@ import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Effect, Layer, Option } from 'effect'
 import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { AutoRestart, DEFAULT_POSTPONE_MINUTES, supervisedLaunchCommand } from './auto-restart.js'
 import { threadSidebarAttentionApi } from './attention-api.js'
 import { ThreadAttention } from './attention-store.js'
 import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
@@ -25,6 +27,7 @@ import { NotificationHistory } from './notification-history.js'
 import { notificationHistoryRecorder } from './notification-history-host.js'
 import { NavigationCounter } from './navigation-counter.js'
 import { OutsideReload } from './outside-reload-promise.js'
+import { ProfileChange, bootProfileName } from './profile-change.js'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { PluginUpdateWatch } from './plugin-updates.js'
@@ -106,19 +109,42 @@ const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, Navig
 
 const restart = RestartDrain.layer.pipe(Layer.provideMerge(RestartControl.layerWith({ env: process.env, homeDirectory: homedir() })))
 
+const bootProfileDirectory = join(resolve(process.env.DSH_HOME?.trim() || join(homedir(), '.dsh')), 'profiles', bootProfileName(process.argv))
+
+/** The automatic restart, fed by the Host files that changed since boot and the booted profile's reconciled manifest. */
+const autoRestart = Layer.unwrap(
+  Effect.gen(function* () {
+    const settings = yield* SidebarSettings
+    const modules = yield* ClientModules
+    const profile = yield* ProfileChange
+    return AutoRestart.layerWith({
+      policy: settings.autoRestart,
+      updates: Effect.gen(function* () {
+        const plugins = yield* modules.pendingPlugins
+        return (yield* profile.changed) ? [...plugins, 'profile'] : plugins
+      }),
+      command: supervisedLaunchCommand(process.env.DSHFILES_DIR),
+    })
+  }),
+).pipe(Layer.provide(ProfileChange.layerWith({ profileDirectory: bootProfileDirectory })))
+
 const autoSettle = AutoSettle.schedule().pipe(Layer.provideMerge(AutoSettle.layer), Layer.provideMerge(AutoSettleSources.layer))
 
 const threads = threadCommandsLayer.pipe(Layer.provideMerge(Layer.mergeAll(ThreadActions.layer, ThreadViews.layer)))
+
+const restartWithUpdates = autoRestart.pipe(
+  Layer.provideMerge(restart),
+  Layer.provideMerge(ClientModules.layer.pipe(Layer.provideMerge(PluginUpdateWatch.layer))),
+)
 
 const services = Layer.mergeAll(
   ThreadAttention.layer,
   NotificationHistory.layer,
   subscriptionNoticeHostLayer,
   ThreadSubscriptionActions.layer.pipe(Layer.provideMerge(ThreadSubscriptions.layer)),
-  restart,
+  restartWithUpdates,
   autoSettle,
   threads,
-  ClientModules.layer.pipe(Layer.provideMerge(PluginUpdateWatch.layer)),
   MachineName.layer,
   UserNotifications.layer,
 ).pipe(Layer.provideMerge(runtimeState))
@@ -170,6 +196,9 @@ export default DshxPlugin.make({
       requestRestart: () => RestartControl.use(control => control.request),
       requestRestartWhenIdle: () => RestartDrain.use(drain => drain.request),
       cancelPendingRestart: () => RestartDrain.use(drain => drain.cancel),
+      autoRestartStatus: () => AutoRestart.use(auto => auto.status),
+      postponeAutoRestart: input => AutoRestart.use(auto => auto.postpone(input.minutes ?? DEFAULT_POSTPONE_MINUTES)),
+      resumeAutoRestart: () => AutoRestart.use(auto => auto.resume),
       launchUrl: () => RestartControl.use(control => Effect.map(control.launchUrl, url => ({ url }))),
     }),
     Api.bind(threadSidebarRecoveryApi, {

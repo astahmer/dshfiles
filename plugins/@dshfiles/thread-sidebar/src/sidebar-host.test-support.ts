@@ -5,6 +5,7 @@ import { SidebarHost, type HostSession } from './sidebar-host-promise.js'
 /** The parts of a DSH Host the sidebar reads, as plain values a test changes. */
 export interface FakeHost {
   readonly running: Ref.Ref<ReadonlyArray<string>>
+  readonly jobs: Ref.Ref<number>
   readonly sessions: Ref.Ref<ReadonlyArray<HostSession>>
   /** The exit codes DSH was asked to exit with; the exit hook is a plain callback, so it records synchronously. */
   readonly exits: Effect.Effect<ReadonlyArray<number>>
@@ -15,6 +16,7 @@ export interface FakeHost {
 
 export const makeFakeHost = Effect.all({
   running: Ref.make<ReadonlyArray<string>>([]),
+  jobs: Ref.make(0),
   sessions: Ref.make<ReadonlyArray<HostSession>>([]),
   prompts: Ref.make<ReadonlyArray<{ readonly sessionId: string; readonly requestId: string; readonly text: string }>>([]),
   persistenceFails: Ref.make(false),
@@ -37,6 +39,7 @@ export const fakeSidebarHost = (fake: FakeHost, options: { readonly exitHook?: b
     SidebarHost,
     SidebarHost.of({
       runningSessionIds: Ref.get(fake.running),
+      runningJobCount: Ref.get(fake.jobs),
       sessions: Ref.get(fake.sessions),
       workspaces: Effect.succeed([]),
       archivedSessionIds: Effect.succeed([]),

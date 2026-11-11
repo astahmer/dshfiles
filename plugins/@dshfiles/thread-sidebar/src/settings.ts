@@ -137,6 +137,16 @@ export const threadSidebarSettings = defineSettings({
       .max(600)
       .default(DEFAULT_PREFERENCES.resumeAfterRestartDelaySeconds)
       .description('Seconds to wait after DSH starts before the automatic resume, so plugins and providers finish loading.'),
+    autoRestartWhenIdle: Schema.boolean()
+      .default(true)
+      .description(
+        'Restart DSH by itself to apply a plugin or profile update that needs a Host restart, once no turn, subagent, background job or open question has run for the quiet period. A 30 s notice with Postpone comes first. Needs DSH started through the supervised launcher (scripts/dsh-launcher); otherwise the notice shows that command and nothing restarts.',
+      ),
+    autoRestartQuietSeconds: Schema.natural()
+      .min(30)
+      .max(3600)
+      .default(60)
+      .description('Seconds DSH must stay idle before the automatic restart; the last 30 s show the restart notice.'),
     subscriptionNoticeLevel: Schema.union(SUBSCRIPTION_NOTICE_LEVELS)
       .default('all')
       .description(

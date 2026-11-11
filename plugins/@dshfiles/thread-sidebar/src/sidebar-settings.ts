@@ -2,6 +2,7 @@ import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { Clock, Context, Effect, Layer, Schedule, Semaphore, Stream, SubscriptionRef } from 'effect'
+import type { AutoRestartPolicy } from './auto-restart.js'
 import type { AutoSettlePolicy } from './organization.js'
 import { threadSidebarSettings } from './settings.js'
 import { SidebarSettingsWriteFailed } from './sidebar-errors.js'
@@ -54,6 +55,7 @@ export class SidebarSettings extends Context.Service<
     /** Every change of the auto-settle policy after the current one; other sidebar writes do not emit. */
     readonly policyChanges: Stream.Stream<AutoSettlePolicy>
     readonly autoResume: Effect.Effect<AutoResumePolicy>
+    readonly autoRestart: Effect.Effect<AutoRestartPolicy>
     readonly subscriptionNoticeLevel: Effect.Effect<SubscriptionNoticeLevel>
     readonly subscriptionDelivery: Effect.Effect<SubscriptionDeliveryMode>
     /** Settle several threads in one write, keeping the first settle instant of each and dropping their parked mark. */
@@ -104,6 +106,7 @@ export class SidebarSettings extends Context.Service<
           maxThreads: value.resumeAfterRestartMaxThreads,
           delaySeconds: value.resumeAfterRestartDelaySeconds,
         })),
+        autoRestart: Effect.map(settings.get, value => ({ enabled: value.autoRestartWhenIdle, quietSeconds: value.autoRestartQuietSeconds })),
         subscriptionNoticeLevel: Effect.map(settings.get, value => value.subscriptionNoticeLevel),
         subscriptionDelivery: Effect.map(settings.get, value => value.subscriptionDelivery),
         settle: Effect.fn('settled threads settle')(function* (sessionIds) {

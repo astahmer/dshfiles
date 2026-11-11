@@ -305,6 +305,9 @@ export default defineClient({
             manual: translate('threadSidebarUpdatesManual'),
             restart: translate('threadSidebarRestart'),
             restartWhenIdle: translate('threadSidebarRestartWhenIdle'),
+            autoCountdown: seconds => translate('threadSidebarAutoRestartCountdown', { seconds }),
+            postpone: translate('threadSidebarAutoRestartPostpone'),
+            autoUnsupervised: translate('threadSidebarAutoRestartUnsupervised'),
           }}
         />
       )

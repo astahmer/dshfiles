@@ -1,8 +1,9 @@
 import type { StatusItemProps } from '@dshfiles/frame-layout/status-strip'
-import { useRegistry } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, useRegistry } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { threadSidebarRestartApi, type AutoRestartStatusWire } from './restart-api.js'
 import { RestartBridge, type RestartRequest } from './restart-bridge.js'
 import { PendingRestartSources, type PendingRestartSource } from './restart-sources.js'
 
@@ -13,6 +14,48 @@ export interface RestartStatusText {
   readonly manual: string
   readonly restart: string
   readonly restartWhenIdle: string
+  /** "Restarting to apply updates in 30 s" while the automatic restart counts down. */
+  readonly autoCountdown: (seconds: number) => string
+  readonly postpone: string
+  /** No supervisor can restart DSH: start it with this command. */
+  readonly autoUnsupervised: string
+}
+
+const AUTO_RESTART_POLL_MS = 5_000
+
+/** The Host's automatic-restart state, polled while the item is mounted; undefined on a Host without it. */
+const useAutoRestart = (): { readonly status: AutoRestartStatusWire | undefined; readonly secondsLeft: number | null; readonly refetch: () => void } => {
+  const query = useApiQuery(threadSidebarRestartApi, 'autoRestartStatus', { input: {} })
+  const refetch = query.refetch
+  const status = query.status === 'error' ? undefined : query.data
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const poll = window.setInterval(() => {
+      if (!document.hidden) refetch()
+    }, AUTO_RESTART_POLL_MS)
+    return () => window.clearInterval(poll)
+  }, [refetch])
+  const counting = status?.phase === 'countdown'
+  useEffect(() => {
+    if (!counting) return
+    const tick = window.setInterval(() => setTick(count => count + 1), 1_000)
+    return () => window.clearInterval(tick)
+  }, [counting])
+  // A page that saw the automatic restart begin reloads once the new Host answers: the Host halves it held back
+  // only take effect in the page with their client bundles, and the page would otherwise keep showing the old notice.
+  const followed = useRef<{ readonly run: string; readonly restarting: boolean } | null>(null)
+  useEffect(() => {
+    if (status === undefined) return
+    const previous = followed.current
+    if (previous !== null && previous.restarting && previous.run !== status.run) {
+      window.location.reload()
+      return
+    }
+    const restarting = status.phase === 'countdown' || status.phase === 'restarting' || (previous?.restarting === true && previous.run === status.run)
+    followed.current = { run: status.run, restarting }
+  }, [status])
+  const secondsLeft = counting && status.restartAt !== null ? Math.max(0, Math.ceil((status.restartAt - Date.now()) / 1000)) : null
+  return { status, secondsLeft, refetch }
 }
 
 const NO_PACKAGES: readonly string[] = []
@@ -48,10 +91,17 @@ export const RestartStatusItem = (props: StatusItemProps & { readonly text: Rest
   const notice = useSyncExternalStore(RestartBridge.subscribe, RestartBridge.read, RestartBridge.read)
   const sources = useRegistry(PendingRestartSources)
   const sourcePackages = useSourcePackages(sources)
-  const plugins = useMemo(() => RestartBridge.combine([notice.hostPlugins, sourcePackages]), [notice.hostPlugins, sourcePackages])
+  const auto = useAutoRestart()
+  const autoUpdates = auto.status?.updates ?? NO_PACKAGES
+  const plugins = useMemo(() => RestartBridge.combine([notice.hostPlugins, sourcePackages, autoUpdates]), [notice.hostPlugins, sourcePackages, autoUpdates])
   const [open, setOpen] = useState(false)
-  if (plugins.length === 0 && notice.waitingLabel === null) return null
-  const label = notice.waitingLabel ?? props.text.pending(plugins.length)
+  const restartApi = useApi(threadSidebarRestartApi)
+  if (plugins.length === 0 && notice.waitingLabel === null && auto.secondsLeft === null) return null
+  const label = auto.secondsLeft === null ? (notice.waitingLabel ?? props.text.pending(plugins.length)) : props.text.autoCountdown(auto.secondsLeft)
+  const postpone = (): void => {
+    setOpen(false)
+    void restartApi.safe.postponeAutoRestart({}).then(() => auto.refetch())
+  }
   const run = (request: RestartRequest): void => {
     setOpen(false)
     RestartBridge.request(request)
@@ -79,8 +129,21 @@ export const RestartStatusItem = (props: StatusItemProps & { readonly text: Rest
             </ul>
           </div>
         )}
+        {auto.status?.phase === 'unsupervised' && auto.status.command !== null ? (
+          <div className="dshx:flex dshx:flex-col dshx:gap-1">
+            <p className="dshx:text-xs dshx:text-muted-foreground">{props.text.autoUnsupervised}</p>
+            <code className="dshx:break-all dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:py-0.5 dshx:font-mono dshx:text-xs" data-testid="auto-restart-command">
+              {auto.status.command}
+            </code>
+          </div>
+        ) : null}
         {notice.available ? (
           <div className="dshx:flex dshx:flex-wrap dshx:justify-end dshx:gap-2">
+            {auto.secondsLeft === null ? null : (
+              <Button type="button" variant="outline" size="sm" onClick={postpone}>
+                {props.text.postpone}
+              </Button>
+            )}
             {notice.waitingLabel === null ? (
               <Button type="button" variant="outline" size="sm" onClick={() => run('restart-when-idle')}>
                 {props.text.restartWhenIdle}

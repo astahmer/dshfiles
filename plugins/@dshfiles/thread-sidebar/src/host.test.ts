@@ -135,6 +135,8 @@ describe('thread-sidebar Host event wiring', () => {
     expect(threadSidebarSettings.schema({}).resumeAfterRestart).toBe(false)
     expect(threadSidebarSettings.schema({}).resumeAfterRestartMaxThreads).toBe(5)
     expect(threadSidebarSettings.schema({}).resumeAfterRestartDelaySeconds).toBe(10)
+    expect(threadSidebarSettings.schema({}).autoRestartWhenIdle).toBe(true)
+    expect(threadSidebarSettings.schema({}).autoRestartQuietSeconds).toBe(60)
   })
 
   it.effect('promotes the turns a crash left open as interrupted rows and never resumes them on its own', () =>
