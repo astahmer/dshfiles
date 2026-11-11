@@ -17,6 +17,7 @@ import { providerModelLabel } from './route-label.js'
 const subagentArgumentsSchema = Schema.StructWithRest(
   Schema.Struct({
     prompt: Schema.optional(Schema.String),
+    description: Schema.optional(Schema.String),
     provider: Schema.optional(Schema.String),
     model: Schema.optional(Schema.String),
   }),
@@ -61,7 +62,8 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     lastTurnCompleted: feedTurn ?? listedTurn,
   })
   const name = subagentName({ sessionId: props.sessionId, callId: props.callId })
-  const heading = routeLabel === undefined ? `${props.t('tool.title.subagent')} · ${name}` : `${props.t('tool.title.subagent')} · ${name} · ${routeLabel}`
+  const task = args?.description?.trim()
+  const heading = [props.t('tool.title.subagent'), name, task === '' ? undefined : task, routeLabel].filter(part => part !== undefined).join(' · ')
   const title = childId === undefined ? heading : `${heading} · ${subagentStateLabel(props.preview.t, state)}`
   const disclosure = props.useDisclosure()
   const prompt = args?.prompt?.trim()

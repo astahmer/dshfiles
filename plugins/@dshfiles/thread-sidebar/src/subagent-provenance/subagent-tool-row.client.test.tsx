@@ -45,11 +45,13 @@ const props = ({
   provider,
   model,
   prompt = 'Review this change',
+  description,
   expanded = false,
 }: {
   provider: string
   model: string
   prompt?: string
+  description?: string
   expanded?: boolean
 }): Props => ({
   phase: 'start',
@@ -63,8 +65,8 @@ const props = ({
     step: 1,
     time: 1,
     subCalls: [],
-    argsRaw: JSON.stringify({ prompt, provider, model }),
-    args: PartialArguments.fromText(JSON.stringify({ prompt, provider, model })),
+    argsRaw: JSON.stringify({ prompt, provider, model, description }),
+    args: PartialArguments.fromText(JSON.stringify({ prompt, provider, model, description })),
   },
   callId: 'call-1',
   toolName: 'subagent',
@@ -145,6 +147,11 @@ describe('SubagentProvenanceToolRow', () => {
   it('shows a readable subagent name and the requested provider/model', () => {
     render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna' })} />)
     expect(screen.getByText(/^Create subagent · [A-Z][a-z]+ [A-Z][a-z]+ · openai\/gpt-6\.1-luna$/)).not.toBeNull()
+  })
+
+  it('names the delegated task between the subagent name and its route', () => {
+    render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description: '  Optimize traces plugin ' })} />)
+    expect(screen.getByText(/^Create subagent · [A-Z][a-z]+ [A-Z][a-z]+ · Optimize traces plugin · openai\/gpt-6\.1-luna$/)).not.toBeNull()
   })
 
   it('keeps the full prompt out of the collapsed preview', () => {
