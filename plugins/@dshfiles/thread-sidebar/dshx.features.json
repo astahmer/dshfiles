@@ -3849,8 +3849,8 @@
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify supervisor\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
-        "hover text \"Notify supervisor\" at 8,8",
-        "rightclick text \"Notify target\" at 8,8",
+        "hover tab \"Threads\"",
+        "rightclick button \"Notify target*\" at 8,8",
         "click menuitem \"Notify “Notify supervisor” when this thread finishes\"",
         "expect menuitemradio \"Only when stuck\""
       ]
