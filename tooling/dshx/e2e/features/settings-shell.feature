@@ -30,7 +30,7 @@ Feature: Settings shell
   @smoke
   @scenario:settings-shell.tab
   Scenario: Settings opens as a tab when main-tabs is loaded
-    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/settings-shell, @dshfiles/main-tabs" is booted
     When Settings is opened from the sidebar
     Then Settings fills the main view under its own tab
 

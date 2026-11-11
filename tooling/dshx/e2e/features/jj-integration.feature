@@ -103,7 +103,7 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.new-thread-from-thread-workspace-isolation-browser-journey
   Scenario: An inherited thread workspace is replaced only on the first send
-    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/multi-host, @dshfiles/settings-shell" is booted
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/main-tabs, @dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/multi-host, @dshfiles/settings-shell" is booted
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
     And a message is sent in the thread workspace
@@ -156,7 +156,7 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.backlog-stays-selected-during-first-send-browser-journey
   Scenario: A delayed New thread send leaves Backlog selected
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/multi-host, @dshfiles/ai-accounts, @dshfiles/main-tabs, @dshfiles/backlog, @dshfiles/settings-shell" is booted
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/multi-host, @dshfiles/ai-accounts, @dshfiles/frame-layout, @dshfiles/main-tabs, @dshfiles/backlog, @dshfiles/settings-shell" is booted
     When a Command Code account backed by a local fake provider is added
     And the New thread screen is reopened
     And a disposable jj repository is chosen as the New thread project
