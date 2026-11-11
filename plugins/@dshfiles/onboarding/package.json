@@ -67,8 +67,17 @@
     "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-plugin-manager": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/schemastery": "^3.18.4",
     "@dshfiles/thread-sidebar": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-plugin-manager": {
+      "optional": true
+    }
   },
   "dsh": {
     "bundle": {

@@ -53,6 +53,7 @@
     "plugins/@dshfiles/storage-json/src/native/**",
     "**/*.snapshot.json",
     "plugins/@dshfiles/plugin-guide/src/generated/**",
+    "plugins/@dshfiles/onboarding/src/generated/**",
     "tooling/dshx/e2e/fixtures/tool-schemas.json",
     "tooling/dshx/packages/dshx/tests/fixtures/effect-api-tool-schema.json"
   ]

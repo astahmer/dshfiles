@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as Schema from 'effect/Schema'
@@ -13,30 +14,35 @@ const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(pluginRoot, '..', '..', '..')
 const pluginsDir = join(repoRoot, 'plugins', '@dshfiles')
 const catalogFile = join(pluginRoot, 'src', 'generated', 'feature-catalog.ts')
-const generate = (mode?: '--check') =>
-  spawnSync(process.execPath, ['--experimental-strip-types', 'scripts/generate-catalog.ts', ...(mode === undefined ? [] : [mode])], { cwd: pluginRoot, encoding: 'utf8' })
+const generate = (input: { readonly out: string; readonly check?: boolean }) =>
+  spawnSync(process.execPath, ['--experimental-strip-types', 'scripts/generate-catalog.ts', '--out', input.out, ...(input.check === true ? ['--check'] : [])], {
+    cwd: pluginRoot,
+    encoding: 'utf8',
+  })
 
 const pluginDirectories = readdirSync(pluginsDir).filter(name => existsSync(join(pluginsDir, name, 'package.json')))
 
 describe('onboarding feature catalog', () => {
   it('is current with the feature catalogs it is generated from', () => {
-    const output = execFileSync(process.execPath, ['--experimental-strip-types', 'scripts/generate-catalog.ts', '--check'], { cwd: pluginRoot, encoding: 'utf8' })
+    const output = execFileSync(process.execPath, ['--experimental-strip-types', 'scripts/generate-catalog.ts', '--check'], {
+      cwd: pluginRoot,
+      encoding: 'utf8',
+    })
     expect(output).toContain('Onboarding catalog is current')
   }, 30_000)
 
   it('fails the check on a hand-edited catalog and passes again after regenerating', () => {
-    const backup = `${catalogFile}.bak`
-    copyFileSync(catalogFile, backup)
+    const scratch = mkdtempSync(join(tmpdir(), 'onboarding-catalog-'))
+    const out = join(scratch, 'feature-catalog.ts')
     try {
-      writeFileSync(catalogFile, readFileSync(catalogFile, 'utf8').replace('"schemaVersion": 1', '"schemaVersion": 1, "edited": true'))
-      const stale = generate('--check')
+      writeFileSync(out, readFileSync(catalogFile, 'utf8').replace('"schemaVersion": 1', '"schemaVersion": 1, "edited": true'))
+      const stale = generate({ out, check: true })
       expect(stale.status).toBe(1)
       expect(stale.stderr).toContain('is stale: run `pnpm --dir plugins/@dshfiles/onboarding generate`')
-      expect(generate().status).toBe(0)
-      expect(generate('--check').status).toBe(0)
+      expect(generate({ out }).status).toBe(0)
+      expect(generate({ out, check: true }).status).toBe(0)
     } finally {
-      copyFileSync(backup, catalogFile)
-      rmSync(backup)
+      rmSync(scratch, { recursive: true, force: true })
     }
   }, 60_000)
 

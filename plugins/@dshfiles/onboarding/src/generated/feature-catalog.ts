@@ -335,8 +335,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     {
       "name": "onboarding",
       "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and a read-only onboarding_overview agent tool.",
-      "ui": false,
-      "features": 0
+      "ui": true,
+      "features": 2
     },
     {
       "name": "optmem-core",
@@ -5268,6 +5268,53 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         "expect heading \"Remote threads\""
       ],
       "onboarding": null
+    },
+    {
+      "key": "onboarding#getting-started",
+      "plugin": "onboarding",
+      "id": "getting-started",
+      "title": "See what this setup can do and what it still needs on one page",
+      "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (AI account configured, project added, project is a jj or git repository, GitHub CLI signed in) with a fix action for each open ite…",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started; palette: Onboarding: Getting started",
+      "reach": [
+        "click tab \"Knowledge\"",
+        "click button \"Getting started\"",
+        "expect heading \"Getting started\""
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and fix each open checklist item.",
+        "doneWhen": "Every checklist item shows Done.",
+        "open": {
+          "panel": "dshfiles-onboarding"
+        }
+      }
+    },
+    {
+      "key": "onboarding#setup-wizard",
+      "plugin": "onboarding",
+      "id": "setup-wizard",
+      "title": "Get set up in three steps: account, project, first task",
+      "summary": "While no thread is open, a three-step setup wizard links to AI accounts, Settings › Projects and workspace isolation, ticks each step from the live checklist, and ends by inserting a starter prompt into the composer without sending it. Skip, Back and Next on every step; the outc…",
+      "destination": "threads",
+      "currentSurface": "empty thread view (first run); palette: Onboarding: Show the setup wizard",
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Show the setup wizard\"",
+        "click option \"Onboarding: Show the setup wizard*\"",
+        "expect region \"Connect an AI account\""
+      ],
+      "onboarding": {
+        "prerequisites": [
+          "account",
+          "project"
+        ],
+        "firstAction": "Run Onboarding: Show the setup wizard from the command palette.",
+        "doneWhen": "A starter prompt waits in the composer.",
+        "open": {
+          "command": "@dshfiles/onboarding.wizard"
+        }
+      }
     },
     {
       "key": "optmem-core#credential-redaction",

@@ -146,7 +146,7 @@ describe('feature search', () => {
     const value = OnboardingOverview.overview({ catalog: FEATURE_CATALOG, facts: facts(), states: null, request: {}, curatedDefault: true })
     const text = OnboardingOverview.render(value)
     expect(text.length).toBeLessThanOrEqual(6_000)
-    expect(text).toContain('- [x] An AI account is configured')
+    expect(text).toContain('- [x] A model provider is set up')
     expect(text).toContain('Versioning workflow')
   })
 })

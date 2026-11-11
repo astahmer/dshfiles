@@ -58,6 +58,7 @@ describe('onboarding Host', () => {
         { id: 'w2', title: 'thread', path: `${repository}-threads/thread-abc123` },
       ],
     } as never)
+    host.ctx.provide('subprocess', {} as never)
     host.ctx.provide('llm', { listProviders: () => [{ id: 'deepseek' }] } as never)
     host.ctx.provide('pluginManager', {
       listPlugins: async () => [

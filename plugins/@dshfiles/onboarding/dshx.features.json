@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "getting-started",
+      "title": "See what this setup can do and what it still needs on one page",
+      "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (AI account configured, project added, project is a jj or git repository, GitHub CLI signed in) with a fix action for each open item, the eight plugin packs with every plugin enabled, disabled or not installed plus its prerequisites and key settings, and a curated-first search over every catalogued feature grouped by destination, with an Open button only where the route is registered. The onboarding_overview agent tool returns the same checklist, packs and rows. It changes nothing.",
+      "reach": ["click tab \"Knowledge\"", "click button \"Getting started\"", "expect heading \"Getting started\""],
+      "surfaces": ["client", "host", "api", "tool", "command", "settings"],
+      "surface": "destinationSection",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started; palette: Onboarding: Getting started",
+      "configuration": [
+        {
+          "key": "checklist",
+          "defaultValue": "true",
+          "constraints": "Boolean; off hides the checklist and skips every Host check.",
+          "coveredBy": ["onboarding.host-overview"]
+        },
+        {
+          "key": "githubCheck",
+          "defaultValue": "true",
+          "constraints": "Boolean; off reports the GitHub item as off and never runs gh.",
+          "coveredBy": ["onboarding.host-overview"]
+        },
+        {
+          "key": "packs",
+          "defaultValue": "true",
+          "constraints": "Boolean; off hides the packs section.",
+          "coveredBy": ["onboarding.page"]
+        },
+        {
+          "key": "curatedOnly",
+          "defaultValue": "true",
+          "constraints": "Boolean; applies only until a search query is typed.",
+          "coveredBy": ["onboarding.feature-search"]
+        }
+      ],
+      "states": ["loading", "checklist-done", "checklist-open", "host-unreadable", "no-match"],
+      "failureModes": [
+        "A Host without the model service, workspace registry or plugin manager reports that item or plugin as unknown instead of guessing.",
+        "gh missing or slower than five seconds shows Install the GitHub CLI or unknown; its output is never read.",
+        "A row whose panel, command or Settings place is not registered shows no Open button."
+      ],
+      "externalDependencies": [
+        {
+          "id": "github-cli",
+          "boundary": "Runs `gh auth status --hostname github.com` on the Host at most once a minute while the page or the agent asks; only the exit code is read.",
+          "deterministicFake": "src/host.test.ts runs the real check against fake gh scripts that exit 0 and 1, and a missing path."
+        }
+      ],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "onboarding gh auth",
+          "file": "plugins/@dshfiles/onboarding/src/host.test.ts",
+          "testName": "records one onboarding gh auth span per run with its status"
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and fix each open checklist item.",
+        "doneWhen": "Every checklist item shows Done.",
+        "open": { "panel": "dshfiles-onboarding" }
+      },
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "onboarding.getting-started",
+          "featureFile": "tooling/dshx/e2e/features/onboarding.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "onboarding.host-overview",
+          "file": "plugins/@dshfiles/onboarding/src/host.test.ts",
+          "testName": "serves the overview over its API and as the read-only onboarding_overview tool"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.page",
+          "file": "plugins/@dshfiles/onboarding/src/getting-started-page.test.tsx",
+          "testName": "shows the checklist, packs and features, and opens only registered routes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.feature-search",
+          "file": "plugins/@dshfiles/onboarding/src/overview-model.test.ts",
+          "testName": "lists curated rows first until the user searches, with the bundle route or the block route"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.catalog-current",
+          "file": "plugins/@dshfiles/onboarding/src/catalog.test.ts",
+          "testName": "fails the check on a hand-edited catalog and passes again after regenerating"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.packs",
+          "file": "plugins/@dshfiles/onboarding/src/catalog.test.ts",
+          "testName": "name only plugin directories that exist, with one Core pack"
+        }
+      ]
+    },
+    {
+      "id": "setup-wizard",
+      "title": "Get set up in three steps: account, project, first task",
+      "summary": "While no thread is open, a three-step setup wizard links to AI accounts, Settings › Projects and workspace isolation, ticks each step from the live checklist, and ends by inserting a starter prompt into the composer without sending it. Skip, Back and Next on every step; the outcome is kept per browser. Onboarding: Show the setup wizard and Start setup on Getting started replay it. It makes no model request.",
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Show the setup wizard\"",
+        "click option \"Onboarding: Show the setup wizard*\"",
+        "expect region \"Connect an AI account\""
+      ],
+      "surfaces": ["client", "command", "settings"],
+      "surface": "detail",
+      "destination": "threads",
+      "currentSurface": "empty thread view (first run); palette: Onboarding: Show the setup wizard",
+      "configuration": [
+        {
+          "key": "wizard",
+          "defaultValue": "true",
+          "constraints": "Boolean; off never shows the wizard on first run. The palette command still replays it.",
+          "coveredBy": ["onboarding.wizard"]
+        }
+      ],
+      "states": ["account", "project", "first-task", "inserted", "no-composer", "skipped", "done"],
+      "failureModes": [
+        "No composer on screen: Insert prompt opens a new thread draft holding the prompt instead.",
+        "Settings shell absent: the workspace isolation button is hidden."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only flow: it links to other pages and inserts text, and its checklist read is the getting-started API call."
+        }
+      ],
+      "onboarding": {
+        "prerequisites": ["account", "project"],
+        "firstAction": "Run Onboarding: Show the setup wizard from the command palette.",
+        "doneWhen": "A starter prompt waits in the composer.",
+        "open": { "command": "@dshfiles/onboarding.wizard" }
+      },
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "onboarding.wizard-journey",
+          "featureFile": "tooling/dshx/e2e/features/onboarding.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.wizard",
+          "file": "plugins/@dshfiles/onboarding/src/setup-wizard.test.tsx",
+          "testName": "walks account, project and first task, inserts the prompt without sending, and reports skip"
+        }
+      ]
+    }
+  ]
+}

@@ -4,7 +4,20 @@ import { CURATED_BUNDLES } from './curation.js'
 import { PACKS } from './packs.js'
 
 /** Rail destinations in rail order, then the active thread's regions; `none` sorts last. */
-export const DESTINATION_ORDER = ['threads', 'inbox', 'land', 'work', 'agents', 'observe', 'knowledge', 'settings', 'thread-panel', 'composer', 'transcript', 'none'] as const
+export const DESTINATION_ORDER = [
+  'threads',
+  'inbox',
+  'land',
+  'work',
+  'agents',
+  'observe',
+  'knowledge',
+  'settings',
+  'thread-panel',
+  'composer',
+  'transcript',
+  'none',
+] as const
 
 const checklistStateSchema = Schema.Literals(['done', 'todo', 'unknown', 'off'])
 export const checklistItemSchema = Schema.Struct({
@@ -83,14 +96,14 @@ const checklist = (facts: ChecklistFacts): readonly ChecklistItem[] => {
   return [
     {
       id: 'account',
-      title: 'An AI account is configured',
+      title: 'A model provider is set up',
       state: facts.providers === null ? 'unknown' : facts.providers > 0 ? 'done' : 'todo',
       detail:
         facts.providers === null
           ? 'This Host serves no model service to ask.'
           : facts.providers > 0
-            ? `${String(facts.providers)} model provider${facts.providers === 1 ? '' : 's'} configured.`
-            : 'No model provider is configured yet.',
+            ? `${String(facts.providers)} model provider${facts.providers === 1 ? '' : 's'} registered. AI accounts shows whether each has a working credential.`
+            : 'No model provider is registered yet.',
       fix: { label: 'Open AI accounts', route: accountsRoute, shellCommand: null },
     },
     {
@@ -128,12 +141,20 @@ const checklist = (facts: ChecklistFacts): readonly ChecklistItem[] => {
         failed: 'gh auth status did not answer in time.',
         off: 'The GitHub check is off in Settings › Onboarding.',
       }[facts.github],
-      fix: { label: facts.github === 'missing' ? 'Install the GitHub CLI' : 'Sign in with gh', route: null, shellCommand: facts.github === 'missing' ? 'https://cli.github.com' : 'gh auth login' },
+      fix: {
+        label: facts.github === 'missing' ? 'Install the GitHub CLI' : 'Sign in with gh',
+        route: null,
+        shellCommand: facts.github === 'missing' ? 'https://cli.github.com' : 'gh auth login',
+      },
     },
   ]
 }
 
-const packs = (input: { readonly catalog: FeatureCatalog; readonly states: ReadonlyMap<string, PluginState> | null; readonly checklist: readonly ChecklistItem[] | null }): readonly PackView[] =>
+const packs = (input: {
+  readonly catalog: FeatureCatalog
+  readonly states: ReadonlyMap<string, PluginState> | null
+  readonly checklist: readonly ChecklistItem[] | null
+}): readonly PackView[] =>
   PACKS.map(pack => ({
     id: pack.id,
     title: pack.title,
@@ -178,7 +199,10 @@ const DEFAULT_LIMIT = 60
 
 /** Rows for a query: every word must match title, plugin, summary or where it lives; curated-only applies until the user searches. */
 const features = (catalog: FeatureCatalog, input: OverviewInput & { readonly curatedDefault: boolean }) => {
-  const words = (input.query ?? '').toLocaleLowerCase().split(/\s+/u).filter(word => word.length > 0)
+  const words = (input.query ?? '')
+    .toLocaleLowerCase()
+    .split(/\s+/u)
+    .filter(word => word.length > 0)
   const curatedOnly = words.length === 0 && (input.curatedOnly ?? input.curatedDefault)
   const matching = catalog.features
     .map(rowOf)
@@ -226,9 +250,7 @@ const render = (value: Overview): string => {
     ...(value.checklist ?? []).map(item => `- [${item.state === 'done' ? 'x' : ' '}] ${item.title} — ${item.detail}`),
     ...(value.checklist === null ? ['(checklist off in Settings › Onboarding)'] : []),
     '## Packs',
-    ...value.packs.map(
-      pack => `- ${pack.title}${pack.core ? ' (core)' : ''}: ${pack.plugins.map(plugin => `${plugin.name} ${plugin.state}`).join(', ')}`,
-    ),
+    ...value.packs.map(pack => `- ${pack.title}${pack.core ? ' (core)' : ''}: ${pack.plugins.map(plugin => `${plugin.name} ${plugin.state}`).join(', ')}`),
     `## Features (${String(value.features.rows.length)} of ${String(value.features.total)}${value.features.curatedOnly ? ', curated' : ''})`,
     ...value.features.rows.map(row => `- [${row.destination}] ${row.title} (${row.plugin})${row.currentSurface === null ? '' : ` — ${row.currentSurface}`}`),
   ]
@@ -244,4 +266,3 @@ export class OnboardingOverview {
   static readonly render = render
   static readonly rowOf = rowOf
 }
-

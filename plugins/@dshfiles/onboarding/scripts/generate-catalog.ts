@@ -5,7 +5,7 @@
  * block this page reads is one `features:check` accepts.
  *
  * Nothing here reads a running Host or the network. Run with `node --experimental-strip-types scripts/generate-catalog.ts`;
- * pass `--check` to fail instead of writing when the checked-in catalog is stale.
+ * pass `--check` to fail instead of writing when the checked-in catalog is stale, and `--out <file>` to use another file.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
@@ -15,13 +15,16 @@ const here = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(here, '..')
 const repoRoot = join(pluginRoot, '..', '..', '..')
 const pluginsDir = join(repoRoot, 'plugins', '@dshfiles')
-const outFile = join(pluginRoot, 'src', 'generated', 'feature-catalog.ts')
+const outIndex = process.argv.indexOf('--out')
+const outArgument = outIndex >= 0 ? process.argv[outIndex + 1] : undefined
+const outFile = outArgument ?? join(pluginRoot, 'src', 'generated', 'feature-catalog.ts')
 const featureSchemaFile = join(repoRoot, 'tooling', 'dshx', 'packages', 'dshx', 'src', 'project', 'features.ts')
 
 const repoPath = (file: string): string => relative(repoRoot, file).split('\\').join('/')
 const read = (file: string): string => readFileSync(file, 'utf8')
 
 // SAFETY: features.ts exports featureCatalogIssues as (value: unknown) => readonly string[].
+// oxlint-disable-next-line antislop/no-unknown-parameters -- the dshx schema check is the decode boundary for each raw catalog.
 const featureSchema = (await import(pathToFileURL(featureSchemaFile).href)) as { readonly featureCatalogIssues: (value: unknown) => readonly string[] }
 
 const SUMMARY_LIMIT = 280

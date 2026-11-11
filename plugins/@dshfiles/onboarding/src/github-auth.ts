@@ -25,7 +25,10 @@ const drain = <E>(stream: Stream.Stream<Uint8Array, E>) => Stream.runDrain(strea
 export const checkGithubAuth = (input: { readonly executable: string }): Effect.Effect<GithubAuthStatus, never, ChildProcessSpawner.ChildProcessSpawner> =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const command = ChildProcess.make(input.executable, ['auth', 'status', '--hostname', 'github.com'], { stdin: 'ignore', forceKillAfter: Duration.seconds(1) })
+    const command = ChildProcess.make(input.executable, ['auth', 'status', '--hostname', 'github.com'], {
+      stdin: 'ignore',
+      forceKillAfter: Duration.seconds(1),
+    })
     return yield* Effect.scoped(
       Effect.gen(function* () {
         const process = yield* spawner.spawn(command)

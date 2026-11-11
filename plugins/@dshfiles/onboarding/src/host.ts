@@ -15,6 +15,7 @@ const facts = SetupFacts.layer({ githubExecutable: 'gh' }).pipe(
 /** Serves the build-time feature catalog with the live setup facts; it changes nothing. */
 export default DshxPlugin.make({
   name: 'dshfiles-onboarding',
+  inject: ['subprocess'],
   settings: [onboardingSettings],
   layer: facts,
   apis: [
