@@ -1330,9 +1330,9 @@ The search worker opened its own `DatabaseSync` connection. It now builds on `@d
 (`SqliteClient`), and the ingest pass is an Effect program: `runIngestPass` / `indexSessions` stage file reads,
 frame decode and headers outside any transaction, then write a bounded group (64 sessions, 250 ms, or 8 MiB of
 document text) inside one `sql.withTransaction`. Each commit re-reads the staged sessions' cursors and the archived
-set, so a targeted search or archive change that landed during staging is skipped instead of overwritten. A search
-queues behind at most one group, not a whole pass, and a failing group rolls back every session and FTS row in it
-(`tests/ingest.spec.ts`).
+set, so a targeted search or archive change that landed during staging is skipped instead of overwritten. Searches read
+on their own connection, so they do not queue behind a group commit, and a failing group rolls back every session and FTS
+row in it (`tests/ingest.spec.ts`).
 
 Proof used a copy, never the live file. A read-only SQLite online backup of `plugins/session-search/index.sqlite`
 and its WAL (346 MiB) went to private scratch, and every run copied it again. The corpus was 120 frozen session logs
@@ -1363,6 +1363,37 @@ To reproduce, take a read-only SQLite online backup of the live index (never ope
 `SearchIndex.searchSessions` through the same `SqliteStore.layer` while comparing response digests. The harnesses
 that produced this table were scratch files, removed with the private copy; the plugin suite remains the gate:
 `pnpm --dir plugins/@dshfiles/session-search test`.
+
+### Concurrent search during an ingest group commit (2026-11-11)
+
+The group transaction held the worker's only connection, so a search that arrived while a group committed waited out the
+whole transaction. `pnpm --dir plugins/@dshfiles/session-search bench:commit` measures it through the built worker: 64
+Sessions / 4.88 MiB of document text fill one group, then every log gains two events so a second group commits while one
+search at a time runs back to back. Eight runs (three before, five after) at load 36–42 of 10 CPUs from unrelated work;
+wall drifts with load, so runs are reported as median (range) and process CPU beside them.
+
+| Signal                                                   | Before (one connection) | After (read-only connection + 1 MiB chunks) |
+| -------------------------------------------------------- | ----------------------- | ------------------------------------------- |
+| Worker-reported slowest search during the commit         | 408 ms (190–950)        | **64 ms (38–263)**                          |
+| Client p50 during the commit                             | 16.2 ms (9.6–26.6)      | 13.5 ms (9.8–17.2)                          |
+| Client p95 during the commit (not comparable, see below) | 201 ms (25–417)         | 503 ms (265–576)                            |
+| Idle p95 in the same runs (load reference)               | 72 ms (15–158)          | 80 ms (30–300)                              |
+| Same corpus: documents, sessions, ordering digest        | 256 / 64, identical     | 256 / 64, identical                         |
+| First-build process CPU (write path unchanged)           | 2 713 ms (2 621–2 778)  | 2 729 ms (2 582–2 736)                      |
+| Delta-group process CPU (write path unchanged)           | 1 726 ms (1 517–2 079)  | 1 615 ms (1 496–1 750)                      |
+
+The client-observed p95 is not comparable across variants: before the fix the bench's `health` RPC shared the writer and
+often absorbed the pause, leaving the search RPC fast; after the fix `health` returns at once, so a search that lands
+inside the worker's remaining synchronous work carries it. The worker-reported slowest search isolates the search path:
+408 → 64 ms is the transaction queue the change targets. The residual ~1 s tail at this load is worker-thread scheduling,
+not the transaction pass.
+
+`search-worker.ts` opens a second read-only `SqliteClient` on the same WAL file after the writable store migrated;
+searches and health read the last committed snapshot (the state a search between groups saw), while ingest keeps the only
+writer and the one `sql.withTransaction` group commit. Document inserts stay inside that transaction, chunked by 100 rows
+or 1 MiB of text so one synchronous FTS5 call no longer carries 6.4 MB. `tests/read-connection.spec.ts` proves a read
+completes while a write transaction is open and fails with one connection; the group rollback and stale-cursor tests are
+unchanged.
 
 ## Agent browser mirror cost (2026-11-11)
 
