@@ -250,7 +250,7 @@ const summarize = (
   blockedBy: relations.openBlockersOf(item).map(blocker => BacklogReference.refOf(blocker)),
   lease: leaseView(relations.leaseOf(item)),
   criteriaProgress: BacklogItems.criteriaRollup(item.criteria),
-  planApproval: item.planApproval ?? null,
+  planApproval: item.plan === undefined ? null : (item.planApproval ?? null),
   due: item.due ?? null,
   recurrence: item.recurrence ?? null,
   gates: (item.gates ?? []).map(gate => ({ id: gate.id, kind: gate.kind, target: gate.target, open: BacklogGates.isOpen(gate, DueDates.dateOf(now)) })),
@@ -471,7 +471,7 @@ const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>, acto
   const changed: BacklogHumanField[] = []
   const userChanged = new Set<BacklogHumanField>()
   const recordChange = (field: BacklogHumanField): void => {
-    changed.push(field)
+    if (!changed.includes(field)) changed.push(field)
     userChanged.add(field)
   }
   if (fields.title !== undefined && fields.title.trim() !== '' && fields.title !== item.title) {
@@ -546,10 +546,14 @@ const updateChange = (item: BacklogItem, fields: Omit<BacklogUpdate, 'id'>, acto
   if (fields.plan !== undefined && !sameText(item.plan, fields.plan)) {
     change.plan = fields.plan === null || fields.plan.trim() === '' ? null : fields.plan.slice(0, BacklogItems.maxBodyChars)
     recordChange('plan')
+    if (item.planApproval !== undefined) {
+      change.planApproval = null
+      recordChange('planApproval')
+    }
   }
   // Only the user approves a plan; an agent asks for approval.
   const approval = fields.planApproval === 'approved' && actor.kind !== 'user' ? undefined : fields.planApproval
-  if (approval !== undefined && approval !== (item.planApproval ?? null)) {
+  if (approval !== undefined && approval !== (change.planApproval === undefined ? (item.planApproval ?? null) : change.planApproval)) {
     change.planApproval = approval
     recordChange('planApproval')
     if (approval === 'pending' && fields.attention === undefined && (item.attention ?? 'none') === 'none') {

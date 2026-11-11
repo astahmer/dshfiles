@@ -246,7 +246,7 @@ const inState = (item: BacklogItem, state: SearchState, context: SearchContext):
     case 'summary':
       return item.summary !== undefined
     case 'plan-pending':
-      return item.planApproval === 'pending'
+      return item.plan !== undefined && item.planApproval === 'pending'
     case 'due':
       return item.due !== undefined
     case 'overdue':

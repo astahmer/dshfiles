@@ -71,6 +71,38 @@ describe('item sections', () => {
     }).pipe(Effect.scoped),
   )
 
+  it.effect('drops an approval when the plan changes, unless the same change asks again', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(1_000)
+      const { store } = yield* open
+      const id = (yield* store.capture({ text: 'plan that changes', actor: user })).item.id
+      yield* store.update({ id, plan: '1. read', planApproval: 'pending', actor: agent })
+      yield* store.update({ id, planApproval: 'approved', actor: user })
+
+      const rewritten = detailOf(yield* store.update({ id, plan: '1. read\n2. rewrite', actor: agent }))
+      expect(rewritten.item.planApproval).toBeUndefined()
+      const askedAgain = detailOf(yield* store.update({ id, plan: '1. read\n2. rewrite\n3. ship', planApproval: 'pending', actor: agent }))
+      expect(askedAgain.item.planApproval).toBe('pending')
+      const repeated = detailOf(yield* store.update({ id, plan: '1. ship', planApproval: 'pending', actor: agent }))
+      expect(repeated.item.planApproval).toBe('pending')
+
+      const cleared = detailOf(yield* store.update({ id, plan: null, actor: user }))
+      expect(cleared.item.planApproval).toBeUndefined()
+      expect((yield* store.list({ query: 'is:plan-pending' })).total).toBe(0)
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('shows no pending plan for an item without a plan', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(1_000)
+      const { store } = yield* open
+      const id = (yield* store.capture({ text: 'approval without a plan', actor: user })).item.id
+      yield* store.update({ id, planApproval: 'pending', actor: agent })
+      expect((yield* store.list({ query: 'is:plan-pending' })).total).toBe(0)
+      expect((yield* store.list({})).items.find(item => item.id === id)?.planApproval).toBeNull()
+    }).pipe(Effect.scoped),
+  )
+
   it.effect('keeps a final summary, finds it by text and reverts it from the log', () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(1_000)
