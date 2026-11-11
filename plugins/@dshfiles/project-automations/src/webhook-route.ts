@@ -2,9 +2,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
 import { Clock, Context, Effect, Layer, Option, Result, Schema } from 'effect'
 import { AutomationRunner } from './automation-runner.js'
+import { ProjectAutomationsSettingsTag } from './automation-settings.js'
 import { AutomationStore } from './automation-store.js'
 import { PromptTemplate } from './prompt-template.js'
 import { SlidingWindowLimiter } from './rate-limit.js'
+import { bodyDigestOf, GITHUB_DELIVERY_HEADER, isDeliveryId, WebhookReplayStore } from './webhook-replay-store.js'
 import { ReplayGuard, GITHUB_SIGNATURE_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER, WebhookSignature, type SignatureRejection } from './webhook-signature.js'
 
 /**
@@ -70,7 +72,13 @@ const rejectionDetail = {
   'stale-timestamp': 'Refused: the request timestamp is more than 5 minutes from the DSH Host clock. Sign with the current time and check both clocks.',
   replayed: 'Refused: this exact signed request was already accepted. Send a new request with a fresh timestamp.',
   'ambiguous-signature': `Refused: the request carried both ${SIGNATURE_HEADER} and ${GITHUB_SIGNATURE_HEADER}. Send one scheme only.`,
-} satisfies Record<SignatureRejection, string>
+  'missing-delivery': `Refused: a GitHub webhook must carry ${GITHUB_DELIVERY_HEADER} with GitHub's delivery id. Redeliver from GitHub, or use the timestamped ${SIGNATURE_HEADER} scheme when the sender cannot set it.`,
+  'malformed-delivery': `Refused: ${GITHUB_DELIVERY_HEADER} must be GitHub's delivery id, 8 to 64 letters, digits, underscores or dashes.`,
+  'replayed-delivery': `Refused: this GitHub delivery was already accepted. GitHub reuses ${GITHUB_DELIVERY_HEADER} when it redelivers the same event, so it starts no second thread.`,
+  'replayed-body': `Refused: this signed payload was already accepted under another ${GITHUB_DELIVERY_HEADER}. Send a new event, not a copy of an accepted one.`,
+} satisfies Record<WebhookRejection, string>
+
+type WebhookRejection = SignatureRejection | 'missing-delivery' | 'malformed-delivery' | 'replayed-delivery' | 'replayed-body'
 
 const header = (request: IncomingMessage, name: string): string | undefined => {
   const value = request.headers[name]
@@ -91,6 +99,7 @@ export const handleWebhook = Effect.fn('automation webhook', { kind: 'server' })
   const store = yield* AutomationStore
   const runner = yield* AutomationRunner
   const secrets = yield* SecretReferenceResolver
+  const replay = yield* WebhookReplayStore
   const now = yield* Clock.currentTimeMillis
   yield* Effect.annotateCurrentSpan('http.request.method', request.method ?? 'unknown')
 
@@ -150,23 +159,40 @@ export const handleWebhook = Effect.fn('automation webhook', { kind: 'server' })
   }
   const timestamped = header(request, SIGNATURE_HEADER)
   const githubSignature = header(request, GITHUB_SIGNATURE_HEADER)
-  const verdict =
-    timestamped !== undefined && githubSignature !== undefined
-      ? { ok: false as const, reason: 'ambiguous-signature' as const }
-      : githubSignature === undefined
-        ? WebhookSignature.verify({
-            secret: secret.success.value,
-            body: body.success,
-            signature: timestamped,
-            timestamp: header(request, TIMESTAMP_HEADER),
-            now,
-            guard: guards.replay,
-          })
-        : WebhookSignature.verifyGitHub({ secret: secret.success.value, body: body.success, signature: githubSignature })
-  if (!verdict.ok) {
-    yield* outcome(verdict.reason)
-    yield* runner.reject({ automation, detail: rejectionDetail[verdict.reason] })
-    return yield* reply(response, 401, { ok: false, message: rejectionDetail[verdict.reason] })
+  const reject = (reason: WebhookRejection) =>
+    Effect.gen(function* () {
+      yield* outcome(reason)
+      yield* runner.reject({ automation, detail: rejectionDetail[reason] })
+      return yield* reply(response, 401, { ok: false, message: rejectionDetail[reason] })
+    })
+  if (timestamped !== undefined && githubSignature !== undefined) return yield* reject('ambiguous-signature')
+  const github = githubSignature !== undefined
+  const verdict = github
+    ? WebhookSignature.verifyGitHub({ secret: secret.success.value, body: body.success, signature: githubSignature })
+    : WebhookSignature.verify({
+        secret: secret.success.value,
+        body: body.success,
+        signature: timestamped,
+        timestamp: header(request, TIMESTAMP_HEADER),
+        now,
+        guard: guards.replay,
+      })
+  if (!verdict.ok) return yield* reject(verdict.reason)
+  if (github) {
+    const deliveryId = header(request, GITHUB_DELIVERY_HEADER)?.trim()
+    if (deliveryId === undefined || deliveryId === '') return yield* reject('missing-delivery')
+    if (!isDeliveryId(deliveryId)) return yield* reject('malformed-delivery')
+    const settings = yield* ProjectAutomationsSettingsTag
+    const windowMs = (yield* settings.get).githubDeliveryWindowHours * 3_600_000
+    const claimed = yield* replay.claim({ deliveryId, digest: bodyDigestOf(body.success), now, windowMs }).pipe(Effect.result)
+    if (Result.isFailure(claimed)) {
+      yield* outcome('replay-store-unavailable')
+      return yield* reply(response, 503, {
+        ok: false,
+        message: 'This webhook cannot check for replayed GitHub deliveries right now, so it refused the request. The DSH owner can read why in the Host logs.',
+      })
+    }
+    if (!claimed.success.ok) return yield* reject(claimed.success.reason)
   }
   if (!automation.enabled) {
     yield* outcome('paused')

@@ -16,6 +16,7 @@ import { Schema } from 'effect'
 import { automationRecordSchema, automationsApi, type AutomationRecord } from './automations-api.js'
 import { NAMESPACE } from './automation-store.js'
 import automationsHost from './host.js'
+import { projectAutomationsSettings } from './settings.js'
 import { WebhookSignature } from './webhook-signature.js'
 
 const cleanups: Array<() => Promise<void>> = []
@@ -41,7 +42,7 @@ const eventually = async <A>(read: () => Promise<A | undefined>, timeoutMs = 5_0
 }
 
 /** The sessions owner stands in for session-controller; the secret port stands in for the Secret Catalog. */
-const fixture = async () => {
+const fixture = async (input: { readonly githubDeliveryWindowHours?: number } = {}) => {
   const root = await mkdtemp(join(tmpdir(), 'project-automations-'))
   const host = await createTestHost()
   cleanups.push(async () => {
@@ -52,6 +53,15 @@ const fixture = async () => {
   await ctx.plugin(Storage)
   await ctx.plugin(StorageJson, { root: join(root, 'storage') })
   await ctx.plugin(StorageDomain, { backend: 'json' })
+  if (input.githubDeliveryWindowHours !== undefined) {
+    const value = { githubDeliveryWindowHours: input.githubDeliveryWindowHours }
+    ctx.provide('settings', {
+      configure: () => () => undefined,
+      describe: () => [{ ns: projectAutomationsSettings.namespace, value, revision: 1 }],
+      update: async () => undefined,
+      replace: async () => undefined,
+    })
+  } else ctx.provide('settings', { configure: () => () => undefined, describe: () => [], update: async () => undefined, replace: async () => undefined })
   ctx.provide('workspaceRegistry', {
     list: () => [
       { id: 'project-1', title: 'sample', path: '/tmp/sample', sessionIds: new Set<string>() },
@@ -394,7 +404,7 @@ it('posts into an existing thread when the automation names one, and records a m
   })
 })
 
-it('accepts GitHub webhook signatures over the raw body and refuses tampered or double-signed requests', async () => {
+it('accepts GitHub webhook signatures over the raw body and refuses tampered, double-signed or replayed deliveries', async () => {
   const { automations, created, origin } = await fixture()
   const saved = await automations.save({
     title: 'Push events',
@@ -404,13 +414,14 @@ it('accepts GitHub webhook signatures over the raw body and refuses tampered or 
   })
   const url = `${origin}${saved.webhookPath ?? ''}`
   const body = JSON.stringify({ ref: 'refs/heads/main' })
-  const signature = WebhookSignature.signGitHub({ secret: HOOK_SECRET, body: Buffer.from(body) })
-  const send = (input: { readonly body: string; readonly signature?: string; readonly timestamped?: boolean }) =>
+  const signatureOf = (text: string) => WebhookSignature.signGitHub({ secret: HOOK_SECRET, body: Buffer.from(text) })
+  const send = (input: { readonly body: string; readonly delivery?: string | null; readonly signature?: string; readonly timestamped?: boolean }) =>
     fetch(url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'x-github-event': 'push',
+        ...(input.delivery === null ? {} : { 'x-github-delivery': input.delivery ?? '6f5b0a2e-3c4d-4a8f-9f0e-1c2d3e4f5a6b' }),
         ...(input.timestamped === true
           ? (() => {
               const timestamp = String(Math.floor(Date.now() / 1000))
@@ -419,7 +430,7 @@ it('accepts GitHub webhook signatures over the raw body and refuses tampered or 
                 'x-dsh-signature': WebhookSignature.sign({ secret: HOOK_SECRET, timestamp, body: Buffer.from(input.body) }),
               }
             })()
-          : { 'x-hub-signature-256': input.signature ?? signature }),
+          : { 'x-hub-signature-256': input.signature ?? signatureOf(input.body) }),
       },
       body: input.body,
     })
@@ -428,15 +439,43 @@ it('accepts GitHub webhook signatures over the raw body and refuses tampered or 
   expect(accepted.status).toBe(202)
   expect(created[0]?.prompt).toContain('Handle refs/heads/main')
 
-  const tampered = await send({ body: JSON.stringify({ ref: 'refs/heads/evil' }) })
+  const tampered = await send({
+    body: JSON.stringify({ ref: 'refs/heads/evil' }),
+    delivery: '2b7c8d9e-1111-4222-8333-944455556666',
+    signature: signatureOf(body),
+  })
   expect(tampered.status).toBe(401)
-  const malformed = await send({ body, signature: 'sha256=abc' })
+  expect((await tampered.json()).message).toContain('does not match')
+  const malformed = await send({ body, delivery: '3c8d9e0f-1111-4222-8333-944455556666', signature: 'sha256=abc' })
   expect(malformed.status).toBe(401)
+
+  // GitHub redelivers the same event with the same delivery id and signature: it starts no second thread.
+  const redelivered = await send({ body })
+  expect(redelivered.status).toBe(401)
+  expect((await redelivered.json()).message).toContain('already accepted')
+
+  // The delivery header is not signed, so the same signed body under a new id is still one event resent.
+  const recopied = await send({ body, delivery: '4d9e0f10-1111-4222-8333-944455556666' })
+  expect(recopied.status).toBe(401)
+  expect((await recopied.json()).message).toContain('another')
+
+  const missing = await send({ body: JSON.stringify({ ref: 'refs/heads/next' }), delivery: null })
+  expect(missing.status).toBe(401)
+  expect((await missing.json()).message).toContain('x-github-delivery')
+  const malformedDelivery = await send({ body: JSON.stringify({ ref: 'refs/heads/next' }), delivery: 'short' })
+  expect(malformedDelivery.status).toBe(401)
+
+  // A distinct event has a distinct id and body, so it passes.
+  const distinct = await send({ body: JSON.stringify({ ref: 'refs/heads/next' }), delivery: '5e0f1021-1111-4222-8333-944455556666' })
+  expect(distinct.status).toBe(202)
+  expect(created).toHaveLength(2)
+
   const both = await fetch(url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-hub-signature-256': signature,
+      'x-github-delivery': '6f102132-1111-4222-8333-944455556666',
+      'x-hub-signature-256': signatureOf(body),
       'x-dsh-timestamp': String(Math.floor(Date.now() / 1000)),
       'x-dsh-signature': WebhookSignature.sign({ secret: HOOK_SECRET, timestamp: String(Math.floor(Date.now() / 1000)), body: Buffer.from(body) }),
     },
@@ -444,4 +483,43 @@ it('accepts GitHub webhook signatures over the raw body and refuses tampered or 
   })
   expect(both.status).toBe(401)
   expect((await both.json()).message).toContain('one scheme')
+})
+
+it('keeps GitHub delivery ids across a Host restart and forgets them once their window ends', async () => {
+  const { automations, created, origin, restart, ctx } = await fixture({ githubDeliveryWindowHours: 1 })
+  const saved = await automations.save({
+    title: 'Push events',
+    projectId: 'project-1',
+    prompt: 'Handle {{body.ref}}',
+    trigger: { kind: 'webhook', secretRef: 'secret:HOOK', ratePerMinute: 10 },
+  })
+  const url = `${origin}${saved.webhookPath ?? ''}`
+  const send = (input: { readonly body: string; readonly delivery: string }) =>
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-github-delivery': input.delivery,
+        'x-hub-signature-256': WebhookSignature.signGitHub({ secret: HOOK_SECRET, body: Buffer.from(input.body) }),
+      },
+      body: input.body,
+    })
+  const body = JSON.stringify({ ref: 'refs/heads/main' })
+  const delivery = '7a213243-1111-4222-8333-944455556666'
+  expect((await send({ body, delivery })).status).toBe(202)
+
+  // The Host restarts: the delivery id comes back from plugin storage, so the same event still starts no thread.
+  await restart()
+  const afterRestart = await send({ body, delivery })
+  expect(afterRestart.status).toBe(401)
+  expect((await afterRestart.json()).message).toContain('already accepted')
+  expect(created).toHaveLength(1)
+
+  // An entry whose window already ended is forgotten, so that delivery id is accepted again (with a new event body,
+  // since the five-minute body window is separate).
+  const storage = pluginStorage(ctx, NAMESPACE)
+  await storage.set(`webhook-delivery/${delivery}`, { digest: 'f'.repeat(64), receivedAt: Date.now() - 7_200_000, expiresAt: Date.now() - 3_600_000 })
+  await restart()
+  expect((await send({ body: JSON.stringify({ ref: 'refs/heads/after-window' }), delivery })).status).toBe(202)
+  expect(created).toHaveLength(2)
 })

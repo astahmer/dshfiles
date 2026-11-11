@@ -5566,6 +5566,9 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(270d4dc1290c940a1694f1ca388defa2)
+      '@deepseek-ai/dsh-api-session-controller':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(ba230b0e8dc09e1c77265b3fc923dd43)
       '@deepseek-ai/dsh-api-workspace-controller':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-api-gateway@0.2.1-rc.2)(@deepseek-ai/dsh-client-connection@0.2.1-rc.2)(@deepseek-ai/dsh-host-directory-picker@0.2.1-rc.2)(@deepseek-ai/dsh-session@0.2.1-rc.2)(@deepseek-ai/dsh-storage-domain@0.2.1-rc.2)(@deepseek-ai/dsh-typert-protocol@0.2.1-rc.2)(@deepseek-ai/dsh-workspace@0.2.1-rc.2)
@@ -5608,6 +5611,9 @@ importers:
       '@deepseek-ai/dsh-workspace':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-session-persistence@0.2.1-rc.2)(@deepseek-ai/dsh-session@0.2.1-rc.2)(@deepseek-ai/dsh-storage-domain@0.2.1-rc.2)(@deepseek-ai/dsh-storage@0.2.1-rc.2)(@deepseek-ai/dsh-typert-protocol@0.2.1-rc.2)
+      '@deepseek-ai/schemastery':
+        specifier: 'catalog:'
+        version: 3.18.4
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx

@@ -95,7 +95,7 @@
     {
       "id": "project-automation-webhooks",
       "title": "Start threads from signed webhooks",
-      "summary": "A webhook automation answers POST /automations/webhook/<id> on the DSH web server. The request carries either x-dsh-timestamp (Unix seconds) and x-dsh-signature: sha256=HMAC-SHA256(secret, \"<timestamp>.<raw body>\"), or GitHub's x-hub-signature-256 over the raw body. The secret:ALIAS is resolved on the Host per request. The timestamped scheme rejects timestamps over 5 minutes off and replays inside that window; GitHub signatures authenticate the body but do not prevent replay. More than the automation's per-minute limit (and 120 per minute overall) and bodies over 256 KiB are refused. An accepted request starts a thread with the prompt template filled from a bounded, sanitized subset of the request ({{body.path}}, {{headers.name}}, never credential headers), followed by a note that inserted values are untrusted data. Refusals after the automation is found are recorded as rejected runs with what to fix.",
+      "summary": "A webhook automation answers POST /automations/webhook/<id> on the DSH web server. The request carries either x-dsh-timestamp (Unix seconds) and x-dsh-signature: sha256=HMAC-SHA256(secret, \"<timestamp>.<raw body>\"), or GitHub's x-hub-signature-256 over the raw body with x-github-delivery. The secret:ALIAS is resolved on the Host per request. The timestamped scheme rejects timestamps over 5 minutes off and replays inside that window. GitHub's scheme refuses a delivery id already accepted and the same signed body under another delivery id within 5 minutes, remembering both in plugin storage for 24 hours by default (a setting) so a restart keeps refusing them; a captured request can still be replayed after that window. More than the automation's per-minute limit (and 120 per minute overall) and bodies over 256 KiB are refused. An accepted request starts a thread with the prompt template filled from a bounded, sanitized subset of the request ({{body.path}}, {{headers.name}}, never credential headers), followed by a note that inserted values are untrusted data. Refusals after the automation is found are recorded as rejected runs with what to fix.",
       "reach": ["click tab \"Work\"", "click button \"Automations\"", "expect heading \"Automations\""],
       "surfaces": ["client", "host", "integration", "storage"],
       "surface": "infrastructure",
@@ -110,18 +110,24 @@
         "bad-signature",
         "stale-timestamp",
         "replayed",
+        "replayed-delivery",
+        "replayed-body",
+        "missing-delivery",
         "rate-limited",
         "too-large",
         "secret-unavailable",
+        "replay-store-unavailable",
         "not-found"
       ],
       "failureModes": [
         "An unknown automation id gets 404 naming where to copy the URL again.",
         "A missing, malformed or wrong signature, a stale timestamp or a replay gets 401 with how to sign, and a rejected run.",
+        "A GitHub request without a delivery id, or one already accepted, gets 401 naming the header to send; a signed body reused under another delivery id within 5 minutes gets 401 too.",
         "A secret reference that does not resolve gets 503 for the sender and a rejected run naming the alias to fix in Secrets.",
+        "The replay store could not be read or written, so the request gets 503 instead of being accepted unguarded.",
         "A paused automation gets 409 and a rejected run saying to resume it.",
         "Over the per-minute limit gets 429 with Retry-After; the limit is counted before verification so a flood stays cheap, and a flood can delay genuine requests until it stops.",
-        "The replay window is held in memory: a request captured less than 5 minutes before a Host restart could be accepted once more after it."
+        "The timestamped replay window is held in memory: a request captured less than 5 minutes before a Host restart could be accepted once more after it. The GitHub delivery window is stored, so it survives a restart, but a captured request can be replayed after its window ends."
       ],
       "externalDependencies": [
         {
@@ -161,6 +167,24 @@
           "id": "project-automations.webhook-secret-and-pause",
           "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
           "testName": "refuses a webhook whose secret does not resolve and a paused one, and records why"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.github-delivery",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "accepts GitHub webhook signatures over the raw body and refuses tampered, double-signed or replayed deliveries"
+        },
+        {
+          "kind": "host-test",
+          "id": "project-automations.github-delivery-restart",
+          "file": "plugins/@dshfiles/project-automations/src/automations-host.test.ts",
+          "testName": "keeps GitHub delivery ids across a Host restart and forgets them once their window ends"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-automations.delivery-id",
+          "file": "plugins/@dshfiles/project-automations/src/webhook-guards.test.ts",
+          "testName": "accepts the shapes GitHub sends and refuses ids that could not name a delivery"
         },
         {
           "kind": "unit-test",

@@ -8,11 +8,14 @@ import { createHostApiClient } from '@dshfiles/dshx/host'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
 import { Effect, Layer } from 'effect'
 import { automationsApi } from './automations-api.js'
+import { projectAutomationsSettingsLayer } from './automation-settings.js'
 import { AutomationOrigin, AutomationsService } from './automations-service.js'
 import { AutomationProjects, AutomationRunner, AutomationSessions } from './automation-runner.js'
 import { AutomationStore } from './automation-store.js'
 import { runScheduler } from './scheduler.js'
+import { projectAutomationsSettings } from './settings.js'
 import { handleWebhook, WEBHOOK_PATH, WebhookGuards } from './webhook-route.js'
+import { WebhookReplayStore } from './webhook-replay-store.js'
 
 const PACKAGE_ID = '@dshfiles/project-automations'
 
@@ -60,10 +63,10 @@ const WebhookRouteLive = Layer.effectDiscard(
   }),
 )
 
-const CoreLive = AutomationRunner.layer.pipe(Layer.provideMerge(Layer.mergeAll(AutomationStore.layer, SessionsLive, ProjectsLive)))
+const CoreLive = AutomationRunner.layer.pipe(Layer.provideMerge(Layer.mergeAll(AutomationStore.layer, WebhookReplayStore.layer, SessionsLive, ProjectsLive)))
 
 const AutomationsLive = Layer.mergeAll(AutomationsService.layer, WebhookRouteLive).pipe(
-  Layer.provideMerge(Layer.mergeAll(CoreLive, OriginLive, WebhookGuards.layer, SecretReferenceResolver.layer)),
+  Layer.provideMerge(Layer.mergeAll(CoreLive, OriginLive, WebhookGuards.layer, SecretReferenceResolver.layer, projectAutomationsSettingsLayer)),
 )
 
 export default DshxPlugin.make({
@@ -71,6 +74,7 @@ export default DshxPlugin.make({
   inject: ['workspaceRegistry', 'webServer'],
   layer: AutomationsLive,
   main: runScheduler,
+  settings: [projectAutomationsSettings],
   apis: [
     Api.bind(automationsApi, {
       list: () => AutomationsService.use(service => service.list()),

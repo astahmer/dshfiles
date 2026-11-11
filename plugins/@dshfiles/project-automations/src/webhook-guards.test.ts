@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PromptTemplate } from './prompt-template.js'
 import { SlidingWindowLimiter } from './rate-limit.js'
+import { bodyDigestOf, isDeliveryId } from './webhook-replay-store.js'
 import { REPLAY_WINDOW_SECONDS, ReplayGuard, WebhookSignature } from './webhook-signature.js'
 
 const SECRET = 'whsec-test-value'
@@ -151,5 +152,21 @@ describe('GitHub webhook signatures', () => {
       ok: false,
       reason: 'bad-signature',
     })
+  })
+})
+
+describe('GitHub delivery ids', () => {
+  it('accepts the shapes GitHub sends and refuses ids that could not name a delivery', () => {
+    expect(isDeliveryId('6f5b0a2e-3c4d-4a8f-9f0e-1c2d3e4f5a6b')).toBe(true)
+    expect(isDeliveryId('12345678')).toBe(true)
+    expect(isDeliveryId('short')).toBe(false)
+    expect(isDeliveryId('has space here')).toBe(false)
+    expect(isDeliveryId('x'.repeat(65))).toBe(false)
+    expect(isDeliveryId('')).toBe(false)
+  })
+
+  it('digests the raw bytes, so a reformatted body is a different event', () => {
+    expect(bodyDigestOf(Buffer.from('{"a":1}'))).toMatch(/^[0-9a-f]{64}$/u)
+    expect(bodyDigestOf(Buffer.from('{"a":1}'))).not.toBe(bodyDigestOf(Buffer.from('{"a": 1}')))
   })
 })
