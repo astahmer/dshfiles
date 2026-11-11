@@ -220,3 +220,12 @@ tokens; output is free. The rate lives in `src/jev-usage.ts` and is not fetched
 from a billing endpoint. Unknown input-token counts remain visible as calls but
 do not contribute to cost. This is DSH-local request usage, not account-wide
 billing or balance. TypeSafe's public API documents per-call usage but no account balance/history endpoint ([API reference](https://docs.typesafe.ai/api/system-one), [models/pricing](https://docs.typesafe.ai/models)).
+
+Provider-reported billed cost is not shown because the Host does not carry one:
+DSH `llm/stream` reports `TokenUsage` counters only (input, output, total, and
+optional cache and reasoning counts), with no provider cost field, and the
+adapters normalize the provider response. A gateway that reports what it billed
+(such as OpenRouter's `usage.cost`) therefore cannot reach this plugin without
+inventing it, so every figure here stays the list-price estimate above. Carrying
+that amount, absent from providers that do not report one, is row 107 in
+[the Host gaps plan](../../../plans/dsh-host-gaps.md).
