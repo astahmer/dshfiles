@@ -61,20 +61,25 @@ const testHost = Effect.acquireRelease(
     }),
 )
 
-const worktreesLayer = Layer.unwrap(
-  Effect.map(testHost, ({ host }) =>
-    GitWorktrees.layer.pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          DshChildProcessSpawner.layer.pipe(Layer.provide(HostContext.layer({ ctx: host.ctx, packageId: '@dshfiles/git-worktrees' }))),
-          nodeFileSystemLayer,
-          nodePathLayer,
-          Settings.layerTest(gitWorktreesSettings.namespace, { isolate: false, threadsDirectory: '' }),
+const worktreesLayerWith = (threadsDirectory: string) =>
+  Layer.unwrap(
+    Effect.map(testHost, ({ host }) =>
+      GitWorktrees.layer.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            DshChildProcessSpawner.layer.pipe(Layer.provide(HostContext.layer({ ctx: host.ctx, packageId: '@dshfiles/git-worktrees' }))),
+            nodeFileSystemLayer,
+            nodePathLayer,
+            Settings.layerTest(gitWorktreesSettings.namespace, { isolate: false, threadsDirectory }),
+          ),
         ),
       ),
     ),
-  ),
-)
+  )
+
+const customThreadsRoot = realpathSync(mkdtempSync(join(tmpdir(), 'git-worktrees-custom-')))
+
+const worktreesLayer = worktreesLayerWith('')
 
 const wireEnvelope = Schema.Struct({
   result: Schema.Union([
@@ -136,6 +141,23 @@ describe('git worktrees against real git', () => {
     )
   })
 
+  it.layer(worktreesLayerWith(customThreadsRoot))(it => {
+    it.effect('puts thread worktrees under a custom threads directory and names it for the repository', () =>
+      Effect.gen(function* () {
+        const { repo } = yield* repository
+        const worktrees = yield* GitWorktrees
+        const thread = yield* worktrees.provision(repo, undefined)
+
+        expect(yield* worktrees.threadsDirectoryOf(repo)).toBe(join(customThreadsRoot, 'repo'))
+        expect(thread.path).toBe(join(customThreadsRoot, 'repo', thread.name))
+        expect(yield* worktrees.locate(thread.path)).toEqual({ repoRoot: repo, workspaceRoot: thread.path, threadName: thread.name })
+
+        yield* worktrees.remove(thread.path, false)
+        rmSync(customThreadsRoot, { recursive: true, force: true })
+      }),
+    )
+  })
+
   it.effect('is not a repository outside git and refuses to remove the project checkout', () =>
     Effect.gen(function* () {
       const { root, repo } = yield* repository
@@ -152,6 +174,18 @@ describe('git worktrees against real git', () => {
       const span = recorder.span('git rev-parse')
       expect(span.status.code).toBe('error')
       expect(JSON.stringify(span.attributes)).not.toContain(root)
+
+      const providerResponse = yield* Effect.promise(async () => {
+        const response = await host.connection.requestApi({
+          packageId: '@dshfiles/git-worktrees',
+          apiId: 'vcs-provider',
+          method: 'threadsDirectories',
+          version: 1,
+          input: { repoRoots: [repo] },
+        })
+        return Schema.decodeUnknownSync(wireEnvelope)(await response.json()).result
+      })
+      expect(providerResponse).toEqual({ ok: true, value: { output: { directories: [{ repoRoot: repo, threadsDirectory: `${repo}-threads` }] } } })
 
       expect(yield* call('remove', { path: repo, force: true })).toEqual({
         ok: false,

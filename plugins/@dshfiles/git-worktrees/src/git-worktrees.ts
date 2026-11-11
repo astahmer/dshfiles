@@ -77,6 +77,8 @@ export class GitWorktrees extends Context.Service<
     /** Undefined outside a git repository. */
     readonly locate: (path: string) => Effect.Effect<GitLocation | undefined>
     readonly isolateByDefault: Effect.Effect<boolean>
+    /** The folder thread worktrees of `repoRoot` are created in, from the `threadsDirectory` setting. */
+    readonly threadsDirectoryOf: (repoRoot: string) => Effect.Effect<string>
     readonly worktrees: (repoRoot: string) => Effect.Effect<readonly ThreadWorktree[], GitFailed>
     readonly provision: (repoRoot: string, base: string | undefined) => Effect.Effect<ThreadWorktree, GitFailed>
     readonly remove: (path: string, force: boolean) => Effect.Effect<void, GitFailed | NotARepository | NotAThreadWorktree>
@@ -212,6 +214,7 @@ export class GitWorktrees extends Context.Service<
       return GitWorktrees.of({
         locate,
         isolateByDefault: Effect.map(settings.get, value => value.isolate),
+        threadsDirectoryOf,
         worktrees,
         provision,
         remove,

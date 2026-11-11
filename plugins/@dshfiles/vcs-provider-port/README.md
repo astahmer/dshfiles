@@ -11,12 +11,13 @@ both public exports with ordinary Node.
 
 A provider is a dshx API with the shared id `vcs-provider` and the provider's own package as `owner`:
 
-| Method      | What                                                                                                     |
-| ----------- | -------------------------------------------------------------------------------------------------------- |
-| `detect`    | Whether it manages the repository holding a path; `vcs`, `priority`, repository and workspace roots.     |
-| `provision` | Where a new thread starts: an isolated workspace of a DSH workspace's repository, or the checkout as is. |
-| `snapshot`  | An opaque token for the files of the workspace at a path. Changes nothing.                               |
-| `restore`   | Put those files back; returns a snapshot of what they were, so the restore can be reversed.              |
+| Method               | What                                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| `detect`             | Whether it manages the repository holding a path; `vcs`, `priority`, repository and workspace roots.     |
+| `threadsDirectories` | The folder each repository root's thread workspaces are created in, from the provider's settings.        |
+| `provision`          | Where a new thread starts: an isolated workspace of a DSH workspace's repository, or the checkout as is. |
+| `snapshot`           | An opaque token for the files of the workspace at a path. Changes nothing.                               |
+| `restore`            | Put those files back; returns a snapshot of what they were, so the restore can be reversed.              |
 
 ```ts
 // provider
@@ -29,6 +30,11 @@ if (provider !== undefined) await provider.client.provision({ workspaceId, isola
 
 `resolve` asks every served provider and keeps the highest `priority` that claims the path; a provider whose
 `detect` fails is skipped, and a path nobody claims resolves to `undefined` (keep the project checkout).
+
+`VcsProviders.threadsDirectories(ctx, { repoRoots, callerPackageId })` merges every provider's answer, so a caller can
+attribute a thread workspace to its project from its path even when the user moved thread workspaces with a
+`threadsDirectory` setting (`<dir>/<repository name>/<thread>`). A failing provider is skipped; the caller keeps its
+`<repository>-threads` fallback for what nobody answers. Caller: `@dshfiles/thread-sidebar` (project grouping).
 
 Effect callers can import `VcsProviderService` from `@dshfiles/vcs-provider-port/effect` and use
 `VcsProviderService.layer(ctx)`. Its `owners` and `resolve` operations are typed Effects; failures are represented

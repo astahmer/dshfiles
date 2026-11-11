@@ -115,6 +115,15 @@ export default DshxPlugin.make({
                 },
           ),
         ),
+      threadsDirectories: input =>
+        GitWorktrees.use(worktrees =>
+          Effect.map(
+            Effect.forEach(input.repoRoots, repoRoot =>
+              Effect.map(worktrees.threadsDirectoryOf(repoRoot), threadsDirectory => ({ repoRoot, threadsDirectory })),
+            ),
+            directories => ({ directories }),
+          ),
+        ),
       provision,
       snapshot: input => GitWorktrees.use(worktrees => Effect.map(worktrees.snapshot(input.path), snapshot => ({ snapshot }))),
       restore: input => GitWorktrees.use(worktrees => Effect.map(worktrees.restore(input.path, input.snapshot), previous => ({ previous }))),

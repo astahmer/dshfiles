@@ -7,7 +7,13 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { VcsProviders } from './index.js'
 import { VcsProviderService } from './effect.js'
 
-const provider = (input: { readonly owner: string; readonly vcs: string; readonly priority: number; readonly claims: (path: string) => boolean }) =>
+const provider = (input: {
+  readonly owner: string
+  readonly vcs: string
+  readonly priority: number
+  readonly claims: (path: string) => boolean
+  readonly threadsDirectory?: (repoRoot: string) => string
+}) =>
   defineHost({
     apis: [
       VcsProviders.contract(input.owner).host({
@@ -15,6 +21,9 @@ const provider = (input: { readonly owner: string; readonly vcs: string; readonl
           match: input.claims(request.path)
             ? { vcs: input.vcs, priority: input.priority, repoRoot: request.path, workspaceRoot: request.path, isolated: false }
             : null,
+        }),
+        threadsDirectories: ({ input: request }) => ({
+          directories: request.repoRoots.map(repoRoot => ({ repoRoot, threadsDirectory: (input.threadsDirectory ?? (root => `${root}-threads`))(repoRoot) })),
         }),
         provision: ({ input: request }) => ({ workspaceId: request.workspaceId, isolated: false }),
         snapshot: () => ({ snapshot: `${input.vcs}:1` }),
@@ -62,6 +71,9 @@ describe('VcsProviders.resolve', () => {
             detect: () => {
               throw new Error('detect exploded')
             },
+            threadsDirectories: () => {
+              throw new Error('threadsDirectories exploded')
+            },
             provision: ({ input: request }) => ({ workspaceId: request.workspaceId, isolated: false }),
             snapshot: () => ({ snapshot: 'broken:1' }),
             restore: () => ({ previous: 'broken:0' }),
@@ -89,5 +101,46 @@ describe('VcsProviders.resolve', () => {
       Option.some(['@test/git', { vcs: 'git', priority: 10, repoRoot: '/repo', workspaceRoot: '/repo', isolated: false }]),
     )
     expect(result.snapshot).toEqual({ snapshot: 'git:1' })
+  })
+})
+
+describe('VcsProviders.threadsDirectories', () => {
+  test("merges every provider's thread directories and skips a provider that fails", async () => {
+    host = await createTestHost()
+    await host.mount(
+      provider({ owner: '@test/jj', vcs: 'jj', priority: 100, claims: () => true, threadsDirectory: repoRoot => `/elsewhere/${repoRoot.split('/').at(-1)}` }),
+      { packageId: '@test/jj' },
+    )
+    await host.mount(provider({ owner: '@test/git', vcs: 'git', priority: 10, claims: () => true }), { packageId: '@test/git' })
+    await host.mount(
+      defineHost({
+        apis: [
+          VcsProviders.contract('@test/broken').host({
+            detect: () => ({ match: null }),
+            threadsDirectories: () => {
+              throw new Error('threadsDirectories exploded')
+            },
+            provision: ({ input: request }) => ({ workspaceId: request.workspaceId, isolated: false }),
+            snapshot: () => ({ snapshot: 'broken:1' }),
+            restore: () => ({ previous: 'broken:0' }),
+          }),
+        ],
+      }),
+      { packageId: '@test/broken' },
+    )
+
+    const directories = await VcsProviders.threadsDirectories(host.ctx, { repoRoots: ['/dev/app'], callerPackageId: '@test/caller' })
+
+    expect([...directories].sort((left, right) => left.threadsDirectory.localeCompare(right.threadsDirectory))).toEqual([
+      { repoRoot: '/dev/app', threadsDirectory: '/dev/app-threads' },
+      { repoRoot: '/dev/app', threadsDirectory: '/elsewhere/app' },
+    ])
+  })
+
+  test('answers nothing without a provider or a repository root', async () => {
+    host = await createTestHost()
+    expect(await VcsProviders.threadsDirectories(host.ctx, { repoRoots: ['/dev/app'], callerPackageId: '@test/caller' })).toEqual([])
+    await host.mount(provider({ owner: '@test/git', vcs: 'git', priority: 10, claims: () => true }), { packageId: '@test/git' })
+    expect(await VcsProviders.threadsDirectories(host.ctx, { repoRoots: [], callerPackageId: '@test/caller' })).toEqual([])
   })
 })

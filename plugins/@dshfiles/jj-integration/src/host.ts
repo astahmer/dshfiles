@@ -149,6 +149,13 @@ const vcsProviderHandlers = Api.handlers(VcsProviders.contract('@dshfiles/jj-int
         }),
       ),
     ),
+  threadsDirectories: input =>
+    ThreadWorkspaces.use(threads =>
+      Effect.map(
+        Effect.forEach(input.repoRoots, repoRoot => Effect.map(threads.threadsDirectory(repoRoot), threadsDirectory => ({ repoRoot, threadsDirectory }))),
+        directories => ({ directories }),
+      ),
+    ),
   provision: input =>
     ThreadLifecycle.use(lifecycle =>
       Effect.map(lifecycle.provision(input), provisioned => ({ workspaceId: provisioned.workspaceId, isolated: provisioned.isolated })),

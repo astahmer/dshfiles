@@ -14,11 +14,23 @@ const matchSchema = Schema.Struct({
   isolated: Schema.Boolean,
 })
 
+const threadsDirectorySchema = Schema.Struct({
+  repoRoot: Schema.String.check(Schema.isMinLength(1)),
+  /** The folder this provider creates the repository's thread workspaces in; each one is a direct child of it. */
+  threadsDirectory: Schema.String.check(Schema.isMinLength(1)),
+})
+
 const methods = {
   detect: method({
     input: Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) }),
     output: Schema.Struct({ match: Schema.NullOr(matchSchema) }),
     description: 'Whether this provider manages the repository holding a path, and where its root and current workspace are. Read-only.',
+  }),
+  threadsDirectories: method({
+    input: Schema.Struct({ repoRoots: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMaxLength(1000)) }),
+    output: Schema.Struct({ directories: Schema.Array(threadsDirectorySchema).check(Schema.isMaxLength(1000)) }),
+    description:
+      'Where this provider creates the thread workspaces of each repository root, so a caller can tell which project a thread workspace belongs to from its path. Reads settings only; read-only.',
   }),
   provision: method({
     input: Schema.Struct({
@@ -55,6 +67,7 @@ const methods = {
 
 export type VcsProviderMethods = typeof methods
 export type VcsMatch = typeof matchSchema.Type
+export type ThreadsDirectory = typeof threadsDirectorySchema.Type
 
 /**
  * Version-control providers are dshx APIs that share one id and method set and differ by owner, so jj-integration and
@@ -88,5 +101,25 @@ export class VcsProviders {
     return answers
       .filter(answer => answer !== undefined)
       .reduce<(typeof answers)[number]>((best, answer) => (best === undefined || answer.match.priority > best.match.priority ? answer : best), undefined)
+  }
+
+  /**
+   * Every served provider's thread directory for each repository root; a provider that fails or predates the method is
+   * skipped, so callers keep their own default layout for what nobody answers.
+   */
+  static async threadsDirectories(
+    ctx: CordisContext,
+    input: { readonly repoRoots: readonly string[]; readonly callerPackageId: string; readonly signal?: AbortSignal },
+  ): Promise<readonly ThreadsDirectory[]> {
+    if (input.repoRoots.length === 0) return []
+    const answers = await Promise.all(
+      VcsProviders.owners(ctx).map(async owner => {
+        const client = createHostApiClient(ctx, VcsProviders.contract(owner), input.callerPackageId)
+        const listed = await client.safe.threadsDirectories({ repoRoots: input.repoRoots }, input.signal === undefined ? undefined : { signal: input.signal })
+        return listed.ok ? listed.value.directories : []
+      }),
+    )
+    const unique = new Map(answers.flat().map(entry => [`${entry.repoRoot}\u0000${entry.threadsDirectory}`, entry]))
+    return [...unique.values()]
   }
 }

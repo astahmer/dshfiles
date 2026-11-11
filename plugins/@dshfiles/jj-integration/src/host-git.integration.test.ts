@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -46,10 +46,10 @@ describe.skipIf(!gitAvailable)('jj-integration in a git-only repository', () => 
     const thread = harness.workspacePath(provisioned.workspaceId)
     expect(existsSync(join(thread, '.git'))).toBe(true)
 
-    const provider = await createHostApiClient(harness.host.ctx, VcsProviders.contract('@dshfiles/jj-integration'), '@dshfiles/backlog').detect({
-      path: thread,
-    })
+    const providerClient = createHostApiClient(harness.host.ctx, VcsProviders.contract('@dshfiles/jj-integration'), '@dshfiles/backlog')
+    const provider = await providerClient.detect({ path: thread })
     expect(provider.match).toMatchObject({ vcs: 'git', priority: 50, repoRoot: repo, workspaceRoot: thread, isolated: true })
+    expect(await providerClient.threadsDirectories({ repoRoots: [repo] })).toEqual({ directories: [{ repoRoot: repo, threadsDirectory: dirname(thread) }] })
 
     writeFileSync(join(thread, 'feature.txt'), 'feature\n')
     git(thread, 'add', '--all')
