@@ -36,6 +36,23 @@ const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 const trimSeparators = (path: string): string => path.replace(/[\\/]+$/u, '')
 const segments = (path: string): readonly string[] => trimSeparators(path).split(/[\\/]/u)
 
+/**
+ * Thread folder → the repository whose thread workspaces it holds, as the VCS providers report it. Its owner
+ * (`@dshfiles/thread-sidebar/thread-directories`) passes it in; without it the `<repository>-threads` layout applies.
+ */
+export type ThreadDirectories = ReadonlyMap<string, string>
+
+const parentOf = (path: string): string => {
+  const trimmed = trimSeparators(path)
+  return trimmed.slice(0, Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\')))
+}
+
+const reportedRepository = (path: string, threadDirectories: ThreadDirectories | undefined): string | undefined => {
+  if (threadDirectories === undefined) return undefined
+  const repository = threadDirectories.get(parentOf(path))
+  return repository === undefined || repository === trimSeparators(path) ? undefined : repository
+}
+
 const hasThreadsDirectory = (name: string | undefined): boolean =>
   name !== undefined && name.length > THREADS_DIRECTORY_SUFFIX.length && name.endsWith(THREADS_DIRECTORY_SUFFIX)
 
@@ -55,18 +72,21 @@ export class EntityLabels {
   }
 
   /** A jj workspace a project was cut from: it belongs to that project and is never a project of its own. */
-  static isThreadWorkspace(path: string | null): boolean {
+  static isThreadWorkspace(path: string | null, threadDirectories?: ThreadDirectories): boolean {
     if (path === null) return false
+    if (reportedRepository(path, threadDirectories) !== undefined) return true
     const parts = segments(path)
     return THREAD_WORKSPACE_NAME.test(parts.at(-1) ?? '') || hasThreadsDirectory(parts.at(-2))
   }
 
   /** The repository checkout a thread workspace belongs to; the path itself for anything else. */
-  static repositoryPath(path: string): string {
+  static repositoryPath(path: string, threadDirectories?: ThreadDirectories): string {
     const trimmed = trimSeparators(path)
+    const reported = reportedRepository(path, threadDirectories)
+    if (reported !== undefined) return reported
     if (!EntityLabels.isThreadWorkspace(path)) return trimmed
     // Slice rather than re-join, so the result keeps the Host's own separator and matches registered paths.
-    const parent = trimmed.slice(0, Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\')))
+    const parent = parentOf(path)
     return parent.endsWith(THREADS_DIRECTORY_SUFFIX) ? parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length) : parent
   }
 
@@ -74,20 +94,23 @@ export class EntityLabels {
    * Registered rows that are projects: a jj workspace cut from one is a workspace of it, so a project list, a project
    * filter or a project chooser leaves those out and shows the checkout they belong to instead.
    */
-  static projectsOf<Item extends { readonly path: string }>(items: readonly Item[]): readonly Item[] {
-    return items.filter(item => !EntityLabels.isThreadWorkspace(item.path))
+  static projectsOf<Item extends { readonly path: string }>(items: readonly Item[], threadDirectories?: ThreadDirectories): readonly Item[] {
+    return items.filter(item => !EntityLabels.isThreadWorkspace(item.path, threadDirectories))
   }
 
   /** Projects in their original order, each with the thread workspaces cut from it; orphan threads get a group with no project. */
-  static groupByRepository<Item extends { readonly path: string | null }>(items: readonly Item[]): readonly ProjectGroup<Item>[] {
+  static groupByRepository<Item extends { readonly path: string | null }>(
+    items: readonly Item[],
+    threadDirectories?: ThreadDirectories,
+  ): readonly ProjectGroup<Item>[] {
     const groups = new Map<string, { project: Item | null; threads: Item[] }>()
     for (const item of items) {
-      if (item.path === null || EntityLabels.isThreadWorkspace(item.path)) continue
-      groups.set(EntityLabels.repositoryPath(item.path), { project: item, threads: [] })
+      if (item.path === null || EntityLabels.isThreadWorkspace(item.path, threadDirectories)) continue
+      groups.set(EntityLabels.repositoryPath(item.path, threadDirectories), { project: item, threads: [] })
     }
     for (const item of items) {
-      if (item.path === null || !EntityLabels.isThreadWorkspace(item.path)) continue
-      const repositoryPath = EntityLabels.repositoryPath(item.path)
+      if (item.path === null || !EntityLabels.isThreadWorkspace(item.path, threadDirectories)) continue
+      const repositoryPath = EntityLabels.repositoryPath(item.path, threadDirectories)
       const group = groups.get(repositoryPath) ?? { project: null, threads: [] }
       group.threads.push(item)
       groups.set(repositoryPath, group)
@@ -117,20 +140,23 @@ export class EntityLabels {
    * Resolves a workspace id or a directory to its project name: a thread workspace reads as its repository's
    * project, and an unregistered directory as its folder name.
    */
-  static useWorkspaceLabel(workspaces: WorkspaceStore): (target: { readonly workspaceId: string } | { readonly path: string }) => string {
+  static useWorkspaceLabel(
+    workspaces: WorkspaceStore,
+    threadDirectories?: ThreadDirectories,
+  ): (target: { readonly workspaceId: string } | { readonly path: string }) => string {
     const items = useListSnapshot(workspaces).items
     const projectsByPath = useMemo(
-      () => new Map(items.filter(item => !EntityLabels.isThreadWorkspace(item.path)).map(item => [trimSeparators(item.path), item.title])),
-      [items],
+      () => new Map(items.filter(item => !EntityLabels.isThreadWorkspace(item.path, threadDirectories)).map(item => [trimSeparators(item.path), item.title])),
+      [items, threadDirectories],
     )
     return useCallback(
       target => {
         const path = 'path' in target ? target.path : items.find(item => item.workspaceId === target.workspaceId)?.path
         if (path === undefined) return `Project ${EntityLabels.shortId('workspaceId' in target ? target.workspaceId : '')}`
-        const repositoryPath = EntityLabels.repositoryPath(path)
+        const repositoryPath = EntityLabels.repositoryPath(path, threadDirectories)
         return projectsByPath.get(repositoryPath) ?? segments(repositoryPath).at(-1) ?? repositoryPath
       },
-      [items, projectsByPath],
+      [items, projectsByPath, threadDirectories],
     )
   }
 }

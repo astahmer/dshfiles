@@ -54,6 +54,35 @@ describe('EntityLabels', () => {
     expect(result.current({ path: '/tmp/scratch-project' })).toBe('scratch-project')
   })
 
+  it('folds a thread workspace in a custom threads directory under the repository its owner reports', () => {
+    const threadDirectories = new Map([['/elsewhere/dshfiles', '/dev/dshfiles']])
+    const rows = [
+      { path: '/dev/dshfiles', id: 'repo' },
+      { path: '/elsewhere/dshfiles/thread-4c91b5', id: 'thread' },
+    ]
+    expect(EntityLabels.repositoryPath('/elsewhere/dshfiles/thread-4c91b5')).toBe('/elsewhere/dshfiles')
+    expect(EntityLabels.repositoryPath('/elsewhere/dshfiles/thread-4c91b5', threadDirectories)).toBe('/dev/dshfiles')
+    expect(EntityLabels.repositoryPath('/dev/dshfiles-threads/thread-4c91b5', threadDirectories)).toBe('/dev/dshfiles')
+    expect(EntityLabels.isThreadWorkspace('/elsewhere/dshfiles/legacy-name', threadDirectories)).toBe(true)
+    expect(EntityLabels.projectsOf(rows, threadDirectories).map(row => row.id)).toEqual(['repo'])
+    expect(
+      EntityLabels.groupByRepository(rows, threadDirectories).map(group => [
+        group.repositoryPath,
+        group.project?.id ?? null,
+        group.threads.map(thread => thread.id),
+      ]),
+    ).toEqual([['/dev/dshfiles', 'repo', ['thread']]])
+
+    const custom = store({
+      items: [
+        { workspaceId: 'w-repo', title: 'Harness', path: '/dev/dshfiles' },
+        { workspaceId: 'w-thread', title: 'Harness · thread-4c91b5', path: '/elsewhere/dshfiles/thread-4c91b5' },
+      ],
+    })
+    const { result } = renderHook(() => EntityLabels.useWorkspaceLabel(custom, threadDirectories))
+    expect(result.current({ workspaceId: 'w-thread' })).toBe('Harness')
+  })
+
   it('names a Session by its thread title and an unknown one by a short id', () => {
     const sessions = store({ byId: { 'session-1': { displayTitle: 'Fix the composer', cwd: '/dev/dshfiles' }, 'session-2': { displayTitle: ' ' } } })
     const { result } = renderHook(() => EntityLabels.useSessionLabel(sessions))
