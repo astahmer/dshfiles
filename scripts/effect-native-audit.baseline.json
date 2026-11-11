@@ -113,7 +113,7 @@
     "moduleState": 6,
     "timers": 8,
     "childProcess": 5,
-    "nodeFs": 18,
+    "nodeFs": 19,
     "globalFetch": 0,
     "testMocks": 81,
     "runOutsideEdges": 0,
@@ -659,6 +659,30 @@
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },
+  "@dshfiles/session-log-window": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 1,
+    "childProcess": 0,
+    "nodeFs": 1,
+    "globalFetch": 0,
+    "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
+  "@dshfiles/session-persistence-jsonl": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 6,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
   "@dshfiles/session-search": {
     "layerEmpty": 0,
     "promiseAdapters": 0,
@@ -764,6 +788,18 @@
     "nodeFs": 0,
     "globalFetch": 0,
     "testMocks": 0,
+    "runOutsideEdges": 0,
+    "syncDecodeInEffect": 0
+  },
+  "@dshfiles/storage-json": {
+    "layerEmpty": 0,
+    "promiseAdapters": 0,
+    "moduleState": 0,
+    "timers": 0,
+    "childProcess": 0,
+    "nodeFs": 0,
+    "globalFetch": 0,
+    "testMocks": 1,
     "runOutsideEdges": 0,
     "syncDecodeInEffect": 0
   },

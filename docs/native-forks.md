@@ -98,4 +98,7 @@ boundaries. A new fork is not done when it builds: record it in the gate or `pnp
   with the reason.
 - `tooling/antislop/effect/baseline.json`: record a pre-existing `effect-migration` finding by file and count
   instead of suppressing it inline.
+- `scripts/effect-native-audit.baseline.json`: record the fork's row at its current counts when its tests must
+  observe the vendored Promise code's own I/O (`vi.mock('node:fs/promises')`, fake timers count as `testMocks`).
+  The audit skips `src/native` itself; only those tests reach the scorecard.
 - Never raise a cap in `scripts/lint-ratchet.json` to absorb a new fork; caps only move down.
