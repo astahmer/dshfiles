@@ -97,7 +97,7 @@ export class ThreadMetadata extends Context.Service<
       const entriesOf = (stored: typeof storedMetadataSchema.Type): Readonly<Record<string, RebaseMetadataEntry>> =>
         Object.fromEntries(
           Object.entries(stored).flatMap(([name, value]) => {
-            if (!name.startsWith('thread-')) return []
+            if (!ThreadWorkspaceModel.isManagedName(name)) return []
             const entry = decodeMetadataEntry(value, { onExcessProperty: 'error' })
             if (Option.isNone(entry)) return []
             return [[name, typeof entry.value === 'number' ? { at: entry.value } : entry.value]]

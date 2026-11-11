@@ -25,7 +25,7 @@ import type {
   VerifiedLandOptions,
   VerifiedLandOutcome,
 } from './thread-workspace-types.js'
-import type { ThreadLocation } from './thread-workspace-model.js'
+import { type ThreadLocation, ThreadWorkspaceModel } from './thread-workspace-model.js'
 import { LAND_ATTEMPTS, runVerifiedLand, type LandSettlement, type LandStepResult } from './verified-land-phases.js'
 
 /**
@@ -53,7 +53,7 @@ const MAX_PATCH_PATHS = 128
 const MAX_PATCH_PATH_BYTES = 16_384
 const MAX_PATCH_TARGET_REVISIONS = 1_024
 const MAX_PATCH_BODY_BYTES = 65_536
-const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
+const THREAD_WORKSPACE_NAME = ThreadWorkspaceModel.managedNamePattern
 const HEX_ID = /^[0-9a-f]+$/u
 const OPERATION_ID = /^[0-9a-f]{12,128}$/u
 const isCommitId = (value: string): boolean => value.length >= 40 && HEX_ID.test(value)
@@ -610,8 +610,7 @@ const make = Effect.gen(function* () {
       if (workspaceName === undefined || extraWorkspaceNames.length > 0 || !workspaceName.endsWith('@'))
         return yield* jjFailed('Could not attribute detached JJ work to one owning workspace; automatic integration is paused.')
       const name = workspaceName.slice(0, -1)
-      if (name.length === 0 || (name.startsWith('thread-') && !THREAD_WORKSPACE_NAME.test(name)))
-        return yield* jjFailed('Detached JJ work has an unrecognized thread owner; automatic integration is paused.')
+      if (name.length === 0) return yield* jjFailed('Detached JJ work has an unrecognized thread owner; automatic integration is paused.')
       return { revision, name }
     })
     const owners = yield* Effect.forEach(detachedRevisions, ownerOf, { concurrency: STATUS_READ_CONCURRENCY })
@@ -779,7 +778,8 @@ const make = Effect.gen(function* () {
     const target = yield* targetRevset(repoRoot)
     const workspaces = (yield* Effect.forEach(
       names,
-      name => Effect.map(exists(path.join(directory, name, '.jj')), present => (present || name.startsWith('thread-') ? [{ name, present }] : [])),
+      name =>
+        Effect.map(exists(path.join(directory, name, '.jj')), present => (present || ThreadWorkspaceModel.isManagedName(name) ? [{ name, present }] : [])),
       { concurrency: STATUS_READ_CONCURRENCY },
     )).flat()
     const chunks = Array.from({ length: Math.ceil(workspaces.length / MAX_WORKSPACES_PER_READ) }, (_, index) =>
@@ -1601,7 +1601,7 @@ const make = Effect.gen(function* () {
     for (const record of rootRecords) {
       const reportedRoot = path.resolve(record.path)
       if (
-        record.name.startsWith('thread-') ||
+        ThreadWorkspaceModel.isManagedName(record.name) ||
         pathsOverlap(reportedRoot, realRepoRoot) ||
         pathsOverlap(reportedRoot, threadDirectory) ||
         rootRecords.some(other => other.name !== record.name && pathIsWithin(reportedRoot, path.resolve(other.path)))

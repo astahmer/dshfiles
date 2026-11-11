@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 
 import type { VcsKind } from '@dshfiles/vcs-provider-port/detect'
+import { managedThreadWorkspaceName } from './thread-workspace-name.js'
 
 /** The version-control system a thread workspace backend drives; jj wins when a checkout has both `.jj` and `.git`. */
 export type { VcsKind }
@@ -43,5 +44,7 @@ const checkoutSyncArgv = (input: {
 export class ThreadWorkspaceModel {
   static readonly isSecondaryWorkspace = isSecondaryWorkspace
   static readonly defaultThreadsDirectory = defaultThreadsDirectory
+  static readonly managedNamePattern = managedThreadWorkspaceName
+  static readonly isManagedName = (name: string): boolean => managedThreadWorkspaceName.test(name)
   static readonly checkoutSyncArgv = checkoutSyncArgv
 }

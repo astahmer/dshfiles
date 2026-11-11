@@ -10,6 +10,7 @@ import {
   type JjThreadView,
 } from '@dshfiles/multi-host/api'
 import { Schema } from 'effect'
+import { managedThreadWorkspaceName } from './thread-workspace-name.js'
 import {
   cancelQueuedLandOutputSchema,
   cleanupKindSchema,
@@ -91,7 +92,7 @@ export type WorkspaceSetupTask = typeof workspaceSetupTaskSchema.Type
 export type WorkspaceSetup = typeof workspaceSetupSchema.Type
 export type DestinationView = typeof destinationSchema.Type
 
-export const threadWorkspaceNameEffect = Schema.String.check(Schema.isPattern(/^thread-[0-9a-f]{6}$/u))
+export const threadWorkspaceNameEffect = Schema.String.check(Schema.isPattern(managedThreadWorkspaceName))
 export const threadWorkspaceName = threadWorkspaceNameEffect
 
 /** Cleanup requests and results are validated with Effect Schema. */

@@ -897,6 +897,26 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `all() ~ ::main`, '-T', 'commit_id')).toContain(siblingDetachedCommitId)
   })
 
+  it('treats a foreign thread-prefixed workspace as unmanaged instead of pausing integration', async () => {
+    const thread = await threads.provision(repo)
+    const foreign = join(root, 'mywork')
+    jj(repo, 'workspace', 'add', foreign, '--name', 'thread-mywork', '-r', 'main')
+    writeFileSync(join(foreign, 'foreign.txt'), 'foreign work\n')
+    jj(foreign, 'describe', '-m', 'feat: foreign detached work')
+    jj(foreign, 'new', 'main')
+    writeFileSync(join(thread.path, 'target.txt'), 'target work\n')
+    jj(thread.path, 'describe', '-m', 'feat: target work')
+
+    expect((await threads.list(repo)).map(entry => entry.name)).toEqual([thread.name])
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: await threads.workingCopyCommitId(thread.path),
+      authorize: async () => true,
+      verifyCandidate: async () => ({ status: 'passed' }),
+    })
+    expect(outcome).toMatchObject({ status: 'landed' })
+  })
+
   it('fails closed on binary patches whose equivalence cannot be proven', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'binary.dat'), Buffer.from([0, 255, 1, 0]))

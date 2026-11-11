@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { managedThreadWorkspaceName } from './thread-workspace-name.js'
 
 /**
  * Effect Schema contracts for the jj-integration API. `strictStandardSchema` in `api.ts` publishes closed objects
@@ -10,7 +11,7 @@ const boundedString = (maxLength: number) => Schema.String.check(Schema.isMaxLen
 const nonEmptyString = Schema.String.check(Schema.isMinLength(1))
 const nonEmptyBoundedString = (maxLength: number) => Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(maxLength))
 
-export const threadWorkspaceNameEffect = Schema.String.check(Schema.isPattern(/^thread-[0-9a-f]{6}$/u))
+export const threadWorkspaceNameEffect = Schema.String.check(Schema.isPattern(managedThreadWorkspaceName))
 
 export const integrationProgressSchema = Schema.Struct({
   phase: Schema.Literals(['queued', 'validating', 'rebasing']),

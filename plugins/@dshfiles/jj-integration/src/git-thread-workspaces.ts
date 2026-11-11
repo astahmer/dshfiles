@@ -21,10 +21,10 @@ import type {
   VerifiedLandOptions,
   VerifiedLandOutcome,
 } from './thread-workspace-types.js'
-import type { ThreadLocation } from './thread-workspace-model.js'
+import { type ThreadLocation, ThreadWorkspaceModel } from './thread-workspace-model.js'
 import { LAND_ATTEMPTS, runVerifiedLand, type LandSettlement, type LandStepResult } from './verified-land-phases.js'
 
-const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
+const THREAD_WORKSPACE_NAME = ThreadWorkspaceModel.managedNamePattern
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u
 /** Starting a thread from a remote branch waits on this one fetch; past it the last fetched position is used. */
 const FETCH_BASE_TIMEOUT = Duration.seconds(45)
