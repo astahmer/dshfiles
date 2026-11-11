@@ -21,11 +21,12 @@ blocked event loop on a loaded host).
 
 Every other vendored file is byte-identical to the pinned revision. The whole delta is:
 
-| File                     | Change                                                                                                    |
-| ------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `src/native/spawn.ts`    | the group-exit poll backs off from 15 ms to 500 ms; a short-lived tree is still seen at once              |
-| `src/native/terminal.ts` | the readiness probe refreshes its descendant evidence at most once per second; teardown still scans fresh |
-| `src/host.ts`            | new: Loader entry that mounts the native Service unchanged                                                |
+| File                                     | Change                                                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `src/native/linux-scope.ts` + `index.ts` | systemd-run's identity is read once per PATH value instead of per launch; the manager is still confirmed per launch |
+| `src/native/spawn.ts`                    | the group-exit poll backs off from 15 ms to 500 ms; a short-lived tree is still seen at once                        |
+| `src/native/terminal.ts`                 | the readiness probe refreshes its descendant evidence at most once per second; teardown still scans fresh           |
+| `src/host.ts`                            | new: Loader entry that mounts the native Service unchanged                                                          |
 
 The runner process the service launches is still the stock package's `@deepseek-ai/dsh-subprocess-local/runner`.
 

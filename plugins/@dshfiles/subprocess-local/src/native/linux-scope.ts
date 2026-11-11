@@ -240,6 +240,20 @@ export function systemdRunIdentity(internals: LinuxScopeInternals = {}): string 
 }
 
 /**
+ * dshfiles delta: systemdRunIdentity once per PATH value. The selector reads it on every eligible launch, and each
+ * read stats every PATH entry; the user manager is still confirmed per launch.
+ * @returns the identity reader the Linux scope selector consults.
+ */
+export function memoizedSystemdRunIdentity(): () => string | undefined {
+  let cached: { readonly path: string | undefined; readonly identity: string | undefined } | undefined
+  return () => {
+    const path = childEnv().PATH
+    if (cached === undefined || cached.path !== path) cached = { path, identity: systemdRunIdentity() }
+    return cached.identity
+  }
+}
+
+/**
  * Confirm the user manager before a scope launch. A listener on its private socket confirms it
  * without a child process; otherwise one systemctl query decides. A hung manager that still
  * listens passes, and its scope launch fails with LinuxScopeNotStartedError.

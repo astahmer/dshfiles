@@ -41,7 +41,7 @@ import {
   prepareLinuxTerminalScope,
   probeLinuxNative,
   signalLinuxDirectProcess,
-  systemdRunIdentity,
+  memoizedSystemdRunIdentity,
 } from './linux-scope.ts'
 import { LinuxScopeSelector } from './linux-scope-selector.ts'
 import type { LinuxScopeDecision } from './linux-scope-selector.ts'
@@ -80,7 +80,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
     probe: () => probeLinuxNative(),
     managerListener: () => linuxManagerListener(),
     confirmManager: () => confirmLinuxManager(),
-    launcherIdentity: () => systemdRunIdentity(),
+    launcherIdentity: memoizedSystemdRunIdentity(),
   })
   /** Scope decision of the launch in progress; selectContainmentMode sets it immediately before the launch reads it. */
   private linuxScopeDecision: Extract<LinuxScopeDecision, { kind: 'scope' }> | undefined
