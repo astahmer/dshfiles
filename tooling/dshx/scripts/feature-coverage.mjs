@@ -112,6 +112,21 @@ const readPresentationBaseline = async () => {
   return new Set(parsed.missing)
 }
 
+/**
+ * A UI plugin (a feature lists a `client` surface) ships at least one `onboarding` block, so Getting started can say what
+ * to do first and when it worked. A plugin whose every client feature is `surface: infrastructure` has nothing a user
+ * addresses directly and needs none.
+ */
+const onboardingIssues = catalog => {
+  const clientFeatures = catalog.features.filter(feature => feature.surfaces.includes('client'))
+  if (clientFeatures.every(feature => feature.surface === 'infrastructure')) return []
+  if (catalog.features.some(feature => feature.onboarding !== undefined)) return []
+  const userFacing = clientFeatures.filter(feature => feature.surface !== 'infrastructure').map(feature => feature.id)
+  return [
+    `UI plugin has no onboarding block: add "onboarding": { "firstAction": "<one sentence>", "doneWhen": "<one sentence>" } to its most user-facing feature (${userFacing.join(', ')}), with "prerequisites" only when real and "open" only for a main panel, command or Settings section the plugin registers; or mark each client feature "surface": "infrastructure" if users never address it`,
+  ]
+}
+
 const packages = await collectPackages()
 const presentationBaseline = await readPresentationBaseline()
 const presentationSeen = new Set()
@@ -200,6 +215,7 @@ for (const plugin of packages) {
       }
     }
   }
+  featureIssues.push(...onboardingIssues(parsed))
   if (parsed.kind === 'infrastructure' && !parsed.features.some(feature => feature.verification.some(item => item.kind === 'unit-test'))) {
     featureIssues.push('infrastructure catalogs need at least one package unit-test reference')
   }

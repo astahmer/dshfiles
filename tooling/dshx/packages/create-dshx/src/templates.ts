@@ -805,6 +805,11 @@ function renderFeatureCatalog(context: TemplateContext, templateName: TemplateNa
     surface: commands ? 'command' : 'agentToolOnly',
     destination: 'none',
     currentSurface: commands ? 'palette: Greeting command' : 'agent tool only',
+    onboarding: template.hostOnly
+      ? undefined
+      : commands
+        ? { firstAction: 'Run Greeting command from the command palette.', doneWhen: 'The greeting answer shows.' }
+        : { firstAction: 'Ask the agent whether the plugin is ready.', doneWhen: 'The agent answers with the status tool.' },
     configuration: [],
     states: ['ready'],
     failureModes: ['The Host entry fails to activate, so the contribution is never registered.'],

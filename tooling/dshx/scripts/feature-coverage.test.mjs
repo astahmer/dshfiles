@@ -253,6 +253,33 @@ test('accepts an onboarding block and rejects an unknown prerequisite, a second 
   })
 })
 
+test('requires an onboarding block on a UI plugin unless every client feature is infrastructure', async () => {
+  await withFixture(async ({ root, catalogFile }) => {
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surfaces = ['client', 'host']
+    })
+    const missing = runCheck(root)
+    assert.equal(missing.status, 1)
+    assert.match(missing.stderr, /@dshfiles\/demo: UI plugin has no onboarding block: add "onboarding": \{ "firstAction"/)
+    assert.match(missing.stderr, /most user-facing feature \(boot-profile\)/)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surface = 'infrastructure'
+      catalog.features[0].destination = 'none'
+    })
+    const infrastructure = runCheck(root)
+    assert.equal(infrastructure.status, 0, infrastructure.stderr)
+
+    await editCatalog(catalogFile, catalog => {
+      catalog.features[0].surface = 'detail'
+      catalog.features[0].destination = 'observe'
+      catalog.features[0].onboarding = { firstAction: 'Open Observe › Profiles and boot one.', doneWhen: 'A profile shows Ready.' }
+    })
+    const withBlock = runCheck(root)
+    assert.equal(withBlock.status, 0, withBlock.stderr)
+  })
+})
+
 test('requires a telemetry entry on every feature', async () => {
   await withFixture(async ({ root, catalogFile }) => {
     await editCatalog(catalogFile, catalog => {
