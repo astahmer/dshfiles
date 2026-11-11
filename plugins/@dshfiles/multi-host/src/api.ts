@@ -162,14 +162,16 @@ const connectionTestStepSchema = Schema.Struct({
   message: Schema.optional(Schema.String),
 })
 const directoryEntrySchema = Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })
-const directoryListingSchema = Schema.Struct({
+export const maxDirectoryEntries = 2_000
+export const directoryListingSchema = Schema.Struct({
   path: Schema.String,
   home: Schema.String,
   crumbs: Schema.Array(directoryEntrySchema),
-  entries: Schema.Array(directoryEntrySchema),
+  entries: Schema.Array(directoryEntrySchema).check(Schema.isMaxLength(maxDirectoryEntries)),
   truncated: Schema.Boolean,
 })
 const fileReferenceCandidateSchema = Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(4096)), kind: Schema.Literals(['file', 'directory']) })
+export const fileReferenceCandidatesSchema = Schema.Array(fileReferenceCandidateSchema).check(Schema.isMaxLength(1000))
 const encodedFileDataSchema = Schema.String.check(
   Schema.isMaxLength(32_000_000),
   Schema.isPattern(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u),
@@ -1035,7 +1037,7 @@ const effectMultiHostApi = defineApi({
     runtimeFileReferences: method({
       input: Schema.Struct({ runtimeId: idSchema, sessionId: sessionIdSchema, query: Schema.String.check(Schema.isMaxLength(4096)) }),
       output: Schema.Union([
-        Schema.Struct({ ok: Schema.Literal(true), candidates: Schema.Array(fileReferenceCandidateSchema).check(Schema.isMaxLength(1000)) }),
+        Schema.Struct({ ok: Schema.Literal(true), candidates: fileReferenceCandidatesSchema }),
         failedSchema,
       ]),
       description: 'List file and directory mentions for one remote Session cwd. Read-only.',

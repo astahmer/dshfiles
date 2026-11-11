@@ -1,9 +1,7 @@
 import { homedir } from 'node:os'
 import { Effect, FileSystem, Path } from 'effect'
-import type { DirectoryListing } from './api.js'
+import { maxDirectoryEntries, type DirectoryListing } from './api.js'
 import { FolderPathInvalid, FolderUnavailable } from './errors.js'
-
-const maxEntries = 2_000
 
 /** One folder level of this machine for a remote folder picker. Stock DSH only serves `directoryPicker.list` where the
  * composition has an in-app browser; a headless Linux runtime composes the native chooser and refuses it. */
@@ -35,8 +33,8 @@ const list = Effect.fn('multi-host directory list')(function* (requested: string
     path: folder,
     home: homedir(),
     crumbs,
-    entries: entries.slice(0, maxEntries),
-    truncated: entries.length > maxEntries,
+    entries: entries.slice(0, maxDirectoryEntries),
+    truncated: entries.length > maxDirectoryEntries,
   } satisfies DirectoryListing
 })
 

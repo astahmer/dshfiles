@@ -15,6 +15,8 @@ import { basename, join, posix } from 'node:path'
 import { Api, DshxPlugin, HostContext, hostServiceChanges } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import {
+  directoryListingSchema,
+  fileReferenceCandidatesSchema,
   fileUploadValueSchema,
   jjRepositoriesEffectSchema,
   multiHostApi,
@@ -86,21 +88,11 @@ const profileSchema = Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLengt
 const configSchema = Schema.Struct({ profile: Schema.optional(profileSchema) })
 
 const sessionCreatedSchema = Schema.Struct({ sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }).pipe(SchemaFields.passthrough)
-const directoryListingSchema = Schema.Struct({
-  path: Schema.String,
-  home: Schema.String,
-  crumbs: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })),
-  entries: Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String, hidden: Schema.Boolean })).check(Schema.isMaxLength(5_000)),
-  truncated: Schema.Boolean,
-}).pipe(SchemaFields.passthrough)
 const workspaceCreatedSchema = Schema.Struct({
   workspace: Schema.Struct({ workspaceId: Schema.String.check(Schema.isMinLength(1)), path: Schema.String.check(Schema.isMinLength(1)) }).pipe(
     SchemaFields.passthrough,
   ),
 }).pipe(SchemaFields.passthrough)
-const fileReferenceCandidatesSchema = Schema.Array(
-  Schema.Struct({ path: Schema.String.check(Schema.isMaxLength(4096)), kind: Schema.Literals(['file', 'directory']) }),
-).check(Schema.isMaxLength(1000))
 const modelCatalogSchema = Schema.Struct({
   default: Schema.optional(
     Schema.Struct({ provider: Schema.String, model: Schema.String, reasoningEffort: Schema.optional(Schema.String) }).pipe(SchemaFields.passthrough),
@@ -917,8 +909,8 @@ const handlers = Api.handlers(multiHostApi, {
         path: listing.path,
         home: listing.home,
         crumbs: listing.crumbs,
-        entries: listing.entries.slice(0, 2_000),
-        truncated: listing.truncated || listing.entries.length > 2_000,
+        entries: listing.entries,
+        truncated: listing.truncated,
       })),
       Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
     )

@@ -2,8 +2,9 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NodeServices } from '@effect/platform-node'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { describe, expect, test } from 'vitest'
+import { directoryListingSchema, maxDirectoryEntries } from '../src/api.js'
 import { DirectoryListingModel } from '../src/directory-listing.js'
 
 const listDirectory = (path: string) => DirectoryListingModel.list(path).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer)), Effect.runPromise)
@@ -11,6 +12,19 @@ const createChildDirectory = (input: { readonly path: string; readonly name: str
   DirectoryListingModel.createChild(input).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer)), Effect.runPromise)
 
 describe('runtime folder listing', () => {
+  test('the contract schema holds exactly the entries one listing returns', () => {
+    const listing = (count: number) => ({
+      path: '/',
+      home: '/',
+      crumbs: [],
+      entries: Array.from({ length: count }, (_, index) => ({ name: `${index}`, path: `/${index}`, hidden: false })),
+      truncated: false,
+    })
+    expect(maxDirectoryEntries).toBe(2_000)
+    expect(Schema.is(directoryListingSchema)(listing(maxDirectoryEntries))).toBe(true)
+    expect(Schema.is(directoryListingSchema)(listing(maxDirectoryEntries + 1))).toBe(false)
+  })
+
   test('lists folders and folder symlinks, hidden ones last, with crumbs; files are left out', async () => {
     const root = await realpath(await mkdtemp(join(tmpdir(), 'multi-host-folders-')))
     try {
