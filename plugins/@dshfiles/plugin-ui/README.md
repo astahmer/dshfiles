@@ -366,6 +366,11 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
   sets `touch-action` on every native button, link, tab and menu item, and a 16px floor on every native field under a
   coarse pointer. Keep it inside `@layer base`; an unlayered rule there beats `dshx:touch-none` and every other
   `dshx:` utility. Add a new page-global rule to that file only with the same reason, and list it here.
+- On a coarse pointer every kit button, toggle, toggle-group item and raw
+  `<button>` under `.dshx-root` gets a 44px hit area through `::after` (tabs
+  triggers use `::before`). A raw button that draws with an `after:` utility is
+  skipped; one that draws with a hand-written `::after` rule loses its drawing, so
+  use an `after:` utility or `::before` instead.
 - Avoid native JSX `<select>` controls; use `Combobox` from
   `@dshfiles/plugin-ui/components/ui/combobox` instead, matching the New Thread
   picker for consistent, searchable selection. The `no-native-select` lint rule

@@ -405,15 +405,27 @@
  * button, toggle and toggle-group item gets a hit area of at least 44px, centred on it, without changing its drawn
  * size or the layout: the dense desktop layout stays as it is and a 24px icon button is still easy to hit on a phone.
  * Base layer, so a positioning utility on the control (`absolute`, `fixed`) still wins and is itself the containing
- * block. Tabs triggers are left out: their `after:` draws the active underline.
+ * block. Tabs triggers are left out: their `after:` draws the active underline. Raw `<button>`s inside a plugin root get
+ * the same hit area unless an `after:` utility already draws with their ::after; the Host conversation's CSS-module
+ * buttons are left out.
  */
 @layer base {
   @media (pointer: coarse) {
-    :where([data-slot='button'], [data-slot='toggle'], [data-slot='toggle-group-item']) {
+    :where(
+      [data-slot='button'],
+      [data-slot='toggle'],
+      [data-slot='toggle-group-item'],
+      .dshx-root button:not([data-slot]):not([class*='after:']):not([data-slot^='conversation.'] *)
+    ) {
       position: relative;
     }
 
-    :where([data-slot='button'], [data-slot='toggle'], [data-slot='toggle-group-item'])::after {
+    :where(
+      [data-slot='button'],
+      [data-slot='toggle'],
+      [data-slot='toggle-group-item'],
+      .dshx-root button:not([data-slot]):not([class*='after:']):not([data-slot^='conversation.'] *)
+    )::after {
       content: '';
       position: absolute;
       inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
