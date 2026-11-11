@@ -1,6 +1,6 @@
 # Guided onboarding and feature discovery
 
-**Resume here:** P1–P4 and the phone `reachNarrow` walks are on `main`. Next: land follow-ups 12 and 14 (running), then P5 (AGENTS.md rule + `features:check` error for a UI plugin without an onboarding block).
+**Resume here:** P1–P4, the phone walks and follow-ups 12/14 are on `main`. Next: P5. Decide first which UI plugins must join a pack (52 are in none, some are shared libraries), then add an `onboarding` block to the 79 UI plugins without one and make `features:check` fail when one is missing.
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
@@ -50,9 +50,9 @@
 9. The wizard's "No composer is open" message is unreachable: without a composer on screen it opens a new thread draft with the prompt, which always succeeds.
 10. Usage suggestions read Usage's 100 most-used tools; a tool used outside that set reads as unused and may be suggested (Dismiss hides it). The "repeated prompts → prompt stash" rule is omitted: Usage never exposes prompt text, by design. The populated list is proven by a DOM test only (the scratch profile has too little usage to cross a threshold).
 11. Effect `Cache` lookups run under the services captured at layer build, so a span opened inside a lookup never reaches the request's tracer. Onboarding uses its own keyed `TtlCell` instead; other plugins that open spans inside `Cache.makeWith` lookups may have the same blind spot.
-12. `scripts/pack-docs.ts` restates overview-model's "curated" rule, because plain `node` cannot load `overview-model.ts`. Move the rule into a module with type-only imports (`curation.ts`) that both read, after P4a lands.
+12. ~~pack-docs restated the curated rule~~ — done: `curationOf` in `curation.ts` is the one rule; the gallery and `scripts/pack-docs.ts` both call it and a test asserts they agree (`jj:utnpxqlx`).
 13. `dshx init` reads `onboarding/src/packs.ts` from the checkout at run time (a dshx module would close a workspace cycle: onboarding depends on dshx). Its interactive terminal picker and booting a composed profile are unverified; `--yes`, `--dry-run` and `--json` ran in a temp home.
-14. Try it from the page starts its thread in the Host default directory; it should start in the project on screen (pass that project from the page). A real Start demo against a model is unverified (the scratch profile has no provider, and the scenario asserts nothing is sent).
+14. ~~Try it started in the Host default directory~~ — done: the page passes the project on screen and the Host refuses one thread actions does not list (`jj:zluqlsom`); with no project on screen the dialog says it starts in the Host default directory. A real Start demo against a model is still unverified.
 
 ### Landing checks
 
