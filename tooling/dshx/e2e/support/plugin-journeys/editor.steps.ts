@@ -24,7 +24,7 @@ const editorPanel = (page: Page) =>
     .locator('div.dshx-root')
     .filter({ has: page.getByRole('button', { name: 'Toggle file tree', exact: true }) })
     .last()
-const editorTab = (page: Page, name: string) => editorPanel(page).getByRole('tab', { name, exact: true })
+const editorTab = (page: Page, name: string) => editorPanel(page).getByRole('group', { name: 'Open files', exact: true }).getByRole('button', { name, exact: true })
 const saveState = (page: Page) => editorPanel(page).getByText(/^(Saved|Unsaved|New file|Read-only)$/)
 
 const openGoToFile = async (page: Page): Promise<void> => {
@@ -79,7 +79,7 @@ When('{string} is opened with Go to file', async ({ page }: { page: Page }, file
   await paletteDialog(page)
     .getByRole('option', { name: new RegExp(`^${fileName.replace('.', '\\.')}`) })
     .click()
-  await expect(editorTab(page, fileName)).toHaveAttribute('aria-selected', 'true')
+  await expect(editorTab(page, fileName)).toHaveAttribute('aria-current', 'true')
 })
 
 const workspaceFilesRow = (page: Page, fileName: string) =>
@@ -91,10 +91,10 @@ When('{string} is opened twice from the Workspace files page', async ({ page }: 
   const chooser = pane.getByRole('region', { name: 'Choose a view', exact: true }).filter({ visible: true })
   await chooser.getByRole('button', { name: /^Workspace files/ }).click()
   await workspaceFilesRow(page, fileName).click()
-  await expect(editorTab(page, fileName)).toHaveAttribute('aria-selected', 'true')
+  await expect(editorTab(page, fileName)).toHaveAttribute('aria-current', 'true')
   await page.getByRole('tab', { name: 'Files', exact: true }).first().click()
   await workspaceFilesRow(page, fileName).click()
-  await expect(editorTab(page, fileName)).toHaveAttribute('aria-selected', 'true')
+  await expect(editorTab(page, fileName)).toHaveAttribute('aria-current', 'true')
 })
 
 When('the editor placement is set to {string} in the plugin settings', async ({ page }: { page: Page }, placement: string) => {
@@ -139,7 +139,7 @@ When('the version-control file .git\\/HEAD is edited from the file tree and save
   const tree = editorPanel(page).getByRole('tree', { name: 'Workspace files', exact: true })
   await tree.getByRole('button', { name: '.git', exact: true }).click()
   await tree.getByRole('button', { name: 'HEAD', exact: true }).click()
-  await expect(editorTab(page, 'HEAD')).toHaveAttribute('aria-selected', 'true')
+  await expect(editorTab(page, 'HEAD')).toHaveAttribute('aria-current', 'true')
   await appendToActiveFile(page, '\ntampered')
   await saveActiveFile(page)
   const approval = page.getByRole('alertdialog', { name: 'Write this file to disk?', exact: true })

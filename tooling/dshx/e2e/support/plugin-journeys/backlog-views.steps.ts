@@ -22,9 +22,9 @@ const itemsTable = (page: Page) => page.getByRole('table', { name: 'Backlog item
 const viewButton = (page: Page, name: string) => page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name, exact: true })
 
 const showInboxFilter = async (page: Page, filter: string): Promise<void> => {
-  const tab = inbox(page).getByRole('tab', { name: new RegExp(`^${filter}`) })
+  const tab = inbox(page).getByRole('radio', { name: new RegExp(`^${filter}`) })
   await tab.click()
-  await expect(tab).toHaveAttribute('aria-selected', 'true')
+  await expect(tab).toHaveAttribute('aria-checked', 'true')
 }
 
 Then('the Inbox filters stay on one line', async ({ page }: { page: Page }) => {

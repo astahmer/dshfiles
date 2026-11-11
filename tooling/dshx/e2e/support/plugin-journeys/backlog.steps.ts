@@ -1487,9 +1487,9 @@ When('the Backlog Inbox is opened', async ({ page }: { page: Page }) => {
 Then('the Inbox lists {string} under {string}', async ({ page }: { page: Page }, title: string, filter: string) => {
   await recordAssertion(page, 'backlog-attention-inbox', async () => {
     const inbox = page.getByRole('region', { name: 'Inbox', exact: true })
-    const filterTab = inbox.getByRole('tab', { name: new RegExp(`^${filter}`) })
+    const filterTab = inbox.getByRole('radio', { name: new RegExp(`^${filter}`) })
     await filterTab.click()
-    await expect(filterTab).toHaveAttribute('aria-selected', 'true')
+    await expect(filterTab).toHaveAttribute('aria-checked', 'true')
     await expect(inbox.getByRole('list')).toContainText(title)
   })
   await finishJourneyAssertions(page)
