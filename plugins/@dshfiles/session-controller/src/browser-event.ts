@@ -44,6 +44,12 @@ const chunkRecordSchema = passthrough(
 type WithReplayState = Schema.Schema.Type<typeof withReplayStateSchema>
 
 /**
+ * One entry of a settled assistant event's recorded stream, as `assistantDataSchema` keeps it: a text, reasoning or
+ * tool-call run or a single chunk is decoded where it is read; any other entry passes through unread.
+ */
+type StreamRecord = NonNullable<Schema.Schema.Type<typeof assistantDataSchema>['stream']>[number]
+
+/**
  * The browser copy of a Session event. Two parts of a settled assistant event are bytes no browser reader needs:
  * 1. Provider replay state (thinking signatures) on the message source: only the Host replays a provider response.
  * 2. The recorded chunk stream, which repeats every text and argument of `message` (three times, with its block-end
@@ -80,7 +86,7 @@ export class BrowserEvent {
    * The record holding the stream's first token (dsh-llm `isTokenDelta`), trimmed to it; empty without one.
    * @returns `stream` itself when it already is that single untrimmed record.
    */
-  private static firstTokenStream(stream: readonly unknown[]): readonly unknown[] {
+  private static firstTokenStream(stream: readonly StreamRecord[]): readonly StreamRecord[] {
     for (const record of stream) {
       const kept = BrowserEvent.firstTokenOf(record)
       if (kept === undefined) continue
@@ -90,7 +96,7 @@ export class BrowserEvent {
   }
 
   /** @returns `record` when its last member is the first token, a trimmed copy when later members follow it. */
-  private static firstTokenOf(record: unknown): unknown {
+  private static firstTokenOf(record: StreamRecord): StreamRecord | undefined {
     const text = Schema.decodeUnknownResult(textRunSchema)(record)
     if (text._tag === 'Success')
       return BrowserEvent.trimRun(
@@ -116,11 +122,11 @@ export class BrowserEvent {
 
   /** A run keeps its members through `first`; `dt` holds one gap per later member, so it keeps `first` gaps. */
   private static trimRun<Run extends Readonly<Record<'dt', readonly number[]>> & Readonly<Partial<Record<'texts' | 'args', readonly string[]>>>>(
-    record: unknown,
+    record: StreamRecord,
     run: Run,
     key: 'texts' | 'args',
     first: number,
-  ): unknown {
+  ): StreamRecord | undefined {
     const fragments = run[key] ?? []
     if (first < 0) return undefined
     if (first === fragments.length - 1) return record

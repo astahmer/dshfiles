@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
 import { HostReload } from './host-reload.js'
 
@@ -44,7 +45,7 @@ describe('host reload Loader contract', () => {
     expect(HostReload.contractOf({ name: 'dshfiles-pilot', inject: ['tools'], apply: () => 1 })).toBe(base)
     expect(HostReload.contractOf({ name: 'dshfiles-other', inject: ['tools'], apply })).not.toBe(base)
     expect(HostReload.contractOf({ name: 'dshfiles-pilot', inject: ['tools', 'agents'], apply })).not.toBe(base)
-    const configWithJsonForm = { '~standard': { version: 1 as const, vendor: 'test', validate: (value: unknown) => ({ value }) }, toJSON: () => ({ a: 1 }) }
+    const configWithJsonForm = { '~standard': Schema.toStandardSchemaV1(Schema.Unknown)['~standard'], toJSON: () => ({ a: 1 }) }
     expect(HostReload.contractOf({ name: 'dshfiles-pilot', inject: ['tools'], Config: configWithJsonForm, apply })).not.toBe(base)
   })
 })

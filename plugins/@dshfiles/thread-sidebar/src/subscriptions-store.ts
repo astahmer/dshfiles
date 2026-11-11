@@ -143,12 +143,12 @@ export class ThreadSubscriptions extends Context.Service<
           return yield* apply('subscribe', current => {
             const existing = current.find(edge => keyOf(edge) === keyOf(input))
             const level = input.level === 'default' ? undefined : (input.level ?? existing?.level)
-            const row: ThreadSubscription = {
+            const unlevelled: ThreadSubscription = {
               subscriberSessionId: input.subscriberSessionId,
               targetSessionId: input.targetSessionId,
               createdAt: existing?.createdAt ?? now,
-              ...(level === undefined ? {} : { level }),
             }
+            const row: ThreadSubscription = level === undefined ? unlevelled : { ...unlevelled, level }
             return { put: [row], remove: [] }
           })
         }),

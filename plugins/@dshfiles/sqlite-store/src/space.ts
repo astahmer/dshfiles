@@ -32,7 +32,8 @@ export interface SqliteIdleVacuum {
   readonly pages?: number
 }
 
-const AUTO_VACUUM_MODES: Readonly<Record<number, SqliteAutoVacuum>> = { 0: 'none', 1: 'full', 2: 'incremental' }
+/** `PRAGMA auto_vacuum` values, indexed by the number SQLite returns. */
+const AUTO_VACUUM_MODES = ['none', 'full', 'incremental'] as const satisfies readonly SqliteAutoVacuum[]
 const DEFAULT_IDLE_VACUUM_EVERY = Duration.minutes(5)
 const DEFAULT_IDLE_VACUUM_PAGES = 32
 

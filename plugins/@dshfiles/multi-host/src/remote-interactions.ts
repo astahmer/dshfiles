@@ -44,7 +44,10 @@ const decodeProjection = Schema.decodeUnknownOption(
   ]),
 )
 /** A control-stream patch that does not fit the value this connection holds; the connection ends and reopens. */
-class ProjectionPatchMisfit extends Schema.TaggedError<ProjectionPatchMisfit>()('ProjectionPatchMisfit', { key: Schema.String }) {}
+class ProjectionPatchMisfit extends Schema.TaggedError<ProjectionPatchMisfit>()('ProjectionPatchMisfit', {
+  key: Schema.String,
+  cause: Schema.optional(Schema.Defect()),
+}) {}
 
 const decodeClaimFrame = Schema.decodeUnknownOption(Schema.Struct({ remainingMs: Schema.Number }).pipe(SchemaFields.passthrough))
 
@@ -277,7 +280,7 @@ export class RemoteInteractions extends Context.Service<
                       if (previous === undefined) return Effect.fail(new ProjectionPatchMisfit({ key: update.key }))
                       return Effect.try({
                         try: () => ProjectionPatches.apply(previous, ProjectionPatches.decode(update.patch)),
-                        catch: () => new ProjectionPatchMisfit({ key: update.key }),
+                        catch: cause => new ProjectionPatchMisfit({ key: update.key, cause }),
                       }).pipe(Effect.tap(value => Effect.sync(() => cells.set(cell, value))))
                     }),
                     value => PubSub.publish(projected, { sessionId: update.sessionId, key: update.key, value, seq: update.seq }),

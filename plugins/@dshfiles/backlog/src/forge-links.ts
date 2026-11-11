@@ -139,7 +139,6 @@ export class ForgeLinks extends Context.Service<
         const fixing = items.flatMap(item => issueLinksOf(item).flatMap(link => (link.relation === 'fixes' ? [{ item, link }] : [])))
         if (fixing.length === 0) return
         const states = new Map((yield* pulls.issues(fixing.map(entry => entry.link.target))).map(issue => [issue.url, issue]))
-        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each signal writes its own item; a second link of the same item finds it done.
         for (const entry of fixing) {
           const issue = states.get(issueOf(entry.link.target)?.url ?? '')
           if (issue === undefined || issue.state !== 'closed' || (issue.reason !== null && unfinishedIssueReasons.has(issue.reason))) continue

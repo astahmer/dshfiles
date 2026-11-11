@@ -41,11 +41,11 @@ export type SubscriptionFinish = 'completed' | 'aborted' | 'blocked' | 'error' |
 
 export type SubscriptionStatus = 'finished' | 'landed' | 'failed' | 'blocked' | 'stopped' | 'truncated' | 'waiting-on-question'
 
-const statusesByLevel: Record<Exclude<SubscriptionNoticeLevel, 'all'>, ReadonlySet<SubscriptionStatus>> = {
-  outcomes: new Set(['landed', 'failed', 'waiting-on-question']),
-  stuck: new Set(['failed', 'waiting-on-question', 'blocked', 'truncated']),
-  never: new Set(),
-}
+const statusesByLevel = {
+  outcomes: new Set<SubscriptionStatus>(['landed', 'failed', 'waiting-on-question']),
+  stuck: new Set<SubscriptionStatus>(['failed', 'waiting-on-question', 'blocked', 'truncated']),
+  never: new Set<SubscriptionStatus>(),
+} satisfies Record<Exclude<SubscriptionNoticeLevel, 'all'>, ReadonlySet<SubscriptionStatus>>
 
 const statusByFinish = new Map<SubscriptionFinish, SubscriptionStatus>([
   ['completed', 'finished'],
@@ -222,8 +222,7 @@ export interface SubscriptionEdges {
 }
 
 /** A notice that could not be queued because the subscriber is gone ends that subscription instead of retrying forever. */
-const subscriberIsGone = (code: string): boolean =>
-  code === 'thread-not-found' || code === 'thread-unavailable' || code === 'SESSION_QUERY_SESSION_NOT_FOUND'
+const subscriberIsGone = (code: string): boolean => code === 'thread-not-found' || code === 'thread-unavailable' || code === 'SESSION_QUERY_SESSION_NOT_FOUND'
 
 /** A compaction that ran inside a turn which answered nothing changed nothing a subscriber waits on. A failure still reports. */
 const isQuietTurn = (turn: FinishedTurn): boolean =>

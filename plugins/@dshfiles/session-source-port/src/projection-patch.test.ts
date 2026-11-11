@@ -1,3 +1,4 @@
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { describe, expect, it } from 'vitest'
 import { ProjectionPatches, type PatchJson } from './projection-patch.ts'
 
@@ -59,7 +60,7 @@ describe('projection patches', () => {
 describe('ProjectionPatches.decode', () => {
   it('accepts what ProjectionPatches.diff produces and rejects other shapes', () => {
     const patch = ProjectionPatches.diff({ a: Array.from({ length: 20 }, (_, index) => index) }, { a: Array.from({ length: 21 }, (_, index) => index) })
-    expect(ProjectionPatches.decode(JSON.parse(JSON.stringify(patch)))).toEqual(patch)
+    expect(ProjectionPatches.decode(decodeJson(jsonValueSchema, JSON.stringify(patch)))).toEqual(patch)
     expect(() => ProjectionPatches.decode({ a: -1, i: [] })).toThrow()
     expect(() => ProjectionPatches.decode({ x: 1 })).toThrow()
   })

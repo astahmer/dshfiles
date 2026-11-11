@@ -27,12 +27,16 @@ const turnEnd = (kind: string, reason?: string) => ({
   data: { turn: 3, reason: reason === undefined ? { kind } : { kind, reason: { kind: reason } } },
 })
 
-const edge = (subscriberSessionId: string, targetSessionId = 'target', level?: SubscriptionNoticeLevel): ThreadSubscription => ({
-  subscriberSessionId,
-  targetSessionId,
-  createdAt: 1,
-  ...(level === undefined ? {} : { level }),
-})
+const edge = (subscriberSessionId: string, targetSessionId = 'target', level?: SubscriptionNoticeLevel): ThreadSubscription => {
+  const row: ThreadSubscription = { subscriberSessionId, targetSessionId, createdAt: 1 }
+  return level === undefined ? row : { ...row, level }
+}
+
+/** The Session event payloads these tests publish: an assistant message, a turn or step boundary, or nothing. */
+type TestEventData =
+  | { readonly message: { readonly content: ReadonlyArray<{ readonly type: string; readonly text: string }> } }
+  | { readonly turn: number; readonly reason?: { readonly kind: string }; readonly step?: number }
+  | Readonly<Record<string, never>>
 
 /** The subscription store as the notifier reads it, remembering what a pass pruned. */
 const fakeEdges = (rows: ReadonlyArray<ThreadSubscription>) =>
@@ -62,7 +66,7 @@ const fakeNotices = (input: {
   /** What a steer answers; a refused steer is how a compacting or racing Host shows. */
   readonly steerOutcome?: DeliveryOutcome
   readonly landed?: boolean
-  readonly level?: SubscriptionNoticeLevel
+  readonly level?: SubscriptionNoticeLevel | undefined
   readonly delivery?: SubscriptionDeliveryMode
 }) =>
   Effect.gen(function* () {
@@ -81,7 +85,8 @@ const fakeNotices = (input: {
             if (input.outcome !== undefined && !input.outcome.delivered) return input.outcome
             if (request.mode === 'steer' && input.steerOutcome !== undefined && !input.steerOutcome.delivered) return input.steerOutcome
             yield* Ref.update(delivered, current => [...current, request])
-            return { delivered: true } as DeliveryOutcome
+            const sent: DeliveryOutcome = { delivered: true }
+            return sent
           }),
         messagesOf: () =>
           Effect.as(
@@ -254,9 +259,10 @@ describe('thread subscription notices', () => {
   )
   describe('the tracker', () => {
     let seq = 0
-    const at = (sessionId: string, type: string, data: unknown = {}): { readonly sessionId: string; readonly event: SessionEventReport } => {
+    const at = (sessionId: string, type: string, data: TestEventData = {}) => {
       seq += 1
-      return { sessionId, event: { type, seq, time: seq * 1_000, data } }
+      const event: SessionEventReport = { type, seq, time: seq * 1_000, data }
+      return { sessionId, event }
     }
     const said = (sessionId: string, text: string) => at(sessionId, 'assistant/message', { message: { content: [{ type: 'text', text }] } })
     const ended = (sessionId: string, kind: string) => at(sessionId, 'turn/end', { turn: 1, reason: { kind } })
@@ -421,7 +427,7 @@ describe('thread subscription notices', () => {
                 ['target', state({ pendingQuestions: input.pendingQuestions ?? 0 })],
                 ['watcher', state()],
               ]),
-              ...(input.defaultLevel === undefined ? {} : { level: input.defaultLevel }),
+              level: input.defaultLevel,
               landed: input.landed ?? false,
             })
             const tracker = yield* makeSubscriptionNoticeTracker({ notices, subscriptions: store })

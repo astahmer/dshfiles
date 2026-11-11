@@ -225,6 +225,9 @@ const layer = (options: SqliteStoreOptions): Layer.Layer<SqlClient.SqlClient, Sq
  * The service must expose methods only: a property read cannot start the build, and a non-method property dies with
  * a message naming it rather than silently resolving to a wrapper function.
  */
+/** Whether `key` names a member of `value`, own or inherited, as the `in` operator reads it. */
+const isMemberOf = <T extends object>(value: T, key: PropertyKey): key is keyof T => key in value
+
 const deferred = <Self, Shape extends object, E, R>(service: Context.Service<Self, Shape>, layer: Layer.Layer<Self, E, R>): Layer.Layer<Self, E, R> =>
   Layer.effect(
     service,
@@ -239,9 +242,9 @@ const deferred = <Self, Shape extends object, E, R>(service: Context.Service<Sel
           (...args: ReadonlyArray<unknown>) =>
             Effect.flatMap(built, context => {
               const instance = Context.get(context, service)
-              // SAFETY: the proxy only forwards calls; a member that is not a function cannot start the build, so it
-              // reports a named failure instead of resolving to a wrapper.
-              const member = (instance as Record<PropertyKey, unknown>)[key]
+              // The proxy only forwards calls; a member that is not a function cannot start the build, so it reports a
+              // named failure instead of resolving to a wrapper.
+              const member = isMemberOf(instance, key) ? instance[key] : undefined
               if (typeof member !== 'function') return Effect.die(new DeferredStoreMemberMissing({ service: service.key, member: String(key) }))
               // SAFETY: typeof proved the member is a callable method of this service.
               return (member as (...values: Array<unknown>) => Effect.Effect<unknown, E>).apply(instance, [...args])

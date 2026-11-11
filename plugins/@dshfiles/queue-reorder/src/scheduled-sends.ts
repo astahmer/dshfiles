@@ -73,17 +73,17 @@ const make = Effect.gen(function* () {
   }) {
     const now = yield* Clock.currentTimeMillis
     yield* checkTime(input.sendAt, now)
-    const send: ScheduledSend = {
+    const unmodelled: ScheduledSend = {
       id: newSendId(),
       sessionId: input.sessionId,
       text: input.text,
       sendAt: input.sendAt,
-      ...(input.model === undefined ? {} : { model: input.model }),
       createdAt: now,
       status: 'scheduled',
       requestId: randomUUID(),
       attempts: 0,
     }
+    const send: ScheduledSend = input.model === undefined ? unmodelled : { ...unmodelled, model: input.model }
     yield* store.exclusive(store.put(send))
     yield* Effect.annotateCurrentSpan({ 'dshx.scheduled_send.id': send.id, 'dsh.session.id': send.sessionId })
     return send
@@ -108,7 +108,7 @@ const make = Effect.gen(function* () {
         const modelled = input.model === undefined ? base : input.model === null ? withoutModel : { ...withoutModel, model: input.model }
         const next: ScheduledSend = {
           ...modelled,
-          ...(input.text === undefined ? {} : { text: input.text }),
+          text: input.text ?? modelled.text,
           sendAt: input.sendAt ?? (current.status === 'failed' ? Math.max(current.sendAt, now) : current.sendAt),
           status: 'scheduled',
           attempts: 0,
@@ -168,7 +168,7 @@ const make = Effect.gen(function* () {
               status: 'scheduled',
               note: outcome.note,
               retryAt: now + RETRY_DELAY_MS,
-              ...(outcome.kind === 'wait' ? { attempts: claimed.attempts - 1 } : {}),
+              attempts: outcome.kind === 'wait' ? claimed.attempts - 1 : claimed.attempts,
             }
           : { ...withoutRetry(claimed), status: 'failed', note: outcome.note }
         yield* store.put(settled)

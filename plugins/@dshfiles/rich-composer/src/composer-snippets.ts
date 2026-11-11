@@ -33,7 +33,13 @@ interface SnippetSource {
   readonly codec: { clipboardText(ref: string): string; serialize(ref: string): Promise<string> }
 }
 
-const isSourceRegistry = (value: unknown): value is { registerSource(source: SnippetSource): () => void } =>
+/** The input-trigger pipeline as far as the chips use it: a place to register their source. */
+interface SnippetSourceRegistry {
+  registerSource(source: SnippetSource): () => void
+}
+
+/** The injected `inputTriggers` service is untyped here; this is where it is checked before use. */
+const isSourceRegistry = (value: unknown): value is SnippetSourceRegistry =>
   typeof value === 'object' && value !== null && 'registerSource' in value && typeof value.registerSource === 'function'
 
 /** The composer's quote, note and line-comment chips: the chip keeps its content in `ref`, so a restored draft still sends it. */
@@ -68,10 +74,11 @@ export class ComposerSnippets {
     return ComposerSnippets.clipboardText(snippet)
   }
 
+  static isSourceRegistry = isSourceRegistry
+
   /** Registers the chips' serializer with the input-trigger pipeline; a draft holding one cannot send without it. */
-  static register = (inputTriggers: unknown): (() => void) => {
-    if (!isSourceRegistry(inputTriggers)) return () => {}
-    return inputTriggers.registerSource({
+  static register = (inputTriggers: SnippetSourceRegistry): (() => void) =>
+    inputTriggers.registerSource({
       trigger: '@',
       name: SNIPPET_SOURCE,
       showGroupTitle: false,
@@ -82,7 +89,6 @@ export class ComposerSnippets {
         serialize: ref => Promise.resolve(ComposerSnippets.serialize(ref)),
       },
     })
-  }
 
   private static lines = (comment: { readonly line: number; readonly endLine?: number | undefined }): string =>
     comment.endLine === undefined || comment.endLine === comment.line ? String(comment.line) : `${String(comment.line)}-${String(comment.endLine)}`

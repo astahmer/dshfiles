@@ -22,15 +22,10 @@ type Prompt = Partial<DocumentRow> & { readonly text: string; readonly time: num
 const commit = (
   index: SearchIndex,
   input: { readonly sessionId: string; readonly delegationDepth?: number; readonly replace?: boolean; readonly documents: readonly Prompt[] },
-) =>
-  index.commitBatch({
-    header: {
-      id: input.sessionId,
-      version: 4,
-      createdAt: 1,
-      isSeeded: false,
-      ...(input.delegationDepth === undefined ? {} : { delegationDepth: input.delegationDepth }),
-    },
+) => {
+  const header = { id: input.sessionId, version: 4, createdAt: 1, isSeeded: false }
+  return index.commitBatch({
+    header: input.delegationDepth === undefined ? header : { ...header, delegationDepth: input.delegationDepth },
     cursor: { logPath: `/logs/${input.sessionId}`, dev: '1', ino: input.sessionId, offset: 10, size: 10, mtimeNs: '1' },
     documents: input.documents.map((document, seq) => ({
       sessionId: input.sessionId,
@@ -44,6 +39,7 @@ const commit = (
     replace: input.replace ?? false,
     now: 1,
   })
+}
 
 const request = { limit: 10, window: 100, maxChars: 1_000 }
 

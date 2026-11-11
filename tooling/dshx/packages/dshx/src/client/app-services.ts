@@ -238,9 +238,19 @@ export interface CommandsService {
   readonly keys: Subscribable<ReadonlyMap<string, readonly string[]>>
 }
 
+/**
+ * A native external store whose snapshot shape the Host does not publish.
+ * `Snapshot` stays a type parameter so the raw value keeps its identity for
+ * caching and is decoded with a schema where it is read.
+ */
+interface NativeStore<Snapshot> {
+  getSnapshot(): Snapshot
+  subscribe(listener: () => void): () => void
+}
+
 interface NativeShortcutCatalog {
   readonly platform: string
-  readonly catalog: { getSnapshot(): unknown; subscribe(listener: () => void): () => void }
+  readonly catalog: NativeStore<unknown>
 }
 
 const isNativeShortcutCatalog = (value: unknown): value is NativeShortcutCatalog =>
@@ -256,7 +266,7 @@ const isNativeShortcutCatalog = (value: unknown): value is NativeShortcutCatalog
 
 const ShortcutCatalog = Schema.Array(Schema.Struct({ id: Schema.String, binding: Schema.Unknown, modified: Schema.Boolean }))
 
-const createCommandKeys = (shortcuts: () => unknown): Subscribable<ReadonlyMap<string, readonly string[]>> => {
+const createCommandKeys = <Shortcuts>(shortcuts: () => Shortcuts): Subscribable<ReadonlyMap<string, readonly string[]>> => {
   const commands = BrowserBroker.items(Command)
   let cached: { readonly commands: unknown; readonly catalog: unknown; readonly keys: ReadonlyMap<string, readonly string[]> } | undefined
   return {
@@ -289,7 +299,7 @@ const createCommandKeys = (shortcuts: () => unknown): Subscribable<ReadonlyMap<s
   }
 }
 
-const createCommands = (shortcuts: () => unknown): CommandsService => ({
+const createCommands = <Shortcuts>(shortcuts: () => Shortcuts): CommandsService => ({
   list: BrowserBroker.items(Command),
   keys: createCommandKeys(shortcuts),
   run: id => {
@@ -347,7 +357,7 @@ const isNativeSideRegion = (value: unknown): value is NativeSideRegion =>
   typeof value.toggleExpanded === 'function'
 
 // The Host's toggle throws while no session is on screen; that is a refusal here, not an error.
-const createSideRegion = (sidebarRight: () => unknown): SideRegionService => {
+const createSideRegion = <SidebarRight>(sidebarRight: () => SidebarRight): SideRegionService => {
   const toggleWhen = (wanted: (expanded: boolean) => boolean): boolean => {
     const native = sidebarRight()
     if (!isNativeSideRegion(native)) return false
@@ -384,7 +394,7 @@ const isNativeLayout = (value: unknown): value is NativeLayout =>
   typeof value.panelInfo === 'object' &&
   value.panelInfo !== null
 
-const createLayout = (input: { readonly layout: () => unknown; readonly sidebarRight: () => unknown }): LayoutService => ({
+const createLayout = <Layout, SidebarRight>(input: { readonly layout: () => Layout; readonly sidebarRight: () => SidebarRight }): LayoutService => ({
   side: createSideRegion(input.sidebarRight),
   panel: {
     get: () => {
@@ -558,13 +568,10 @@ export interface EnvironmentService {
   readonly appearance: Subscribable<AppearanceState>
 }
 
-interface NativeLocale {
-  getSnapshot(): unknown
-  subscribe(listener: () => void): () => void
-}
+type NativeLocale = NativeStore<unknown>
 
-interface NativeTheme {
-  getTheme(): unknown
+interface NativeTheme<Theme> {
+  getTheme(): Theme
 }
 
 const isNativeLocale = (value: unknown): value is NativeLocale =>
@@ -575,7 +582,7 @@ const isNativeLocale = (value: unknown): value is NativeLocale =>
   'subscribe' in value &&
   typeof value.subscribe === 'function'
 
-const isNativeTheme = (value: unknown): value is NativeTheme =>
+const isNativeTheme = (value: unknown): value is NativeTheme<unknown> =>
   typeof value === 'object' && value !== null && 'getTheme' in value && typeof value.getTheme === 'function'
 
 const LocaleSnapshot = Schema.Struct({ active: Schema.String.check(Schema.isMinLength(1)) })
@@ -585,9 +592,9 @@ const ThemeSnapshot = Schema.Struct({
 })
 const TextInfo = Schema.Struct({ direction: Schema.String })
 
-const activeLocaleOf = (snapshot: unknown): string | undefined => decode(LocaleSnapshot, snapshot)?.active
+const decodeActiveLocale = (snapshot: unknown): string | undefined => decode(LocaleSnapshot, snapshot)?.active
 
-const appearanceOf = (snapshot: unknown): AppearanceState | undefined => {
+const decodeAppearance = (snapshot: unknown): AppearanceState | undefined => {
   const theme = decode(ThemeSnapshot, snapshot)
   return theme === undefined ? undefined : { colorScheme: theme.active.colorScheme, fonts: theme.fontFamilies }
 }
@@ -604,14 +611,14 @@ const directionOf = (localeId: string): TextDirection => {
   }
 }
 
-const createEnvironment = (input: {
-  readonly service: (name: 'locale' | 'theme') => unknown
+const createEnvironment = <Service>(input: {
+  readonly service: (name: 'locale' | 'theme') => Service
   readonly on: (event: 'theme/change', listener: () => void) => () => void
 }): EnvironmentService => {
   let locale: LocaleState | undefined
   const readLocale = (): LocaleState => {
     const native = input.service('locale')
-    const id = (isNativeLocale(native) ? activeLocaleOf(native.getSnapshot()) : undefined) ?? LocaleNamespaceModel.active()
+    const id = (isNativeLocale(native) ? decodeActiveLocale(native.getSnapshot()) : undefined) ?? LocaleNamespaceModel.active()
     if (locale?.id !== id) locale = { id, direction: directionOf(id) }
     return locale
   }
@@ -624,7 +631,7 @@ const createEnvironment = (input: {
     if (!isNativeTheme(native)) return fallbackAppearance
     const source = native.getTheme()
     if (appearance !== undefined && appearance.source === source) return appearance.state
-    const state = appearanceOf(source) ?? fallbackAppearance
+    const state = decodeAppearance(source) ?? fallbackAppearance
     appearance = { source, state }
     return state
   }

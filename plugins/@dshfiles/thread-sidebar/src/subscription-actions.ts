@@ -103,7 +103,8 @@ export class ThreadSubscriptionActions extends Context.Service<ThreadSubscriptio
               (filter.subscriberSessionId === undefined || row.subscriberSessionId === filter.subscriberSessionId) &&
               (filter.targetSessionId === undefined || row.targetSessionId === filter.targetSessionId),
           )
-          if (rows.length === 0) return { subscriptions: [] } as ThreadSubscriptionsSnapshot
+          const none: ThreadSubscriptionsSnapshot = { subscriptions: [] }
+          if (rows.length === 0) return none
           const titles = yield* titlesOf([...new Set(rows.flatMap(row => [row.subscriberSessionId, row.targetSessionId]))])
           return {
             subscriptions: rows.map(row => {

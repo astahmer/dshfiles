@@ -40,9 +40,15 @@ const astGrepBoundaries = [
   'tooling/dshx/packages/dshx/src/effect/host-prompt.ts',
   'tooling/dshx/packages/dshx/src/effect/settings.ts',
   'plugins/@dshfiles/usage/src/api.ts',
+  // The `.` export of @dshfiles/sqlite-store: forwards the space types its consumers (traces) name.
+  'plugins/@dshfiles/sqlite-store/src/sqlite-store.ts',
+  // The `turn-admission-api` dshx module of session-controller: forwards the policy and snapshot contract chat reads.
+  'plugins/@dshfiles/session-controller/src/turn-admission-api.ts',
   'plugins/@dshfiles/input-trigger/src/client/index.ts',
   'plugins/@dshfiles/main-tabs/src/workbench-tabs.ts',
   'plugins/@dshfiles/rich-composer/src/conversation-contract.ts',
+  // The `rich-text-editor` dshx module and `./rich-text-editor` export of rich-composer: the editor other plugins embed.
+  'plugins/@dshfiles/rich-composer/src/editor/index.ts',
   'tooling/dshx/packages/create-dshx/src/capabilities.ts',
   'tooling/dshx/packages/create-dshx/src/index.ts',
   'tooling/dshx/packages/dshx/client/index.d.ts',
@@ -65,6 +71,8 @@ const astGrepVendored = [
   'plugins/@dshfiles/storage-domain/src/native/**',
   'plugins/@dshfiles/storage-json/src/native/**',
   'plugins/@dshfiles/session-persistence-jsonl/src/native/**',
+  'plugins/@dshfiles/tool-fs/src/native/**',
+  'plugins/@dshfiles/tool-bash/src/native/**',
   'plugins/@dshfiles/storage-domain/tests/**',
   'plugins/@dshfiles/storage-json/tests/**',
   'plugins/@dshfiles/model-selection/src/native/**',
@@ -111,6 +119,12 @@ const astGrepNativeEntryImporters = [
   'plugins/@dshfiles/agent-loop/tests/agent-loop.integration.test.ts',
   'plugins/@dshfiles/cordis-client-runner/tests/inspect-manifest.test.ts',
   'plugins/@dshfiles/cordis-cards/tests/inventory-read.test.ts',
+  'plugins/@dshfiles/agent-loop/tests/output-limit-continuation.test.ts',
+  'plugins/@dshfiles/agent-loop/tests/request-retry.test.ts',
+  'plugins/@dshfiles/agent-loop/tests/tool-argument-limit.test.ts',
+  'plugins/@dshfiles/sidebar-terminal/src/client-entry.ts',
+  'plugins/@dshfiles/sidebar-terminal/src/registration.test.ts',
+  'plugins/@dshfiles/tool-fs/src/read.test.ts',
 ]
 
 const ruleCapsSchema = Schema.Record(Schema.String, Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)))

@@ -863,13 +863,16 @@ const notifyChoiceLabelKeys = {
 
 /** Off, follow the default level, or a fixed level for one pair; a batch shows no current choice. */
 const NotifyChoiceMenu = (props: {
-  readonly title: string
+  /** The subscriber thread's title, named in the submenu label. */
+  readonly subscriberTitle: string
   readonly choice: ThreadNotifyChoice | undefined
   readonly onChoose: (choice: ThreadNotifyChoice) => void
   readonly t: ThreadSidebarTranslate
 }): JSX.Element => (
   <ContextMenuSub>
-    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">{props.t('threadSidebarNotifyOnFinish', { title: props.title })}</ContextMenuSubTrigger>
+    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">
+      {props.t('threadSidebarNotifyOnFinish', { title: props.subscriberTitle })}
+    </ContextMenuSubTrigger>
     <ContextMenuSubContent className="dshx-root dshx:min-w-44">
       <ContextMenuRadioGroup value={props.choice ?? ''}>
         {THREAD_NOTIFY_CHOICES.map(choice => (
@@ -916,7 +919,7 @@ const BatchThreadMenuItems = (props: {
       </ContextMenuSub>
       <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>{props.t('threadSidebarCopyLinks')}</ContextMenuItem>
       {notifySubscriber === undefined ? null : (
-        <NotifyChoiceMenu title={notifySubscriber.title} choice={undefined} onChoose={choice => props.actions.batchNotify(choice)} t={props.t} />
+        <NotifyChoiceMenu subscriberTitle={notifySubscriber.title} choice={undefined} onChoose={choice => props.actions.batchNotify(choice)} t={props.t} />
       )}
       <ContextMenuSeparator />
       {snapshot.anyLive ? <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>{props.t('threadSidebarArchive')}</ContextMenuItem> : null}
@@ -1020,7 +1023,7 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
       <ContextMenuSeparator />
       {notifyTarget === undefined ? null : (
         <NotifyChoiceMenu
-          title={notifyTarget.subscriberTitle}
+          subscriberTitle={notifyTarget.subscriberTitle}
           choice={notifyTarget.choice}
           onChoose={choice => props.actions.setNotify(notifyTarget, choice)}
           t={t}

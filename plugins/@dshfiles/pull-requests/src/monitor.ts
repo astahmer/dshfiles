@@ -84,13 +84,13 @@ export type PullRequestMonitorError =
 const linkId = (input: { readonly sessionId: string; readonly repo: string; readonly number: number }): string =>
   `${encodeURIComponent(input.sessionId)}::${input.repo.toLowerCase()}#${String(input.number)}`
 
-export const sessionFor = (provided: string | undefined, caller: ApiCaller): Effect.Effect<string, PullRequestSessionRequired> => {
+const sessionFor = (provided: string | undefined, caller: ApiCaller): Effect.Effect<string, PullRequestSessionRequired> => {
   if (provided !== undefined) return Effect.succeed(provided)
   if (caller.kind === 'agent' && caller.sessionId !== undefined) return Effect.succeed(caller.sessionId)
   return Effect.fail(new PullRequestSessionRequired({ reason: 'Pass a session id when the call is not made from a thread.' }))
 }
 
-export const cwdForCaller = (caller: ApiCaller): string => (caller.kind === 'agent' ? (caller.cwd ?? '') : '')
+const cwdForCaller = (caller: ApiCaller): string => (caller.kind === 'agent' ? (caller.cwd ?? '') : '')
 
 const parsePullRequestUrl = (url: string): { readonly repo: string; readonly number: number; readonly url: string } | undefined => {
   const target = ForgeModel.parsePullRequestUrl(url)
@@ -126,7 +126,7 @@ const transitionMessage = (input: {
 const ownedWatchId = (input: { readonly owner: WatchOwner; readonly repo: string; readonly number: number }): string =>
   `${input.owner.kind}:${encodeURIComponent(input.owner.id)}::${input.repo.toLowerCase()}#${String(input.number)}`
 
-export const ownedWatchViewOf = (record: OwnedWatchRecord): OwnedWatchView => ({
+const ownedWatchViewOf = (record: OwnedWatchRecord): OwnedWatchView => ({
   owner: record.owner,
   repo: record.repo,
   number: record.number,
@@ -136,6 +136,13 @@ export const ownedWatchViewOf = (record: OwnedWatchRecord): OwnedWatchView => ({
   lastCheckedAt: record.lastCheckedAt,
   lastError: record.lastError,
 })
+
+/** Who a monitor call acts for, and the owned-watch view the API returns. */
+export class PullRequestMonitorModel {
+  static readonly sessionFor = sessionFor
+  static readonly cwdForCaller = cwdForCaller
+  static readonly ownedWatchViewOf = ownedWatchViewOf
+}
 
 const backoffDelay = (consecutiveRateLimits: number): number =>
   Math.min(POLL_INTERVAL_MS * 2 ** Math.min(Math.max(0, consecutiveRateLimits - 1), 8), MAX_BACKOFF_MS)

@@ -88,7 +88,7 @@ class ToolSearchFailure extends Schema.TaggedError<ToolSearchFailure>()(
   }
 }
 
-const detailOf = (failure: unknown): string => (failure instanceof Error ? failure.message : String(failure))
+const detailOf = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
 
 const outputSchema = Schema.Struct({
   query: Schema.String,

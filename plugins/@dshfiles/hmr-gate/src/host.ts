@@ -57,6 +57,7 @@ interface GateRuntime {
 
 /** Loader row config. `hostReload` is the experimental in-process Host reload; off unless the profile row sets it. */
 const gateConfigSchema = Schema.Struct({ hostReload: Schema.optional(Schema.Boolean) }).pipe(Schema.withDecodingDefault(Effect.succeed({})))
+type GateConfig = typeof gateConfigSchema.Type
 const gateConfigStandardSchema = { '~standard': Schema.toStandardSchemaV1(gateConfigSchema)['~standard'] }
 
 const HOST_RELOAD_HISTORY = 16
@@ -283,7 +284,8 @@ export default defineHost({
   apis: [hmrGateHostApi],
   inject: ['clientModules', 'webServer'],
   Config: gateConfigStandardSchema,
-  setup: (ctx: Context, config: unknown) => {
+  setup: (ctx: Context, config: GateConfig) => {
+    // Decoded again, so a row config that never went through the Config schema still reads as the default.
     const decoded = Schema.decodeUnknownOption(gateConfigSchema)(config)
     runtime = registerGate(ctx, Option.isSome(decoded) && decoded.value.hostReload === true)
   },

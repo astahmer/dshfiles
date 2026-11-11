@@ -42,16 +42,24 @@ const decodeErrorShape = Schema.decodeUnknownOption(ErrorShape)
 
 const MAX_DEPTH = 6
 
+/** What a provider failure says about itself: its codes, types and messages, and the HTTP statuses it carries. */
+interface ErrorDetails {
+  readonly texts: readonly string[]
+  readonly statuses: readonly number[]
+}
+
+const NO_DETAILS: ErrorDetails = { texts: [], statuses: [] }
+
 /** Every code, type and message along an error's `cause` chain and nested provider `error` bodies. */
-const errorDetails = (value: unknown, depth = 0): { readonly texts: readonly string[]; readonly statuses: readonly number[] } => {
-  if (depth > MAX_DEPTH) return { texts: [], statuses: [] }
-  if (typeof value === 'string') return { texts: [value], statuses: [] }
-  const shape = decodeErrorShape(value)
-  if (shape._tag === 'None') return { texts: [], statuses: [] }
+const errorDetails = (cause: unknown, depth = 0): ErrorDetails => {
+  if (depth > MAX_DEPTH) return NO_DETAILS
+  if (typeof cause === 'string') return { texts: [cause], statuses: [] } satisfies ErrorDetails
+  const shape = decodeErrorShape(cause)
+  if (shape._tag === 'None') return NO_DETAILS
   const own = [shape.value.code, shape.value.type, shape.value.message].filter((part): part is string => typeof part === 'string')
   const status = typeof shape.value.status === 'number' ? [shape.value.status] : []
   const nested = [shape.value.error, shape.value.cause].map(child => errorDetails(child, depth + 1))
-  return { texts: [...own, ...nested.flatMap(entry => entry.texts)], statuses: [...status, ...nested.flatMap(entry => entry.statuses)] }
+  return { texts: [...own, ...nested.flatMap(entry => entry.texts)], statuses: [...status, ...nested.flatMap(entry => entry.statuses)] } satisfies ErrorDetails
 }
 
 /**

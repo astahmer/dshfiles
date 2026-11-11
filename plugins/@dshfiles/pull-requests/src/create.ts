@@ -11,7 +11,7 @@ import {
   type PullRequestCreatePreviewInput,
 } from './create-model.js'
 import { ForgePullRequests, type ForgeRepositoryInfo } from './forge-port.js'
-import { cwdForCaller, PullRequestMonitor, sessionFor, type PullRequestMonitorError } from './monitor.js'
+import { PullRequestMonitor, PullRequestMonitorModel, type PullRequestMonitorError } from './monitor.js'
 import { ProjectBase } from './project-base.js'
 import type { PullRequestRecord } from './pull-request-model.js'
 import { ThreadContext } from './thread-context.js'
@@ -207,8 +207,8 @@ export class PullRequestCreator extends Context.Service<
       })
 
       const preview = Effect.fn('pull-requests create preview')(function* (input: PullRequestCreatePreviewInput, caller: ApiCaller) {
-        const sessionId = yield* sessionFor(input.sessionId, caller)
-        const cwd = input.cwd ?? (yield* thread.cwdOf(sessionId)) ?? (cwdForCaller(caller) || undefined)
+        const sessionId = yield* PullRequestMonitorModel.sessionFor(input.sessionId, caller)
+        const cwd = input.cwd ?? (yield* thread.cwdOf(sessionId)) ?? (PullRequestMonitorModel.cwdForCaller(caller) || undefined)
         const blank = {
           sessionId,
           repo: null,
@@ -285,9 +285,9 @@ export class PullRequestCreator extends Context.Service<
         ).pipe(Effect.result)
 
       const create = Effect.fn('pull-requests create')(function* (input: PullRequestCreateInput, caller: ApiCaller) {
-        const sessionId = yield* sessionFor(input.sessionId, caller)
+        const sessionId = yield* PullRequestMonitorModel.sessionFor(input.sessionId, caller)
         // Pushing and opening the pull request need only the directory: never the conversation.
-        const cwd = input.cwd ?? (yield* thread.cwdOf(sessionId)) ?? (cwdForCaller(caller) || undefined)
+        const cwd = input.cwd ?? (yield* thread.cwdOf(sessionId)) ?? (PullRequestMonitorModel.cwdForCaller(caller) || undefined)
         if (cwd === undefined) {
           const missing = CreateModel.problem('no-session-cwd', 'This thread has no working directory.')
           return failed('preflight', missing.message, missing.recovery, { problems: [missing] })

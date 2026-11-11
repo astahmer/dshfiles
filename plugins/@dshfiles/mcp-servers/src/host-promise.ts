@@ -1,5 +1,5 @@
 import type { Events } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-config-editor'
+import type { ConfigEditor } from '@deepseek-ai/dsh-config-editor'
 import { credentialRef, type CredentialKey } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { apply as nativeMcpClient, type Config as NativeMcpConfig } from '@deepseek-ai/dsh-mcp-client'
@@ -26,6 +26,9 @@ const PACKAGE_NAME = '@dshfiles/mcp-servers'
 
 const decodeConfig = Schema.decodeUnknownEffect(configSchema)
 const decodeGrant = Schema.decodeUnknownOption(oauthGrantSchema)
+
+/** This plugin's raw row in the profile patch, as the native config editor hands it to an edit and takes it back. */
+type ProfileConfigRow = Parameters<Parameters<ConfigEditor['edit']>[1]>[0]
 
 type CallbackHandler = (request: IncomingMessage, response: ServerResponse) => Effect.Effect<void>
 
@@ -56,7 +59,7 @@ export class McpHost extends Context.Service<
     readonly config: Effect.Effect<ManagerConfig, ManagerConfigUnavailable>
     /** The raw row, for preferences that must survive an unreadable row. */
     readonly rawConfig: Effect.Effect<unknown, ManagerConfigUnavailable>
-    readonly editConfig: (change: (current: Record<string, unknown>) => Record<string, unknown>) => Effect.Effect<void, ManagerConfigUnavailable>
+    readonly editConfig: (change: (current: ProfileConfigRow) => ProfileConfigRow) => Effect.Effect<void, ManagerConfigUnavailable>
     /** Fires after a profile edit reaches this row; the manager reconciles in place instead of restarting. */
     readonly configUpdates: Stream.Stream<void>
     readonly readGrant: (key: CredentialKey) => Effect.Effect<Option.Option<OAuthGrant>>
@@ -104,7 +107,7 @@ export class McpHost extends Context.Service<
         decodeConfig(raw).pipe(Effect.mapError(cause => new ManagerConfigUnavailable({ reason: 'invalid', cause }))),
       )
 
-      const editConfig = Effect.fn('mcp servers config edit')(function* (change: (current: Record<string, unknown>) => Record<string, unknown>) {
+      const editConfig = Effect.fn('mcp servers config edit')(function* (change: (current: ProfileConfigRow) => ProfileConfigRow) {
         const found = yield* entry
         yield* Effect.tryPromise({
           try: () => configEditor.edit(found, current => change(current)),

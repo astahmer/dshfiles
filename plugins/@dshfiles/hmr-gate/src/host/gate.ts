@@ -91,21 +91,27 @@ const packageRootOf = (clientPath: string): string | undefined => {
   return undefined
 }
 
+/** The package that owns a built artifact (`dist/client.js` → package root) and its manifest text, read fresh. */
+const packageManifestOf = (artifactPath: string): { readonly root: string; readonly raw: string } | undefined => {
+  const root = packageRootOf(artifactPath)
+  if (root === undefined) return undefined
+  try {
+    return { root, raw: readFileSync(join(root, 'package.json'), 'utf8') }
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * The Host artifact one client bundle pairs with: the package's own entry, read
  * from its manifest rather than assumed from a `dist/` convention, because native
  * packages ship `lib/index.js` and owned bundles ship `dist/index.js`.
  */
 const hostArtifactOf = (clientPath: string): string | undefined => {
-  const root = packageRootOf(clientPath)
-  if (root === undefined) return undefined
-  let raw: string
-  try {
-    raw = readFileSync(join(root, 'package.json'), 'utf8')
-  } catch {
-    return undefined
-  }
-  const manifest = decodeJsonSafe(manifestSchema, raw)
+  const owner = packageManifestOf(clientPath)
+  if (owner === undefined) return undefined
+  const root = owner.root
+  const manifest = decodeJsonSafe(manifestSchema, owner.raw)
   if (manifest._tag !== 'Success') return undefined
   const entry = entryOf(manifest.success)
   if (entry === undefined) return undefined
@@ -113,8 +119,10 @@ const hostArtifactOf = (clientPath: string): string | undefined => {
   return fileExists(absolute) ? absolute : undefined
 }
 
+/** The built files a package pairs: its Host artifact, its manifest, and their content digests, read fresh from disk. */
 export class HostArtifacts {
   static readonly digestOf = digestOf
+  static readonly packageManifestOf = packageManifestOf
   static readonly hostArtifactOf = hostArtifactOf
   static readonly loadedDigestOf = loadedDigestOf
 }

@@ -63,12 +63,26 @@ const isRateLimitMessage = (text: string): boolean => {
 
 const MISSING_EXECUTABLE = /ENOENT|not ?found|no such file/iu
 
+/** The fields of a spawn failure this check reads; the platform error's shape is not trusted, so each stays unparsed. */
+interface SpawnFailureData {
+  readonly reason?: unknown
+  readonly message?: unknown
+  readonly cause?: unknown
+}
+
+/** A tagged platform failure reason, e.g. `{ _tag: 'NotFound' }`. */
+interface FailureReasonData {
+  readonly _tag?: unknown
+}
+
 const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null
 
+/** Whether a spawn failure means the executable is absent, read from the platform error without trusting its shape. */
 const isMissingExecutable = (error: unknown): boolean => {
-  if (!isObject(error)) return false
-  const failure = error as { readonly reason?: { readonly _tag?: unknown }; readonly message?: unknown; readonly cause?: unknown }
-  if (failure.reason?._tag === 'NotFound') return true
+  const failure: SpawnFailureData | undefined = isObject(error) ? error : undefined
+  if (failure === undefined) return false
+  const reason: FailureReasonData = isObject(failure.reason) ? failure.reason : {}
+  if (reason._tag === 'NotFound') return true
   return MISSING_EXECUTABLE.test(String(failure.message ?? '')) || MISSING_EXECUTABLE.test(String(failure.cause ?? ''))
 }
 
@@ -179,22 +193,23 @@ const mergeFields = (mr: GlabMergeRequest): Pick<GitHubPullRequestView, 'mergeab
   return { mergeable, mergeStateStatus: mergeStateStatus(), reviewDecision }
 }
 
-const PIPELINE_STATES: Record<string, string> = {
-  success: 'SUCCESS',
-  failed: 'FAILURE',
-  canceled: 'CANCELLED',
-  skipped: 'SKIPPED',
-  running: 'IN_PROGRESS',
-  pending: 'PENDING',
-  created: 'QUEUED',
-  manual: 'ACTION_REQUIRED',
-}
+/** GitLab pipeline statuses mapped to the GitHub check states the watcher stores; others are upper-cased as they are. */
+const PIPELINE_STATES = new Map<string, string>([
+  ['success', 'SUCCESS'],
+  ['failed', 'FAILURE'],
+  ['canceled', 'CANCELLED'],
+  ['skipped', 'SKIPPED'],
+  ['running', 'IN_PROGRESS'],
+  ['pending', 'PENDING'],
+  ['created', 'QUEUED'],
+  ['manual', 'ACTION_REQUIRED'],
+])
 
 /** Map one decoded merge request onto the same normalized view the GitHub watcher stores. */
 export const normalizeMergeRequest = (mr: GlabMergeRequest): GitHubPullRequestView => {
   const status = mr.head_pipeline?.status?.toLowerCase()
   const pipeline =
-    status === undefined ? null : [{ __typename: 'StatusContext' as const, context: 'pipeline', state: PIPELINE_STATES[status] ?? status.toUpperCase() }]
+    status === undefined ? null : [{ __typename: 'StatusContext' as const, context: 'pipeline', state: PIPELINE_STATES.get(status) ?? status.toUpperCase() }]
   const notes = (mr.notes ?? []).flatMap(note => {
     const createdAt = note.created_at
     if (createdAt === undefined || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(createdAt)) return []

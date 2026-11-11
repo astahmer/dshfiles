@@ -321,6 +321,8 @@ interface AttentionGlobal {
 
 /** One store per page: every plugin bundle that reads attention shares this poll. */
 export const sharedThreadAttentionStore = (): ThreadAttentionStore => {
+  // SAFETY: AttentionGlobal only adds one optional slot to the page's global object, and this function is the only
+  // writer of that slot, so whatever it holds is a ThreadAttentionStore this function created.
   const scope = globalThis as AttentionGlobal
   scope.__dshfilesThreadAttentionStore ??= createStore()
   return scope.__dshfilesThreadAttentionStore

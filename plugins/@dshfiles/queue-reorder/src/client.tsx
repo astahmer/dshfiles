@@ -102,9 +102,27 @@ const RowAction = (props: {
   </Tooltip>
 )
 
+/** A truncated one-line preview whose full text shows in a tooltip; no tooltip when there is nothing more to read. */
+const PreviewText = (props: { readonly tooltip: string; readonly className: string; readonly children: ReactNode }): JSX.Element => {
+  const text = (
+    <span className={props.className} data-queue-preview="">
+      {props.children}
+    </span>
+  )
+  if (props.tooltip === '') return text
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{text}</TooltipTrigger>
+      <TooltipContent side="top" className="dshx:max-w-[calc(100vw-1rem)]">
+        {props.tooltip}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 /** Injected on top of the seat's standard props, as the shipped entry does. */
 export interface QueueDockInjected {
-  readonly updateQueue: (itemId: MessageId, action: QueueAction) => Promise<unknown>
+  readonly updateQueue: (itemId: MessageId, action: QueueAction) => Promise<void>
   /** Absent when this DSH build exposes no composer input or draft attachments to plugins. */
   readonly queueEditor: QueueEditor | undefined
   /** Image bytes for thumbnails; absent when this DSH build cannot read queued attachments. */
@@ -241,9 +259,9 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
       >
         <PencilIcon className="dshx:size-3.5 dshx:flex-none dshx:text-muted-foreground" aria-hidden />
         <span className="dshx:flex-none dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{editStatusLabel[record.status]}</span>
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:text-muted-foreground" title={placeholderPreview || undefined}>
+        <PreviewText tooltip={placeholderPreview} className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:text-muted-foreground">
           {placeholderPreview || attachmentsOf(record.blocks) || '—'}
-        </span>
+        </PreviewText>
       </li>
     )
 
@@ -300,11 +318,11 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
         >
           <GripVerticalIcon className="dshx:size-3.5" />
         </span>
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={preview || undefined}>
+        <PreviewText tooltip={preview} className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">
           {text !== ''
             ? props.renderFactorySlot('conversation.user.text', { text, facts: QUEUE_TEXT_FACTS, interactive: false, ellipsis: true })
             : preview || (showAttachments && previews.length > 0 ? '' : (files ?? '—'))}
-        </span>
+        </PreviewText>
         {showAttachments ? <QueuedAttachments sessionId={props.sessionId} previews={previews} readImage={props.readImage} /> : null}
         {queueMutable ? (
           <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">

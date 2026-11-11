@@ -45,13 +45,12 @@ const legacyPreferenceRenames = {
   rebasedThreadArchiveDelay: 'rebasedThreadSettleDelay',
 } as const
 
+/** A stored preferences object before its fields are checked: only the keys matter to the legacy upgrade. */
 const preferenceDocumentSchema = Schema.Record(Schema.String, Schema.Unknown)
+type PreferenceDocument = typeof preferenceDocumentSchema.Type
 
-const upgradeLegacyPreferenceKeys = (value: unknown): unknown => {
-  const parsed = Schema.decodeUnknownOption(preferenceDocumentSchema)(value)
-  // Anything that is not a preferences document is left to the strict schema, which rejects it.
-  if (Option.isNone(parsed)) return value
-  const upgraded: Record<string, unknown> = { ...parsed.value }
+const upgradeLegacyPreferenceKeys = (document: PreferenceDocument): PreferenceDocument => {
+  const upgraded = { ...document }
   for (const [legacy, current] of Object.entries(legacyPreferenceRenames)) {
     if (!(legacy in upgraded)) continue
     if (upgraded[current] === undefined) upgraded[current] = upgraded[legacy]
@@ -230,10 +229,11 @@ const preferencesSchema = Schema.Struct({
   notificationCategories: SchemaHelpers.withDecodedDefault(threadNotificationCategoriesSchema, () => DEFAULT_THREAD_NOTIFICATION_CATEGORIES),
 })
 
-const storedPreferencesSchema = Schema.Unknown.pipe(
+// Anything that is not a preferences document fails the document decode, as the strict schema would reject it.
+const storedPreferencesSchema = preferenceDocumentSchema.pipe(
   Schema.decodeTo(preferencesSchema, {
-    decode: SchemaGetter.transform(value => {
-      const upgraded = upgradeLegacyPreferenceKeys(value)
+    decode: SchemaGetter.transform(document => {
+      const upgraded = upgradeLegacyPreferenceKeys(document)
       // SAFETY: the target Struct validates the migrated value after this adapter.
       return upgraded as Schema.Struct.Encoded<typeof preferencesSchema.fields>
     }),
@@ -243,7 +243,9 @@ const storedPreferencesSchema = Schema.Unknown.pipe(
 
 /** Decode a Host settings value; null when it does not satisfy the sidebar contract. */
 const decodePreferences = (value: unknown): SidebarPreferences | null => {
-  const checked = Schema.decodeUnknownOption(preferencesInputSchema)(upgradeLegacyPreferenceKeys(value))
+  const checked = Option.flatMap(Schema.decodeUnknownOption(preferenceDocumentSchema)(value), document =>
+    Schema.decodeUnknownOption(preferencesInputSchema)(upgradeLegacyPreferenceKeys(document)),
+  )
   if (Option.isNone(checked)) return null
   const categoriesStillDefault =
     checked.value.notificationCategories === undefined ||

@@ -7,7 +7,7 @@ import { SqliteStore } from '@dshfiles/sqlite-store'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { Clock, Context, Effect, Layer, Option, Ref, Schema } from 'effect'
 import { Reactivity } from 'effect/reactivity'
-import { SqlClient } from 'effect/sql'
+import { SqlClient, type SqlConnection } from 'effect/sql'
 import { FAMILY_MEMBER_LIMIT } from './api.js'
 import type { ActivityReport, ChartQuery, ChartView, FamilyCost, FamilyCostQuery, RequestPage, RequestQuery, RequestView } from './api.js'
 import { UsageStoreFailed } from './errors.js'
@@ -775,12 +775,18 @@ const make = (sql: SqlClient.SqlClient) =>
     const run = (text: string, params: ReadonlyArray<SqlParam> = []) => Effect.asVoid(sql.unsafe(text, params))
     // Reports read the hot table and the cold archive as one, so the archive exists before the first report runs.
     yield* run(ARCHIVE_DDL)
-    const read = <A>(decodeRows: (input: unknown) => Effect.Effect<A, Schema.SchemaError>, text: string, params: ReadonlyArray<SqlParam> = []) =>
-      Effect.flatMap(sql.unsafe(text, params), decodeRows)
-    const readFirst = <A>(decodeRow: (input: unknown) => Effect.Effect<A, Schema.SchemaError>, text: string, params: ReadonlyArray<SqlParam> = []) =>
-      Effect.flatMap(sql.unsafe(text, params), rows => decodeRow(rows[0]))
-    const readOption = <A>(decodeRow: (input: unknown) => Effect.Effect<A, Schema.SchemaError>, text: string, params: ReadonlyArray<SqlParam> = []) =>
-      Effect.flatMap(sql.unsafe(text, params), rows => (rows[0] === undefined ? Effect.succeedNone : Effect.asSome(decodeRow(rows[0]))))
+    const read = <A>(
+      decodeRows: (rows: ReadonlyArray<SqlConnection.Row>) => Effect.Effect<A, Schema.SchemaError>,
+      text: string,
+      params: ReadonlyArray<SqlParam> = [],
+    ) => Effect.flatMap(sql.unsafe<SqlConnection.Row>(text, params), decodeRows)
+    const readFirst = <A>(
+      decodeRow: (row: SqlConnection.Row | undefined) => Effect.Effect<A, Schema.SchemaError>,
+      text: string,
+      params: ReadonlyArray<SqlParam> = [],
+    ) => Effect.flatMap(sql.unsafe<SqlConnection.Row>(text, params), rows => decodeRow(rows[0]))
+    const readOption = <A>(decodeRow: (row: SqlConnection.Row) => Effect.Effect<A, Schema.SchemaError>, text: string, params: ReadonlyArray<SqlParam> = []) =>
+      Effect.flatMap(sql.unsafe<SqlConnection.Row>(text, params), rows => (rows[0] === undefined ? Effect.succeedNone : Effect.asSome(decodeRow(rows[0]))))
 
     // Rows are folded once and only topped up afterwards, so a fold that reads logs differently re-reads them all.
     const foldVersion = yield* readOption(decode.metaValue, "SELECT value FROM meta WHERE key = 'foldVersion'")

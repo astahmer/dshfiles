@@ -57,7 +57,7 @@ class RunawayAdapter extends LlmAdapter {
   }
 }
 
-const run = async (input: { readonly install: (ctx: Context) => PromiseLike<unknown>; readonly delayMs: number }) => {
+const run = async (input: { readonly install: (ctx: Context) => Promise<void>; readonly delayMs: number }) => {
   const ctx = new Context()
   try {
     await ctx.plugin(SessionProjectionRegistry)
@@ -97,12 +97,22 @@ const resultText = (result: { readonly message: { readonly content: readonly { r
 
 describe('tool argument limit', () => {
   it('stops a call whose arguments outgrow the byte limit, runs nothing, and tells the model how to retry', async () => {
-    const upstream = await run({ install: ctx => ctx.plugin(UpstreamAgentLoop), delayMs: 0 })
+    const upstream = await run({
+      install: async ctx => {
+        await ctx.plugin(UpstreamAgentLoop)
+      },
+      delayMs: 0,
+    })
     // Before: the loop reads every runaway delta and then hands the call to the tool.
     expect(upstream.adapter.deltasSent).toBe(2_000)
     expect(upstream.adapter.stoppedEarly).toBe(false)
 
-    const forked = await run({ install: ctx => ctx.plugin(ForkedAgentLoop, { maxToolCallArgumentBytes: 256 }), delayMs: 0 })
+    const forked = await run({
+      install: async ctx => {
+        await ctx.plugin(ForkedAgentLoop, { maxToolCallArgumentBytes: 256 })
+      },
+      delayMs: 0,
+    })
     expect(forked.adapter.stoppedEarly).toBe(true)
     expect(forked.adapter.deltasSent).toBeLessThan(200)
     expect(forked.calls).toEqual([expect.objectContaining({ callId: CALL_ID, name: 'apply_patch', arguments: '{}' })])
@@ -118,7 +128,12 @@ describe('tool argument limit', () => {
   })
 
   it('stops a call that keeps streaming arguments past the time limit', async () => {
-    const forked = await run({ install: ctx => ctx.plugin(ForkedAgentLoop, { toolCallArgumentTimeoutMs: 40 }), delayMs: 5 })
+    const forked = await run({
+      install: async ctx => {
+        await ctx.plugin(ForkedAgentLoop, { toolCallArgumentTimeoutMs: 40 })
+      },
+      delayMs: 5,
+    })
     expect(forked.adapter.stoppedEarly).toBe(true)
     expect(forked.adapter.deltasSent).toBeLessThan(100)
     expect(resultText(forked.results[0])).toMatch(/streamed arguments for \d+ ms \(limit 40 ms/)

@@ -134,7 +134,7 @@ const stageSession = (options: IngestPassOptions & { readonly log: SessionLogFil
           })
     for (const document of documents) {
       const bounded = DocumentText.truncate(DocumentText.sanitize(document.text), DocumentText.capFor(document.type))
-      rows.push({
+      const row: DocumentRow = {
         sessionId: document.sessionId,
         seq: document.seq,
         type: document.type,
@@ -142,8 +142,9 @@ const stageSession = (options: IngestPassOptions & { readonly log: SessionLogFil
         surface: document.surface,
         text: bounded.text,
         truncated: bounded.truncated,
-        ...(document.type === 'user/message' ? { humanPrompt: humanPrompts.has(document.seq) } : {}),
-      })
+      }
+      // Only a user message says whether a person sent it; every other row leaves `humanPrompt` absent.
+      rows.push(document.type === 'user/message' ? { ...row, humanPrompt: humanPrompts.has(document.seq) } : row)
     }
   }
   const header = FrameLog.readHeader(log.path)

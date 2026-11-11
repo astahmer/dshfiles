@@ -11,6 +11,18 @@ const queueDock = (page: Page) => page.locator('[data-queue-dock]')
 const composerInput = (page: Page) => page.locator('[data-composer-card]').getByRole('textbox')
 const queuedRows = (page: Page) => queueDock(page).locator('li:not([data-queue-edit-placeholder])')
 
+/** The full preview a queued row's tooltip shows on hover; the row itself keeps one truncated line. */
+const rowPreviewTooltip = async (page: Page, hasText: string): Promise<string> => {
+  const trigger = queuedRows(page).filter({ hasText }).locator('[data-queue-preview]')
+  await trigger.hover()
+  // Radix marks its trigger open; the tooltip content then holds the whole preview.
+  await expect(trigger).toHaveAttribute('data-state', /open/)
+  const text = (await page.getByRole('tooltip').last().textContent()) ?? ''
+  // Move off the row so the next step does not start on an open tooltip; nothing below depends on it closing.
+  await composerInput(page).hover()
+  return text
+}
+
 const latestUserText = (request: FakeChatRequest): string =>
   request.messages.filter(message => message.role === 'user' && !message.text.startsWith('Current runtime context.')).at(-1)?.text ?? ''
 
@@ -93,9 +105,8 @@ Then('the edges of the queue cannot move further', async ({ page }: { page: Page
 
 Then('the long message previews as one truncated line', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'queue-reorder-preview-is-one-bounded-line', async () => {
-    const preview = queuedRows(page).filter({ hasText: 'third queued' }).locator('span[title]')
-    const text = (await preview.textContent()) ?? ''
-    const title = (await preview.getAttribute('title')) ?? ''
+    const text = (await queuedRows(page).filter({ hasText: 'third queued' }).locator('[data-queue-preview]').textContent()) ?? ''
+    const title = await rowPreviewTooltip(page, 'third queued')
     expect(text.startsWith('third queued line xxx')).toBe(true)
     expect(text).not.toContain('\n')
     expect([...title].length).toBeLessThanOrEqual(201)
@@ -148,7 +159,7 @@ Then('the queue starts collapsed and previews at most 40 characters', async ({ p
   })
   await queueDock(page).getByRole('button').first().click()
   await recordAssertion(page, 'queue-reorder-preview-length-applies', async () => {
-    const title = (await queuedRows(page).filter({ hasText: 'third queued' }).locator('span[title]').getAttribute('title')) ?? ''
+    const title = await rowPreviewTooltip(page, 'third queued')
     expect([...title].length).toBeLessThanOrEqual(41)
   })
   await finishJourneyAssertions(page)
@@ -247,7 +258,7 @@ Then('{string} shows a thumbnail of {string} and a chip for {string}', async ({ 
     await expect(row.getByRole('group', { name: '2 attachments', exact: true })).toBeVisible()
     await expect(row.getByRole('img', { name: image, exact: true })).toBeVisible()
     await expect(row.locator('[data-queue-attachment="file"]')).toHaveText(file)
-    await expect(row.locator('span[title]').first()).toHaveText(text)
+    await expect(row.locator('[data-queue-preview]')).toHaveText(text)
   })
 })
 

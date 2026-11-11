@@ -1,11 +1,10 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Context, Plugin } from '@deepseek-ai/cordis'
 import { decodeJsonSafe } from '@dshfiles/dshx/json'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { Option } from 'effect'
 import * as Schema from 'effect/Schema'
+import { HostArtifacts } from './gate.js'
 
 /**
  * Replaces one opted-in plugin's Host half inside the running DSH: the Loader row keeps its id and config, the plugin's
@@ -28,10 +27,21 @@ const optInManifestSchema = Schema.Struct({
   dshx: Schema.optional(Schema.Struct({ hostReload: Schema.optional(Schema.Literal('safe')) })),
 })
 
-/** A running fiber, as far as a swap needs it. */
+/** A running fiber, as far as a swap needs it: Cordis `Fiber.await()` resolves to the fiber itself. */
 interface SwapFiber {
-  await(): Promise<unknown>
-  dispose(): unknown
+  await(): Promise<SwapFiber>
+  dispose(): Promise<void>
+}
+
+/**
+ * Any value a module may export. Nothing about it is assumed: `isPlugin` decides whether it is a plugin a Loader row
+ * can run.
+ */
+type ModuleExport = object | string | number | bigint | boolean | symbol | null | undefined
+
+/** A plugin module's evaluated namespace, as `import()` returns it; the Loader unwraps its exports. */
+interface ModuleNamespace {
+  readonly default?: ModuleExport
 }
 
 /** One Loader row: `@deepseek-ai/cordis-plugin-loader`'s `Entry`, narrowed to the fields `Entry._init` itself sets. */
@@ -39,12 +49,14 @@ interface ReloadEntry {
   readonly ctx: Context
   readonly options: { readonly name: string; readonly config?: unknown }
   fiber: SwapFiber | undefined
-  moduleNamespace: unknown
+  /** Undefined on cordis-plugin-loader before 1.0.6, which does not keep the imported module. */
+  moduleNamespace: ModuleNamespace | undefined
 }
 
 interface ReloadLoader {
   entries(): Iterable<ReloadEntry>
-  unwrapExports(value: unknown): unknown
+  /** The Loader's ESM/CJS/default normalization: the namespace's (possibly nested) default export, or the namespace. */
+  unwrapExports(value: ModuleNamespace): ModuleExport
 }
 
 const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null
@@ -74,33 +86,11 @@ const moduleCacheSchema = Schema.Struct({ internal: Schema.Struct({ loadCache: S
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 500)
 
-/** The package directory that owns a Host artifact (`dist/index.js` → package root). */
-const packageRootOf = (hostPath: string): string | undefined => {
-  let directory = dirname(hostPath)
-  for (let depth = 0; depth < 4; depth += 1) {
-    try {
-      readFileSync(join(directory, 'package.json'))
-      return directory
-    } catch {
-      const parent = dirname(directory)
-      if (parent === directory) return undefined
-      directory = parent
-    }
-  }
-  return undefined
-}
-
 /** The package's name when its manifest opts its Host half into in-process reload, read fresh on every rebuild. */
 const optedInPackage = (hostPath: string): string | undefined => {
-  const root = packageRootOf(hostPath)
-  if (root === undefined) return undefined
-  let raw: string
-  try {
-    raw = readFileSync(join(root, 'package.json'), 'utf8')
-  } catch {
-    return undefined
-  }
-  const manifest = decodeJsonSafe(optInManifestSchema, raw)
+  const owner = HostArtifacts.packageManifestOf(hostPath)
+  if (owner === undefined) return undefined
+  const manifest = decodeJsonSafe(optInManifestSchema, owner.raw)
   if (manifest._tag !== 'Success') return undefined
   return manifest.success.dshx?.hostReload === 'safe' ? manifest.success.name : undefined
 }
@@ -158,7 +148,7 @@ const settle = async (fiber: SwapFiber | undefined): Promise<void> => {
 }
 
 /** Start `plugin` as the entry's fiber, the way `Entry._init` does, and wait for it to activate. */
-const activate = async (entry: ReloadEntry, plugin: Plugin, moduleNamespace: unknown): Promise<void> => {
+const activate = async (entry: ReloadEntry, plugin: Plugin, moduleNamespace: ModuleNamespace): Promise<void> => {
   const fiber: SwapFiber = entry.ctx.registry.plugin(plugin, entry.options.config).ctx.fiber
   entry.fiber = fiber
   entry.moduleNamespace = moduleNamespace
@@ -175,18 +165,19 @@ const reload = (ctx: Context, hostPath: string, packageName: string): Promise<Ho
     const entries = [...loader.value.entries()].filter(entry => entry.options.name === packageName && entry.fiber !== undefined)
     const entry = entries.length === 1 ? entries[0] : undefined
     if (entry === undefined) return { kind: 'refused', reason: 'entry-not-found' }
-    const packageRoot = packageRootOf(hostPath)
+    const packageRoot = HostArtifacts.packageManifestOf(hostPath)?.root
     if (packageRoot === undefined) return { kind: 'refused', reason: 'entry-not-found' }
 
     const loadCache = cache.value.internal.loadCache
     const previousNamespace = entry.moduleNamespace
+    if (previousNamespace === undefined) return { kind: 'refused', reason: 'no-module-namespace' }
     const previousPlugin = loader.value.unwrapExports(previousNamespace)
-    if (previousNamespace === undefined || !isPlugin(previousPlugin)) return { kind: 'refused', reason: 'no-module-namespace' }
+    if (!isPlugin(previousPlugin)) return { kind: 'refused', reason: 'no-module-namespace' }
     const urls = packageUrls(loadCache, packageRoot)
     const restoreCache = evict(loadCache, urls)
     span.setAttribute('dshfiles.host_reload.evicted', urls.length)
 
-    let nextNamespace: unknown
+    let nextNamespace: ModuleNamespace
     try {
       nextNamespace = await import(pathToFileURL(hostPath).href)
     } catch (error) {

@@ -24,7 +24,10 @@ export default defineClient({
     apply(ctx)
     metadata?.plugin?.provide(Composer, createComposerService(ctx))
     ctx.inject(['inputTriggers'], scope => {
-      scope.effect(() => ComposerSnippets.register(scope.get('inputTriggers')), 'rich-composer: quote and note chips')
+      scope.effect(() => {
+        const inputTriggers = scope.get('inputTriggers')
+        return ComposerSnippets.isSourceRegistry(inputTriggers) ? ComposerSnippets.register(inputTriggers) : () => {}
+      }, 'rich-composer: quote and note chips')
     })
 
     const warmup = createApiClient(ctx, agentWarmupApi)

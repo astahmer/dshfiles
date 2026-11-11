@@ -31,7 +31,7 @@ const recordWait = (input: { readonly database: string; readonly startNanos: big
     span.end(input.endNanos, input.exit)
   })
 
-const nestedTransaction = (client: SqlClient.SqlClient) => Effect.map(Effect.context<never>(), context => Context.getOption(context, client.transactionService))
+const nestedTransaction = (client: SqlClient.SqlClient) => Effect.serviceOption(client.transactionService)
 
 export const withLockWaitSpans = (client: SqlClient.SqlClient, options: { readonly database: string; readonly thresholdMs: number }): SqlClient.SqlClient => {
   if (options.thresholdMs <= 0) return client

@@ -7,8 +7,14 @@ const id = (value: string): SessionId => Schema.decodeSync(SessionId)(value)
 
 const idle: LiveAgentIdleState = { status: 'idle', nextTurn: 0, nextStep: 0 }
 
+/** What the candidate reads live: the thread's last activity and its agent, changed by each case. */
+interface LiveThread {
+  observed: number | null
+  agent: LiveAgentIdleState | undefined
+}
+
 const build = (overrides: Partial<Parameters<typeof observedIdleCandidate>[0]> = {}) => {
-  const state: { observed: number | null; agent: LiveAgentIdleState | undefined } = { observed: 1_000, agent: idle }
+  const state: LiveThread = { observed: 1_000, agent: idle }
   const candidate = observedIdleCandidate({
     sessionId: id('thread'),
     observedLastActivityAt: 1_000,

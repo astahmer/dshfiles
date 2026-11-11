@@ -55,7 +55,15 @@ const readBody = (request: IncomingMessage) =>
     })
   })
 
-const reply = (response: ServerResponse, status: number, body: Readonly<Record<string, unknown>>, headers?: Readonly<Record<string, string>>) =>
+/** What a webhook answers: whether a run started (and which), or why the request was refused. */
+interface WebhookReplyBody {
+  readonly ok: boolean
+  readonly message?: string
+  readonly runId?: string
+  readonly sessionId?: string | undefined
+}
+
+const reply = (response: ServerResponse, status: number, body: WebhookReplyBody, headers?: Readonly<Record<string, string>>) =>
   Effect.sync(() => {
     if (response.headersSent) return
     response.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers })

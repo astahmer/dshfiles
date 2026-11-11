@@ -13,10 +13,10 @@ import { PullRequestCreator } from './create.js'
 import { GitHubCli } from './github-cli.js'
 import { GitLabCli } from './gitlab-cli.js'
 import { ForgePullRequests } from './forge-port.js'
-import { GitHubPointsFloor, PullRequestMonitor, ownedWatchViewOf } from './monitor.js'
+import { GitHubPointsFloor, PullRequestMonitor, PullRequestMonitorModel } from './monitor.js'
 import { ProjectBase } from './project-base.js'
 import { PullRequestSettings, pullRequestSettings } from './settings.js'
-import { TRIGGER_EVENT_TYPES, refreshOnThreadEvents, sweepWatched, type ThreadEvent } from './refresh-triggers.js'
+import { PullRequestRefreshTriggers, TRIGGER_EVENT_TYPES, type ThreadEvent } from './refresh-triggers.js'
 import { PullRequestStore } from './store.js'
 import { ThreadContext } from './thread-context.js'
 import type { PullRequestLinkView, PullRequestRecord } from './pull-request-model.js'
@@ -68,8 +68,10 @@ const pollWorker = Layer.effectDiscard(
       refresh: (input: Parameters<typeof pullRequests.refresh>[0]) => withFloor(pullRequests.refresh(input)),
       pollAll: withFloor(pullRequests.pollAll),
     }
-    yield* DshxPlugin.worker(refreshOnThreadEvents({ monitor, events, config }))
-    yield* DshxPlugin.worker(sweepWatched({ monitor, every: Effect.map(settings.get, value => Duration.minutes(value.sweepMinutes)) }))
+    yield* DshxPlugin.worker(PullRequestRefreshTriggers.refreshOnThreadEvents({ monitor, events, config }))
+    yield* DshxPlugin.worker(
+      PullRequestRefreshTriggers.sweepWatched({ monitor, every: Effect.map(settings.get, value => Duration.minutes(value.sweepMinutes)) }),
+    )
   }),
 ).pipe(Layer.provideMerge(creator), Layer.provideMerge(Settings.layer(pullRequestSettings)))
 
@@ -94,10 +96,13 @@ export default DshxPlugin.make({
         PullRequestMonitor.use(monitor => monitor.watch(input, call.caller).pipe(Effect.map(link => ({ link: pullRequestLinkViewOf(link) })))),
       createPreview: (input, call) => PullRequestCreator.use(creator => creator.preview(input, call.caller)),
       create: (input, call) => PullRequestCreator.use(creator => creator.create(input, call.caller)),
-      watchFor: input => PullRequestMonitor.use(monitor => monitor.watchFor(input).pipe(Effect.map(watch => ({ watch: ownedWatchViewOf(watch) })))),
+      watchFor: input =>
+        PullRequestMonitor.use(monitor => monitor.watchFor(input).pipe(Effect.map(watch => ({ watch: PullRequestMonitorModel.ownedWatchViewOf(watch) })))),
       unwatchFor: input => PullRequestMonitor.use(monitor => monitor.unwatchFor(input).pipe(Effect.map(removed => ({ removed })))),
       ownedWatches: input =>
-        PullRequestMonitor.use(monitor => monitor.ownedWatches(input).pipe(Effect.map(watches => ({ watches: watches.map(ownedWatchViewOf) })))),
+        PullRequestMonitor.use(monitor =>
+          monitor.ownedWatches(input).pipe(Effect.map(watches => ({ watches: watches.map(PullRequestMonitorModel.ownedWatchViewOf) }))),
+        ),
       issueStates: input =>
         GitHubCli.use(github =>
           Effect.gen(function* () {
