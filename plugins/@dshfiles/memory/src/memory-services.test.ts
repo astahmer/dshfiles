@@ -253,6 +253,15 @@ const settle = Effect.gen(function* () {
   }
 })
 
+/**
+ * Settle until `done` holds or about five real seconds pass. A digest reads the log and writes SQLite for real, so on a
+ * loaded runner one fixed `settle` can end before the write lands; the assertion after it still fails on a real miss.
+ */
+const settleUntil = <E>(done: Effect.Effect<boolean, E>) =>
+  Effect.gen(function* () {
+    for (let attempt = 0; attempt < 150 && !(yield* done); attempt++) yield* settle
+  })
+
 describe('memory services', () => {
   it.effect('digests a thread once it goes idle, never while a turn runs', () =>
     Effect.gen(function* () {
@@ -285,7 +294,7 @@ describe('memory services', () => {
       }
       expect(yield* memory.repo.thread(thread.header.id)).toBeUndefined()
       yield* TestClock.adjust('1 second')
-      yield* settle
+      yield* settleUntil(memory.repo.thread(thread.header.id).pipe(Effect.map(stored => stored !== undefined)))
       expect(memory.fakes.reads.count).toBe(1)
       expect(yield* memory.repo.thread(thread.header.id)).toBeDefined()
     }).pipe(Effect.scoped),
