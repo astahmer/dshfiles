@@ -51,8 +51,8 @@ export class WebhookSignature {
   }
 
   /**
-   * Check GitHub's untimestamped signature against the raw body in constant time. GitHub's delivery id is the replay
-   * guard there, so this verifies authenticity only; the comparison runs on equal-length buffers, never on hex text.
+   * Check GitHub's untimestamped signature against the raw body in constant time. This verifies authenticity only;
+   * the delivery id is not signed and this scheme does not prevent replay.
    */
   static verifyGitHub(input: { readonly secret: string; readonly body: Uint8Array; readonly signature: string }): SignatureVerdict {
     const presented = digestOf(input.signature)

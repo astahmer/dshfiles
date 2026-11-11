@@ -69,9 +69,9 @@ curl -X POST -H 'content-type: application/json' -H "x-dsh-timestamp: $ts" -H "x
 - The route answers wherever the DSH web server listens.
 - GitHub-style senders may instead sign with `x-hub-signature-256: sha256=<hex HMAC-SHA256(secret, raw body)>`, with
   no timestamp header. That scheme is verified over the raw bytes exactly as received (never re-serialized JSON) with
-  a constant-time digest comparison, and strict `sha256=<64 lowercase hex>` decoding. It has no replay window: GitHub
-  makes each delivery id unique, and this only proves authenticity. Send one scheme per request; a request carrying
-  both headers is refused, so neither scheme can be downgraded.
+  a constant-time digest comparison and a 64-hex-digit digest. This proves authenticity, not freshness: a captured
+  valid body and signature can be replayed. GitHub's delivery ID is not signed and is not checked here. Use the
+  timestamped scheme when replay protection is required. Send one scheme per request; both headers together are refused.
 
 ## Agent tools
 

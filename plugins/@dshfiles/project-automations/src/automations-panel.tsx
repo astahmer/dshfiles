@@ -137,8 +137,8 @@ const automationRoutine = (props: {
           <>
             <p className="dshx:m-0">
               POST with x-dsh-timestamp (Unix seconds) and x-dsh-signature: sha256= HMAC-SHA256 of “timestamp.body” keyed with the value of{' '}
-              {automation.trigger.kind === 'webhook' ? automation.trigger.secretRef : 'the secret'}. Requests more than 5 minutes off, replays and more than{' '}
-              {automation.trigger.kind === 'webhook' ? automation.trigger.ratePerMinute : 10} per minute are refused.
+              {automation.trigger.kind === 'webhook' ? automation.trigger.secretRef : 'the secret'}. Timestamped requests more than 5 minutes off or replayed are refused. GitHub signatures authenticate the body but do not prevent replay. More than{' '}
+              {automation.trigger.kind === 'webhook' ? automation.trigger.ratePerMinute : 10} requests per minute are refused.
             </p>
             <CopyField label="Signed test request" value={AutomationFormModel.curlExample(url)} multiline />
           </>

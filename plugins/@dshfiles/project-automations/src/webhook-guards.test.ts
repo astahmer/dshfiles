@@ -117,7 +117,6 @@ describe('prompt template', () => {
 })
 
 describe('GitHub webhook signatures', () => {
-  // GitHub signs the raw body only: no timestamp, so no replay window; its delivery id is the replay guard.
   const body = Buffer.from('{"zen":"Keep it logically awesome."}')
   const signature = WebhookSignature.signGitHub({ secret: SECRET, body })
 
