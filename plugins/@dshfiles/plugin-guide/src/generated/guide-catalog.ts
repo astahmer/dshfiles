@@ -2948,8 +2948,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › secret-link-reveal"
       ],
       "details": [
-        "Used by 12 catalog feature(s)",
-        "Destinations in use: land, observe, threads, work"
+        "Used by 13 catalog feature(s)",
+        "Destinations in use: knowledge, land, observe, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
       "docs": "docs/observability.md",
