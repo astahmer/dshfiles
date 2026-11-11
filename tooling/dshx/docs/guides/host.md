@@ -99,6 +99,10 @@ export default defineHost({
 
 DSHX does not keep a disposer array. Register lifecycle ownership with `ctx.effect()` or use the disposer semantics of the official registry being called. A Settings `.host({ setup })` disposer is passed to `ctx.effect()` automatically.
 
+### The built `apply` and Cordis
+
+The generated `dist/index.js` (and `dist/client.js`) exports `apply` as an arrow function. Cordis 4 treats any `apply` with a `prototype` (a `function` declaration or expression) as a class: it runs `new apply(ctx, config)` and returns `instance[symbols.init]?.()`, so the Promise that `setup` returns is dropped. The disposer it resolves to never reaches the Fiber, and a rejection becomes an unhandled rejection that DSH treats as a fatal load failure and exits the Host. With the arrow, Cordis collects the disposer, runs it when the row is disabled or reloaded, and turns a failed activation into that row's error (Plugins page, boot report) instead of a Host exit. A hand-written native Host module that returns a disposer or a Promise exports `apply` as an arrow or object method for the same reason.
+
 ## Runtime validation
 
 The built adapter reports a Host-definition diagnostic when the default export is not a `defineHost()` object, contains an unknown field, uses a malformed contribution, or supplies a non-function `setup`. Native DSH Host modules remain supported when they export named `name`, `inject`, `Config`, and `apply` instead of a default definition.

@@ -103,6 +103,13 @@ definition object cannot be active on two Cordis Hosts at once (a second activat
 static tool definitions and API registrations carry no owning `ctx` to pick a runtime by. A test that mounts one
 plugin on two Hosts exports a factory that calls `DshxPlugin.make` once per Host.
 
+Disabling the Loader row (Settings › Plugins, `loader.update(id, { disabled: true })`, settings-shell's
+`plugin_set_enabled`) runs that disposer: the slot stops, the Scope closes, `main` and workers are interrupted.
+Re-enabling builds a fresh layer in the same process. This depends on the built entry exporting `apply` as an arrow
+function (see [Host lifecycle](../guides/host.md#the-built-apply-and-cordis)); a bundle built by dshx before 2026-11-11
+exports a function declaration, loses the disposer, and its re-enable fails with `PluginInactive … already active in
+this process` until DSH restarts. Rebuild such bundles.
+
 ### `Api.bind(contract, handlers)` and `Api.handlers(contract, handlers)`
 
 Handlers are `(input, call) => Effect`. `input` is the decoded contract input; `call` carries `caller` and `peer`.
@@ -271,7 +278,9 @@ when the entry carries a cause; `DshxPlugin.make` installs that logger for every
 Use `@effect/vitest` and real layers. A domain service that needs no Host is tested with `it.layer(Service.layer)`.
 Test the edge (`DshxPlugin.make`, `Api.bind`, `Tool.make`) against a real in-memory Host: build `createTestHost()`
 from `@dshfiles/dshx/testing` inside `Layer.effect` with `Effect.acquireRelease`, mount the definition, and call it
-through `createHostApiClient` or `host.tools.execute`. A layer that reads `HostContext` gets
+through `createHostApiClient` or `host.tools.execute`. `host.mount` applies the definition directly; to cover what the
+Loader sees (the built `dist/index.js` namespace, disable and re-enable), build a fixture with `buildHost` and mount it
+through the real Loader, as `tests/host-entry-lifecycle.spec.ts` does. A layer that reads `HostContext` gets
 `HostContext.layer({ ctx: host.ctx, packageId })`. A test that reads `Config` without going through
 `DshxPlugin.make` (a domain service under `it.layer`) provides the same provider:
 `Effect.provide(DshxPlugin.processEnvConfig)`. To assert a span, provide `tracerLayer` (exported from

@@ -12,6 +12,9 @@ import { HostCompilerGuards } from './guards.js'
 import { HostRuntimeStore, type RuntimeSnapshotOutcome } from './runtime-store.js'
 
 const VIRTUAL_HOST_ENTRY = '\0virtual:dshx-host-entry'
+// An arrow, never a function declaration: Cordis runs `new apply(ctx, config)` for any `apply` with a prototype and
+// drops its return value, so the async disposer and any activation rejection would never reach the Fiber.
+const HOST_APPLY_EXPORT = 'export const apply = (ctx, config) => plugin.apply(ctx, config)'
 const VIRTUAL_HOST_PUBLIC = '\0virtual:dshx-host-public'
 const VIRTUAL_HOST_COMMUNICATION_PUBLIC = '\0virtual:dshx-host-communication-public'
 const VIRTUAL_HOST_COMMUNICATION_TYPES_PUBLIC = '\0virtual:dshx-host-communication-types-public'
@@ -255,7 +258,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       }
       if (id !== VIRTUAL_HOST_ENTRY) return null
       if (paths.entry === undefined) {
-        return `export const name = ${JSON.stringify(name)}\nexport const inject = undefined\nexport const Config = undefined\nexport function apply() {}\n`
+        return `export const name = ${JSON.stringify(name)}\nexport const inject = undefined\nexport const Config = undefined\nexport const apply = () => undefined\n`
       }
       const metadata = {
         packageId: options.packageId,
@@ -289,7 +292,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const name = plugin.name',
           'export const inject = plugin.inject',
           'export const Config = plugin.Config',
-          'export function apply(ctx, config) { return plugin.apply(ctx, config) }',
+          HOST_APPLY_EXPORT,
           '',
         ].join('\n')
       }
@@ -306,7 +309,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
         'export const name = plugin.name',
         'export const inject = plugin.inject',
         'export const Config = plugin.Config',
-        'export function apply(ctx, config) { return plugin.apply(ctx, config) }',
+        HOST_APPLY_EXPORT,
         '',
       ].join('\n')
     },
@@ -371,13 +374,12 @@ function hostGenerationWrapperSource(generationId: string, hostContractVersion: 
     'export const inject = implementation.inject',
     'export const Config = implementation.Config',
     '',
-    'export function apply(ctx, config) {',
-    '  return createGenerationManager({',
+    'export const apply = (ctx, config) =>',
+    '  createGenerationManager({',
     `    generation: ${JSON.stringify(generationId)},`,
     `    hostContractVersion: ${JSON.stringify(hostContractVersion)},`,
     `    manifestUrl: new URL('./${HOST_GENERATION_MANIFEST}', import.meta.url),`,
     '  }).apply(ctx, config)',
-    '}',
     '',
   ].join('\n')
 }

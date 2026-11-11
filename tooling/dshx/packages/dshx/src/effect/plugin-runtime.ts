@@ -107,7 +107,10 @@ export const makeActivationSlot = <R>(plugin: string): ActivationSlot<R> => {
     },
     isActive: () => state.status === 'active',
     begin: () => {
-      if (state.status === 'active') throw new PluginInactive(`${plugin} is already active in this process; unload it before activating it again.`)
+      if (state.status === 'active')
+        throw new PluginInactive(
+          `${plugin} is already active in this process: its previous activation was never unloaded. Restart DSH to start it again, and keep a single Loader row for this plugin.`,
+        )
       if (state.status !== 'waiting') state = { status: 'waiting', ready: Promise.withResolvers() }
       deferred = undefined
       started = undefined

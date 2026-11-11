@@ -369,7 +369,8 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         'export const name = plugin.name',
         'export const inject = plugin.inject',
         'export const Config = plugin.Config',
-        'export function apply(ctx, config) { return plugin.apply(ctx, config) }',
+        // An arrow: Cordis constructs an `apply` with a prototype and drops its returned disposer.
+        'export const apply = (ctx, config) => plugin.apply(ctx, config)',
         ...(options.sharedRuntime === undefined ? [] : [SharedRuntime.supplierEntryExport()]),
         ...(options.shared === undefined ? [] : [SharedRuntime.consumerEntryImport(options.shared)]),
         '',

@@ -531,7 +531,7 @@ describe('host compiler', () => {
       outDir: 'dist',
     })
     const output = resolve(root, 'dist/index.js')
-    expect(await readFile(output, 'utf8')).toContain('function apply()')
+    expect(await readFile(output, 'utf8')).toContain('var apply = () => void 0')
     const plugin = Schema.decodeUnknownSync(hostPluginShape)(await import(`${pathToFileURL(output).href}?test=${Date.now()}`))
     expect(plugin.name).toBe('client-only-host')
     expect(plugin.apply()).toBeUndefined()
