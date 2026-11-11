@@ -10,51 +10,92 @@ path is excluded.
 
 ## Where it stands
 
-`pnpm lint` was green when these were measured with `node scripts/lint-ratchet.ts oxlint` and
-`node scripts/lint-ratchet.ts ast-grep` (2026-11-10, on a `git archive` of the committed tip, so other
-agents' uncommitted edits in the shared workspace did not count):
+Measured on a `git archive` of `main` (`be839049`, 2026-11-11) so no other
+agent's uncommitted edits counted. The gate was **red** there: 1 error-level
+finding, 4 rules over cap, one Effect finding over baseline, and 6 files with
+format drift. Each item is fixed and every cap now equals its measured count:
 
-| Checker  | Start | Now |
-| -------- | ----- | --- |
-| oxlint   | 2433  | 995 |
-| ast-grep | 461   | 150 |
+| Checker            | Start (campaign) | Red main | Now |
+| ------------------ | ---------------- | -------- | --- |
+| oxlint             | 2433             | 1019     | 986 |
+| ast-grep           | 461              | 150      | 148 |
+| effect-antislop    | n/a              | 34       | 33  |
+| `fmt:check` drifts | n/a              | 6        | 0   |
 
-Every cap equals its count. Per rule (oxlint): `require-safety-comment-for-type-assertion` 297,
-`no-unknown-parameters` 228, `no-unsafe-dictionary-type` 172, `no-unknown-returns` 116,
-`no-known-value-widening` 87, `ui-guidance(no-native-title)` 64, `no-runtime-typeof` 31. Every other rule,
-including error-level findings and unused disable directives, is at 0.
+Per rule (oxlint). Cap equals count, so a new finding fails the gate:
 
-ast-grep: `no-direct-json-parse` 147, `no-direct-json-parse-tsx` 3; every other rule at 0.
+| Rule                                        | Red main | Now | Cap |
+| ------------------------------------------- | -------- | --- | --- |
+| `require-safety-comment-for-type-assertion` | 297      | 297 | 297 |
+| `no-unknown-parameters`                     | 240      | 227 | 227 |
+| `no-unsafe-dictionary-type`                 | 176      | 169 | 169 |
+| `no-unknown-returns`                        | 116      | 116 | 116 |
+| `no-known-value-widening`                   | 92       | 87  | 87  |
+| `ui-guidance(no-native-title)`              | 64       | 64  | 64  |
+| `no-runtime-typeof`                         | 32       | 26  | 26  |
+| `no-conditional-empty-object-spread`        | 1        | 0   | 0   |
+| `no-export-bag` (error)                     | 1        | 0   | 0   |
 
-2026-11-10: main had drifted past the ratchet: 16 error-level findings plus new findings for
-`no-conditional-empty-object-spread`, `no-index-import`, `no-deeply-nested-ternary` and others, mostly
-from the newly landed agent-loop fork and phone-pairing. agent-loop/src/native and
-sidebar-right/src/native are pinned native forks and are now excluded like the other forks. The three files
-that load a fork's vendored `index.ts` entry are listed in `astGrepNativeEntryImporters`.
-phone-pairing/experiments is a standalone prototype that nothing imports, and oxlint ignores it.
+ast-grep: `no-direct-json-parse` 147 (cap 147), `no-direct-json-parse-tsx` 3 → 1
+(cap 1); every other rule is at 0. `check:zod-imports` reports 11 recorded
+bridges and no unlisted import, and `pnpm lint` is green.
 
-2026-11-04: dshx `src` is down to two deliberate sites: `config/resolve.ts` parses
-raw so it can see an own `__proto__` key, which a schema decode drops, and
-`repository/bundle-freshness.ts` is imported as TypeScript source by
-`scripts/profile-sync.ts`, where `../json.js` does not resolve. Every
-other site goes through `src/json.ts` with its owning schema or `jsonValueSchema`.
-`no-direct-json-parse` measured 171 → 151; cap lowered 184 → 151.
+2026-11-11 fixes, nearest zero first:
+
+- `no-export-bag`: `dshx/src/settings/client.ts` groups its cohesive Settings
+  helpers under `SettingsClient` (static `create`/`provide`), leaving
+  `observeSettings` as the one exported function; it returns the named
+  `SettingsObservation<ClientValue>`.
+- `no-conditional-empty-object-spread`: `session-undo` builds the checkpoint
+  summary and adds `revision` only when present, with a test asserting the
+  property is absent.
+- `no-direct-json-parse-tsx`: `plugin-ui` asserts the serialized localStorage
+  value instead of parsing it; `thread-sidebar` decodes its client revision
+  snapshot through `@dshfiles/dshx/json` with `Schema.Array(Schema.Tuple(...))`.
+- `effect-migration(no-cause-dropping-catch)`: `conversation-cleanup`'s
+  `JsonlPurgeRefused` carries `cause: Schema.optional(Schema.Defect())` while its
+  recovery message stays bounded.
+- `no-runtime-typeof` / `no-unsafe-dictionary-type` / `no-unknown-parameters`
+  (jj-integration): the JSON Schema boundary uses Effect's `JsonSchema` and
+  `Schema.Json` types and decodes the merged document once.
+- `no-unknown-parameters` (test decode helpers): helpers that run a schema decode
+  are named as boundaries (`decodeWith`, `checkDecodes`, `decodeInput`,
+  `checkConfig`, `checkDraft`, `resolveClosedDocument`, `toWire`).
+- `no-known-value-widening`: `loopback-access` types its closed address-label
+  dictionary with `satisfies`; `optmem-core` names its bounded text result.
+- Format drift: the six committed files are formatted.
+- Not a lint finding, but `pnpm typecheck` was red on the same `main`:
+  `tests/tracing.spec.ts` narrowed the `unknown` in-process delivery contract.
+  The fixture now decodes the delivered batch with its export schema.
 
 ## Remaining work, in order
 
-Measure a clean tree: in a shared workspace, other agents' uncommitted edits change the counts. Running
-`git --git-dir=<repo>/.git archive <commit> | tar -x -C <dir>`, symlinking `node_modules` and running the
-ratchet there counts exactly what is committed.
+1. `require-safety-comment-for-type-assertion` (297) and
+   `no-unknown-parameters` (227) are the two biggest piles; take them one
+   package at a time.
+2. `no-unsafe-dictionary-type` (169), `no-unknown-returns` (116) and
+   `no-known-value-widening` (87): replace open dictionaries with named owner
+   contracts and keep inference.
+3. `ui-guidance(no-native-title)` (64): hover help becomes the plugin-ui
+   `Tooltip`; a prop that labels a section, card or dialog is renamed
+   `heading`/`label`.
+4. `no-runtime-typeof` (26): branch on domain values; `typeof` stays only inside
+   a decoder.
+5. `no-direct-json-parse` (147): about 76 sites remain in
+   `tooling/dshx/packages/dshx/tests`; dshx `src` is done (2026-11-04).
+6. `pulls-review/src/client.tsx` still parses the legacy reviewed-marks
+   localStorage value directly (the last non-native TSX `JSON.parse`). It
+   deletes the key before parsing, so moving it to a decoder must preserve the
+   malformed-value behaviour and be covered by migration tests.
+7. Re-measure on a clean archive and lower every cap again when a rule empties.
 
-1. **dshx** — `src` done (2026-11-04). Remaining: about 76
-   `no-direct-json-parse` sites in `tooling/dshx/packages/dshx/tests`, then the
-   antislop tail.
-2. **ai-accounts** — `api-key-setup-dialog.tsx` plus the antislop tail.
-3. **multi-host, thread-sidebar, traces, annotations** — mostly
-   `no-direct-json-parse` and `unknown` parameters.
-4. **The long tail** of the per-rule counts above.
-5. **Ratchet the caps** to the measured counts once the tail is done, then
-   re-run `pnpm lint`.
+Measure a clean tree: in a shared workspace, other agents' uncommitted edits
+change the counts. Running
+`git --git-dir=<repo>/.git archive <commit> | tar -x -C <dir>`, symlinking
+`node_modules` and running the ratchet there counts exactly what is committed.
+`check:zod-imports` now skips the tool's own build caches
+(`tooling/dshx/packages/dshx/client-runtime`, `runtime-store`); before that fix
+the gate failed on any tree that had run a build.
 
 ## Decisions (do not re-litigate)
 
@@ -73,7 +114,12 @@ ratchet there counts exactly what is committed.
   (`ProjectFolderPicker`, `CommandDialog`, `ToolCard`, `Breakdown`).
 - **`typeof` inside a decoder is fine.** `allowInTypeGuards`,
   `allowWhenStaticallyTyped` and `allowInBoundaryFunctions` are enabled; a
-  `typeof` in the middle of domain code is not.
+  `typeof` in the middle of domain code is not. The same naming contract covers
+  `no-unknown-parameters`: a helper that decodes with a schema is a boundary and
+  is named as one (`decode*`, `parse*`, `check*`, `read*`, `resolve*`, `to*`).
+- **Cohesive module helpers group under one namespace class.** Three or more
+  lowercase callable exports in one module is an export bag; dshx `src` keeps
+  boundary and hook exports explicit instead.
 
 ## Hazards (read before resuming)
 
