@@ -434,7 +434,7 @@ interface ConnectionTarget {
 }
 
 const optionsKey = (options: ConnectionTarget['options']): string =>
-  JSON.stringify(Object.entries(options ?? {}).toSorted(([left], [right]) => left.localeCompare(right)))
+  JSON.stringify([...Object.entries(options ?? {})].sort(([left], [right]) => left.localeCompare(right)))
 
 /** Whether a connection test of `tested` still speaks for `current`: same provider, key reference, base URL and options. */
 const sameConnectionTarget = (tested: ConnectionTarget | undefined, current: ConnectionTarget): boolean =>
