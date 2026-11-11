@@ -17,7 +17,7 @@ import { PanelTitles } from '@dshfiles/workbench/panel-titles'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
-import { Schema } from 'effect'
+import { Effect, Fiber, Schema } from 'effect'
 import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
@@ -205,23 +205,25 @@ export default defineClient({
 
     ctx.effect(() => {
       let reported = ''
-      let disposed = false
       // A custom threads directory is only known to the Host's VCS providers: ask once per project set.
       let threadDirectories: ThreadDirectories = new Map()
       let askedProjectPaths = ''
+      let directoriesRequest: Fiber.Fiber<void> | undefined
       const refreshThreadDirectories = (workspaces: readonly { readonly path: string }[]): void => {
         const projectPaths = [...new Set(WorkspacePaths.projects({ rows: workspaces }).map(workspace => workspace.path))].sort()
         const key = projectPaths.join('\n')
         if (key === askedProjectPaths || projectPaths.length === 0) return
         askedProjectPaths = key
-        void createApiClient(ctx, threadSidebarThreadDirectoriesApi)
-          .list({ projectPaths })
-          .then(reportedDirectories => {
-            if (disposed || askedProjectPaths !== key) return
-            threadDirectories = WorkspacePaths.threadDirectoriesOf(reportedDirectories.directories)
-            report()
-          })
-          .catch(() => undefined)
+        if (directoriesRequest !== undefined) Effect.runFork(Fiber.interrupt(directoriesRequest))
+        directoriesRequest = Effect.runFork(
+          Effect.tryPromise(signal => createApiClient(ctx, threadSidebarThreadDirectoriesApi).list({ projectPaths }, { signal })).pipe(
+            Effect.map(reportedDirectories => {
+              threadDirectories = WorkspacePaths.threadDirectoriesOf(reportedDirectories.directories)
+              report()
+            }),
+            Effect.ignore,
+          ),
+        )
       }
       const report = (): void => {
         const sessions = ctx.sessions.list.getSnapshot()
@@ -260,7 +262,7 @@ export default defineClient({
       ]
       report()
       return () => {
-        disposed = true
+        if (directoriesRequest !== undefined) Effect.runFork(Fiber.interrupt(directoriesRequest))
         disposers.forEach(dispose => dispose())
       }
     }, 'main-tabs: follow the main view')
