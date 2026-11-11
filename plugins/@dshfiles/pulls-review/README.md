@@ -34,6 +34,8 @@ read it, and can it land?" without leaving the thread:
   opens the revision graph for rebase-only or describe work. After a land, the Inbox's Ready to land
   item resolves at once.
 
+![Important files stay first after a viewed mark](docs/screenshots/important-files-first.jpg)
+
 ![Land previews the revisions before anything moves](docs/screenshots/land-card.png)
 
 ![A line comment waits in the composer as a chip](docs/screenshots/diff-line-comments.png)
