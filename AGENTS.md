@@ -300,10 +300,13 @@ configuration and private-copy behavior before you invoke `dsh-lkg`. Runbook:
 
 ## Writing plugins
 
-Make significant or opinionated features configurable or independently
-switchable, so others can combine dshfiles to fit their workflows. Use sensible,
-compatible defaults. Document the controls, effects and restart requirements. No
-toggle for each minor detail.
+Make every plugin configurable by default: each significant or opinionated
+feature gets a setting or is independently switchable, so others can combine
+dshfiles to fit their workflows. Use sensible, compatible defaults. A feature
+that spends tokens, money or Host time on its own (a warning that triggers a
+compaction, a background model call) ships off by default until a measurement
+shows it pays for itself. Document the controls, effects and restart
+requirements. No toggle for each minor detail.
 
 New plugins use our dshx hard fork at `tooling/dshx` (`@dshfiles/dshx`;
 provenance in [`FORK.md`](tooling/dshx/FORK.md)). It has no upstream remote.
@@ -338,8 +341,12 @@ dshx inspect slots --root sidebar     # read the live composition instead of gue
    the changed screen) after a significant UI change (new surface, moved
    control, restyle), never for copy. `node --run check:screenshots` fails a UI
    plugin without one; `pnpm screenshots` captures them from a scratch DSH. See
-   [plugin screenshots](docs/plugin-screenshots.md).
-4. A capability the user has, the Agent gets. Each user-facing capability (row
+   [plugin screenshots](docs/plugin-screenshots.md). A change that adds or moves
+   UI carries its screenshots in the PR description too.
+4. Every UI works on a phone: check it at 390 px width with touch-sized targets
+   (44 px) and keyboard-only use, and cover new surfaces in a narrow-viewport
+   journey or a scratch-DSH shot.
+5. A capability the user has, the Agent gets. Each user-facing capability (row
    action, dialog verb, settings write) carries an agent tool: bind the existing
    dshx method with `tool: { name, readOnly, render }`, not a second
    `defineTool` that restates it.
@@ -354,7 +361,7 @@ dshx inspect slots --root sidebar     # read the live composition instead of gue
    5. Presentation-only state (tab layout, lightbox, draft) is not a tool.
    6. No native Host verb? Apply [The core boundary](#the-core-boundary).
    7. Audit and backlog: [`docs/agent-tool-parity.md`](docs/agent-tool-parity.md).
-5. Host work leaves a span, and the catalog says which. Each feature in
+6. Host work leaves a span, and the catalog says which. Each feature in
    `dshx.features.json` lists `telemetry`: the `automatic` spans it gets
    (`api-dispatch`, `agent-tool`, `model-stream`, or the shared `jj` / `secret`
    / `multi-host` helpers), a `custom` span with the `recordSpans()` test that
@@ -365,15 +372,15 @@ dshx inspect slots --root sidebar     # read the live composition instead of gue
    `ioDelegation`. `features:check` and `dshx build` fail an addition or update
    that skips this
    ([telemetry contract](docs/observability.md#the-telemetry-contract-checked)).
-6. Loader row ids share one namespace per profile: keep the scope in the id
+7. Loader row ids share one namespace per profile: keep the scope in the id
    (`@dshfiles/shortcuts` → `dshfiles-shortcuts`). `defineSettings.namespace`
    equals that row id. One Host entry cannot declare both native `Config` and
    dshx `settings`.
-7. A plugin and dshx resolve **one** `@deepseek-ai/cordis` (including
+8. A plugin and dshx resolve **one** `@deepseek-ai/cordis` (including
    `cordis-plugin-include` and `cordis-plugin-loader`); two copies land
    `declare module` augmentations on the wrong `Events`. Root
    `pnpm-workspace.yaml` pins the versions with `dedupePeerDependents: true`.
-8. Each user-facing warning or error gives a recovery path: what the user can
+9. Each user-facing warning or error gives a recovery path: what the user can
    change or do next, with a direct control or exact command when available. No
    safe recovery? Explain the limitation and the next practical alternative.
    Never a dead-end message.
