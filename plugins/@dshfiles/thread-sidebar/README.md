@@ -931,23 +931,53 @@ another thread — typically one it started with `thread_create` / `thread_fork`
 which is a root thread and never resumes its creator — calls
 `thread_subscribe { sessionId }` first: the edge is stored durably in the
 `thread_subscriptions` storage domain (`src/subscriptions-store.ts`), and from
-then on that target's `turn/end` queues ONE compact notice into the subscriber
-and wakes it when it is idle. The notice carries the status (`finished`,
-`failed`, `blocked`, `stopped`, `truncated`, or `waiting-on-question` when the
-target stopped on a question, which outranks its finish reason) plus a
-320-character preview of its newest answer — never the transcript, never tool
-output — and says that quoted text is data, not instructions. Delivery is
+then on that target's `turn/end` sends ONE compact notice into the subscriber.
+The notice carries the status (`finished`, `landed` when the thread's workspace
+landed on the trunk during that turn, `failed`, `blocked`, `stopped`,
+`truncated`, or `waiting-on-question` when the target stopped on a question,
+which outranks its finish reason) plus a 320-character preview of the answer of
+the turn that ended — taken from that turn's own `assistant/message` events, so
+it never quotes an earlier or later turn, and never the transcript or tool
+output — and says that quoted text is data, not instructions. A turn that only
+compacted (a `compaction/*` bracket and no answer) sends nothing unless it
+failed.
+
+Delivery (`src/subscription-notices.ts`, `src/subscription-notices-host.ts`) is
 session-controller's `sessions.message` with `wake: true`, the same inbox path a
-native subagent settlement uses (`src/subscription-notices-host.ts`); the
-watcher only listens to the public `session/event` stream. Nothing is delivered
+native subagent settlement uses; the watcher only listens to the public
+`session/event` stream.
+
+| Subscriber is…                       | `subscriptionDelivery: steer` (default)                                                | `queue`                                          |
+| ------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| idle                                 | woken at once with the notice (`next-turn`)                                            | same                                             |
+| running                              | held, then steered into its live turn at its next `step/end` (`next-step`)             | held until its `turn/end`, then queued and woken |
+| woken, turn not started yet (≤ 60 s) | held and steered into that turn at its first step end, instead of a second queued item | held until that turn ends                        |
+
+Everything held for one subscriber leaves as ONE message: several targets become
+one line each (`- “title” (id) — status: preview`), and a target that ended
+twice keeps only its latest status. A steer the Host refuses (no live turn,
+compacting, a race) stays held and leaves queued at the subscriber's turn end,
+merged with whatever arrived meanwhile. Held notices live in Host memory only:
+a Host restart drops them.
+
+Each subscription has a level: `all` (every turn end), `outcomes` (landed,
+failed or a question), `stuck` (failed, a question, blocked or truncated) or
+`never` (kept but silent). A subscription without its own level follows the
+`subscriptionNoticeLevel` setting (default `all`). `thread_subscribe { sessionId,
+level }` sets it (`default` clears it); subscribing an existing pair changes its
+level. Native subagent settlement notices do not pass through this filter: the
+subagent manager calls `parent.inject` / `sendWaking` directly, with no hook a
+plugin can register (see `plans/dsh-host-gaps.md`). Nothing is delivered
 without an edge, so the default stays silent: a created thread does not wake its
 creator. A thread cannot watch itself and a pair cannot watch itself in both
 directions (two threads that wake each other would keep each other running); an
 archived subscriber or target ends the edge — at once through this plugin's own
 archive path, and on the next notice pass for an archive made elsewhere — and a
 subscriber the Host no longer resolves loses its edge instead of retrying. The
-same state is the **Notify “…” when this thread finishes** checkbox in a thread
-row's context menu (checked while the open thread watches that row) and the
+same state is the **Notify “…” when this thread finishes** submenu in a thread
+row's context menu — Off, Default level, Every turn, Landed/failed/question,
+Only when stuck or Never for the open thread watching that row; with several
+rows selected it sets that choice for all of them at once — and the
 `N notified` badge on a row that has subscribers; both read the one Host
 snapshot, refreshed by the API's `changed` event.
 

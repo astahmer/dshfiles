@@ -1,6 +1,12 @@
 import { defineApi, event, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import { SchemaHelpers } from './schema-helpers.js'
+import { SUBSCRIPTION_NOTICE_LEVELS } from './subscription-levels.js'
+
+const levelSchema = Schema.Literals(SUBSCRIPTION_NOTICE_LEVELS)
+
+/** A level to set, or `default` to drop the pair's own level so it follows the setting again. */
+const levelChoiceSchema = Schema.Literals([...SUBSCRIPTION_NOTICE_LEVELS, 'default'])
 
 const sessionIdSchema = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256))
 
@@ -15,6 +21,8 @@ export const threadSubscriptionSchema = SchemaHelpers.strictStruct(
     subscriberSessionId: sessionIdSchema,
     targetSessionId: sessionIdSchema,
     createdAt: Schema.Number.check(Schema.isFinite()),
+    /** Which turn ends reach the subscriber; absent follows the `subscriptionNoticeLevel` setting. */
+    level: Schema.optional(levelSchema),
     subscriberTitle: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
     targetTitle: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
   }),
@@ -29,11 +37,16 @@ export type ThreadSubscriptionsSnapshot = Schema.Schema.Type<typeof threadSubscr
 
 const label = (title: string | undefined, sessionId: string): string => (title === undefined ? sessionId : `${title} (${sessionId})`)
 
+const levelSuffix = (row: ThreadSubscription): string => (row.level === undefined ? '' : ` (level: ${row.level})`)
+
 const renderSubscriptions = (output: ThreadSubscriptionsSnapshot): string =>
   output.subscriptions.length === 0
     ? 'No thread subscriptions: nothing is notified when another thread finishes.'
     : output.subscriptions
-        .map(row => `${label(row.subscriberTitle, row.subscriberSessionId)} is notified when ${label(row.targetTitle, row.targetSessionId)} finishes`)
+        .map(
+          row =>
+            `${label(row.subscriberTitle, row.subscriberSessionId)} is notified when ${label(row.targetTitle, row.targetSessionId)} finishes${levelSuffix(row)}`,
+        )
         .join('\n')
 
 /**
@@ -61,13 +74,13 @@ export const threadSubscriptionsApi = defineApi({
       tool: { name: 'thread_subscriptions', readOnly: true, render: renderSubscriptions },
     }),
     subscribe: method({
-      input: Schema.Struct({ sessionId: sessionIdSchema, subscriberSessionId: Schema.optional(sessionIdSchema) }),
+      input: Schema.Struct({ sessionId: sessionIdSchema, subscriberSessionId: Schema.optional(sessionIdSchema), level: Schema.optional(levelChoiceSchema) }),
       output: threadSubscriptionsSchema,
-      description: `Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) is queued into the subscriber and wakes it when it is idle. Defaults the subscriber to the calling thread. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.`,
+      description: `Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) reaches the subscriber: it wakes an idle subscriber, joins a running one at its next step, and several ends merge into one notice. Defaults the subscriber to the calling thread. level picks which ends reach it: all, outcomes (landed, failed, question), stuck (failed, question, blocked, truncated) or never; default (or omitted on a new pair) follows the user's setting. Subscribing an existing pair changes its level; omitting level keeps it. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.`,
       tool: {
         name: 'thread_subscribe',
         render: output =>
-          output.subscriptions.map(row => `${row.subscriberSessionId} is notified when ${row.targetSessionId} finishes`).join('\n') ||
+          output.subscriptions.map(row => `${row.subscriberSessionId} is notified when ${row.targetSessionId} finishes${levelSuffix(row)}`).join('\n') ||
           'No subscription was stored.',
       },
     }),

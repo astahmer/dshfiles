@@ -17,7 +17,7 @@ it('every subscription tool publishes an object schema with its arguments', () =
   })
   expect(documentOf('subscribe').schema).toMatchObject({
     type: 'object',
-    properties: { sessionId: {}, subscriberSessionId: {} },
+    properties: { sessionId: {}, subscriberSessionId: {}, level: { anyOf: [{ enum: ['all', 'outcomes', 'stuck', 'never', 'default'] }, { type: 'null' }] } },
     required: ['sessionId'],
   })
   expect(documentOf('unsubscribe').schema).toMatchObject({

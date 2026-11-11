@@ -6,6 +6,7 @@ import type { AutoSettlePolicy } from './organization.js'
 import { threadSidebarSettings } from './settings.js'
 import { SidebarSettingsWriteFailed } from './sidebar-errors.js'
 import { SettledThreadsModel, type SettledStatus } from './settled-threads.js'
+import type { SubscriptionDeliveryMode, SubscriptionNoticeLevel } from './subscription-levels.js'
 
 export type SidebarSettingsValue = SettingsValue<typeof threadSidebarSettings.schema>
 
@@ -46,6 +47,8 @@ export class SidebarSettings extends Context.Service<
     /** Every change of the auto-settle policy after the current one; other sidebar writes do not emit. */
     readonly policyChanges: Stream.Stream<AutoSettlePolicy>
     readonly resumeAfterRestart: Effect.Effect<boolean>
+    readonly subscriptionNoticeLevel: Effect.Effect<SubscriptionNoticeLevel>
+    readonly subscriptionDelivery: Effect.Effect<SubscriptionDeliveryMode>
     /** Settle several threads in one write, keeping the first settle instant of each and dropping their parked mark. */
     readonly settle: (sessionIds: ReadonlyArray<string>) => Effect.Effect<void, SidebarSettingsWriteFailed>
     /** Add or drop one settled id, returning the ids the namespace now holds. */
@@ -90,6 +93,8 @@ export class SidebarSettings extends Context.Service<
           Stream.drop(1),
         ),
         resumeAfterRestart: Effect.map(settings.get, value => value.resumeAfterRestart),
+        subscriptionNoticeLevel: Effect.map(settings.get, value => value.subscriptionNoticeLevel),
+        subscriptionDelivery: Effect.map(settings.get, value => value.subscriptionDelivery),
         settle: Effect.fn('settled threads settle')(function* (sessionIds) {
           yield* write((value, now) => settleAndUnpark(value, sessionIds, now))
         }),

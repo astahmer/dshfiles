@@ -8,6 +8,7 @@ import {
   SIDEBAR_SECTIONS,
   THREAD_ROW_ACTIONS,
 } from './organization.js'
+import { SUBSCRIPTION_DELIVERY_MODES, SUBSCRIPTION_NOTICE_LEVELS } from './subscription-levels.js'
 import { THREAD_DELAYS } from './thread-delays.js'
 import {
   DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
@@ -125,6 +126,16 @@ export const threadSidebarSettings = defineSettings({
     resumeAfterRestart: Schema.boolean()
       .default(DEFAULT_PREFERENCES.resumeAfterRestart)
       .description('When DSH starts again, continue the threads that were working when it stopped (a restart, a crash or a forced stop).'),
+    subscriptionNoticeLevel: Schema.union(SUBSCRIPTION_NOTICE_LEVELS)
+      .default('all')
+      .description(
+        'Which turn ends of a subscribed thread reach the thread watching it, unless that subscription sets its own level: all, outcomes (landed, failed, asks a question), stuck (failed, asks a question, blocked, truncated) or never.',
+      ),
+    subscriptionDelivery: Schema.union(SUBSCRIPTION_DELIVERY_MODES)
+      .default('steer')
+      .description(
+        'How a notice reaches a watching thread that is running: steer it into the live turn at its next step, or queue it for after that turn. Notices that arrive together merge into one either way.',
+      ),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
       .description('Apply manual pin, park, archive, and restore actions to all child threads.'),

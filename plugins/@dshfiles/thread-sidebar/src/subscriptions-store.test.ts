@@ -63,6 +63,24 @@ describe('thread subscriptions', () => {
     ).pipe(Effect.tap(root => Effect.map(durableRows(root), rows => expect(rows).toHaveLength(1)))),
   )
 
+  it.effect('subscribing an existing pair changes its level, keeps it when omitted, and default drops it', () =>
+    withStore(5_000, root =>
+      Effect.gen(function* () {
+        const subscriptions = yield* ThreadSubscriptions
+        const levelOf = Effect.map(subscriptions.edgesFor('target'), edges => edges.map(edge => edge.level))
+        yield* subscriptions.subscribe({ subscriberSessionId: 'watcher', targetSessionId: 'target', level: 'stuck' })
+        expect(yield* levelOf).toEqual(['stuck'])
+        yield* subscriptions.subscribe({ subscriberSessionId: 'watcher', targetSessionId: 'target' })
+        expect(yield* levelOf).toEqual(['stuck'])
+        yield* subscriptions.subscribe({ subscriberSessionId: 'watcher', targetSessionId: 'target', level: 'never' })
+        expect(yield* levelOf).toEqual(['never'])
+        yield* subscriptions.subscribe({ subscriberSessionId: 'watcher', targetSessionId: 'target', level: 'default' })
+        expect(yield* subscriptions.edgesFor('target')).toEqual([{ subscriberSessionId: 'watcher', targetSessionId: 'target', createdAt: 5_000 }])
+        return root
+      }),
+    ).pipe(Effect.tap(root => Effect.map(durableRows(root), rows => expect(rows).toHaveLength(1)))),
+  )
+
   it.effect('pruning drops every edge of an archived thread on either end', () =>
     withStore(5_000, root =>
       Effect.gen(function* () {

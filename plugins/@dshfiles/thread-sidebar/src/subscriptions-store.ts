@@ -3,6 +3,7 @@ import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { Clock, Context, Effect, Layer, PubSub, Schema, Stream, SynchronizedRef } from 'effect'
 import { SubscriptionStorageFailed } from './sidebar-errors.js'
+import { SUBSCRIPTION_NOTICE_LEVELS, type SubscriptionNoticeLevel } from './subscription-levels.js'
 import { type ThreadSubscription, type ThreadSubscriptionsSnapshot } from './subscriptions-api.js'
 
 /** Two ids and when the edge was stored; titles are read at the boundary, never duplicated into storage. */
@@ -10,6 +11,7 @@ const storedSubscriptionSchema = Schema.Struct({
   subscriberSessionId: Schema.String.check(Schema.isMinLength(1)),
   targetSessionId: Schema.String.check(Schema.isMinLength(1)),
   createdAt: Schema.Number.check(Schema.isFinite()),
+  level: Schema.optional(Schema.Literals(SUBSCRIPTION_NOTICE_LEVELS)),
 })
 
 export const threadSubscriptionsDomain = defineDomain({
@@ -80,9 +82,11 @@ export class ThreadSubscriptions extends Context.Service<
     /** Every committed change, after the mirror moved; read `snapshot` for the state. */
     readonly changes: Stream.Stream<void>
     readonly edgesFor: (targetSessionId: string) => Effect.Effect<ReadonlyArray<ThreadSubscription>>
+    /** Store an edge, or change an existing one's level; an omitted level keeps the one it had, `default` drops it. */
     readonly subscribe: (input: {
       readonly subscriberSessionId: string
       readonly targetSessionId: string
+      readonly level?: SubscriptionNoticeLevel | 'default' | undefined
     }) => Effect.Effect<ThreadSubscriptionsSnapshot, SubscriptionStorageFailed>
     readonly unsubscribe: (input: {
       readonly subscriberSessionId: string
@@ -135,11 +139,18 @@ export class ThreadSubscriptions extends Context.Service<
         changes: Stream.fromPubSub(changed),
         edgesFor: targetSessionId => Effect.map(SynchronizedRef.get(state), edges => edges.filter(edge => edge.targetSessionId === targetSessionId)),
         subscribe: Effect.fn('thread subscriptions subscribe')(function* (input) {
-          const createdAt = yield* Clock.currentTimeMillis
-          return yield* apply('subscribe', () => ({
-            put: [{ subscriberSessionId: input.subscriberSessionId, targetSessionId: input.targetSessionId, createdAt }],
-            remove: [],
-          }))
+          const now = yield* Clock.currentTimeMillis
+          return yield* apply('subscribe', current => {
+            const existing = current.find(edge => keyOf(edge) === keyOf(input))
+            const level = input.level === 'default' ? undefined : (input.level ?? existing?.level)
+            const row: ThreadSubscription = {
+              subscriberSessionId: input.subscriberSessionId,
+              targetSessionId: input.targetSessionId,
+              createdAt: existing?.createdAt ?? now,
+              ...(level === undefined ? {} : { level }),
+            }
+            return { put: [row], remove: [] }
+          })
         }),
         unsubscribe: Effect.fn('thread subscriptions unsubscribe')(function* (input) {
           return yield* apply('unsubscribe', () => ({ put: [], remove: [keyOf(input)] }))

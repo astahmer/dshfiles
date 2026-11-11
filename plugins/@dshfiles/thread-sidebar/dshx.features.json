@@ -3245,7 +3245,7 @@
     {
       "id": "phone-stack-navigation",
       "title": "Navigate the phone as a stack",
-      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux \u00a78 phase 6): a top bar names the screen and Back pops one level \u2014 a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers a Thread menu button: it calls the typed Rich Composer menu contract, only while the stage has its own mounted reader, to show the thread's view tabs, header controls and thread-panel opener (the bottom sheet) under the bar; it closes when the stage stops showing a thread. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
+      "summary": "Below 640px the fixed layout is a stack (docs/ade-ux §8 phase 6): a top bar names the screen and Back pops one level — a thread returns to the Threads list, or to the Inbox when it was opened from an Inbox item; a page returns to its destination's list; a destination opened from More returns to More; the Threads and Inbox lists are the tab roots and have no Back. On a thread the bar offers a Thread menu button: it calls the typed Rich Composer menu contract, only while the stage has its own mounted reader, to show the thread's view tabs, header controls and thread-panel opener (the bottom sheet) under the bar; it closes when the stage stops showing a thread. The bar leaves its trailing corner to the frame's Status chip, the stage sits between the bar and the tab bar on the dynamic viewport, and while the software keyboard is open (a shorter visual viewport with an editable element focused) the tab bar hides and the stage ends on the keyboard. Tapping the row already on the stage closes the list too. Desktop is unchanged.",
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",
@@ -3599,19 +3599,36 @@
     {
       "id": "thread-subscriptions",
       "title": "Opt-in completion notices between threads",
-      "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end queues ONE compact notice into the subscriber (status: finished, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character answer preview, never the transcript) and wakes it when it is idle. Nothing is delivered without a subscription, so a thread started with thread_create/thread_fork stays silent by default. The state is durable Host storage, visible and reversible from a thread's context menu (Notify “…” when this thread finishes) and the N-notified row badge, and it ends when either thread is archived.",
+      "summary": "A thread can subscribe to another thread's turn completions. While subscribed, that thread's turn end sends ONE compact notice into the subscriber (status: finished, landed, failed, blocked, stopped, truncated or waiting-on-question, plus a 320-character preview of the turn that ended, never the transcript); compaction-only turns send nothing. An idle subscriber is woken; a running one gets the notice steered into its live turn at its next step (or queued behind it), and notices that arrive together merge into one, latest status per thread. Each subscription has a level (all, outcomes, stuck, never) with a default setting. Nothing is delivered without a subscription, so a thread started with thread_create/thread_fork stays silent by default. The state is durable Host storage, visible and reversible from a thread's context menu (Notify “…” when this thread finishes, also for several selected threads) and the N-notified row badge, and it ends when either thread is archived.",
       "surface": "rowDecorator",
       "destination": "threads",
       "currentSurface": "threads: row context menu → Notify “…” when this thread finishes",
       "surfaces": ["client", "host", "tool", "storage"],
-      "configuration": [],
-      "states": ["idle", "subscribed", "notice-delivered", "archived-cleanup"],
+      "configuration": [
+        {
+          "key": "subscriptionNoticeLevel",
+          "defaultValue": "all",
+          "constraints": "One of all, outcomes, stuck or never; the level of a subscription that sets none.",
+          "choices": ["all", "outcomes", "stuck", "never"],
+          "coveredBy": ["thread-sidebar.subscription-levels"]
+        },
+        {
+          "key": "subscriptionDelivery",
+          "defaultValue": "steer",
+          "constraints": "One of steer or queue; how a running subscriber hears a notice.",
+          "choices": ["steer", "queue"],
+          "coveredBy": ["thread-sidebar.subscription-steer-merge", "thread-sidebar.subscription-queue-merge"]
+        }
+      ],
+      "states": ["idle", "subscribed", "notice-held", "notice-steered", "notice-delivered", "archived-cleanup"],
       "failureModes": [
         "Without a subscription nothing is delivered: a created thread ends silently, which is the default.",
         "A thread cannot watch itself, and a pair cannot watch itself in both directions, because two threads that wake each other on every completion would keep each other running; the refusal names the edge to drop first.",
         "An archived subscriber or target ends the edge: the archive path this plugin performs drops it at once, and a notice pass drops an endpoint archived from elsewhere before delivering.",
         "A subscriber the Host no longer resolves loses its edge instead of retrying forever, and an undelivered notice is logged with its reason.",
-        "A settled subscriber accepts the queued notice but runs no model step until it is unsettled, like any other wake."
+        "A settled subscriber accepts the queued notice but runs no model step until it is unsettled, like any other wake.",
+        "A steer the Host refuses (no live turn, compacting, a race) stays held and is queued once at the subscriber's turn end, merged with later notices; held notices are in Host memory and a Host restart drops them.",
+        "Native subagent settlement notices cannot be filtered by level: the subagent manager injects them with no plugin hook."
       ],
       "externalDependencies": [
         {
@@ -3650,6 +3667,54 @@
           "id": "thread-sidebar.subscription-gone-subscriber",
           "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
           "testName": "a subscriber the Host no longer resolves loses its edge instead of retrying forever"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-queue-merge",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
+          "testName": "queue mode: notices that arrive while the subscriber runs merge into one at its turn end, latest status per thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-steer-merge",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
+          "testName": "steer mode: a running subscriber hears at its next step, several ends merged into one steer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-steer-refused",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
+          "testName": "a refused steer falls back to one queued notice at the turn end, merged with what arrived meanwhile"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-idle-wake",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
+          "testName": "an idle subscriber is woken at once; the next end before its turn starts joins that turn instead of queueing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-compaction-quiet",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
+          "testName": "a compaction-only turn does not notify; a turn that also answered does"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-turn-preview",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
+          "testName": "the preview quotes the turn that ended, without reading the transcript"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-levels",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscription-notices.test.ts",
+          "testName": "a level filters what reaches one subscription; the default level covers those that set none"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subscription-level",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subscriptions-store.test.ts",
+          "testName": "subscribing an existing pair changes its level, keeps it when omitted, and default drops it"
         },
         {
           "kind": "not-applicable",

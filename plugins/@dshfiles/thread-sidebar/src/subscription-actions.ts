@@ -5,6 +5,7 @@ import { Context, Effect, Layer } from 'effect'
 import { SidebarHost } from './sidebar-host-promise.js'
 import { SubscriptionStorageFailed } from './sidebar-errors.js'
 import { hostCall } from './subscription-host-promise.js'
+import type { SubscriptionNoticeLevel } from './subscription-levels.js'
 import { ThreadSubscriptions, ThreadSubscriptionsModel } from './subscriptions-store.js'
 import type { ThreadSubscription, ThreadSubscriptionsSnapshot } from './subscriptions-api.js'
 
@@ -19,6 +20,7 @@ type ThreadSubscriptionDraft = {
   subscriberSessionId: string
   targetSessionId: string
   createdAt: number
+  level?: SubscriptionNoticeLevel
   subscriberTitle?: string
   targetTitle?: string
 }
@@ -47,7 +49,11 @@ export interface ThreadSubscriptionActionSet {
     caller: ApiCaller,
   ) => Effect.Effect<ThreadSubscriptionsSnapshot, SubscriptionActionError>
   readonly subscribe: (
-    input: { readonly subscriberSessionId?: string | undefined; readonly sessionId: string },
+    input: {
+      readonly subscriberSessionId?: string | undefined
+      readonly sessionId: string
+      readonly level?: SubscriptionNoticeLevel | 'default' | undefined
+    },
     caller: ApiCaller,
   ) => Effect.Effect<ThreadSubscriptionsSnapshot, SubscriptionActionError>
   readonly unsubscribe: (
@@ -108,6 +114,7 @@ export class ThreadSubscriptionActions extends Context.Service<ThreadSubscriptio
                 targetSessionId: row.targetSessionId,
                 createdAt: row.createdAt,
               }
+              if (row.level !== undefined) view.level = row.level
               if (subscriberTitle !== undefined) view.subscriberTitle = subscriberTitle
               if (targetTitle !== undefined) view.targetTitle = targetTitle
               return view satisfies ThreadSubscription
@@ -145,7 +152,7 @@ export class ThreadSubscriptionActions extends Context.Service<ThreadSubscriptio
           const current = yield* store.snapshot
           const refusal = ThreadSubscriptionsModel.refusalOf({ subscriberSessionId, targetSessionId: input.sessionId, subscriptions: current.subscriptions })
           if (refusal !== undefined) return yield* Effect.fail(new PluginApiError(refusal, { code: 'subscription-refused' }))
-          yield* store.subscribe({ subscriberSessionId, targetSessionId: input.sessionId })
+          yield* store.subscribe({ subscriberSessionId, targetSessionId: input.sessionId, level: input.level })
           return yield* snapshot({ subscriberSessionId })
         }),
         unsubscribe: Effect.fn('thread subscriptions unsubscribe action')(function* (input, caller) {

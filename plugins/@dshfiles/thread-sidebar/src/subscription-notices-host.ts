@@ -2,12 +2,13 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
-import { Clock, Effect, Layer, Stream } from 'effect'
+import { Clock, Effect, Layer, Option, Stream } from 'effect'
 import { SessionEvents } from './session-events.js'
 import { SidebarHost } from './sidebar-host-promise.js'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { hostCall } from './subscription-host-promise.js'
-import { SubscriptionNoticeModel, SubscriptionNotices, notifySubscribers, type DeliveryOutcome, type SubscriptionNoticeDeps } from './subscription-notices.js'
+import { SidebarSettings } from './sidebar-settings.js'
+import { SubscriptionNotices, makeSubscriptionNoticeTracker, type DeliveryOutcome, type SubscriptionNoticeDeps } from './subscription-notices.js'
 import { threadSubscriptionsApi } from './subscriptions-api.js'
 import { ThreadSubscriptions } from './subscriptions-store.js'
 
@@ -28,12 +29,13 @@ export const subscriptionNoticeHostLayer = Layer.effect(
     const ctx = host.ctx
     const sessions = createHostApiClient(ctx, sessionsApi, host.packageId)
     const sidebar = yield* SidebarHost
+    const settings = yield* SidebarSettings
     const deps: SubscriptionNoticeDeps = {
       stateOf: (sessionIds: ReadonlyArray<string>) =>
         Effect.gen(function* () {
           const archived = new Set(yield* sidebar.archivedSessionIds)
           const listed = yield* sidebar.sessions
-          const pending = new Map(listed.map(session => [session.sessionId, session.pendingQuestions] as const))
+          const bySessionId = new Map(listed.map(session => [session.sessionId, session] as const))
           const titles = yield* hostCall(signal =>
             ctx.sessionQuery.readTitleSnapshots(
               sessionIds.map(id => SessionId(id)),
@@ -48,7 +50,15 @@ export const subscriptionNoticeHostLayer = Layer.effect(
           return new Map(
             sessionIds.map(
               sessionId =>
-                [sessionId, { archived: archived.has(sessionId), pendingQuestions: pending.get(sessionId) ?? 0, title: bySession.get(sessionId) }] as const,
+                [
+                  sessionId,
+                  {
+                    archived: archived.has(sessionId),
+                    pendingQuestions: bySessionId.get(sessionId)?.pendingQuestions ?? 0,
+                    running: bySessionId.get(sessionId)?.running === true,
+                    title: bySession.get(sessionId),
+                  },
+                ] as const,
             ),
           )
         }).pipe(
@@ -56,15 +66,38 @@ export const subscriptionNoticeHostLayer = Layer.effect(
           Effect.withSpan('thread subscription target state'),
         ),
       // `wake: true` is the whole opt-in: only a subscription reaches this call, so nothing else starts a thread's turn.
+      // A steer joins the running turn at its next step; one that finds the thread idle wakes it like a queued notice.
       deliver: input =>
-        hostCall(() => sessions.message({ sessionId: input.sessionId, text: input.text, target: 'next-turn', wake: true })).pipe(
+        hostCall(() =>
+          sessions.message({ sessionId: input.sessionId, text: input.text, target: input.mode === 'steer' ? 'next-step' : 'next-turn', wake: true }),
+        ).pipe(
           Effect.as<DeliveryOutcome>({ delivered: true }),
           Effect.catch(error => Effect.succeed(catchDelivery(error))),
         ),
       messagesOf: sessionId =>
         hostCall(signal => sessions.messages({ sessionId, limit: 8 }, { signal })).pipe(
-          Effect.map(page => page.entries.map(entry => ({ role: entry.role, text: entry.text }))),
+          Effect.map(page => page.entries.map(entry => ({ role: entry.role, text: entry.text, seq: entry.seq }))),
         ),
+      landedSince: input =>
+        sidebar.rebasedThreads.pipe(
+          Effect.map(found =>
+            Option.match(found, {
+              onNone: () => false,
+              onSome: threads =>
+                threads.some(
+                  thread =>
+                    thread.sessionIds.includes(input.sessionId) &&
+                    thread.unlanded.length === 0 &&
+                    thread.rebasedAt !== undefined &&
+                    (input.since === undefined || thread.rebasedAt >= input.since),
+                ),
+            }),
+          ),
+          Effect.catch(() => Effect.succeed(false)),
+          Effect.withSpan('thread subscription landed check'),
+        ),
+      defaultLevel: settings.subscriptionNoticeLevel,
+      deliveryMode: settings.subscriptionDelivery,
     }
     return SubscriptionNotices.of(deps)
   }),
@@ -79,12 +112,8 @@ export const subscriptionNoticer = Layer.effectDiscard(
     const notices = yield* SubscriptionNotices
     const subscriptions = yield* ThreadSubscriptions
     const events = yield* (yield* SessionEvents).subscribe
-    yield* DshxPlugin.worker(
-      Stream.runForEach(events, ({ sessionId, event }) => {
-        const finish = SubscriptionNoticeModel.finishOf(event)
-        return finish === null ? Effect.void : notifySubscribers({ notices, subscriptions, targetSessionId: sessionId, finish })
-      }),
-    )
+    const tracker = yield* makeSubscriptionNoticeTracker({ notices, subscriptions })
+    yield* DshxPlugin.worker(Stream.runForEach(events, tracker.observe))
   }),
 )
 

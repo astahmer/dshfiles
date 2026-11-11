@@ -1,7 +1,13 @@
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useApiEvent, useApiQuery } from '@dshfiles/dshx/client'
 import { useCallback, useMemo } from 'react'
+import type { SubscriptionNoticeLevel } from './subscription-levels.js'
 import { threadSubscriptionsApi, type ThreadSubscription } from './subscriptions-api.js'
+
+/** What the thread menu offers for one pair: no subscription, one that follows the default level, or a fixed level. */
+export type ThreadNotifyChoice = 'off' | 'default' | SubscriptionNoticeLevel
+
+export const THREAD_NOTIFY_CHOICES = ['off', 'default', 'all', 'outcomes', 'stuck', 'never'] as const satisfies readonly ThreadNotifyChoice[]
 
 export interface ThreadSubscriptionsState {
   /** False while a Host that predates the subscription API answers; every affordance then stays hidden. */
@@ -10,7 +16,13 @@ export interface ThreadSubscriptionsState {
   /** The edges that end at one thread, i.e. who is notified when it finishes. */
   readonly notifiersOf: (targetSessionId: string) => readonly ThreadSubscription[]
   readonly isSubscribed: (input: { readonly subscriberSessionId: string; readonly targetSessionId: string }) => boolean
-  readonly setSubscription: (input: { readonly subscriberSessionId: string; readonly targetSessionId: string; readonly subscribed: boolean }) => void
+  readonly choiceOf: (input: { readonly subscriberSessionId: string; readonly targetSessionId: string }) => ThreadNotifyChoice
+  /** Subscribe, change the level of, or unsubscribe one subscriber from several targets at once. */
+  readonly setNotify: (input: {
+    readonly subscriberSessionId: string
+    readonly targetSessionIds: readonly string[]
+    readonly choice: ThreadNotifyChoice
+  }) => void
 }
 
 /**
@@ -36,17 +48,20 @@ export const useThreadSubscriptions = (): ThreadSubscriptionsState => {
     }
     return grouped
   }, [subscriptions])
-  const keys = useMemo(() => new Set(subscriptions.map(row => `${row.subscriberSessionId}\u001f${row.targetSessionId}`)), [subscriptions])
+  const bySubscriberAndTarget = useMemo(
+    () => new Map(subscriptions.map(row => [`${row.subscriberSessionId}\u001f${row.targetSessionId}`, row] as const)),
+    [subscriptions],
+  )
 
-  const setSubscription = useCallback(
-    (input: { readonly subscriberSessionId: string; readonly targetSessionId: string; readonly subscribed: boolean }) => {
-      const request = input.subscribed
-        ? api.subscribe({ sessionId: input.targetSessionId, subscriberSessionId: input.subscriberSessionId })
-        : api.unsubscribe({ sessionId: input.targetSessionId, subscriberSessionId: input.subscriberSessionId })
-      void request.then(
-        () => refetch(),
-        () => undefined,
+  const setNotify = useCallback(
+    (input: { readonly subscriberSessionId: string; readonly targetSessionIds: readonly string[]; readonly choice: ThreadNotifyChoice }) => {
+      const targets = input.targetSessionIds.filter(targetSessionId => targetSessionId !== input.subscriberSessionId)
+      const requests = targets.map(targetSessionId =>
+        input.choice === 'off'
+          ? api.unsubscribe({ sessionId: targetSessionId, subscriberSessionId: input.subscriberSessionId })
+          : api.subscribe({ sessionId: targetSessionId, subscriberSessionId: input.subscriberSessionId, level: input.choice }),
       )
+      void Promise.allSettled(requests).then(() => refetch())
     },
     [api, refetch],
   )
@@ -55,7 +70,11 @@ export const useThreadSubscriptions = (): ThreadSubscriptionsState => {
     available: query.error === null ? query.data !== undefined : !isApiOwnerMissing(query.error),
     subscriptions,
     notifiersOf: (targetSessionId: string) => byTarget.get(targetSessionId) ?? [],
-    isSubscribed: input => keys.has(`${input.subscriberSessionId}\u001f${input.targetSessionId}`),
-    setSubscription,
+    isSubscribed: input => bySubscriberAndTarget.has(`${input.subscriberSessionId}\u001f${input.targetSessionId}`),
+    choiceOf: input => {
+      const row = bySubscriberAndTarget.get(`${input.subscriberSessionId}\u001f${input.targetSessionId}`)
+      return row === undefined ? 'off' : (row.level ?? 'default')
+    },
+    setNotify,
   }
 }

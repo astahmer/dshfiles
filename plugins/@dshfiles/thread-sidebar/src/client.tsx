@@ -31,7 +31,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
 import { useApi, useApiQuery, usePlugin, useRegistry } from '@dshfiles/dshx/client'
-import { useThreadSubscriptions } from './subscriptions-client.js'
+import { THREAD_NOTIFY_CHOICES, useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ThreadRowActions, type ThreadRowActionTarget } from './thread-row-actions.js'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -60,7 +60,6 @@ import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
   ContextMenu,
-  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuLabel,
@@ -517,8 +516,11 @@ interface RowActions {
   readonly rename: (sessionId: SessionSummary['id'], title: string) => void
   readonly cancelRename: () => void
   readonly setAutoSettleOverride: (sessionId: SessionSummary['id'], override: AutoSettleOverride) => void
-  /** Opt-in completion notices: the open thread is told when the target thread finishes. */
-  readonly toggleNotify: (input: ThreadNotifyTarget) => void
+  /** Opt-in completion notices: the open thread is told when the target thread finishes, at the chosen level. */
+  readonly setNotify: (input: ThreadNotifyTarget, choice: ThreadNotifyChoice) => void
+  /** The open thread a batch notice level applies to, or undefined when none can subscribe. */
+  readonly batchNotifySubscriber: () => { readonly title: string } | undefined
+  readonly batchNotify: (choice: ThreadNotifyChoice) => void
   /** The row's one inline verb (plan §4.3): an inbox item's provider verb, a sidebar Resume, or open the thread. */
   readonly actOnStatus: (sessionId: SessionSummary['id'], status: ThreadStatus) => void
   readonly translate: ThreadSidebarTranslate
@@ -543,7 +545,7 @@ export interface ThreadNotifyTarget {
   readonly subscriberSessionId: string
   readonly subscriberTitle: string
   readonly targetSessionId: string
-  readonly subscribed: boolean
+  readonly choice: ThreadNotifyChoice
 }
 
 interface ThreadRowProps {
@@ -845,12 +847,43 @@ type ThreadContextMenuProps = Pick<
 > & { readonly children: JSX.Element }
 
 /** One menu for the whole batch: every verb applies to each selected thread the verb can still change. */
+const notifyChoiceLabelKeys = {
+  off: 'threadSidebarNotifyChoiceOff',
+  default: 'threadSidebarNotifyChoiceDefault',
+  all: 'threadSidebarNotifyChoiceAll',
+  outcomes: 'threadSidebarNotifyChoiceOutcomes',
+  stuck: 'threadSidebarNotifyChoiceStuck',
+  never: 'threadSidebarNotifyChoiceNever',
+} as const satisfies Record<ThreadNotifyChoice, string>
+
+/** Off, follow the default level, or a fixed level for one pair; a batch shows no current choice. */
+const NotifyChoiceMenu = (props: {
+  readonly title: string
+  readonly choice: ThreadNotifyChoice | undefined
+  readonly onChoose: (choice: ThreadNotifyChoice) => void
+  readonly t: ThreadSidebarTranslate
+}): JSX.Element => (
+  <ContextMenuSub>
+    <ContextMenuSubTrigger data-testid="thread-sidebar-notify-level">{props.t('threadSidebarNotifyOnFinish', { title: props.title })}</ContextMenuSubTrigger>
+    <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+      <ContextMenuRadioGroup value={props.choice ?? ''}>
+        {THREAD_NOTIFY_CHOICES.map(choice => (
+          <ContextMenuRadioItem key={choice} value={choice} data-notify-choice={choice} onSelect={() => props.onChoose(choice)}>
+            {props.t(notifyChoiceLabelKeys[choice])}
+          </ContextMenuRadioItem>
+        ))}
+      </ContextMenuRadioGroup>
+    </ContextMenuSubContent>
+  </ContextMenuSub>
+)
+
 const BatchThreadMenuItems = (props: {
   readonly snapshot: BatchSelectionSnapshot
   readonly actions: RowActions
   readonly t: ThreadSidebarTranslate
 }): JSX.Element => {
   const snapshot = props.snapshot
+  const notifySubscriber = props.actions.batchNotifySubscriber()
   return (
     <>
       <ContextMenuLabel>{props.t('threadSidebarSelectedCount', { count: snapshot.ids.length })}</ContextMenuLabel>
@@ -877,6 +910,9 @@ const BatchThreadMenuItems = (props: {
         </ContextMenuSubContent>
       </ContextMenuSub>
       <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>{props.t('threadSidebarCopyLinks')}</ContextMenuItem>
+      {notifySubscriber === undefined ? null : (
+        <NotifyChoiceMenu title={notifySubscriber.title} choice={undefined} onChoose={choice => props.actions.batchNotify(choice)} t={props.t} />
+      )}
       <ContextMenuSeparator />
       {snapshot.anyLive ? <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>{props.t('threadSidebarArchive')}</ContextMenuItem> : null}
       {snapshot.anyArchived ? (
@@ -978,9 +1014,12 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
       <RegisteredThreadRowActions target={{ sessionId: session.id, workspaceId: props.workspaceId, archived, running: session.running }} />
       <ContextMenuSeparator />
       {notifyTarget === undefined ? null : (
-        <ContextMenuCheckboxItem checked={notifyTarget.subscribed} onSelect={() => props.actions.toggleNotify(notifyTarget)}>
-          {t('threadSidebarNotifyOnFinish', { title: notifyTarget.subscriberTitle })}
-        </ContextMenuCheckboxItem>
+        <NotifyChoiceMenu
+          title={notifyTarget.subscriberTitle}
+          choice={notifyTarget.choice}
+          onChoose={choice => props.actions.setNotify(notifyTarget, choice)}
+          t={t}
+        />
       )}
       <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
         {t('threadSidebarMarkUnread')}
@@ -4270,12 +4309,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     continueThreadIn,
     turnThreadIntoProject,
     notifyThread,
-    toggleSubscription: (target: ThreadNotifyTarget) =>
-      subscriptions.setSubscription({
-        subscriberSessionId: target.subscriberSessionId,
-        targetSessionId: target.targetSessionId,
-        subscribed: !target.subscribed,
-      }),
+    setNotify: (target: ThreadNotifyTarget, choice: ThreadNotifyChoice) =>
+      subscriptions.setNotify({ subscriberSessionId: target.subscriberSessionId, targetSessionIds: [target.targetSessionId], choice }),
+    batchNotifySubscriber: () => (subscriptions.available && selectedSession !== undefined ? { title: selectedSession.displayTitle } : undefined),
+    batchNotify: (choice: ThreadNotifyChoice) => {
+      if (selectedSession === undefined) return
+      subscriptions.setNotify({ subscriberSessionId: selectedSession.id, targetSessionIds: selectionRef.current.sessionIds, choice })
+    },
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -4312,12 +4352,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     continueThreadIn,
     turnThreadIntoProject,
     notifyThread,
-    toggleSubscription: (target: ThreadNotifyTarget) =>
-      subscriptions.setSubscription({
-        subscriberSessionId: target.subscriberSessionId,
-        targetSessionId: target.targetSessionId,
-        subscribed: !target.subscribed,
-      }),
+    setNotify: (target: ThreadNotifyTarget, choice: ThreadNotifyChoice) =>
+      subscriptions.setNotify({ subscriberSessionId: target.subscriberSessionId, targetSessionIds: [target.targetSessionId], choice }),
+    batchNotifySubscriber: () => (subscriptions.available && selectedSession !== undefined ? { title: selectedSession.displayTitle } : undefined),
+    batchNotify: (choice: ThreadNotifyChoice) => {
+      if (selectedSession === undefined) return
+      subscriptions.setNotify({ subscriberSessionId: selectedSession.id, targetSessionIds: selectionRef.current.sessionIds, choice })
+    },
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -4468,7 +4509,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         })
       },
       actOnStatus: (sessionId, status) => latestRowActions.current.actOnStatus(sessionId, status),
-      toggleNotify: target => latestRowActions.current.toggleSubscription(target),
+      setNotify: (target, choice) => latestRowActions.current.setNotify(target, choice),
+      batchNotifySubscriber: () => latestRowActions.current.batchNotifySubscriber(),
+      batchNotify: choice => latestRowActions.current.batchNotify(choice),
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
     }
   }, [multiSelection])
@@ -4671,7 +4714,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 subscriberSessionId: selectedSession.id,
                 subscriberTitle: selectedSession.displayTitle,
                 targetSessionId: session.id,
-                subscribed: subscriptions.isSubscribed({ subscriberSessionId: selectedSession.id, targetSessionId: session.id }),
+                choice: subscriptions.choiceOf({ subscriberSessionId: selectedSession.id, targetSessionId: session.id }),
               }
         }
         subscriberCount={subscriptions.available ? subscriptions.notifiersOf(session.id).length : undefined}
