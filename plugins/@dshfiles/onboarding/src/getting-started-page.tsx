@@ -73,6 +73,9 @@ const ChecklistRow = (props: {
   const { item } = props
   const Icon = STATE_ICON[item.state]
   const [copied, setCopied] = useState(false)
+  const copyCommand = async (command: string): Promise<void> => {
+    setCopied(await props.copy(command))
+  }
   const route = item.fix.route
   const routeOpen = route !== null && Routes.available(route, props.routes)
   const link = item.fix.shellCommand?.startsWith('https://') === true ? item.fix.shellCommand : null
@@ -109,7 +112,7 @@ const ChecklistRow = (props: {
             <Button
               aria-label={`Copy ${item.fix.shellCommand}`}
               className={TOUCH}
-              onClick={() => void props.copy(item.fix.shellCommand ?? '').then(setCopied)}
+              onClick={() => void copyCommand(item.fix.shellCommand ?? '')}
               size="sm"
               variant="ghost"
             >

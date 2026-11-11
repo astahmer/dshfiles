@@ -10,6 +10,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { Schema } from 'effect'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(here, '..')
@@ -22,6 +23,9 @@ const featureSchemaFile = join(repoRoot, 'tooling', 'dshx', 'packages', 'dshx', 
 
 const repoPath = (file: string): string => relative(repoRoot, file).split('\\').join('/')
 const read = (file: string): string => readFileSync(file, 'utf8')
+/** Only `description` is read from a package manifest; every other key is ignored. */
+const decodeManifest = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ description: Schema.optional(Schema.Unknown) })))
+const decodeCatalogJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))
 
 // SAFETY: features.ts exports featureCatalogIssues as (value: unknown) => readonly string[].
 // oxlint-disable-next-line antislop/no-unknown-parameters -- the dshx schema check is the decode boundary for each raw catalog.
@@ -49,15 +53,14 @@ const features: unknown[] = []
 for (const name of readdirSync(pluginsDir).sort()) {
   const packageFile = join(pluginsDir, name, 'package.json')
   if (!existsSync(packageFile)) continue
-  // SAFETY: every owned package.json is a JSON object; only `description` is read and checked to be a string.
-  const manifest = JSON.parse(read(packageFile)) as { readonly description?: unknown }
+  const manifest = decodeManifest(read(packageFile))
   const description = typeof manifest.description === 'string' ? clip(manifest.description) : ''
   const catalogFile = join(pluginsDir, name, 'dshx.features.json')
   if (!existsSync(catalogFile)) {
     plugins.push({ name, description, ui: false, features: 0 })
     continue
   }
-  const raw: unknown = JSON.parse(read(catalogFile))
+  const raw: unknown = decodeCatalogJson(read(catalogFile))
   const issues = featureSchema.featureCatalogIssues(raw)
   if (issues.length > 0) throw new Error(`${repoPath(catalogFile)} fails the dshx feature schema:\n- ${issues.join('\n- ')}`)
   // SAFETY: featureCatalogIssues returned no issue, so the value is a valid DshxFeatureCatalog.

@@ -11,6 +11,7 @@ import {
   type StepStatus,
   type Toolchain,
 } from './pack-plan.js'
+import { packManagerCalls } from './pack-manager-promise.js'
 
 const MAX_DETAIL = 300
 const INSTALL_TIMEOUT = Duration.minutes(5)
@@ -92,7 +93,7 @@ export class PackControls extends Context.Service<
 
         const rows = Effect.suspend(() => {
           const manager = input.manager()
-          return manager === undefined ? Effect.succeed(null) : Effect.tryPromise(() => manager.listPlugins()).pipe(Effect.orElseSucceed(() => null))
+          return manager === undefined ? Effect.succeed(null) : packManagerCalls(manager).listPlugins.pipe(Effect.orElseSucceed(() => null))
         })
         const entries = Effect.map(rows, listed => (listed === null ? null : PackPlan.entriesOf(listed)))
 
@@ -103,7 +104,7 @@ export class PackControls extends Context.Service<
           const profile = input.profile()
           if (profile === undefined) return { kind: 'manual', reason: 'This Host was not started from a DSH profile it can name.' }
           const manager = input.manager()
-          const bundles = yield* Effect.tryPromise(() => manager?.listBundles?.() ?? Promise.resolve([])).pipe(Effect.orElseSucceed(() => []))
+          const bundles = manager === undefined ? [] : yield* packManagerCalls(manager).listBundles.pipe(Effect.orElseSucceed(() => []))
           const source = bundles.find(bundle => bundle.name === SELF)?.source?.replace(/^(link|file):/u, '')
           const unlinked = 'This profile does not link Getting started from a dshfiles checkout, so the repository toolchain is not on this Host.'
           if (source === undefined || !path.isAbsolute(source)) return { kind: 'manual', reason: unlinked }
@@ -212,16 +213,18 @@ export class PackControls extends Context.Service<
               })
               const row = current?.find(candidate => candidate.entryId === entryId)
               if (manager === undefined || row === undefined) return Effect.succeed(step('failed', `entry ${entryId} is no longer listed`))
-              return Effect.tryPromise(() => manager.setPluginEnabled(row.entryId, action === 'enable')).pipe(
-                Effect.map(result =>
-                  step(
-                    result.application,
-                    result.error === undefined ? null : [result.error.code, result.error.diagnostic].filter(part => part !== undefined).join(': '),
-                    result.restartReason ?? null,
+              return packManagerCalls(manager)
+                .setPluginEnabled(row.entryId, action === 'enable')
+                .pipe(
+                  Effect.map(result =>
+                    step(
+                      result.application,
+                      result.error === undefined ? null : [result.error.code, result.error.diagnostic].filter(part => part !== undefined).join(': '),
+                      result.restartReason ?? null,
+                    ),
                   ),
-                ),
-                Effect.catch(error => Effect.succeed(step('failed', String(error instanceof Error ? error.message : error)))),
-              )
+                  Effect.catch(error => Effect.succeed(step('failed', error.reason))),
+                )
             }
             const results = yield* Effect.forEach(entryIds, each)
             return results.reduce((worst, next) => (STATUS_RANK[next.status] > STATUS_RANK[worst.status] ? next : worst))
