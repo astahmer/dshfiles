@@ -13,6 +13,18 @@ const ISSUE_READ_LIMIT = 100
 const ISSUE_STALE_MS = 4 * 60_000
 const ISSUE_BACKOFF_MS = 5 * 60_000
 const MAX_ISSUE_BACKOFF_MS = 60 * 60_000
+
+export interface IssueBackoff {
+  readonly until: number
+  readonly count: number
+}
+
+/** After one issue read: a rate limit waits five minutes, doubling per consecutive limit up to an hour; a read that went through resets it. */
+export const issueBackoffAfter = (input: { readonly previous: IssueBackoff; readonly now: number; readonly rateLimited: boolean }): IssueBackoff => {
+  if (!input.rateLimited) return { until: 0, count: 0 }
+  const count = input.previous.count + 1
+  return { until: input.now + Math.min(ISSUE_BACKOFF_MS * 2 ** (count - 1), MAX_ISSUE_BACKOFF_MS), count }
+}
 /** Issue states kept in memory; the oldest reads go first past it. */
 const MAX_CACHED_ISSUES = 2_000
 
@@ -217,7 +229,7 @@ export class PullRequestState extends Context.Service<
       }).pipe(Effect.withSpan('backlog pull request item watches'))
 
       const issueCache = yield* Ref.make<ReadonlyMap<string, IssueView>>(new Map())
-      const issueBackoff = yield* Ref.make({ until: 0, count: 0 })
+      const issueBackoff = yield* Ref.make<IssueBackoff>({ until: 0, count: 0 })
 
       const issues = Effect.fn('backlog issue state')(function* (urls: readonly string[]) {
         const cached = yield* Ref.get(issueCache)
@@ -246,11 +258,9 @@ export class PullRequestState extends Context.Service<
           .issueStates({ urls: stale })
           .pipe(Effect.catch(error => Effect.as(Effect.logWarning('backlog: issue states are unavailable', error), null)))
         if (read === null) return
-        if (read.rateLimited) {
-          const count = backoff.count + 1
-          yield* Ref.set(issueBackoff, { until: now + Math.min(ISSUE_BACKOFF_MS * 2 ** (count - 1), MAX_ISSUE_BACKOFF_MS), count })
-          yield* Effect.logWarning('backlog: GitHub rate-limited issue reads; backing off', { consecutiveRateLimits: count })
-        } else yield* Ref.set(issueBackoff, { until: 0, count: 0 })
+        const nextBackoff = issueBackoffAfter({ previous: backoff, now, rateLimited: read.rateLimited })
+        yield* Ref.set(issueBackoff, nextBackoff)
+        if (read.rateLimited) yield* Effect.logWarning('backlog: GitHub rate-limited issue reads; backing off', { consecutiveRateLimits: nextBackoff.count })
         yield* Ref.update(issueCache, previous => {
           const next = new Map(previous)
           for (const answer of read.issues) {
