@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergedPullRequestClosers } from './gate-watch.js'
+import { mergedPullRequestClosers } from './forge-links.js'
 import type { PullRequestView } from './pull-request-state.js'
 
 const view = (input: Partial<PullRequestView>): PullRequestView => ({
@@ -10,6 +10,7 @@ const view = (input: Partial<PullRequestView>): PullRequestView => ({
   checks: 'none',
   watched: true,
   body: null,
+  checkedAt: null,
   ...input,
 })
 

@@ -186,19 +186,44 @@ const pullRequestViewSchema = Schema.Struct({
   state: Schema.Literals(['open', 'merged', 'closed', 'unknown']),
   checks: Schema.Literals(['passing', 'failing', 'pending', 'none']),
   watched: Schema.Boolean,
+  /** When the state was last read from the forge; absent from a Host older than the field. */
+  checkedAt: Schema.optionalKey(Schema.NullOr(Schema.Number)),
 })
-const pullRequestsOutputSchema = Schema.Struct({ available: Schema.Boolean, pullRequests: Schema.Array(pullRequestViewSchema) })
+const issueViewSchema = Schema.Struct({
+  url: Schema.String,
+  repo: Schema.String,
+  number: countSchema,
+  state: Schema.Literals(['open', 'closed', 'unknown']),
+  reason: Schema.NullOr(Schema.String),
+  checkedAt: Schema.NullOr(Schema.Number),
+})
+const pullRequestsOutputSchema = Schema.Struct({
+  available: Schema.Boolean,
+  pullRequests: Schema.Array(pullRequestViewSchema),
+  /** Linked GitHub issues with their last read state; absent from a Host older than the field. */
+  issues: Schema.optionalKey(Schema.Array(issueViewSchema)),
+})
 const pullRequestUrlSchema = Schema.String.check(
   Schema.isMaxLength(BacklogItems.maxTargetChars),
   Schema.makeFilter(value => (BacklogGates.pullRequestOf(value) === null ? 'Expected a GitHub pull request or GitLab merge request URL.' : undefined)),
 )
 
+const checkedLabel = (checkedAt: number | null | undefined): string =>
+  checkedAt === null || checkedAt === undefined ? ' · never checked' : ` · checked ${new Date(checkedAt).toISOString()}`
+
 const renderPullRequests = (output: typeof pullRequestsOutputSchema.Type): string =>
   !output.available
-    ? 'The pull-requests plugin is not loaded: PR links stay plain URLs.'
-    : output.pullRequests
-        .map(pull => `${pull.repo}#${String(pull.number)} ${pull.state} · checks ${pull.checks}${pull.watched ? '' : ' · not watched'}`)
-        .join('\n') || 'No pull requests linked.'
+    ? 'The pull-requests plugin is not loaded: PR and issue links stay plain URLs.'
+    : [
+        ...output.pullRequests.map(
+          pull =>
+            `${pull.repo}#${String(pull.number)} ${pull.state} · checks ${pull.checks}${pull.watched ? '' : ' · not watched'}${checkedLabel(pull.checkedAt)}`,
+        ),
+        ...(output.issues ?? []).map(
+          issue =>
+            `issue ${issue.repo}#${String(issue.number)} ${issue.state}${issue.reason === null ? '' : ` (${issue.reason.toLowerCase()})`}${checkedLabel(issue.checkedAt)}`,
+        ),
+      ].join('\n') || 'No pull requests or issues linked.'
 
 const revertResultSchema = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(true), value: detailSchema }),
@@ -1198,7 +1223,7 @@ export const backlogApi = defineApi({
       input: Schema.Struct({ id: itemKeySchema }),
       output: pullRequestsOutputSchema,
       description:
-        'The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed) and checks, read from the pull-requests plugin. A PR no thread watches shows `unknown`; `available: false` when that plugin is not loaded. Read-only.',
+        'The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed), checks and when that state was last read, and its linked GitHub issues with their open/closed state, read through the pull-requests plugin. Open items watch their PRs on their own; a PR not yet read shows `unknown`; `available: false` when that plugin is not loaded. Read-only.',
       tool: { name: 'backlog_pull_requests', readOnly: true, render: renderPullRequests },
     }),
     linkPullRequest: method({
@@ -1211,7 +1236,7 @@ export const backlogApi = defineApi({
         gate: Schema.Boolean.pipe(Schema.optional).annotate({ description: 'Also wait on it: the item is not ready until the PR merges.' }),
       }),
       output: detailResultSchema,
-      description: `Link a pull request to an item as a first-class PR link: its state and checks show on the item (watched through the newest thread linked to the item), and merging it closes the item when \`closes\` is on. ${writeNote}`,
+      description: `Link a pull request to an item as a first-class PR link: its state and checks show on the item (the item watches it, and so does the newest thread linked to the item), and merging it closes the item when \`closes\` is on. ${writeNote}`,
       tool: { name: 'backlog_link_pr', readOnly: false, render: renderDetailPreview },
     }),
     merge: method({

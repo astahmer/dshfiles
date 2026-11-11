@@ -251,13 +251,24 @@ changes and can be reverted), never parsed out of its description.
   watches: pull-request state through `@dshfiles/pull-requests`, one `jj log` per repository for its main branch, and
   `@dshfiles/project-checks` receipts. A date gate follows the calendar and is never stored as met.
 - **Pull requests**: GitHub pull and GitLab merge-request URLs are PR links. **Link PR…** in the inspector or
-  `backlog_link_pr` links one as `fixes` (or `implements` with `closes: false`) and asks `@dshfiles/pull-requests` to
-  watch it through the item's newest thread; the inspector and `backlog_pull_requests` show open, merged or closed and
-  the checks. A fixing PR that merges moves its item to done unless you set its status by hand, and so do the items
+  `backlog_link_pr` links one as `fixes` (or `implements` with `closes: false`). Every open item watches each PR it
+  links (any relation) and each PR gate through `@dshfiles/pull-requests` itself — no thread needed — so the state stays
+  current on the pull-requests sweep; the item's newest thread also watches it, to hear about reviews and CI. The gate
+  watch backfills these item watches on its first pass after a start, adds one for each new link on the
+  `revisionPollMinutes` cadence (at once from **Link PR…**), and releases them when the item is done or dropped. At most
+  300 PRs are watched this way, newest items first. `watchLinkedPullRequests` (on) turns it off. The inspector and
+  `backlog_pull_requests` show open, merged or closed, the checks, and how long ago the state was read. A fixing PR that merges moves its item to done unless you set its status by hand, and so do the items
   its description names with `Closes b:k3f9` (also `Fixes`, `Resolves`): pull-requests keeps the description’s first
   16,384 characters with each polled state, and the gate watch reads it only once the pull request merged. Without the
   pull-requests plugin a PR link is a plain link and a description closes nothing; commits saying `Closes b:k3f9` still
   close the item once they land on `main`.
+- **Linked issues**: GitHub issue URLs on open items are read in batches (fifty per `gh api graphql` call, at most a
+  hundred issues per pass, oldest read first) through `@dshfiles/pull-requests` on the `revisionPollMinutes` cadence.
+  The inspector and `backlog_pull_requests` show each as open or closed (with GitHub's reason) and when it was read. A
+  `fixes` issue closed as completed moves its item to done unless you set its status by hand; one closed as not planned
+  or duplicate leaves it open, as an unmerged PR does. A rate-limited read backs off from five minutes, doubling up to an
+  hour. Read states live in Host memory: after a restart they show `not read yet` until the next pass.
+  `linkedIssueStates` (on) turns it off. Issues bound to a Remote sync binding keep syncing through that binding too.
 - **Duplicate merge**: **Merge into…** on the item menu (one item or a selection) and **Merge into b:…** on a triage
   duplicate suggestion, or `backlog_merge` (an agent passes `confirm: true`), move each duplicate's comments (quoted,
   keeping who wrote them), links, tags, files and sub-issues into the survivor, rewrite links other items held to the
@@ -519,7 +530,7 @@ dropping the rest of the draft.
 | `backlog_update`                 | write: edit or move; `priority`, `parent`, `criteria`, `criteriaChecks`, `plan`, `planApproval`, `summary`, `due`, `recurrence`, `gates` |
 | `backlog_merge`                  | write (`confirm: true`): merge duplicates into a survivor; their references keep resolving to it                                         |
 | `backlog_link_pr`                | write: link a pull request as `fixes` (or `implements`), optionally as a gate, and watch it                                              |
-| `backlog_pull_requests`          | read: an item's pull requests with live state and checks                                                                                 |
+| `backlog_pull_requests`          | read: an item's pull requests with live state and checks, its linked GitHub issues' state, and when each was last read                   |
 | `backlog_set_project_guidance`   | write: one project's markdown guidance for agents                                                                                        |
 | `backlog_schedule_rule`          | write: a project automation that triages the inbox or recreates an item on a schedule                                                    |
 | `backlog_ready`                  | read: the ready queue, urgent first then oldest; `project`, `limit` (20)                                                                 |
@@ -579,9 +590,12 @@ sync** lists **connections**, each with its **bindings**:
   key's only team, the project's github.com git remote, `<project>/backlog/`), picked from what the connection
   discovers; a scope (every project, or one); a direction (two-way, pull only, push only); which fields flow which way
   (title, description, status, labels, priority, parent, relations — a field the provider cannot carry is greyed out);
-  remote status names per backlog status (`doing` → `In Review`); a conflict policy; an interval (**Sync now only** by
-  default); **Push agent comments** (off: only your comments go out); and **Import new remote items**. Each binding row
-  has **Sync now**, **Import all open**, an on/off switch, edit and remove.
+  remote status names per backlog status (`doing` → `In Review`); a conflict policy; an interval (**Every 15 min** for
+  a new binding; a binding saved before keeps its own value, and **Sync now only** turns it off); **Push agent
+  comments** (off: only your comments go out); and **Import new remote items**. Each binding row has **Sync now**,
+  **Import all open**, an on/off switch, edit and remove. When a provider rate-limits an automatic pass (HTTP 429, or a
+  refusal naming a rate limit), that binding waits twice its interval before the next one, doubling per consecutive
+  limit up to six hours; one successful pass resets it. **Sync now** is never held back.
 
 Linking is always your action: an item's row menu and its detail offer **Link to …** and **Create in …** for every
 binding that serves its project, and **Sync now** / **Unlink** per linked source. An item may be linked through several

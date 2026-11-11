@@ -41,6 +41,17 @@ const pullRequestOf = (url: string): { readonly host: 'github' | 'gitlab'; reado
   return { host: 'gitlab', repo: match[5] ?? '', number: Number(match[6]), url: url.trim() }
 }
 
+const issuePattern = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/issues\/([1-9]\d*)\/?(?:[?#].*)?$/u
+
+/** A GitHub issue URL, normalized and read as `owner/repo#number`; null for anything else. */
+const issueOf = (url: string): { readonly repo: string; readonly number: number; readonly url: string } | null => {
+  const match = issuePattern.exec(url.trim())
+  if (match === null) return null
+  const repo = match[1] ?? ''
+  const number = Number(match[2])
+  return { repo, number, url: `https://github.com/${repo}/issues/${String(number)}` }
+}
+
 const label = (gate: Pick<BacklogGate, 'kind' | 'target'>): string => {
   if (gate.kind === 'pr') {
     const pull = pullRequestOf(gate.target)
@@ -67,6 +78,7 @@ export class BacklogGates {
   static readonly isOpen = isOpen
   static readonly open = openGates
   static readonly pullRequestOf = pullRequestOf
+  static readonly issueOf = issueOf
   static readonly label = label
   static readonly idOf = gateId
 }

@@ -6,10 +6,8 @@ import { Cause, Clock, Effect, Layer, Ref, Schedule } from 'effect'
 import type { BacklogSummaryView } from './api.js'
 import { BacklogMainBranch } from './main-branch.js'
 import { BacklogSettingsTag } from './backlog-settings.js'
-import { BacklogGates } from './gates.js'
+import { ForgeLinks } from './forge-links.js'
 import { AutomationHost } from './peer-replication.js'
-import { PullRequestState, type PullRequestView } from './pull-request-state.js'
-import { BacklogSignals } from './signals.js'
 import { BacklogStore } from './store.js'
 
 const MAX_REPOSITORIES = 10
@@ -26,18 +24,8 @@ const openStatuses = ['inbox', 'todo', 'doing'] as const
 const revisionPattern = /^[0-9a-z]{4,64}$/
 
 /**
- * The item refs each merged pull request closes through its description (`Closes b:k3f9`), so the gate watch can close
- * items the PR names and not only the one it is linked to. A pull request still open closes nothing.
- */
-export const mergedPullRequestClosers = (pullRequests: readonly PullRequestView[]): readonly { readonly url: string; readonly refs: readonly string[] }[] =>
-  pullRequests.flatMap(pull => {
-    if (pull.state !== 'merged' || pull.body === null) return []
-    const refs = BacklogSignals.closedBy(pull.body)
-    return refs.length === 0 ? [] : [{ url: pull.url, refs }]
-  })
-
-/**
- * Resolves gates from what the Host already watches: pull requests through `@dshfiles/pull-requests`, revisions on
+ * Resolves gates from what the Host already watches: pull requests through `@dshfiles/pull-requests` (each open item
+ * watches its linked PRs there, no thread needed, and linked GitHub issues are read in batches), revisions on
  * the project's main branch with one jj read per repository, project-check receipts of the threads linked to the item, and the calendar
  * for date gates (derived on read, nothing to resolve). A linked pull request with relation `fixes` that merges moves
  * its item to done, and so do the items its description names (`Closes b:k3f9`), unless you set the status by hand.
@@ -46,59 +34,13 @@ export const GateWatch = Layer.effectDiscard(
   Effect.gen(function* () {
     const store = yield* BacklogStore
     const settings = yield* BacklogSettingsTag
-    const pulls = yield* PullRequestState
+    const forge = yield* ForgeLinks
     const jj = yield* Jj
     const mainBranch = yield* BacklogMainBranch
     const apis = yield* HostApis
     const checks = apis.client(projectChecksApi)
     const automation = yield* AutomationHost
     const lastPoll = yield* Ref.make(0)
-
-    const resolvePulls = Effect.fn('backlog gate pull requests')(function* (items: readonly BacklogSummaryView[]) {
-      const urls = [
-        ...new Set(
-          items.flatMap(item => [
-            ...item.gates.filter(gate => gate.open && gate.kind === 'pr').map(gate => gate.target),
-            ...item.links.filter(link => link.type === 'url' && link.relation === 'fixes').map(link => link.target),
-          ]),
-        ),
-      ]
-      if (urls.length === 0) return
-      const known = yield* pulls.of(urls)
-      if (!known.available) return
-      const merged = new Set(known.pullRequests.filter(pull => pull.state === 'merged').map(pull => pull.url))
-      const isMerged = (url: string) => merged.has(BacklogGates.pullRequestOf(url)?.url ?? url)
-      const closed = new Set<number>()
-      // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each item resolves its own gates and links in order; the set dedupes them.
-      for (const item of items) {
-        const resolved: Resolution[] = item.gates
-          .filter(gate => gate.open && gate.kind === 'pr' && isMerged(gate.target))
-          .map(gate => ({ gateId: gate.id, detail: 'merged' }))
-        if (resolved.length > 0) yield* store.resolveGates({ id: item.id, resolved })
-        for (const link of item.links.filter(candidate => candidate.type === 'url' && candidate.relation === 'fixes' && isMerged(candidate.target))) {
-          yield* store.applySignal({ id: item.id, status: 'done', link, reason: `fixed by ${BacklogGates.label({ kind: 'pr', target: link.target })}` })
-          closed.add(item.id)
-        }
-      }
-      // A merged pull request closes the items its own description names, not only the one it is linked to.
-      // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- resolvers are cheap local reads, run in ref order until a first miss.
-      for (const closer of mergedPullRequestClosers(known.pullRequests)) {
-        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- one ref resolves at a time, skipping refs that already closed.
-        for (const ref of closer.refs) {
-          const id = yield* store.resolve(ref)
-          if (id === undefined || closed.has(id)) continue
-          const found = yield* store.get(id)
-          if (!found.ok || found.value.item.status === 'done' || found.value.item.status === 'dropped') continue
-          yield* store.applySignal({
-            id,
-            status: 'done',
-            link: { type: 'url', target: closer.url, relation: 'fixes' },
-            reason: `closed by ${BacklogGates.label({ kind: 'pr', target: closer.url })}`,
-          })
-          closed.add(id)
-        }
-      }
-    })
 
     const onMain = (repository: string, revision: string) =>
       Effect.flatMap(mainBranch.revsetFor(repository), main =>
@@ -155,12 +97,18 @@ export const GateWatch = Layer.effectDiscard(
     const tick = Effect.gen(function* () {
       const current = yield* settings.get
       const now = yield* Clock.currentTimeMillis
-      if (!current.lifecycleSignals || now - (yield* Ref.get(lastPoll)) < current.revisionPollMinutes * 60_000) return
+      const forgeLinks = current.watchLinkedPullRequests || current.linkedIssueStates
+      if ((!current.lifecycleSignals && !forgeLinks) || now - (yield* Ref.get(lastPoll)) < current.revisionPollMinutes * 60_000) return
       yield* Ref.set(lastPoll, now)
+      const items = (yield* store.list({ freshness: 'all', statuses: [...openStatuses], limit: 2_000 })).items
+      // Every Host keeps its own forge reads current, so each shows live state; the first pass is the backfill.
+      if (current.watchLinkedPullRequests) yield* forge.syncWatches(items)
+      if (current.linkedIssueStates) yield* forge.refreshIssues(items)
+      if (!current.lifecycleSignals) return
       // Hosts that share the backlog would each resolve the same gate; only the automation Host writes it.
       if (!(yield* automation.here)) return yield* Effect.annotateCurrentSpan('dshx.backlog.automation', 'elsewhere')
-      const items = (yield* store.list({ freshness: 'all', statuses: [...openStatuses], limit: 2_000 })).items
-      yield* resolvePulls(items)
+      yield* forge.resolvePulls(items)
+      if (current.linkedIssueStates) yield* forge.resolveIssues(items)
       yield* resolveRevisions(items, current.revisionRepositories)
       yield* resolveChecks(items)
     }).pipe(Effect.withSpan('backlog gate watch'))

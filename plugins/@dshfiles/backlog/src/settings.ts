@@ -96,7 +96,19 @@ export const backlogSettings = defineSettings({
       .min(1)
       .max(120)
       .default(5)
-      .description('How often main is checked. A check that finds main unchanged costs one jj call.'),
+      .description(
+        'How often main is checked, linked pull requests are matched to item watches and linked issues are read. A check that finds main unchanged costs one jj call.',
+      ),
+    watchLinkedPullRequests: Schema.boolean()
+      .default(true)
+      .description(
+        'Keep the state of every pull request an open item links current, with no thread: the item watches it through the Pull requests plugin until the item is done or dropped. Each watch costs one gh call per Pull requests sweep. A `fixes` PR that merges closes its item.',
+      ),
+    linkedIssueStates: Schema.boolean()
+      .default(true)
+      .description(
+        'Read the open or closed state of GitHub issues open items link, in batches of fifty per gh call, on the main-check interval above. A `fixes` issue closed as completed closes its item. Needs the Pull requests plugin and a signed-in gh.',
+      ),
     dormantAfterDays: Schema.object({
       note: Schema.natural().max(3_650).default(14),
       idea: Schema.natural().max(3_650).default(30),

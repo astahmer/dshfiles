@@ -2386,7 +2386,7 @@
     {
       "id": "remote-sync-settings",
       "title": "Configure remote sync connections and bindings, and import remote items",
-      "summary": "Backlog settings \u203a Remote sync lists connections (one account of one provider each: a name, a secret:ALIAS key reference with the provider's Host-variable fallback, an optional API base URL) with Test, reorder, edit and remove, and under each its bindings: a container picked from what the connection discovers (or derived from the project), a project scope, a direction, a per-field flow with remote status names, a conflict policy, an interval, Push agent comments and Import new remote items, with Sync now, Import all open, an on/off switch, edit and remove. Removing a connection or binding asks first and drops its item links. Import reads the provider from the pasted id or URL. Rows saved in the earlier syncBackends setting move into connections and bindings on the first start, keeping every item link. Agents list with backlog_sync_connections, change with backlog_sync_connection_save/move/remove and backlog_sync_binding_save/remove, discover with backlog_sync_discover, test with backlog_sync_test_connection and backlog_sync_test_all, and import with backlog_import_remote and backlog_sync_import_all when the user asked; removals and import-all take confirm: true.",
+      "summary": "Backlog settings \u203a Remote sync lists connections (one account of one provider each: a name, a secret:ALIAS key reference with the provider's Host-variable fallback, an optional API base URL) with Test, reorder, edit and remove, and under each its bindings: a container picked from what the connection discovers (or derived from the project), a project scope, a direction, a per-field flow with remote status names, a conflict policy, an interval (every 15 minutes for a new binding; saved bindings keep theirs), Push agent comments and Import new remote items, with Sync now, Import all open, an on/off switch, edit and remove. Removing a connection or binding asks first and drops its item links. Import reads the provider from the pasted id or URL. Rows saved in the earlier syncBackends setting move into connections and bindings on the first start, keeping every item link. Agents list with backlog_sync_connections, change with backlog_sync_connection_save/move/remove and backlog_sync_binding_save/remove, discover with backlog_sync_discover, test with backlog_sync_test_connection and backlog_sync_test_all, and import with backlog_import_remote and backlog_sync_import_all when the user asked; removals and import-all take confirm: true.",
       "reach": [
         "click tab \"Work\"",
         "click button \"Backlog\"",
@@ -2435,7 +2435,7 @@
         "Saving a connection of an unknown provider kind, a duplicate connection id or a binding of a missing connection is refused with what to fix.",
         "A Host that predates connections and bindings answers without them; the section asks for a DSH Host process restart instead of showing an empty list.",
         "Importing a remote item already linked through that binding returns its item; a reference no provider recognizes is refused with examples of what to paste.",
-        "A failing scheduled pass is logged and retried at the binding's next interval; each item's error stays visible on its sync chip.",
+        "A failing scheduled pass is logged and retried at the binding's next interval; each item's error stays visible on its sync chip. A rate-limited automatic pass waits twice the interval, doubling per consecutive limit up to six hours.",
         "Test connection names a missing key, a refused key or an unreachable API with its fix; the key never reaches the browser."
       ],
       "externalDependencies": [
@@ -2496,6 +2496,12 @@
           "id": "backlog.remote-sync-connection-edit",
           "file": "plugins/@dshfiles/backlog/src/sync-service.test.ts",
           "testName": "refuses an unknown provider kind and renames a connection with its bindings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.remote-sync-rate-limit-backoff",
+          "file": "plugins/@dshfiles/backlog/src/sync-model.test.ts",
+          "testName": "doubles the binding interval per consecutive limit, capped at six hours, and clears on success"
         },
         {
           "kind": "host-test",
@@ -3570,24 +3576,50 @@
       "surfaces": ["client", "host", "tool"],
       "destination": "work",
       "currentSurface": "left-nav: Backlog \u203a item detail \u203a Waits on, Pull requests",
-      "summary": "Gates hold an item out of the ready queue until a pull request merges, a jj revision lands on main, a project check passes in a thread linked to the item, or a date arrives (is:gated, has:gate, a chip on rows and cards). A Host gate watch resolves them on the revision poll cadence from the pull-requests contract, one jj read per repository and project-check receipts; a date gate follows the calendar. GitHub pull and GitLab merge-request URLs are PR links: Link PR in the detail or backlog_link_pr links one as fixes and asks pull-requests to watch it through the item's newest thread; the detail and backlog_pull_requests show open, merged or closed and checks, and a fixing PR that merges closes its item unless its status was set by hand; a merged PR's description also closes every item it names with Closes/Fixes/Resolves b:k3f9, read from its first 16,384 characters. Without the pull-requests plugin they stay plain URLs.",
-      "states": ["no-gates", "gated", "gate-met", "date-gate-open", "pr-unwatched", "pr-open", "pr-merged", "pull-requests-absent"],
+      "summary": "Gates hold an item out of the ready queue until a pull request merges, a jj revision lands on main, a project check passes in a thread linked to the item, or a date arrives (is:gated, has:gate, a chip on rows and cards). A Host gate watch resolves them on the revision poll cadence from the pull-requests contract, one jj read per repository and project-check receipts; a date gate follows the calendar. GitHub pull and GitLab merge-request URLs are PR links: Link PR in the detail or backlog_link_pr links one as fixes. Every open item watches each PR it links (any relation) and each PR gate through the pull-requests contract with no thread needed (backfilled on the first pass after a start, released when the item is done or dropped, at most 300), and its newest thread watches it too; GitHub issue URLs are read in batches through the same contract. The detail and backlog_pull_requests show open, merged or closed, checks, linked issues open or closed, and how long ago each state was read; a fixing PR that merges closes its item unless its status was set by hand; a merged PR's description also closes every item it names with Closes/Fixes/Resolves b:k3f9, read from its first 16,384 characters, and a fixes issue closed as completed closes its item the same way (not planned or duplicate leaves it open). Without the pull-requests plugin they stay plain URLs.",
+      "states": [
+        "no-gates",
+        "gated",
+        "gate-met",
+        "date-gate-open",
+        "pr-unwatched",
+        "pr-open",
+        "pr-merged",
+        "pull-requests-absent",
+        "issue-open",
+        "issue-closed",
+        "issue-not-read"
+      ],
       "failureModes": [
         "Without the pull-requests plugin, PR gates never resolve on their own and PR links show as plain links; remove the gate or install the plugin.",
-        "A revision gate whose id no repository knows stays open; check the id with jj log."
+        "A revision gate whose id no repository knows stays open; check the id with jj log.",
+        "When GitHub rate-limits issue reads, the next reads wait five minutes, doubling up to an hour; the detail keeps showing the last read state with its age.",
+        "Read issue states live in Host memory: after a Host restart they show not read yet until the next pass."
       ],
       "configuration": [
         {
           "key": "dshfiles-backlog.revisionPollMinutes",
           "defaultValue": "5",
-          "constraints": "Minutes between gate watch passes, shared with the main revision poll; lifecycleSignals off stops both.",
+          "constraints": "Minutes between gate watch passes, shared with the main revision poll, item watch sync and issue reads; lifecycleSignals off stops gate resolution and the main poll.",
           "coveredBy": ["backlog.gates-ready"]
+        },
+        {
+          "key": "dshfiles-backlog.watchLinkedPullRequests",
+          "defaultValue": "true",
+          "constraints": "Boolean; off stops item watches (thread watches stay).",
+          "coveredBy": ["backlog.item-watches-pr"]
+        },
+        {
+          "key": "dshfiles-backlog.linkedIssueStates",
+          "defaultValue": "true",
+          "constraints": "Boolean; off stops issue reads and closing items from fixes issues.",
+          "coveredBy": ["backlog.issue-closes"]
         }
       ],
       "externalDependencies": [
         {
           "id": "pull-requests-plugin",
-          "boundary": "Pull-request state read through the @dshfiles/pull-requests Host API (list, watch); absent, PR links stay plain URLs.",
+          "boundary": "Pull-request and issue state read through the @dshfiles/pull-requests Host API (list, watch, watchFor, unwatchFor, ownedWatches, issueStates); absent, PR and issue links stay plain URLs.",
           "deterministicFake": "Store-level tests resolve PR gates and apply the merge signal directly in src/gates.test.ts."
         },
         {
@@ -3636,6 +3668,24 @@
           "id": "backlog.pr-merge-closes",
           "file": "plugins/@dshfiles/backlog/src/gates.test.ts",
           "testName": "closes an item whose fixing pull request merged, but never over a status set by hand"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.item-watches-pr",
+          "file": "plugins/@dshfiles/backlog/src/forge-links.test.ts",
+          "testName": "an item linked to a pull request with no thread watches it and closes when it merges"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.item-watch-released",
+          "file": "plugins/@dshfiles/backlog/src/forge-links.test.ts",
+          "testName": "watches every linked PR whatever its relation, and releases the watch once the item is done"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.issue-closes",
+          "file": "plugins/@dshfiles/backlog/src/forge-links.test.ts",
+          "testName": "a fixes issue closed as completed closes its item; not planned or a status set by hand does not"
         }
       ]
     },

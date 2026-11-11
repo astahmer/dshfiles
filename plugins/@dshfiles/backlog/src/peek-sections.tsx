@@ -5,7 +5,17 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
-import { CheckIcon, CircleDotIcon, GitMergeIcon, GitPullRequestClosedIcon, GitPullRequestIcon, HourglassIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  CheckIcon,
+  CircleCheckIcon,
+  CircleDotIcon,
+  GitMergeIcon,
+  GitPullRequestClosedIcon,
+  GitPullRequestIcon,
+  HourglassIcon,
+  PlusIcon,
+  XIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 
@@ -13,6 +23,7 @@ import { backlogApi, type BacklogDetailView } from './api.js'
 import { useToday } from './due-date-hooks.js'
 import { BacklogGates, type BacklogGate, type BacklogGateKind } from './gates.js'
 import { BacklogItems, type BacklogCriterion } from './item.js'
+import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogNotices } from './notices.js'
 import { useBacklogActions, type BacklogUpdateInput } from './use-backlog-actions.js'
 
@@ -305,6 +316,21 @@ const pullStateTones = {
   unknown: 'dshx:text-muted-foreground',
 } as const
 const checkTones = { passing: 'dshx:text-success', failing: 'dshx:text-destructive', pending: 'dshx:text-warning', none: 'dshx:text-muted-foreground' } as const
+const issueOf = BacklogGates.issueOf
+const issueStateIcons = { open: CircleDotIcon, closed: CircleCheckIcon, unknown: CircleDotIcon } as const
+const issueStateTones = { open: 'dshx:text-success', closed: 'dshx:text-violet', unknown: 'dshx:text-muted-foreground' } as const
+
+/** When the forge state was last read, so a stale state reads as stale. */
+const CheckedAge = (props: { readonly checkedAt: number | null | undefined }): JSX.Element | null =>
+  props.checkedAt === null || props.checkedAt === undefined ? null : (
+    <time
+      dateTime={new Date(props.checkedAt).toISOString()}
+      aria-label={`Checked ${new Date(props.checkedAt).toLocaleString()}`}
+      className="dshx:text-[11px] dshx:text-muted-foreground"
+    >
+      {ItemGlyphs.ago(props.checkedAt)}
+    </time>
+  )
 
 /** Linked pull requests with their live state and checks, and the action that links one. */
 const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Element => {
@@ -313,9 +339,10 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
   const item = props.detail.item
   const [draft, setDraft] = useState('')
   const urls = [...item.links.filter(link => link.type === 'url' && BacklogGates.pullRequestOf(link.target) !== null).map(link => link.target)]
+  const issueUrls = item.links.filter(link => link.type === 'url' && issueOf(link.target) !== null).map(link => link.target)
   const states = useQuery({
-    queryKey: ['dshfiles-backlog', 'pull-requests', item.id, urls.join(' ')],
-    enabled: urls.length > 0,
+    queryKey: ['dshfiles-backlog', 'pull-requests', item.id, [...urls, ...issueUrls].join(' ')],
+    enabled: urls.length > 0 || issueUrls.length > 0,
     staleTime: 30_000,
     refetchInterval: 60_000,
     queryFn: ({ signal }) => api.pullRequests({ id: item.id }, { signal }),
@@ -325,7 +352,15 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
     states.data?.pullRequests ??
     urls.flatMap(url => {
       const pull = BacklogGates.pullRequestOf(url)
-      return pull === null ? [] : [{ url: pull.url, repo: pull.repo, number: pull.number, state: 'unknown' as const, checks: 'none' as const, watched: false }]
+      return pull === null
+        ? []
+        : [{ url: pull.url, repo: pull.repo, number: pull.number, state: 'unknown' as const, checks: 'none' as const, watched: false, checkedAt: null }]
+    })
+  const issues =
+    states.data?.issues ??
+    issueUrls.flatMap(url => {
+      const issue = issueOf(url)
+      return issue === null ? [] : [{ ...issue, state: 'unknown' as const, reason: null, checkedAt: null }]
     })
   return (
     <section aria-label="Pull requests" className="dshx:flex dshx:flex-col dshx:gap-1.5">
@@ -341,9 +376,35 @@ const PullRequests = (props: { readonly detail: BacklogDetailView }): JSX.Elemen
                   {pull.repo}#{pull.number}
                 </a>
                 <span aria-label={`State ${pull.state}`} className={cn('dshx:text-[11px]', pullStateTones[pull.state])}>
-                  {pull.state === 'unknown' ? (states.data?.available === false ? 'plain link' : 'not watched') : pull.state}
+                  {pull.state === 'unknown' ? (states.data?.available === false ? 'plain link' : pull.watched ? 'not read yet' : 'not watched') : pull.state}
                 </span>
                 {pull.checks === 'none' ? null : <span className={cn('dshx:text-[11px]', checkTones[pull.checks])}>checks {pull.checks}</span>}
+                <CheckedAge checkedAt={pull.checkedAt} />
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {issues.length === 0 ? null : (
+        <ul aria-label="Linked issues" className="dshx:flex dshx:flex-col dshx:gap-0.5">
+          {issues.map(issue => {
+            const Icon = issueStateIcons[issue.state]
+            return (
+              <li key={issue.url} className="dshx:flex dshx:min-h-7 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-[13px]">
+                <Icon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0', issueStateTones[issue.state])} />
+                <a href={issue.url} target="_blank" rel="noreferrer" className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:hover:underline">
+                  {issue.repo}#{issue.number}
+                </a>
+                <span aria-label={`Issue state ${issue.state}`} className={cn('dshx:text-[11px]', issueStateTones[issue.state])}>
+                  {issue.state === 'unknown'
+                    ? states.data?.available === false
+                      ? 'plain link'
+                      : 'not read yet'
+                    : issue.state === 'closed' && issue.reason !== null
+                      ? `closed · ${issue.reason.toLowerCase().replace('_', ' ')}`
+                      : issue.state}
+                </span>
+                <CheckedAge checkedAt={issue.checkedAt} />
               </li>
             )
           })}

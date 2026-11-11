@@ -35,6 +35,7 @@ import { LifecycleSignals } from './lifecycle-signals.js'
 import { GateWatch } from './gate-watch.js'
 import { BacklogMainBranch } from './main-branch.js'
 import { ScheduledRules } from './scheduled-rules.js'
+import { ForgeLinks } from './forge-links.js'
 import { PullRequestState } from './pull-request-state.js'
 import { CaptureProjects } from './project-target.js'
 import { ReplyGenerator } from './reply-generator.js'
@@ -87,6 +88,7 @@ const backlogServices = Layer.mergeAll(
   Layer.provideMerge(BacklogSyncEngine.layer),
   Layer.provideMerge(StartRecovery.layer),
   Layer.provideMerge(ThreadStart.layer),
+  Layer.provideMerge(ForgeLinks.layer),
   Layer.provideMerge(
     Layer.mergeAll(
       BacklogStore.layer,
@@ -140,7 +142,10 @@ const itemIdsOf = (keys: readonly (number | string)[]) =>
     ),
   )
 
-/** Asks the pull-requests plugin to watch a PR through the newest thread linked to the item, so its state stays live. */
+/**
+ * Asks the pull-requests plugin to watch a PR for the item itself, so its state is live at once with no thread, and
+ * through the newest thread linked to the item, so that thread hears about reviews and CI.
+ */
 const withWatch = <Result extends { readonly ok: boolean }>(
   result: Result & ({ readonly ok: false } | { readonly ok: true; readonly value: BacklogDetailView }),
   url: string,
@@ -149,6 +154,10 @@ const withWatch = <Result extends { readonly ok: boolean }>(
     if (!result.ok) return result
     const thread = [...result.value.item.links].reverse().find(link => link.type === 'thread' && BacklogItems.isSessionId(link.target))
     if (thread !== undefined) yield* PullRequestState.use(pulls => pulls.watch({ url, sessionId: thread.target }))
+    const item = result.value.item
+    const open = item.status !== 'done' && item.status !== 'dropped'
+    if (open && (yield* BacklogSettingsTag.use(settings => settings.get)).watchLinkedPullRequests)
+      yield* PullRequestState.use(pulls => pulls.watchForItem({ itemId: item.id, url, cwd: item.project ?? undefined }))
     return result
   })
 
@@ -370,13 +379,32 @@ const backlogHandlers = Api.handlers(backlogApi, {
   pullRequests: input =>
     Effect.gen(function* () {
       const found = yield* Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.get(id)))
-      if (!found.ok) return { available: yield* PullRequestState.use(pulls => pulls.available), pullRequests: [] }
+      if (!found.ok) return { available: yield* PullRequestState.use(pulls => pulls.available), pullRequests: [], issues: [] }
       const item = found.value.item
-      const urls = [
-        ...item.links.filter(link => link.type === 'url').map(link => link.target),
-        ...(item.gates ?? []).filter(gate => gate.kind === 'pr').map(gate => gate.target),
-      ]
-      return yield* PullRequestState.use(pulls => pulls.of([...new Set(urls)]))
+      const linked = item.links.filter(link => link.type === 'url').map(link => link.target)
+      const urls = [...linked, ...(item.gates ?? []).filter(gate => gate.kind === 'pr').map(gate => gate.target)]
+      return yield* PullRequestState.use(pulls =>
+        Effect.map(Effect.all([pulls.of([...new Set(urls)]), pulls.issues([...new Set(linked)])]), ([states, issues]) => ({
+          available: states.available,
+          pullRequests: states.pullRequests.map(pull => ({
+            url: pull.url,
+            repo: pull.repo,
+            number: pull.number,
+            state: pull.state,
+            checks: pull.checks,
+            watched: pull.watched,
+            checkedAt: pull.checkedAt,
+          })),
+          issues: issues.map(issue => ({
+            url: issue.url,
+            repo: issue.repo,
+            number: issue.number,
+            state: issue.state,
+            reason: issue.reason,
+            checkedAt: issue.checkedAt,
+          })),
+        })),
+      )
     }),
   linkPullRequest: (keyed, call) =>
     Effect.gen(function* () {
