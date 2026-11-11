@@ -24,9 +24,11 @@ export const RESTART_HOST = 'Restart the DSH host process'
 const jsTag = { tag: 'tag:yaml.org,2002:js', resolve: (expression: string) => expression }
 const optionPattern = /^([A-Za-z_][A-Za-z0-9_-]*)=(.*)$/su
 
+export const profileNameSchema = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._-]+$/u, { message: 'Profile names are plain directory names.' }))
+
 const profileTargetFields = {
   packageSpec: Schema.String.check(Schema.isMinLength(1)),
-  profile: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9._-]+$/u, { message: 'Profile names are plain directory names.' })),
+  profile: profileNameSchema,
   dshHome: Schema.String.check(Schema.isMinLength(1)),
   dryRun: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   cwd: Schema.String.pipe(Schema.withDecodingDefault(Effect.sync(() => process.cwd()))),
@@ -289,8 +291,13 @@ const commandLine = (parts: readonly string[]): string =>
 const installedVersion = async (root: string): Promise<string | null> =>
   existsSync(join(root, 'package.json')) ? ((await readBundleManifest(root)).version ?? null) : null
 
-const openProfile = async (target: ProfileTarget) => {
-  const profileRoot = join(resolve(target.dshHome), 'profiles', target.profile)
+type ProfileLocation = Pick<ProfileTarget, 'profile' | 'dshHome'>
+type ProfileStepTarget = Pick<ProfileTarget, 'profile' | 'dshHome' | 'dryRun' | 'cwd'>
+
+const profileRootOf = (target: ProfileLocation): string => join(resolve(target.dshHome), 'profiles', target.profile)
+
+const openProfile = async (target: ProfileLocation) => {
+  const profileRoot = profileRootOf(target)
   const manifestPath = join(profileRoot, 'package.json')
   if (!existsSync(manifestPath))
     throw new ProfilePluginError(
@@ -308,13 +315,26 @@ const openProfile = async (target: ProfileTarget) => {
 
 type OpenProfile = Awaited<ReturnType<typeof openProfile>>
 
+const ownedSyncArgs = (input: ProfileLocation & { readonly packageNames: readonly string[] }): readonly string[] => [
+  join(DSHFILES_ROOT, 'scripts/profile-sync.ts'),
+  '--profile',
+  input.profile,
+  '--home',
+  resolve(input.dshHome),
+  ...input.packageNames.flatMap(packageName => ['--bundle', packageName]),
+]
+
+/** The profile-sync command that links these owned bundles, as the plans print it. */
+const ownedSyncCommand = (input: ProfileLocation & { readonly packageNames: readonly string[] }): string =>
+  commandLine([process.execPath, ...ownedSyncArgs(input)])
+
 interface StepLog {
   readonly commands: string[]
   readonly files: ProfilePluginFile[]
 }
 
 /** The two ways a profile changes: `dsh plugin <pnpm args>` and profile-sync for owned bundles. Both are named in the plan, even in a dry run. */
-const profileSteps = (target: ProfileTarget, profile: OpenProfile, dependencies: ProfilePluginDependencies, log: StepLog) => ({
+const profileSteps = (target: ProfileStepTarget, profile: OpenProfile, dependencies: ProfilePluginDependencies, log: StepLog) => ({
   dsh: async (args: readonly string[], change: string, failureHint: string): Promise<void> => {
     const full = ['plugin', '--profile', target.profile, ...args]
     log.commands.push(commandLine(['dsh', ...full]))
@@ -323,8 +343,8 @@ const profileSteps = (target: ProfileTarget, profile: OpenProfile, dependencies:
     const result = await (dependencies.runDsh ?? runProjectDsh)(full, { cwd: target.cwd, env: profile.env, timeoutMs: 300_000 })
     if (result.exitCode !== 0) throw new ProfilePluginError(`dsh ${full.join(' ')} failed: ${(result.stderr || result.stdout).trim()}`, failureHint)
   },
-  syncOwned: async (packageName: string): Promise<void> => {
-    const sync = [join(DSHFILES_ROOT, 'scripts/profile-sync.ts'), '--profile', target.profile, '--home', resolve(target.dshHome), '--bundle', packageName]
+  syncOwned: async (packageNames: readonly string[]): Promise<void> => {
+    const sync = ownedSyncArgs({ ...target, packageNames })
     log.commands.push(commandLine([process.execPath, ...sync]))
     log.files.push(
       { path: profile.manifestPath, change: 'link: dependency and bundle entry' },
@@ -334,7 +354,7 @@ const profileSteps = (target: ProfileTarget, profile: OpenProfile, dependencies:
     const result = await execa(process.execPath, sync, { cwd: DSHFILES_ROOT, env: profile.env, reject: false })
     if (result.exitCode !== 0)
       throw new ProfilePluginError(
-        `profile-sync failed for ${packageName}: ${(result.stderr || result.stdout).trim()}`,
+        `profile-sync failed for ${packageNames.join(', ')}: ${(result.stderr || result.stdout).trim()}`,
         'Run the printed command by hand to see the full output.',
       )
   },
@@ -369,7 +389,7 @@ const installResolved = async (
 
   const install = async (): Promise<void> => {
     if (resolved.source === 'owned') {
-      if (!linkedHere) await steps.syncOwned(resolved.packageName)
+      if (!linkedHere) await steps.syncOwned([resolved.packageName])
       return
     }
     if (resolved.source === 'local') {
@@ -446,6 +466,64 @@ const installResolved = async (
     restart: log.files.length > 0 ? RESTART_HOST : null,
     dryRun: request.dryRun,
   }
+}
+
+const ownedBundlesInputSchema = Schema.Struct({
+  packageNames: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1)),
+  profile: profileTargetFields.profile,
+  dshHome: profileTargetFields.dshHome,
+  dryRun: profileTargetFields.dryRun,
+  cwd: profileTargetFields.cwd,
+})
+type OwnedBundlesInput = Schema.Codec.Encoded<typeof ownedBundlesInputSchema>
+
+interface OwnedBundlesPlan {
+  readonly profile: string
+  readonly profileRoot: string
+  /** Bundles this run links (or would link), in the order asked. */
+  readonly linked: readonly string[]
+  /** Bundles already linked to this checkout, left alone. */
+  readonly upToDate: readonly string[]
+  readonly commands: readonly string[]
+  readonly files: readonly ProfilePluginFile[]
+  readonly restart: string | null
+  readonly dryRun: boolean
+}
+
+/** Link several owned bundles with one profile-sync run, the same path as `dshx add` for one; bundles already linked here are left alone. */
+const addOwnedBundles = async (input: OwnedBundlesInput, dependencies: ProfilePluginDependencies = {}): Promise<OwnedBundlesPlan> => {
+  const request = Schema.decodeUnknownSync(ownedBundlesInputSchema)(input)
+  const profile = await openProfile(request)
+  const checkout = await LocalBundleModel.listLocalBootBundles(dependencies.pluginsRoot === undefined ? {} : { pluginsRoot: dependencies.pluginsRoot })
+  const bundles = request.packageNames.map(packageName => {
+    const bundle = checkout.find(candidate => candidate.packageId === packageName)
+    if (bundle === undefined)
+      throw new ProfilePluginError(`Owned plugin bundle ${packageName} was not found under plugins/@dshfiles.`, 'Check the name with "ls plugins/@dshfiles".')
+    return bundle
+  })
+  const linkedHere = (bundle: { readonly packageId: string; readonly projectRoot: string }): boolean =>
+    profile.manifest.dsh.profile.bundles.includes(bundle.packageId) && profile.manifest.dependencies[bundle.packageId] === `link:${bundle.projectRoot}`
+  const missing = bundles.filter(bundle => !linkedHere(bundle)).map(bundle => bundle.packageId)
+  const log: StepLog = { commands: [], files: [] }
+  if (missing.length > 0) await profileSteps(request, profile, dependencies, log).syncOwned(missing)
+  if (!request.dryRun) for (const packageName of missing) await RegistryRecords.dropProfile(profile.profileRoot, packageName)
+  return {
+    profile: request.profile,
+    profileRoot: profile.profileRoot,
+    linked: missing,
+    upToDate: bundles.filter(linkedHere).map(bundle => bundle.packageId),
+    commands: log.commands,
+    files: log.files,
+    restart: log.files.length > 0 ? RESTART_HOST : null,
+    dryRun: request.dryRun,
+  }
+}
+
+/** The bundle list of a profile, or undefined when the profile has no manifest yet. */
+const readProfileBundles = async (target: ProfileLocation): Promise<{ readonly profileRoot: string; readonly bundles: readonly string[] } | undefined> => {
+  if (!existsSync(join(profileRootOf(target), 'package.json'))) return undefined
+  const profile = await openProfile(target)
+  return { profileRoot: profile.profileRoot, bundles: profile.manifest.dsh.profile.bundles }
 }
 
 const tarballFileName = (item: PluginItem, integrity: string): string =>
@@ -628,7 +706,7 @@ const updatePluginInProfile = async (input: UpdatePluginInput, dependencies: Pro
 
   const checkout = await LocalBundleModel.listLocalBootBundles(dependencies.pluginsRoot === undefined ? {} : { pluginsRoot: dependencies.pluginsRoot })
   const ownedHere = checkout.find(bundle => bundle.packageId === target.name)
-  if (target.source === 'owned' && resolve(ownedHere?.projectRoot ?? '') !== resolve(target.root)) await steps.syncOwned(target.name)
+  if (target.source === 'owned' && resolve(ownedHere?.projectRoot ?? '') !== resolve(target.root)) await steps.syncOwned([target.name])
   if (target.source === 'local') warnings.push(`${target.name} is linked from ${target.root}; DSH loads what is built there, so rebuild it in place.`)
   if (target.source === 'registry' && target.version !== undefined)
     await steps.dsh(['add', `${target.name}@${target.version}`], 'registry dependency version', 'Check the version exists on the registry.')
@@ -728,6 +806,10 @@ const removePluginFromProfile = async (input: RemovePluginInput, dependencies: P
 export class ProfilePlugins {
   static readonly add = addPluginToProfile
   static readonly addItem = addRegistryItem
+  static readonly addOwned = addOwnedBundles
+  static readonly readBundles = readProfileBundles
+  static readonly profileRoot = profileRootOf
+  static readonly ownedSyncCommand = ownedSyncCommand
   static readonly update = updatePluginInProfile
   static readonly remove = removePluginFromProfile
 }

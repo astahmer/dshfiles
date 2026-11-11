@@ -306,6 +306,7 @@ export const cliCommandMetadata = {
   add: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution; or install a plugin or registry item (dshx add <package> --help).',
   update: 'Move a plugin installed in a profile to a newer version (dshx update --help).',
   remove: 'Uninstall a plugin from a profile (dshx remove --help).',
+  init: 'Compose a DSH profile from plugin packs (dshx init --help).',
   registry: 'Discover plugins and plugin source in registries, and build your own (dshx registry --help).',
   status: 'Report the running local DSH: process, launch revision, plugin activation, and bundles.',
   info: 'Show local DSHX and Node runtime information.',

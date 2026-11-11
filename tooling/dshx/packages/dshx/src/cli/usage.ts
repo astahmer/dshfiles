@@ -458,6 +458,7 @@ const helpCommands = {
   add: addHelp,
   update: simpleHelpCommand('update'),
   remove: simpleHelpCommand('remove'),
+  init: simpleHelpCommand('init'),
   registry: simpleHelpCommand('registry'),
   status: simpleHelpCommand('status'),
   info: simpleHelpCommand('info'),

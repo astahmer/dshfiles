@@ -147,6 +147,22 @@ Both read where the plugin came from out of the profile manifest and print the s
 
 Neither restarts DSH; a change needs **Restart the DSH host process**. These are profile-file commands and need no running DSH; `dshx plugins` and `dshx bundles` change the running Host instead.
 
+### `dshx init`: compose a profile from packs
+
+```bash
+dshx init --profile <name> [--packs core,versioning,...] [--extend] [--yes] [--home <dir>] [--dry-run] [--json]
+```
+
+Composes a DSH profile from the plugin packs the onboarding plugin defines (`plugins/@dshfiles/onboarding/src/packs.ts`, the same packs as **Getting started**; one page per pack in [`docs/packs`](../../../docs/packs/README.md)). Core is always included: `--packs knowledge` composes Core and Knowledge. In a terminal without `--packs` it shows a multi-select of the packs with each summary and plugin list, Core checked and locked, then the plan and a confirmation.
+
+- The packs' plugins, plus the owned bundles their clients keep external (`shared-runtime`, `input-trigger`, …), are linked with one `scripts/profile-sync.ts --bundle …` run: the path `dshx add` takes for one owned bundle. Bundles already linked to this checkout are left alone, so a second run reports `up to date`.
+- A missing profile is created with the files `dsh plugin` writes for a new profile (`package.json` with the `web` template's `@deepseek-ai/dsh-base` and `@deepseek-ai/dsh-web-app`, an empty `cordis.patch.yml`, `pnpm-workspace.yaml`). A directory without `package.json` is refused with `dshx add`'s hint.
+- An existing profile whose owned plugins differ from the composition is refused: `--extend` adds the packs' plugins and keeps the others (listed as `kept`). `dshx init` never removes a plugin; use `dshx remove`.
+- Applying needs `--yes` when stdin is not a terminal; `--dry-run` prints the composed plugin list, the files and the command and writes nothing.
+- It reads the pack file from this checkout at run time (Node strips its types): dshx does not depend on the onboarding package, which depends on dshx.
+
+It never restarts DSH and never edits the `profiles/web` seed; a change needs **Restart the DSH host process**. `--json` prints `{ schemaVersion, command: "init", ok, data: { profile, profileRoot, packs, plugins, suppliers, kept, created, linked, upToDate, commands, files, restart, dryRun } }` or `error: { code, message, hint }`. Exit codes: 0 composed or up to date, 1 failed (a refused profile, a cancelled prompt, profile-sync failing), 2 usage (an unknown pack, which lists the valid ids; no `--profile`; no `--packs` or `--yes` when it cannot ask).
+
 ### `dshx publish --dry-run`: check a registry release without uploading
 
 ```bash
@@ -175,14 +191,14 @@ Exit codes: 0 ok, 1 failed, 2 usage.
 | --------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `--cwd <path>`        | project commands; sessions create/start                              | Resolve another project or create a Session in a working directory        |
 | `--verbose`           | all                                                                  | Include underlying provider/process causes                                |
-| `--json`              | check, inspect, add, update, remove, registry, DSH platform commands | Stable machine-readable output                                            |
+| `--json`              | check, inspect, add, update, remove, init, registry, DSH platform commands | Stable machine-readable output                                      |
 | `--quiet`             | all                                                                  | Suppress human success output; preserve JSON and errors                   |
 | `--no-color`          | all                                                                  | Disable terminal styling                                                  |
 | `--url <launch-url>`  | DSH platform commands                                                | Override `DSHX_URL` for this invocation                                   |
 | `--title <title>`     | sessions start                                                       | Name the new Session; otherwise the Host titles it from its first message |
 | `--runtime`           | check                                                                | Enable Profile/Composition/runtime validation                             |
 | `--fix`               | check                                                                | Apply deterministic manifest repairs                                      |
-| `--dry-run`           | check --fix, add, update, remove, publish                            | Produce a plan/diff without writing                                       |
+| `--dry-run`           | check --fix, add, update, remove, init, publish                      | Produce a plan/diff without writing                                       |
 | `--open`              | dev                                                                  | Open the development URL                                                  |
 | `--port <0-65535>`    | dev                                                                  | Select the DSH Web port; `0` allocates one                                |
 | `--help`, `--version` | all                                                                  | Print CLI metadata                                                        |
