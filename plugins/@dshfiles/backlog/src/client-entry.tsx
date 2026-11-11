@@ -1,6 +1,7 @@
 import { Option, Schema } from 'effect'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { useMemo } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -26,6 +27,7 @@ import { BacklogFocusModel } from './backlog-focus.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogMentions } from './backlog-mentions.js'
 import { BacklogMentionChip } from './backlog-mention-chip.js'
+import { BacklogMentionDropInput } from './backlog-mention-drop.js'
 import { backlogUserTextRule } from './backlog-user-text.js'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
@@ -44,7 +46,7 @@ const backlogCaptureEventSchema = Schema.Struct({ text: Schema.String.check(Sche
 
 export default defineClient({
   name: '@dshfiles/backlog',
-  inject: ['slots', 'layout', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'uiConversation'],
+  inject: ['slots', 'layout', 'sessions', 'workspaces', 'conversation', 'remote', 'remote.session', 'uiWorkspace', 'uiConversation'],
   setup(ctx, decorate, metadata) {
     metadata?.plugin?.add(InlineReferences, backlogInlineReference)
     ctx.effect(() => ctx.uiConversation.userText.register(backlogUserTextRule), 'backlog: sent mentions render as chips')
@@ -368,6 +370,18 @@ export default defineClient({
     ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-backlog-notices', order: 121 }, decorate(NoticeOverlay)))
     ctx.slots.inject('conversation.user.text.node', () =>
       ctx.slots.register({ name: 'conversation.user.text.node', key: 'backlog', priority: 100 }, BacklogMentionChip),
+    )
+    ctx.slots.inject('conversation.input.overlay', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.overlay', id: 'dshfiles-backlog-mention-drop' },
+        decorate((props: { readonly inputActions: InputActions; readonly sessionId: SessionId }) => {
+          const input = useMemo(() => {
+            const scope = ctx.sessions.scope(props.sessionId)
+            return scope === undefined ? undefined : ctx.conversation.input.for(scope)
+          }, [props.sessionId])
+          return <BacklogMentionDropInput inputActions={props.inputActions} input={input} />
+        }),
+      ),
     )
     ctx.slots.inject('conversation.session.header.utilities', () =>
       ctx.slots.register(

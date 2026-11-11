@@ -1020,13 +1020,13 @@
     {
       "id": "backlog-mentions",
       "title": "Mention backlog items with @",
-      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text.",
+      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\" (backlog item; \u2026)`. The Agent reads the id and title, the thread signal turns it into a link and a start, and the sent message renders the same chip instead of that serialized text. Dragging an item's `b:<id>` label from the feed or the item header onto a thread composer inserts the same chip at the caret; dropped anywhere else it is plain `b:<id>` text.",
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: @b: mentions",
       "configuration": [],
-      "states": ["listed", "inserted", "sent", "rendered"],
+      "states": ["listed", "dragged", "inserted", "sent", "rendered"],
       "failureModes": [
         "A failing search returns no backlog rows; the other @ groups are unaffected.",
         "An invalid chip reference blocks the send instead of sending broken text."
@@ -1048,6 +1048,11 @@
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "backlog.mention-drag-into-composer",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "backlog.mentions-unit-scopes",
           "file": "plugins/@dshfiles/backlog/src/backlog-mentions.test.ts",
@@ -1058,6 +1063,18 @@
           "id": "backlog.mentions-unit-serialize",
           "file": "plugins/@dshfiles/backlog/src/backlog-mentions.test.ts",
           "testName": "sends a chip as text naming b:<id>, so the thread signal sees it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.mentions-unit-drag-payload",
+          "file": "plugins/@dshfiles/backlog/src/backlog-mention-drop.test.tsx",
+          "testName": "writes the plain ref for any text field and the chip payload for a composer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.mentions-unit-composer-drop",
+          "file": "plugins/@dshfiles/backlog/src/backlog-mention-drop.test.tsx",
+          "testName": "a dropped item becomes the mention chip at the caret"
         }
       ],
       "telemetry": [

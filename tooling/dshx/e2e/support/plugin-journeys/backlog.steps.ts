@@ -1292,6 +1292,33 @@ When('a message with the serialized backlog mention is sent', async ({ page }: {
   await sendMessage(page, await withBacklogRefs(page, 'Following b:1 "Ship the backlog reference preview" (backlog item; backlog_get has its details)'))
 })
 
+const threadComposer = (page: Page) => page.locator('[data-composer-seat]').getByRole('textbox').filter({ visible: true }).first()
+
+When('a thread on the fake model is started', async ({ page }: { page: Page }) => {
+  await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
+})
+
+When('the reference of backlog item {string} is dragged into the thread composer', async ({ page }: { page: Page }, reference: string) => {
+  const label = await withBacklogRefs(page, reference)
+  const handle = page
+    .locator('[data-backlog-mention-handle]')
+    .filter({ hasText: new RegExp(`^${label}$`, 'u'), visible: true })
+    .first()
+  await handle.dragTo(threadComposer(page))
+})
+
+Then('the thread composer holds the backlog chip {string} titled {string}', async ({ page }: { page: Page }, reference: string, title: string) => {
+  await recordAssertion(page, 'backlog-mention-drag-into-composer', async () => {
+    const chip = threadComposer(page).locator('[data-composer-chip]')
+    await expect(chip).toHaveCount(1, { timeout: 15_000 })
+    const label = await withBacklogRefs(page, reference)
+    await expect(chip).toContainText(`${label} ${title}`)
+    // The drop is the chip alone: the browser must not also paste the plain `b:<ref>` text.
+    expect((await threadComposer(page).innerText()).split(label).length - 1).toBe(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the sent mention renders as a backlog chip {string} titled {string}', async ({ page }: { page: Page }, reference: string, title: string) => {
   await recordAssertion(page, 'backlog-sent-mention-chip', async () => {
     const chip = page.getByRole('button', { name: `Preview backlog item ${await withBacklogRefs(page, reference)}`, exact: true })

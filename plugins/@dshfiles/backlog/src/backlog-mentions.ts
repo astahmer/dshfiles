@@ -1,3 +1,4 @@
+import type { ReferenceInsert } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { InputTriggerCandidate, InputTriggerSource, RestoredReference } from '@dshfiles/input-trigger/client'
 import { Option, Schema } from 'effect'
 
@@ -25,6 +26,14 @@ const decodeRef = (value: string): { readonly ref: string; readonly title: strin
   const ref = BacklogReference.parse('ref' in decoded ? decoded.ref : String(decoded.id))
   return ref === undefined ? null : { ref, title: decoded.title }
 }
+
+/** The chip a picked or dropped item becomes. */
+const referenceInsert = (value: { readonly ref: string; readonly title: string }): ReferenceInsert => ({
+  source: 'backlog',
+  ref: JSON.stringify({ ref: value.ref, title: value.title }),
+  label: `${BacklogReference.label(value.ref)} ${value.title}`,
+  clipboardText: `${BacklogReference.label(value.ref)} ${value.title}`,
+})
 
 /** The text after `@b:`/`@backlog:`, the whole query for plain `@`, or undefined while another source's scope is typed. */
 const scopedQuery = (query: string): { readonly text: string; readonly scoped: boolean } | undefined => {
@@ -66,14 +75,7 @@ const createSource = (options: {
   onPick({ candidate }) {
     const ref = decodeRef(candidate.value ?? '')
     if (ref === null) return undefined
-    return {
-      insert: {
-        source: 'backlog',
-        ref: JSON.stringify(ref),
-        label: `${BacklogReference.label(ref.ref)} ${ref.title}`,
-        clipboardText: `${BacklogReference.label(ref.ref)} ${ref.title}`,
-      },
-    }
+    return { insert: referenceInsert(ref) }
   },
   codec: {
     clipboardText(ref) {
@@ -110,4 +112,6 @@ const createSource = (options: {
 export class BacklogMentions {
   static readonly createSource = createSource
   static readonly scopedQuery = scopedQuery
+  static readonly decodeRef = decodeRef
+  static readonly referenceInsert = referenceInsert
 }

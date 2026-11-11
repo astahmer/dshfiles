@@ -561,6 +561,11 @@ When('the main workbench adds the registered {string} panel', async ({ page }: {
   await expect(dockTab(mainDock(page), title)).toBeVisible()
 })
 
+When('Backlog is opened in the right pane', async ({ page }: { page: Page }) => {
+  await setRightPaneVisible(page, true)
+  await addRegisteredPanel(page, dockRegion(page), 'Backlog')
+})
+
 When('Backlog is opened in the right and main panes', async ({ page }: { page: Page }) => {
   await addRegisteredPanel(page, dockRegion(page), 'Backlog')
   await addRegisteredPanel(page, mainPane(page), 'Backlog')

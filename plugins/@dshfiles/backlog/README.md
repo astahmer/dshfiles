@@ -506,6 +506,9 @@ In any composer, `@b:` (or `@backlog:`) searches the backlog, and plain `@` show
 items next to threads and files. The chip is sent as `b:k3f9 "title"`, so the thread signal above links the
 thread and starts the item, just as typing `b:k3f9` does.
 
+Drag an item's `b:k3f9` label (in the feed or the item header) onto a thread composer to insert the same chip at the
+caret. Dropped on any other text field it is the plain `b:k3f9` text.
+
 Every backlog text box — the capture composer, an item's description and its reply box — completes the same
 sources from one `@` menu: agents, backlog items, threads and projects. Typing `@project-name` offers known projects;
 picking one inserts `workspace:<URI-encoded absolute path>`, an extracted link reference that does not change the item's

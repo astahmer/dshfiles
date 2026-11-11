@@ -382,6 +382,17 @@ Feature: Backlog
     When a message with the serialized backlog mention is sent
     Then the sent mention renders as a backlog chip "b:1" titled "Ship the backlog reference preview"
 
+  @scenario:backlog.mention-drag-into-composer
+  Scenario: Drag a backlog item into the thread composer to mention it
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/sidebar-right, @dshfiles/workbench, @dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    And a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "Drag me into a thread" is captured
+    When a thread on the fake model is started
+    And Backlog is opened in the right pane
+    And the reference of backlog item "b:1" is dragged into the thread composer
+    Then the thread composer holds the backlog chip "b:1" titled "Drag me into a thread"
+
   @fake-secret-cli
   @scenario:backlog.jev-secret-setup
   Scenario: Offer a masked secret setup from chat when Jev has no key
