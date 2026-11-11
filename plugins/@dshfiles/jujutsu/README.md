@@ -150,7 +150,9 @@ Two panels in navigation, the main view and the Workbench chooser: **Revision gr
   at least one workspace.
 - Repository actions → Clean up thread workspaces previews idle candidates with
   1h, 6h, 24h, or a custom positive whole-hour threshold and explains skipped
-  workspaces; removing candidates starts a background job.
+  workspaces; removing candidates starts a background job. A thread workspace
+  row also names the background processes its removal stops first (`Stops vite,
+  node`) and the terminals it keeps (jj-integration `stopWorkspaceProcesses`).
 
 ## Graph landmarks and temporary views
 

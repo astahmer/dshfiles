@@ -231,9 +231,11 @@ export const MaintenanceLive = Layer.effectDiscard(
             const next = yield* settled.read
             const previous = yield* Ref.getAndSet(snapshot, next)
             const justSettled = previous === undefined || next === undefined ? [] : SettleCleanupModel.newlySettled({ previous, next })
+            const current = yield* settings.get
+            // Stop first, so the actions a project flags for the settle itself are not cancelled with the rest.
+            if (justSettled.length > 0 && current.stopProjectActionsOnSettle) yield* workspaceSetup.stopActions({ sessionIds: justSettled })
             // A project can flag trusted actions for a settle; they run in the workspace the settled thread works in.
             if (justSettled.length > 0) yield* workspaceSetup.onSettle({ sessionIds: justSettled })
-            const current = yield* settings.get
             if (next === undefined || justSettled.length === 0 || !current.autoCleanup.onSettle) return
             const request = AutoCleanupModel.request(current.autoCleanup, null)
             yield* SettleCleanupModel.run({

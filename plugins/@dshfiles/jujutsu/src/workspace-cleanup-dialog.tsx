@@ -10,7 +10,7 @@ import { jjIntegrationApi, type CleanupKindView, type CleanupResult, type Cleanu
 import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import { CleanupJobTrailModel, cleanupJobsKey, requestWorkspaceCleanup, useCleanupJobs } from './cleanup-jobs-queries.js'
-import { cleanupPreviewLoadingLabel } from './workspace-cleanup-preview.js'
+import { cleanupPreviewLoadingLabel, cleanupProcessLabels } from './workspace-cleanup-preview.js'
 import { WorkspaceCleanupSummary } from './workspace-cleanup-summary.js'
 
 const AGE_CHOICES = [
@@ -45,6 +45,7 @@ interface CleanupRow {
   readonly at: number
   readonly missing: boolean
   readonly integratedInto?: readonly string[] | undefined
+  readonly processes?: CleanupResult['workspaces'][number]['processes']
 }
 
 const cleanupRows = (result: CleanupResult): CleanupRow[] => [
@@ -54,6 +55,7 @@ const cleanupRows = (result: CleanupResult): CleanupRow[] => [
     at: workspace.lastUsedAt,
     missing: workspace.missing,
     integratedInto: workspace.integratedInto,
+    processes: workspace.processes,
   })),
   ...result.untracked.map(entry => ({
     key: JSON.stringify([entry.repoRoot, entry.name, 'untracked']),
@@ -64,7 +66,12 @@ const cleanupRows = (result: CleanupResult): CleanupRow[] => [
 ]
 
 const rowMeta = (row: CleanupRow): string =>
-  [row.missing ? 'Folder missing' : undefined, row.integratedInto === undefined ? undefined : `On ${row.integratedInto.join(', ')}`, formatAge(row.at)]
+  [
+    row.missing ? 'Folder missing' : undefined,
+    row.integratedInto === undefined ? undefined : `On ${row.integratedInto.join(', ')}`,
+    ...cleanupProcessLabels(row.processes),
+    formatAge(row.at),
+  ]
     .filter(part => part !== undefined)
     .join(' · ')
 

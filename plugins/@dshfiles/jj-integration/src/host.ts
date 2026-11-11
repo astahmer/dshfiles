@@ -17,6 +17,7 @@ import { HostHooksLive, rebaseCommand } from './host-hooks-promise.js'
 import { IntegrationQueue } from './integration-queue.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
 import { JjSettingsLive } from './jj-settings.js'
+import { WorkspaceProcesses } from './workspace-processes.js'
 import { Landing } from './landing.js'
 import { MaintenanceLive } from './maintenance.js'
 import { ProjectBookmarks } from './project-bookmarks.js'
@@ -59,6 +60,7 @@ const BaseLive = Layer.mergeAll(
   IntegrationRequests.layer,
   IsolatedSessions.layer,
   HostApis.layer,
+  WorkspaceProcesses.layer,
 )
 
 const JjIntegrationLive = Layer.mergeAll(MaintenanceLive, HostHooksLive, IntegrationQueue.layer).pipe(

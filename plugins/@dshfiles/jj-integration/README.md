@@ -464,6 +464,28 @@ verb as `jj_thread_cleanup` (`apply: false` previews, `apply: true` waits for
 the pass and returns its result), plus `jj_thread_cleanup_jobs` to read the
 background trail.
 
+#### Processes left in a removed workspace
+
+A dev server or watcher an agent left running from a thread workspace would
+keep its port and files after the folder is gone. With `stopWorkspaceProcesses`
+(on by default), every removal — the button, `jj_thread_cleanup`, automatic and
+settle cleanup — first stops the Host user's processes whose working directory
+is that thread workspace or a folder inside it: SIGTERM, then SIGKILL for
+whatever is still inside the workspace after 5 seconds. The preview lists them
+per row (`Stops vite, node`), and the job's rows record what happened
+(`processes`: `stopped`, `killed` or `failed`).
+
+What it never stops: another user's process, a process with a controlling
+terminal (your own shell or a command typed into one: listed as
+`kept-terminal`), the DSH Host or any process it runs under, anything outside
+the workspace path (a sibling sharing its prefix, `thread-1` vs `thread-10`,
+included) and anything in an **Other JJ workspace**. When the Host's own folder
+is inside the workspace it stops nothing. The process table comes from `ps` and
+`lsof -d cwd` on macOS and `/proc` on Linux; on other platforms, or when the
+table cannot be read, nothing is stopped. Each pass leaves a
+`jj-integration workspace processes stop` span (`inspect` for the preview) with
+the found, stopped, killed and failed counts.
+
 ### Automatic cleanup
 
 The Host also runs that same job on its own (setting `autoCleanup`, on by
@@ -520,6 +542,12 @@ applies, and the job rechecks unlanded work, activity and queued integrations
 before removing, so settling never forces work away. Each settle leaves a
 `jj-integration settle cleanup` span with the settled, targeted and removed
 counts.
+
+`stopProjectActionsOnSettle` (off by default) cancels the settled Sessions'
+Project Checks actions that are still queued or running, such as a dev server a
+thread started, before the actions a project flags for the settle itself run.
+It leaves a `jj-integration project actions stop on settle` span with the
+number it stopped.
 
 Restoring such a thread (Unsettle, Unarchive) needs no extra step: before its
 next turn builds its prompt, the Host checks the Session's folder out again from
@@ -625,19 +653,21 @@ the subagent is idle), or any rebase that keeps the revisions' ancestry — the 
 
 ## Settings (`jj-integration`)
 
-| Key                                   | Default   | Meaning                                                                                                                                    |
-| ------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `autoIntegrationScope`                | `none`    | `none` is manual; `isolated` auto-integrates uniquely owned thread workspaces; `all` also isolates new threads by default.                 |
-| `autoIntegrationExcludedRepositories` | empty     | Absolute repository paths that automatic integration never touches; manual Integrate still works.                                          |
-| `isolateByDefault`                    | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                                              |
-| `bookmark`                            | `main`    | Fallback main branch for a project without its own; see [Main branch per project](#main-branch-per-project).                               |
-| `repositoryBookmarks`                 | empty     | `{ repository, bookmark }` per project, set in Settings › Projects; wins over `dsh.project.json` and origin's default branch.              |
-| `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                                           |
-| `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                                           |
-| `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                                |
-| `removeFinishedThreads`               | `true`    | Enable automatic removal of inactive, rebased thread workspaces after the configured grace period.                                         |
-| `removeFinishedThreadsAfterMinutes`   | `15`      | Minutes after the latest rebase to retain a finished workspace; accepts 1–1440.                                                            |
-| `autoCleanup`                         | object    | `{ enabled: true, kinds: ['empty', 'integrated'], olderThanHours: 24, intervalMinutes: 60 }`; see [Automatic cleanup](#automatic-cleanup). |
+| Key                                   | Default   | Meaning                                                                                                                                                                           |
+| ------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `autoIntegrationScope`                | `none`    | `none` is manual; `isolated` auto-integrates uniquely owned thread workspaces; `all` also isolates new threads by default.                                                        |
+| `autoIntegrationExcludedRepositories` | empty     | Absolute repository paths that automatic integration never touches; manual Integrate still works.                                                                                 |
+| `isolateByDefault`                    | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                                                                                     |
+| `bookmark`                            | `main`    | Fallback main branch for a project without its own; see [Main branch per project](#main-branch-per-project).                                                                      |
+| `repositoryBookmarks`                 | empty     | `{ repository, bookmark }` per project, set in Settings › Projects; wins over `dsh.project.json` and origin's default branch.                                                     |
+| `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                                                                                  |
+| `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                                                                                  |
+| `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                                                                       |
+| `removeFinishedThreads`               | `true`    | Enable automatic removal of inactive, rebased thread workspaces after the configured grace period.                                                                                |
+| `removeFinishedThreadsAfterMinutes`   | `15`      | Minutes after the latest rebase to retain a finished workspace; accepts 1–1440.                                                                                                   |
+| `stopWorkspaceProcesses`              | `true`    | Stop background processes still running inside a thread workspace before cleanup removes it; see [Processes left in a removed workspace](#processes-left-in-a-removed-workspace). |
+| `stopProjectActionsOnSettle`          | `false`   | Cancel a settled thread's queued or running Project Checks actions; see [Settle cleanup](#settle-cleanup).                                                                        |
+| `autoCleanup`                         | object    | `{ enabled: true, kinds: ['empty', 'integrated'], olderThanHours: 24, intervalMinutes: 60 }`; see [Automatic cleanup](#automatic-cleanup).                                        |
 
 The settings keys `askAgentToFixLanding` and `syncWorkspaceAfterLand` retain
 their names for saved-settings compatibility; their descriptions and UI copy

@@ -9,12 +9,14 @@ import { CleanupRunner, type CleanupReporter } from './cleanup-runner.js'
 import { filterCleanupTargets } from './cleanup-targets.js'
 import { ActivityLog, SessionReads, WorkspaceRegistry } from './host-edges-promise.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
+import { JjSettings } from './jj-settings.js'
 import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
 import { MergedPullRequests } from './merged-pull-requests.js'
 import { ThreadWorkspaces } from './thread-workspaces.js'
 import { WorkspaceCleanupModel } from './workspace-cleanup.js'
+import { WorkspaceProcesses } from './workspace-processes.js'
 import { WorkspaceSessionPath } from './workspace-session-path.js'
 import { WorkspaceSync } from './workspace-sync.js'
 
@@ -57,6 +59,31 @@ const make = Effect.gen(function* () {
   const path = yield* Path.Path
   const fileSystem = yield* FileSystem.FileSystem
   const hostApis = yield* HostApis
+  const settings = yield* JjSettings
+  const workspaceProcesses = yield* WorkspaceProcesses
+
+  /** Thread workspaces only: another JJ checkout is the user's own, and a missing folder runs nothing. */
+  const stopsProcessesIn = (workspace: PlannedWorkspace): boolean => workspace.kind !== 'secondary' && !workspace.missing
+
+  /** Stops what still runs inside each thread workspace about to be removed, and records it on the row. */
+  const stopProcesses = Effect.fnUntraced(function* (rows: readonly PlannedWorkspace[]) {
+    if (!(yield* settings.get).stopWorkspaceProcesses) return rows
+    return yield* Effect.forEach(rows, row =>
+      stopsProcessesIn(row)
+        ? Effect.map(workspaceProcesses.stop({ workspacePath: row.path }), processes => (processes.length === 0 ? row : { ...row, processes }))
+        : Effect.succeed(row),
+    )
+  })
+
+  /** The dry run: what a removal would stop or keep, from one process table read, listed only when there is some. */
+  const previewProcesses = Effect.fnUntraced(function* (rows: readonly PlannedWorkspace[]) {
+    if (!(yield* settings.get).stopWorkspaceProcesses) return rows
+    const found = yield* workspaceProcesses.inspect(rows.filter(stopsProcessesIn).map(row => row.path))
+    return rows.map(row => {
+      const processes = found.get(row.path) ?? []
+      return processes.length === 0 ? row : { ...row, processes }
+    })
+  })
 
   const warnAndSkip = (what: string, repoRoot: string) => (error: { readonly message: string }) =>
     Effect.as(Effect.logWarning(`jj-integration: could not ${what} in ${repoRoot}: ${error.message}`), [])
@@ -316,8 +343,10 @@ const make = Effect.gen(function* () {
     yield* report.beginPhase('removing')
     const plannedByRepository = new Map<string, PlannedWorkspace[]>()
     for (const workspace of planned.workspaces) plannedByRepository.set(workspace.repoRoot, [...(plannedByRepository.get(workspace.repoRoot) ?? []), workspace])
-    for (const [repoRoot, plannedWorkspaces] of plannedByRepository) {
-      for (const workspace of plannedWorkspaces) yield* report.beginItem(workspace.name)
+    for (const [repoRoot, plannedByName] of plannedByRepository) {
+      for (const workspace of plannedByName) yield* report.beginItem(workspace.name)
+      // A dev server left running from the folder would keep its port and files after the folder is gone.
+      const plannedWorkspaces = yield* stopProcesses(plannedByName)
       const threadWorkspaces = plannedWorkspaces.filter(workspace => workspace.kind !== 'secondary')
       const secondaryWorkspaces = plannedWorkspaces.filter(workspace => workspace.kind === 'secondary')
       const threadOutcome =
@@ -423,9 +452,10 @@ const make = Effect.gen(function* () {
 
   const preview = Effect.fn('cleanup preview')(function* (input: CleanupRequest) {
     const planned = yield* scan({ ...input, apply: false, trigger: 'manual' })
+    const workspaces = yield* previewProcesses(planned.workspaces)
     return {
       applied: false,
-      workspaces: planned.workspaces.map(row => ({ ...row, outcome: 'would-remove' as const })),
+      workspaces: workspaces.map(row => ({ ...row, outcome: 'would-remove' as const })),
       skipped: planned.skipped,
       untracked: planned.untracked.map(row => ({ ...row, outcome: 'would-remove' as const })),
       emptyRevisions: planned.emptyRevisions,

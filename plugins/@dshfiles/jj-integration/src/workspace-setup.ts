@@ -28,6 +28,30 @@ const idempotencyKey = (input: {
   return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}`
 }
 
+/**
+ * Cancels each settled Session's project actions still queued or running (a dev server it started) and returns how many
+ * it asked to stop. A Session whose queue cannot be read or cancelled is logged and skipped, never retried.
+ */
+export const stopOpenProjectActions = Effect.fn('jj-integration project actions stop on settle')(function* <TaskError, CancelError>(input: {
+  readonly sessionIds: readonly string[]
+  readonly tasks: (sessionId: string) => Effect.Effect<readonly { readonly id: string; readonly status: string }[], TaskError>
+  readonly cancel: (sessionId: string, taskId: string) => Effect.Effect<unknown, CancelError>
+}) {
+  const stopped = yield* Effect.forEach(
+    input.sessionIds,
+    sessionId =>
+      Effect.gen(function* () {
+        const open = (yield* input.tasks(sessionId)).filter(task => task.status === 'queued' || task.status === 'running')
+        yield* Effect.forEach(open, task => input.cancel(sessionId, task.id), { concurrency: 1, discard: true })
+        return open.length
+      }).pipe(Effect.catch(error => Effect.as(Effect.logWarning(`jj-integration: could not stop project actions on settle: ${String(error)}`), 0))),
+    { concurrency: 1 },
+  )
+  const total = stopped.reduce((sum, count) => sum + count, 0)
+  yield* Effect.annotateCurrentSpan({ 'dshx.settle.sessions': input.sessionIds.length, 'dshx.settle.actions_stopped': total })
+  return total
+})
+
 const empty: WorkspaceSetup = { tasks: [], awaitsFirstTurn: false, applies: false }
 
 /**
@@ -43,6 +67,8 @@ export class WorkspaceSetupService extends Context.Service<
     readonly ensure: (input: { readonly sessionId: string; readonly path: string }) => Effect.Effect<WorkspaceSetup>
     readonly cancel: (input: { readonly sessionId: string; readonly taskId: string }) => Effect.Effect<WorkspaceSetup>
     readonly onSettle: (input: { readonly sessionIds: readonly string[] }) => Effect.Effect<void>
+    /** Cancels the settled Sessions' project actions still queued or running; returns how many it asked to stop. */
+    readonly stopActions: (input: { readonly sessionIds: readonly string[] }) => Effect.Effect<number>
   }
 >()('@dshfiles/jj-integration/WorkspaceSetup') {
   static readonly layer = Layer.effect(
@@ -153,7 +179,14 @@ export class WorkspaceSetupService extends Context.Service<
       const onSettle = (input: { readonly sessionIds: readonly string[] }) =>
         runSettle(input).pipe(Effect.catch(error => Effect.logWarning(`jj-integration: settle workspace setup failed: ${String(error)}`)))
 
-      return WorkspaceSetupService.of({ ensure, cancel, onSettle })
+      const stopActions = (input: { readonly sessionIds: readonly string[] }) =>
+        stopOpenProjectActions({
+          sessionIds: input.sessionIds,
+          tasks: sessionId => projectChecks.tasks({ sessionId }),
+          cancel: (sessionId, taskId) => projectChecks.cancelTask({ sessionId, taskId }),
+        })
+
+      return WorkspaceSetupService.of({ ensure, cancel, onSettle, stopActions })
     }),
   )
 }

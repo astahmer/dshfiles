@@ -1490,6 +1490,97 @@
         { "kind": "automatic", "source": "agent-tool" },
         { "kind": "automatic", "source": "jj" }
       ]
+    },
+    {
+      "id": "workspace-process-stop",
+      "title": "Stop processes left in a thread workspace before removing it",
+      "summary": "Before cleanup (button, jj_thread_cleanup, automatic or settle cleanup) removes a thread workspace, the Host stops its user's processes whose working directory is inside that workspace: SIGTERM, then SIGKILL after 5 seconds for whatever is still inside. The cleanup preview lists them per row as a dry run, and the job's rows record stopped, killed or failed. Optionally, a settle cancels the thread's queued or running Project Checks actions.",
+      "surfaces": ["host", "client"],
+      "surface": "command",
+      "destination": "land",
+      "currentSurface": "left-nav: Revision graph › Clean up workspaces (row meta)",
+      "configuration": [
+        {
+          "key": "stopWorkspaceProcesses",
+          "defaultValue": "true",
+          "constraints": "Thread workspaces only; Other JJ workspaces are never touched.",
+          "coveredBy": ["jj-integration.workspace-process-stop-cleanup"]
+        },
+        {
+          "key": "stopProjectActionsOnSettle",
+          "defaultValue": "false",
+          "constraints": "Cancels only queued or running actions of the Sessions just settled, before the actions flagged for the settle run.",
+          "coveredBy": ["jj-integration.workspace-process-stop-settle-actions"]
+        }
+      ],
+      "states": ["would-stop", "kept-terminal", "stopped", "killed", "failed"],
+      "failureModes": [
+        "Only the Host user's processes whose cwd is the workspace folder or below it are selected; a sibling sharing the prefix is not.",
+        "A process with a controlling terminal is listed as kept-terminal and never signalled.",
+        "The Host and every process it runs under are never selected, and nothing is selected when the Host's own folder is inside the workspace.",
+        "Before SIGKILL the process table is read again, so a pid recycled during the grace period is not killed.",
+        "An unreadable process table, or a platform other than macOS and Linux, stops nothing."
+      ],
+      "externalDependencies": [
+        {
+          "id": "process-table",
+          "boundary": "ps and lsof -d cwd on macOS, /proc on Linux, read through the DSH subprocess service and file system.",
+          "deterministicFake": "Real detached sleep processes in temporary folders; no process mock."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "jj-integration.workspace-process-stop-browser",
+          "reason": "A browser journey would need a live background process inside a removable scratch workspace; the Host integration test drives the real preview and removal against a real process, and the dialog's row text is unit-tested in jujutsu workspace-cleanup-preview.test.ts."
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-process-stop-model",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-processes.test.ts",
+          "testName": "never selects the Host or a process it runs under, even inside the workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-process-stop-kill",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-processes.test.ts",
+          "testName": "kills a process that ignores SIGTERM once the grace period ends"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-process-stop-cleanup",
+          "file": "plugins/@dshfiles/jj-integration/src/agent-workspace-cleanup.integration.test.ts",
+          "testName": "lists a background process left in the workspace in the preview, then stops it before removing the folder"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.workspace-process-stop-settle-actions",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-setup-stop.test.ts",
+          "testName": "cancels only the queued and running actions of the settled Sessions and records a span"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "jj-integration workspace processes stop",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-processes.test.ts",
+          "testName": "previews, then stops processes inside the workspace and leaves the sibling folder running"
+        },
+        {
+          "kind": "custom",
+          "span": "jj-integration project actions stop on settle",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-setup-stop.test.ts",
+          "testName": "cancels only the queued and running actions of the settled Sessions and records a span"
+        }
+      ]
     }
   ]
 }

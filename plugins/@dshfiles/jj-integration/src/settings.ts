@@ -67,6 +67,14 @@ export const jjIntegrationSettings = defineSettings({
       .max(24 * 60)
       .default(15)
       .description('Minutes after the latest rebase to retain an inactive, finished thread workspace before removing it.'),
+    stopWorkspaceProcesses: Schema.boolean()
+      .default(true)
+      .description(
+        'Before cleanup removes a thread workspace, stop your processes still running from inside it (a dev server or watcher an agent left in the background): SIGTERM, then SIGKILL after 5 seconds. A process with a terminal (your own shell) is kept, and the preview lists both. Other JJ workspaces are never touched.',
+      ),
+    stopProjectActionsOnSettle: Schema.boolean()
+      .default(false)
+      .description('When a thread is settled, cancel its Project Checks actions that are still queued or running, such as a dev server it started.'),
     autoCleanup: Schema.object({
       enabled: Schema.boolean().default(true).description('Run “Clean up thread workspaces” on its own, on the interval below.'),
       kinds: Schema.array(

@@ -110,6 +110,18 @@ const threadPathInputSchema = Schema.Struct({
   ),
 })
 
+/** A workspace row lists at most this many processes, each named by its command alone. */
+export const MAX_WORKSPACE_PROCESSES = 20
+export const MAX_PROCESS_COMMAND_LENGTH = 120
+
+const workspaceProcessSchema = Schema.Struct({
+  pid: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(1)),
+  command: Schema.String.check(Schema.isMaxLength(MAX_PROCESS_COMMAND_LENGTH)),
+  /** `kept-terminal` is a process with a controlling terminal (someone's shell): listed, never stopped. */
+  outcome: Schema.Literals(['would-stop', 'kept-terminal', 'stopped', 'killed', 'failed']),
+})
+export type WorkspaceProcessView = typeof workspaceProcessSchema.Type
+
 const cleanupWorkspaceSchema = Schema.Struct({
   repoRoot: Schema.String,
   name: Schema.String,
@@ -119,6 +131,11 @@ const cleanupWorkspaceSchema = Schema.Struct({
   missing: Schema.Boolean,
   /** Other bookmarks that each hold all of this workspace's work: why a workspace with revisions is removable. */
   integratedInto: Schema.optional(Schema.Array(Schema.String)),
+  /**
+   * Processes of the Host's user still running inside a thread workspace: what removal would stop (preview) or stopped
+   * before removing it. Omitted when there are none, the setting stopWorkspaceProcesses is off, or the Host predates it.
+   */
+  processes: Schema.optional(Schema.Array(workspaceProcessSchema).check(Schema.isMaxLength(MAX_WORKSPACE_PROCESSES))),
   outcome: Schema.Literals(['would-remove', 'removed', 'has-work', 'failed']),
   message: Schema.optional(Schema.String.check(Schema.isMaxLength(MAX_CLEANUP_MESSAGE_LENGTH))),
 })
@@ -190,9 +207,15 @@ const cleanupJobSchema = Schema.Struct({
 })
 export type CleanupJobView = typeof cleanupJobSchema.Type
 
+const describeProcesses = (processes: readonly WorkspaceProcessView[] | undefined): string =>
+  processes === undefined || processes.length === 0
+    ? ''
+    : `; processes: ${processes.map(entry => `${entry.command} ${String(entry.pid)} ${entry.outcome}`).join(', ')}`
+
 const describeRemoved = (workspace: CleanupResult['workspaces'][number]): string => {
   if (workspace.missing) return 'folder missing; registration forgotten'
-  return workspace.integratedInto === undefined ? workspace.kind : `${workspace.kind} into ${workspace.integratedInto.join(', ')}`
+  const kind = workspace.integratedInto === undefined ? workspace.kind : `${workspace.kind} into ${workspace.integratedInto.join(', ')}`
+  return `${kind}${describeProcesses(workspace.processes)}`
 }
 
 const renderCleanup = (output: CleanupResult): string => {

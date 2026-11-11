@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -160,6 +160,37 @@ describe.skipIf(!jjAvailable)('workspaces agents isolate for themselves', () => 
 
     expect((await cleanup(false)).skipped).toContainEqual(expect.objectContaining({ name: isolated.name, reason: 'has-work' }))
   })
+
+  it.skipIf(process.platform !== 'darwin' && process.platform !== 'linux')(
+    'lists a background process left in the workspace in the preview, then stops it before removing the folder',
+    async () => {
+      const sessionId = 'session-dev-server'
+      harness.setSession(sessionId, { running: false, questions: 0 })
+      const isolated = isolatedWorkspace(await harness.runTool('jj_thread_isolate', {}, { sessionId, cwd: repo }))
+      // Detached: no controlling terminal, like a dev server an agent left running in the background.
+      const server = spawn('/bin/sh', ['-c', 'exec sleep 60'], { cwd: isolated.path, detached: true, stdio: 'ignore' })
+      const exited = new Promise<NodeJS.Signals | null>(resolve => server.once('exit', (_code, signalName) => resolve(signalName)))
+      try {
+        await expect.poll(() => spawnSync('ps', ['-p', String(server.pid)]).status).toBe(0)
+        const preview = await cleanup(false)
+        expect(preview.workspaces.find(workspace => workspace.name === isolated.name)?.processes).toStrictEqual([
+          { pid: server.pid, command: 'sleep', outcome: 'would-stop' },
+        ])
+        expect(server.exitCode).toBeNull()
+
+        const applied = await cleanup(true)
+        expect(applied.workspaces.find(workspace => workspace.name === isolated.name)).toMatchObject({
+          outcome: 'removed',
+          processes: [{ pid: server.pid, command: 'sleep', outcome: 'stopped' }],
+        })
+        expect(await exited).toBe('SIGTERM')
+        expect(existsSync(isolated.path)).toBe(false)
+      } finally {
+        if (server.exitCode === null && server.signalCode === null) server.kill('SIGKILL')
+      }
+    },
+    60_000,
+  )
 
   it('ties a targeted cleanup without a folder, as a settle starts it, to the project of its targets', async () => {
     const { job } = await harness.api.startCleanup({
