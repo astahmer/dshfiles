@@ -2,12 +2,13 @@ import { open, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
 import * as Schema from 'effect/Schema'
+import { completeZstdFrameEnds } from '../plugins/@dshfiles/usage/src/zstd-frames.ts'
 import { ScriptJson } from './json.ts'
 
 /**
  * Discovers and streams DSH Session logs (`session.v<N>.jsonl.zstd`).
  *
- * The frame walk mirrors `plugins/@dshfiles/usage/src/session-log.ts`: the JSONL
+ * The frame walk is `plugins/@dshfiles/usage/src/zstd-frames.ts`: the JSONL
  * backend appends one independent, checksummed Zstandard frame per durable
  * batch, so a reader resumes at the end of the last complete frame and never
  * decompresses earlier frames again. Slicing keeps a multi-hundred-megabyte
@@ -15,7 +16,6 @@ import { ScriptJson } from './json.ts'
  */
 
 const LOG_NAME = /^session(?:\.v(\d+))?\.jsonl(?:\.zstd)?$/
-const ZSTD_MAGIC = 0xfd2fb528
 const SLICE_BYTES = 4 * 1024 * 1024
 
 const logRecordSchema = Schema.Struct({
@@ -33,38 +33,6 @@ export interface SessionLogRef {
   readonly path: string
   readonly size: number
   readonly mtimeMs: number
-}
-
-/** End offsets of the complete frames in `buffer`; a torn final frame is left out. */
-const completeFrameEnds = (buffer: Buffer): number[] => {
-  const ends: number[] = []
-  let offset = 0
-  while (offset + 5 <= buffer.length) {
-    if (buffer.readUInt32LE(offset) !== ZSTD_MAGIC) throw new Error(`not a Zstandard frame at byte ${String(offset)}`)
-    let cursor = offset + 4
-    const descriptor = buffer.readUInt8(cursor)
-    cursor += 1
-    const contentSizeFlag = descriptor >>> 6
-    const singleSegment = (descriptor & 0x20) !== 0
-    const checksum = (descriptor & 0x04) !== 0
-    const dictionaryFlag = descriptor & 0x03
-    cursor += (singleSegment ? 0 : 1) + (dictionaryFlag === 3 ? 4 : dictionaryFlag) + (contentSizeFlag === 0 ? (singleSegment ? 1 : 0) : 1 << contentSizeFlag)
-    let complete = false
-    while (cursor + 3 <= buffer.length) {
-      const header = buffer.readUIntLE(cursor, 3)
-      cursor += 3
-      cursor += ((header >>> 1) & 3) === 1 ? 1 : header >>> 3
-      if ((header & 1) === 1) {
-        complete = true
-        break
-      }
-    }
-    if (checksum) cursor += 4
-    if (!complete || cursor > buffer.length) break
-    ends.push(cursor)
-    offset = cursor
-  }
-  return ends
 }
 
 const parseLines = (text: string, into: LogRecord[]): void => {
@@ -94,7 +62,7 @@ const readLogSlice = async (input: {
       return { records, endOffset: input.fromOffset + lastNewline + 1 }
     }
     let start = 0
-    for (const end of completeFrameEnds(bytes)) {
+    for (const end of completeZstdFrameEnds(bytes)) {
       parseLines(zstdDecompressSync(bytes.subarray(start, end)).toString('utf8'), records)
       start = end
     }
