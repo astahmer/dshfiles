@@ -11,6 +11,7 @@ import { relative, resolve as resolvePath } from 'node:path'
  * invocation therefore pays one module graph, not every command's.
  */
 import { StagedOutput } from '../compiler/staged-output.js'
+import { FaceBuildOptions } from '../compiler/options.js'
 import { resolveDshxConfig } from '../config/resolve.js'
 import type { startDevSession } from '../dev/orchestrator.js'
 import type { DevEvent, DevSession } from '../dev/types.js'
@@ -267,50 +268,13 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
   const buildHostFace = runtime.buildHost ?? (await import('../compiler/host/build.js')).buildHost
   jobs.push({
     fallback: resolvePath(project.outDir, 'index.js'),
-    task: buildHostFace({
-      packageId: project.packageId,
-      logicalName: project.name,
-      root: project.root,
-      ...(project.hostEntry !== undefined && { entry: project.hostEntry }),
-      outDir: staged.directory,
-      sourcemap: project.build.sourcemap,
-      declarations: project.build.declarations ?? true,
-      bundleDependencies: project.hostBundleDependencies ?? [],
-      ...(project.hostDshxRuntime !== undefined && { dshxRuntime: project.hostDshxRuntime }),
-      ...(project.hostVitePlugins !== undefined && { vite: { plugins: project.hostVitePlugins } }),
-      compatibility,
-    }),
+    task: buildHostFace(FaceBuildOptions.host({ project, compatibility, outDir: staged.directory, hostHmr: false })),
   })
   if (project.clientEntry !== undefined) {
-    const dsh = project.manifest.dsh
-    const client =
-      typeof dsh === 'object' && dsh !== null && !Array.isArray(dsh) && typeof (dsh as Record<string, unknown>).client === 'object'
-        ? ((dsh as Record<string, unknown>).client as Record<string, unknown>)
-        : undefined
-    const external = Array.isArray(client?.external) && client.external.every(value => typeof value === 'string') ? (client.external as string[]) : []
-    const inject = Array.isArray(client?.inject) && client.inject.every(value => typeof value === 'string') ? (client.inject as string[]) : []
     const buildClientFace = runtime.buildClient ?? (await import('../compiler/client/build.js')).buildClient
     jobs.push({
       fallback: resolvePath(project.outDir, 'client.js'),
-      task: buildClientFace({
-        packageId: project.packageId,
-        logicalName: project.name,
-        root: project.root,
-        entry: project.clientEntry,
-        outDir: staged.directory,
-        sourcemap: project.build.sourcemap,
-        declarations: project.build.declarations ?? true,
-        minify: project.build.minify ?? false,
-        bundleDependencies: project.clientBundleDependencies ?? [],
-        ...(project.clientShared !== undefined && { shared: project.clientShared }),
-        ...(project.clientSharedRuntime !== undefined && { sharedRuntime: project.clientSharedRuntime }),
-        ...(project.clientSharedDshxRuntime === true && { sharedDshxRuntime: true }),
-        ...(project.clientDshxRuntime !== undefined && { dshxRuntime: project.clientDshxRuntime }),
-        ...(project.clientVitePlugins !== undefined && { vite: { plugins: project.clientVitePlugins } }),
-        external,
-        inject,
-        compatibility,
-      }),
+      task: buildClientFace(FaceBuildOptions.client({ project, compatibility, outDir: staged.directory, entry: project.clientEntry })),
     })
   }
   if ((project.modules ?? []).length > 0) {

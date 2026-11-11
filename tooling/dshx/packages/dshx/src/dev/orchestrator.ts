@@ -4,9 +4,9 @@ import type { BuildClientOptions } from '../compiler/client/build.js'
 import { watchClient } from '../compiler/client/build.js'
 import type { BuildHostOptions } from '../compiler/host/build.js'
 import { watchHost } from '../compiler/host/build.js'
+import { FaceBuildOptions } from '../compiler/options.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
-import type { JsonObject, JsonValue } from '../json.js'
 import { resolveDshxConfig } from '../config/resolve.js'
 import { ProfileOrchestrator } from '../profile/orchestrator.js'
 import { watchProjectFiles } from './project-watcher.js'
@@ -43,19 +43,6 @@ function errorMessage(error: unknown): string {
   return String(error)
 }
 
-const isJsonObject = (value: JsonValue | undefined): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
-
-function clientManifestArray(project: ResolvedDshxConfig, field: 'external' | 'inject'): readonly string[] {
-  const dsh = project.manifest.dsh
-  if (!isJsonObject(dsh)) return []
-  const client = dsh.client
-  if (!isJsonObject(client)) return []
-  const value = client[field]
-  if (!Array.isArray(value)) return []
-  const strings = value.filter((item): item is string => typeof item === 'string')
-  return strings.length === value.length ? strings : []
-}
-
 function childFromExeca(
   project: ResolvedDshxConfig,
   args: readonly string[],
@@ -88,43 +75,10 @@ interface BuildPaths {
 }
 
 function buildOptions(project: ResolvedDshxConfig, compatibility: import('../compat/types.js').DshCompatibility): BuildPaths {
+  const target = { project, compatibility, outDir: project.outDir }
   return {
-    ...(project.hostEntry !== undefined && {
-      host: {
-        packageId: project.packageId,
-        logicalName: project.name,
-        root: project.root,
-        entry: project.hostEntry,
-        outDir: project.outDir,
-        sourcemap: project.build.sourcemap,
-        declarations: project.build.declarations ?? true,
-        bundleDependencies: project.hostBundleDependencies ?? [],
-        ...(project.hostDshxRuntime !== undefined && { dshxRuntime: project.hostDshxRuntime }),
-        ...(project.hostVitePlugins !== undefined && { vite: { plugins: project.hostVitePlugins } }),
-        compatibility,
-        ...(project.dev.hostHmr !== undefined && { generation: { hostContractVersion: project.dev.hostHmr.hostContractVersion } }),
-      },
-    }),
-    ...(project.clientEntry !== undefined && {
-      client: {
-        packageId: project.packageId,
-        logicalName: project.name,
-        root: project.root,
-        entry: project.clientEntry,
-        outDir: project.outDir,
-        sourcemap: project.build.sourcemap,
-        declarations: project.build.declarations ?? true,
-        bundleDependencies: project.clientBundleDependencies ?? [],
-        ...(project.clientShared !== undefined && { shared: project.clientShared }),
-        ...(project.clientSharedRuntime !== undefined && { sharedRuntime: project.clientSharedRuntime }),
-        ...(project.clientSharedDshxRuntime === true && { sharedDshxRuntime: true }),
-        ...(project.clientDshxRuntime !== undefined && { dshxRuntime: project.clientDshxRuntime }),
-        ...(project.clientVitePlugins !== undefined && { vite: { plugins: project.clientVitePlugins } }),
-        external: clientManifestArray(project, 'external'),
-        inject: clientManifestArray(project, 'inject'),
-        compatibility,
-      },
-    }),
+    ...(project.hostEntry !== undefined && { host: FaceBuildOptions.host({ ...target, hostHmr: true }) }),
+    ...(project.clientEntry !== undefined && { client: FaceBuildOptions.client({ ...target, entry: project.clientEntry }) }),
   }
 }
 
