@@ -773,7 +773,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Observe › Activity and filter the feed to one thread.",
+        "doneWhen": "The feed lists that thread's events, newest first.",
+        "open": {
+          "panel": "activity-timeline"
+        }
+      }
     },
     {
       "key": "activity-timeline#activity-condensation",
@@ -915,7 +921,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Inbox › Needs you and answer or open the first item.",
+        "doneWhen": "The item leaves Needs you and the Inbox badge count drops.",
+        "open": {
+          "panel": "attention-inbox"
+        }
+      }
     },
     {
       "key": "activity-timeline#inbox-opens-subject",
@@ -981,7 +993,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "left-nav: Messages",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Agents › Messages and post a message to a topic.",
+        "doneWhen": "Your message shows in the topic's history.",
+        "open": {
+          "panel": "agent-communication"
+        }
+      }
     },
     {
       "key": "agent-communication#human-browser",
@@ -1168,7 +1186,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Ask the agent for a multi-step task and let it write a plan.",
+        "doneWhen": "A plan card shows Step N of M and the current step sits beside the composer."
+      }
     },
     {
       "key": "agent-plan#pinned-step",
@@ -1388,7 +1412,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "In a new thread, pick a preset from the Standard mode chip before typing.",
+        "doneWhen": "The chip names the preset and the first message runs with it.",
+        "open": {
+          "settings": {
+            "section": "agent-presets"
+          }
+        }
+      }
     },
     {
       "key": "agent-questions#parent-child-question",
@@ -1635,7 +1667,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "transcript: native question card",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Ask the agent to check something with you before it acts.",
+        "doneWhen": "A question card shows in the thread and your answer reaches the agent."
+      }
     },
     {
       "key": "agent-questions#question-card-layout",
@@ -2098,7 +2136,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Agents › Capabilities while a thread is on screen.",
+        "doneWhen": "The page lists the tools, plugins, MCP servers and skills that thread can use.",
+        "open": {
+          "panel": "dshfiles-agent-toolkit"
+        }
+      }
     },
     {
       "key": "agent-toolkit#agent-toolkit-palette",
@@ -2284,7 +2328,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Agents › Directory and create an agent with a handle and instructions.",
+        "doneWhen": "The agent is listed in the directory and enabled.",
+        "open": {
+          "panel": "dshfiles-agents"
+        }
+      }
     },
     {
       "key": "agents#agent-mentions",
@@ -2311,7 +2361,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Start a new thread with @ followed by an agent's handle and your request.",
+        "doneWhen": "A thread runs on that agent with your text as its first prompt."
+      }
     },
     {
       "key": "agents#agent-mention-preview",
@@ -2492,7 +2548,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Knowledge › Agent CLI threads and open a Claude Code or Codex session.",
+        "doneWhen": "The session's prompts, tool calls and token totals show read-only.",
+        "open": {
+          "panel": "dshfiles-agentsview"
+        }
+      }
     },
     {
       "key": "ai-accounts#disabled-account-preview",
@@ -2662,7 +2724,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › AI accounts and add an account for your provider.",
+        "doneWhen": "The account shows as connected and its models are listed.",
+        "open": {
+          "panel": "ai-accounts"
+        }
+      }
     },
     {
       "key": "ai-accounts#reference-dashboard",
@@ -2910,7 +2978,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Open Observe › Quota history after a few turns.",
+        "doneWhen": "The chart shows your accounts' usage over time.",
+        "open": {
+          "panel": "ai-accounts-usage"
+        }
+      }
     },
     {
       "key": "ai-accounts#quota-forecast",
@@ -3015,7 +3092,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Open Observe › Quota forecast.",
+        "doneWhen": "Each account shows when it runs out at the current pace.",
+        "open": {
+          "panel": "ai-accounts-forecast"
+        }
+      }
     },
     {
       "key": "ai-accounts#extra-usage-guard",
@@ -3298,7 +3384,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Press Annotate an element in the composer and click a part of the page.",
+        "doneWhen": "A note linked to that element's source sits in the draft, not yet sent."
+      }
     },
     {
       "key": "annotations#backlog-composers",
@@ -3645,7 +3734,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Attach two images to a message and click one.",
+        "doneWhen": "The gallery opens and the arrow keys move between the images."
+      }
     },
     {
       "key": "background-jobs#jobs-board",
@@ -3708,7 +3800,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Observe › Processes and read the Jobs tab.",
+        "doneWhen": "Every thread's running and finished background jobs are listed.",
+        "open": {
+          "panel": "dshfiles-background-jobs"
+        }
+      }
     },
     {
       "key": "background-jobs#batch-stop-jobs",
@@ -4173,7 +4271,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Work › Backlog and type a note or task into the capture box.",
+        "doneWhen": "The item shows in the feed with its kind and title.",
+        "open": {
+          "panel": "dshfiles-backlog-panel"
+        }
+      }
     },
     {
       "key": "backlog#jev-settings",
@@ -5161,7 +5265,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "composer: @b: mentions",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Type @b: in the composer and pick a backlog item.",
+        "doneWhen": "The item shows as a chip in your message."
+      }
     },
     {
       "key": "backlog#backlinks",
@@ -6702,7 +6809,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Right-click a backlog item and choose Start thread.",
+        "doneWhen": "A new thread opens, linked from the item.",
+        "open": {
+          "panel": "dshfiles-backlog-panel"
+        }
+      }
     },
     {
       "key": "backlog#jev-secret-setup",
@@ -9968,7 +10084,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "right-pane: btw tab",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "In a thread with a finished turn, type /btw and a question.",
+        "doneWhen": "The answer opens in a btw tab beside the thread, which keeps going untouched."
+      }
     },
     {
       "key": "btw#btw-command-chip",
@@ -10111,7 +10233,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › Capabilities hub and pick skills, MCP servers or plugins.",
+        "doneWhen": "That kind's own manager opens.",
+        "open": {
+          "panel": "dshfiles-capabilities-hub"
+        }
+      }
     },
     {
       "key": "chat#resume-interrupted",
@@ -10316,7 +10444,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Press Cmd+F (Ctrl+F elsewhere) in a thread and type a word.",
+        "doneWhen": "The thread jumps to each match, older history included.",
+        "open": {
+          "command": "dshfiles-chat.find-in-thread"
+        }
+      }
     },
     {
       "key": "chat#route-change-markers",
@@ -10453,7 +10587,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open the command palette and type part of a thread title or file name.",
+        "doneWhen": "Picking a result opens that thread or file."
+      }
     },
     {
       "key": "command-palette#action-registry",
@@ -10687,7 +10824,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Knowledge › Component gallery and pick a tab.",
+        "doneWhen": "The shared components render live on the page.",
+        "open": {
+          "panel": "component-gallery"
+        }
+      }
     },
     {
       "key": "context-compaction#bounded-compaction",
@@ -10795,7 +10938,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › Conversation cleanup and preview what it would delete.",
+        "doneWhen": "The preview lists the cold settled or archived conversations, and nothing is deleted until you confirm.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-conversation-cleanup"
+          }
+        }
+      }
     },
     {
       "key": "credential-port#secret-credential-port",
@@ -10873,7 +11024,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "right-pane: native review tab › Viewed",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open a thread's review tab and mark a changed file Viewed.",
+        "doneWhen": "The file shows as viewed and the progress count goes up."
+      }
     },
     {
       "key": "diff-viewed#host-owned-view-state",
@@ -10952,7 +11106,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Run Editor: Artifacts from the command palette in a thread and create a document.",
+        "doneWhen": "The document is saved with the thread and opens again later.",
+        "open": {
+          "command": "dshfiles-editor.artifacts"
+        }
+      }
     },
     {
       "key": "editor#workspace-editor",
@@ -11021,7 +11181,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project"
+        ],
+        "firstAction": "Open a new tab, pick Editor: Files and open a file of the project.",
+        "doneWhen": "You edit and save the file in the editor."
+      }
     },
     {
       "key": "editor#file-links",
@@ -11238,7 +11404,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open the Status bar settings and hide or move an item.",
+        "doneWhen": "The status strip shows your order.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-status-bar"
+          }
+        }
+      }
     },
     {
       "key": "frame-layout#status-strip-restore",
@@ -11501,7 +11675,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "After a plugin rebuild, read the Restart pending item in the status strip.",
+        "doneWhen": "It names the plugins that wait for a Host restart."
+      }
     },
     {
       "key": "hmr-gate#host-reload",
@@ -11562,7 +11739,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Ask the agent to show a chart or mockup as an HTML page.",
+        "doneWhen": "The page shows as a card in the transcript and opens in a new tab."
+      }
     },
     {
       "key": "html-render#html-preview-card",
@@ -11821,7 +12004,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "composer: / menu",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Type / at the start of the composer and pick a command.",
+        "doneWhen": "The command runs and its token leaves the draft."
+      }
     },
     {
       "key": "input-trigger#entity-registry",
@@ -12093,7 +12279,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "In a new thread's run row, set the Workspace segment to its own workspace.",
+        "doneWhen": "The thread runs in its own jj workspace, not in the project checkout."
+      }
     },
     {
       "key": "jj-integration#git-thread-workspaces",
@@ -12437,7 +12630,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "Open the thread workspace control in a thread's header and choose Integrate.",
+        "doneWhen": "The thread's revisions land on the bookmark."
+      }
     },
     {
       "key": "jj-integration#turn-end-integrate",
@@ -12582,7 +12782,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "Open Land › Workspaces and pick a thread workspace.",
+        "doneWhen": "The workspace shows its state, and a ready one integrates from there.",
+        "open": {
+          "panel": "jj-integration"
+        }
+      }
     },
     {
       "key": "jj-integration#thread-integration-attention-view",
@@ -13358,7 +13568,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "Open Land › History and pick a revision.",
+        "doneWhen": "The revision's detail and changed files show.",
+        "open": {
+          "panel": "dshfiles-jujutsu"
+        }
+      }
     },
     {
       "key": "jujutsu#revision-detail-and-diff",
@@ -14521,7 +14741,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "Open Land › Source control and describe the working copy.",
+        "doneWhen": "The working copy shows your description.",
+        "open": {
+          "panel": "dshfiles-jujutsu-source-control"
+        }
+      }
     },
     {
       "key": "jujutsu#panel-scopes",
@@ -14692,7 +14922,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › Network access and choose whether DSH is reachable on your LAN.",
+        "doneWhen": "The choice is saved and applies after the next restart.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-network-access"
+          }
+        }
+      }
     },
     {
       "key": "main-tabs#workbench-semantics-provider",
@@ -14955,7 +15193,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Press + at the end of the tab strip.",
+        "doneWhen": "A new tab opens with a search over threads and views."
+      }
     },
     {
       "key": "main-tabs#tab-keyboard",
@@ -15207,7 +15448,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › MCP endpoint and generate a token.",
+        "doneWhen": "You copied the claude mcp add command that connects a terminal agent to DSH.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-mcp-endpoint"
+          }
+        }
+      }
     },
     {
       "key": "mcp-servers#server-configuration",
@@ -15248,7 +15497,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › MCP servers and add a server.",
+        "doneWhen": "The server shows as connected with its tools listed.",
+        "open": {
+          "panel": "mcp-servers"
+        }
+      }
     },
     {
       "key": "mcp-servers#secret-catalog-credential-bindings",
@@ -15606,7 +15861,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Knowledge › Memory and search your notes.",
+        "doneWhen": "A note opens with its source and evidence.",
+        "open": {
+          "panel": "dshfiles-memory-panel"
+        }
+      }
     },
     {
       "key": "memory#memory-reference-preview",
@@ -15898,7 +16159,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Type @ in the composer and pick a file or a thread.",
+        "doneWhen": "The reference shows as a chip in your message."
+      }
     },
     {
       "key": "mentions#session-mention-links",
@@ -15972,7 +16236,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "transcript: mermaid code fence",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Ask the agent to draw a flow as a mermaid diagram.",
+        "doneWhen": "The diagram renders in the transcript instead of code."
+      }
     },
     {
       "key": "model-effort-picker#model-selection",
@@ -16020,7 +16290,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Open the model picker in the composer and search for a model.",
+        "doneWhen": "The composer names the model and account you picked."
+      }
     },
     {
       "key": "model-effort-picker#fast-mode",
@@ -16223,7 +16499,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "In a new thread, choose a model before typing.",
+        "doneWhen": "The first message runs on that model."
+      }
     },
     {
       "key": "multi-host#runtime-directory",
@@ -16453,7 +16735,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Observe › Hosts.",
+        "doneWhen": "Each registered host shows its live load and memory use.",
+        "open": {
+          "panel": "dshfiles-multi-host-hosts"
+        }
+      }
     },
     {
       "key": "multi-host#logical-project-grouping",
@@ -17523,7 +17811,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › Plugin guide and search for a slot or API.",
+        "doneWhen": "The entry shows its scope, risk and source link.",
+        "open": {
+          "panel": "dshfiles-plugin-guide"
+        }
+      }
     },
     {
       "key": "plugin-ui#query-client-binding",
@@ -17646,7 +17940,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account",
+          "project"
+        ],
+        "firstAction": "Ask the agent to start the project's dev server, then open the thread header's dev servers chip.",
+        "doneWhen": "The chip lists the port and opens it in the browser."
+      }
     },
     {
       "key": "preview#render-html",
@@ -17733,7 +18034,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account",
+          "project"
+        ],
+        "firstAction": "Open Work › Automations and create a schedule for a project.",
+        "doneWhen": "Run now starts a thread in that project and the run shows in its history.",
+        "open": {
+          "panel": "project-automations"
+        }
+      }
     },
     {
       "key": "project-automations#project-automation-webhooks",
@@ -17815,7 +18126,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project"
+        ],
+        "firstAction": "Open Project checks in the composer and run a configured check.",
+        "doneWhen": "The check's receipt shows its result."
+      }
     },
     {
       "key": "project-checks#native-hook-receipts",
@@ -17866,7 +18183,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Prompts in the composer and save a snippet.",
+        "doneWhen": "The snippet inserts into any composer without sending."
+      }
     },
     {
       "key": "prompt-stash#guarded-composer-insertion",
@@ -17945,7 +18265,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Run Search prompt history from the command palette and type a word you sent before.",
+        "doneWhen": "Enter puts that prompt in the composer without sending it.",
+        "open": {
+          "command": "@dshfiles/prompt-stash.history"
+        }
+      }
     },
     {
       "key": "prompt-stash#draft-attachment-retention",
@@ -18137,7 +18463,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account",
+          "repository",
+          "github"
+        ],
+        "firstAction": "Run Create pull request from this thread from the command palette.",
+        "doneWhen": "After you confirm, the pull request opens on GitHub, linked to the thread."
+      }
     },
     {
       "key": "pulls-review#thread-review-scopes",
@@ -18311,7 +18645,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "Open Land › Review and pick a project or thread workspace.",
+        "doneWhen": "Its changes show in one diff, grouped by scope.",
+        "open": {
+          "panel": "pulls-review"
+        }
+      }
     },
     {
       "key": "pulls-review#ai-scope-summaries",
@@ -18462,7 +18806,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "Open the Changes tab in a thread's side panel after a turn that edited files.",
+        "doneWhen": "The turn's changes show with a file list and diff."
+      }
     },
     {
       "key": "pulls-review#package-json-table",
@@ -18703,7 +19054,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "composer: queued messages",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Queue two messages while the agent works, then drag one above the other.",
+        "doneWhen": "The queue sends them in your new order."
+      }
     },
     {
       "key": "queue-reorder#composer-message-editing",
@@ -18964,7 +19318,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Knowledge › Resources and attach a property pack to a resource.",
+        "doneWhen": "The resource shows the pack's typed properties.",
+        "open": {
+          "panel": "dshfiles-resources"
+        }
+      }
     },
     {
       "key": "rich-composer#phone-thread-menu",
@@ -19272,7 +19632,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Press ArrowUp in an empty composer of a thread.",
+        "doneWhen": "Your previous prompt fills the composer and Escape restores the draft."
+      }
     },
     {
       "key": "rich-composer#large-paste-file",
@@ -19486,7 +19849,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › Secrets and add a secret.",
+        "doneWhen": "The alias is listed in its scope without showing its value.",
+        "open": {
+          "panel": "secret-catalog"
+        }
+      }
     },
     {
       "key": "secret-catalog#bounded-secret-reveal",
@@ -20013,7 +20382,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "composer: Sending when upload finishes pill",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Attach a large file and press Enter before it finishes uploading.",
+        "doneWhen": "The message sends by itself once the upload ends."
+      }
     },
     {
       "key": "session-controller#live-model-catalog",
@@ -20103,7 +20475,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Set Settings › General › Running threads limit to a number above 0.",
+        "doneWhen": "Past that many running threads, a new turn waits for a free slot."
+      }
     },
     {
       "key": "session-log-window#bounded-session-log-window",
@@ -20216,7 +20591,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project",
+          "repository"
+        ],
+        "firstAction": "After a turn that edited files, press Undo last turn in the composer.",
+        "doneWhen": "The files and the conversation return to before that turn, and Redo brings them back."
+      }
     },
     {
       "key": "session-undo#turn-rewind",
@@ -20367,7 +20749,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › Models and review your model providers.",
+        "doneWhen": "The providers you use are listed with their models.",
+        "open": {
+          "settings": {
+            "section": "models"
+          }
+        }
+      }
     },
     {
       "key": "settings-shell#settings-shell-port",
@@ -20715,7 +21105,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings and type a word in Search settings.",
+        "doneWhen": "Matching settings show as a list you can edit in place.",
+        "open": {
+          "settings": {
+            "section": "general"
+          }
+        }
+      }
     },
     {
       "key": "settings-shell#settings-search-entries",
@@ -21383,7 +21781,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "settings: Plugins › Web search",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › Plugins › Web search and choose a provider.",
+        "doneWhen": "The agent's web_search uses that provider."
+      }
     },
     {
       "key": "shared-runtime#shared-client-runtime",
@@ -21419,7 +21820,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "keyboard: Mod+B",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Press Cmd+B on a Mac or Ctrl+B elsewhere.",
+        "doneWhen": "The sidebar hides and shows again on the next press."
+      }
     },
     {
       "key": "shortcuts#panel-selection-chords",
@@ -21652,7 +22056,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account",
+          "project"
+        ],
+        "firstAction": "Ask the agent to run the project's Vitest tests.",
+        "doneWhen": "A test-results card shows per-file results instead of terminal text."
+      }
     },
     {
       "key": "test-runs#bash-stack-trace",
@@ -21720,7 +22131,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Settings › Thread sharing and create a link for a thread.",
+        "doneWhen": "The link opens a read-only copy of the thread.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-thread-share"
+          }
+        }
+      }
     },
     {
       "key": "thread-share#thread-share-snapshot-export",
@@ -22084,7 +22503,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Threads › Board.",
+        "doneWhen": "Your threads show as columns on their own page.",
+        "open": {
+          "panel": "dshfiles-thread-board"
+        }
+      }
     },
     {
       "key": "thread-sidebar#status-grouped-thread-list",
@@ -22175,7 +22600,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Threads and read the groups.",
+        "doneWhen": "Your threads are grouped as Needs you, Working, Ready, Idle and Done."
+      }
     },
     {
       "key": "thread-sidebar#working-status-item",
@@ -24471,7 +24899,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Inbox › Waiting threads.",
+        "doneWhen": "Each thread waiting on you is listed once, with Open and Done.",
+        "open": {
+          "panel": "thread-sidebar-waiting"
+        }
+      }
     },
     {
       "key": "thread-sidebar#subagent-live-preview",
@@ -24718,7 +25152,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open a thread's row menu and choose Export….",
+        "doneWhen": "A .dshthread file downloads, ready to import on another machine."
+      }
     },
     {
       "key": "thread-transfer#thread-import",
@@ -24836,7 +25273,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Ask the agent for a task that runs a tool.",
+        "doneWhen": "Each tool card shows when it started and how long it took."
+      }
     },
     {
       "key": "tool-meta#read-code-card",
@@ -24987,7 +25430,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Observe › Traces and open a trace.",
+        "doneWhen": "Its span waterfall shows each step with its duration.",
+        "open": {
+          "panel": "traces"
+        }
+      }
     },
     {
       "key": "traces#thread-traces-tab",
@@ -25680,7 +26129,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Ask the agent for a task that edits a file or runs a command.",
+        "doneWhen": "A one-line summary of files, commands and time shows under the turn."
+      }
     },
     {
       "key": "turn-summary#turn-walkthrough",
@@ -25873,7 +26328,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Open Observe › Usage after a few turns.",
+        "doneWhen": "The Requests tab lists each model request with its tokens and cost.",
+        "open": {
+          "panel": "dshfiles-usage"
+        }
+      }
     },
     {
       "key": "usage#usage-charts",
@@ -26442,7 +26906,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Ask the agent to ask you to choose between options.",
+        "doneWhen": "A question form shows the options and your answer reaches the agent."
+      }
     },
     {
       "key": "vcs-provider-port#vcs-provider-resolution",
@@ -26490,7 +26960,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "transcript: web_search / web_fetch rows",
       "reach": [],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "account"
+        ],
+        "firstAction": "Ask the agent to read a web page.",
+        "doneWhen": "A chip with the page's host and title shows under the web_fetch call."
+      }
     },
     {
       "key": "web-search-brave#brave-web-search",
@@ -26536,7 +27012,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project"
+        ],
+        "firstAction": "Open Knowledge › Whiteboard and create a board for a project.",
+        "doneWhen": "The board saves as you draw and opens again later.",
+        "open": {
+          "panel": "dshfiles-whiteboard"
+        }
+      }
     },
     {
       "key": "whiteboard#agent-diagrams",
@@ -27081,7 +27566,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "In a pane, open Choose a view and pick a page under Thread panels.",
+        "doneWhen": "That thread page opens in the pane and follows the thread on screen."
+      }
     },
     {
       "key": "workbench#phone-thread-panel-sheet",
@@ -27358,7 +27846,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Choose workspace from the composer, then Add workspace, and pick a folder.",
+        "doneWhen": "The folder is a project you can start threads in."
+      }
     },
     {
       "key": "workspace-folder-picker#project-clone",
@@ -27668,7 +28159,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
-      "onboarding": null
+      "onboarding": {
+        "prerequisites": [
+          "project"
+        ],
+        "firstAction": "Open Settings › Projects and pick a project.",
+        "doneWhen": "The project's settings, such as its main branch, show.",
+        "open": {
+          "settings": {
+            "section": "dshfiles-workspace-folder-picker-projects"
+          }
+        }
+      }
     },
     {
       "key": "workspace-nav#new-thread-composer",
@@ -27702,7 +28204,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Press + for a New thread and start typing right away.",
+        "doneWhen": "The composer takes your text before the thread exists, and sending creates it."
+      }
     },
     {
       "key": "worktree-memory#memory-board",
@@ -27743,7 +28248,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "reachNarrow": null,
-      "onboarding": null
+      "onboarding": {
+        "firstAction": "Open Observe › RAM.",
+        "doneWhen": "Memory use shows per workspace and per Node process.",
+        "open": {
+          "panel": "dshfiles-worktree-memory"
+        }
+      }
     },
     {
       "key": "worktree-memory#orphan-scratch-hosts",
