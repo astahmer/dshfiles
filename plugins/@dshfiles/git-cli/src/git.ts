@@ -24,6 +24,11 @@ export interface GitOutput {
   readonly stderr: string
 }
 
+/** {@link GitOutput} with stdout kept as bytes, for a blob's content (`git cat-file blob`). */
+export interface GitBytesOutput extends Omit<GitOutput, 'stdout'> {
+  readonly stdout: Uint8Array
+}
+
 export interface GitOptions {
   /**
    * The executable. Defaults to the bare `git`: DSH's spawner resolves a bare name through its subprocess runtime, and a
@@ -69,7 +74,7 @@ const collectBounded = <E>(stream: Stream.Stream<Uint8Array, E>, maxBytes: numbe
         joined.set(chunk, offset)
         offset += chunk.byteLength
       }
-      return { text: new TextDecoder().decode(joined), truncated: state.truncated }
+      return { bytes: joined, truncated: state.truncated }
     }),
   )
 
@@ -84,6 +89,8 @@ export class Git extends Context.Service<
     readonly run: (command: GitCommand) => Effect.Effect<GitOutput, GitRunFailed>
     /** Stdout on exit 0, otherwise `GitCommandFailed` with redacted arguments and stderr. */
     readonly exec: (command: GitCommand) => Effect.Effect<string, GitExecError>
+    /** {@link run} with stdout as raw bytes; a non-zero exit is a value. */
+    readonly runBytes: (command: GitCommand) => Effect.Effect<GitBytesOutput, GitRunFailed>
   }
 >()('@dshfiles/git-cli/Git') {
   static readonly make = Effect.fnUntraced(function* (options: GitOptions) {
@@ -92,7 +99,7 @@ export class Git extends Context.Service<
     const maxStderrBytes = options.maxStderrBytes ?? DEFAULT_MAX_STDERR_BYTES
     const baseEnvironment = nonInteractiveEnvironment(options.environment ?? process.env)
 
-    const bounded = (command: GitCommand): Effect.Effect<GitOutput, GitRunFailed> => {
+    const boundedBytes = (command: GitCommand): Effect.Effect<GitBytesOutput, GitRunFailed> => {
       const args = ['-c', 'core.quotePath=false', ...command.args]
       const verb = GitArgs.verb(command.args)
       const timeout = Duration.fromInputUnsafe(command.timeout ?? options.timeout ?? DEFAULT_TIMEOUT)
@@ -115,9 +122,12 @@ export class Git extends Context.Service<
         ).pipe(Effect.mapError(cause => new GitRunFailed({ verb, reason: 'output-read-failed', cause })))
         yield* Effect.annotateCurrentSpan({ 'process.exit.code': exitCode })
         if (stdout.truncated && command.onStdoutLimit !== 'truncate') return yield* new GitRunFailed({ verb, reason: 'output-truncated' })
-        return { exitCode, stdout: stdout.text, stdoutTruncated: stdout.truncated, stderr: stderr.text } satisfies GitOutput
+        return { exitCode, stdout: stdout.bytes, stdoutTruncated: stdout.truncated, stderr: new TextDecoder().decode(stderr.bytes) } satisfies GitBytesOutput
       }).pipe(Effect.scoped, Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.fail(new GitRunFailed({ verb, reason: 'timed-out' })) }))
     }
+
+    const bounded = (command: GitCommand): Effect.Effect<GitOutput, GitRunFailed> =>
+      Effect.map(boundedBytes(command), output => ({ ...output, stdout: new TextDecoder().decode(output.stdout) }))
 
     /** One span per run, around exec's exit check too, so a failed exec ends its span as an error. */
     const traced = <A, E>(command: GitCommand, effect: Effect.Effect<A, E>) =>
@@ -147,7 +157,7 @@ export class Git extends Context.Service<
         ),
       )
 
-    return Git.of({ run, exec })
+    return Git.of({ run, exec, runBytes: command => traced(command, boundedBytes(command)) })
   })
 
   static readonly layer = Layer.effect(Git, Git.make({}))

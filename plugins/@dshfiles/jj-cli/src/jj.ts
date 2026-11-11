@@ -23,6 +23,11 @@ export interface JjOutput {
   readonly stderrTruncated: boolean
 }
 
+/** {@link JjOutput} with stdout kept as bytes, for a file's content at a revision. */
+export interface JjBytesOutput extends Omit<JjOutput, 'stdout'> {
+  readonly stdout: Uint8Array
+}
+
 export interface JjOptions {
   /** Absolute jj path; resolved from `PATH` once when omitted. */
   readonly executable?: string | undefined
@@ -36,12 +41,12 @@ const DEFAULT_MAX_STDOUT_BYTES = 1_160_000
 const DEFAULT_MAX_STDERR_BYTES = 64_000
 const KILL_GRACE = Duration.millis(1_500)
 
-interface CollectedText {
-  readonly text: string
+interface CollectedBytes {
+  readonly bytes: Uint8Array
   readonly truncated: boolean
 }
 
-const collectBounded = <E>(input: { readonly stream: Stream.Stream<Uint8Array, E>; readonly maxBytes: number }): Effect.Effect<CollectedText, E> =>
+const collectBounded = <E>(input: { readonly stream: Stream.Stream<Uint8Array, E>; readonly maxBytes: number }): Effect.Effect<CollectedBytes, E> =>
   Stream.runFold(
     input.stream,
     () => ({ chunks: new Array<Uint8Array>(), bytes: 0, truncated: false }),
@@ -60,9 +65,11 @@ const collectBounded = <E>(input: { readonly stream: Stream.Stream<Uint8Array, E
         joined.set(chunk, offset)
         offset += chunk.byteLength
       }
-      return { text: new TextDecoder().decode(joined), truncated: state.truncated }
+      return { bytes: joined, truncated: state.truncated }
     }),
   )
+
+const decoded = (output: JjBytesOutput): JjOutput => ({ ...output, stdout: new TextDecoder().decode(output.stdout) })
 
 const isSafeExecutable = (input: { readonly path: Path.Path; readonly executable: string }): boolean =>
   input.path.isAbsolute(input.executable) && !input.executable.includes('\0')
@@ -75,6 +82,8 @@ export class Jj extends Context.Service<
     readonly run: (command: JjCommand) => Effect.Effect<JjOutput, JjRunError>
     /** Run jj and fail with `JjCommandFailed` (redacted args and stderr) on a non-zero exit. */
     readonly exec: (command: JjCommand) => Effect.Effect<JjOutput, JjExecError>
+    /** {@link run} with stdout as raw bytes (`jj file show` of a binary file); a non-zero exit is a value. */
+    readonly runBytes: (command: JjCommand) => Effect.Effect<JjBytesOutput, JjRunError>
   }
 >()('@dshfiles/jj-cli/Jj') {
   static readonly make = Effect.fnUntraced(function* (options: JjOptions) {
@@ -139,14 +148,14 @@ export class Jj extends Context.Service<
       if (stdout.truncated && input.command.onStdoutLimit !== 'truncate') return yield* new JjOutputTruncated({ verb: input.verb, maxBytes: maxStdoutBytes })
       return {
         exitCode,
-        stdout: stdout.text,
+        stdout: stdout.bytes,
         stdoutTruncated: stdout.truncated,
-        stderr: stderr.text,
+        stderr: new TextDecoder().decode(stderr.bytes),
         stderrTruncated: stderr.truncated,
-      } satisfies JjOutput
+      } satisfies JjBytesOutput
     })
 
-    const bounded = (command: JjCommand) => {
+    const boundedBytes = (command: JjCommand) => {
       const verb = JjArgs.verb(command.args)
       const timeout = Duration.fromInputUnsafe(command.timeout ?? options.timeout ?? DEFAULT_TIMEOUT)
       return spawnAndCollect({ command, verb }).pipe(
@@ -158,6 +167,8 @@ export class Jj extends Context.Service<
         Effect.tap(output => Effect.annotateCurrentSpan({ 'process.exit.code': output.exitCode, 'jj.output.truncated': output.stdoutTruncated })),
       )
     }
+
+    const bounded = (command: JjCommand) => Effect.map(boundedBytes(command), decoded)
 
     const failOnNonZeroExit = (input: { readonly command: JjCommand; readonly output: JjOutput }) =>
       input.output.exitCode === 0
@@ -178,6 +189,7 @@ export class Jj extends Context.Service<
     return Jj.of({
       run: command => traced({ command, effect: bounded(command) }),
       exec: command => traced({ command, effect: bounded(command).pipe(Effect.flatMap(output => failOnNonZeroExit({ command, output }))) }),
+      runBytes: command => traced({ command, effect: boundedBytes(command) }),
     })
   })
 

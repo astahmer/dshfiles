@@ -61,6 +61,7 @@ const fakeJj = (script: JjScript, calls: string[][]) =>
           return Effect.succeed(fail(`unexpected jj ${command.args.join(' ')}`))
         }),
       exec: () => Effect.die('exec is not used by the create flow'),
+      runBytes: () => Effect.die('runBytes is not used by the create flow'),
     }),
   )
 

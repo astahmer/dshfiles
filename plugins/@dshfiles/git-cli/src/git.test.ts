@@ -58,6 +58,22 @@ describe('Git', () => {
     }).pipe(Effect.provide(GitTestLayer), Effect.scoped),
   )
 
+  it.live('reads a committed binary blob as its exact bytes', () =>
+    Effect.gen(function* () {
+      const git = yield* Git
+      const directory = yield* temporaryDirectory
+      const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x80])
+      writeFileSync(join(directory, 'shot.png'), bytes)
+      const identity = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' }
+      yield* git.exec({ args: ['init', '-q', '-b', 'main'], cwd: directory })
+      yield* git.exec({ args: ['add', 'shot.png'], cwd: directory })
+      yield* git.exec({ args: ['commit', '-q', '-m', 'image'], cwd: directory, env: identity })
+      const output = yield* git.runBytes({ args: ['cat-file', 'blob', 'HEAD:shot.png'], cwd: directory })
+      expect(output.exitCode).toBe(0)
+      expect(output.stdout).toEqual(bytes)
+    }).pipe(Effect.scoped, Effect.provide(GitTestLayer)),
+  )
+
   it.live('stops a run that exceeds its timeout', () =>
     Effect.gen(function* () {
       const directory = yield* temporaryDirectory

@@ -38,6 +38,20 @@ describe('Jj', () => {
     }).pipe(Effect.scoped, Effect.provide(JjTestLayer)),
   )
 
+  it.live('reads a binary file at a revision as its exact bytes', () =>
+    Effect.gen(function* () {
+      const jj = yield* Jj
+      const fileSystem = yield* FileSystem.FileSystem
+      const { repository } = yield* temporaryRepository
+      const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x80])
+      yield* fileSystem.writeFile(`${repository}/shot.png`, bytes)
+      yield* jj.exec({ args: ['describe', '-m', 'image'], cwd: repository })
+      const output = yield* jj.runBytes({ args: ['file', 'show', '-r', '@', 'root-file:"shot.png"'], cwd: repository })
+      expect(output.exitCode).toBe(0)
+      expect(output.stdout).toEqual(bytes)
+    }).pipe(Effect.scoped, Effect.provide(JjTestLayer)),
+  )
+
   it.live('returns a non-zero exit as a value with its stderr', () =>
     Effect.gen(function* () {
       const jj = yield* Jj
