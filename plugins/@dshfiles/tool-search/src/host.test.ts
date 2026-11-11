@@ -44,6 +44,7 @@ interface AgentContext {
     readonly restrict: (filter: { readonly allow?: readonly string[]; readonly deny?: readonly string[] }) => () => void
     readonly register: (tool: RegisteredTool) => () => void
   }
+  readonly on: (name: string, listener: () => void) => () => void
 }
 
 interface TestAgent {
@@ -90,6 +91,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
   const makeAgent = (id: string, restored: readonly string[] = []): TestAgent => {
     let agent: TestAgent
     const context = {
+      on: () => () => undefined,
       tools: {
         get: (name: string) => globalTools.get(name),
         schemas: (scope?: TestAgent) => [
