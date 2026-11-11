@@ -743,6 +743,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
+          "value": null
+        },
+        {
+          "text": "click button \"Activity\"",
+          "action": "click",
+          "by": "button",
+          "name": "Activity",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Search activity\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Search activity",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -754,6 +784,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Activity Timeline: Activity › attention filter",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -801,6 +832,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -812,6 +844,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "Host contract: attention-api module and attention_* agent tools",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -827,6 +860,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "text": "click tab \"Inbox\"",
           "action": "click",
           "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "click button \"Needs you\"",
+          "action": "click",
+          "by": "button",
+          "name": "Needs you",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Needs you*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Needs you*",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
           "name": "Inbox",
           "value": null
         },
@@ -878,6 +941,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect text \"Needs you\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Needs you",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -889,6 +968,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -900,6 +980,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -933,6 +1014,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Agents Configured agents and their messages.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents Configured agents and their messages.",
+          "value": null
+        },
+        {
+          "text": "click button \"Messages\"",
+          "action": "click",
+          "by": "button",
+          "name": "Messages",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Message a thread…\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Message a thread…",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -944,6 +1055,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: dshx_comm_inbox / dshx_comm_ack",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -955,6 +1067,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -966,6 +1079,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -977,6 +1091,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1052,6 +1167,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1092,6 +1208,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1132,6 +1249,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1172,6 +1290,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1198,6 +1317,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1238,6 +1358,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "expect button \"Standard mode\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Standard mode",
+          "value": null
+        },
+        {
+          "text": "click button \"Standard mode\"",
+          "action": "click",
+          "by": "button",
+          "name": "Standard mode",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Creator mode*\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Creator mode*",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -1254,6 +1404,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "expect text \"ask_parent_question\"",
+          "action": "expect",
+          "by": "text",
+          "name": "ask_parent_question",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Agents Configured agents and their messages.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents Configured agents and their messages.",
           "value": null
         },
         {
@@ -1332,6 +1526,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1379,6 +1574,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1426,6 +1622,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1437,6 +1634,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: native question card",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1448,6 +1646,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: native question card",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1464,6 +1663,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "expect text \"list_thread_questions\"",
+          "action": "expect",
+          "by": "text",
+          "name": "list_thread_questions",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Agents Configured agents and their messages.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents Configured agents and their messages.",
           "value": null
         },
         {
@@ -1556,6 +1799,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1571,6 +1815,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "text": "click tab \"Inbox\"",
           "action": "click",
           "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
           "name": "Inbox",
           "value": null
         },
@@ -1650,6 +1910,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1661,6 +1922,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: OTel spans (read in left-nav: Traces: Explorer)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1672,6 +1934,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: OTel spans (read in left-nav: Traces: Explorer)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1683,6 +1946,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: OTel spans (read in left-nav: Traces: Explorer)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1694,6 +1958,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "settings: Agent telemetry › capture content",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1727,6 +1992,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1743,6 +2009,57 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "click radio \"Plugins\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Plugins",
+          "value": null
+        },
+        {
+          "text": "expect region \"Plugins (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Plugins (*",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Agents Configured agents and their messages.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents Configured agents and their messages.",
           "value": null
         },
         {
@@ -1842,6 +2159,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1903,6 +2221,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1964,6 +2283,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -1990,6 +2310,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2107,6 +2428,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2123,6 +2445,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Agent CLI threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agent CLI threads",
+          "value": null
+        },
+        {
+          "text": "expect text \"Threads other agent CLIs recorded on this machine*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Threads other agent CLIs recorded on this machine*",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Knowledge Memory and reference material agents use.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Knowledge Memory and reference material agents use.",
           "value": null
         },
         {
@@ -2173,6 +2525,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2213,6 +2566,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2239,6 +2593,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2265,6 +2620,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2305,6 +2661,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2345,6 +2702,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2392,6 +2750,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2425,6 +2784,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2458,6 +2818,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2474,6 +2835,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Quota\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Quota",
+          "value": null
+        },
+        {
+          "text": "click radio \"History\"",
+          "action": "click",
+          "by": "radio",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "expect text \"Quota history\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Quota history",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
           "value": null
         },
         {
@@ -2559,6 +2964,57 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Quota\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Quota",
+          "value": null
+        },
+        {
+          "text": "click radio \"Forecast\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Forecast",
+          "value": null
+        },
+        {
+          "text": "click radio \"Hand-off\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Hand-off",
+          "value": null
+        },
+        {
+          "text": "expect text \"Enable an account with quota to see where it is heading.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Enable an account with quota to see where it is heading.",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -2570,6 +3026,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "status-strip: Quota popover › account card › Use extra usage",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2581,6 +3038,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › failure recovery",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2592,6 +3050,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › failure recovery",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2603,6 +3062,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "transcript: usage-limit turn tail › Resume",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2671,6 +3131,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2686,6 +3147,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "text": "click tab \"Inbox\"",
           "action": "click",
           "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
           "name": "Inbox",
           "value": null
         },
@@ -2730,6 +3207,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2819,6 +3297,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2866,6 +3345,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Annotate an element\"",
+          "action": "click",
+          "by": "button",
+          "name": "Annotate an element",
+          "value": null
+        },
+        {
+          "text": "expect text \"None yet in this draft\"",
+          "action": "expect",
+          "by": "text",
+          "name": "None yet in this draft",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -2877,6 +3400,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: annotations_source",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2888,6 +3412,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: annotations_intake (browser extension)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2899,6 +3424,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "dialog: annotate an HTML preview",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2910,6 +3436,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Annotate an element › DSH-owned Chrome",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2921,6 +3448,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: apply_patch",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -2937,6 +3465,99 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "expect button \"Remove image red.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image red.png",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/blue.png"
+        },
+        {
+          "text": "expect button \"Remove image blue.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image blue.png",
+          "value": null
+        },
+        {
+          "text": "click button \"red.png, click to view original\"",
+          "action": "click",
+          "by": "button",
+          "name": "red.png, click to view original",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Image preview\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Image preview",
+          "value": null
+        },
+        {
+          "text": "expect img \"red.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "red.png",
+          "value": null
+        },
+        {
+          "text": "press ArrowRight",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ArrowRight"
+        },
+        {
+          "text": "expect img \"blue.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "blue.png",
+          "value": null
+        },
+        {
+          "text": "expect button \"Image 2 of 2\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Image 2 of 2",
+          "value": null
+        },
+        {
+          "text": "click button \"Image 1 of 2\"",
+          "action": "click",
+          "by": "button",
+          "name": "Image 1 of 2",
+          "value": null
+        },
+        {
+          "text": "expect img \"red.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "red.png",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -3057,6 +3678,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
+          "value": null
+        },
+        {
+          "text": "click button \"Processes\"",
+          "action": "click",
+          "by": "button",
+          "name": "Processes",
+          "value": null
+        },
+        {
+          "text": "expect text \"What runs on this host for your threads*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "What runs on this host for your threads*",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -3090,6 +3741,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -3144,6 +3796,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -3160,6 +3813,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Processes\"",
+          "action": "click",
+          "by": "button",
+          "name": "Processes",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Processes\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Processes",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
           "value": null
         },
         {
@@ -3217,6 +3900,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -3271,6 +3955,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -3287,6 +3972,113 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Board\"",
+          "action": "click",
+          "by": "button",
+          "name": "Board",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Projects\"",
+          "action": "click",
+          "by": "button",
+          "name": "Projects",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Inspect @Image 1\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Inspect @Image 1"
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -3449,6 +4241,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -3601,6 +4394,155 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Feed item to close\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Feed item to close"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Feed item to drop\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Feed item to drop"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "expect feed \"Backlog feed\"",
+          "action": "expect",
+          "by": "feed",
+          "name": "Backlog feed",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Feed item to close\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Feed item to close",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Feed item to drop\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Feed item to drop",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Dropped\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Dropped",
+          "value": null
+        },
+        {
+          "text": "click button \"Done, 1 item\"",
+          "action": "click",
+          "by": "button",
+          "name": "Done, 1 item",
+          "value": null
+        },
+        {
+          "text": "click button \"Dropped, 1 item\"",
+          "action": "click",
+          "by": "button",
+          "name": "Dropped, 1 item",
+          "value": null
+        },
+        {
+          "text": "expect text \"Feed item to close\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Feed item to close",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Capture\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "press ArrowUp",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ArrowUp"
+        },
+        {
+          "text": "expect article \"Item b:#2\"",
+          "action": "expect",
+          "by": "article",
+          "name": "Item b:#2",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -3612,6 +4554,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › rows",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -3771,6 +4714,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -3818,6 +4762,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -3956,6 +4901,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4087,6 +5033,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4098,6 +5045,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › capture",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4145,6 +5093,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Backfill triage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backfill triage",
+          "value": null
+        },
+        {
+          "text": "expect text \"Runs Jev and the configured triage model*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Runs Jev and the configured triage model*",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -4156,6 +5148,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: thread and revision signals",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4167,6 +5160,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: @b: mentions",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4178,6 +5172,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "thread header utilities count chip; jj panel revision details (jj-integration RevisionSections)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4189,6 +5184,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "conversation.chat.assistant-actions: Add to backlog",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4404,6 +5400,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4415,6 +5412,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › search",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4455,6 +5453,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect text \"Needs you\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Needs you",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -4466,6 +5501,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: backlog.* events into left-nav: Activity Timeline: Activity",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4681,6 +5717,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4875,6 +5912,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -4891,6 +5929,120 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Filter by project\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Filter by project",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Project of the new item\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Project of the new item",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Project of the new item\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Project of the new item",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Search projects\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Search projects",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "click combobox \"Filter by project\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Filter by project",
+          "value": null
+        },
+        {
+          "text": "expect option \"All projects\"",
+          "action": "expect",
+          "by": "option",
+          "name": "All projects",
+          "value": null
+        },
+        {
+          "text": "expect option \"No project\"",
+          "action": "expect",
+          "by": "option",
+          "name": "No project",
+          "value": null
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "click option \"sample*\"",
+          "action": "click",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "click option \"No project\"",
+          "action": "click",
+          "by": "option",
+          "name": "No project",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 projects\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 projects",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -5032,6 +6184,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Hide agent items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Hide agent items",
+          "value": null
+        },
+        {
+          "text": "expect button \"Hide agent items\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Hide agent items",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -5043,6 +6232,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: capture project resolution",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -5059,6 +6249,239 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "click button \"All statuses*\"",
+          "action": "click",
+          "by": "button",
+          "name": "All statuses*",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Start a thread from b:1\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Start a thread from b:1"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Start a thread from b:1\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Start a thread from b:1",
+          "value": null
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "rightclick article \"Item b:#1\"",
+          "action": "rightclick",
+          "by": "article",
+          "name": "Item b:#1",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Start thread…\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Start thread…",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Status\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Project\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Project",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy item ID\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy item ID",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy item link\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy item link",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Start thread…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Start thread…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Start thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Cancel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Cancel",
+          "value": null
+        },
+        {
+          "text": "click button \"Board\"",
+          "action": "click",
+          "by": "button",
+          "name": "Board",
+          "value": null
+        },
+        {
+          "text": "expect article \"Card b:#1\"",
+          "action": "expect",
+          "by": "article",
+          "name": "Card b:#1",
+          "value": null
+        },
+        {
+          "text": "click article \"Card b:#1\"",
+          "action": "click",
+          "by": "article",
+          "name": "Card b:#1",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        },
+        {
+          "text": "click button \"Start thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Start thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Cancel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Cancel",
+          "value": null
+        },
+        {
+          "text": "click button \"Start thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Thread project\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Thread project",
+          "value": null
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Open the thread when it is created\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Open the thread when it is created",
+          "value": null
+        },
+        {
+          "text": "click button \"Cancel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Cancel",
+          "value": null
+        },
+        {
+          "text": "hover button \"Start thread\"",
+          "action": "hover",
+          "by": "button",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "expect tooltip \"Start a thread for this item\"",
+          "action": "expect",
+          "by": "tooltip",
+          "name": "Start a thread for this item",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -5340,6 +6763,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -5387,6 +6811,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -5525,6 +6950,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -5628,6 +7054,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -5644,6 +7071,120 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog settings",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Remote item to import\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Remote item to import",
+          "value": null
+        },
+        {
+          "text": "click button \"Add Linear connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add Linear connection",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Linear key reference\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Linear key reference",
+          "value": null
+        },
+        {
+          "text": "expect button \"Test connection\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Test connection",
+          "value": null
+        },
+        {
+          "text": "click button \"Save connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Save connection",
+          "value": null
+        },
+        {
+          "text": "click button \"Add binding\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add binding",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Team\" \"ENG\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Team",
+          "value": "ENG"
+        },
+        {
+          "text": "click button \"Save binding\"",
+          "action": "click",
+          "by": "button",
+          "name": "Save binding",
+          "value": null
+        },
+        {
+          "text": "expect button \"Import all open\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Import all open",
+          "value": null
+        },
+        {
+          "text": "click button \"Add Markdown files connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add Markdown files connection",
+          "value": null
+        },
+        {
+          "text": "click button \"Save connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Save connection",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove Markdown files\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove Markdown files",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -5806,6 +7347,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -5853,6 +7395,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -5907,6 +7450,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -6003,6 +7547,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -6014,6 +7559,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tools: backlog_revert, backlog_triage_backfill, backlog_sync_now, backlog_delete",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -6061,6 +7607,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Export…\"",
+          "action": "click",
+          "by": "button",
+          "name": "Export…",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Export file\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Export file",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -6077,6 +7667,141 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Ship the shipped digest\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Ship the shipped digest"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Fix the period switcher\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Fix the period switcher"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "expect feed \"Backlog feed\"",
+          "action": "expect",
+          "by": "feed",
+          "name": "Backlog feed",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Ship the shipped digest\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Ship the shipped digest",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Fix the period switcher\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Fix the period switcher",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "click button \"Shipped\"",
+          "action": "click",
+          "by": "button",
+          "name": "Shipped",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Shipped\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Shipped",
+          "value": null
+        },
+        {
+          "text": "click radio \"Day\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Day",
+          "value": null
+        },
+        {
+          "text": "expect listitem \"Today: 2 shipped\"",
+          "action": "expect",
+          "by": "listitem",
+          "name": "Today: 2 shipped",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -6337,6 +8062,141 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Ship the shipped digest\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Ship the shipped digest"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Fix the period switcher\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Fix the period switcher"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "expect feed \"Backlog feed\"",
+          "action": "expect",
+          "by": "feed",
+          "name": "Backlog feed",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Ship the shipped digest\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Ship the shipped digest",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Fix the period switcher\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Fix the period switcher",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "click button \"Shipped\"",
+          "action": "click",
+          "by": "button",
+          "name": "Shipped",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Shipped\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Shipped",
+          "value": null
+        },
+        {
+          "text": "click radio \"Day\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Day",
+          "value": null
+        },
+        {
+          "text": "expect listitem \"Today: 2 shipped\"",
+          "action": "expect",
+          "by": "listitem",
+          "name": "Today: 2 shipped",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -6391,6 +8251,57 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!2 Priority demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!2 Priority demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "expect table \"Backlog items\"",
+          "action": "expect",
+          "by": "table",
+          "name": "Backlog items",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -6407,6 +8318,71 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Sub-issue demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Sub-issue demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click text \"Sub-issue demo\"",
+          "action": "click",
+          "by": "text",
+          "name": "Sub-issue demo",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        },
+        {
+          "text": "click button \"Add sub-issue\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add sub-issue",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Sub-issue title\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Sub-issue title",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -6569,6 +8545,113 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!1 Fix the login outage\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!1 Fix the login outage"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!2 Write the release notes\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!2 Write the release notes"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!2 Review the claim lease sweep\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!2 Review the claim lease sweep"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!4 Tidy the changelog\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!4 Tidy the changelog"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Plan the team offsite\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Plan the team offsite"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Ready\"",
+          "action": "click",
+          "by": "button",
+          "name": "Ready",
+          "value": null
+        },
+        {
+          "text": "expect table \"Backlog items\"",
+          "action": "expect",
+          "by": "table",
+          "name": "Backlog items",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -6585,6 +8668,57 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Claim demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Claim demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click text \"Claim demo\"",
+          "action": "click",
+          "by": "text",
+          "name": "Claim demo",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -6677,6 +8811,57 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Run state demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Run state demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "expect table \"Backlog items\"",
+          "action": "expect",
+          "by": "table",
+          "name": "Backlog items",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -6693,6 +8878,127 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Ship structured sections #backlog !2\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Ship structured sections #backlog !2"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"New criterion\" \"Stored as fields in the op log\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "New criterion",
+          "value": "Stored as fields in the op log"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"New criterion\" \"Editable in the peek\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "New criterion",
+          "value": "Editable in the peek"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"New criterion\" \"Searchable with has:criteria\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "New criterion",
+          "value": "Searchable with has:criteria"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click checkbox \"Stored as fields in the op log\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Stored as fields in the op log",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Pull request URL\" \"https://github.com/astahmer/dshfiles/pull/579\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Pull request URL",
+          "value": "https://github.com/astahmer/dshfiles/pull/579"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect region \"Acceptance criteria\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Acceptance criteria",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -6862,6 +9168,64 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Login fails on Safari /template Bug report\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Login fails on Safari /template Bug report"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "expect region \"Acceptance criteria\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Acceptance criteria",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -6930,6 +9294,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -6946,6 +9311,71 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Water the plants\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Water the plants"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "click button \"Repeat b:#1\"",
+          "action": "click",
+          "by": "button",
+          "name": "Repeat b:#1",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Weekly\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Weekly",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -7080,6 +9510,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7096,6 +9527,64 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Ship after the PR\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Ship after the PR"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "expect region \"Gates\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Gates",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -7202,6 +9691,64 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Triage the inbox nightly\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Triage the inbox nightly"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Triage the inbox nightly\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Triage the inbox nightly",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Make recurring\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Make recurring",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -7218,6 +9765,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Projects\"",
+          "action": "click",
+          "by": "button",
+          "name": "Projects",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Projects\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Projects",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -7289,6 +9873,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7329,6 +9914,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7369,6 +9955,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7380,6 +9967,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "right-pane: btw tab",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7391,6 +9979,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: /btw chip",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7487,6 +10076,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7520,6 +10110,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7531,6 +10122,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: Resume beside a stopped task",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7542,6 +10134,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: Retry beside a failed turn",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7568,6 +10161,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7601,6 +10195,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7655,6 +10250,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7666,6 +10262,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: inline-reference registry",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7677,6 +10274,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: code-fence registry",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7717,6 +10315,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7778,6 +10377,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7804,6 +10404,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7851,6 +10452,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7891,6 +10493,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7924,6 +10527,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7935,6 +10539,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: ranking",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -7975,6 +10580,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8022,6 +10628,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8033,6 +10640,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: ranking budget",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8044,6 +10652,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: Commands › keys",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8077,6 +10686,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8088,6 +10698,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8099,6 +10710,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: agent pre-step listener, no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8110,6 +10722,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: agent request-error listener, no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8121,6 +10734,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: timer, no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8132,6 +10746,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: threshold API and agent tool",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8179,6 +10794,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8190,6 +10806,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8216,6 +10833,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8242,6 +10860,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8253,6 +10872,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "right-pane: native review tab › Viewed",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8264,6 +10884,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: diff_viewed storage",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8275,6 +10896,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: diff_viewed storage",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8329,6 +10951,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8397,6 +11020,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8451,6 +11075,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8462,6 +11087,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: workspace file index",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8473,6 +11099,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: SessionScreen contract",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8484,6 +11111,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: grep / glob",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8503,6 +11131,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8522,6 +11151,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8541,6 +11171,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8552,6 +11183,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "shell: frame columns at phone width",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8571,6 +11203,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8604,6 +11237,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8665,6 +11299,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8705,6 +11340,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8716,6 +11352,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8727,6 +11364,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "settings: git worktree isolation (opt-in)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8738,6 +11376,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: git file snapshots",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8749,6 +11388,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: goal rounds",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8760,6 +11400,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: extend_goal_budget / complete_blocked_goal",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8771,6 +11412,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: goal tool fork",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8811,6 +11453,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8837,6 +11480,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8856,6 +11500,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8875,6 +11520,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8915,6 +11561,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -8976,6 +11623,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9037,6 +11685,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9147,6 +11796,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9158,6 +11808,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: command chips",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9169,6 +11820,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: / menu",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9251,6 +11903,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9262,6 +11915,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9273,6 +11927,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9284,6 +11939,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9436,6 +12092,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9447,6 +12104,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: run row Workspace segment",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9578,6 +12236,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9618,6 +12277,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9679,6 +12339,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9775,6 +12436,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9815,6 +12477,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -9918,6 +12581,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10000,6 +12664,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10061,6 +12726,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10077,6 +12743,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Workspaces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Land\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "expect text \"No thread workspaces.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "No thread workspaces.",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land Workspaces ready to land, and repository history.",
           "value": null
         },
         {
@@ -10148,6 +12851,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10163,6 +12867,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "text": "click tab \"Inbox\"",
           "action": "click",
           "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
           "name": "Inbox",
           "value": null
         },
@@ -10207,6 +12927,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10268,6 +12989,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10279,6 +13001,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › Clean up workspaces (row meta)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10295,6 +13018,113 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Locate Current\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Locate Current",
+          "value": null
+        },
+        {
+          "text": "click button \"Compare\"",
+          "action": "click",
+          "by": "button",
+          "name": "Compare",
+          "value": null
+        },
+        {
+          "text": "expect region \"Revision comparison\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Revision comparison",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Comparison target\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Comparison target",
+          "value": null
+        },
+        {
+          "text": "click option \"Another revision…\"",
+          "action": "click",
+          "by": "option",
+          "name": "Another revision…",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Choose revision target\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Choose revision target",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Choose revision target\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Choose revision target",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Search loaded revisions\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Search loaded revisions",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land Workspaces ready to land, and repository history.",
           "value": null
         },
         {
@@ -10527,6 +13357,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10602,6 +13433,78 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land Workspaces ready to land, and repository history.",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Sample project*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "click button \"Sample project*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Full diff\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Full diff",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -10613,6 +13516,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › selection strip",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10646,6 +13550,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10662,6 +13567,85 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Sample project*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "rightclick button \"Sample project*\"",
+          "action": "rightclick",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"New change here\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "New change here",
+          "value": null
+        },
+        {
+          "text": "expect group \"Confirm new change\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Confirm new change",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land Workspaces ready to land, and repository history.",
           "value": null
         },
         {
@@ -10803,6 +13787,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -10819,6 +13804,85 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Sample project*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "rightclick button \"Sample project*\"",
+          "action": "rightclick",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"New workspace here…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "New workspace here…",
+          "value": null
+        },
+        {
+          "text": "expect group \"Create workspace at this revision\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Create workspace at this revision",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land Workspaces ready to land, and repository history.",
           "value": null
         },
         {
@@ -11030,6 +14094,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11046,6 +14111,99 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Repository actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "Repository actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Clean up JJ workspaces…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Clean up JJ workspaces…",
+          "value": null
+        },
+        {
+          "text": "expect text \"Clean up workspaces\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Clean up workspaces",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Select all eligible items\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Select all eligible items",
+          "value": null
+        },
+        {
+          "text": "expect text \"No workspace qualifies.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "No workspace qualifies.",
+          "value": null
+        },
+        {
+          "text": "expect text \"0 empty revisions will be abandoned.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "0 empty revisions will be abandoned.",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land Workspaces ready to land, and repository history.",
           "value": null
         },
         {
@@ -11215,6 +14373,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11231,6 +14390,78 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Source control\"",
+          "action": "click",
+          "by": "button",
+          "name": "Source control",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect textbox \"Working copy description\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Working copy description",
+          "value": null
+        },
+        {
+          "text": "expect button \"Jujutsu view settings\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Jujutsu view settings",
+          "value": null
+        },
+        {
+          "text": "expect button \"Repository actions\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Repository actions",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Land Workspaces ready to land, and repository history.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land Workspaces ready to land, and repository history.",
           "value": null
         },
         {
@@ -11407,6 +14638,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11418,6 +14650,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: loopback listeners",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11458,6 +14691,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11498,6 +14732,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11671,6 +14906,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11718,6 +14954,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11793,6 +15030,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11804,6 +15042,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "main-tabs: tab persistence",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11907,6 +15146,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11918,6 +15158,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: /mcp endpoint",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -11965,6 +15206,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12005,6 +15247,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12080,6 +15323,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12204,6 +15448,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12215,6 +15460,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers › registry",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12226,6 +15472,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers › OAuth",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12259,6 +15506,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12270,6 +15518,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: memory digests",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12281,6 +15530,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: memory start block in the system prompt",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12292,6 +15542,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: memory_search / memory_read / memory_note",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12308,6 +15559,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Memory\"",
+          "action": "click",
+          "by": "button",
+          "name": "Memory",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Notes\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Notes",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Knowledge Memory and reference material agents use.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Knowledge Memory and reference material agents use.",
           "value": null
         },
         {
@@ -12400,6 +15681,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12416,6 +15698,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Memory\"",
+          "action": "click",
+          "by": "button",
+          "name": "Memory",
+          "value": null
+        },
+        {
+          "text": "click tab \"Analytics\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Analytics",
+          "value": null
+        },
+        {
+          "text": "expect text \"Recall\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Recall",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Knowledge Memory and reference material agents use.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Knowledge Memory and reference material agents use.",
           "value": null
         },
         {
@@ -12480,6 +15799,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12517,6 +15837,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "@t:"
+        },
+        {
+          "text": "expect text \"Threads · @f: files\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Threads · @f: files",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Seed a mention target"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -12595,6 +15959,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12606,6 +15971,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: mermaid code fence",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12653,6 +16019,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12664,6 +16031,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: model picker › Fast mode",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12675,6 +16043,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: model picker › account swap",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12729,6 +16098,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12790,6 +16160,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12851,6 +16222,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -12867,6 +16239,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Run on Local\"",
+          "action": "click",
+          "by": "button",
+          "name": "Run on Local",
+          "value": null
+        },
+        {
+          "text": "click option \"Add host…\"",
+          "action": "click",
+          "by": "option",
+          "name": "Add host…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Add host\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Add host",
+          "value": null
+        },
+        {
+          "text": "click button \"SSH destination\"",
+          "action": "click",
+          "by": "button",
+          "name": "SSH destination",
+          "value": null
+        },
+        {
+          "text": "expect text \"Enter a custom destination…\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Enter a custom destination…",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -13036,6 +16452,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13047,6 +16464,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: remote threads under their local project",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13108,6 +16526,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13169,6 +16588,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13237,6 +16657,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13248,6 +16669,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: multi_host_delegate",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13259,6 +16681,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: SSH runtime tunnels",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13299,6 +16722,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13310,6 +16734,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Open host UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13343,6 +16768,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13369,6 +16795,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13409,6 +16836,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13449,6 +16877,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13489,6 +16918,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13529,6 +16959,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13545,6 +16976,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Getting started\"",
+          "action": "click",
+          "by": "button",
+          "name": "Getting started",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Getting started\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Getting started",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Knowledge Memory and reference material agents use.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Knowledge Memory and reference material agents use.",
           "value": null
         },
         {
@@ -13584,6 +17045,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Getting started\"",
+          "action": "click",
+          "by": "button",
+          "name": "Getting started",
+          "value": null
+        },
+        {
+          "text": "click button \"Enable pack: Observe & perf\"",
+          "action": "click",
+          "by": "button",
+          "name": "Enable pack: Observe & perf",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Enable Observe & perf\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Enable Observe & perf",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Knowledge Memory and reference material agents use.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Knowledge Memory and reference material agents use.",
           "value": null
         },
         {
@@ -13654,6 +17152,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": {
         "prerequisites": [
           "account",
@@ -13680,6 +17179,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Getting started\"",
+          "action": "click",
+          "by": "button",
+          "name": "Getting started",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search features\" \"Native Settings shell\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search features",
+          "value": "Native Settings shell"
+        },
+        {
+          "text": "click button \"Show me where: Native Settings shell, ported\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show me where: Native Settings shell, ported",
+          "value": null
+        },
+        {
+          "text": "expect region \"Show me where\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Show me where",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Knowledge Memory and reference material agents use.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Knowledge Memory and reference material agents use.",
           "value": null
         },
         {
@@ -13750,6 +17293,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": {
         "firstAction": "Open Knowledge › Getting started and read What's new.",
         "doneWhen": "You pressed Mark as seen, so the next change reads New.",
@@ -13789,6 +17333,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": {
         "firstAction": "Open Knowledge › Getting started and turn on Suggestions in Settings.",
         "doneWhen": "Suggestions lists a feature to try, or says nothing in your tool use points to one.",
@@ -13811,6 +17356,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: onboarding_reach; read by Show me where on Knowledge › Getting started",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13844,6 +17390,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": {
         "firstAction": "Turn on Try it in Settings › Onboarding, then press Try it on a feature in Knowledge › Getting started.",
         "doneWhen": "A Try it thread opens and the agent shows the feature without changing anything.",
@@ -13866,6 +17413,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13877,6 +17425,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13888,6 +17437,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13899,6 +17449,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13910,6 +17461,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: startup terminal output",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13936,6 +17488,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13969,6 +17522,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13980,6 +17534,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -13991,6 +17546,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14002,6 +17558,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14013,6 +17570,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14024,6 +17582,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14035,6 +17594,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14046,6 +17606,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "agent tool: policies_list (no UI)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14057,6 +17618,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "agent tool: preview_open / preview_screenshot",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14083,6 +17645,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14094,6 +17657,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: preview-render contract",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14105,6 +17669,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "thread panel: Agent browser",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14121,6 +17686,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Automations\"",
+          "action": "click",
+          "by": "button",
+          "name": "Automations",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Automations\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Automations",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Work Backlog items and schedules that start threads.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Work Backlog items and schedules that start threads.",
           "value": null
         },
         {
@@ -14171,6 +17766,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14218,6 +17814,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14229,6 +17826,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "composer: Project checks › hook events",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14240,6 +17838,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: receipts into left-nav: Activity Timeline: Activity",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14266,6 +17865,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14277,6 +17877,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Prompts › insert",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14288,6 +17889,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Prompts › recent",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14342,6 +17944,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14459,6 +18062,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14470,6 +18074,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tools: pull_request_link, pull_request_watch, pull_request_list",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14531,6 +18136,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14704,6 +18310,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14758,6 +18365,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14791,6 +18399,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14852,6 +18461,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14892,6 +18502,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14974,6 +18585,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -14985,6 +18597,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "transcript: Edited N files card",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15053,6 +18666,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15064,6 +18678,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes › diff line selection",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15075,6 +18690,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: pulls-review reviewed record",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15086,6 +18702,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: queued messages",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15097,6 +18714,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: queued messages › edit",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15108,6 +18726,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: queued messages › preview",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15204,6 +18823,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15244,6 +18864,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15284,6 +18905,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15295,6 +18917,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "agent tool: reference_* and /reference (no UI)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15306,6 +18929,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15339,6 +18963,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15350,6 +18975,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "phone top bar: Thread menu",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15361,6 +18987,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: docked Conversation views",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15377,6 +19004,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -15427,6 +19070,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "expect text \"Image 1\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Image 1",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -15443,6 +19116,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "expect text \"Image 1\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Image 1",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -15514,6 +19217,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15525,6 +19229,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: Composer contract",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15551,6 +19256,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -15567,6 +19288,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
           "value": null
         },
         {
@@ -15624,6 +19361,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "expect group \"Run settings\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Run settings",
+          "value": null
+        },
+        {
+          "text": "expect button \"Choose workspace\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "expect button \"Run on Local\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Run on Local",
+          "value": null
+        },
+        {
+          "text": "expect button \"Workspace: *\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Workspace: *",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -15635,6 +19409,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: restored draft references",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15710,6 +19485,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15757,6 +19533,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15825,6 +19602,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15893,6 +19671,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -15968,6 +19747,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16029,6 +19809,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16040,6 +19821,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16101,6 +19883,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16162,6 +19945,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16216,6 +20000,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16227,6 +20012,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Sending when upload finishes pill",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16238,6 +20024,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: model catalog cache",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16249,6 +20036,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: thread_local_model_state / thread_select_local_model",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16275,6 +20063,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16286,6 +20075,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: sessions API",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16312,6 +20102,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16323,6 +20114,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16334,6 +20126,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16345,6 +20138,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: session search index",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16356,6 +20150,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: session-search findInThread API and thread_find tool",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16367,6 +20162,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: session-search promptHistory API (read by @dshfiles/prompt-stash)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16378,6 +20174,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16418,6 +20215,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16472,6 +20270,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16526,6 +20325,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16566,6 +20366,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16596,6 +20397,29 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "General",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Sections\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Sections",
           "value": null
         }
       ],
@@ -16639,6 +20463,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16662,6 +20487,29 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "menuitem",
           "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Check for DSH updates\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Check for DSH updates",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
           "value": null
         },
         {
@@ -16712,6 +20560,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16742,6 +20591,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "option",
           "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "expect group \"Models & accounts\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Models & accounts",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
           "value": null
         },
         {
@@ -16796,6 +20675,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "text",
           "name": "1 Setting Found",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "fill searchbox \"Search settings\" \"max tabs\"",
+          "action": "fill",
+          "by": "searchbox",
+          "name": "Search settings",
+          "value": "max tabs"
+        },
+        {
+          "text": "expect text \"1 matching settings\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 matching settings",
+          "value": null
+        },
+        {
+          "text": "expect spinbutton \"Max tabs\"",
+          "action": "expect",
+          "by": "spinbutton",
+          "name": "Max tabs",
           "value": null
         }
       ],
@@ -16860,6 +20776,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -16907,6 +20824,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"Main tabs\"",
+          "action": "click",
+          "by": "option",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "expect spinbutton \"Max tabs\"",
+          "action": "expect",
+          "by": "spinbutton",
+          "name": "Max tabs",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -16943,6 +20897,57 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "text": "click button \"Main tabs\"",
           "action": "click",
           "by": "button",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "fill spinbutton \"Max tabs\" \"8\"",
+          "action": "fill",
+          "by": "spinbutton",
+          "name": "Max tabs",
+          "value": "8"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Reset to default\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Reset to default",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"Main tabs\"",
+          "action": "click",
+          "by": "option",
           "name": "Main tabs",
           "value": null
         },
@@ -17036,6 +21041,71 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"Main tabs\"",
+          "action": "click",
+          "by": "option",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "fill spinbutton \"Max tabs\" \"8\"",
+          "action": "fill",
+          "by": "spinbutton",
+          "name": "Max tabs",
+          "value": "8"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Reset to default\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Reset to default",
+          "value": null
+        },
+        {
+          "text": "click radio \"JSON\"",
+          "action": "click",
+          "by": "radio",
+          "name": "JSON",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Overrides\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Overrides",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -17083,6 +21153,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17112,6 +21183,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "text": "click button \"Main tabs\"",
           "action": "click",
           "by": "button",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Plugin enabled\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Plugin enabled",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"Main tabs\"",
+          "action": "click",
+          "by": "option",
           "name": "Main tabs",
           "value": null
         },
@@ -17170,6 +21278,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click button \"More ways to open the configuration file\"",
+          "action": "click",
+          "by": "button",
+          "name": "More ways to open the configuration file",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy path\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy path",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -17203,6 +21341,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "fill searchbox \"Search settings\" \"Jev\"",
+          "action": "fill",
+          "by": "searchbox",
+          "name": "Search settings",
+          "value": "Jev"
+        },
+        {
+          "text": "expect text \"Key\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Key",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -17214,6 +21382,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Plugins › Web search",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17225,6 +21394,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: shared runtime",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17236,6 +21406,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: shared EventSource",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17247,6 +21418,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "keyboard: Mod+B",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17258,6 +21430,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "keyboard: Mod+N / Mod+,",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17269,6 +21442,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Keyboard shortcuts",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17323,6 +21497,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17377,6 +21552,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17388,6 +21564,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17399,6 +21576,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17410,6 +21588,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17421,6 +21600,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17432,6 +21612,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17443,6 +21624,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: no UI",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17469,6 +21651,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17495,6 +21678,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17535,6 +21719,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17575,6 +21760,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17615,6 +21801,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17655,6 +21842,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17716,6 +21904,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17749,6 +21938,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17831,6 +22021,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17892,6 +22083,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -17903,6 +22095,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: All threads › Group: Status",
       "reach": [
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"Group: Status\"",
+          "action": "click",
+          "by": "button",
+          "name": "Group: Status",
+          "value": null
+        },
+        {
+          "text": "expect text \"Arrange manually\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Arrange manually",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "expect button \"Group: Status\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Group: Status",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Threads",
+          "value": null
+        },
         {
           "text": "expect region \"Threads\"",
           "action": "expect",
@@ -17958,6 +22194,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18103,6 +22340,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18206,6 +22444,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18302,6 +22541,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18398,6 +22638,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18409,6 +22650,57 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Remote group",
       "reach": [
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "expect button \"All threads\"",
+          "action": "expect",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread list settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread list settings",
+          "value": null
+        },
+        {
+          "text": "expect region \"Thread list settings\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Thread list settings",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Threads",
+          "value": null
+        },
         {
           "text": "click button \"All threads\"",
           "action": "click",
@@ -18534,6 +22826,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18609,6 +22902,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18705,6 +22999,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18745,6 +23040,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18774,6 +23070,113 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "text": "click button \"Thread notifications\"",
           "action": "click",
           "by": "button",
+          "name": "Thread notifications",
+          "value": null
+        },
+        {
+          "text": "expect group \"Thread notifications\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Thread notifications",
+          "value": null
+        },
+        {
+          "text": "expect button \"Approval needed: Off\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Approval needed: Off",
+          "value": null
+        },
+        {
+          "text": "expect button \"Turn stopped: Off\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Turn stopped: Off",
+          "value": null
+        },
+        {
+          "text": "expect button \"Agent messages: In-app and system\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Agent messages: In-app and system",
+          "value": null
+        },
+        {
+          "text": "expect button \"Snooze notifications\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Snooze notifications",
+          "value": null
+        },
+        {
+          "text": "click button \"Snooze notifications\"",
+          "action": "click",
+          "by": "button",
+          "name": "Snooze notifications",
+          "value": null
+        },
+        {
+          "text": "expect button \"Resume notifications\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Resume notifications",
+          "value": null
+        },
+        {
+          "text": "click button \"Resume notifications\"",
+          "action": "click",
+          "by": "button",
+          "name": "Resume notifications",
+          "value": null
+        },
+        {
+          "text": "expect button \"Snooze notifications\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Snooze notifications",
+          "value": null
+        },
+        {
+          "text": "expect button \"In-app notification position\"",
+          "action": "expect",
+          "by": "button",
+          "name": "In-app notification position",
+          "value": null
+        },
+        {
+          "text": "expect button \"In-app notification timeout\"",
+          "action": "expect",
+          "by": "button",
+          "name": "In-app notification timeout",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"Thread notifications\"",
+          "action": "click",
+          "by": "option",
           "name": "Thread notifications",
           "value": null
         },
@@ -18895,6 +23298,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18935,6 +23339,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -18946,6 +23351,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "sidebar-footer: client reload banner",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19007,6 +23413,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19018,6 +23425,36 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: child threads",
       "reach": [
+        {
+          "text": "click button \"Thread list settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread list settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Finished subagents: Fold into “N finished”\"",
+          "action": "click",
+          "by": "button",
+          "name": "Finished subagents: Fold into “N finished”",
+          "value": null
+        },
+        {
+          "text": "expect menuitemradio \"Hide them\"",
+          "action": "expect",
+          "by": "menuitemradio",
+          "name": "Hide them",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Threads",
+          "value": null
+        },
         {
           "text": "click button \"Thread list settings\"",
           "action": "click",
@@ -19129,6 +23566,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19169,6 +23607,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19180,6 +23619,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "status-strip: Restarting to apply updates",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19191,6 +23631,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "thread-list: interrupted threads",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19202,6 +23643,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "activity: Resumed automatically after the restart",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19319,6 +23761,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19394,6 +23837,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19455,6 +23899,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19509,6 +23954,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19520,6 +23966,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Referenced by",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19531,6 +23978,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "thread-list: inventory reads",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19542,6 +23990,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: keyboard navigation",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19596,6 +24045,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19636,6 +24086,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19647,6 +24098,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: thread_queue_remove / thread_queue_steer / thread_queue_edit",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19658,6 +24110,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "url: ?prompt= link",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19726,6 +24179,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19780,6 +24234,57 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
+          "value": null
+        },
+        {
+          "text": "expect navigation \"Observe pages\"",
+          "action": "expect",
+          "by": "navigation",
+          "name": "Observe pages",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Traces\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click button \"Threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "expect button \"Board\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Board",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -19791,6 +24296,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "shell: phone tab bar only; the stage kept the desktop tab strip and no Back",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19802,6 +24308,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: hover action strip and right-click menu only",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19835,6 +24342,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19882,6 +24390,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19893,6 +24402,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: shell_navigation_counts / shell_navigation_reset",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19904,6 +24414,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "shell: collapsed icon rail at phone width",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -19919,6 +24430,29 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "text": "click tab \"Inbox\"",
           "action": "click",
           "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "click button \"Waiting threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Waiting threads",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Waiting threads\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Waiting threads",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
           "name": "Inbox",
           "value": null
         },
@@ -19991,6 +24525,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20122,6 +24657,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20133,6 +24669,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool notify_user; in-app toast and system notification",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20180,6 +24717,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20220,6 +24758,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20231,6 +24770,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: ask_user_question",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20242,6 +24782,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: bash",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20253,6 +24794,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tools: read, write, edit, read_image",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20293,6 +24835,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20304,6 +24847,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: file read as a code card",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20315,6 +24859,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: file edit as a collapsible diff",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20326,6 +24871,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: pending approval request",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20337,6 +24883,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: tool search (not mounted)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20370,6 +24917,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20438,6 +24986,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20492,6 +25041,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20539,6 +25089,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20555,6 +25106,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click tab \"Operations\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Operations",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Window\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Window",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
           "value": null
         },
         {
@@ -20626,6 +25214,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20673,6 +25262,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20762,6 +25352,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20816,6 +25407,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20912,6 +25504,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20952,6 +25545,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -20992,6 +25586,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21018,6 +25613,22 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -21029,6 +25640,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: probe; agent tool traces_stalls",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21040,6 +25652,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tools traces_store_space, traces_reclaim_space",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21066,6 +25679,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21141,6 +25755,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21152,6 +25767,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: tweet_context",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21163,6 +25779,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: shared stylesheet",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21174,6 +25791,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: shared stylesheet",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21185,6 +25803,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: usage ledger",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21253,6 +25872,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21269,6 +25889,71 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Cost\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Cost",
+          "value": null
+        },
+        {
+          "text": "expect text \"Cost over time\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Cost over time",
+          "value": null
+        },
+        {
+          "text": "click text \"1 y\"",
+          "action": "click",
+          "by": "text",
+          "name": "1 y",
+          "value": null
+        },
+        {
+          "text": "expect text \"Usage distribution\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Usage distribution",
+          "value": null
+        },
+        {
+          "text": "click text \"Daily calendar\"",
+          "action": "click",
+          "by": "text",
+          "name": "Daily calendar",
+          "value": null
+        },
+        {
+          "text": "expect text \"Cache savings (estimate)\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Cache savings (estimate)",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
           "value": null
         },
         {
@@ -21368,6 +26053,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Cost\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Cost",
+          "value": null
+        },
+        {
+          "text": "expect text \"Jev API usage\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Jev API usage",
+          "value": null
+        },
+        {
+          "text": "expect text \"Usage by API key · calendar month to date\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Usage by API key · calendar month to date",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -21429,6 +26158,64 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Tools\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Tools",
+          "value": null
+        },
+        {
+          "text": "expect text \"Tool calls over time\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool calls over time",
+          "value": null
+        },
+        {
+          "text": "expect text \"Most-used tools\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Most-used tools",
+          "value": null
+        },
+        {
+          "text": "expect text \"Output by category\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Output by category",
+          "value": null
+        },
+        {
+          "text": "expect text \"Every tool\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Every tool",
+          "value": null
+        }
+      ],
       "onboarding": null
     },
     {
@@ -21440,6 +26227,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: usage_otel_metrics",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21456,6 +26244,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "tab",
           "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Quota\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Quota",
+          "value": null
+        },
+        {
+          "text": "click radio \"Forecast\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Forecast",
+          "value": null
+        },
+        {
+          "text": "expect radio \"Accounts\"",
+          "action": "expect",
+          "by": "radio",
+          "name": "Accounts",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Observe Usage, activity, traces, jobs and hosts.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Observe Usage, activity, traces, jobs and hosts.",
           "value": null
         },
         {
@@ -21527,6 +26359,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21567,6 +26400,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21607,6 +26441,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21618,6 +26453,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21629,6 +26465,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21640,6 +26477,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: dshfiles-web-fetch-readable",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21651,6 +26489,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: web_search / web_fetch rows",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21662,6 +26501,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Brave web search",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21695,6 +26535,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21706,6 +26547,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tools: whiteboard_list, whiteboard_read, whiteboard_write, whiteboard_rename, whiteboard_delete, whiteboard_restore",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21717,6 +26559,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "module: @dshfiles/whiteboard/xstate-diagram",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21757,6 +26600,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21846,6 +26690,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21900,6 +26745,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21940,6 +26786,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -21973,6 +26820,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22006,6 +26854,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22032,6 +26881,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22065,6 +26915,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22133,6 +26984,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22180,6 +27032,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22227,6 +27080,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22238,6 +27092,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "workbench: right pane as a narrow column; phone reached facets only through the main pane's New tab",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22292,6 +27147,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22325,6 +27181,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22365,6 +27222,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22412,6 +27270,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22445,6 +27304,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22456,6 +27316,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: panel registration",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22496,6 +27357,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22550,6 +27412,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22576,6 +27439,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22630,6 +27494,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22641,6 +27506,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › search",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22652,6 +27518,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › keyboard rows",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22663,6 +27530,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Recent",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22674,6 +27542,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "Hosts › Add folder (directory-only picker)",
       "reach": [],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22721,6 +27590,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22750,6 +27620,43 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "text": "click button \"Projects\"",
           "action": "click",
           "by": "button",
+          "name": "Projects",
+          "value": null
+        },
+        {
+          "text": "expect region \"Declared project settings\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Declared project settings",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"Projects\"",
+          "action": "click",
+          "by": "option",
           "name": "Projects",
           "value": null
         },
@@ -22794,6 +27701,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22834,6 +27742,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {
@@ -22874,6 +27783,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
       "onboarding": null
     }
   ]

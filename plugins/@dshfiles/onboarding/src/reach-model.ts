@@ -55,7 +55,10 @@ export const featureReachSchema = Schema.Struct({
   /** The first step can be replayed: the gallery shows Show me where. */
   walkable: Schema.Boolean,
   unsupportedActions: Schema.Array(Schema.Literals(REACH_ACTIONS)),
+  /** The desktop walk (`reach`). */
   steps: Schema.Array(walkStepSchema),
+  /** The phone walk (`reachNarrow`), at {@link PHONE_QUERY}; `null` walks `steps` on a phone too. */
+  narrowSteps: Schema.NullOr(Schema.Array(walkStepSchema)),
 })
 export type FeatureReach = typeof featureReachSchema.Type
 
@@ -81,8 +84,8 @@ const unsupportedOf = (step: CatalogReachStep): string | null => {
   return null
 }
 
-const walkSteps = (feature: CatalogFeature): readonly WalkStep[] =>
-  feature.reach.map((step, index) => ({
+const walkSteps = (reach: readonly CatalogReachStep[]): readonly WalkStep[] =>
+  reach.map((step, index) => ({
     index,
     text: step.text,
     action: step.action,
@@ -97,7 +100,9 @@ const walkable = (feature: CatalogFeature): boolean => {
 }
 
 const reachOf = (feature: CatalogFeature, route: Route | null): FeatureReach => {
-  const steps = walkSteps(feature)
+  const steps = walkSteps(feature.reach)
+  const narrowSteps = feature.reachNarrow === null ? null : walkSteps(feature.reachNarrow)
+  const replayed = [...steps, ...(narrowSteps ?? [])]
   return {
     key: feature.key,
     plugin: feature.plugin,
@@ -107,10 +112,21 @@ const reachOf = (feature: CatalogFeature, route: Route | null): FeatureReach => 
     route,
     docsUrl: `${REPOSITORY}/${feature.plugin}/README.md`,
     walkable: walkable(feature),
-    unsupportedActions: REACH_ACTIONS.filter(action => steps.some(step => step.action === action && step.unsupported !== null)),
+    unsupportedActions: REACH_ACTIONS.filter(action => replayed.some(step => step.action === action && step.unsupported !== null)),
     steps,
+    narrowSteps,
   }
 }
+
+/**
+ * The phone breakpoint of the shell: below 640 px thread-sidebar draws its bottom tab bar and settings-shell its Sections
+ * combobox (both `(max-width: 639.98px)`, Tailwind's `sm`). Neither exports it and onboarding depends on neither.
+ */
+export const PHONE_QUERY = '(max-width: 639.98px)'
+
+/** The steps a walk follows: `reachNarrow` on a phone when the feature has one, `reach` otherwise. */
+const stepsFor = (input: { readonly reach: FeatureReach; readonly phone: boolean }): readonly WalkStep[] =>
+  input.phone && input.reach.narrowSteps !== null ? input.reach.narrowSteps : input.reach.steps
 
 /** `routeOf` is the gallery row's route, so Open in the walk is the Open the page shows. */
 const reach = (input: { readonly catalog: FeatureCatalog; readonly key: string; readonly routeOf: (feature: CatalogFeature) => Route | null }): ReachOutput => {
@@ -141,16 +157,22 @@ const describeStep = (step: WalkStep): string => {
 
 const locatorLabel = (locator: Locator): string => (locator.kind === 'role' ? (locator.role ?? 'element') : locator.kind)
 
+const renderSteps = (steps: readonly WalkStep[]): readonly string[] =>
+  steps.map(
+    step =>
+      `${String(step.index + 1)}. ${describeStep(step)}${step.locator === null ? '' : ` (${locatorLabel(step.locator)})`}${step.unsupported === null ? '' : ` — not replayable here: ${step.unsupported}`}`,
+  )
+
 const render = (value: ReachOutput): string => {
   const feature = value.feature
   if (feature === null) return 'No catalogued feature has that key. Find it with onboarding_overview (its rows carry `key`).'
+  const narrow = feature.narrowSteps
   return [
     `## ${feature.title} (${feature.plugin})`,
     `Lives in: ${feature.destination}${feature.currentSurface === null ? '' : ` — ${feature.currentSurface}`}`,
-    ...feature.steps.map(
-      step =>
-        `${String(step.index + 1)}. ${describeStep(step)}${step.locator === null ? '' : ` (${locatorLabel(step.locator)})`}${step.unsupported === null ? '' : ` — not replayable here: ${step.unsupported}`}`,
-    ),
+    ...(narrow === null
+      ? renderSteps(feature.steps)
+      : ['Desktop (640 px wide or more):', ...renderSteps(feature.steps), 'Phone (narrower than 640 px):', ...renderSteps(narrow)]),
     ...(feature.walkable ? [] : ['Show me where is not offered for this feature: its first step cannot be replayed in the app.']),
     `Docs: ${feature.docsUrl}`,
   ].join('\n')
@@ -159,6 +181,7 @@ const render = (value: ReachOutput): string => {
 export class ReachModel {
   static readonly reach = reach
   static readonly walkable = walkable
+  static readonly stepsFor = stepsFor
   static readonly describeStep = describeStep
   static readonly locatorLabel = locatorLabel
   static readonly render = render

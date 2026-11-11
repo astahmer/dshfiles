@@ -120,6 +120,7 @@ const tinyCatalog: FeatureCatalog = {
         { text: 'click tab "Work"', action: 'click', by: 'tab', name: 'Work', value: null },
         { text: 'expect heading "Backlog"', action: 'expect', by: 'heading', name: 'Backlog', value: null },
       ],
+      reachNarrow: null,
       onboarding: null,
     },
     {
@@ -131,6 +132,7 @@ const tinyCatalog: FeatureCatalog = {
       destination: 'none',
       currentSurface: null,
       reach: [],
+      reachNarrow: null,
       onboarding: null,
     },
     {
@@ -145,6 +147,7 @@ const tinyCatalog: FeatureCatalog = {
         { text: 'seed tool-call-thread', action: 'seed', by: null, name: null, value: 'tool-call-thread' },
         { text: 'expect text "Side"', action: 'expect', by: 'text', name: 'Side', value: null },
       ],
+      reachNarrow: null,
       onboarding: { prerequisites: ['account'], firstAction: 'Type /btw.', doneWhen: 'A side answer shows.', open: { command: '@dshfiles/btw.open' } },
     },
   ],

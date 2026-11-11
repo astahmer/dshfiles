@@ -163,15 +163,20 @@ thread**) opens the setting.
    collapses and case is ignored; an exact name wins, and a substring counts only for a name ending in `*` (as the
    grammar writes it), so `button "Memory"` never rings `Keep memory across threads`; the first visible match wins. Elements other
    plugins render count; elements hidden from the accessibility tree do not for role steps.
-3. **Never acts.** It never clicks, types, hovers or presses. A step advances on evidence: `click` when that control is
+3. **Phones.** Below 640 px (`(max-width: 639.98px)`, the breakpoint where thread-sidebar draws its bottom tab bar and
+   settings-shell its **Sections** combobox) the walk follows the feature's `reachNarrow` steps: **More**, then the
+   destination's row, instead of a rail tab; **Sections** instead of a Settings section button; **Threads** → **Search
+   threads** instead of the palette button. A feature without `reachNarrow` walks `reach` there too. Crossing the
+   breakpoint (a rotation) restarts the walk on the other steps.
+4. **Never acts.** It never clicks, types, hovers or presses. A step advances on evidence: `click` when that control is
    clicked, `hover` when the pointer enters it, `fill` when its value changes, `press` when the key is pressed, `expect`
    when its target shows. **Next** always advances; on the last step it ends the walk.
-4. **Stops honestly.** `seed`, `attach`, `rightclick`, `shiftclick` and names holding a scratch backlog ordinal
+5. **Stops honestly.** `seed`, `attach`, `rightclick`, `shiftclick` and names holding a scratch backlog ordinal
    (`b:#1`) are E2E-only: the walk stops there, says why, links the plugin README and keeps the ring on the last
    control. A row whose first step is one of these has no button.
-5. **Not on screen.** After 10 s without the target the card names the destination and current surface and offers
+6. **Not on screen.** After 10 s without the target the card names the destination and current surface and offers
    **Open** when the row's route is registered, otherwise says to go there; it keeps looking.
-6. **Ends.** End, Escape (unless a menu or dialog took that Escape first), finishing, or another Show me where. One
+7. **Ends.** End, Escape (unless a menu or dialog took that Escape first), finishing, or another Show me where. One
    walk at a time; every listener, observer and timer is released. Nothing is stored, sent or spent.
 
 ## Settings (`dshfiles-onboarding`)
@@ -198,8 +203,9 @@ All apply live; none needs a restart.
    and the verdict the dialog shows. It runs only when the user asked: `confirm: true` has no default, so a bare request
    changes nothing. `plugins` narrows it to some plugins of the plan.
 3. `onboarding_reach` (read-only, `onboarding/reach`) answers "how do I get to X" with the steps Show me where walks:
-   each action, locator and name, the steps this app cannot replay and why, the destination, Open route and docs. Find
-   `key` with `onboarding_overview`.
+   each action, locator and name, the steps this app cannot replay and why, the destination, Open route and docs. A
+   feature with `reachNarrow` lists both walks, labelled desktop (640 px or wider) and phone. Find `key` with
+   `onboarding_overview`.
 4. `onboarding_whats_new` (read-only, `onboarding/whatsNew`) returns the same changes and upstream lists the page shows,
    with `since` (ISO 8601), `plugin` and `limit` (default 50). Marking changes seen is per browser and has no tool.
 5. `onboarding_suggestions` (read-only, `onboarding/suggestions`) returns the same suggestions, with the counts and

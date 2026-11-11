@@ -7,6 +7,12 @@
       "title": "See what this setup can do and what it still needs on one page",
       "summary": "Knowledge › Getting started (also in the command palette and the New tab view chooser) shows a self-ticking setup checklist read live from the Host (an AI account connected, counted from AI accounts when it is installed, project added, project is a jj or git repository, GitHub CLI signed in) with a fix action for each open item, the eight plugin packs with every plugin enabled, disabled or not installed plus its prerequisites and key settings, and a curated-first search over every catalogued feature grouped by destination, with an Open button only where the route is registered. The onboarding_overview agent tool returns the same checklist, packs and rows. It changes nothing.",
       "reach": ["click tab \"Knowledge\"", "click button \"Getting started\"", "expect heading \"Getting started\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Knowledge Memory and reference material agents use.\"",
+        "click button \"Getting started\"",
+        "expect heading \"Getting started\""
+      ],
       "surfaces": ["client", "host", "api", "tool", "command", "settings"],
       "surface": "destinationSection",
       "destination": "knowledge",
@@ -117,6 +123,13 @@
       "summary": "Each non-core pack on Getting started has Enable pack and Disable pack. Either opens one dialog that names exactly which packages would install, which rows would be enabled or disabled, which are already fine, which another pack keeps on, the pack's prerequisites and whether a restart follows; nothing changes before Confirm, Cancel changes nothing and a satisfied pack says Up to date. Confirm works one plugin at a time with progress and Stop after this plugin: existing rows switch through the plugin manager, whose applied, restart-required (with its reason) or overridden verdict is shown as given; missing owned bundles install with the dshfiles checkout's dshx add into the profile DSH runs, or, when this Host cannot reach that checkout, come back as the exact command to copy with the install docs. Core is never disabled and nothing restarts DSH: the result says what waits for a restart (Restart when idle under the managed launcher, otherwise your own launcher). onboarding_overview returns the same preview and onboarding_pack_apply applies it only with confirm: true.",
       "reach": [
         "click tab \"Knowledge\"",
+        "click button \"Getting started\"",
+        "click button \"Enable pack: Observe & perf\"",
+        "expect dialog \"Enable Observe & perf\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Knowledge Memory and reference material agents use.\"",
         "click button \"Getting started\"",
         "click button \"Enable pack: Observe & perf\"",
         "expect dialog \"Enable Observe & perf\""
@@ -286,9 +299,17 @@
     {
       "id": "show-me-where",
       "title": "Show me where a feature lives, one step at a time",
-      "summary": "Each Getting started feature row whose first reach step the app can replay has Show me where. It opens a non-modal walk: a ring around the next control (by ARIA role and accessible name, text, label or title; an exact name first, a substring only for a name ending in *, the first visible match), a chip such as Step 2 of 5 · Click \"Settings\", the feature title and a footer with Next and End. It never clicks, types, hovers or presses for the user: a step advances when that control is clicked, pointed at, changed or the key is pressed, an expect passes when its target shows, and Next always advances. Seed, attach, right-click and shift-click steps are E2E-only: the walk stops there, says why and links the plugin docs. A target missing for 10 s names the destination and offers Open through the row's registered route. Escape or End ends it; nothing is stored and nothing is sent.",
+      "summary": "Each Getting started feature row whose first reach step the app can replay has Show me where. It opens a non-modal walk: a ring around the next control (by ARIA role and accessible name, text, label or title; an exact name first, a substring only for a name ending in *, the first visible match), a chip such as Step 2 of 5 · Click \"Settings\", the feature title and a footer with Next and End. It never clicks, types, hovers or presses for the user: a step advances when that control is clicked, pointed at, changed or the key is pressed, an expect passes when its target shows, and Next always advances. Seed, attach, right-click and shift-click steps are E2E-only: the walk stops there, says why and links the plugin docs. A target missing for 10 s names the destination and offers Open through the row's registered route. Below 640 px it walks the feature's reachNarrow steps (More and the destination row, the Settings Sections combobox) when it has them, reach otherwise. Escape or End ends it; nothing is stored and nothing is sent.",
       "reach": [
         "click tab \"Knowledge\"",
+        "click button \"Getting started\"",
+        "fill textbox \"Search features\" \"Native Settings shell\"",
+        "click button \"Show me where: Native Settings shell, ported\"",
+        "expect region \"Show me where\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Knowledge Memory and reference material agents use.\"",
         "click button \"Getting started\"",
         "fill textbox \"Search features\" \"Native Settings shell\"",
         "click button \"Show me where: Native Settings shell, ported\"",
@@ -325,6 +346,17 @@
           "kind": "gherkin",
           "id": "onboarding.show-me-where",
           "featureFile": "tooling/dshx/e2e/features/onboarding.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "onboarding.reach-narrow",
+          "featureFile": "tooling/dshx/e2e/features/onboarding.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.walk-phone",
+          "file": "plugins/@dshfiles/onboarding/src/show-me-where.client.test.tsx",
+          "testName": "walks reachNarrow below 640 px and reach at desktop width"
         },
         {
           "kind": "unit-test",

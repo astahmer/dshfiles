@@ -1,11 +1,11 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { destinationLabel } from './getting-started-page.js'
 import { TOUCH } from './touch.js'
-import { ReachModel, type FeatureReach, type WalkStep } from './reach-model.js'
+import { PHONE_QUERY, ReachModel, type FeatureReach, type WalkStep } from './reach-model.js'
 import { Routes, type RouteServices } from './routes.js'
 import { createWalk, type WalkController, type WalkSnapshot } from './walk-controller.js'
 
@@ -43,10 +43,10 @@ const chipText = (input: { readonly snapshot: WalkSnapshot; readonly steps: read
   return `${position} · ${ReachModel.describeStep(step)}`
 }
 
-const announcement = (input: { readonly snapshot: WalkSnapshot; readonly reach: FeatureReach }): string => {
-  const step = input.reach.steps[input.snapshot.index]
+const announcement = (input: { readonly snapshot: WalkSnapshot; readonly reach: FeatureReach; readonly steps: readonly WalkStep[] }): string => {
+  const step = input.steps[input.snapshot.index]
   if (step === undefined) return ''
-  const chip = chipText({ snapshot: input.snapshot, steps: input.reach.steps })
+  const chip = chipText({ snapshot: input.snapshot, steps: input.steps })
   const target = targetLabel(step)
   if (input.snapshot.phase === 'arrived') return `${chip}. You reached ${input.reach.title}.`
   if (input.snapshot.phase === 'missing') return `${chip}. ${target} is not on screen.`
@@ -74,14 +74,14 @@ const Ring = (props: { readonly element: Element }): ReactNode => {
   )
 }
 
-const Walk = (props: ShowMeWhereProps & { readonly controller: WalkController }): ReactNode => {
-  const { controller, reach } = props
+const Walk = (props: ShowMeWhereProps & { readonly controller: WalkController; readonly steps: readonly WalkStep[] }): ReactNode => {
+  const { controller, reach, steps } = props
   const snapshot = useSyncExternalStore(controller.subscribe, controller.snapshot, controller.snapshot)
-  const step = reach.steps[snapshot.index]
+  const step = steps[snapshot.index]
   const ringed = snapshot.target ?? snapshot.lastTarget
   const route = reach.route
   const canOpen = route !== null && Routes.available(route, props.routes)
-  const last = snapshot.index >= reach.steps.length - 1
+  const last = snapshot.index >= steps.length - 1
   const showNext = !last && snapshot.phase !== 'unsupported' && snapshot.phase !== 'arrived'
   const firstButton = useRef<HTMLButtonElement>(null)
   useEffect(() => firstButton.current?.focus(), [])
@@ -106,7 +106,7 @@ const Walk = (props: ShowMeWhereProps & { readonly controller: WalkController })
       >
         <p className="dshx:min-w-0 dshx:text-xs dshx:text-muted-foreground dshx:break-words">{reach.title}</p>
         <p className="dshx:min-w-0 dshx:text-sm dshx:font-medium dshx:break-words dshx:whitespace-normal" data-walk-chip="">
-          {chipText({ snapshot, steps: reach.steps })}
+          {chipText({ snapshot, steps })}
         </p>
         {snapshot.phase === 'missing' && step !== undefined ? (
           <p className="dshx:text-xs dshx:break-words" role="note">
@@ -144,7 +144,7 @@ const Walk = (props: ShowMeWhereProps & { readonly controller: WalkController })
           </Button>
         </div>
         <p aria-live="polite" className="dshx:sr-only" data-walk-announcement="">
-          {announcement({ snapshot, reach })}
+          {announcement({ snapshot, reach, steps })}
         </p>
       </section>
     </div>,
@@ -152,9 +152,25 @@ const Walk = (props: ShowMeWhereProps & { readonly controller: WalkController })
   )
 }
 
+/** The viewport is phone-width; crossing the breakpoint (a rotation) re-renders and restarts the walk on the other steps. */
+const usePhone = (root: Document | undefined): boolean => {
+  const view = (root ?? document).defaultView
+  const query = useMemo(() => (view === null || typeof view.matchMedia !== 'function' ? null : view.matchMedia(PHONE_QUERY)), [view])
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      query?.addEventListener('change', listener)
+      return () => query?.removeEventListener('change', listener)
+    },
+    [query],
+  )
+  const read = (): boolean => query?.matches === true
+  return useSyncExternalStore(subscribe, read, read)
+}
+
 /**
- * Show me where: a non-modal walk over one feature's `reach` steps. It rings the next control and waits for the user
- * to act; unmounting ends the walk and releases everything it watched.
+ * Show me where: a non-modal walk over one feature's `reach` steps, or its `reachNarrow` steps on a phone-width
+ * viewport. It rings the next control and waits for the user to act; unmounting ends the walk and releases everything
+ * it watched.
  */
 export const ShowMeWhere = (props: ShowMeWhereProps): ReactNode => {
   const [controller, setController] = useState<WalkController | null>(null)
@@ -163,7 +179,8 @@ export const ShowMeWhere = (props: ShowMeWhereProps): ReactNode => {
   const root = props.document
   const isVisible = props.isVisible
   const missingAfterMs = props.missingAfterMs
-  const steps = props.reach.steps
+  const phone = usePhone(root)
+  const steps = ReachModel.stepsFor({ reach: props.reach, phone })
   useEffect(() => {
     // Unmounting ends the walk silently; End, Escape or finishing it tell the owner.
     let unmounting = false
@@ -183,5 +200,5 @@ export const ShowMeWhere = (props: ShowMeWhereProps): ReactNode => {
     }
   }, [steps, root, isVisible, missingAfterMs])
   if (controller === null) return null
-  return <Walk {...props} controller={controller} />
+  return <Walk {...props} controller={controller} steps={steps} />
 }

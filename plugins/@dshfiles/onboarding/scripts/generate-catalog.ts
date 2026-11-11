@@ -1,6 +1,6 @@
 /**
  * Build the onboarding feature catalog from declarations that are already checked in: every owned plugin's
- * `package.json` description and its `dshx.features.json` (title, summary, destination, current surface, reach steps and
+ * `package.json` description and its `dshx.features.json` (title, summary, destination, current surface, reach and reachNarrow steps and
  * the optional `onboarding` block). Each catalog is validated with the dshx feature schema first, so a destination or
  * block this page reads is one `features:check` accepts.
  *
@@ -73,6 +73,7 @@ const catalogSchema = Schema.Struct({
       destination: Schema.optional(Schema.String),
       currentSurface: Schema.optional(Schema.String),
       reach: Schema.optional(Schema.Array(Schema.String)),
+      reachNarrow: Schema.optional(Schema.Array(Schema.String)),
       onboarding: Schema.optional(Schema.Unknown),
     }),
   ),
@@ -105,6 +106,7 @@ for (const name of readdirSync(pluginsDir).sort()) {
       destination: feature.destination ?? 'none',
       currentSurface: feature.currentSurface ?? null,
       reach: (feature.reach ?? []).map(reachStep),
+      reachNarrow: feature.reachNarrow === undefined ? null : feature.reachNarrow.map(reachStep),
       onboarding: feature.onboarding ?? null,
     })
   }

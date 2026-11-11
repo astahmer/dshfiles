@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
+import { parseReachStep } from '../../../packages/dshx/src/project/features.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
+import { ScratchDriveRuntime, ScratchFeatureCatalog } from '../../../packages/dshx/src/scratch/drive.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion, settingsPage } from '../steps.js'
 
@@ -324,9 +326,15 @@ Then('no walk overlay or walk listener is left', async ({ page }: { page: Page }
   })
 })
 
+Then('the walk follows the phone steps, {int} of them, from {string}', async ({ page }: { page: Page }, total: number, name: string) => {
+  await recordAssertion(page, 'onboarding-walk-phone-steps', async () => {
+    await expect(walkCard(page).locator('[data-walk-chip]')).toHaveText(`Step 1 of ${String(total)} · Click "${name}"`)
+  })
+})
+
 Then('after 10 seconds the walk says the Memory button is not on screen and names Knowledge', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'onboarding-walk-missing', async () => {
-    await expect(walkCard(page).locator('[data-walk-chip]')).toHaveText('Step 2 of 3 · Click "Memory"')
+    await expect(walkCard(page).locator('[data-walk-chip]')).toHaveText('Step 3 of 4 · Click "Memory"')
     await expect(walkCard(page)).toHaveAttribute('data-walk-phase', 'seeking')
     await expect(walkCard(page)).toHaveAttribute('data-walk-phase', 'missing', { timeout: 12_000 })
     await expect(walkCard(page).getByRole('note')).toContainText('button "Memory" is not on screen.')
@@ -335,6 +343,39 @@ Then('after 10 seconds the walk says the Memory button is not on screen and name
     await expect(walkCard(page).getByRole('button', { name: 'Open', exact: true })).toHaveCount(0)
   })
   await page.screenshot({ path: test.info().outputPath('show-me-where-missing.png'), animations: 'disabled' })
+})
+
+/**
+ * Play one catalog walk as `dshx dev open` does (its own locator), from a reloaded app root. Only the steps a phone walk
+ * of the curated set uses are played; a seed, attach or context-menu step fails the check instead of being skipped.
+ */
+const playReach = async (page: Page, steps: readonly string[]): Promise<void> => {
+  for (const text of steps) {
+    const step = parseReachStep(text)
+    if (step === undefined || step.action === 'seed' || step.action === 'attach' || step.action === 'rightclick' || step.action === 'shiftclick')
+      throw new Error(`the 390 px check cannot play "${text}": pick a feature whose phone walk needs no harness state`)
+    if (step.action === 'press') await page.keyboard.press(step.key)
+    else if (step.action === 'click') await ScratchDriveRuntime.locate(page, step.by, step.name).click({ timeout: 10_000 })
+    else if (step.action === 'hover') await ScratchDriveRuntime.locate(page, step.by, step.name).hover({ timeout: 10_000 })
+    else if (step.action === 'fill') await ScratchDriveRuntime.locate(page, step.by, step.name).fill(step.value ?? '', { timeout: 10_000 })
+    else await expect(ScratchDriveRuntime.locate(page, step.by, step.name), text).toBeVisible({ timeout: 10_000 })
+  }
+}
+
+Then('the phone walks of {string} each reach their final expect at 390 pixels', async ({ page }: { page: Page }, keys: string) => {
+  const catalog = await ScratchFeatureCatalog.list()
+  await page.setViewportSize({ width: 390, height: 844 })
+  for (const key of keys.split(',').map(entry => entry.trim())) {
+    const feature = catalog.find(candidate => `${candidate.packageId.slice('@dshfiles/'.length)}#${candidate.id}` === key)
+    const steps = feature?.reachNarrow ?? feature?.reach
+    if (steps === undefined) throw new Error(`${key} has no catalog walk`)
+    await StartupDialogs.reloadPastProviderSetup(page)
+    await expect(page.getByRole('navigation', { name: 'Destinations', exact: true }).getByRole('button', { name: 'More', exact: true })).toBeVisible()
+    await recordAssertion(page, `onboarding-phone-walk-${key.replace('#', '-')}`, () => playReach(page, steps))
+  }
+  await page.screenshot({ path: test.info().outputPath('phone-walk.png'), animations: 'disabled' })
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await finishJourneyAssertions(page)
 })
 
 /** Requests that would change the profile or restart DSH; the preview journey must send none. */

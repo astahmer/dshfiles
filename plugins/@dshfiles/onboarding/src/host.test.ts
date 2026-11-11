@@ -134,7 +134,16 @@ describe('onboarding Host', () => {
         ['click', { kind: 'role', role: 'menuitem', name: 'Settings', match: 'substring' }, null],
         ['expect', { kind: 'role', role: 'button', name: 'General', match: 'exact' }, null],
       ])
+      expect(settings.feature?.narrowSteps?.map(step => step.text)).toEqual([
+        'click button "More"',
+        'click button "Settings Accounts, tools, secrets and plugins."',
+        'expect combobox "Sections"',
+      ])
+      const memory = await client.reach({ key: 'memory#memory-panel' })
+      expect(memory.feature?.steps.length).toBe(3)
+      expect(memory.feature?.narrowSteps?.[0]?.locator).toEqual({ kind: 'role', role: 'button', name: 'More', match: 'exact' })
       const seeded = await client.reach({ key: 'thread-sidebar#rename-thread-title' })
+      expect(seeded.feature?.narrowSteps).toBeNull()
       expect(seeded.feature).toMatchObject({ walkable: false, unsupportedActions: ['rightclick', 'seed'] })
       expect((await client.reach({ key: 'nothing#here' })).feature).toBeNull()
       await expect(client.reach({ key: '../etc' })).rejects.toThrow()
@@ -153,6 +162,18 @@ describe('onboarding Host', () => {
       expect(text).toContain('1. Click \\"All threads\\" (button)')
       expect(text).toContain('Right-click \\"Idle policy target\\" (text) — not replayable here')
       expect(text).toContain('Docs: https://github.com/astahmer/dshfiles/blob/main/plugins/@dshfiles/thread-sidebar/README.md')
+      const phone = JSON.stringify(
+        await host.tools.execute({
+          callId: ToolCallId('call-reach-phone'),
+          name: 'onboarding_reach',
+          arguments: { key: 'memory#memory-panel' },
+          signal: new AbortController().signal,
+        }),
+      )
+      expect(phone).toContain('Desktop (640 px wide or more):\\n1. Click \\"Knowledge\\" (tab)')
+      expect(phone).toContain(
+        'Phone (narrower than 640 px):\\n1. Click \\"More\\" (button)\\n2. Click \\"Knowledge Memory and reference material agents use.\\" (button)',
+      )
     } finally {
       await host.dispose()
     }

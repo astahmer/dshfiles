@@ -25,6 +25,7 @@ const stepsOf = (reach: readonly CatalogReachStep[]): readonly WalkStep[] => {
     destination: 'settings',
     currentSurface: null,
     reach,
+    reachNarrow: null,
     onboarding: null,
   }
   const value = ReachModel.reach({ catalog: { schemaVersion: 1, generatedFrom: [], plugins: [], features: [feature] }, key: feature.key, routeOf: () => null })

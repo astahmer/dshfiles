@@ -47,6 +47,8 @@ export const catalogFeatureSchema = Schema.Struct({
   destination: Schema.String,
   currentSurface: Schema.NullOr(Schema.String),
   reach: Schema.Array(catalogReachStepSchema),
+  /** The phone-width walk (`reachNarrow`), `null` when the feature walks `reach` on a phone too. */
+  reachNarrow: Schema.NullOr(Schema.Array(catalogReachStepSchema)),
   onboarding: Schema.NullOr(onboardingBlockSchema),
 })
 export type CatalogFeature = typeof catalogFeatureSchema.Type
