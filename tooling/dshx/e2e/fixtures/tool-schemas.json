@@ -1,5 +1,5 @@
 {
-  "hostBundles": 79,
+  "hostBundles": 84,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -21,6 +21,7 @@
     "@dshfiles/capabilities-hub",
     "@dshfiles/command-palette",
     "@dshfiles/context-compaction",
+    "@dshfiles/conversation-cleanup",
     "@dshfiles/cordis-cards",
     "@dshfiles/cordis-client-runner",
     "@dshfiles/diff-viewed",
@@ -38,6 +39,7 @@
     "@dshfiles/mermaid-diagrams",
     "@dshfiles/model-effort-picker",
     "@dshfiles/multi-host",
+    "@dshfiles/onboarding",
     "@dshfiles/phone-access",
     "@dshfiles/phone-pairing",
     "@dshfiles/plugin-guide",
@@ -61,6 +63,7 @@
     "@dshfiles/settings-subagent",
     "@dshfiles/settings-web-search",
     "@dshfiles/shared-streams",
+    "@dshfiles/sidebar-terminal",
     "@dshfiles/storage-domain",
     "@dshfiles/storage-json",
     "@dshfiles/test-runs",
@@ -68,6 +71,8 @@
     "@dshfiles/thread-sidebar",
     "@dshfiles/thread-transfer",
     "@dshfiles/tool-ask-user",
+    "@dshfiles/tool-bash",
+    "@dshfiles/tool-fs",
     "@dshfiles/tool-meta",
     "@dshfiles/tool-search",
     "@dshfiles/traces",
@@ -81,12 +86,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 599,
-  "apiToolBindings": 414,
-  "apiToolNameCount": 414,
-  "apiToolSchemas": 413,
+  "apiMethods": 650,
+  "apiToolBindings": 453,
+  "apiToolNameCount": 453,
+  "apiToolSchemas": 452,
   "definedTools": 24,
-  "tools": 437,
+  "tools": 476,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -1245,6 +1250,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "useExtraUsage": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -1327,6 +1335,26 @@
         },
         "required": [
           "distribution"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "ai_accounts_set_extra_usage",
+      "description": "Allow or refuse a provider’s paid extra usage (overage credits) for one account. With it off, the account stops at its plan limits: routing skips it once a plan window is spent and a turn that would run on it stops with a recovery message. Only accounts whose quota reports extra usage honor it. Call only when the user asked to change that account.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "instanceId",
+          "enabled"
         ],
         "additionalProperties": false
       }
@@ -1771,6 +1799,135 @@
       }
     },
     {
+      "name": "artifact_create",
+      "description": "Create an artifact only when the user asked. Defaults to the calling thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "text/markdown",
+              "text/html"
+            ]
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "mimeType",
+          "content"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "artifact_delete",
+      "description": "Delete an artifact only when the user asked; confirm must be true. Refuses stale revisions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "expectedRevision",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "artifact_list",
+      "description": "List artifacts in a thread. Defaults to the calling thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "artifact_read",
+      "description": "Read an artifact in a thread. Defaults to the calling thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "artifact_update",
+      "description": "Update an artifact only when the user asked. Refuses stale revisions.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "text/markdown",
+              "text/html"
+            ]
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "ask_parent_question",
       "description": "Ask your direct parent to decide a question, or pass questionId alone to reattach after Host restart. For a new question, provide options with id and label, optional description, mark one option as recommended, choose expiry behavior, and optionally set timeoutMs from 1,000 to 3,600,000 (default 180,000). The parent may decide directly or use the native ask_user_question tool to ask a human.",
       "parameters": {
@@ -1932,6 +2089,37 @@
       }
     },
     {
+      "name": "auto_restart_postpone",
+      "description": "Hold the automatic DSH restart for some minutes (default 60); the updates stay pending. Run only when the user asked to postpone the restart. Reverse with resumeAutoRestart.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "minutes": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "auto_restart_resume",
+      "description": "Drop a postponement of the automatic DSH restart. Run only when the user asked to let it restart again.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "auto_restart_status",
+      "description": "The automatic restart that applies pending Host updates once DSH is idle: its phase, the pending updates, what keeps DSH busy, when it would restart and any postponement. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "automation_delete",
       "description": "Delete an automation and its run history; its webhook URL stops answering. Threads it started are kept. Requires confirm: true. Call only when the user asked for this.",
       "parameters": {
@@ -2006,7 +2194,7 @@
     },
     {
       "name": "automation_save",
-      "description": "Create a project automation (omit id) or replace one (pass its id). A schedule trigger takes cron, daily, weekly or every timing with an explicit IANA time zone; a webhook trigger takes the HMAC secret as a secret:ALIAS reference and a per-minute rate limit. Each run starts a new thread in the project with the prompt; a webhook prompt may read {{body.path}} and {{headers.name}}. Call only when the user asked for this.",
+      "description": "Create a project automation (omit id) or replace one (pass its id). A schedule trigger takes cron, daily, weekly or every timing with an explicit IANA time zone; a webhook trigger takes the HMAC secret as a secret:ALIAS reference and a per-minute rate limit. Each run posts its prompt: by default it starts a new thread in the project, and with destination {kind:'existing-thread',sessionId} it adds the prompt to that thread as a queued message. A webhook prompt may read {{body.path}} and {{headers.name}}, and accepts either the timestamped x-dsh-signature scheme or GitHub's x-hub-signature-256 over the raw body. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -2046,6 +2234,44 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "destination": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "new-thread"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "existing-thread"
+                    ]
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "sessionId"
+                ],
+                "additionalProperties": false
+              }
+            ]
           },
           "trigger": {
             "oneOf": [
@@ -2858,7 +3084,7 @@
     },
     {
       "name": "backlog_link_pr",
-      "description": "Link a pull request to an item as a first-class PR link: its state and checks show on the item (watched through the newest thread linked to the item), and merging it closes the item when `closes` is on. Only for the user's request or this thread's own task.",
+      "description": "Link a pull request to an item as a first-class PR link: its state and checks show on the item (the item watches it, and so does the newest thread linked to the item), and merging it closes the item when `closes` is on. Only for the user's request or this thread's own task.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -3104,7 +3330,7 @@
     },
     {
       "name": "backlog_pull_requests",
-      "description": "The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed) and checks, read from the pull-requests plugin. A PR no thread watches shows `unknown`; `available: false` when that plugin is not loaded. Read-only.",
+      "description": "The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed), checks and when that state was last read, and its linked GitHub issues with their open/closed state, read through the pull-requests plugin. Open items watch their PRs on their own; a PR not yet read shows `unknown`; `available: false` when that plugin is not loaded. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -4350,6 +4576,20 @@
       }
     },
     {
+      "name": "compaction_threshold",
+      "description": "Read the token count at which automatic compaction next runs for one live thread, from its routed model, context window, output reservation and the compaction policy. Null before the thread routed a request, when the route declares no context window, or when the policy leaves no pressure budget.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {}
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "context_instruction_files",
       "description": "The AGENTS.md-compatible instruction files DSH's workspace instruction loader finds for a thread folder with its default discovery settings (user-global first, then project root to folder), with their sizes. Read-only.",
       "parameters": {
@@ -4363,6 +4603,38 @@
         "required": [
           "cwd"
         ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "conversation_cleanup_delete",
+      "description": "Permanently delete the exact conversations in a fresh cleanup preview, after rechecking their state and obtaining each persistence write lock. Irreversible: removes local JSONL generations, not shared attachments, workspaces, backups or derived indexes. Loaded or changed sessions are skipped; failures are reported individually. Agent calls require a root conversation with Full access; delegated or restricted agents are refused. Call only when the user explicitly asked to delete these conversations and confirmed permanent deletion.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "previewId": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "previewId",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "conversation_cleanup_preview",
+      "description": "Preview permanent deletion of up to 200 local settled OR archived conversations. Loaded sessions, background activity, migration-required logs and the caller are protected. Nothing is deleted. Read-only; preview expires after ten minutes.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
         "additionalProperties": false
       }
     },
@@ -5734,7 +6006,11 @@
       "description": "List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.",
       "parameters": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "revisionLimit": {
+            "type": "integer"
+          }
+        },
         "additionalProperties": false
       }
     },
@@ -7015,7 +7291,7 @@
     },
     {
       "name": "multi_host_project_origins",
-      "description": "Read the Git origin URL for local project paths and paths on registered remote runtimes, in bounded batches. Read-only.",
+      "description": "Read the Git origin URL for local project paths and paths on registered remote runtimes, in bounded batches. A remote host slower than 1.5 s answers null with pending: true while its read finishes into the cache; ask again. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -7696,6 +7972,274 @@
       }
     },
     {
+      "name": "notification_history_clear",
+      "description": "Permanently clear only the specified retained notification entries. Read the list first; newer arrivals are preserved. Requires confirm:true. Call only when the user asked to clear notification history.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "ids",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "notification_history_list",
+      "description": "Read the last 500 retained thread notifications, newest first, including read and dismissed entries. Summaries are fixed categories, never conversation contents. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "notification_history_set_dismissed",
+      "description": "Dismiss a notification entry or restore it with dismissed:false. This does not stop, resolve or acknowledge its thread. Call only when the user asked.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "dismissed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "dismissed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "notification_history_set_read",
+      "description": "Mark the specified notification entries read or unread, without acknowledging or changing their threads. Call only when the user asked.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "read": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ids",
+          "read"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "notify_user",
+      "description": "Send the user a notification (title and body, optionally linking a thread) through their configured notification routes. Call only when the user asked to be notified, or when a long task or routine reaches a result or a blocker that needs the user’s attention; never for progress updates. The text appears in the operating system notification center: never include secrets or credentials. Rate-limited per thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "description": "Short headline, such as “Migration finished”.",
+            "type": "string"
+          },
+          "body": {
+            "description": "What happened and what the user should look at.",
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Thread a click opens. Omit for the calling thread; null for a notification about no thread."
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "onboarding_overview",
+      "description": "What this DSH setup can do and what is still missing: the setup checklist (an AI account connected, project added, project is a jj or git repository, GitHub CLI signed in) read live from the Host, each plugin pack with every plugin enabled, disabled or not installed, and the catalogued features grouped by destination with where each lives and how to open it. Search with `query` (every word must match), narrow with `destination`; curated features only until a query is given unless `curatedOnly` says otherwise. `preview: { pack, action }` adds exactly what enabling or disabling that pack would install, switch, keep and need, and whether a restart follows. Changes nothing. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string",
+            "enum": [
+              "threads",
+              "inbox",
+              "land",
+              "work",
+              "agents",
+              "observe",
+              "knowledge",
+              "settings",
+              "thread-panel",
+              "composer",
+              "transcript",
+              "none"
+            ]
+          },
+          "curatedOnly": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "preview": {
+            "type": "object",
+            "properties": {
+              "pack": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "enable",
+                  "disable"
+                ]
+              }
+            },
+            "required": [
+              "pack",
+              "action"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "onboarding_pack_apply",
+      "description": "Enable or disable one plugin pack of the active profile. Call only when the user asked to enable or disable that pack, after showing them onboarding_overview's preview; `confirm: true` is required and a call without it changes nothing. Existing plugin rows switch through the plugin manager (its applied / restart-required / overridden verdict is relayed); missing owned bundles install one at a time with the dshfiles checkout's dshx add, or come back as the exact command to run when this Host cannot reach that toolchain. The Core pack is never disabled, a disable keeps plugins another fully enabled pack shares, and nothing restarts DSH: the result says what waits for a restart. Reverse it with the other action.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pack": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "enable",
+              "disable"
+            ]
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "plugins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "pack",
+          "action",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "onboarding_reach",
+      "description": "How to get to one catalogued feature in the app, step by step: each `reach` step with its action (click, hover, fill, press, expect…), the control it targets (an ARIA role, or text, label or title) and its accessible name, plus which steps this app cannot replay (seed, attach, right-click and shift-click are E2E-only) and why. Also names the destination the feature lives in, its Open route and its docs. Find `key` (`<plugin>#<feature>`) with onboarding_overview. The same data drives Show me where on Getting started. Changes nothing. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "onboarding_suggestions",
+      "description": "Catalogued features the user has not used yet whose usage pattern suggests value, from the last 30 days of local tool use: each with the counts that triggered it (e.g. many jj shell commands and no thread workspace), why it helps, and its feature row (find it with onboarding_reach). Reads only aggregate counts from the Usage plugin (tool names, the executable of each shell command, request counts), cached for 10 minutes; never prompts, paths or command arguments. `no-usage` means the Usage plugin is not running. Refused while the onboarding `suggestions` setting is off (the default), and nothing is read then. No network or model request. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "onboarding_try_it",
+      "description": "Start a demo of one catalogued feature (`feature`, its key from onboarding_overview) or one plugin pack (`pack`): a new thread whose first message, built only from the feature catalog, asks the agent there to show that feature in this setup with read-only tools and to ask before any write. The message is sent at once, so the new thread runs on the user's default model and spends tokens on their account. Call only when the user asked for this demo; `confirm: true` is required and a call without it starts nothing. Refused while the onboarding `tryIt` setting is off (the default). The thread starts in `project` when given (a registered project id from project_list; any other id is refused), otherwise in your own directory. Returns the new thread's id; stop or archive that thread to end the demo.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "feature": {
+            "type": "string"
+          },
+          "pack": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "onboarding_whats_new",
+      "description": "What changed in the owned dshfiles plugins, newest first: every `feat(<plugin>)` and `fix(<plugin>)` change in the jj (or git) history of the dshfiles checkout this profile links Getting started from, each with its plugin, date and commit, plus the plugins' catalog descriptions. `upstream` lists, per remote whose bookmark of the same name differs from the local one, the changes there not yet in local history, as of the last fetch; this method never fetches. `since` (ISO 8601) keeps changes that landed after an instant, `plugin` one plugin, `limit` bounds the list (default 50). `no-checkout` means a registry install with no history on this Host (the same changes are at `commitsUrl`); `off` means the onboarding `whatsNew` setting is off. No network or model request. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer"
+          },
+          "plugin": {
+            "type": "string"
+          },
+          "since": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "plugin_guide_search",
       "description": "Search the DSH plugin extension surfaces a plugin may use: dshx SDK entry points, native Client slots, owned registries, client contracts, Host APIs, shared modules and feature-catalog surfaces. Each entry names its import, scope, mode, registration shape, additive-or-replacement risk, source file and docs. Static build-time catalog, never live occupancy. Read-only.",
       "parameters": {
@@ -7720,6 +8264,39 @@
             "type": "integer"
           }
         },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plugin_inventory",
+      "description": "List the plugin entries of the active profile with their module, the bundle that declares each row and the bundles that reconfigure it, whether each is enabled, its runtime phase, a change waiting for a restart, whether pnpm profile:sync restores the row from the seed, and why it cannot be changed when the profile patch cannot address it. A query filters by entry id or module. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plugin_set_enabled",
+      "description": "Enable or disable one plugin entry of the active profile (an entryId from plugin_inventory). The plugin manager saves it in the profile patch and reports whether the running DSH applied it or needs a restart; this never restarts DSH. Reverse it with the opposite value. Call only when the user asked to enable or disable that plugin.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entryId",
+          "enabled"
+        ],
         "additionalProperties": false
       }
     },
@@ -8480,6 +9057,22 @@
       }
     },
     {
+      "name": "prompt_history_search",
+      "description": "Search the prompts the user sent across every top-level thread, newest first, each text once: the newest prompts the historyRetention setting keeps, without prompts longer than historyMaxChars. `text` keeps prompts holding every word (the last may be a prefix); without it the newest prompts are listed. `limit` defaults to 30. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "prompt_stash_state",
       "description": "The saved prompt library every browser and plugin shares. Read-only.",
       "parameters": {
@@ -8489,7 +9082,7 @@
     },
     {
       "name": "pull_request_create",
-      "description": "Create a GitHub pull request from a thread’s jj workspace after pull_request_create_preview: sets the bookmark on the previewed head commit, pushes it with jj git push, runs gh pr create (or reuses an open pull request for the bookmark), then links and watches it on the thread. Requires confirm: true and the preview’s headCommitId; refuses when the workspace moved. Publishes to GitHub. Call only when the user asked for this.",
+      "description": "Create a pull request or merge request from a thread’s jj workspace after pull_request_create_preview: sets the bookmark on the previewed head commit, pushes it with jj git push, runs gh pr create or glab mr create (or reuses an open one for the bookmark), then links and watches it on the thread. Requires confirm: true and the preview’s headCommitId; refuses when the workspace moved. Publishes to the forge. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8540,7 +9133,7 @@
     },
     {
       "name": "pull_request_create_preview",
-      "description": "Preview creating a GitHub pull request from a thread’s jj workspace: the repository, base branch, bookmark to push, the commits above the base, a title and body drafted from the thread with its model, an existing open pull request for the bookmark, and every blocking problem with its recovery. Changes nothing (it only reads jj, gh and the thread). Pass its bookmark, base, headCommitId, title and body to pull_request_create. Read-only.",
+      "description": "Preview creating a pull request (GitHub) or merge request (GitLab) from a thread’s jj workspace: the repository, base branch, bookmark to push, the commits above the base, a title and body drafted from the thread with its model, an existing open pull request for the bookmark, and every blocking problem with its recovery. Changes nothing (it only reads jj, gh and the thread). Pass its bookmark, base, headCommitId, title and body to pull_request_create. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8562,7 +9155,7 @@
     },
     {
       "name": "pull_request_link",
-      "description": "Link a GitHub pull request to a DSH thread by GitHub URL, or by number and repository cwd. The session id defaults to the calling thread. Call only when the user asked for this.",
+      "description": "Link a GitHub pull request or GitLab merge request to a DSH thread by URL, or by number and repository cwd. The session id defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -8570,7 +9163,7 @@
     },
     {
       "name": "pull_request_list",
-      "description": "List GitHub pull-request links for one thread (defaults to the calling thread) or across all threads with all: true, including each link’s last known state and whether it is watched. Read-only.",
+      "description": "List GitHub pull-request and GitLab merge-request links for one thread (defaults to the calling thread) or across all threads with all: true, including each link’s last known state and whether it is watched. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8585,8 +9178,28 @@
       }
     },
     {
+      "name": "pull_request_search",
+      "description": "Search recent issues and pull requests in the current GitHub repository. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "pull_request_unlink",
-      "description": "Remove one GitHub pull-request link from a DSH thread. Specify the URL or repository and number; the session id defaults to the calling thread. Call only when the user asked for this.",
+      "description": "Remove one GitHub pull-request or GitLab merge-request link from a DSH thread. Specify the URL or repository and number; the session id defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -8594,7 +9207,7 @@
     },
     {
       "name": "pull_request_unwatch",
-      "description": "Stop watching one linked GitHub pull request without removing its thread link. The session id defaults to the calling thread. Call only when the user asked for this.",
+      "description": "Stop watching one linked pull request or merge request without removing its thread link. The session id defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -8602,7 +9215,7 @@
     },
     {
       "name": "pull_request_watch",
-      "description": "Start watching a GitHub pull request; watching creates the thread link if needed. The session id defaults to the calling thread. Call only when the user asked for this.",
+      "description": "Start watching a GitHub pull request or GitLab merge request; watching creates the thread link if needed. The session id defaults to the calling thread. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -9449,6 +10062,134 @@
       }
     },
     {
+      "name": "scheduled_send_cancel",
+      "description": "Cancel one scheduled message so it is never sent. Returns it, so it can be scheduled again with scheduled_send_create. Call only when the user asked to cancel it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scheduled_send_create",
+      "description": "Schedule a message to be sent into a thread at sendAt (Unix epoch milliseconds, in the future), as if the user sent it then; with model, the thread switches to that model and effort first. Agents default to their own thread. Call only when the user asked to send something later.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "sendAt": {
+            "type": "integer"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "reasoningEffort": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "text",
+          "sendAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scheduled_send_list",
+      "description": "List the messages scheduled to be sent later, soonest first: one thread when sessionId is given (agents default to their own thread), else every thread. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scheduled_send_now",
+      "description": "Send one scheduled message now instead of at its time. Call only when the user asked to send it now.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scheduled_send_update",
+      "description": "Change the text, send time, or model and effort of one scheduled message (model null keeps the thread’s own). A failed send is rescheduled. Call only when the user asked to change it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "sendAt": {
+            "type": "integer"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "reasoningEffort": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "secret_get",
       "description": "Retrieve one configured secret value from the secret CLI for this Session workspace. The plaintext enters the conversation, so call it only when the current task needs that exact value. Discover aliases with secret_list first.",
       "parameters": {
@@ -9654,7 +10395,7 @@
     },
     {
       "name": "session_undo_history",
-      "description": "The turns of a thread that can be undone or rewound to (session_rewind takes their turn number), newest last, each with its prompt and whether its files were snapshotted, and whether a redo is available. Read-only.",
+      "description": "The turns of a thread that can be undone or rewound to (session_rewind takes their turn number), newest last, each with its prompt, whether its files were snapshotted and the jj revision its edits left, and whether a redo is available. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -9722,6 +10463,25 @@
         },
         "required": [
           "returnPolicy"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "settings_inspect",
+      "description": "Inspect one settings namespace field by field: the schema default, the user override (present even when it equals the default), the inherited value a reset restores, the effective value, and its source (override, profile composition, schema default, or unknown when the Host cannot tell). A query filters fields by path, title or description. Secret fields are never listed. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "namespace"
         ],
         "additionalProperties": false
       }
@@ -9856,6 +10616,14 @@
     {
       "name": "thread_attention_state",
       "description": "Threads whose finished turn (or manual unread mark) the user has not acknowledged yet. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "thread_attention_write_capabilities",
+      "description": "Which attention write contracts this Host serves; a Host without this method answers full snapshots only.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -10039,6 +10807,29 @@
         "required": [
           "text",
           "models"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "thread_find",
+      "description": "Find every event of one DSH thread (Session) whose text contains all words of `text` (the last word may be a prefix), in transcript order: the whole stored transcript, older turns and tool calls and results included (model thinking is not indexed). Each match has its event seq, type, time and a short snippet. `limit` defaults to 200. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sessionId",
+          "text"
         ],
         "additionalProperties": false
       }
@@ -10461,7 +11252,7 @@
     },
     {
       "name": "thread_subscribe",
-      "description": "Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) is queued into the subscriber and wakes it when it is idle. Defaults the subscriber to the calling thread. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.",
+      "description": "Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) reaches the subscriber: it wakes an idle subscriber, joins a running one at its next step, and several ends merge into one notice. Defaults the subscriber to the calling thread. level picks which ends reach it: all, outcomes (landed, failed, question), stuck (failed, question, blocked, truncated) or never; default (or omitted on a new pair) follows the user's setting. Subscribing an existing pair changes its level; omitting level keeps it. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -10470,6 +11261,16 @@
           },
           "subscriberSessionId": {
             "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "all",
+              "outcomes",
+              "stuck",
+              "never",
+              "default"
+            ]
           }
         },
         "required": [
@@ -11246,6 +12047,26 @@
       }
     },
     {
+      "name": "traces_reclaim_space",
+      "description": "Give the span store's free pages back to the disk and report the bytes freed. Run only when the user asked to reclaim space, and pass confirm: true. An incremental store moves only the pages behind its free ones (2.4 s for 27 MB free); an older store is rewritten once with a full VACUUM (blocks the Host for seconds: 3.4 s for a 62 MB store) and is incremental afterwards. Stored telemetry is kept.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "description": "Must be true. On a store that is not incremental yet this runs one full VACUUM that blocks the DSH Host for its duration (seconds: 3.4 s for a 62 MB store) and converts the file.",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "traces_search",
       "description": "Search stored OpenTelemetry traces, newest first: root span, duration, span and error counts, services and list-price cost of their model calls. Filter by service, operation, error status, minimum duration, time range, text, DSH session or turn. Read-only.",
       "parameters": {
@@ -11405,8 +12226,35 @@
       }
     },
     {
+      "name": "traces_stalls",
+      "description": "DSH Host event-loop stalls (spans 'host event-loop stall', recorded when the loop was blocked past the eventLoopStallMs setting), newest first, each with up to 8 spans that were open while it lasted, ranked by overlap times the share of the span the stall fills, so the blocking work ranks above the turn around it. SQLite busy waits show as 'sqlite lock wait' spans. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "windowMinutes": {
+            "type": "integer",
+            "description": "Look-back window in minutes; defaults to 60."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Stalls to return, newest first; defaults to 20."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "traces_status",
       "description": "The OTLP receiver: viewer mode, listen address and state (listening, port in use, off), request and item counters, forwarding, what the store retains, where this DSH process exports its own spans and metrics, and a diagnosis of why telemetry does or does not arrive. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "traces_store_space",
+      "description": "The span store's SQLite file: page size, page and free-page counts in pages and bytes, its auto_vacuum mode, and how traces_reclaim_space would give the free pages back (incremental-vacuum, or a one-time converting vacuum for a file created before incremental auto_vacuum). Read-only.",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -11646,7 +12494,8 @@
             "enum": [
               "ok",
               "aborted",
-              "failed"
+              "failed",
+              "unknown"
             ]
           },
           "sessionId": {
@@ -11691,6 +12540,23 @@
       "parameters": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "usage_thread_family_cost",
+      "description": "A thread's own list-price cost and its family cost: the thread plus every subagent session below it (subagents of subagents included), with each descendant's cost, requests and tokens. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "description": "The thread whose own cost and subagent (descendant) cost to total.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
         "additionalProperties": false
       }
     },
