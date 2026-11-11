@@ -1,67 +1,67 @@
 import { describe, expect, it } from 'vitest'
-import { forgeTargetOf, forgeTargetOfRemoteUrl, parseForgePullRequestUrl, pullRequestUrlOf, repositoryKeyOf } from './forge.js'
+import { ForgeModel } from './forge.js'
 import { normalizeMergeRequest } from './gitlab-cli.js'
 
 describe('forge targets', () => {
   it('parses GitHub pull-request URLs strictly', () => {
-    expect(parseForgePullRequestUrl('https://github.com/acme/widget/pull/12')).toEqual({
+    expect(ForgeModel.parsePullRequestUrl('https://github.com/acme/widget/pull/12')).toEqual({
       kind: 'github',
       host: 'github.com',
       project: 'acme/widget',
       number: 12,
       url: 'https://github.com/acme/widget/pull/12',
     })
-    expect(parseForgePullRequestUrl('https://github.com/acme/widget/pull/12/')).toMatchObject({ number: 12 })
-    expect(parseForgePullRequestUrl('http://github.com/acme/widget/pull/12')).toBeUndefined()
-    expect(parseForgePullRequestUrl('https://user:pw@github.com/acme/widget/pull/12')).toBeUndefined()
-    expect(parseForgePullRequestUrl('https://github.com/acme/widget/pull/0')).toBeUndefined()
-    expect(parseForgePullRequestUrl('https://github.com/acme/widget/issues/12')).toBeUndefined()
+    expect(ForgeModel.parsePullRequestUrl('https://github.com/acme/widget/pull/12/')).toMatchObject({ number: 12 })
+    expect(ForgeModel.parsePullRequestUrl('http://github.com/acme/widget/pull/12')).toBeUndefined()
+    expect(ForgeModel.parsePullRequestUrl('https://user:pw@github.com/acme/widget/pull/12')).toBeUndefined()
+    expect(ForgeModel.parsePullRequestUrl('https://github.com/acme/widget/pull/0')).toBeUndefined()
+    expect(ForgeModel.parsePullRequestUrl('https://github.com/acme/widget/issues/12')).toBeUndefined()
   })
 
   it('parses GitLab merge-request URLs, including nested groups and a self-hosted host', () => {
-    expect(parseForgePullRequestUrl('https://gitlab.com/group/project/-/merge_requests/7')).toEqual({
+    expect(ForgeModel.parsePullRequestUrl('https://gitlab.com/group/project/-/merge_requests/7')).toEqual({
       kind: 'gitlab',
       host: 'gitlab.com',
       project: 'group/project',
       number: 7,
       url: 'https://gitlab.com/group/project/-/merge_requests/7',
     })
-    expect(parseForgePullRequestUrl('https://gitlab.example.com/team/sub/project/-/merge_requests/9')).toMatchObject({
+    expect(ForgeModel.parsePullRequestUrl('https://gitlab.example.com/team/sub/project/-/merge_requests/9')).toMatchObject({
       host: 'gitlab.example.com',
       project: 'team/sub/project',
       number: 9,
     })
-    expect(parseForgePullRequestUrl('https://gitlab.com/group/project/merge_requests/7')).toBeUndefined()
-    expect(parseForgePullRequestUrl('http://gitlab.com/group/project/-/merge_requests/7')).toBeUndefined()
+    expect(ForgeModel.parsePullRequestUrl('https://gitlab.com/group/project/merge_requests/7')).toBeUndefined()
+    expect(ForgeModel.parsePullRequestUrl('http://gitlab.com/group/project/-/merge_requests/7')).toBeUndefined()
   })
 
   it('keeps a bare owner/name GitHub and treats a dotted first segment as a forge host', () => {
-    expect(forgeTargetOf('acme/widget')).toEqual({ kind: 'github', host: 'github.com', project: 'acme/widget' })
-    expect(forgeTargetOf('gitlab.com/group/project')).toEqual({ kind: 'gitlab', host: 'gitlab.com', project: 'group/project' })
-    expect(forgeTargetOf('gitlab.example.com/group/sub/project')).toMatchObject({ host: 'gitlab.example.com', project: 'group/sub/project' })
-    expect(forgeTargetOf('not a repo')).toBeUndefined()
+    expect(ForgeModel.targetOf('acme/widget')).toEqual({ kind: 'github', host: 'github.com', project: 'acme/widget' })
+    expect(ForgeModel.targetOf('gitlab.com/group/project')).toEqual({ kind: 'gitlab', host: 'gitlab.com', project: 'group/project' })
+    expect(ForgeModel.targetOf('gitlab.example.com/group/sub/project')).toMatchObject({ host: 'gitlab.example.com', project: 'group/sub/project' })
+    expect(ForgeModel.targetOf('not a repo')).toBeUndefined()
   })
 
   it('round-trips the stored key and the pull-request URL for both forges', () => {
-    const github = forgeTargetOf('acme/widget')
-    const gitlab = forgeTargetOf('gitlab.com/group/project')
+    const github = ForgeModel.targetOf('acme/widget')
+    const gitlab = ForgeModel.targetOf('gitlab.com/group/project')
     if (github === undefined || gitlab === undefined) throw new Error('fixtures must resolve')
-    expect(repositoryKeyOf(github)).toBe('acme/widget')
-    expect(repositoryKeyOf(gitlab)).toBe('gitlab.com/group/project')
-    expect(pullRequestUrlOf(github, 3)).toBe('https://github.com/acme/widget/pull/3')
-    expect(pullRequestUrlOf(gitlab, 3)).toBe('https://gitlab.com/group/project/-/merge_requests/3')
+    expect(ForgeModel.repositoryKeyOf(github)).toBe('acme/widget')
+    expect(ForgeModel.repositoryKeyOf(gitlab)).toBe('gitlab.com/group/project')
+    expect(ForgeModel.pullRequestUrlOf(github, 3)).toBe('https://github.com/acme/widget/pull/3')
+    expect(ForgeModel.pullRequestUrlOf(gitlab, 3)).toBe('https://gitlab.com/group/project/-/merge_requests/3')
   })
 
   it('reads remote URLs in ssh, scp and https forms', () => {
-    expect(forgeTargetOfRemoteUrl('git@github.com:acme/widget.git')).toMatchObject({ kind: 'github', project: 'acme/widget' })
-    expect(forgeTargetOfRemoteUrl('https://github.com/acme/widget')).toMatchObject({ kind: 'github', project: 'acme/widget' })
-    expect(forgeTargetOfRemoteUrl('ssh://git@gitlab.example.com/team/sub/project.git')).toMatchObject({
+    expect(ForgeModel.targetOfRemoteUrl('git@github.com:acme/widget.git')).toMatchObject({ kind: 'github', project: 'acme/widget' })
+    expect(ForgeModel.targetOfRemoteUrl('https://github.com/acme/widget')).toMatchObject({ kind: 'github', project: 'acme/widget' })
+    expect(ForgeModel.targetOfRemoteUrl('ssh://git@gitlab.example.com/team/sub/project.git')).toMatchObject({
       kind: 'gitlab',
       host: 'gitlab.example.com',
       project: 'team/sub/project',
     })
-    expect(forgeTargetOfRemoteUrl('/Users/me/repos/local')).toBeUndefined()
-    expect(forgeTargetOfRemoteUrl('file:///tmp/repo')).toBeUndefined()
+    expect(ForgeModel.targetOfRemoteUrl('/Users/me/repos/local')).toBeUndefined()
+    expect(ForgeModel.targetOfRemoteUrl('file:///tmp/repo')).toBeUndefined()
   })
 })
 

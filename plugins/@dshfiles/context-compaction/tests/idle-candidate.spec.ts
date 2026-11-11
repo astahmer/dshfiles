@@ -15,7 +15,7 @@ const build = (overrides: Partial<Parameters<typeof observedIdleCandidate>[0]> =
     currentLastActivityAt: () => state.observed,
     liveAgent: () => state.agent,
     tokens: 200_000,
-    compact: () => Promise.resolve(null),
+    compact: () => Promise.resolve(),
     ...overrides,
   })
   return { candidate, state }

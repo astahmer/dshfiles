@@ -221,13 +221,13 @@ const remoteFailureSchema = Schema.StructWithRest(
 
 const decodeRemoteFailure = Schema.decodeUnknownOption(remoteFailureSchema)
 
-const hostCause = (error: unknown): unknown => (error instanceof ThreadHostCallFailed ? error.cause : error)
+const hostCause = (error: ThreadHostCallFailed): unknown => error.cause
 
-const errorCode = (error: unknown): string | undefined => Option.getOrUndefined(decodeRemoteFailure(hostCause(error)))?.code
+const errorCode = (error: ThreadHostCallFailed): string | undefined => Option.getOrUndefined(decodeRemoteFailure(hostCause(error)))?.code
 
 const pluginCode = (code: string | undefined): string => (code !== undefined && /^[a-z][a-z0-9-]{0,63}$/u.test(code) ? code : 'action-failed')
 
-const failure = (failed: unknown, message: string): PluginApiError => {
+const failure = (failed: ThreadHostCallFailed, message: string): PluginApiError => {
   const code = errorCode(failed)
   const error = hostCause(failed)
   if (code === 'session/not-found') {
@@ -245,7 +245,7 @@ const failure = (failed: unknown, message: string): PluginApiError => {
   return new PluginApiError(message, { code: pluginCode(code) })
 }
 
-const activityKinds = (error: unknown): string[] =>
+const activityKinds = (error: ThreadHostCallFailed): string[] =>
   (Option.getOrUndefined(decodeRemoteFailure(hostCause(error)))?.details?.activity ?? []).map(entry => entry.kind)
 
 const callerSessionId = (caller: ApiCaller): string | undefined => (caller.kind === 'agent' ? caller.sessionId : undefined)
@@ -422,7 +422,7 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     const sessionId = yield* targetSessionId(input.sessionId, caller)
     const stopActivity = input.stopActivity === true
     return yield* deps.archive(sessionId, stopActivity).pipe(
-      Effect.as({ status: 'archived' as const, sessionId, activity: [] as string[] }),
+      Effect.as({ status: 'archived' as const, sessionId, activity: Array.of<string>() }),
       Effect.catch(error =>
         errorCode(error) === 'workspace/session-active'
           ? Effect.succeed({

@@ -7,7 +7,12 @@ import { CursorAccountModel } from './cursor-account.js'
 import { ProviderUsageModel } from './usage.js'
 
 const noCredits = { available: 0, resets: [] }
-const jwt = (payload: Record<string, unknown>): string => `h.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.s`
+/** The claims these fixtures put in an unsigned test token. */
+interface JwtClaims {
+  readonly sub: string
+}
+
+const jwt = (payload: JwtClaims): string => `h.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.s`
 
 describe('Codex usage', () => {
   it('labels windows by their span, so a weekly-only plan is not shown as a session', () => {

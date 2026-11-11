@@ -2,20 +2,47 @@ import { DshxEffect, HostContext } from '@dshfiles/dshx/effect'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
-import { Context, Effect, Layer } from 'effect'
+import { Context, Effect, Layer, Schema } from 'effect'
 import { FetchHttpClient } from 'effect/http'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import type { AddressInfo } from 'node:net'
 import { McpHost } from './host-promise.js'
 import { StatelessMcp } from './stateless-client.js'
 
 // A stateless MCP 2026-07-28 server over real HTTP, validating requests the way a strict modern server does
 // (headers mirror the body, `_meta` on every request), and a legacy 2025-11-25 server that needs `initialize`.
 
+/** The request fields the fixture reads; anything else a client sends (legacy `initialize` params) is dropped. */
+const fixtureParamsSchema = Schema.Struct({
+  _meta: Schema.optional(
+    Schema.Struct({
+      'io.modelcontextprotocol/protocolVersion': Schema.optional(Schema.String),
+      'io.modelcontextprotocol/clientInfo': Schema.optional(Schema.Struct({ name: Schema.String, version: Schema.String })),
+      'io.modelcontextprotocol/clientCapabilities': Schema.optional(Schema.JsonObject),
+    }),
+  ),
+  cursor: Schema.optional(Schema.String),
+  name: Schema.optional(Schema.String),
+  arguments: Schema.optional(
+    Schema.Struct({ text: Schema.optional(Schema.String), scope: Schema.optional(Schema.Struct({ region: Schema.optional(Schema.String) })) }),
+  ),
+})
+
+const fixtureRequestSchema = Schema.Struct({
+  id: Schema.optional(Schema.Union([Schema.Number, Schema.String])),
+  method: Schema.String,
+  params: Schema.optional(fixtureParamsSchema),
+})
+
+type FixtureRequest = (typeof fixtureRequestSchema)['Type']
+
+const decodeFixtureRequest = Schema.decodeUnknownSync(Schema.fromJsonString(fixtureRequestSchema))
+
+const decodeListenPort = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }))
+
 interface Seen {
   readonly method: string
   readonly headers: IncomingMessage['headers']
-  readonly params: Record<string, unknown>
+  readonly params: (typeof fixtureParamsSchema)['Type']
 }
 
 const NON_ASCII_TOOL = 'météo'
@@ -49,7 +76,33 @@ const readBody = async (request: IncomingMessage) => {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-const json = (response: ServerResponse, status: number, body: unknown) => {
+/** What the fixture's `complete` results carry, per method. */
+interface FixtureResult {
+  readonly supportedVersions?: ReadonlyArray<string>
+  readonly capabilities?: { readonly tools: Readonly<Record<string, never>> }
+  readonly instructions?: string
+  readonly tools?: typeof tools
+  readonly nextCursor?: string
+  readonly content?: ReadonlyArray<{ readonly type: 'text'; readonly text: string }>
+}
+
+/** `data` of the unsupported-version error: what was asked for and what the fixture offers. */
+interface UnsupportedVersionData {
+  readonly requested: string | undefined
+  readonly supported: ReadonlyArray<string>
+}
+
+interface JsonRpcReply {
+  readonly jsonrpc: '2.0'
+  readonly id: FixtureRequest['id'] | null
+  readonly result?: FixtureResult & {
+    readonly resultType: 'complete'
+    readonly _meta: { readonly 'io.modelcontextprotocol/serverInfo': { readonly name: string; readonly version: string } }
+  }
+  readonly error?: { readonly code: number; readonly message: string; readonly data?: UnsupportedVersionData }
+}
+
+const json = (response: ServerResponse, status: number, body: JsonRpcReply) => {
   response.writeHead(status, { 'content-type': 'application/json' })
   response.end(JSON.stringify(body))
 }
@@ -61,17 +114,17 @@ const fixtureServer = (mode: Mode) =>
     Effect.promise(async () => {
       const seen: Array<Seen> = []
       const server = createServer(async (request, response) => {
-        const body = JSON.parse(await readBody(request))
+        const body = decodeFixtureRequest(await readBody(request))
         const id = body.id
-        const params: Record<string, unknown> = body.params ?? {}
+        const params = body.params ?? {}
         seen.push({ method: body.method, headers: request.headers, params })
-        const error = (status: number, code: number, message: string, data?: unknown) =>
+        const error = (status: number, code: number, message: string, data?: UnsupportedVersionData) =>
           json(response, status, { jsonrpc: '2.0', id, error: { code, message, ...(data !== undefined && { data }) } })
         if (mode === 'legacy') {
           if (body.method === 'initialize') return error(500, -32603, 'fixture stops after proving the fallback')
           return json(response, 400, { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Bad Request: Server not initialized' } })
         }
-        const meta = params['_meta'] as Record<string, unknown> | undefined
+        const meta = params._meta
         const version = meta?.['io.modelcontextprotocol/protocolVersion']
         if (
           request.headers['mcp-protocol-version'] !== version ||
@@ -81,7 +134,7 @@ const fixtureServer = (mode: Mode) =>
           return error(400, -32020, 'Protocol or method headers do not match the request')
         if (mode === 'modern-other-version' || version !== '2026-07-28')
           return error(400, -32022, 'Unsupported protocol version', { requested: version, supported: ['2099-01-01'] })
-        const complete = (result: Record<string, unknown>) =>
+        const complete = (result: FixtureResult) =>
           json(response, 200, {
             jsonrpc: '2.0',
             id,
@@ -95,7 +148,7 @@ const fixtureServer = (mode: Mode) =>
           case 'tools/call': {
             const name = decodeName(String(request.headers['mcp-name'] ?? ''))
             if (name !== params['name']) return error(400, -32020, 'Tool name header does not match the request')
-            const args = (params['arguments'] ?? {}) as Record<string, unknown>
+            const args = params.arguments ?? {}
             if (name === 'echo') {
               // An SSE answer: a request-scoped notification, then the response.
               response.writeHead(200, { 'content-type': 'text/event-stream' })
@@ -107,7 +160,7 @@ const fixtureServer = (mode: Mode) =>
               return
             }
             if (name === 'regional') {
-              const region = (args['scope'] as Record<string, unknown> | undefined)?.['region']
+              const region = args.scope?.region
               if (request.headers['mcp-param-region'] !== region) return error(400, -32020, 'Region header does not match the request')
               return complete({ content: [{ type: 'text', text: `region:${String(region)}` }] })
             }
@@ -118,7 +171,7 @@ const fixtureServer = (mode: Mode) =>
         }
       })
       await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-      const { port } = server.address() as AddressInfo
+      const { port } = decodeListenPort(server.address())
       return { url: `http://127.0.0.1:${port}/mcp`, seen, server }
     }),
     fixture => Effect.promise(() => new Promise<void>(resolve => fixture.server.close(() => resolve()))),
@@ -205,6 +258,7 @@ describe('MCP 2026-07-28 stateless client', () => {
       expect(fixture.seen.every(seen => seen.headers['authorization'] === 'Bearer test-access-token')).toBe(true)
       expect(fixture.seen.some(seen => seen.method === 'initialize')).toBe(false)
 
+      // SAFETY: these fixture tools answer text only, so the native executor and the stateless call read nothing but `signal`.
       const execution = { signal: new AbortController().signal } as Parameters<NonNullable<ReturnType<typeof host.tools.get>>['execute']>[1]
       const echo = yield* Effect.promise(() => Promise.resolve(host.tools.get('mcp__bridge__echo')?.execute({ text: 'hi' }, execution)))
       expect(echo).toEqual({ content: [{ type: 'text', text: 'echo:hi' }] })

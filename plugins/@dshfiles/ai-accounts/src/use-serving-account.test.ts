@@ -1,9 +1,11 @@
 import { QueryClient } from '@dshfiles/plugin-ui/query'
+import type { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { servingAccountQuery, servingAccountPollInterval } from './serving-account-query.js'
 
 const snapshot = (sessionId: string) => ({ sessionId, currentAttempt: null, lastSuccessful: null })
-const wire = (value: unknown) => JSON.parse(JSON.stringify(value))
+/** What the snapshot reply becomes after crossing the wire as JSON. */
+const wire = (value: Schema.Json) => JSON.parse(JSON.stringify(value))
 
 describe('serving account query boundary', () => {
   it('fails closed on old Hosts, malformed metadata and cross-chat replies', async () => {

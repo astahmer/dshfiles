@@ -538,6 +538,21 @@ export class SessionOwnerMissing extends Schema.TaggedError<SessionOwnerMissing>
   }
 }
 
+const localProjectCodes = [
+  'local-path-not-absolute',
+  'local-path-unavailable',
+  'not-a-git-project',
+  'local-path-not-project-root',
+  'local-process-failed',
+  'too-many-files',
+  'invalid-file-path',
+  'file-not-copyable',
+  'credential-like-file',
+  'file-too-large',
+  'copy-size-limit',
+  'archive-too-large',
+] as const
+
 const localProjectMessages = {
   'local-path-not-absolute': 'Choose an absolute local project folder path.',
   'local-path-unavailable': 'That local project folder is not available on this machine.',
@@ -551,12 +566,12 @@ const localProjectMessages = {
   'file-too-large': 'A selected local file is too large to copy.',
   'copy-size-limit': 'Selected local files exceed the 50 MB copy limit.',
   'archive-too-large': 'The local files archive exceeds the 55 MB transfer limit.',
-} as const
+} as const satisfies Readonly<Record<(typeof localProjectCodes)[number], string>>
 
 /** A local project scan or archive refused; `code` names which rule it broke. */
 export class LocalProjectFailed extends Schema.TaggedError<LocalProjectFailed>()(
   'LocalProjectFailed',
-  { code: Schema.Literals(Object.keys(localProjectMessages) as [keyof typeof localProjectMessages]), cause: Schema.optional(Schema.Defect()) },
+  { code: Schema.Literals(localProjectCodes), cause: Schema.optional(Schema.Defect()) },
   { dshxWireCode: 'local-project-failed' },
 ) {
   override get message(): string {

@@ -6,7 +6,7 @@ import { threadSidebarAutoSettleApi } from '@dshfiles/thread-sidebar/auto-settle
 import { Clock, Context, Effect, Layer, Ref, Schema } from 'effect'
 import { GhCommandFailed, GhResponseInvalid, type PullRequestRead } from './github-cli.js'
 import { GlabCommandFailed, GlabResponseInvalid } from './gitlab-cli.js'
-import { forgeTargetOf, parseForgePullRequestUrl, pullRequestUrlOf, repositoryKeyOf } from './forge.js'
+import { ForgeModel } from './forge.js'
 import { ForgePullRequests, UnsupportedRepository } from './forge-port.js'
 import {
   summarizePullRequest,
@@ -93,9 +93,9 @@ export const sessionFor = (provided: string | undefined, caller: ApiCaller): Eff
 export const cwdForCaller = (caller: ApiCaller): string => (caller.kind === 'agent' ? (caller.cwd ?? '') : '')
 
 const parsePullRequestUrl = (url: string): { readonly repo: string; readonly number: number; readonly url: string } | undefined => {
-  const target = parseForgePullRequestUrl(url)
+  const target = ForgeModel.parsePullRequestUrl(url)
   if (target === undefined) return undefined
-  return { repo: repositoryKeyOf(target), number: target.number, url: target.url }
+  return { repo: ForgeModel.repositoryKeyOf(target), number: target.number, url: target.url }
 }
 
 const eventLabel = (event: PullRequestEvent): string => `${event.author === null ? 'unknown author' : `@${event.author}`} at ${event.at}`
@@ -230,12 +230,12 @@ export class PullRequestMonitor extends Context.Service<
         }
 
         const info = yield* forge.repositoryInfo({ cwd: input.cwd })
-        const target = forgeTargetOf(info.repo) ?? { kind: info.kind, host: info.host, project: info.project }
+        const target = ForgeModel.targetOf(info.repo) ?? { kind: info.kind, host: info.host, project: info.project }
         return recordFor({
           sessionId,
           repo: info.repo,
           number: input.number,
-          url: pullRequestUrlOf(target, input.number),
+          url: ForgeModel.pullRequestUrlOf(target, input.number),
           cwd: input.cwd,
           watching: false,
         })
@@ -323,7 +323,7 @@ export class PullRequestMonitor extends Context.Service<
         return byKey
       })
 
-      const isGitHub = (repo: string): boolean => forgeTargetOf(repo)?.kind === 'github'
+      const isGitHub = (repo: string): boolean => ForgeModel.targetOf(repo)?.kind === 'github'
 
       const snapshotOf = (read: Extract<PullRequestRead, { readonly kind: 'read' }>): PullRequestSnapshot =>
         read.fingerprint === null ? summarizePullRequest(read.view) : { ...summarizePullRequest(read.view), fingerprint: read.fingerprint }

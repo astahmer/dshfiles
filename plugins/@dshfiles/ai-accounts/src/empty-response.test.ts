@@ -15,7 +15,14 @@ import { describe, expect, it } from 'vitest'
 import { createCommandCodeProvider } from './commandcode-provider.js'
 import { isEmptyCompletion, settlementAnswered } from './empty-response.js'
 
-const frame = (delta: Record<string, unknown>, finish: string | null): string => {
+/** The delta fields of one OpenAI-compatible chat completion chunk these fixtures stream. */
+interface ChunkDelta {
+  readonly role?: 'assistant'
+  readonly reasoning_content?: string
+  readonly content?: string
+}
+
+const frame = (delta: ChunkDelta, finish: string | null): string => {
   const chunk = {
     id: 'c1',
     object: 'chat.completion.chunk',
@@ -59,11 +66,18 @@ interface Outcome {
 
 const MODEL = 'gpt-6-luna'
 
-const ndjson = (...parts: readonly Record<string, unknown>[]): string => parts.map(part => JSON.stringify(part)).join('\n')
+/** One event of the Command Code CLI endpoint's NDJSON stream. */
+interface CliStreamEvent {
+  readonly type: 'reasoning-delta' | 'text-delta' | 'finish'
+  readonly text?: string
+  readonly finishReason?: string
+}
+
+const ndjson = (...parts: readonly CliStreamEvent[]): string => parts.map(part => JSON.stringify(part)).join('\n')
 
 /** `planId` decides the transport: a Pro plan uses the Provider API (SSE), anything else the CLI endpoint (NDJSON). */
 const run = async (body: string, planId: string): Promise<Outcome> => {
-  const stubFetch = async (resource: string | URL | Request): Promise<Response> => {
+  const stubFetch: typeof fetch = async resource => {
     const url = new URL(resource instanceof Request ? resource.url : resource)
     if (url.pathname === '/alpha/billing/subscriptions') return Response.json({ data: { planId } })
     return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
@@ -73,7 +87,7 @@ const run = async (body: string, planId: string): Promise<Outcome> => {
   const deltas: string[] = []
   const stream = provider.streamSimple(model, { messages: [{ role: 'user', content: [{ type: 'text', text: 'hello' }], timestamp: 0 }] } as never, {
     apiKey: `key-${planId}`,
-    fetch: stubFetch as typeof fetch,
+    fetch: stubFetch,
   })
   for await (const event of stream) {
     if (event.type === 'text_delta' || event.type === 'thinking_delta' || event.type === 'toolcall_delta') deltas.push(event.type)

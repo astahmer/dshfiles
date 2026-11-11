@@ -8,7 +8,7 @@ import { Llm } from '@dshfiles/dshx/effect/llm'
 import type { SessionId } from '@dshfiles/dshx/ids'
 import { SessionId as sessionIdSchema } from '@dshfiles/dshx/ids'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
-import { Context, Effect, Layer, Schema } from 'effect'
+import { Context, Duration, Effect, Layer, Schema } from 'effect'
 import { compactionApi, type CompactionThreshold } from './compaction-api.js'
 import { compactionThresholdTokens } from './compaction-threshold.js'
 import { compactionRequestBudget, MIN_REQUEST_BUDGET_BYTES } from './budget.js'
@@ -20,7 +20,14 @@ import { compactionEngine, type SummaryRequest } from './compaction-engine.js'
 import { isProviderContextOverflow } from './context-overflow.js'
 import { sweepIdleCompaction, type IdleCompactionCandidate } from './idle-compaction-sweep.js'
 
-const SWEEP_INTERVAL_MS = 60_000
+const SWEEP_INTERVAL = Duration.minutes(1)
+
+/** The Session controller refused one idle compaction; `text` is its own explanation. */
+class IdleCompactionRefused extends Schema.TaggedError<IdleCompactionRefused>()('IdleCompactionRefused', { text: Schema.String }) {
+  override get message(): string {
+    return this.text
+  }
+}
 
 const IDLE_MIN_TOKENS_MAX = 10_000_000
 
@@ -167,7 +174,6 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
       let sweeping = false
       yield* Effect.acquireRelease(
         Effect.sync(() => {
-          const logger = host.ctx.logger('context-compaction')
           const offEvent = host.ctx.on(
             'session/event',
             (session, event) => {
@@ -184,58 +190,7 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
             },
             { global: true },
           )
-          const timer = setInterval(() => {
-            const idlePolicy = idlePolicyOf(config)
-            if (idlePolicy.strategy === 'off' || sweeping) return
-            runOutsideReload(host.ctx, () => {
-              if (!isApiServed(host.ctx, sessionsApi)) return
-              sweeping = true
-              void (async () => {
-                const now = Date.now()
-                const listed = await sessions.list({ limit: 200 }, { signal: sweepAbort.signal })
-                const candidates: IdleCompactionCandidate[] = []
-                for (const row of listed.threads) {
-                  if (row.running) continue
-                  const sessionId = toSessionId(row.sessionId)
-                  const liveAgent = () => host.ctx.get('agents')?.get(sessionId)
-                  const measuredAgent = liveAgent()
-                  const measured = measuredAgent === undefined ? undefined : host.ctx.get('tokenMeter')?.measure(measuredAgent.session).totalTokens
-                  const candidate = observedIdleCandidate({
-                    sessionId,
-                    observedLastActivityAt: observedLastActivity.get(sessionId) ?? null,
-                    currentLastActivityAt: () => observedLastActivity.get(sessionId) ?? null,
-                    liveAgent: () => {
-                      const agent = liveAgent()
-                      return agent === undefined
-                        ? undefined
-                        : { status: agent.status, nextTurn: agent.inbox.nextTurn.length, nextStep: agent.inbox.nextStep.length }
-                    },
-                    tokens: measured === undefined || !Number.isFinite(measured) ? null : Math.round(measured),
-                    compact: async () => {
-                      const result = await sessions.compact({ sessionId: row.sessionId, minTokens: config.idle.minTokens }, { signal: sweepAbort.signal })
-                      if (result.kind === 'error') throw new Error(result.text ?? 'Compaction failed.')
-                    },
-                  })
-                  if (candidate !== null) candidates.push(candidate)
-                }
-                await sweepIdleCompaction({
-                  now,
-                  candidates,
-                  attemptedAt,
-                  policy: idlePolicy,
-                  onAttempt: ({ sessionId, lastActivityAt }) => attemptedAt.set(sessionId, lastActivityAt),
-                  onFailure: ({ sessionId, error }) => logger.warn(`context-compaction: idle compaction of "${sessionId}" skipped: ${String(error)}`),
-                })
-              })()
-                .catch((error: unknown) => logger.warn(`context-compaction: idle sweep failed: ${String(error)}`))
-                .finally(() => {
-                  sweeping = false
-                })
-            })
-          }, SWEEP_INTERVAL_MS)
-          timer.unref()
           return () => {
-            clearInterval(timer)
             offEvent()
             offStatus()
             sweepAbort.abort()
@@ -243,6 +198,58 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
         }),
         dispose => Effect.sync(dispose),
       )
+      const logger = host.ctx.logger('context-compaction')
+      const sweep = (): void => {
+        const idlePolicy = idlePolicyOf(config)
+        if (idlePolicy.strategy === 'off' || sweeping) return
+        runOutsideReload(host.ctx, () => {
+          if (!isApiServed(host.ctx, sessionsApi)) return
+          sweeping = true
+          void (async () => {
+            const now = Date.now()
+            const listed = await sessions.list({ limit: 200 }, { signal: sweepAbort.signal })
+            const candidates: IdleCompactionCandidate[] = []
+            for (const row of listed.threads) {
+              if (row.running) continue
+              const sessionId = toSessionId(row.sessionId)
+              const liveAgent = () => host.ctx.get('agents')?.get(sessionId)
+              const measuredAgent = liveAgent()
+              const measured = measuredAgent === undefined ? undefined : host.ctx.get('tokenMeter')?.measure(measuredAgent.session).totalTokens
+              const candidate = observedIdleCandidate({
+                sessionId,
+                observedLastActivityAt: observedLastActivity.get(sessionId) ?? null,
+                currentLastActivityAt: () => observedLastActivity.get(sessionId) ?? null,
+                liveAgent: () => {
+                  const agent = liveAgent()
+                  return agent === undefined
+                    ? undefined
+                    : { status: agent.status, nextTurn: agent.inbox.nextTurn.length, nextStep: agent.inbox.nextStep.length }
+                },
+                tokens: measured === undefined || !Number.isFinite(measured) ? null : Math.round(measured),
+                compact: async () => {
+                  const result = await sessions.compact({ sessionId: row.sessionId, minTokens: config.idle.minTokens }, { signal: sweepAbort.signal })
+                  if (result.kind === 'error') throw new IdleCompactionRefused({ text: result.text ?? 'Compaction failed.' })
+                },
+              })
+              if (candidate !== null) candidates.push(candidate)
+            }
+            await sweepIdleCompaction({
+              now,
+              candidates,
+              attemptedAt,
+              policy: idlePolicy,
+              onAttempt: ({ sessionId, lastActivityAt }) => attemptedAt.set(sessionId, lastActivityAt),
+              onFailure: ({ sessionId, error }) => logger.warn(`context-compaction: idle compaction of "${sessionId}" skipped: ${String(error)}`),
+            })
+          })()
+            .catch((error: unknown) => logger.warn(`context-compaction: idle sweep failed: ${String(error)}`))
+            .finally(() => {
+              sweeping = false
+            })
+        })
+      }
+      // Forked after the listener scope, so the sweep loop is interrupted before the listeners it reads are removed.
+      yield* DshxPlugin.worker(Effect.forever(Effect.andThen(Effect.sleep(SWEEP_INTERVAL), Effect.sync(sweep))))
       return CompactionThresholds.of({
         read: Effect.fn('context compaction threshold read')(function* (sessionId: SessionId) {
           const session = host.ctx.get('agents')?.get(sessionId)?.session

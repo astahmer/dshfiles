@@ -50,7 +50,10 @@ export interface ChunkedSummaryOptions {
   readonly summarize: (input: SummarizeInput) => Effect.Effect<SummaryProjection, SummaryRequestFailed>
 }
 
-const serializedBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength
+/** What the summary budget measures as UTF-8 JSON: a message, the tool schemas, or a priced image's text. */
+type BudgetedValue = Message | readonly ToolSchema[] | string
+
+const serializedBytes = (value: BudgetedValue) => new TextEncoder().encode(JSON.stringify(value)).byteLength
 
 const toolCallIds = (message: Message) => (message.role === 'assistant' ? message.content.flatMap(block => (block.type === 'tool-call' ? [block.id] : [])) : [])
 

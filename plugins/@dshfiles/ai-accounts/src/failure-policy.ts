@@ -33,13 +33,13 @@ const quiet: KindPolicy = { retries: 0, backoffMs: 1_000, lunaReserve: false, fa
  * Transport keeps the two retries DSH gave it and adds fail-over; auth and
  * oversized requests stay with DSH, whose compaction owns context overflow.
  */
-export const DEFAULT_RECOVERY_POLICY: RecoveryPolicy = {
+export const DEFAULT_RECOVERY_POLICY = {
   transport: { ...quiet, retries: 2, failover: true, then: 'fail' },
   rateLimit: { ...quiet, failover: true, waitSeconds: 60, then: 'fail' },
   exhausted: { ...quiet, lunaReserve: true, failover: true, then: 'fail' },
   auth: quiet,
   oversized: quiet,
-}
+} satisfies RecoveryPolicy
 
 /** The longest single backoff; a provider asking for more is waited out by the `wait` rung instead. */
 const MAX_BACKOFF_MS = 60_000
@@ -143,6 +143,12 @@ export type RecoveryStep =
   | { readonly kind: 'shrink' }
   | { readonly kind: 'give-up'; readonly then: 'fail' | 'dsh' }
 
+/** The rung to take now and the ladder position after taking it. */
+export interface RecoveryDecision {
+  readonly step: RecoveryStep
+  readonly progress: RecoveryProgress
+}
+
 /**
  * The next rung for one failure. A Luna Reserve switch or a fail-over lands on
  * a different quota, so the same-account retries start over there.
@@ -154,7 +160,7 @@ export const decideRecovery = (input: {
   readonly lunaReserveAvailable: boolean
   readonly failoverTo: string | undefined
   readonly canShrink: boolean
-}): { readonly step: RecoveryStep; readonly progress: RecoveryProgress } => {
+}): RecoveryDecision => {
   const { policy, progress } = input
   const retryAfterMs = input.retryAfterMs !== undefined && Number.isFinite(input.retryAfterMs) && input.retryAfterMs > 0 ? input.retryAfterMs : undefined
   if (progress.retries < policy.retries) {
