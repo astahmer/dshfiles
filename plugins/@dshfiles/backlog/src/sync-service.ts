@@ -80,14 +80,14 @@ export interface SyncConnectionTest {
 /** A binding as a form or an agent sends it: every field but the connection of a new binding may be left out. */
 export type BindingDraft = { readonly [K in keyof Omit<SyncBinding, 'ownerHostId'>]?: SyncBinding[K] | undefined }
 
-/** A new binding's defaults: two-way, every field, last writer wins, Sync now only. */
+/** A new binding's defaults: two-way, every field, last writer wins, synced every fifteen minutes. */
 const bindingDefaults = {
   container: '',
   scope: null,
   direction: 'two-way',
   fieldMap: BacklogSyncModel.defaultFieldMap(),
   conflictPolicy: 'lww',
-  pollEverySec: 0,
+  pollEverySec: BacklogSyncModel.defaultPollSeconds,
   pushAgentComments: false,
   importNew: false,
   enabled: true,
@@ -767,12 +767,16 @@ export class BacklogSync extends Context.Service<
       })
 
       const lastRun = yield* Ref.make<ReadonlyMap<string, number>>(new Map())
+      const rateLimited = yield* Ref.make<ReadonlyMap<string, { readonly until: number; readonly count: number }>>(new Map())
       const autoSyncTick = Effect.gen(function* () {
         const current = yield* snapshot
         const at = yield* Clock.currentTimeMillis
         const ran = yield* Ref.get(lastRun)
+        const limited = yield* Ref.get(rateLimited)
         const due = yield* Effect.filter(
-          current.bindings.filter(binding => binding.enabled && binding.pollEverySec > 0 && binding.ownerHostId === sources.hostId),
+          current.bindings.filter(
+            binding => binding.enabled && binding.pollEverySec > 0 && binding.ownerHostId === sources.hostId && (limited.get(binding.id)?.until ?? 0) <= at,
+          ),
           binding =>
             Effect.map(
               sources.state(binding.id).pipe(Effect.orDie),
@@ -785,7 +789,22 @@ export class BacklogSync extends Context.Service<
           due,
           binding =>
             passOf(binding).pipe(
-              Effect.catch(error => Effect.logWarning('backlog sync: a binding pass failed', { binding: binding.id, error: error.message })),
+              Effect.andThen(Ref.update(rateLimited, previous => BacklogSyncModel.withoutBackoff(previous, binding.id))),
+              Effect.catch(error =>
+                Effect.gen(function* () {
+                  yield* Effect.logWarning('backlog sync: a binding pass failed', { binding: binding.id, error: error.message })
+                  if (!BacklogSyncModel.isRateLimited(error)) return
+                  const next = yield* Ref.modify(rateLimited, previous => {
+                    const backoff = BacklogSyncModel.nextBackoff({ previous: previous.get(binding.id), at, pollEverySec: binding.pollEverySec })
+                    return [backoff, new Map([...previous, [binding.id, backoff]])]
+                  })
+                  yield* Effect.logWarning('backlog sync: the provider rate-limited auto-sync; backing off', {
+                    binding: binding.id,
+                    until: next.until,
+                    count: next.count,
+                  })
+                }),
+              ),
             ),
           { concurrency: 4, discard: true },
         )

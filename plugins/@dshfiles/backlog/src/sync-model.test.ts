@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { FilesMapping } from './provider-files.js'
 import { GithubMapping } from './provider-github.js'
 import { LinearMapping } from './provider-linear.js'
-import type { ProviderCapabilities } from './provider-port.js'
+import { BacklogProviderFailed, type ProviderCapabilities } from './provider-port.js'
 import { BacklogSyncModel, type SyncConflictPolicy, type SyncSnapshot } from './sync-model.js'
 
 const snapshot = (fields: Partial<SyncSnapshot> = {}): SyncSnapshot => ({ title: 'Title', body: 'Body', status: 'todo', tags: ['ui'], ...fields })
@@ -209,5 +209,28 @@ describe('provider mappings', () => {
         status => status.category,
       ),
     ).toEqual(['todo', 'done', 'dropped'])
+  })
+})
+
+describe('auto-sync rate-limit backoff', () => {
+  const limited = new BacklogProviderFailed({ provider: 'GitHub', code: 'rejected', status: 429, detail: '' })
+
+  test('reads a 429 or a refusal that names a rate limit, nothing else', () => {
+    expect(BacklogSyncModel.isRateLimited(limited)).toBe(true)
+    expect(
+      BacklogSyncModel.isRateLimited(new BacklogProviderFailed({ provider: 'GitHub', code: 'rejected', status: 403, detail: 'API rate limit exceeded' })),
+    ).toBe(true)
+    expect(BacklogSyncModel.isRateLimited(new BacklogProviderFailed({ provider: 'GitHub', code: 'rejected', status: 403, detail: 'Bad credentials' }))).toBe(
+      false,
+    )
+    expect(BacklogSyncModel.isRateLimited({ _tag: 'SyncConfigInvalid', message: 'rate limit' })).toBe(false)
+  })
+
+  test('doubles the binding interval per consecutive limit, capped at six hours, and clears on success', () => {
+    const first = BacklogSyncModel.nextBackoff({ previous: undefined, at: 0, pollEverySec: 900 })
+    expect(first).toEqual({ until: 1_800_000, count: 1 })
+    expect(BacklogSyncModel.nextBackoff({ previous: first, at: 0, pollEverySec: 900 })).toEqual({ until: 3_600_000, count: 2 })
+    expect(BacklogSyncModel.nextBackoff({ previous: { until: 0, count: 9 }, at: 0, pollEverySec: 900 }).until).toBe(6 * 60 * 60_000)
+    expect(BacklogSyncModel.withoutBackoff(new Map([['github-acme', first]]), 'github-acme').size).toBe(0)
   })
 })

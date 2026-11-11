@@ -512,6 +512,12 @@ describe('Remote sync setup', () => {
 
       yield* sync.saveConnection({ connection: { instanceId: 'linear', kind: 'linear', label: 'Linear', credential: '', baseUrl: '' } })
       yield* sync.saveBinding({ binding: { connectionId: 'linear' } })
+      // A new binding syncs on its own every fifteen minutes; saving it again keeps what it holds.
+      expect((yield* sync.status({})).bindings.map(view => view.binding.pollEverySec)).toEqual([BacklogSyncModel.defaultPollSeconds])
+      const saved = (yield* sync.status({})).bindings[0]?.binding.id ?? ''
+      yield* sync.saveBinding({ binding: { id: saved, pollEverySec: 0 } })
+      yield* sync.saveBinding({ binding: { id: saved, pushAgentComments: true } })
+      expect((yield* sync.status({})).bindings.map(view => view.binding.pollEverySec)).toEqual([0])
       const store = yield* BacklogStore
       const created = yield* store.capture({ text: 'Which team?', actor: user })
       const failed = yield* Effect.flip(sync.link({ id: created.item.id, provider: 'linear', create: true, actor: user }))

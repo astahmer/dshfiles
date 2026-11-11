@@ -12,6 +12,30 @@ const conflictPolicies = ['lww', 'local-wins', 'remote-wins', 'flag'] as const
 const MAX_CONFLICTS = 20
 const MAX_COMMENT_PAIRS = 400
 const MAX_POLL_SECONDS = 86_400
+/** A new binding syncs on its own every fifteen minutes; 0 keeps it to Sync now. Existing bindings keep their value. */
+const DEFAULT_POLL_SECONDS = 900
+/** The longest a rate-limited binding waits before auto-sync tries it again. */
+const MAX_BACKOFF_MS = 6 * 60 * 60_000
+
+type SyncBackoff = { readonly until: number; readonly count: number }
+
+/** A pass failure that means the provider rate-limited the request: HTTP 429, or a refusal that says so. */
+const isRateLimited = (error: { readonly _tag: string; readonly message: string }): boolean =>
+  error._tag === 'BacklogProviderFailed' &&
+  (('status' in error && error.status === 429) || /rate.?limit|too many requests|abuse detection/iu.test(error.message))
+
+/** The next wait after a rate limit: the binding's own interval, doubled per consecutive limit, capped at six hours. */
+const nextBackoff = (input: { readonly previous: SyncBackoff | undefined; readonly at: number; readonly pollEverySec: number }): SyncBackoff => {
+  const count = (input.previous?.count ?? 0) + 1
+  return { until: input.at + Math.min(Math.max(input.pollEverySec, 60) * 1_000 * 2 ** count, MAX_BACKOFF_MS), count }
+}
+
+const withoutBackoff = (backoffs: ReadonlyMap<string, SyncBackoff>, bindingId: string): ReadonlyMap<string, SyncBackoff> => {
+  if (!backoffs.has(bindingId)) return backoffs
+  const next = new Map(backoffs)
+  next.delete(bindingId)
+  return next
+}
 
 const slugSchema = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,63}$/))
 const fieldSchema = Schema.Literals(syncedFields)
@@ -420,6 +444,10 @@ export class BacklogSyncModel {
   static readonly maxConflicts = MAX_CONFLICTS
   static readonly maxCommentPairs = MAX_COMMENT_PAIRS
   static readonly maxPollSeconds = MAX_POLL_SECONDS
+  static readonly defaultPollSeconds = DEFAULT_POLL_SECONDS
+  static readonly isRateLimited = isRateLimited
+  static readonly nextBackoff = nextBackoff
+  static readonly withoutBackoff = withoutBackoff
   static readonly slugSchema = slugSchema
   static readonly fieldSchema = fieldSchema
   static readonly connectionSchema = connectionSchema
