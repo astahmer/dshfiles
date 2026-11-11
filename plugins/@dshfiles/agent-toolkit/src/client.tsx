@@ -15,10 +15,10 @@ import { ContextFacet } from './context-facet.js'
 import { AGENT_TOOLKIT_LOCALE_NAMESPACE, agentToolkitLocale, type AgentToolkitKey } from './locales.js'
 import { sameThreadRows } from './thread-projection.js'
 import { AgentToolkitPanel, type ToolkitThread } from './toolkit-panel.js'
+import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 const PANEL_ID = 'dshfiles-agent-toolkit'
 const MEMORY_PANEL_ID = 'dshfiles-memory-panel'
-const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 const THREAD_OPTIONS = 30
 /** The thread panel's Context facet: one page per thread. */
 const CONTEXT_TAB_ID = '@dshfiles/agent-toolkit/context'
@@ -92,11 +92,7 @@ export default defineClient({
                 fiberPhase: entry.fiberPhase,
               }))
             }}
-            openSettings={entryId =>
-              window.dispatchEvent(
-                new CustomEvent(OPEN_SETTINGS_EVENT, { detail: { setting: { entryId, fieldPath: [] }, section: 'plugins' }, cancelable: true }),
-              )
-            }
+            openSettings={entryId => dispatchOpenSettings({ setting: { entryId, fieldPath: [] }, section: 'plugins' })}
             openMemoryPanel={() => openPanel(MEMORY_PANEL_ID)}
           />
         </PluginQueryProvider>

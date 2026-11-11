@@ -27,6 +27,7 @@
   "dependencies": {
     "@dshfiles/mcp-servers": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/settings-shell": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/thread-sidebar": "workspace:*",
     "effect": "catalog:"

@@ -1,4 +1,5 @@
 import type { Route } from './catalog-model.js'
+import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 /** The supported navigation verbs a route resolves to; a route whose target is not registered here has no button. */
 export interface RouteServices {
@@ -11,12 +12,6 @@ export interface RouteServices {
 }
 
 export type SettingsRequest = { readonly section: string } | { readonly setting: { readonly entryId: string; readonly fieldPath: readonly string[] } }
-
-/** `@dshfiles/settings-shell`'s cross-plugin entry point: it calls preventDefault() when it took the request. */
-const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
-
-const dispatchOpenSettings = (request: SettingsRequest): boolean =>
-  !window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { detail: request, cancelable: true }))
 
 const settingsRequestOf = (route: Extract<Route, { readonly settings: unknown }>): SettingsRequest =>
   'section' in route.settings ? { section: route.settings.section } : { setting: { entryId: route.settings.entryId, fieldPath: route.settings.fieldPath } }

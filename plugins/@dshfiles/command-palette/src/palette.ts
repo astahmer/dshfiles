@@ -1,8 +1,5 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-
-/** Owned by @dshfiles/editor: `open-file` opens a workspace path, `workspace-files` streams the session's file list. */
-const OPEN_FILE_EVENT = 'dshfiles:open-file'
-const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
+import { GO_TO_LINE_EVENT, OPEN_FILE_EVENT } from '@dshfiles/editor/open-file'
 
 /** Query prefixes route to threads, commands, thread content, editor lines, or the prefix list. */
 export type PalettePrefix = '>' | '<' | '#' | ':' | '?' | 'thread:' | 'session:'

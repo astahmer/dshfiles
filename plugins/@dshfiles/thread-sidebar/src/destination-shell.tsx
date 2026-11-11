@@ -40,6 +40,7 @@ import {
 import type { NavigationRecord } from './navigation-api.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard } from './phone-shell.js'
 import { usePhoneThreadMenu } from '@dshfiles/rich-composer/phone-thread-menu'
+import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 const ICONS = {
   'messages-square': MessagesSquareIcon,
@@ -87,7 +88,7 @@ const PHONE_QUERY = '(max-width: 639.98px)'
  * Opens `@dshfiles/settings-shell`'s Settings page in the stage through its documented cross-plugin request (plan §4.6).
  * False when the shell is not loaded: the rail then only shows its list, never the native Settings dialog.
  */
-const openSettingsPage = (): boolean => !window.dispatchEvent(new CustomEvent('dshfiles:open-settings', { detail: {}, cancelable: true }))
+const openSettingsPage = (): boolean => dispatchOpenSettings()
 const PHONE_NAV_HEIGHT = 'calc(56px + env(safe-area-inset-bottom, 0px))'
 /** The phone top bar (Back, title, thread panels; the frame's status chip takes its trailing 48px). */
 const PHONE_TOP_HEIGHT = 'calc(44px + env(safe-area-inset-top, 0px))'

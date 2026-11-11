@@ -1105,6 +1105,9 @@ importers:
       '@dshfiles/references':
         specifier: workspace:*
         version: link:../references
+      '@dshfiles/settings-shell':
+        specifier: workspace:*
+        version: link:../settings-shell
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -2284,6 +2287,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/settings-shell':
+        specifier: workspace:*
+        version: link:../settings-shell
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -2529,6 +2535,9 @@ importers:
 
   plugins/@dshfiles/command-palette:
     dependencies:
+      '@dshfiles/editor':
+        specifier: workspace:*
+        version: link:../editor
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -5133,6 +5142,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/settings-shell':
+        specifier: workspace:*
+        version: link:../settings-shell
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -7415,6 +7427,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/editor':
+        specifier: workspace:*
+        version: link:../editor
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -8453,6 +8468,9 @@ importers:
       '@dshfiles/session-controller':
         specifier: workspace:*
         version: link:../session-controller
+      '@dshfiles/settings-shell':
+        specifier: workspace:*
+        version: link:../settings-shell
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
@@ -9051,6 +9069,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/settings-shell':
+        specifier: workspace:*
+        version: link:../settings-shell
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime

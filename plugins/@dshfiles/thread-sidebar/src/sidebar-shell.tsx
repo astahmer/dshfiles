@@ -105,6 +105,7 @@ import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
 import { threadSidebarNavigationApi, type NavigationRecord } from './navigation-api.js'
 import { SidebarCustomizationFallback, SidebarCustomizationSeat } from './sidebar-customization.js'
 import { decodeClientRevisions } from './client-revisions.js'
+import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 const NO_PENDING_PLUGINS: readonly string[] = []
 
@@ -248,13 +249,11 @@ const sameIds = (left: readonly string[], right: readonly string[]): boolean => 
 /** Commands that only reopen this palette are left out of its command list. */
 const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
 
-/** The cancelable cross-plugin event `@dshfiles/settings-shell` listens for; handled when dispatch returns false. */
-const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 const SETTINGS_COMMAND_ID = 'settings.open'
 
 export const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
   if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
-  if (!window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { cancelable: true }))) return
+  if (dispatchOpenSettings()) return
   // A native settings root owns the seat instead of the dshx shell: its trigger is the only public opener there.
   document.querySelector<HTMLButtonElement>('[data-footer-entry="settings"] button[aria-haspopup="dialog"]')?.click()
 }

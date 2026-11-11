@@ -21,7 +21,15 @@ import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
 import { editorSettingsLocale, EDITOR_SETTINGS_LOCALE_NAMESPACE } from './editor-settings-locales.js'
 import { EDITOR_OPEN_FILE_LINKS_OWNER_ID } from './editor-settings-row.js'
 import { EditorPanel } from './editor-panel.js'
-import { OpenFileAddress, fileLinkParamsSchema, GO_TO_LINE_EVENT, goToLineRequestSchema, OPEN_FILE_EVENT, openFileRequestSchema } from './open-file.js'
+import {
+  EDITOR_FILES_PANE_ID,
+  OpenFileAddress,
+  fileLinkParamsSchema,
+  GO_TO_LINE_EVENT,
+  goToLineRequestSchema,
+  OPEN_FILE_EVENT,
+  openFileRequestSchema,
+} from './open-file.js'
 import { openFileLinksPreference } from './open-file-links-preference.js'
 import { EDITOR_SETTINGS_NAMESPACE } from './settings-namespace.js'
 import { editorSettings } from './settings.js'
@@ -29,7 +37,6 @@ import { createFollowedSession } from './followed-session.js'
 import { createSessionScreen } from './session-screen.js'
 import { createWorkspaceFileIndex } from './workspace-files.js'
 
-const RIGHT_PANE_ID = '@dshfiles/editor/files'
 const RIGHT_PANE_KIND = 'dshfiles-editor-files'
 const WORKBENCH_PANEL_ID = 'dshfiles-editor.main'
 const FILE_LINK_ID = '@dshfiles/editor/file-link'
@@ -167,7 +174,7 @@ export default defineClient({
     ctx.effect(
       () =>
         ctx.sidebarRightTabs.register({
-          id: RIGHT_PANE_ID,
+          id: EDITOR_FILES_PANE_ID,
           kind: RIGHT_PANE_KIND,
           keepMounted: true,
           title: () => 'Editor',
@@ -177,7 +184,7 @@ export default defineClient({
         }),
       'dshfiles-editor: right pane tab type',
     )
-    ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, Panel))
+    ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: EDITOR_FILES_PANE_ID }, Panel))
 
     // Thread tool-call paths and composer references open `dsh-resource://file/session/…` in the right sidebar. This
     // type outranks the Host text preview (`extension` band) for those addresses, hands the file to the editor and

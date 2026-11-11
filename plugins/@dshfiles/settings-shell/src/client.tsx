@@ -47,6 +47,7 @@ import { WELCOME_LOCALE_NAMESPACE, WELCOME_STEP_ID, WelcomeNotice, WelcomeNotice
 import { settingsShellApi } from './shell-api.js'
 import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseNotice } from './release-notice.js'
+import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
 import { PluginEntryCard } from './plugin-entry-card.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
@@ -70,10 +71,7 @@ import {
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
 const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
 const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
-/** The Editor plugin's right-pane tab and its cross-plugin open request (`@dshfiles/editor` README). */
-const EDITOR_PANE_ID = '@dshfiles/editor/files'
 const PUBLISH_SETTLE_MS = 250
-const OPEN_FILE_EVENT = 'dshfiles:open-file'
 const OPEN_SETTINGS_COMMAND = 'settings.open'
 
 /** A frame's portal target: the element the panel currently renders, or null while unmounted. */
@@ -844,7 +842,7 @@ export default defineClient({
     if (ctx.remote.$host.isLoopback) {
       const documentController = new SettingsDocumentStore(ctx.configForms.describe(), () => ctx.remote.settings.openSettingsDocument())
       ctx.effect(() => () => documentController.dispose(), 'settings-shell: document action')
-      const editorLoaded = (): boolean => ctx.slots.entries('sidebar.right.pane.tab').some(entry => entry.options.key === EDITOR_PANE_ID)
+      const editorLoaded = (): boolean => ctx.slots.entries('sidebar.right.pane.tab').some(entry => entry.options.key === EDITOR_FILES_PANE_ID)
       const openers: ConfigFileOpeners = {
         documentPath: async () => {
           const result = await api.safe.documentPath(undefined)
@@ -863,7 +861,7 @@ export default defineClient({
         reveal: async path => (await ctx.remote.session.openWorkspacePath({ path, action: 'reveal' })).ok,
         openInEditor: path => {
           if (!editorLoaded()) return false
-          return !window.dispatchEvent(new CustomEvent(OPEN_FILE_EVENT, { detail: { path }, cancelable: true }))
+          return dispatchOpenFile({ path })
         },
       }
       ctx.slots.inject('settings.action', () =>

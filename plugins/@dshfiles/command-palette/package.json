@@ -29,6 +29,7 @@
     "test:e2e:smoke": "node ../../../tooling/dshx/scripts/run-e2e.mjs --smoke"
   },
   "dependencies": {
+    "@dshfiles/editor": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "effect": "catalog:"

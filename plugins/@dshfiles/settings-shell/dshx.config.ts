@@ -5,7 +5,7 @@ export default defineConfig({
   name: '@dshfiles/settings-shell',
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
   // The settings contract: backlog, memory and Secret Catalog read the one Jev key from this namespace.
-  modules: { settings: 'src/settings.ts' },
+  modules: { settings: 'src/settings.ts', 'open-settings': 'src/open-settings.ts' },
   client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   build: { sourcemap: true, declarations: true, minify: true },
 })

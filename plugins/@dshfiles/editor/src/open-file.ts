@@ -8,6 +8,9 @@ import * as Schema from 'effect/Schema'
  */
 export const OPEN_FILE_EVENT = 'dshfiles:open-file'
 
+/** The editor's `sidebar.right.pane.tab` key: its presence tells another plugin the editor is loaded. */
+export const EDITOR_FILES_PANE_ID = '@dshfiles/editor/files'
+
 const pathSchema = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096))
 const lineNumberSchema = Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThan(0))
 
@@ -24,6 +27,10 @@ export const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
 export const goToLineRequestSchema = Schema.Struct({ line: lineNumberSchema })
 
 export type OpenFileRequest = Schema.Schema.Type<typeof openFileRequestSchema>
+
+/** True when the editor took the request. */
+export const dispatchOpenFile = (request: OpenFileRequest): boolean =>
+  !window.dispatchEvent(new CustomEvent(OPEN_FILE_EVENT, { detail: request, cancelable: true }))
 
 const normalizeSegments = (path: string): string => {
   const absolute = path.startsWith('/')

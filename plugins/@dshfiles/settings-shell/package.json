@@ -18,6 +18,10 @@
     "./settings": {
       "types": "./src/settings.ts",
       "default": "./dist/settings.js"
+    },
+    "./open-settings": {
+      "types": "./src/open-settings.ts",
+      "default": "./dist/open-settings.js"
     }
   },
   "scripts": {
@@ -32,6 +36,7 @@
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/command-palette": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/editor": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",

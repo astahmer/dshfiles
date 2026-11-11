@@ -28,6 +28,7 @@
   "dependencies": {
     "@dshfiles/ai-accounts": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/settings-shell": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/thread-sidebar": "workspace:*",
     "@effect/platform-node": "catalog:",

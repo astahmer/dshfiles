@@ -84,6 +84,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/rich-composer": "workspace:*",
     "@dshfiles/session-controller": "workspace:*",
+    "@dshfiles/settings-shell": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
     "@dshfiles/workspace-folder-picker": "workspace:*",

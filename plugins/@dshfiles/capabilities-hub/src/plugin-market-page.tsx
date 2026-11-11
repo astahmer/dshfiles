@@ -1,10 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react'
+import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 /** The settings section dshmarket registers for its catalog. */
 export const MARKET_SECTION_ID = 'market'
-
-/** settings-shell's cross-plugin open request; see its README, "Open Settings from another plugin". */
-const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
 
 /**
  * The Plugin Market row of the Settings destination. The catalog is a `settings.section` dshmarket owns, and only
@@ -15,7 +13,7 @@ export const createPluginMarketPanel = (presence: { readonly subscribe: (listene
   function PluginMarketPanel(): JSX.Element | null {
     const installed = useSyncExternalStore(presence.subscribe, presence.installed)
     useEffect(() => {
-      if (installed) window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { detail: { section: MARKET_SECTION_ID }, cancelable: true }))
+      if (installed) dispatchOpenSettings({ section: MARKET_SECTION_ID })
     }, [installed])
     if (installed) return null
     return (

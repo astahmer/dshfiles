@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/com
 import { ExternalLinkIcon } from '@dshfiles/plugin-ui/icons'
 import type { TracesLocaleKey, TracesTranslate } from './locales.js'
 import type { DiagnosisCode, ReceiverStatus } from './types.js'
+import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 export const receiverEndpoint = (status: ReceiverStatus): string | null =>
   status.boundPort === null ? null : `http://${status.address.includes(':') ? `[${status.address}]` : status.address}:${String(status.boundPort)}`
@@ -133,12 +134,7 @@ export const EmptyStoreGuide = (props: { readonly status: ReceiverStatus; readon
               <Button
                 size="sm"
                 onClick={() => {
-                  window.dispatchEvent(
-                    new CustomEvent('dshfiles:open-settings', {
-                      detail: { setting: { entryId: 'dshfiles-traces', fieldPath: ['port'] } },
-                      cancelable: true,
-                    }),
-                  )
+                  dispatchOpenSettings({ setting: { entryId: 'dshfiles-traces', fieldPath: ['port'] } })
                 }}
                 data-testid="traces-change-port"
               >

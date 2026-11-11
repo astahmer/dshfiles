@@ -19,6 +19,10 @@
     "./artifacts-api": {
       "types": "./src/artifacts-api.ts",
       "default": "./dist/artifacts-api.js"
+    },
+    "./open-file": {
+      "types": "./src/open-file.ts",
+      "default": "./dist/open-file.js"
     }
   },
   "scripts": {

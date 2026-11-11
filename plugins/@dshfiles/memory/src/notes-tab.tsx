@@ -51,6 +51,7 @@ import { memoryApi, type MemoryNoteType, type PanelNote } from './api.ts'
 import { noteStatusBadge, noteStatusLabels, originLabels, originShortLabels, PanelFormat } from './panel-format.ts'
 import { noteForgetMachine } from './note-forget-machine.js'
 import { useNoteEditor } from './use-note-editor.js'
+import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 const noteTypeOptions: readonly { readonly value: MemoryNoteType | ''; readonly label: string }[] = [
   { value: '', label: 'All types' },
@@ -529,9 +530,7 @@ const NoteDetail = (props: {
 
 /** Opens Settings on the one shared Jev key (Tools & MCP › Jev), which Memory's signal gates and review use. */
 const openJevSettings = (): void => {
-  window.dispatchEvent(
-    new CustomEvent('dshfiles:open-settings', { detail: { setting: { entryId: 'dshfiles-settings-shell', fieldPath: ['jevSecret'] } }, cancelable: true }),
-  )
+  dispatchOpenSettings({ setting: { entryId: 'dshfiles-settings-shell', fieldPath: ['jevSecret'] } })
 }
 
 export const NotesTab = (props: {

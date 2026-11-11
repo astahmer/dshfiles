@@ -27,3 +27,7 @@ export const openSettingsRequestSchema = Schema.Struct({
 })
 
 export type OpenSettingsRequest = typeof openSettingsRequestSchema.Type
+
+/** True when the shell took the request. */
+export const dispatchOpenSettings = (request: OpenSettingsRequest = {}): boolean =>
+  !window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { detail: request, cancelable: true }))

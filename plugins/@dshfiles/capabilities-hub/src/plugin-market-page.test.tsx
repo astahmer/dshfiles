@@ -3,6 +3,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 import { createPluginMarketPanel } from './plugin-market-page.js'
+import { OPEN_SETTINGS_EVENT } from '@dshfiles/settings-shell/open-settings'
 
 afterEach(cleanup)
 
@@ -27,8 +28,8 @@ const openRequests = (): unknown[] => {
   const onOpen = (event: Event): void => {
     if (event instanceof CustomEvent) requests.push(event.detail)
   }
-  window.addEventListener('dshfiles:open-settings', onOpen)
-  onTestFinished(() => window.removeEventListener('dshfiles:open-settings', onOpen))
+  window.addEventListener(OPEN_SETTINGS_EVENT, onOpen)
+  onTestFinished(() => window.removeEventListener(OPEN_SETTINGS_EVENT, onOpen))
   return requests
 }
 

@@ -81,6 +81,7 @@ import { BacklogExportSettings } from './export-settings.js'
 import { BacklogHostsSettings } from './peer-settings.js'
 import { withViewTransition } from './view-transition.js'
 import { BacklogPanelPoll } from './panel-poll.js'
+import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 type OpenThread = (sessionId: string) => void
 type View = BacklogView
@@ -331,9 +332,7 @@ export interface StartThreadPorts {
 
 /** Opens Settings on the one shared Jev key (settings-shell's `jevSecret`, under Tools & MCP › Jev). */
 const openJevKeySettings = (): void => {
-  window.dispatchEvent(
-    new CustomEvent('dshfiles:open-settings', { detail: { setting: { entryId: 'dshfiles-settings-shell', fieldPath: ['jevSecret'] } }, cancelable: true }),
-  )
+  dispatchOpenSettings({ setting: { entryId: 'dshfiles-settings-shell', fieldPath: ['jevSecret'] } })
 }
 
 type JevSettingsDraft = { readonly jevEnabled: boolean; readonly autoTriage: boolean }
