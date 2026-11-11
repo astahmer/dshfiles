@@ -5,7 +5,7 @@
     {
       "id": "bash-tool",
       "title": "bash tool",
-      "summary": "The forked bash tool keeps upstream execution, sandboxing, approvals and background-job hand-off.",
+      "summary": "The forked bash tool keeps upstream execution, sandboxing, approvals and background-job hand-off, and renders a result the model can act on: an exit code on every completed run, a timeout that names its wait and suggests a larger timeoutMs, and a truncated tail that counts whole lines.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["completed", "timed-out", "backgrounded"],
@@ -13,12 +13,30 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
-          "id": "tool-bash.vendored",
-          "reason": "Vendored upstream source with no local delta yet; scripts/native-fork-diff.mjs proves it equals the pinned tag."
+          "kind": "unit-test",
+          "id": "tool-bash.exit-code",
+          "file": "plugins/@dshfiles/tool-bash/src/render.test.ts",
+          "testName": "ends every completed run with its exit code, zero included"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-bash.timeout-hint",
+          "file": "plugins/@dshfiles/tool-bash/src/render.test.ts",
+          "testName": "says how long a timed-out command waited and suggests a larger timeout"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-bash.truncated-tail",
+          "file": "plugins/@dshfiles/tool-bash/src/render.test.ts",
+          "testName": "drops the partial first line of a truncated tail so the line count is exact"
         }
       ],
-      "telemetry": [{ "kind": "automatic", "source": "agent-tool" }],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tool: bash"

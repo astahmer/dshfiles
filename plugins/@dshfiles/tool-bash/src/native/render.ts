@@ -8,10 +8,26 @@ import type { ShellRunResult, ShellSandboxInfo, CollectedOutput } from '@deepsee
 import type { SandboxMode } from '@deepseek-ai/dsh-sandbox'
 import { escalationHintMarker, sandboxDenialMarker } from '@deepseek-ai/dsh-sandbox'
 
-/** Append the truncation notice (with the full-output spill path) to a stream's text. */
+/**
+ * Append the truncation notice (with the full-output spill path) to a stream's text. A truncated stream keeps its
+ * tail, which usually starts mid-line: that partial line is dropped so the notice can count whole lines exactly.
+ */
 function streamText(output: CollectedOutput): string {
   if (!output.truncated) return output.text
-  return `${output.text}\n[output truncated; full output: ${output.spillPath ?? '(unavailable)'}]`
+  const firstBreak = output.text.indexOf('\n')
+  const kept = firstBreak === -1 ? output.text : output.text.slice(firstBreak + 1)
+  const lines = kept.length === 0 ? 0 : kept.split('\n').length - (kept.endsWith('\n') ? 1 : 0)
+  const shown = firstBreak === -1 ? 'the end of one line' : `the last ${lines} line${lines === 1 ? '' : 's'}`
+  const body = kept.length === 0 || kept.endsWith('\n') ? kept : `${kept}\n`
+  return `${body}[output truncated: showing ${shown}; full output: ${output.spillPath ?? '(unavailable)'}]`
+}
+
+/** `90000` → `1m 30s`: the wait in the units a person would pick for a larger timeout. */
+function formatWait(timeoutMs: number): string {
+  const seconds = Math.round(timeoutMs / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const rest = seconds % 60
+  return rest === 0 ? `${Math.floor(seconds / 60)}m` : `${Math.floor(seconds / 60)}m ${rest}s`
 }
 
 /**
@@ -50,16 +66,17 @@ export function renderResult(
     }
   }
   // A command may trap SIGTERM and exit 0 after timeout; still report interruption.
-  if (result.timedOut) markers.push(`[timed out after ${result.timeoutMs}ms]`)
+  if (result.timedOut) {
+    markers.push(`[timed out after ${result.timeoutMs}ms (${formatWait(result.timeoutMs)}); rerun with a larger timeoutMs or with run_in_background: true]`)
+  }
   // A kill from outside the call (the human stopping its job) is not a
   // command failure: the reason tells the model not to retry.
   if (result.stopped !== undefined) markers.push(`[stopped: ${result.stopped}]`)
   if (result.signal !== null) {
     markers.push(`[killed by signal: ${result.signal}]`)
-  } else if (result.exitCode !== 0) {
+  } else {
     markers.push(`[exit code: ${result.exitCode}]`)
   }
-  if (markers.length === 0) return body
 
   if (!body.endsWith('\n')) body += '\n'
   return body + markers.join('\n')

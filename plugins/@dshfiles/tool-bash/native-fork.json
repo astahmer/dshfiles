@@ -11,5 +11,5 @@
     { "upstream": "src", "local": "src/native" },
     { "upstream": "locale", "local": "locale" }
   ],
-  "delta": ["src/native/index.ts"]
+  "delta": ["src/native/index.ts", "src/native/render.ts"]
 }

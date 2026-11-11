@@ -15,7 +15,16 @@ rendered without re-parsing it.
 
 ## Local delta
 
-None yet: `src/native` and `locale` equal upstream.
+| File                   | Change                                                                                                                                                                                                                                                                                         |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/render.ts` | every completed run ends with `[exit code: N]`, `0` included; a timeout says how long it waited (`90000ms (1m 30s)`) and suggests a larger `timeoutMs` or `run_in_background: true`; a truncated tail drops its partial first line and says how many whole lines it shows, then the spill path |
+| `src/native/index.ts`  | build compatibility only: Cordis declares `FiberState` as an ambient `const enum`, which `verbatimModuleSyntax` cannot import, so `ACTIVE` (`2`) is inlined                                                                                                                                    |
+
+The exit marker keeps upstream's `[exit code: N]` / `[killed by signal: SIG]` form and stays the last line: the
+native terminal card (`parseExitStatus`, its exit pill) and `@dshfiles/turn-summary` / `@dshfiles/test-runs` anchor on
+it. A signal-killed command already named the signal upstream. Dropping the first line of a truncated tail can drop one
+complete line when the cut fell exactly on a line break; the spill file keeps every byte. `src/render.test.ts` covers
+each case against the real renderer.
 
 ## Wiring
 
