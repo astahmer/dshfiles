@@ -184,11 +184,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const startFanOut = (): void => {
     if (fanOut.length < 2) return
     requestFanOut(
-      fanOut.map(route => ({
-        provider: route.provider,
-        model: route.model,
-        ...(route.reasoningEffort === undefined ? {} : { reasoningEffort: route.reasoningEffort }),
-      })),
+      fanOut.map(route => {
+        const selected = { provider: route.provider, model: route.model }
+        return route.reasoningEffort === undefined ? selected : { ...selected, reasoningEffort: route.reasoningEffort }
+      }),
     )
     setFanOut([])
     setOpen(false)
