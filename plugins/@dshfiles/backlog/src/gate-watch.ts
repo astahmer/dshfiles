@@ -44,17 +44,19 @@ export const GateWatch = Layer.effectDiscard(
 
     const onMain = (repository: string, revision: string) =>
       Effect.flatMap(mainBranch.revsetFor(repository), main =>
-        jj
-          .exec({
-            cwd: repository,
-            args: ['--ignore-working-copy', 'log', '--no-graph', '-r', `present(${revision}) & ::${main}`, '-T', 'commit_id'],
-            timeout: '20 seconds',
-            maxStdoutBytes: 4_000,
-          })
-          .pipe(
-            Effect.map(output => output.stdout.trim() !== ''),
-            Effect.orElseSucceed(() => false),
-          ),
+        main === undefined
+          ? Effect.succeed(false)
+          : jj
+              .exec({
+                cwd: repository,
+                args: ['--ignore-working-copy', 'log', '--no-graph', '-r', `present(${revision}) & ::${main}`, '-T', 'commit_id'],
+                timeout: '20 seconds',
+                maxStdoutBytes: 4_000,
+              })
+              .pipe(
+                Effect.map(output => output.stdout.trim() !== ''),
+                Effect.orElseSucceed(() => false),
+              ),
       )
 
     const resolveRevisions = Effect.fn('backlog gate revisions')(function* (items: readonly BacklogSummaryView[], extra: readonly string[]) {

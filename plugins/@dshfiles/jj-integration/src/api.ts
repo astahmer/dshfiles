@@ -63,6 +63,18 @@ export type RepositoryView = JjRepositoryView
 /** One project's main branch and the layer that chose it, as `projectBookmark` returns it. */
 export type ProjectBookmarkView = typeof projectBookmarkOutputSchema.Type
 
+/** A branch name usable as a bare revision in both jj and git: revset and option syntax stay out. */
+const PLAIN_BRANCH = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$/u
+
+/**
+ * The project's main branch when one of `sources` chose it and it is a plain branch name, else undefined. Each caller
+ * names the layers it trusts: pull requests skip `detected`, because GitHub's default branch already is origin's.
+ */
+export const projectMainBranch = (input: {
+  readonly resolved: ProjectBookmarkView
+  readonly sources: readonly ProjectBookmarkView['source'][]
+}): string | undefined => (input.sources.includes(input.resolved.source) && PLAIN_BRANCH.test(input.resolved.bookmark) ? input.resolved.bookmark : undefined)
+
 /** One line an agent reads: the branch, the layer that chose it, and every layer that could have. */
 const renderProjectBookmark = (output: ProjectBookmarkView): string =>
   [

@@ -59,6 +59,7 @@ export const LifecycleSignals = Layer.effectDiscard(
       // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each repository advances its own seen-main map, so the polls stay in a stable order.
       for (const repository of repositories) {
         const main = yield* mainBranch.revsetFor(repository)
+        if (main === undefined) continue
         const head = yield* Effect.option(readJj(repository, ['log', '--no-graph', '-r', main, '-T', 'commit_id']))
         if (Option.isNone(head) || (yield* Ref.get(seenMain)).get(repository) === head.value) continue
         yield* Ref.update(seenMain, seen => new Map(seen).set(repository, head.value))

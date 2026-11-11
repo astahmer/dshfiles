@@ -1,6 +1,6 @@
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
-import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { jjIntegrationApi, projectMainBranch } from '@dshfiles/jj-integration/api'
 import { Context, Effect, Layer } from 'effect'
 
 /**
@@ -21,7 +21,7 @@ export class ProjectBase extends Context.Service<
       return ProjectBase.of({
         chosenFor: cwd =>
           jjThreads.projectBookmark({ path: cwd }).pipe(
-            Effect.map(resolved => (resolved.source === 'project' || resolved.source === 'file' ? resolved.bookmark : undefined)),
+            Effect.map(resolved => projectMainBranch({ resolved, sources: ['project', 'file'] })),
             // Without jj-integration there is no project choice; any other failure also leaves the GitHub default branch.
             Effect.catch(error =>
               isApiOwnerMissing(error)
