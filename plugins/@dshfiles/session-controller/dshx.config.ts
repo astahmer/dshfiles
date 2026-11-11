@@ -25,6 +25,7 @@ export default defineConfig({
       '@deepseek-ai/dsh-util-crypto',
       '@deepseek-ai/dsh-util-values',
       '@deepseek-ai/dsh-util-workspace-path',
+      '@dshfiles/session-source-port',
     ],
   },
   build: { sourcemap: true, declarations: true, minify: true },

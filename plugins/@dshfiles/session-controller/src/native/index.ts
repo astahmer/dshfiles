@@ -25,7 +25,7 @@ import {
 } from './agent.ts'
 import { SessionCommandController, hasPromptContent } from './commands.ts'
 import { latestStoppedTurn, type StoppedTurn } from '../interrupted-turn.ts'
-import { SessionControlController } from './control.ts'
+import { ProjectionPatchEncoder, SessionControlController } from './control.ts'
 import { SessionHistoryController } from './history.ts'
 import { SessionFileReferences } from './file-references.ts'
 import { ApiSessionList } from './list.ts'
@@ -692,6 +692,8 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote({ mode: 'stream' })
   async *control(signal: AbortSignal): AsyncIterable<SessionControlFrame> {
+    // dshfiles delta: patches are encoded after the access filter, so a patch never follows a value this caller missed.
+    const patches = new ProjectionPatchEncoder()
     for await (const frame of this.controlState.control(signal)) {
       switch (frame.type) {
         case 'baseline': {
@@ -701,7 +703,7 @@ export class SessionController extends TypertRemoteService {
           break
         }
         case 'projection':
-          if (this.ctx.remoteAccess.allows({ kind: 'session', id: frame.sessionId })) yield frame
+          if (this.ctx.remoteAccess.allows({ kind: 'session', id: frame.sessionId })) yield patches.encode(frame)
           break
         /* v8 ignore next -- closed control-frame union. */
         default:

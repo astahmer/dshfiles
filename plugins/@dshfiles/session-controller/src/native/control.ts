@@ -6,9 +6,11 @@ import type {
   Session, SessionId,
 } from '@deepseek-ai/dsh-session'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
+import { diffProjection, projectionCell } from '@dshfiles/session-source-port/projection-patch'
 import type {
   SessionControlBaseline,
   SessionControlFrame,
+  SessionControlValueFrame,
   SessionProjectionBaseline,
   SessionProjectionValues,
 } from './types.ts'
@@ -39,7 +41,7 @@ export class SessionControlController {
    * @param signal - Remote stream cancellation.
    * @returns one complete baseline followed by live replacement frames.
    */
-  async *control(signal: AbortSignal): AsyncIterable<SessionControlFrame> {
+  async *control(signal: AbortSignal): AsyncIterable<SessionControlValueFrame> {
     signal.throwIfAborted()
     const queue = new ControlQueue()
     this.streams.add(queue)
@@ -83,8 +85,34 @@ export class SessionControlController {
     return blocks
   }
 
-  private broadcast(frame: SessionControlFrame): void {
+  private broadcast(frame: SessionControlValueFrame): void {
     for (const stream of this.streams) stream.push(frame)
+  }
+}
+
+/**
+ * dshfiles delta: one control stream's projection frames as patches from the value it sent last per cell. Every
+ * running Session republishes whole projection values on each change; on the live Host `aiAccountsCost` (a per-turn
+ * cost list) reached 28.5 KB per update and `turnOutline` 21.7 KB, 0.5 MB of the stream's 0.77 MB in 90 s.
+ */
+export class ProjectionPatchEncoder {
+  /** Cells remembered per stream; past it the oldest cell's next change travels whole again. */
+  private static readonly MAX_CELLS = 4_096
+  private readonly sent = new Map<string, JsonValue>()
+
+  encode(frame: Extract<SessionControlFrame, { readonly type: 'projection' }>): SessionControlFrame {
+    const cell = projectionCell(frame.sessionId, frame.key)
+    const previous = this.sent.get(cell)
+    this.sent.delete(cell)
+    this.sent.set(cell, frame.value)
+    if (this.sent.size > ProjectionPatchEncoder.MAX_CELLS) {
+      const oldest = this.sent.keys().next()
+      if (oldest.done !== true) this.sent.delete(oldest.value)
+    }
+    if (previous === undefined) return frame
+    const patch = diffProjection(previous, frame.value)
+    if (patch === 'replace') return frame
+    return { type: 'projection-patch', sessionId: frame.sessionId, key: frame.key, patch, seq: frame.seq }
   }
 }
 
@@ -97,12 +125,12 @@ export class ControlQueue {
   private static readonly MAX_PENDING = 4_096
   /** A projection value can be large, so the queue also carries a byte budget: a frame count alone is not a bound. */
   private static readonly MAX_PENDING_BYTES = 4 * 1024 * 1024
-  private readonly buffer = new Deque<SessionControlFrame>()
+  private readonly buffer = new Deque<SessionControlValueFrame>()
   private bufferedBytes = 0
   private wake: (() => void) | undefined
   private done = false
 
-  push(frame: SessionControlFrame): void {
+  push(frame: SessionControlValueFrame): void {
     if (this.done) return
     const bytes = ControlQueue.bytesOf(frame)
     this.buffer.pushBack(frame)
@@ -117,7 +145,7 @@ export class ControlQueue {
     wake?.()
   }
 
-  private static bytesOf(frame: SessionControlFrame): number {
+  private static bytesOf(frame: SessionControlValueFrame): number {
     return Buffer.byteLength(JSON.stringify(frame))
   }
 
@@ -129,7 +157,7 @@ export class ControlQueue {
     wake?.()
   }
 
-  async *iterate(signal: AbortSignal): AsyncIterable<SessionControlFrame> {
+  async *iterate(signal: AbortSignal): AsyncIterable<SessionControlValueFrame> {
     const onAbort = (): void => { this.end() }
     signal.addEventListener('abort', onAbort, { once: true })
     try {
@@ -141,7 +169,7 @@ export class ControlQueue {
         }
         await new Promise<void>((resolve) => { this.wake = resolve })
       }
-      while (this.buffer.size > 0 && !signal.aborted) yield this.buffer.popFront() as SessionControlFrame
+      while (this.buffer.size > 0 && !signal.aborted) yield this.buffer.popFront() as SessionControlValueFrame
     } finally {
       signal.removeEventListener('abort', onAbort)
       this.end()

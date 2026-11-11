@@ -11,6 +11,7 @@ import type { SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session/types
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { Principal } from '@deepseek-ai/dsh-typert-protocol'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
+import type { ProjectionPatch } from '@dshfiles/session-source-port/projection-patch'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
@@ -614,10 +615,25 @@ export interface SessionProjectionUpdate {
   readonly seq: number
 }
 
+/**
+ * dshfiles: a changed projection value as a patch from the value the same stream sent last for that cell, decoded by
+ * `applyProjectionPatch` from `@dshfiles/session-source-port/projection-patch`.
+ */
+export interface SessionProjectionPatchUpdate {
+  readonly sessionId: SessionId
+  readonly key: string
+  readonly patch: ProjectionPatch
+  readonly seq: number
+}
+
 /** Host-wide live state stream. Each generation starts with exactly one baseline. */
 export type SessionControlFrame =
   | { readonly type: 'baseline'; readonly value: SessionControlBaseline }
   | ({ readonly type: 'projection' } & SessionProjectionUpdate)
+  | ({ readonly type: 'projection-patch' } & SessionProjectionPatchUpdate)
+
+/** dshfiles: a control frame with its projection patch applied, as Session state consumes it. */
+export type SessionControlValueFrame = Exclude<SessionControlFrame, { readonly type: 'projection-patch' }>
 
 declare module '@deepseek-ai/cordis' {
   interface Events {

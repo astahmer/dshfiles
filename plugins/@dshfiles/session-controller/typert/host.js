@@ -224,6 +224,12 @@ const _deepseek_ai_dsh_api_session_controller_session_control_result$schema = ()
   'key': z.string().readonly(),
   'value': z.json().readonly(),
   'seq': z.number().readonly(),
+}), z.object({
+  'type': z.literal("projection-patch").readonly(),
+  'sessionId': z.string().readonly(),
+  'key': z.string().readonly(),
+  'patch': z.json().readonly(),
+  'seq': z.number().readonly(),
 })]))
 let _deepseek_ai_dsh_api_session_controller_session_create_parameter_0$schema$value
 const _deepseek_ai_dsh_api_session_controller_session_create_parameter_0$schema = () => (_deepseek_ai_dsh_api_session_controller_session_create_parameter_0$schema$value ??= z.object({

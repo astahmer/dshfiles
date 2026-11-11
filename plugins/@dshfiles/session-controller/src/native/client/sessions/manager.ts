@@ -6,7 +6,7 @@ import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/t
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type {
   SessionControlBaseline,
-  SessionControlFrame,
+  SessionControlValueFrame,
   SessionProjectionHints,
   SessionRenameValue,
   SessionSummary,
@@ -907,7 +907,7 @@ export class SessionManager {
    * Apply a complete control baseline or one later replacement frame.
    * @param frame - baseline or live control replacement from Session Controller.
    */
-  handleControlFrame(frame: SessionControlFrame): void {
+  handleControlFrame(frame: SessionControlValueFrame): void {
     if (frame.type === 'baseline') {
       this.replaceControlBaseline(frame.value)
       return

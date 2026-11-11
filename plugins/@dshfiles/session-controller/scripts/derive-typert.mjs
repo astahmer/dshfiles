@@ -1,6 +1,7 @@
 // The Host's typert-loader reads a Loader entry's generated Remote descriptors from its package's `./typert` export
 // and requires the manifest to name that package. This fork keeps the native Remote surface, so its descriptors are the
-// native package's generated ones with the owning package renamed and the fork's optional list-selector field added.
+// native package's generated ones with the owning package renamed, the fork's optional list-selector field added, and
+// the fork's `projection-patch` control frame accepted.
 // Regenerated on every build.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -41,6 +42,28 @@ const addListProjections = (source, file) => {
   return patched
 }
 
+/** The fork's control stream patches a projection's later values (src/native/control.ts `ProjectionPatchEncoder`). */
+const addControlPatchFrame = (source, file) => {
+  const projectionArm = `z.object({
+  'type': z.literal("projection").readonly(),
+  'sessionId': z.string().readonly(),
+  'key': z.string().readonly(),
+  'value': z.json().readonly(),
+  'seq': z.number().readonly(),
+})]))`
+  if (source.split(projectionArm).length !== 2) throw new Error(`derive-typert: ${file} is missing the control projection frame schema`)
+  return source.replace(
+    projectionArm,
+    `${projectionArm.slice(0, -3)}, z.object({
+  'type': z.literal("projection-patch").readonly(),
+  'sessionId': z.string().readonly(),
+  'key': z.string().readonly(),
+  'patch': z.json().readonly(),
+  'seq': z.number().readonly(),
+})]))`,
+  )
+}
+
 mkdirSync(join(root, 'typert'), { recursive: true })
 for (const [from, to] of [
   ['lib/typert.host.js', 'typert/host.js'],
@@ -53,6 +76,6 @@ for (const [from, to] of [
   const renamed = source.replaceAll(manifest, `  package: '${OWNED}',`)
   writeFileSync(
     join(root, to),
-    `/* Derived by scripts/derive-typert.mjs from ${NATIVE}/${from} — do not edit. */\n${from.endsWith('.js') ? addListProjections(renamed, from) : renamed}`,
+    `/* Derived by scripts/derive-typert.mjs from ${NATIVE}/${from} — do not edit. */\n${from.endsWith('.js') ? addControlPatchFrame(addListProjections(renamed, from), from) : renamed}`,
   )
 }

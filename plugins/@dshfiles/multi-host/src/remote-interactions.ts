@@ -1,3 +1,4 @@
+import { applyProjectionPatch, decodeProjectionPatch, projectionCell, type PatchJson } from '@dshfiles/session-source-port/projection-patch'
 import { Clock, Context, Deferred, Duration, Effect, Layer, Option, PubSub, RcMap, Ref, Schedule, Schema, type Scope, Stream } from 'effect'
 import { remoteApprovalWireSchema, remoteQuestionWireSchema, type RemoteInteraction } from './api.js'
 import type { Gateway, RemoteEventOutcome } from './connectors/gateway.js'
@@ -33,9 +34,14 @@ type EventFrame = Option.Option.Value<ReturnType<typeof decodeEventFrame>>
 const decodeQuestionRequest = Schema.decodeUnknownOption(remoteQuestionWireSchema)
 const decodeApprovalRequest = Schema.decodeUnknownOption(remoteApprovalWireSchema)
 const decodeProjection = Schema.decodeUnknownOption(
-  Schema.Struct({ type: Schema.Literal('projection'), sessionId: Schema.String, key: Schema.String, value: Schema.Unknown, seq: Schema.Number }).pipe(
-    SchemaFields.passthrough,
-  ),
+  Schema.Union([
+    Schema.Struct({ type: Schema.Literal('projection'), sessionId: Schema.String, key: Schema.String, value: Schema.MutableJson, seq: Schema.Number }).pipe(
+      SchemaFields.passthrough,
+    ),
+    Schema.Struct({ type: Schema.Literal('projection-patch'), sessionId: Schema.String, key: Schema.String, patch: Schema.Unknown, seq: Schema.Number }).pipe(
+      SchemaFields.passthrough,
+    ),
+  ]),
 )
 const decodeClaimFrame = Schema.decodeUnknownOption(Schema.Struct({ remainingMs: Schema.Number }).pipe(SchemaFields.passthrough))
 
@@ -245,17 +251,37 @@ export class RemoteInteractions extends Context.Service<
         })
 
       /** A dropped control stream only pauses live values: the next `follow` snapshot carries them, so it is simply reopened. */
+      /**
+       * A controller from this fork sends a projection's later values as patches against the last value the same stream
+       * carried, so each connection keeps those values; a misfit patch ends the connection and the next one starts over.
+       */
       const followProjections = (gateway: Gateway) =>
-        gateway.stream({ endpoint: 'session/control', args: {} }).pipe(
-          Stream.runForEach(frame =>
-            Option.match(decodeProjection(frame), {
-              onNone: () => Effect.void,
-              onSome: ({ key, seq, sessionId, value }) => PubSub.publish(projected, { sessionId, key, value, seq }),
-            }),
-          ),
-          Effect.ignore,
-          Effect.repeat(Schedule.spaced(reconnectDelay)),
-        )
+        Effect.suspend(() => {
+          const cells = new Map<string, PatchJson>()
+          return gateway.stream({ endpoint: 'session/control', args: {} }).pipe(
+            Stream.runForEach(frame =>
+              Option.match(decodeProjection(frame), {
+                onNone: () => Effect.void,
+                onSome: update =>
+                  Effect.flatMap(
+                    Effect.try(() => {
+                      const cell = projectionCell(update.sessionId, update.key)
+                      if (update.type === 'projection') {
+                        cells.set(cell, update.value)
+                        return update.value
+                      }
+                      const previous = cells.get(cell)
+                      if (previous === undefined) throw new Error(`session control patch for an unknown ${update.key} value`)
+                      const value = applyProjectionPatch(previous, decodeProjectionPatch(update.patch))
+                      cells.set(cell, value)
+                      return value
+                    }),
+                    value => PubSub.publish(projected, { sessionId: update.sessionId, key: update.key, value, seq: update.seq }),
+                  ),
+              }),
+            ),
+          )
+        }).pipe(Effect.ignore, Effect.repeat(Schedule.spaced(reconnectDelay)))
 
       const connectOnce = (runtimeId: string) =>
         Effect.scoped(
