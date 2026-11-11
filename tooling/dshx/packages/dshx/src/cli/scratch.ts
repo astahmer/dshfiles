@@ -27,7 +27,7 @@ or as soon as its dsh exits. Still run "dshx dev down" when done.
 
   dshx dev up [--plugin @dshfiles/<name>]...   start it (builds the plugins, seeds a jj project)
   dshx dev doctor                              read-only health check
-  dshx dev open <feature>                      walk a catalog feature's "reach" steps in the browser
+  dshx dev open <feature> [--narrow]           walk a catalog feature's "reach" steps in the browser
   dshx dev shot [--label <label>]              screenshot + console/network error summary
   dshx dev keep [--forever]                    answer a stop warning, or pin the instance
   dshx dev down [--dry-run]                    stop what up started, delete the scratch home
@@ -132,8 +132,13 @@ danger confirm and a sticky toast through the page's Dialogs and Toasts provider
 A failing step stops the walk, saves a screenshot and exits 1: fix the catalog when the UI path
 moved, report a regression when the feature broke (skill maintain-verify-dsh).
 
+--narrow walks at a phone-class 390 x 844 viewport (below the shell's 640px phone breakpoint: bottom
+tab bar, Settings Sections combobox) and runs the feature's "reachNarrow" steps, or "reach" when it
+has none. The page keeps that size for shot; an open without --narrow restores 1440 x 900.
+
 Options:
   --timeout <ms>       Per-step timeout (default 15000).
+  --narrow             Walk at 390 x 844 with "reachNarrow" (falls back to "reach").
 
 ${COMMON_HELP}`,
   ],
@@ -226,6 +231,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         label: { type: 'string' },
         out: { type: 'string' },
         'dry-run': { type: 'boolean' },
+        narrow: { type: 'boolean' },
       },
     }))
   } catch (error) {
@@ -238,7 +244,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
   const allowed: ReadonlyMap<string, readonly string[]> = new Map([
     ['up', ['plugin', 'bundle', 'project', 'port', 'skip-build', 'fake-secret-cli', 'timeout', 'idle-timeout', 'warn-minutes']],
     ['doctor', []],
-    ['open', ['timeout']],
+    ['open', ['timeout', 'narrow']],
     ['shot', ['label', 'out']],
     ['keep', ['forever']],
     ['down', ['dry-run']],
@@ -357,13 +363,13 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
       const timeoutMs = numberOption('timeout', 15_000)
       if (timeoutMs instanceof ScratchError) return fail(timeoutMs)
       const { scratchOpen } = await import('../scratch/drive.js')
-      const result = await scratchOpen(state, positionals[0] ?? '', timeoutMs)
+      const result = await scratchOpen({ state, reference: positionals[0] ?? '', timeoutMs, narrow: values.narrow === true })
       const lines = result.steps.map(
         step => `${step.ok ? 'ok  ' : 'FAIL'} ${step.step} (${step.ms} ms)${step.error === undefined ? '' : `\n     ${step.error}`}`,
       )
       const footer = result.ok
-        ? `Reached ${result.packageId}#${result.feature}. Next: dshx dev shot --label ${result.feature}\n`
-        : `Could not reach ${result.packageId}#${result.feature}; screenshot ${result.failureShot ?? 'not saved'}.\nfix: if the UI path moved, update "reach" in ${result.catalogFile}; if the feature broke, report it (skill maintain-verify-dsh).\n`
+        ? `Reached ${result.packageId}#${result.feature} with "${result.field}" at ${result.viewport.width}x${result.viewport.height}. Next: dshx dev shot --label ${result.feature}\n`
+        : `Could not reach ${result.packageId}#${result.feature} with "${result.field}" at ${result.viewport.width}x${result.viewport.height}; screenshot ${result.failureShot ?? 'not saved'}.\nfix: if the UI path moved, update "${result.field}" in ${result.catalogFile}; if the feature broke, report it (skill maintain-verify-dsh).\n`
       return succeed(result, `${lines.join('\n')}\n${footer}`, result.ok)
     }
     if (action === 'shot') {

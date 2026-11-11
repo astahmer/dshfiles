@@ -32,7 +32,9 @@ If none applies, stop: **Clean**.
    spanned or delegated). List
    the affected features: changed catalogs, plus features whose plugin source
    changed (`jj diff --name-only`). A new user-facing feature gets `reach` when
-   one short path from the app root reaches it.
+   one short path from the app root reaches it, and `reachNarrow` (same grammar)
+   when that path is desktop-only: a rail tab, the Account menu, the palette
+   button or a Settings section button does not render below 640 px.
 2. **Source wave (read-only).** For each affected feature, read the component
    that renders it (`grep -rn "aria-label\|t('" plugins/@dshfiles/<p>/src`) and
    its locale strings: roles, accessible names, the dialog it opens, what makes
@@ -46,6 +48,7 @@ If none applies, stop: **Clean**.
    dshx dev up --plugin <each affected plugin> --json
    dshx dev doctor
    dshx dev open <plugin>/<feature>      # each affected feature
+   dshx dev open --narrow <plugin>/<feature>   # each feature with reachNarrow, at 390 × 844
    dshx dev shot --label <feature> --json
    dshx dev down && pgrep -fl 'dshx-boot-profile|browser-host.js|scratch/watchdog.js' || echo clean
    ```
@@ -57,7 +60,9 @@ If none applies, stop: **Clean**.
    `processes` (`scratch-orphans.spec.ts`), so it never stops a real Host. A startup warning is
    the two-phase stop, not drift: `doctor` reports the answered warning, and
    `dshx dev keep --forever` pins an instance a long pass must keep.
-   A `reach` not walked green in this session stays unverified; say so.
+   A `reach` or `reachNarrow` not walked green in this session stays
+   unverified; say so. The onboarding journey's 390 px check walks a fixed
+   curated set (`@scenario:onboarding.reach-narrow`).
    Then `pnpm check:e2e <plugin>` for each touched plugin: its journeys must be
    green before landing (`pnpm check` runs only the `@smoke` subset). A shared
    step (`steps.ts`, a boot or navigation helper) can break plugins it does not

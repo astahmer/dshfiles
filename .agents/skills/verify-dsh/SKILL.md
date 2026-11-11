@@ -69,6 +69,7 @@ dshx dev open jj-integration/thread-destination
 dshx dev open jj-integration/rebase
 dshx dev open jj-integration/thread-workspaces-panel
 dshx dev open workspace-nav/new-thread-composer
+dshx dev open --narrow memory/memory-panel   # 390 × 844, walks reachNarrow (else reach)
 ```
 
 Goes to the app root, dismisses Preview Notice and the provider-setup dialog,
@@ -77,7 +78,9 @@ UI path does (fake-provider threads, shared workspaces, a rebase-ready thread,
 synthetic OTLP traces, …); each seed's needs and the `attach`, `hover` and
 `at <x>,<y>` step syntax are in [REFERENCE.md](REFERENCE.md#seeds-and-step-syntax).
 The browser keeps its page between commands, so `shot` captures where `open`
-stopped. A failing step exits 1 with a screenshot: decide drift vs regression with
+stopped. `--narrow` walks a phone-width page with the feature's `reachNarrow`
+steps (falling back to `reach`); the page stays narrow for `shot` until an
+`open` without it. A failing step exits 1 with a screenshot: decide drift vs regression with
 `maintain-verify-dsh`. To drive something ad hoc, add `reach` to its catalog
 entry rather than scripting Playwright.
 

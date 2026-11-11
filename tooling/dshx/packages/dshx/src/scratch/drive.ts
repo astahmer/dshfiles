@@ -17,6 +17,7 @@ export interface CatalogFeature {
   readonly id: string
   readonly title: string
   readonly reach?: readonly string[]
+  readonly reachNarrow?: readonly string[]
 }
 
 const catalogFeatures = async (): Promise<CatalogFeature[]> => {
@@ -36,6 +37,7 @@ const catalogFeatures = async (): Promise<CatalogFeature[]> => {
         id: feature.id,
         title: feature.title,
         ...(feature.reach !== undefined && { reach: feature.reach }),
+        ...(feature.reachNarrow !== undefined && { reachNarrow: feature.reachNarrow }),
       })
     }
   }
@@ -106,8 +108,37 @@ export interface OpenStepResult {
   readonly error?: string
 }
 
+/** A phone-class viewport (the e2e journeys' 390 × 844): below the 640 px phone breakpoint of the shell. */
+interface Viewport {
+  readonly width: number
+  readonly height: number
+}
+const NARROW_VIEWPORT: Viewport = { width: 390, height: 844 }
+/** The scratch Chromium's own viewport (browser-host.ts), restored by a desktop open after a narrow one. */
+const DESKTOP_VIEWPORT: Viewport = { width: 1440, height: 900 }
+
+/** A narrow open walks `reachNarrow` when the feature has one; everything else walks `reach`. */
+const stepsFor = (input: {
+  readonly feature: CatalogFeature
+  readonly narrow: boolean
+}): { readonly field: 'reach' | 'reachNarrow'; readonly steps: readonly string[] } | undefined => {
+  if (input.narrow && input.feature.reachNarrow !== undefined) return { field: 'reachNarrow', steps: input.feature.reachNarrow }
+  return input.feature.reach === undefined ? undefined : { field: 'reach', steps: input.feature.reach }
+}
+
+export interface OpenInput {
+  readonly state: ScratchState
+  readonly reference: string
+  readonly timeoutMs: number
+  /** Walk at 390 × 844 with `reachNarrow` (falling back to `reach`); the page keeps that size for `shot`. */
+  readonly narrow: boolean
+}
+
 export interface OpenResult {
   readonly feature: string
+  /** The catalog field the walk ran: `reachNarrow` only for a narrow open of a feature that declares it. */
+  readonly field: 'reach' | 'reachNarrow'
+  readonly viewport: Viewport
   readonly packageId: string
   readonly catalogFile: string
   readonly steps: readonly OpenStepResult[]
@@ -116,9 +147,12 @@ export interface OpenResult {
   readonly failureShot?: string
 }
 
-export const scratchOpen = async (state: ScratchState, reference: string, timeoutMs: number): Promise<OpenResult> => {
-  const feature = await ScratchFeatureCatalog.find(reference)
-  if (feature.reach === undefined) {
+export const scratchOpen = async (input: OpenInput): Promise<OpenResult> => {
+  const state = input.state
+  const timeoutMs = input.timeoutMs
+  const feature = await ScratchFeatureCatalog.find(input.reference)
+  const walk = stepsFor({ feature, narrow: input.narrow })
+  if (walk === undefined) {
     throw new ScratchError(
       'no-reach',
       `${feature.packageId}#${feature.id} has no reach steps.`,
@@ -133,6 +167,8 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
     )
   }
   const { browser, page } = await connect(state)
+  const viewport = input.narrow ? NARROW_VIEWPORT : DESKTOP_VIEWPORT
+  await page.setViewportSize(viewport)
   await StartupDialogs.registerPreviewNoticeDismissal(page)
   const steps: OpenStepResult[] = []
   const openAppRoot = async (): Promise<void> => {
@@ -147,7 +183,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
     let fakeProvider = state.fakeProvider
     // A key press right after fill goes to that field as a locator action, so a dialog that opened in between is dismissed first.
     let filled: ReturnType<typeof locate> | undefined
-    for (const [index, step] of feature.reach.entries()) {
+    for (const [index, step] of walk.steps.entries()) {
       const startedAt = Date.now()
       try {
         const parsed = parseReachStep(await BacklogReachOrdinals.resolve({ step, launchUrl: state.launchUrl }))
@@ -175,7 +211,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
           }
           // A page seed lives in this page (an open dialog), so reloading the root after it would discard it.
           const pageSeed = parsed.seed === 'app-dialog-sample'
-          if (!pageSeed && feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
+          if (!pageSeed && walk.steps[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
         } else if (parsed.action === 'attach')
           await ScratchDriveRuntime.composerFileInput(page).setInputFiles(repositoryFile(parsed.file), { timeout: timeoutMs })
         else if (parsed.action === 'press') await (filled === undefined ? page.keyboard.press(parsed.key) : filled.press(parsed.key, { timeout: timeoutMs }))
@@ -230,7 +266,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         break
       }
     }
-    const ok = steps.length === feature.reach.length && steps.every(step => step.ok)
+    const ok = steps.length === walk.steps.length && steps.every(step => step.ok)
     let failureShot: string | undefined
     if (!ok) {
       await mkdir(state.evidenceDir, { recursive: true })
@@ -239,6 +275,8 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
     }
     return {
       feature: feature.id,
+      field: walk.field,
+      viewport,
       packageId: feature.packageId,
       catalogFile: feature.catalogFile,
       steps,

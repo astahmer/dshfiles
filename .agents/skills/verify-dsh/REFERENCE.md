@@ -88,6 +88,16 @@ or when a binary outside the repository changed.
   the project picker should run before another selects `sample` or use a separate
   `--name` instance. A reach that changes a sidebar view leaves it for the next
   one; row-driven reaches start with `click button "All threads"`.
+- Below 640 px the rail is a bottom tab bar: `reachNarrow` reaches Land, Work,
+  Agents, Observe, Knowledge and Settings with `click button "More"` then the
+  row's whole name, label and description (`click button "Knowledge Memory and
+reference material agents use."`, from thread-sidebar's `destinations.ts`):
+  `click text "Knowledge"` hits the page title behind the list when that
+  destination is already on stage,
+  Settings sections with `click combobox "Sections"` / `click option "<section>"`,
+  the palette with `click button "Threads"` / `click button "Search threads"`, and
+  a new thread with `click button "New"`. No Account menu, palette button or
+  status-strip group renders there. Tapping **More** while its list is open closes it.
 - The project picker filters asynchronously: wait for the row
   (`expect option "sample*"`) before `press Enter`.
 - Register projects by their realpath. macOS temp dirs sit behind

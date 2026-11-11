@@ -113,7 +113,14 @@ surfaces, configuration keys, states, failure modes, external dependencies, and
 line. `not-applicable` needs a reason of at least 20 characters saying why no
 journey can exist (for example multi-host needs an SSH server and a second
 runtime). Optional `reach` steps tell `dshx dev open` how to get to the feature
-from the app root (see the `verify-dsh` skill). `dshx create` scaffolds a
+from the app root (see the `verify-dsh` skill). Optional `reachNarrow` steps
+(same grammar and rules: seeds first, ending with `expect`) are the same walk on
+a phone-width viewport, below the shell's 640 px breakpoint, where the rail is a
+bottom tab bar (**Threads**, **Inbox**, **New**, **More**; other destinations are
+`click button "More"` then their row, named by label and description), Settings picks its section from a
+**Sections** combobox, and the palette opens from **Threads** → **Search
+threads**. `dshx dev open --narrow` and onboarding's Show me where walk
+`reachNarrow` at that width and fall back to `reach` without it. `dshx create` scaffolds a
 catalog with a new plugin (`create-dshx/src/templates.ts`), so a plugin starts
 linked from its manifest's `dshx.features`.
 
