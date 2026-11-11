@@ -3,16 +3,19 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { Command, Composer, defineClient, useApi, useContract, useSettings, type PluginContext } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { CompassIcon } from '@dshfiles/plugin-ui/icons'
-import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { DestinationSections } from '@dshfiles/thread-sidebar/destinations'
 import { useCallback, useEffect, type ReactNode } from 'react'
 import { onboardingApi } from './api.js'
-import { GettingStartedPage, type GettingStartedProps } from './getting-started-page.js'
+import { GettingStartedPage, TOUCH, type GettingStartedProps } from './getting-started-page.js'
 import type { Overview, OverviewInput } from './overview-model.js'
 import { Routes, type RouteServices } from './routes.js'
 import { ONBOARDING_DEFAULTS, onboardingSettings, type OnboardingSettings } from './settings.js'
 import { SetupWizard } from './setup-wizard.js'
+import { ShowMeWhere } from './show-me-where.js'
+import { WalkStore } from './walk-store.js'
 import { WizardStore } from './wizard-store.js'
 
 const PANEL_ID = 'dshfiles-onboarding'
@@ -29,6 +32,45 @@ const useOnboardingSettings = (): OnboardingSettings => {
 const useLoadOverview = (): ((input: OverviewInput, signal: AbortSignal) => Promise<Overview>) => {
   const api = useApi(onboardingApi)
   return useCallback((input, signal) => api.overview(input, { signal }), [api])
+}
+
+const WalkUnreadable = (props: { readonly onRetry: () => void }): ReactNode => (
+  <section
+    aria-label="Show me where"
+    className="dshx-root dshx:fixed dshx:right-3 dshx:bottom-3 dshx:z-[999] dshx:flex dshx:w-96 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-3 dshx:text-popover-foreground dshx:shadow-lg dshx:max-sm:inset-x-2 dshx:max-sm:w-auto"
+    data-onboarding-walk=""
+    role="alert"
+  >
+    <p className="dshx:text-sm">
+      Show me where could not read this feature's steps from the Host. Check that the onboarding plugin is enabled, then try again.
+    </p>
+    <div className="dshx:flex dshx:justify-end dshx:gap-2">
+      <Button className={TOUCH} onClick={props.onRetry} size="sm">
+        Try again
+      </Button>
+      <Button className={TOUCH} onClick={WalkStore.end} size="sm" variant="ghost">
+        End
+      </Button>
+    </div>
+  </section>
+)
+
+/** One feature's steps, read from the Host when a walk starts: the catalog never ships in this bundle. */
+const WalkOverlay = (props: { readonly featureKey: string; readonly routes: RouteServices }): ReactNode => {
+  const api = useApi(onboardingApi)
+  const reach = useQuery({
+    queryKey: ['onboarding', 'reach', props.featureKey],
+    queryFn: ({ signal }) => api.reach({ key: props.featureKey }, { signal }),
+    retry: false,
+    gcTime: 0,
+  })
+  const feature = reach.data?.feature ?? null
+  useEffect(() => {
+    if (reach.isSuccess && (feature === null || !feature.walkable)) WalkStore.end()
+  }, [reach.isSuccess, feature])
+  if (reach.isError) return <WalkUnreadable onRetry={() => void reach.refetch()} />
+  if (feature === null || !feature.walkable) return null
+  return <ShowMeWhere onEnd={WalkStore.end} reach={feature} routes={props.routes} />
 }
 
 const useApplyPack = (): GettingStartedProps['applyPack'] => {
@@ -102,6 +144,7 @@ export default defineClient({
               loadOverview={useLoadOverview()}
               routes={routes}
               settings={useOnboardingSettings()}
+              showWhere={WalkStore.start}
               startWizard={WizardStore.request}
             />
           </PluginQueryProvider>
@@ -133,6 +176,22 @@ export default defineClient({
       )
     }
     ctx.slots.inject('settings.onboarding', () => ctx.slots.register({ name: 'settings.onboarding', id: WIZARD_STEP_ID, order: 10 }, decorate(FirstRunStep)))
+
+    // Show me where outlives the page: its first click usually navigates away from Getting started.
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'dshfiles-onboarding-walk', order: 121 },
+        decorate(() => {
+          const featureKey = WalkStore.useCurrent()
+          if (featureKey === null) return null
+          return (
+            <PluginQueryProvider>
+              <WalkOverlay featureKey={featureKey} key={featureKey} routes={routes} />
+            </PluginQueryProvider>
+          )
+        }),
+      ),
+    )
 
     // Replay from the palette or the page, wherever the user is.
     ctx.slots.inject('shell.overlay', () =>

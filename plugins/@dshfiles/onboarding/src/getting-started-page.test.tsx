@@ -74,6 +74,7 @@ const routes = (registered: readonly string[]): RouteServices & { readonly opene
 const renderPage = (input: { readonly registered: readonly string[]; readonly packs?: boolean }) => {
   const services = routes(input.registered)
   const startWizard = vi.fn()
+  const showWhere = vi.fn()
   const copy = vi.fn(async () => true)
   render(
     <PluginQueryProvider>
@@ -83,11 +84,12 @@ const renderPage = (input: { readonly registered: readonly string[]; readonly pa
         loadOverview={(request, _signal) => loadOverview(request)}
         routes={services}
         settings={{ ...ONBOARDING_DEFAULTS, packs: input.packs ?? true }}
+        showWhere={showWhere}
         startWizard={startWizard}
       />
     </PluginQueryProvider>,
   )
-  return { services, startWizard, copy }
+  return { services, startWizard, showWhere, copy }
 }
 
 describe('GettingStartedPage', () => {
@@ -115,7 +117,10 @@ describe('GettingStartedPage', () => {
     fireEvent.click(within(backlogRow).getByRole('button', { name: /^Open / }))
     expect(page.services.opened.at(-1)).toBe('panel:dshfiles-backlog-panel')
     const unregistered = within(features).getAllByText('traces')[0]?.closest('li')
-    expect(unregistered === null || unregistered === undefined ? [] : within(unregistered).queryAllByRole('button')).toEqual([])
+    expect(unregistered === null || unregistered === undefined ? [] : within(unregistered).queryAllByRole('button', { name: /^Open / })).toEqual([])
+
+    fireEvent.click(within(backlogRow).getByRole('button', { name: /^Show me where: / }))
+    expect(page.showWhere).toHaveBeenCalledWith(backlogRow.dataset.feature)
 
     fireEvent.click(screen.getByRole('button', { name: 'Start setup' }))
     expect(page.startWizard).toHaveBeenCalledOnce()

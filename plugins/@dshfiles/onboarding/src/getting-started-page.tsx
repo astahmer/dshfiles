@@ -10,6 +10,7 @@ import {
   CircleOffIcon,
   CopyIcon,
   ExternalLinkIcon,
+  LocateFixedIcon,
   PlayIcon,
   SearchIcon,
   SettingsIcon,
@@ -63,6 +64,8 @@ export interface GettingStartedProps {
   readonly copy: (text: string) => Promise<boolean>
   readonly startWizard: () => void
   readonly applyPack: PackChangeDialogProps['applyPack']
+  /** Start Show me where on one feature's `reach` steps. */
+  readonly showWhere: (featureKey: string) => void
 }
 
 const ChecklistRow = (props: {
@@ -203,7 +206,7 @@ const PackCard = (props: {
   )
 }
 
-const FeatureItem = (props: { readonly row: FeatureRow; readonly routes: RouteServices }): ReactNode => {
+const FeatureItem = (props: { readonly row: FeatureRow; readonly routes: RouteServices; readonly showWhere: (featureKey: string) => void }): ReactNode => {
   const { row } = props
   const route = row.route
   const canOpen = route !== null && Routes.available(route, props.routes)
@@ -217,6 +220,17 @@ const FeatureItem = (props: { readonly row: FeatureRow; readonly routes: RouteSe
         <p className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">{row.firstAction ?? row.summary}</p>
         {row.currentSurface === null ? null : <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{row.currentSurface}</p>}
       </div>
+      {row.walkable ? (
+        <Button
+          aria-label={`Show me where: ${row.title}`}
+          className={cn('dshx:shrink-0', TOUCH)}
+          onClick={() => props.showWhere(row.key)}
+          size="sm"
+          variant="ghost"
+        >
+          <LocateFixedIcon /> Show me where
+        </Button>
+      ) : null}
       {canOpen ? (
         <Button
           aria-label={`Open ${row.title}`}
@@ -370,7 +384,7 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
             ) : (
               <ul aria-label="Features" className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border">
                 {(data?.features.rows ?? []).map(row => (
-                  <FeatureItem key={row.key} routes={props.routes} row={row} />
+                  <FeatureItem key={row.key} routes={props.routes} row={row} showWhere={props.showWhere} />
                 ))}
               </ul>
             )}

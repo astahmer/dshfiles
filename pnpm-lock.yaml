@@ -5200,6 +5200,9 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 18.3.7(@types/react@18.3.31)
       jsdom:
         specifier: 'catalog:'
         version: 26.1.0
