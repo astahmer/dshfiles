@@ -1,11 +1,12 @@
 import { JjViewReads, type JjRunError } from '@dshfiles/jj-cli'
 import { KeyedMutex } from '@dshfiles/dshx/effect/keyed-mutex'
 import { commandAttributes } from '@dshfiles/dshx/tracing'
-import { Context, Effect, Fiber, FiberMap, FileSystem, Layer, Option, Path, type PlatformError, Ref, Schema } from 'effect'
+import { Context, Duration, Effect, Fiber, FiberMap, FileSystem, Layer, Option, Path, type PlatformError, Ref, Schema } from 'effect'
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { DestinationRejected, JjFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
 import { Executables } from './executables-promise.js'
 import { ProjectBookmarks } from './project-bookmarks.js'
+import { RemoteBaseModel, type RemoteBase } from './remote-base.js'
 import { RepoLocks } from './repo-locks.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadMetadata, type RebaseMetadataEntry } from './thread-metadata.js'
@@ -57,6 +58,15 @@ const HEX_ID = /^[0-9a-f]+$/u
 const OPERATION_ID = /^[0-9a-f]{12,128}$/u
 const isCommitId = (value: string): boolean => value.length >= 40 && HEX_ID.test(value)
 const RESOLVED_BOOKMARKS_TEMPLATE = 'local_bookmarks.filter(|bookmark| !bookmark.conflict()).map(|bookmark| bookmark.name() ++ "\\n").join("")'
+/** Every fetched remote bookmark that names one revision, as `name<TAB>remote`; jj's colocated `@git` refs are not a remote. */
+const REMOTE_BOOKMARKS_TEMPLATE = 'if(remote && remote != "git" && present && !conflict, name ++ "\\t" ++ remote ++ "\\n", "")'
+/** Remote bookmarks other than jj's colocated `@git` refs. */
+const FETCHED_REMOTE_BOOKMARKS = 'remote_bookmarks() ~ remote_bookmarks(remote=exact:"git")'
+/** The bookmarks on one revision: local names first, then `name@remote` for each fetched remote copy. */
+const NEAREST_BOOKMARKS_TEMPLATE =
+  'local_bookmarks.map(|b| b.name() ++ "\\n").join("") ++ remote_bookmarks.filter(|b| b.remote() != "git").map(|b| "@" ++ b.name() ++ "@" ++ b.remote() ++ "\\n").join("")'
+/** Starting a thread from a remote bookmark waits on this one fetch; past it the last fetched position is used. */
+const FETCH_BASE_TIMEOUT = Duration.seconds(45)
 const exactBookmarkNamePattern = (bookmark: string): string => `exact:${JSON.stringify(bookmark)}`
 const bookmarkRevset = (bookmark: string): string => `bookmarks(${exactBookmarkNamePattern(bookmark)})`
 const isUnsupportedRevsetPath = (path: string): boolean =>
@@ -857,9 +867,9 @@ const make = Effect.gen(function* () {
    * is what jj then gets, so what was checked is what is used. Reads through `run`, not `jj`, to tell a destination
    * that names nothing or several revisions from jj itself failing.
    */
-  const resolveDestination = Effect.fnUntraced(function* (repoRoot: string, target: string) {
-    if (target.startsWith('-')) return yield* unknownDestination(target)
-    const output = yield* run(['--ignore-working-copy', 'log', '--no-graph', '-n', '2', '-r', target, '-T', 'commit_id ++ "\\n"'], repoRoot)
+  const resolveDestination = Effect.fnUntraced(function* (repoRoot: string, target: string, revset: string = target) {
+    if (revset.startsWith('-')) return yield* unknownDestination(target)
+    const output = yield* run(['--ignore-working-copy', 'log', '--no-graph', '-n', '2', '-r', revset, '-T', 'commit_id ++ "\\n"'], repoRoot)
     if (output.exitCode !== 0) {
       if (AMBIGUOUS_REVISION.test(output.stderr)) return yield* ambiguousDestination(target)
       if (UNKNOWN_REVISION.test(output.stderr)) return yield* unknownDestination(target)
@@ -870,6 +880,47 @@ const make = Effect.gen(function* () {
     if (others.length > 0) return yield* ambiguousDestination(target)
     if (!isCommitId(commitId)) return yield* jjFailed('JJ returned an invalid commit ID; refusing revision selection.')
     return commitId
+  })
+
+  /** The repository's named remotes; none when jj cannot list them, so the base then resolves as written. */
+  const remoteNames = (repoRoot: string) =>
+    Effect.map(run(['--ignore-working-copy', 'git', 'remote', 'list'], repoRoot), output =>
+      output.exitCode === 0 ? lines(output.stdout).flatMap(line => line.split(/\s+/u).slice(0, 1)) : [],
+    )
+
+  /**
+   * Fetch the one remote bookmark a thread starts from, so it starts from what the remote holds now. Best effort: offline,
+   * or with the remote refusing, the thread starts from the position the last fetch recorded, as the warning says.
+   */
+  const fetchRemoteBase = (repoRoot: string, base: RemoteBase) =>
+    viewReads
+      .read({
+        args: ['--ignore-working-copy', 'git', 'fetch', '--remote', exactBookmarkNamePattern(base.remote), '--branch', exactBookmarkNamePattern(base.name)],
+        cwd: repoRoot,
+        timeout: FETCH_BASE_TIMEOUT,
+      })
+      .pipe(
+        Effect.map(output => (output.exitCode === 0 ? undefined : output.stderr.trim().split('\n').slice(-2).join(' ').slice(0, 400))),
+        Effect.catch(error => Effect.succeed(error.message)),
+        Effect.tap(failure => Effect.annotateCurrentSpan({ 'dshx.fetch.status': failure === undefined ? 'fetched' : 'failed' })),
+        Effect.tap(failure =>
+          failure === undefined
+            ? Effect.void
+            : Effect.logWarning(`Could not fetch ${RemoteBaseModel.formatJj(base)}; starting from its last fetched position. ${failure}`),
+        ),
+        Effect.asVoid,
+        Effect.withSpan('thread workspaces fetch base', { attributes: { 'dshx.fetch.remote': base.remote, 'dshx.fetch.bookmark': base.name } }),
+      )
+
+  /**
+   * The commit a thread starts from. A remote bookmark (`main@origin`) is fetched first when `fetch` is set and resolved
+   * by its exact revset; anything else resolves as written. Only a base with `@` costs the remote listing.
+   */
+  const startingCommit = Effect.fnUntraced(function* (repoRoot: string, target: string, fetch: boolean) {
+    const remote = target.includes('@') ? RemoteBaseModel.parseJj(target, yield* remoteNames(repoRoot)) : undefined
+    if (remote === undefined) return yield* resolveDestination(repoRoot, target)
+    if (fetch) yield* fetchRemoteBase(repoRoot, remote)
+    return yield* resolveDestination(repoRoot, target, RemoteBaseModel.jjRevset(remote))
   })
 
   /** Only for a workspace this call made or an unclaimed spare: it deletes the folder and nothing can be unlanded there. */
@@ -898,7 +949,8 @@ const make = Effect.gen(function* () {
    */
   const warmSpare = Effect.fnUntraced(function* (repoRoot: string, target: string) {
     if ((yield* usableSpare(repoRoot, (yield* readSpares(repoRoot))[target])) !== undefined) return
-    const commitId = yield* resolveDestination(repoRoot, target)
+    // A spare only holds a checkout: claiming it moves it onto the base as it is then, fetched if remote.
+    const commitId = yield* startingCommit(repoRoot, target, false)
     const name = yield* freeThreadName(repoRoot, undefined)
     const directory = yield* threadsDirectory(repoRoot)
     yield* Ref.update(sparesBeingAdded, current => new Set([...current, name]))
@@ -988,7 +1040,7 @@ const make = Effect.gen(function* () {
       Effect.gen(function* () {
         const target = base ?? (yield* bookmarkFor(repoRoot))
         yield* awaitWarming(repoRoot, target)
-        const commitId = yield* resolveDestination(repoRoot, target)
+        const commitId = yield* startingCommit(repoRoot, target, true)
         const spare = yield* usableSpare(repoRoot, (yield* readSpares(repoRoot))[target])
         const claimed =
           spare === undefined ? undefined : yield* claimSpare(repoRoot, spare, { target, commitId, requestedName }).pipe(Effect.orElseSucceed(() => undefined))
@@ -1735,21 +1787,43 @@ const make = Effect.gen(function* () {
     )
   })
 
-  /** Local bookmarks, and the nearest one the workspace at `path` builds on. */
+  const preferredBookmark = (target: string) =>
+    Effect.flatMap(storeRootOf(target).pipe(Effect.orElseSucceed(() => undefined)), root => bookmarkFor(root ?? target))
+
+  /**
+   * Local bookmarks, and the nearest one the workspace at `path` builds on. A workspace started from a remote bookmark
+   * newer than every local one it contains (`main@origin` ahead of `main`) names that remote bookmark.
+   */
   const bookmarks = Effect.fn('thread workspaces bookmarks')(function* (target: string) {
     const [listed, nearest] = yield* Effect.all(
       [
         jj(['--ignore-working-copy', 'bookmark', 'list', '-T', 'if(remote, "", name ++ "\\n")'], target),
         jj(
-          ['--ignore-working-copy', 'log', '--no-graph', '-r', 'heads(::@ & bookmarks())', '-T', 'local_bookmarks.map(|b| b.name()).join("\\n") ++ "\\n"'],
+          ['--ignore-working-copy', 'log', '--no-graph', '-r', `heads(::@ & (bookmarks() | (${FETCHED_REMOTE_BOOKMARKS})))`, '-T', NEAREST_BOOKMARKS_TEMPLATE],
           target,
         ),
       ],
       { concurrency: 'unbounded' },
     )
-    const preferred = yield* bookmarkFor((yield* storeRootOf(target).pipe(Effect.orElseSucceed(() => undefined))) ?? target)
+    const preferred = yield* preferredBookmark(target)
     const candidates = lines(nearest)
-    return { current: candidates.includes(preferred) ? preferred : (candidates[0] ?? null), names: [...new Set(lines(listed))] }
+    const local = candidates.filter(name => !name.startsWith('@'))
+    const remote = candidates.filter(name => name.startsWith('@')).map(name => name.slice(1))
+    const current = local.includes(preferred) ? preferred : (local[0] ?? remote.find(name => name.startsWith(`${preferred}@`)) ?? remote[0] ?? null)
+    return { current, names: [...new Set(lines(listed))] }
+  })
+
+  /** Fetched remote bookmarks as `name@remote`, the project's main branch first, for a thread to start from. */
+  const remoteBookmarks = Effect.fn('thread workspaces remote bookmarks')(function* (target: string) {
+    const [listed, preferred] = yield* Effect.all(
+      [jj(['--ignore-working-copy', 'bookmark', 'list', '--all-remotes', '-T', REMOTE_BOOKMARKS_TEMPLATE], target), preferredBookmark(target)],
+      { concurrency: 'unbounded' },
+    )
+    const refs = lines(listed).flatMap(line => {
+      const [name = '', remote = ''] = line.split('\t')
+      return name.length > 0 && remote.length > 0 ? [{ name, remote }] : []
+    })
+    return RemoteBaseModel.ordered({ refs, preferred, format: RemoteBaseModel.formatJj })
   })
 
   const revisionGraph = Effect.fn('thread workspaces revision graph')(function* (target: string) {
@@ -1813,6 +1887,7 @@ const make = Effect.gen(function* () {
     untrackedEntries,
     removeUntrackedEntry,
     bookmarks,
+    remoteBookmarks,
     workingCopyCommitId,
     snapshotFiles,
     snapshotRevision,

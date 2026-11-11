@@ -34,6 +34,11 @@ export interface WorkspaceToggleClient {
 export interface ToggleRequest {
   readonly isolate: boolean
   readonly base?: string
+  /**
+   * `base` is a remote bookmark (`main@origin`) the Host fetches before it starts the workspace there, so a spare made
+   * earlier — checked out at whatever that bookmark was then — never stands in for it.
+   */
+  readonly fetchesBase?: boolean
   readonly projectWorkspaceId: string
   /** The isolated thread workspace the blank thread sits in now, kept as a spare instead of being thrown away. */
   readonly leaving: SpareWorkspace | null
@@ -173,7 +178,10 @@ const isolatingMove = (input: DefaultDestinationInput): ToggleRequest | null => 
 
 const pendingFor = (client: WorkspaceToggleClient, request: ToggleRequest, name: string | null): PendingDestination => {
   // An omitted base means the Host's current setting, not a stable bookmark identity a client spare can be keyed by.
-  const candidate = request.isolate && request.base !== undefined ? client.findSpare(spareKey(request.projectWorkspaceId, request.base)) : undefined
+  const candidate =
+    request.isolate && request.base !== undefined && request.fetchesBase !== true
+      ? client.findSpare(spareKey(request.projectWorkspaceId, request.base))
+      : undefined
   const spare = candidate?.workspaceId === request.excludeSpareWorkspaceId ? null : (candidate ?? null)
   return { isolate: request.isolate, spare, name: request.isolate ? (spare?.name ?? name ?? client.generateName()) : null }
 }

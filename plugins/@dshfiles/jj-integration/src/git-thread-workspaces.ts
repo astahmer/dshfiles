@@ -1,7 +1,8 @@
-import { Context, Effect, FileSystem, Layer, Option, Path, type PlatformError } from 'effect'
+import { Context, Duration, Effect, FileSystem, Layer, Option, Path, type PlatformError } from 'effect'
 import { GitFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
-import { Git, type GitCommandFailed, type GitRunFailed } from '@dshfiles/git-cli'
+import { Git, redactGitStderr, type GitCommandFailed, type GitRunFailed } from '@dshfiles/git-cli'
 import { ProjectBookmarks } from './project-bookmarks.js'
+import { RemoteBaseModel, type RemoteBase } from './remote-base.js'
 import { RepoLocks } from './repo-locks.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { ThreadMetadata, type RebaseMetadataEntry } from './thread-metadata.js'
@@ -25,6 +26,8 @@ import { LAND_ATTEMPTS, runVerifiedLand, type LandSettlement, type LandStepResul
 
 const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u
+/** Starting a thread from a remote branch waits on this one fetch; past it the last fetched position is used. */
+const FETCH_BASE_TIMEOUT = Duration.seconds(45)
 const STATUS_READ_CONCURRENCY = 8
 const MAX_BEHIND_REVISIONS = 1_000
 /** Status, list and discard read at most this many unlanded commits: enough to show the work, bounded on any history. */
@@ -343,10 +346,48 @@ const make = Effect.gen(function* () {
       ),
     )
 
+  const remoteNames = (repoRoot: string) => Effect.map(run(['remote'], repoRoot), output => (output.exitCode === 0 ? lines(output.stdout) : []))
+
+  /**
+   * Fetch the one remote branch a thread starts from, so it starts from what the remote holds now. Best effort: offline,
+   * or with the remote refusing, the thread starts from the position the last fetch recorded, as the warning says.
+   */
+  const fetchRemoteBase = (repoRoot: string, base: RemoteBase) =>
+    cli
+      .run({
+        args: ['fetch', '--quiet', '--no-tags', '--', base.remote, `+refs/heads/${base.name}:refs/remotes/${base.remote}/${base.name}`],
+        cwd: repoRoot,
+        timeout: FETCH_BASE_TIMEOUT,
+      })
+      .pipe(
+        // A remote URL in git's stderr can carry credentials; the warning reaches the Host log.
+        Effect.map(output => (output.exitCode === 0 ? undefined : redactGitStderr(output.stderr).trim().split('\n').slice(-2).join(' ').slice(0, 400))),
+        Effect.catch(error => Effect.succeed(error.message)),
+        Effect.tap(failure => Effect.annotateCurrentSpan({ 'dshx.fetch.status': failure === undefined ? 'fetched' : 'failed' })),
+        Effect.tap(failure =>
+          failure === undefined
+            ? Effect.void
+            : Effect.logWarning(`Could not fetch ${RemoteBaseModel.formatGit(base)}; starting from its last fetched position. ${failure}`),
+        ),
+        Effect.asVoid,
+        Effect.withSpan('git thread workspaces fetch base', { attributes: { 'dshx.fetch.remote': base.remote, 'dshx.fetch.bookmark': base.name } }),
+      )
+
+  /** The ref a thread starts from: a remote branch (`origin/main`) is fetched first, anything else resolves as the bookmark does. */
+  const startingRef = Effect.fnUntraced(function* (repoRoot: string, base: string | undefined) {
+    const remote = base?.includes('/') === true ? RemoteBaseModel.parseGit(base, yield* remoteNames(repoRoot)) : undefined
+    if (remote === undefined || (yield* run(['check-ref-format', '--branch', remote.name], repoRoot)).exitCode !== 0) return yield* targetRef(repoRoot, base)
+    // A local branch literally named `origin/main` keeps meaning that branch.
+    if ((yield* run(['rev-parse', '--verify', '--quiet', `refs/heads/${base ?? ''}^{commit}`], repoRoot)).exitCode === 0)
+      return yield* targetRef(repoRoot, base)
+    yield* fetchRemoteBase(repoRoot, remote)
+    return yield* commitOf(repoRoot, `refs/remotes/${remote.remote}/${remote.name}`)
+  })
+
   const provision = Effect.fn('git thread workspaces provision')(function* (repoRoot: string, base?: string, requestedName?: string) {
     return yield* locks.withRepo(repoRoot)(
       Effect.gen(function* () {
-        const start = yield* targetRef(repoRoot, base)
+        const start = yield* startingRef(repoRoot, base)
         const directory = yield* threadsDirectory(repoRoot)
         const name = yield* freeThreadName(repoRoot, requestedName)
         const workspacePath = path.join(directory, name)
@@ -806,6 +847,19 @@ const make = Effect.gen(function* () {
     return { current: nearest.includes(preferred) ? preferred : (nearest[0] ?? null), names: [...new Set(listed)] }
   })
 
+  /** Fetched remote branches as `remote/name`, the project's main branch first, for a thread to start from. */
+  const remoteBookmarks = Effect.fn('git thread workspaces remote bookmarks')(function* (target: string) {
+    const [listed, remotes, preferred] = yield* Effect.all(
+      [gitHead(['for-each-ref', '--format=%(refname)', 'refs/remotes'], target, 262_144), remoteNames(target), bookmarkAt(target)],
+      { concurrency: 'unbounded' },
+    )
+    const refs = lines(listed).flatMap(ref => {
+      const parsed = ref.startsWith('refs/remotes/') ? RemoteBaseModel.parseGit(ref.slice('refs/remotes/'.length), remotes) : undefined
+      return parsed === undefined ? [] : [parsed]
+    })
+    return RemoteBaseModel.ordered({ refs, preferred, format: RemoteBaseModel.formatGit })
+  })
+
   const workingCopyCommitId = Effect.fn('git thread workspaces working copy')(function* (target: string) {
     return yield* headOf(target)
   })
@@ -913,6 +967,7 @@ const make = Effect.gen(function* () {
     untrackedEntries,
     removeUntrackedEntry,
     bookmarks,
+    remoteBookmarks,
     workingCopyCommitId,
     snapshotFiles,
     // A git snapshot is a commit outside every branch: it names no revision a reader would open.

@@ -366,6 +366,17 @@ describe('workspaceToggleMachine', () => {
     expect(toggle.spares.has(WorkspaceToggle.spareKey('project', 'main'))).toBe(false)
   })
 
+  it('provisions a workspace from a remote bookmark even when a spare was kept for it', async () => {
+    const toggle = startToggle()
+    toggle.spares.set(WorkspaceToggle.spareKey('project', 'main@origin'), { workspaceId: 'ws-spare', name: 'thread-5pa4e0' })
+    toggle.actor.send({ type: 'toggle', request: isolateRequest({ base: 'main@origin', fetchesBase: true }) })
+    toggle.release()
+
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
+    expect(toggle.spares.has(WorkspaceToggle.spareKey('project', 'main@origin'))).toBe(true)
+  })
+
   it('does not assign a claimed spare workspace to a second new thread', async () => {
     const toggle = startToggle()
     toggle.release()

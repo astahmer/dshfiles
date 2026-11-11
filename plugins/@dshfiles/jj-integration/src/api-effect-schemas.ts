@@ -27,6 +27,11 @@ export const destinationSchema = Schema.Struct({
   ownedByAnotherSession: Schema.optionalKey(Schema.Boolean),
   /** The project's main branch, which a new thread workspace starts from; absent outside a repository or from an older Host. */
   targetBookmark: Schema.optionalKey(Schema.String),
+  /**
+   * Fetched remote bookmarks a new thread workspace can start from (jj `main@origin`, git `origin/main`), the main
+   * branch first. Provisioning from one fetches it first. Absent from an older Host.
+   */
+  remoteBookmarks: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 
 export const projectBookmarkSourceSchema = Schema.Literals(['project', 'file', 'detected', 'global'])

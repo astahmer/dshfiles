@@ -147,6 +147,10 @@ const make = Effect.gen(function* () {
       (target: string) => target,
       (backend, target) => backend.bookmarks(target),
     ),
+    remoteBookmarks: on(
+      (target: string) => target,
+      (backend, target) => backend.remoteBookmarks(target),
+    ),
     workingCopyCommitId: on(
       (target: string) => target,
       (backend, target) => backend.workingCopyCommitId(target),
