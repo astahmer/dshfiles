@@ -19,6 +19,9 @@ import {
   type PullRequestTargetInput,
   type PullRequestTransition,
   type GitHubPullRequestView,
+  type OwnedWatchRecord,
+  type OwnedWatchView,
+  type WatchOwner,
 } from './pull-request-model.js'
 import { PullRequestStore } from './store.js'
 
@@ -120,6 +123,20 @@ const transitionMessage = (input: {
   ].join('\n')
 }
 
+const ownedWatchId = (input: { readonly owner: WatchOwner; readonly repo: string; readonly number: number }): string =>
+  `${input.owner.kind}:${encodeURIComponent(input.owner.id)}::${input.repo.toLowerCase()}#${String(input.number)}`
+
+export const ownedWatchViewOf = (record: OwnedWatchRecord): OwnedWatchView => ({
+  owner: record.owner,
+  repo: record.repo,
+  number: record.number,
+  url: record.url,
+  watching: record.watching,
+  lastKnownState: record.lastKnownState,
+  lastCheckedAt: record.lastCheckedAt,
+  lastError: record.lastError,
+})
+
 const backoffDelay = (consecutiveRateLimits: number): number =>
   Math.min(POLL_INTERVAL_MS * 2 ** Math.min(Math.max(0, consecutiveRateLimits - 1), 8), MAX_BACKOFF_MS)
 
@@ -165,6 +182,19 @@ export class PullRequestMonitor extends Context.Service<
     ) => Effect.Effect<{ readonly links: readonly PullRequestRecord[]; readonly total: number; readonly all: boolean }, PullRequestMonitorError>
     readonly watch: (input: PullRequestLinkInput, caller: ApiCaller) => Effect.Effect<PullRequestRecord, PullRequestMonitorError>
     readonly unwatch: (input: PullRequestTargetInput, caller: ApiCaller) => Effect.Effect<PullRequestRecord, PullRequestMonitorError>
+    /**
+     * Watch a pull request for an owner that is not a thread (a backlog item): the sweep polls it with the thread links,
+     * and a new watch is polled at once unless GitHub is rate-limiting the watcher. It never prompts or settles a thread.
+     */
+    readonly watchFor: (input: {
+      readonly owner: WatchOwner
+      readonly url: string
+      readonly cwd?: string | undefined
+    }) => Effect.Effect<OwnedWatchRecord, PullRequestMonitorError>
+    /** Release an owner's watch of one pull request, or of every pull request when no URL is given; answers how many were released. */
+    readonly unwatchFor: (input: { readonly owner: WatchOwner; readonly url?: string | undefined }) => Effect.Effect<number, PullRequestMonitorError>
+    /** Every watch held by owners of this kind, with each pull request's last known state. */
+    readonly ownedWatches: (input: { readonly kind: WatchOwner['kind'] }) => Effect.Effect<readonly OwnedWatchRecord[], PullRequestMonitorError>
     readonly pollAll: Effect.Effect<void, PullRequestMonitorError>
     /**
      * Poll the watched pull requests these threads link, now, once each: the event-driven path (a push, a turn end, a
@@ -270,10 +300,16 @@ export class PullRequestMonitor extends Context.Service<
         )
       })
 
+      const watchersOf = (target: { readonly repo: string; readonly number: number }) =>
+        Effect.map(Effect.all([store.watched, store.owned]), ([links, owned]) => ({
+          links: links.filter(record => samePullRequest(record, target)),
+          owned: owned.filter(record => record.watching && samePullRequest(record, target)),
+        }))
+
       const pollPullRequest = Effect.fn('pull request poll')(function* (input: { readonly repo: string; readonly number: number; readonly force: boolean }) {
         const now = yield* Clock.currentTimeMillis
-        const beforePoll = yield* store.watched
-        const initialWatchers = beforePoll.filter(record => samePullRequest(record, { repo: input.repo, number: input.number }))
+        const initial = yield* watchersOf(input)
+        const initialWatchers = [...initial.links, ...initial.owned]
         if (initialWatchers.length === 0) return
         const inBackoff = initialWatchers.every(record => {
           const status = PullRequestWatcher.statusOf(record, now)
@@ -281,17 +317,18 @@ export class PullRequestMonitor extends Context.Service<
         })
         if (!input.force && inBackoff) return
 
-        const firstWatcher = initialWatchers[0]
+        const firstWatcher = initialWatchers.find(record => record.cwd.length > 0) ?? initialWatchers[0]
         if (firstWatcher === undefined) return
         const result = yield* capturePullRequestResult(forge.pullRequest({ repo: firstWatcher.repo, number: firstWatcher.number, cwd: firstWatcher.cwd }))
         if (result.kind === 'failure') {
           const rateLimited = (result.error._tag === 'GhCommandFailed' || result.error._tag === 'GlabCommandFailed') && result.error.rateLimited
           const errorTag = result.error._tag === 'GhResponseInvalid' || result.error._tag === 'GlabResponseInvalid' ? 'invalid-response' : 'gh-command-failed'
-          const currentWatchers = (yield* store.watched).filter(record => samePullRequest(record, firstWatcher))
-          const count = rateLimited ? Math.max(...currentWatchers.map(record => record.consecutiveRateLimits), 0) + 1 : 0
+          const current = yield* watchersOf(firstWatcher)
+          const count = rateLimited ? Math.max(...[...current.links, ...current.owned].map(record => record.consecutiveRateLimits), 0) + 1 : 0
           const retryAfterAt = now + backoffDelay(count)
           const outcome = rateLimited ? ({ kind: 'rate-limited', now, retryAfterAt, count } as const) : ({ kind: 'failed', now, error: errorTag } as const)
-          for (const watcher of currentWatchers) yield* store.updateIfWatching(watcher.id, current => PullRequestWatcher.afterPoll(current, outcome))
+          for (const watcher of current.links) yield* store.updateIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, outcome))
+          for (const watcher of current.owned) yield* store.updateOwnedIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, outcome))
           if (rateLimited) {
             yield* Effect.logWarning('pull-requests: GitHub rate limit detected; watcher backoff extended', {
               repo: firstWatcher.repo,
@@ -304,18 +341,20 @@ export class PullRequestMonitor extends Context.Service<
         }
 
         const snapshot = summarizePullRequest(result.value)
-        const currentWatchers = (yield* store.watched).filter(record => samePullRequest(record, firstWatcher))
-        for (const watcher of currentWatchers) {
+        const current = yield* watchersOf(firstWatcher)
+        for (const watcher of current.links) {
           const transitions = transitionPullRequest(watcher.lastKnownState ?? undefined, snapshot)
-          const updated = yield* store.updateIfWatching(watcher.id, current => PullRequestWatcher.afterPoll(current, { kind: 'ok', snapshot, now }))
+          const updated = yield* store.updateIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, { kind: 'ok', snapshot, now }))
           if (updated === undefined) continue
           if (transitions.length > 0) yield* promptThread(updated, snapshot, transitions)
           if (snapshot.state === 'MERGED' || snapshot.state === 'CLOSED') yield* settleThread(updated, snapshot.state)
         }
+        for (const watcher of current.owned)
+          yield* store.updateOwnedIfWatching(watcher.id, record => PullRequestWatcher.afterPoll(record, { kind: 'ok', snapshot, now }))
       })
 
-      const groupsOf = (watchers: readonly PullRequestRecord[]): readonly (readonly PullRequestRecord[])[] => {
-        const groups = new Map<string, PullRequestRecord[]>()
+      const groupsOf = <Watch extends Pick<PullRequestRecord, 'repo' | 'number'>>(watchers: readonly Watch[]): readonly (readonly Watch[])[] => {
+        const groups = new Map<string, Watch[]>()
         for (const watcher of watchers) {
           const key = pullRequestKey(watcher)
           const group = groups.get(key)
@@ -356,7 +395,8 @@ export class PullRequestMonitor extends Context.Service<
       })
 
       const pollAll = Effect.fn('pull-requests poll all')(function* () {
-        const targets = groupsOf(yield* store.watched).flatMap(group => {
+        const owned = (yield* store.owned).filter(record => record.watching)
+        const targets = groupsOf([...(yield* store.watched), ...owned]).flatMap(group => {
           const first = group[0]
           return first === undefined ? [] : [{ repo: first.repo, number: first.number }]
         })
@@ -403,7 +443,56 @@ export class PullRequestMonitor extends Context.Service<
         return record
       })
 
-      return PullRequestMonitor.of({ link, unlink, list, watch, unwatch, pollAll: pollAll(), refresh })
+      const locatorError = new PullRequestLocatorInvalid({
+        reason:
+          'Use a GitHub pull-request URL (https://github.com/<owner>/<repo>/pull/<n>) or a GitLab merge-request URL (https://<host>/<group>/<project>/-/merge_requests/<n>).',
+      })
+
+      const watchFor = Effect.fn('pull-requests watch for owner')(function* (input: {
+        readonly owner: WatchOwner
+        readonly url: string
+        readonly cwd?: string | undefined
+      }) {
+        const parsed = parsePullRequestUrl(input.url)
+        if (parsed === undefined) return yield* locatorError
+        const id = ownedWatchId({ owner: input.owner, ...parsed })
+        const existing = (yield* store.owned).find(record => record.id === id)
+        const saved = yield* store.upsertOwned({
+          id,
+          owner: input.owner,
+          ...parsed,
+          cwd: input.cwd ?? '',
+          watching: true,
+          lastKnownState: null,
+          lastCheckedAt: null,
+          retryAfterAt: null,
+          consecutiveRateLimits: 0,
+          lastError: null,
+        })
+        if (existing !== undefined || !saved.watching) return saved
+        const now = yield* Clock.currentTimeMillis
+        // A backfill of many items must not keep calling gh through a rate limit: the sweep picks them up after it.
+        const limited = [...(yield* store.watched), ...(yield* store.owned)].some(record => record.retryAfterAt !== null && record.retryAfterAt > now)
+        if (!limited) yield* pollPullRequest({ repo: saved.repo, number: saved.number, force: false }).pipe(Effect.ignore)
+        return (yield* store.owned).find(record => record.id === id) ?? saved
+      })
+
+      const unwatchFor = Effect.fn('pull-requests unwatch for owner')(function* (input: { readonly owner: WatchOwner; readonly url?: string | undefined }) {
+        const parsed = input.url === undefined ? undefined : parsePullRequestUrl(input.url)
+        if (input.url !== undefined && parsed === undefined) return yield* locatorError
+        const ids = (yield* store.owned)
+          .filter(
+            record => record.owner.kind === input.owner.kind && record.owner.id === input.owner.id && (parsed === undefined || samePullRequest(record, parsed)),
+          )
+          .map(record => record.id)
+        return yield* store.removeOwned(ids)
+      })
+
+      const ownedWatches = Effect.fn('pull-requests owned watches')(function* (input: { readonly kind: WatchOwner['kind'] }) {
+        return (yield* store.owned).filter(record => record.owner.kind === input.kind)
+      })
+
+      return PullRequestMonitor.of({ link, unlink, list, watch, unwatch, pollAll: pollAll(), refresh, watchFor, unwatchFor, ownedWatches })
     }),
   )
 }

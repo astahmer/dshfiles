@@ -166,4 +166,60 @@ describe('pull-requests pollAll', () => {
       }).pipe(Effect.provide(layer))
     }),
   )
+
+  it.effect('a backlog item watches a pull request with no thread: polled at once and by the sweep, released on request', () =>
+    withStorageHost(host => {
+      const polls: string[] = []
+      let state: GitHubPullRequestView['state'] = 'OPEN'
+      const hostContext = HostContext.of({ ctx: host.ctx, packageId: PACKAGE_ID })
+      const forge = Layer.succeed(
+        ForgePullRequests,
+        ForgePullRequests.of({
+          repositoryInfo: () => Effect.die('unused'),
+          authStatus: () => Effect.die('unused'),
+          pullRequest: input =>
+            Effect.sync(() => {
+              polls.push(`${input.repo}#${String(input.number)}`)
+              return { ...view, state }
+            }),
+          openPullRequestFor: () => Effect.die('unused'),
+          createPullRequest: () => Effect.die('unused'),
+        }),
+      )
+      const layer = PullRequestMonitor.layer.pipe(
+        Layer.provideMerge(
+          Layer.mergeAll(PullRequestStore.layer, forge).pipe(
+            Layer.provideMerge(Layer.mergeAll(StorageDomain.layer, HostApis.layer).pipe(Layer.provide(Layer.succeed(HostContext, hostContext)))),
+          ),
+        ),
+      )
+      return Effect.gen(function* () {
+        const store = yield* PullRequestStore
+        const monitor = yield* PullRequestMonitor
+        const owner = { kind: 'backlog-item', id: '42' } as const
+        const url = 'https://github.com/acme/widget/pull/7'
+
+        const watched = yield* monitor.watchFor({ owner, url })
+        expect(polls).toEqual(['acme/widget#7'])
+        expect(watched.lastKnownState?.state).toBe('OPEN')
+        expect(watched.lastCheckedAt).not.toBeNull()
+        expect(yield* store.list()).toEqual([])
+
+        yield* monitor.watchFor({ owner, url })
+        expect(polls).toHaveLength(1)
+
+        state = 'MERGED'
+        yield* monitor.pollAll
+        const [merged] = yield* monitor.ownedWatches({ kind: 'backlog-item' })
+        expect(merged?.lastKnownState?.state).toBe('MERGED')
+        expect(merged?.watching).toBe(false)
+
+        yield* monitor.pollAll
+        expect(polls).toHaveLength(2)
+
+        expect(yield* monitor.unwatchFor({ owner })).toBe(1)
+        expect(yield* monitor.ownedWatches({ kind: 'backlog-item' })).toEqual([])
+      }).pipe(Effect.provide(layer))
+    }),
+  )
 })

@@ -2,13 +2,15 @@ import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { StorageDomain, StorageDomainReadFailed, StorageDomainWriteFailed } from '@dshfiles/dshx/effect/storage-domain'
 import { Context, Effect, Layer, Option } from 'effect'
-import { pullRequestRecordSchema, type PullRequestRecord } from './pull-request-model.js'
+import { ownedWatchRecordSchema, pullRequestRecordSchema, type OwnedWatchRecord, type PullRequestRecord } from './pull-request-model.js'
 
 export const pullRequestDomain = defineDomain({
   name: 'pull_requests',
   version: 1,
   tables: {
     links: { valueSchema: zodSchemaFromEffect(pullRequestRecordSchema), __key: 'id' },
+    // Added after version 1 shipped: a stored domain without it opens with the table empty.
+    owned: { valueSchema: zodSchemaFromEffect(ownedWatchRecordSchema), __key: 'id' },
   },
 })
 
@@ -28,6 +30,15 @@ export class PullRequestStore extends Context.Service<
     ) => Effect.Effect<PullRequestRecord | undefined, StorageDomainReadFailed | StorageDomainWriteFailed>
     readonly setWatching: (id: string, watching: boolean) => Effect.Effect<PullRequestRecord | undefined, StorageDomainReadFailed | StorageDomainWriteFailed>
     readonly remove: (id: string) => Effect.Effect<boolean, StorageDomainWriteFailed>
+    /** Watches owned by something other than a thread (a backlog item). */
+    readonly owned: Effect.Effect<readonly OwnedWatchRecord[], StorageDomainReadFailed>
+    /** Adds an owned watch, or turns an existing one back on while keeping its last known state. */
+    readonly upsertOwned: (record: OwnedWatchRecord) => Effect.Effect<OwnedWatchRecord, StorageDomainReadFailed | StorageDomainWriteFailed>
+    readonly updateOwnedIfWatching: (
+      id: string,
+      update: (record: OwnedWatchRecord) => OwnedWatchRecord,
+    ) => Effect.Effect<OwnedWatchRecord | undefined, StorageDomainReadFailed | StorageDomainWriteFailed>
+    readonly removeOwned: (ids: readonly string[]) => Effect.Effect<number, StorageDomainWriteFailed>
   }
 >()('@dshfiles/pull-requests/PullRequestStore') {
   static readonly layer = Layer.effect(
@@ -99,6 +110,52 @@ export class PullRequestStore extends Context.Service<
         return yield* domain.withWriteLock(links.delete(id))
       })
 
+      const ownedTable = domain.table('owned')
+
+      const owned = Effect.map(ownedTable.entries, entries => entries.map(([, record]) => record)).pipe(Effect.withSpan('pull-requests store owned'))
+
+      const upsertOwned = Effect.fn('pull-requests store own')(function* (record: OwnedWatchRecord) {
+        return yield* domain.withWriteLock(
+          Effect.gen(function* () {
+            const existing = yield* ownedTable.get(record.id)
+            const next: OwnedWatchRecord = Option.isNone(existing)
+              ? record
+              : {
+                  ...existing.value,
+                  cwd: record.cwd.length > 0 ? record.cwd : existing.value.cwd,
+                  // A terminal pull request is not polled again: its state no longer changes.
+                  watching: existing.value.watching || existing.value.lastKnownState === null || existing.value.lastKnownState.state === 'OPEN',
+                }
+            yield* ownedTable.put(record.id, next)
+            return next
+          }),
+        )
+      })
+
+      const updateOwnedIfWatching = Effect.fn('pull-requests store update owned')(function* (
+        id: string,
+        update: (record: OwnedWatchRecord) => OwnedWatchRecord,
+      ) {
+        return yield* domain.withWriteLock(
+          Effect.gen(function* () {
+            const existing = yield* ownedTable.get(id)
+            if (Option.isNone(existing) || !existing.value.watching) return undefined
+            const next = update(existing.value)
+            yield* ownedTable.put(id, next)
+            return next
+          }),
+        )
+      })
+
+      const removeOwned = Effect.fn('pull-requests store release owned')(function* (ids: readonly string[]) {
+        return yield* domain.withWriteLock(
+          Effect.map(
+            Effect.forEach(ids, id => ownedTable.delete(id)),
+            removed => removed.filter(Boolean).length,
+          ),
+        )
+      })
+
       return PullRequestStore.of({
         get,
         list,
@@ -107,6 +164,10 @@ export class PullRequestStore extends Context.Service<
         updateIfWatching,
         setWatching,
         remove,
+        owned,
+        upsertOwned,
+        updateOwnedIfWatching,
+        removeOwned,
       })
     }),
   )

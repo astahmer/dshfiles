@@ -6,14 +6,14 @@ import { Settings } from '@dshfiles/dshx/effect/settings'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { Jj } from '@dshfiles/jj-cli'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
-import { Duration, Effect, Layer, PubSub, Stream } from 'effect'
+import { Clock, Duration, Effect, Layer, PubSub, Stream } from 'effect'
 import { MergedPullRequests } from '@dshfiles/jj-integration/merged-pull-requests'
 import { pullRequestApi } from './api.js'
 import { PullRequestCreator } from './create.js'
 import { GitHubCli } from './github-cli.js'
 import { GitLabCli } from './gitlab-cli.js'
 import { ForgePullRequests } from './forge-port.js'
-import { PullRequestMonitor } from './monitor.js'
+import { PullRequestMonitor, ownedWatchViewOf } from './monitor.js'
 import { ProjectBase } from './project-base.js'
 import { PullRequestSettings, pullRequestSettings } from './settings.js'
 import { TRIGGER_EVENT_TYPES, refreshOnThreadEvents, sweepWatched, type ThreadEvent } from './refresh-triggers.js'
@@ -88,6 +88,18 @@ export default DshxPlugin.make({
         PullRequestMonitor.use(monitor => monitor.watch(input, call.caller).pipe(Effect.map(link => ({ link: pullRequestLinkViewOf(link) })))),
       createPreview: (input, call) => PullRequestCreator.use(creator => creator.preview(input, call.caller)),
       create: (input, call) => PullRequestCreator.use(creator => creator.create(input, call.caller)),
+      watchFor: input => PullRequestMonitor.use(monitor => monitor.watchFor(input).pipe(Effect.map(watch => ({ watch: ownedWatchViewOf(watch) })))),
+      unwatchFor: input => PullRequestMonitor.use(monitor => monitor.unwatchFor(input).pipe(Effect.map(removed => ({ removed })))),
+      ownedWatches: input =>
+        PullRequestMonitor.use(monitor => monitor.ownedWatches(input).pipe(Effect.map(watches => ({ watches: watches.map(ownedWatchViewOf) })))),
+      issueStates: input =>
+        GitHubCli.use(github =>
+          Effect.gen(function* () {
+            const read = yield* github.issueStates(input)
+            const checkedAt = yield* Clock.currentTimeMillis
+            return { issues: read.issues.map(issue => ({ ...issue, checkedAt })), failed: read.failed, rateLimited: read.rateLimited }
+          }),
+        ),
       unwatch: (input, call) =>
         PullRequestMonitor.use(monitor => monitor.unwatch(input, call.caller).pipe(Effect.map(link => ({ link: pullRequestLinkViewOf(link) })))),
     }),

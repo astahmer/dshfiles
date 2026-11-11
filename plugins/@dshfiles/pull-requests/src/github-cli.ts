@@ -1,6 +1,12 @@
 import { ChildProcess, ChildProcessSpawner } from 'effect/process'
 import { Context, Duration, Effect, Layer, Schema, Stream } from 'effect'
-import { forgeSearchItemSchema, githubPullRequestViewSchema, type ForgeSearchItem, type GitHubPullRequestView } from './pull-request-model.js'
+import {
+  forgeSearchItemSchema,
+  githubPullRequestViewSchema,
+  type ForgeSearchItem,
+  type GitHubPullRequestView,
+  type IssueStatesOutput,
+} from './pull-request-model.js'
 
 const POLL_FIELDS = 'state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,comments,reviews,body'
 const PULL_REQUEST_PROJECTION =
@@ -14,7 +20,7 @@ const collectText = <E>(stream: Stream.Stream<Uint8Array, E>) =>
     ),
   )
 
-const ghOperations = ['repo-view', 'pr-view', 'auth-status', 'repo-info', 'pr-list', 'pr-create'] as const
+const ghOperations = ['repo-view', 'pr-view', 'auth-status', 'repo-info', 'pr-list', 'pr-create', 'issue-states'] as const
 type GhOperation = (typeof ghOperations)[number]
 
 const operationFailure = {
@@ -24,6 +30,7 @@ const operationFailure = {
   'auth-status': 'is not signed in to github.com',
   'pr-list': 'could not list pull requests for the branch',
   'pr-create': 'could not create the pull request',
+  'issue-states': 'could not read issue states',
 } satisfies Record<GhOperation, string>
 
 export class GhCommandFailed extends Schema.TaggedError<GhCommandFailed>()('GhCommandFailed', {
@@ -92,7 +99,13 @@ const summarizeStderr = (stderr: string): string =>
     .replace(/gh[opsu]_[A-Za-z0-9]{20,}/gu, '<redacted>')
     .slice(0, 300)
 
-export type GitHubCommandSpan = 'pull request gh repo' | 'pull request gh view' | 'pull request gh auth' | 'pull request gh list' | 'pull request gh create'
+export type GitHubCommandSpan =
+  | 'pull request gh repo'
+  | 'pull request gh view'
+  | 'pull request gh auth'
+  | 'pull request gh list'
+  | 'pull request gh create'
+  | 'pull request gh issues'
 
 export const withGitHubCommandSpan = <A, E, R>(input: {
   readonly name: GitHubCommandSpan
@@ -106,6 +119,8 @@ const runGh = Effect.fnUntraced(function* (input: {
   readonly cwd?: string
   readonly span: GitHubCommandSpan
   readonly attributes: Record<string, string | number | boolean>
+  /** Keep stdout of a non-zero exit: `gh api graphql` exits 1 when one alias fails but still prints the others. */
+  readonly keepPartialOutput?: boolean
 }) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const commandOptions: ChildProcess.CommandOptions =
@@ -122,7 +137,8 @@ const runGh = Effect.fnUntraced(function* (input: {
         const [stdout, stderr, exitCode] = yield* Effect.all([collectText(process.stdout), collectText(process.stderr), process.exitCode], {
           concurrency: 'unbounded',
         })
-        if (exitCode !== 0)
+        const partial = input.keepPartialOutput === true && stdout.trim().length > 0 && !isRateLimitMessage(stderr)
+        if (exitCode !== 0 && !partial)
           return yield* new GhCommandFailed({ operation: input.operation, rateLimited: isRateLimitMessage(stderr), exitCode, detail: summarizeStderr(stderr) })
         return stdout
       }).pipe(
@@ -144,6 +160,24 @@ const repositoryInfoSchema = Schema.Struct({
 })
 const pullRequestListSchema = Schema.Array(Schema.Struct({ url: Schema.String, state: Schema.optional(Schema.String) }))
 const forgeSearchSchema = Schema.Array(forgeSearchItemSchema)
+const ISSUE_BATCH = 50
+const ISSUE_URL = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/issues\/([1-9]\d*)\/?$/u
+const issueNodeSchema = Schema.NullOr(
+  Schema.Struct({
+    issueOrPullRequest: Schema.NullOr(Schema.Struct({ state: Schema.String, stateReason: Schema.optional(Schema.NullOr(Schema.String)) })),
+  }),
+)
+const issueBatchSchema = Schema.Struct({ data: Schema.NullOr(Schema.Record(Schema.String, issueNodeSchema)) })
+
+/** One aliased GraphQL query for a batch of issues; owner, name and number are already pattern-checked. */
+const issueQueryOf = (issues: readonly { readonly owner: string; readonly name: string; readonly number: number }[]): string =>
+  `query{${issues
+    .map(
+      (issue, index) =>
+        `i${String(index)}:repository(owner:${JSON.stringify(issue.owner)},name:${JSON.stringify(issue.name)}){issueOrPullRequest(number:${String(issue.number)}){...on Issue{state stateReason}}}`,
+    )
+    .join('')}}`
+
 const PULL_REQUEST_URL = /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9]\d*/u
 
 export interface GitHubRepositoryInfo {
@@ -191,6 +225,13 @@ export class GitHubCli extends Context.Service<
       readonly cwd: string
       readonly query: string
     }) => Effect.Effect<readonly ForgeSearchItem[], GhCommandFailed | GhResponseInvalid>
+    /**
+     * The open or closed state of GitHub issues, fifty per `gh api graphql` call. Never fails: an issue it could not
+     * read comes back in `failed`, and a rate limit stops the remaining batches.
+     */
+    readonly issueStates: (input: {
+      readonly urls: readonly string[]
+    }) => Effect.Effect<Omit<IssueStatesOutput, 'issues'> & { readonly issues: readonly Omit<IssueStatesOutput['issues'][number], 'checkedAt'>[] }>
     /** Runs `gh pr create` and returns the new pull request URL. */
     readonly createPullRequest: (input: GitHubPullRequestCreate) => Effect.Effect<string, GhCommandFailed | GhResponseInvalid>
   }
@@ -306,7 +347,49 @@ export class GitHubCli extends Context.Service<
         return url
       })
 
-      return GitHubCli.of({ repositoryName, pullRequest, authStatus, repositoryInfo, openPullRequestFor, searchIssues, createPullRequest })
+      const issueStates = Effect.fn('pull-requests gh issue states')(function* (input: { readonly urls: readonly string[] }) {
+        const parsed = [...new Set(input.urls)].flatMap(url => {
+          const match = ISSUE_URL.exec(url)
+          return match === null ? [] : [{ url, owner: match[1] ?? '', name: match[2] ?? '', number: Number(match[3]) }]
+        })
+        const unparsed = input.urls.filter(url => !parsed.some(issue => issue.url === url))
+        const batches = Array.from({ length: Math.ceil(parsed.length / ISSUE_BATCH) }, (_, index) =>
+          parsed.slice(index * ISSUE_BATCH, (index + 1) * ISSUE_BATCH),
+        )
+        const issues: { url: string; state: 'OPEN' | 'CLOSED'; stateReason: string | null }[] = []
+        const failed: string[] = [...unparsed]
+        let rateLimited = false
+        // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- batches run one at a time so a rate limit stops the rest.
+        for (const batch of batches) {
+          if (rateLimited) {
+            failed.push(...batch.map(issue => issue.url))
+            continue
+          }
+          const read = yield* provide(
+            runGh({
+              operation: 'issue-states',
+              args: ['api', 'graphql', '-f', `query=${issueQueryOf(batch)}`],
+              span: 'pull request gh issues',
+              attributes: { ...pluginAttributes, 'github.issues': batch.length },
+              keepPartialOutput: true,
+            }),
+          ).pipe(Effect.flatMap(decodeGhJson('issue-states', issueBatchSchema)), Effect.result)
+          if (read._tag === 'Failure') {
+            rateLimited = read.failure._tag === 'GhCommandFailed' && read.failure.rateLimited
+            failed.push(...batch.map(issue => issue.url))
+            continue
+          }
+          batch.forEach((issue, index) => {
+            const node = read.success.data?.[`i${String(index)}`]?.issueOrPullRequest
+            const state = node?.state
+            if (state === 'OPEN' || state === 'CLOSED') issues.push({ url: issue.url, state, stateReason: node?.stateReason?.slice(0, 40) ?? null })
+            else failed.push(issue.url)
+          })
+        }
+        return { issues, failed, rateLimited }
+      })
+
+      return GitHubCli.of({ repositoryName, pullRequest, authStatus, repositoryInfo, openPullRequestFor, searchIssues, issueStates, createPullRequest })
     }),
   )
 }

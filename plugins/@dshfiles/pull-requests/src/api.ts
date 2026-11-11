@@ -10,6 +10,14 @@ import {
 } from './create-model.js'
 import {
   forgeSearchItemSchema,
+  issueStatesInputSchema,
+  issueStatesOutputSchema,
+  ownedUnwatchInputSchema,
+  ownedUnwatchOutputSchema,
+  ownedWatchInputSchema,
+  ownedWatchListInputSchema,
+  ownedWatchListOutputSchema,
+  ownedWatchMutationOutputSchema,
   pullRequestLinkInputSchema,
   pullRequestListInputSchema,
   pullRequestListOutputSchema,
@@ -113,6 +121,28 @@ export const pullRequestApi = defineApi({
       output: pullRequestCreateOutputSchema,
       description: `Create a pull request or merge request from a thread’s jj workspace after pull_request_create_preview: sets the bookmark on the previewed head commit, pushes it with jj git push, runs gh pr create or glab mr create (or reuses an open one for the bookmark), then links and watches it on the thread. Requires confirm: true and the preview’s headCommitId; refuses when the workspace moved. Publishes to the forge. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'pull_request_create', render: renderCreate },
+    }),
+    watchFor: method({
+      input: ownedWatchInputSchema,
+      output: ownedWatchMutationOutputSchema,
+      description:
+        'Watch a pull request or merge request for an owner that is not a thread (a backlog item, by its id). The sweep keeps its state current; it never prompts or settles a thread. Idempotent.',
+    }),
+    unwatchFor: method({
+      input: ownedUnwatchInputSchema,
+      output: ownedUnwatchOutputSchema,
+      description: 'Release an owner’s watch of one pull request, or of all its pull requests when no URL is given. Answers how many watches were released.',
+    }),
+    ownedWatches: method({
+      input: ownedWatchListInputSchema,
+      output: ownedWatchListOutputSchema,
+      description: 'List every watch held by owners of one kind (backlog items), with each pull request’s last known state and when it was checked. Read-only.',
+    }),
+    issueStates: method({
+      input: issueStatesInputSchema,
+      output: issueStatesOutputSchema,
+      description:
+        'Read the open or closed state of up to 100 GitHub issues by URL, in batched gh api graphql calls. Reports the URLs it could not read and whether GitHub rate-limited the read. Read-only.',
     }),
     unwatch: method({
       input: pullRequestTargetInputSchema,

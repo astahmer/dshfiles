@@ -138,6 +138,76 @@ export const pullRequestLinkViewSchema = Schema.Struct({
 
 export type PullRequestLinkView = Schema.Schema.Type<typeof pullRequestLinkViewSchema>
 
+/**
+ * Who besides a thread may own a watch. A backlog item watches the pull requests it links, so their state stays current
+ * without a thread; the owner's id is its own key (the backlog item id), never a session id.
+ */
+const watchOwnerSchema = Schema.Struct({
+  kind: Schema.Literal('backlog-item'),
+  id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+})
+export type WatchOwner = Schema.Schema.Type<typeof watchOwnerSchema>
+
+/** A watch an owner other than a thread holds: polled with the thread links, but it never prompts or settles a thread. */
+export const ownedWatchRecordSchema = Schema.Struct({
+  id: Schema.String,
+  owner: watchOwnerSchema,
+  repo: githubRepositorySchema,
+  number: pullRequestNumberSchema,
+  url: githubPullRequestUrlSchema,
+  cwd: Schema.String.check(Schema.isMaxLength(2048)),
+  watching: Schema.Boolean,
+  lastKnownState: Schema.NullOr(pullRequestSnapshotSchema),
+  lastCheckedAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
+  retryAfterAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
+  consecutiveRateLimits: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+  lastError: lastErrorSchema,
+})
+export type OwnedWatchRecord = Schema.Schema.Type<typeof ownedWatchRecordSchema>
+
+const ownedWatchViewSchema = Schema.Struct({
+  owner: watchOwnerSchema,
+  repo: githubRepositorySchema,
+  number: pullRequestNumberSchema,
+  url: githubPullRequestUrlSchema,
+  watching: Schema.Boolean,
+  lastKnownState: Schema.NullOr(pullRequestSnapshotSchema),
+  lastCheckedAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
+  lastError: lastErrorSchema,
+})
+export type OwnedWatchView = Schema.Schema.Type<typeof ownedWatchViewSchema>
+
+export const ownedWatchInputSchema = Schema.Struct({ owner: watchOwnerSchema, url: githubPullRequestUrlSchema, cwd: Schema.optional(cwdSchema) })
+export const ownedUnwatchInputSchema = Schema.Struct({ owner: watchOwnerSchema, url: Schema.optional(githubPullRequestUrlSchema) })
+export const ownedWatchListInputSchema = Schema.Struct({ kind: Schema.Literal('backlog-item') })
+export const ownedWatchMutationOutputSchema = Schema.Struct({ watch: ownedWatchViewSchema })
+export const ownedUnwatchOutputSchema = Schema.Struct({ removed: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)) })
+export const ownedWatchListOutputSchema = Schema.Struct({ watches: Schema.Array(ownedWatchViewSchema) })
+
+/** Issues one state read covers: one GraphQL call per batch of fifty. */
+const MAX_ISSUE_STATE_URLS = 100
+
+/** A GitHub issue URL. */
+const githubIssueUrlSchema = Schema.String.check(Schema.isPattern(/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/issues\/[1-9]\d*\/?$/u))
+
+const issueStateSchema = Schema.Struct({
+  url: Schema.String,
+  state: Schema.Literals(['OPEN', 'CLOSED']),
+  /** GitHub's close reason: COMPLETED, NOT_PLANNED, DUPLICATE or REOPENED; null while open or unknown. */
+  stateReason: Schema.NullOr(Schema.String.check(Schema.isMaxLength(40))),
+  checkedAt: Schema.Number.check(Schema.isFinite()),
+})
+
+export const issueStatesInputSchema = Schema.Struct({ urls: Schema.Array(githubIssueUrlSchema).check(Schema.isMaxLength(MAX_ISSUE_STATE_URLS)) })
+export const issueStatesOutputSchema = Schema.Struct({
+  issues: Schema.Array(issueStateSchema),
+  /** URLs this read could not answer (a failed call, a deleted or transferred issue); retry them later. */
+  failed: Schema.Array(Schema.String),
+  /** GitHub rate-limited the read: back off before the next one. */
+  rateLimited: Schema.Boolean,
+})
+export type IssueStatesOutput = Schema.Schema.Type<typeof issueStatesOutputSchema>
+
 /** What one poll of a watched pull request came back with: the three outcomes the monitor can act on. */
 export type WatcherPollOutcome =
   | { readonly kind: 'ok'; readonly snapshot: PullRequestSnapshot; readonly now: number }
@@ -176,7 +246,7 @@ export class PullRequestWatcher {
   }
 
   /** The record after one poll: the one place the watcher fields move, so no combination of them can be stored. */
-  static readonly afterPoll = (record: PullRequestRecord, outcome: WatcherPollOutcome): PullRequestRecord => {
+  static readonly afterPoll = <Watch extends Omit<PullRequestRecord, 'id' | 'sessionId'>>(record: Watch, outcome: WatcherPollOutcome): Watch => {
     if (outcome.kind === 'rate-limited')
       return {
         ...record,

@@ -45,6 +45,15 @@ Create reads only the thread's directory (none at all when `cwd` is passed), nev
 - Rate limiting applies persisted exponential backoff starting at two minutes and capped at one hour. Other CLI or schema failures retain the last known state and retry on a later cycle.
 - On merge or close, watching stops and the plugin asks `thread-sidebar` to settle the linked thread. Auto-settle can skip running, waiting, blank, archived, pinned, opted-out, or descendant-active threads. If `thread-sidebar` is absent, pull-request state continues updating and the Host logs that message/settle integration was unavailable.
 
+## Watches owned by backlog items, and issue states
+
+The published contract (`@dshfiles/pull-requests/api`) also serves Host plugins that keep forge state for something other than a thread. They are Host API methods, not Agent tools: the backlog decides what to watch.
+
+- `watchFor({ owner: { kind: 'backlog-item', id }, url, cwd? })` watches a pull request or merge request for that owner. It is stored in its own `owned` table of the same storage domain (a domain stored before it opens with the table empty), polled by the same sweep and in the same `gh pr view` as the thread links of that pull request, and never prompts or settles a thread. A new watch polls at once unless a rate-limit backoff holds; then the sweep picks it up. Idempotent; a watch on a merged or closed pull request keeps its terminal state and is not polled again.
+- `unwatchFor({ owner, url? })` releases one watch, or all of an owner's; `ownedWatches({ kind })` lists them with each last known state and `lastCheckedAt`.
+- `issueStates({ urls })` reads up to 100 GitHub issues, fifty per `gh api graphql` call (`state` and `stateReason` only). An issue gh cannot answer (deleted, transferred) comes back in `failed` while the rest of its batch still reads; a rate limit stops the remaining batches and answers `rateLimited: true`, so the caller backs off. Nothing is stored here: the caller keeps what it read.
+- The backlog uses both: each open item watches the pull requests it links and reads its linked issues on its own `revisionPollMinutes` pass (see the backlog README).
+
 ## Verification
 
 From the repository root:
