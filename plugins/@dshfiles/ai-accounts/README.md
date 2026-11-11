@@ -415,7 +415,8 @@ the picker and transcript keep the model you chose.
 
 Failure recovery (Settings › AI Accounts › Failure recovery) decides what a
 failed request on an account route does, per kind: connection failure
-(resets, timeouts, 5xx, Envoy replay-buffer overflow), rate limit, usage
+(resets, timeouts, 5xx, Envoy replay-buffer overflow, an overloaded provider such as
+Codex's "Our servers are currently overloaded"), rate limit, usage
 exhausted, sign-in failure, request too large. The options run in order:
 retry the same account (count and doubling backoff), continue on Luna Reserve
 (Codex), fail over to the next account of the same provider kind that offers

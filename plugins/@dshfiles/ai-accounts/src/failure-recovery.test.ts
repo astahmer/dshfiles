@@ -95,10 +95,29 @@ describe('classifyFailure', () => {
     expect(pool.isHealthy('claude', NOW + 25 * 60 * 60_000)).toBe(true)
   })
 
+  it('retries an overloaded provider with backoff before failing over', () => {
+    const overloaded: readonly LlmFailure[] = [
+      { message: 'Our servers are currently overloaded. Please try again later.', code: 'PI_AI_ERROR' },
+      { message: 'server_is_overloaded: The server is overloaded', code: 'PI_AI_ERROR' },
+      { message: '{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}', code: 'PI_AI_ERROR' },
+    ]
+    for (const failure of overloaded) expect(FailureRecoveryModel.classifyFailure(failure)).toBe('transport')
+
+    const { fail } = setup()
+    const first = fail(overloaded[0] ?? { message: '', code: 'PI_AI_ERROR' })
+    const second = fail(overloaded[0] ?? { message: '', code: 'PI_AI_ERROR' })
+    expect(first).toMatchObject({ kind: 'retry', failureKind: 'transport', step: { kind: 'retry' } })
+    expect(second).toMatchObject({ kind: 'retry', failureKind: 'transport', step: { kind: 'retry' } })
+    const delays = [first, second].map(action => (action.kind === 'retry' && action.step.kind === 'retry' ? action.step.delayMs : 0))
+    expect(delays[0]).toBeGreaterThan(0)
+    expect(delays[1]).toBeGreaterThan(delays[0] ?? 0)
+  })
+
   it('leaves warnings and unrelated wording alone', () => {
     expect(FailureRecoveryModel.classifyFailure({ message: 'You are approaching your usage limit', code: 'PI_AI_ERROR' })).toBeUndefined()
     expect(FailureRecoveryModel.classifyFailure({ message: 'You have hit your rate limit', code: 'PI_AI_ERROR' })).toBeUndefined()
     expect(FailureRecoveryModel.classifyFailure({ message: 'the limit was reached by the tool', code: 'PI_AI_ERROR' })).toBeUndefined()
+    expect(FailureRecoveryModel.classifyFailure({ message: 'the event loop was overloaded by the tool', code: 'PI_AI_ERROR' })).toBeUndefined()
   })
 })
 

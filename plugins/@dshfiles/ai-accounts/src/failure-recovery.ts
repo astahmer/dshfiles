@@ -18,6 +18,11 @@ const TRANSPORT_CODES: ReadonlySet<string> = new Set(['TRANSPORT', 'TIMEOUT', 'O
 /** Consecutive transport failures on one account before it cools like a rate-limited one. */
 const TRANSPORT_FAILURE_LIMIT = 3
 const OPENAI_RETRY_HINT = /An error occurred while processing your request\.\s+You can retry your request\b/i
+/**
+ * A provider at capacity, reported in the stream instead of a 5xx status, so the adapter codes it `PI_AI_ERROR`:
+ * Codex's "Our servers are currently overloaded" and `server_is_overloaded`, Anthropic's `overloaded_error`.
+ */
+const OVERLOADED_TEXT = /\bservers? (?:is|are) (?:currently )?overloaded\b|\bserver_is_overloaded\b|\boverloaded_error\b/i
 const OVERSIZED_TEXT = /\b(?:request|payload|body)(?: entity)? (?:is )?too large\b/i
 /**
  * Spent-plan wording that carries no `usage limit exceeded` phrase to match, e.g.
@@ -52,7 +57,7 @@ const classifyFailure = (failure: Pick<LlmFailure, 'code' | 'message' | 'status'
   if (
     TRANSPORT_CODES.has(failure.code) ||
     (failure.status !== undefined && failure.status >= 500) ||
-    (failure.code === 'PI_AI_ERROR' && OPENAI_RETRY_HINT.test(failure.message))
+    (failure.code === 'PI_AI_ERROR' && (OPENAI_RETRY_HINT.test(failure.message) || OVERLOADED_TEXT.test(failure.message)))
   ) {
     return 'transport'
   }
