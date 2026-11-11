@@ -23,7 +23,7 @@ const tcpAddressSchema = Schema.Struct({
   port: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)),
 })
 const unavailableFamilySchema = Schema.Struct({ code: Schema.Literals(['EAFNOSUPPORT', 'EADDRNOTAVAIL', 'EPROTONOSUPPORT']) })
-const accepts = (schema: Schema.ConstraintDecoder<unknown>, value: unknown): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
+const checkDecodes = (schema: Schema.ConstraintDecoder<unknown>, value: unknown): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
 
 async function mountRuntime(bindAddress: string, localhostEnabled: boolean, freshDefaults = false) {
   const host = await createTestHost()
@@ -46,7 +46,7 @@ async function mountRuntime(bindAddress: string, localhostEnabled: boolean, fres
         ipv6.listen({ host: '::1', port, ipv6Only: true, exclusive: true })
         await listeningIPv6
       } catch (error) {
-        if (!accepts(unavailableFamilySchema, error)) throw error
+        if (!checkDecodes(unavailableFamilySchema, error)) throw error
       }
     }
     await host.ctx.plugin(Loader, { baseUrl: import.meta.url })

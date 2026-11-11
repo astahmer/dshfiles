@@ -15,7 +15,7 @@ const tcpAddressSchema = Schema.Struct({
   address: Schema.String,
   port: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)),
 })
-const accepts = (schema: Schema.ConstraintDecoder<unknown>, value: unknown): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
+const checkDecodes = (schema: Schema.ConstraintDecoder<unknown>, value: unknown): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
 
 function track(socket: Socket): Socket {
   sockets.add(socket)
@@ -49,7 +49,7 @@ async function ipv6Blocker(): Promise<Server | undefined> {
     await listen(server, '::1')
     return server
   } catch (error) {
-    if (accepts(unavailableIPv6Schema, error)) return undefined
+    if (checkDecodes(unavailableIPv6Schema, error)) return undefined
     throw error
   }
 }
@@ -66,8 +66,8 @@ async function reserveLoopbackPair(): Promise<{ ipv4: Server; ipv6: Server; port
       reserved = true
       return { ipv4, ipv6, port }
     } catch (error) {
-      if (accepts(unavailableIPv6Schema, error)) return undefined
-      if (!accepts(addressInUse, error)) throw error
+      if (checkDecodes(unavailableIPv6Schema, error)) return undefined
+      if (!checkDecodes(addressInUse, error)) throw error
     } finally {
       if (!reserved) await Promise.all([closeServer(ipv4), closeServer(ipv6)])
     }

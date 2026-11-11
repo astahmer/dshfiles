@@ -23,7 +23,7 @@ const tcpAddressSchema = Schema.Struct({
   address: Schema.String,
   port: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(65_535)),
 })
-const accepts = (schema: Schema.ConstraintDecoder<unknown>, value: unknown): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
+const checkDecodes = (schema: Schema.ConstraintDecoder<unknown>, value: unknown): boolean => Schema.decodeUnknownResult(schema)(value)._tag === 'Success'
 const servers: Server[] = []
 const sockets = new Set<Socket>()
 const accesses: LoopbackAccess[] = []
@@ -62,7 +62,7 @@ async function expectPortsReleased(port: number): Promise<void> {
   try {
     await listen('::1', port)
   } catch (error) {
-    if (!accepts(unavailableIPv6Schema, error)) throw error
+    if (!checkDecodes(unavailableIPv6Schema, error)) throw error
   }
 }
 
