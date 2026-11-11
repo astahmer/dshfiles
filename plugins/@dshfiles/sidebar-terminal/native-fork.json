@@ -1,0 +1,23 @@
+{
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-client-ui-sidebar-terminal",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
+    "path": "packages/client/ui-sidebar-terminal"
+  },
+  "files": [{ "upstream": "src", "local": "src/native" }],
+  "delta": [
+    "src/native/client/face.ts",
+    "src/native/client/index.ts",
+    "src/native/client/terminal.tsx",
+    "src/native/client/terminal.module.css",
+    "src/native/client/locales.ts"
+  ],
+  "added": [
+    "src/native/client/TerminalExcerptAction.tsx",
+    "src/native/client/excerpt-targets.ts",
+    "src/native/client/excerpt.ts",
+    "src/native/client/use-terminal-excerpt-target.ts"
+  ]
+}

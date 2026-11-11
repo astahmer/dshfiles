@@ -9,6 +9,10 @@
   user-select: none;
 }
 
+.excerpt { position: relative; display: inline-block; }
+.excerptToggle { border: 0; font: inherit; cursor: pointer; }
+.excerptContent { position: absolute; z-index: 1000; bottom: 100%; left: 0; display: block; width: min(32rem, 80vw); max-height: 16rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; padding: 0.75rem; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-l2); border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-sm); }
+
 .marker {
   flex: none;
   font-weight: 500;

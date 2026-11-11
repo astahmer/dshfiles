@@ -1878,6 +1878,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/rich-composer/rich-text-editor",
+      "kind": "module",
+      "title": "@dshfiles/rich-composer/rich-text-editor",
+      "summary": "Public module of @dshfiles/rich-composer.",
+      "publicSymbol": "(side-effect module)",
+      "importFrom": "@dshfiles/rich-composer/rich-text-editor",
+      "owner": "@dshfiles/rich-composer",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/rich-composer/src/editor/index.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/secret-catalog/setup",
       "kind": "module",
       "title": "@dshfiles/secret-catalog/setup",
@@ -3183,7 +3203,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › subagent-traces"
       ],
       "details": [
-        "Used by 111 catalog feature(s)",
+        "Used by 112 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

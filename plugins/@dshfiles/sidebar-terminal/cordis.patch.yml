@@ -1,0 +1,5 @@
+- id: ui-sidebar-terminal
+  disabled: true
+- insert:
+    - id: dshfiles-sidebar-terminal
+      name: '@dshfiles/sidebar-terminal'

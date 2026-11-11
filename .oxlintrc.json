@@ -148,6 +148,7 @@
     "plugins/@dshfiles/session-persistence-jsonl/src/native/**",
     "plugins/@dshfiles/agent-loop/src/native/**",
     "plugins/@dshfiles/sidebar-right/src/native/**",
+    "plugins/@dshfiles/sidebar-terminal/src/native/**",
     "plugins/@dshfiles/phone-pairing/experiments/**"
   ],
   "overrides": [

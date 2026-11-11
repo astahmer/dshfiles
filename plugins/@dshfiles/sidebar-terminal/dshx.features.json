@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "terminal-excerpts",
+      "title": "Add terminal selection to chat",
+      "summary": "Attach the selected terminal output to its originating thread as an inspectable draft chip.",
+      "reach": [
+        "seed tool-call-thread",
+        "click tab \"Fake thread title\"",
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"New terminal\"",
+        "click option \"New terminal*\"",
+        "expect tab \"Terminal*\""
+      ],
+      "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "terminal and composer",
+      "configuration": [],
+      "externalDependencies": [],
+      "states": ["no-selection", "selection", "excerpt-attached", "insertion-failed"],
+      "failureModes": ["A missing or locked originating composer rejects insertion; selection remains available to retry."],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "sidebar-terminal.excerpt",
+          "file": "plugins/@dshfiles/sidebar-terminal/src/excerpt.test.ts",
+          "testName": "keeps the 1-based buffer line range of the selection"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-terminal.registration",
+          "file": "plugins/@dshfiles/sidebar-terminal/src/registration.test.ts",
+          "testName": "binds each terminal body to the session that owns it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-terminal.excerpt-action",
+          "file": "plugins/@dshfiles/sidebar-terminal/src/terminal-excerpt-action.test.tsx",
+          "testName": "shows no excerpt action until the terminal holds a selection"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-terminal.chip",
+          "file": "plugins/@dshfiles/rich-composer/src/terminal-excerpt.test.ts",
+          "testName": "labels the chip with the terminal line range it came from"
+        },
+        {
+          "kind": "unit-test",
+          "id": "sidebar-terminal.chip-inspect",
+          "file": "plugins/@dshfiles/rich-composer/src/native/input/editor/reference-chip-excerpt.test.tsx",
+          "testName": "reveals the captured output the draft will send"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "sidebar-terminal.no-browser-scenario",
+          "reason": "The action needs a drag selection over a live xterm and PTY, and the chip it produces is covered by the component and registration tests here."
+        }
+      ],
+      "telemetry": [{ "kind": "not-applicable", "reason": "Client-only selection and draft presentation; no Host work." }]
+    }
+  ]
+}

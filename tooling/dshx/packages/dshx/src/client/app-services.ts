@@ -111,6 +111,7 @@ export interface ComposerTarget {
 /** A chip in the composer: a workspace file, text sent as a quote or a note, or a comment on file lines; an annotation joins the draft's annotation pill instead. */
 export type ComposerAttachment =
   | { readonly kind: 'file'; readonly path: string }
+  | { readonly kind: 'terminal-excerpt'; readonly text: string; readonly label?: string }
   | { readonly kind: 'quote' | 'note'; readonly text: string; readonly label?: string }
   | { readonly kind: 'comment'; readonly path: string; readonly line: number; readonly endLine?: number; readonly text: string }
   | {
