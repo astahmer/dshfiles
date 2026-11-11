@@ -1,16 +1,16 @@
 # Guided onboarding and feature discovery
 
-**Resume here:** P1 is done and verified (`jj:ourwpqzn`, `jj:lmwrwqwu`, `jj:zqpnxvso`). Start P2: **Enable / Disable pack** with an exact preview (a Host method over `pluginManager.listPlugins` / `setPluginEnabled`, plus the profile-sync path for plugins not installed) and **Show me where** (replay `reach` against the live DOM). Open follow-ups from P1 are listed under _P1 follow-ups_.
+**Resume here:** P1 landed on `main` with its fixups (importer lockfile, `plugin-guide` catalog, boot-task inputs, `profiles/web` seed row, all `jj:knxlmnlw`-lineage). P2 is in progress: **Enable / Disable pack** first (exact preview, install through the profile toolchain, enable through the plugin manager, never a restart), then **Show me where** (replay `reach` against the live DOM). Remaining P1 follow-ups are listed under _P1 follow-ups_.
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
-**Status:** P0 decided, P1 done (2026-11-11); P2 not started.
+**Status:** P0 decided, P1 landed on `main` (2026-11-11); P2 in progress (Enable / Disable pack).
 
 | Phase | Work                                                                                                                                                                | Status      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | P0    | Audience, owner, curated list, blocking-or-not, gallery home, packs                                                                                                 | done        |
 | P1    | Generated catalog + `onboarding` block schema + Knowledge section + gallery + packs (read-only) + self-ticking checklist + palette + wizard + `onboarding_overview` | done        |
-| P2    | **Enable / Disable pack** (exact preview, reversible) + **Show me where** (replay `reach` against the live UI)                                                      | not started |
+| P2    | **Enable / Disable pack** (exact preview, reversible) + **Show me where** (replay `reach` against the live UI)                                                      | in progress |
 | P3    | **What's new** from jj/git history (since last visit; upstream since fork point) + opt-in usage suggestions                                                         | not started |
 | P4    | Agent-led demo in a scratch thread (off by default) + `dshx init` profile composer + generated docs page per pack                                                   | not started |
 | P5    | AGENTS.md rule (each new plugin ships an onboarding block and joins a pack) + `features:check` error for a UI plugin without one                                    | not started |
@@ -24,13 +24,15 @@
 | 3    | Host API: overview + self-ticking checklist (`gh` span), `onboarding_overview` read tool, settings | done: `jj:lmwrwqwu` |
 | 4    | Client: Knowledge section page (checklist, packs, features), palette + New tab, wizard step        | done: `jj:zqpnxvso` |
 | 5    | Feature catalog, journey, 390 px check, screenshots, README                                        | done: `jj:zqpnxvso` |
+| 6    | Landed fixups: lockfile importer, `plugin-guide` catalog, boot-task inputs, `profiles/web` seed row; onboarding catalog already current, e2e re-run 2/2 | done |
 
 ### P1 follow-ups
 
-1. The `account` item counts registered model provider routes, not working credentials (a fresh profile already registers two). A credential-aware check needs the Models page's provider/credential join on the Host; until then the copy says what it measures and points at AI accounts.
+1. The `account` item counts registered model provider routes, not working credentials (a fresh profile already registers two). Being fixed in P2: read enabled saved accounts through the AI accounts Host contract, fall back to provider routes only when it is absent, and say which check ran.
 2. The wizard is a non-modal card (top right), not a dialog: a modal blocked the scratch boot's "no modal overlay" check and is a gate in practice. Escape skips it.
 3. `src/generated/feature-catalog.ts` goes stale whenever any `dshx.features.json` changes, like `plugin-guide`'s catalog: regenerate both when landing (`pnpm --dir plugins/@dshfiles/onboarding generate`).
-4. The plugin is not in the `profiles/web` seed yet; adding it is a profile decision (and P2's Enable pack can then install the rest).
+4. ~~The plugin is not in the `profiles/web` seed yet~~ — landed: the seed lists it as a link dependency and as a profile bundle.
+5. Pre-existing repository drift found while landing, untouched because other lanes own it: `features:check` fails for `session-log-window`, `settings-subagent` and `tool-meta`; the web-profile contract check fails for `conversation-cleanup`, `tool-bash` and `tool-fs`; 68 other `turbo.json` files plus three missing ones (`sidebar-terminal`, `tool-bash`, `tool-fs`) are stale against `browser-tasks.mjs --write`.
 
 ## Goal
 
