@@ -1,4 +1,4 @@
-import { Context, Effect, FileSystem, Layer, Option, Path, Schema, Semaphore, SubscriptionRef } from 'effect'
+import { Context, Effect, FileSystem, Layer, Option, Path, Ref, Schema, Semaphore, SubscriptionRef } from 'effect'
 import { join } from 'node:path'
 import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 
@@ -14,7 +14,7 @@ import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
 import { MISTRAL_LOGIN_HINT, MistralAccountModel } from './mistral-account.js'
 import { AccountOrderModel } from './account-order-model.js'
 import { type AccountReorder, type CreateSetupAccountInput } from './api.js'
-import { AccountConflict, AccountOrderRejected, AccountStoreWriteFailed } from './errors.js'
+import { AccountConflict, AccountOrderRejected, AccountStoreFileUnreadable, AccountStoreWriteFailed } from './errors.js'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 
@@ -48,6 +48,7 @@ const emptyFile = (): AccountStoreFile => ({
 /** The store schema: drafts on disk, observed fields added on read. */
 const storeFileSchema = Schema.Struct({
   ...accountsFileSchema.fields,
+  distribution: accountsFileSchema.fields.distribution.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(DEFAULT_DISTRIBUTION)))),
   accounts: AiAccountsSchema.list(accountDraftSchema, 64),
 })
 
@@ -317,24 +318,33 @@ export class AccountStore extends Context.Service<
     readonly filePath: string
     /** The file as last read or written; synchronous Cordis hooks read it with `SubscriptionRef.getUnsafe`. */
     readonly snapshot: SubscriptionRef.SubscriptionRef<AccountStoreFile>
-    /** Re-read the file so external edits count; missing or unreadable storage yields defaults. */
+    /** Re-read the file so external edits count; missing storage yields defaults, unreadable storage keeps the last good snapshot. */
     readonly read: Effect.Effect<AccountStoreFile>
     readonly write: (next: AccountStoreFile) => Effect.Effect<AccountStoreFile, AccountStoreWriteFailed>
     readonly upsertAccount: (
       draft: AccountDraft,
       previousInstanceId?: string,
       requireExisting?: boolean,
-    ) => Effect.Effect<AccountStoreFile, AccountConflict | AccountStoreWriteFailed>
-    readonly removeAccount: (instanceId: string) => Effect.Effect<AccountStoreFile, AccountStoreWriteFailed>
-    readonly moveAccount: (instanceId: string, direction: AccountOrderDirection) => Effect.Effect<AccountStoreFile, AccountConflict | AccountStoreWriteFailed>
-    readonly reorderAccount: (input: AccountReorder) => Effect.Effect<AccountStoreFile, AccountOrderRejected | AccountStoreWriteFailed>
-    readonly setDistribution: (distribution: AccountsFile['distribution']) => Effect.Effect<AccountStoreFile, AccountStoreWriteFailed>
+    ) => Effect.Effect<AccountStoreFile, AccountConflict | AccountStoreWriteFailed | AccountStoreFileUnreadable>
+    readonly removeAccount: (instanceId: string) => Effect.Effect<AccountStoreFile, AccountStoreWriteFailed | AccountStoreFileUnreadable>
+    readonly moveAccount: (
+      instanceId: string,
+      direction: AccountOrderDirection,
+    ) => Effect.Effect<AccountStoreFile, AccountConflict | AccountStoreWriteFailed | AccountStoreFileUnreadable>
+    readonly reorderAccount: (
+      input: AccountReorder,
+    ) => Effect.Effect<AccountStoreFile, AccountOrderRejected | AccountStoreWriteFailed | AccountStoreFileUnreadable>
+    readonly setDistribution: (
+      distribution: AccountsFile['distribution'],
+    ) => Effect.Effect<AccountStoreFile, AccountStoreWriteFailed | AccountStoreFileUnreadable>
     /** Allocate metadata only. The Host lifecycle, not the durable store, owns unconnected candidates. */
     readonly createSetupAccount: (
       input: CreateSetupAccountInput,
     ) => Effect.Effect<{ readonly instanceId: string; readonly draft: AccountDraft; readonly file: AccountStoreFile }, AccountConflict>
     /** Publish a verified operation once, under the same lock as every settings write. */
-    readonly commitConnection: (input: ConnectionCommit) => Effect.Effect<AccountStoreFile, AccountConflict | AccountStoreWriteFailed>
+    readonly commitConnection: (
+      input: ConnectionCommit,
+    ) => Effect.Effect<AccountStoreFile, AccountConflict | AccountStoreWriteFailed | AccountStoreFileUnreadable>
   }
 >()('@dshfiles/ai-accounts/AccountStore') {
   static readonly makeAt = Effect.fn('ai accounts store open')(function* (filePath: string) {
@@ -342,18 +352,39 @@ export class AccountStore extends Context.Service<
     const path = yield* Path.Path
     const lock = yield* Semaphore.make(1)
 
-    const readFile = fs.readFileString(filePath).pipe(
-      Effect.map(text => Option.getOrElse(decodeStoreText(text), emptyFile)),
-      Effect.orElseSucceed(emptyFile),
+    const readDisk: Effect.Effect<Option.Option<AccountStoreFile>> = fs.readFileString(filePath).pipe(
+      Effect.map(decodeStoreText),
+      Effect.catch(error => Effect.succeed(error.reason._tag === 'NotFound' ? Option.some(emptyFile()) : Option.none())),
     )
-    const snapshot = yield* SubscriptionRef.make(yield* readFile)
-    const read = readFile.pipe(Effect.tap(file => SubscriptionRef.set(snapshot, file)))
+    const initial = yield* readDisk
+    const snapshot = yield* SubscriptionRef.make(Option.getOrElse(initial, emptyFile))
+    const lastGood = yield* Ref.make(initial)
+    const remember = (file: AccountStoreFile) => Effect.andThen(Ref.set(lastGood, Option.some(file)), SubscriptionRef.set(snapshot, file))
+
+    const read = Effect.flatMap(readDisk, decoded =>
+      Option.match(decoded, {
+        onNone: () => SubscriptionRef.get(snapshot),
+        onSome: file => Effect.as(remember(file), file),
+      }),
+    )
+
+    const readForWrite = Effect.flatMap(readDisk, decoded =>
+      Option.match(decoded, {
+        onNone: () => Effect.flatMap(Ref.get(lastGood), Effect.fromOption).pipe(Effect.mapError(() => new AccountStoreFileUnreadable({ path: filePath }))),
+        onSome: file => Effect.as(remember(file), file),
+      }),
+    )
 
     const writeFailed = (cause: unknown) => new AccountStoreWriteFailed({ path: filePath, cause })
+
+    const backUpUnreadable = Effect.flatMap(readDisk, decoded =>
+      Option.isSome(decoded) ? Effect.void : fs.copyFile(filePath, `${filePath}.unreadable-${Date.now()}`).pipe(Effect.mapError(writeFailed)),
+    )
 
     /** Validate and write the next file beside the live one, owner-only; nothing is published yet. */
     const stage = Effect.fn('ai accounts store stage')(function* (next: AccountStoreFile) {
       yield* validateStoreFile(next).pipe(Effect.orDie)
+      yield* backUpUnreadable
       const temporary = `${filePath}.${process.pid}.tmp`
       yield* fs
         .makeDirectory(path.dirname(filePath), { recursive: true })
@@ -367,7 +398,7 @@ export class AccountStore extends Context.Service<
 
     const publish = Effect.fn('ai accounts store publish')(function* (next: AccountStoreFile, temporary: string) {
       yield* fs.rename(temporary, filePath).pipe(Effect.mapError(writeFailed))
-      yield* SubscriptionRef.set(snapshot, next)
+      yield* remember(next)
       return next
     })
 
@@ -385,7 +416,7 @@ export class AccountStore extends Context.Service<
     const serialized = lock.withPermit
 
     const upsertAccount = Effect.fn('ai accounts store upsert')(function* (draft: AccountDraft, previousInstanceId?: string, requireExisting = false) {
-      const file = yield* read
+      const file = yield* readForWrite
       const replaced = previousInstanceId ?? draft.instanceId
       if (replaced !== draft.instanceId && file.accounts.some(existing => existing.instanceId === draft.instanceId))
         return yield* new AccountConflict({ instanceId: draft.instanceId, reason: 'name-taken' })
@@ -397,7 +428,7 @@ export class AccountStore extends Context.Service<
     })
 
     const moveAccount = Effect.fn('ai accounts store move')(function* (instanceId: string, direction: AccountOrderDirection) {
-      const file = yield* read
+      const file = yield* readForWrite
       const current = file.accounts.find(account => account.instanceId === instanceId)
       if (current === undefined) return yield* new AccountConflict({ instanceId, reason: 'missing' })
       const group = file.accounts.filter(account => account.kind === current.kind)
@@ -412,7 +443,7 @@ export class AccountStore extends Context.Service<
     })
 
     const reorderAccount = Effect.fn('ai accounts store reorder')(function* (input: AccountReorder) {
-      const file = yield* read
+      const file = yield* readForWrite
       const accounts = yield* reorderedAccounts(file, input)
       if (accounts.every((account, index) => account === file.accounts[index])) return file
       return yield* persist({ ...file, accounts })
@@ -436,7 +467,7 @@ export class AccountStore extends Context.Service<
     })
 
     const commitConnection = Effect.fn('ai accounts store commit connection')(function* (input: ConnectionCommit) {
-      const file = yield* read
+      const file = yield* readForWrite
       const instanceId = input.draft.instanceId
       const current = file.accounts.find(account => account.instanceId === instanceId)
       const beforeCommit = input.beforeCommit ?? Effect.void
@@ -459,10 +490,10 @@ export class AccountStore extends Context.Service<
       write: next => serialized(persist(next)),
       upsertAccount: (draft, previousInstanceId, requireExisting) => serialized(upsertAccount(draft, previousInstanceId, requireExisting)),
       removeAccount: instanceId =>
-        serialized(Effect.flatMap(read, file => persist({ ...file, accounts: file.accounts.filter(account => account.instanceId !== instanceId) }))),
+        serialized(Effect.flatMap(readForWrite, file => persist({ ...file, accounts: file.accounts.filter(account => account.instanceId !== instanceId) }))),
       moveAccount: (instanceId, direction) => serialized(moveAccount(instanceId, direction)),
       reorderAccount: input => serialized(reorderAccount(input)),
-      setDistribution: distribution => serialized(Effect.flatMap(read, file => persist({ ...file, distribution }))),
+      setDistribution: distribution => serialized(Effect.flatMap(readForWrite, file => persist({ ...file, distribution }))),
       createSetupAccount,
       commitConnection: input => serialized(commitConnection(input)),
     })

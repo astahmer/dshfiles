@@ -215,6 +215,17 @@ export class AccountStoreWriteFailed extends Schema.TaggedError<AccountStoreWrit
   }
 }
 
+/** The accounts file exists but does not decode, and no readable copy was ever loaded to save over it. */
+export class AccountStoreFileUnreadable extends Schema.TaggedError<AccountStoreFileUnreadable>()(
+  'AccountStoreFileUnreadable',
+  { path: Schema.String },
+  { dshxWireCode: 'account-store-file-unreadable' },
+) {
+  override get message(): string {
+    return `The accounts file ${this.path} could not be read, so nothing was saved over it. Fix its JSON or move it aside, then retry.`
+  }
+}
+
 /** Every failure the account APIs expose to their callers. */
 /** The guarded thread selection refused an automatic model switch, usually because the user picked one meanwhile. */
 export class AutomaticSelectionRefused extends Schema.TaggedError<AutomaticSelectionRefused>()('AutomaticSelectionRefused', {
@@ -242,4 +253,5 @@ export const AccountsWireError = Schema.Union([
   AccountConflict,
   AccountOrderRejected,
   AccountStoreWriteFailed,
+  AccountStoreFileUnreadable,
 ])
