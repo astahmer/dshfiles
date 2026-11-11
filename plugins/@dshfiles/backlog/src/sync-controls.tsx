@@ -682,19 +682,18 @@ const ConnectionForm = (props: {
     }),
   )
   const draftOptions = optionFields.length === 0 ? {} : { options: filledOptions }
-  const test = useMutation({
-    mutationFn: () =>
-      api.testSyncConnection({ draft: { kind: props.descriptor.kind, credential: credential.trim(), baseUrl: baseUrl.trim(), ...draftOptions } }),
-  })
+  const draft = { kind: props.descriptor.kind, credential: credential.trim(), baseUrl: baseUrl.trim(), ...draftOptions }
+  const test = useMutation({ mutationFn: (tested: typeof draft) => api.testSyncConnection({ draft: tested }) })
+  const testedDraft = BacklogSyncModel.sameConnectionTarget(test.variables, draft)
   const instanceId =
     props.initial?.instanceId ??
     BacklogSyncModel.uniqueSlug(BacklogSyncModel.slugOf(label === props.descriptor.label ? props.descriptor.kind : label), new Set(props.takenIds))
   const keyed = props.descriptor.credential !== 'none'
-  const save = (): void =>
-    actions.saveConnection.mutate(
-      { connection: { instanceId, kind: props.descriptor.kind, label: label.trim(), credential: credential.trim(), baseUrl: baseUrl.trim(), ...draftOptions } },
-      { onSuccess: props.onDone },
-    )
+  const saveTested = (): void => actions.saveConnection.mutate({ connection: { instanceId, label: label.trim(), ...draft } }, { onSuccess: props.onDone })
+  const save = (): void => {
+    if (testedDraft && test.data?.error === null) return saveTested()
+    test.mutate(draft, { onSuccess: report => (report.error === null ? saveTested() : undefined) })
+  }
   return (
     <form
       aria-label={`${props.initial === undefined ? 'New' : 'Edit'} ${props.descriptor.label} connection`}
@@ -747,18 +746,18 @@ const ConnectionForm = (props: {
           Keys are stored as vault references. Pick one with the key button in the field, or clear it to use the Host environment.
         </p>
       )}
-      <TestReport report={test.data} error={test.error} />
+      {testedDraft ? <TestReport report={test.data} error={test.error} /> : null}
       {actions.saveConnection.error === null ? null : (
         <p role="alert" className="dshx:text-xs dshx:text-destructive">
           {failureText(actions.saveConnection.error, 'The connection could not be saved. Retry.')}
         </p>
       )}
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <Button type="button" size="sm" variant="outline" disabled={test.isPending || !isReferenceOrEmpty(credential)} onClick={() => test.mutate()}>
+        <Button type="button" size="sm" variant="outline" disabled={test.isPending || !isReferenceOrEmpty(credential)} onClick={() => test.mutate(draft)}>
           <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', test.isPending && 'dshx:animate-spin')} />
           Test connection
         </Button>
-        <Button type="submit" size="sm" disabled={actions.saveConnection.isPending || label.trim() === '' || !isReferenceOrEmpty(credential)}>
+        <Button type="submit" size="sm" disabled={test.isPending || actions.saveConnection.isPending || label.trim() === '' || !isReferenceOrEmpty(credential)}>
           Save connection
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={props.onDone}>
@@ -1099,9 +1098,10 @@ const ConnectionCard = (props: {
   const [adding, setAdding] = useState(false)
   const { connection } = props.view
   const test = useMutation({
-    mutationFn: () => api.testSyncConnection({ connection: connection.instanceId }),
+    mutationFn: (tested: typeof connection) => api.testSyncConnection({ connection: tested.instanceId }),
     onSettled: () => client.invalidateQueries({ queryKey: SYNC_STATUS_KEY }),
   })
+  const testedConnection = !editing && BacklogSyncModel.sameConnectionTarget(test.variables, connection)
   return (
     <section
       aria-label={`Connection ${connection.label}`}
@@ -1124,7 +1124,7 @@ const ConnectionCard = (props: {
           )}
           {props.view.available ? null : <span className="dshx:text-xs dshx:text-destructive">Provider not loaded: enable its plugin</span>}
           <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
-            <Button type="button" size="xs" variant="ghost" disabled={test.isPending} onClick={() => test.mutate()}>
+            <Button type="button" size="xs" variant="ghost" disabled={test.isPending} onClick={() => test.mutate(connection)}>
               <RefreshCwIcon aria-hidden className={cn('dshx:size-3', test.isPending && 'dshx:animate-spin')} />
               Test
             </Button>
@@ -1167,7 +1167,7 @@ const ConnectionCard = (props: {
           </span>
         </div>
       )}
-      <TestReport report={test.data} error={test.error} />
+      {testedConnection ? <TestReport report={test.data} error={test.error} /> : null}
       {props.bindings.map(binding => (
         <BindingRow key={binding.binding.id} view={binding} connection={props.view} descriptor={props.descriptor} projectOptions={props.projectOptions} />
       ))}

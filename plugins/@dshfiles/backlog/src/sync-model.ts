@@ -426,6 +426,24 @@ const slugOf = (text: string): string =>
     .replace(/^-+|-+$/gu, '')
     .slice(0, 48) || 'default'
 
+interface ConnectionTarget {
+  readonly kind: string
+  readonly credential: string
+  readonly baseUrl: string
+  readonly options?: Readonly<Record<string, string>> | undefined
+}
+
+const optionsKey = (options: ConnectionTarget['options']): string =>
+  JSON.stringify(Object.entries(options ?? {}).toSorted(([left], [right]) => left.localeCompare(right)))
+
+/** Whether a connection test of `tested` still speaks for `current`: same provider, key reference, base URL and options. */
+const sameConnectionTarget = (tested: ConnectionTarget | undefined, current: ConnectionTarget): boolean =>
+  tested !== undefined &&
+  tested.kind === current.kind &&
+  tested.credential === current.credential &&
+  tested.baseUrl === current.baseUrl &&
+  optionsKey(tested.options) === optionsKey(current.options)
+
 /** A slug not in `taken`: `base`, then `base-2`, `base-3`… */
 const uniqueSlug = (base: string, taken: ReadonlySet<string>): string => {
   if (!taken.has(base)) return base
@@ -473,4 +491,5 @@ export class BacklogSyncModel {
   static readonly slugOf = slugOf
   static readonly uniqueSlug = uniqueSlug
   static readonly sameValue = sameValue
+  static readonly sameConnectionTarget = sameConnectionTarget
 }

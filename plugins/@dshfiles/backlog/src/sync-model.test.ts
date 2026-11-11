@@ -233,4 +233,16 @@ describe('auto-sync rate-limit backoff', () => {
     expect(BacklogSyncModel.nextBackoff({ previous: { until: 0, count: 9 }, at: 0, pollEverySec: 900 }).until).toBe(6 * 60 * 60_000)
     expect(BacklogSyncModel.withoutBackoff(new Map([['github-acme', first]]), 'github-acme').size).toBe(0)
   })
+
+  test('treats a connection test as current only while the key, base URL and options it tested are unchanged', () => {
+    const tested = { kind: 'jira', credential: 'secret:JIRA', baseUrl: 'https://acme.atlassian.net', options: { email: 'me@acme.dev' } }
+    expect(BacklogSyncModel.sameConnectionTarget(tested, { ...tested, options: { email: 'me@acme.dev' } })).toBe(true)
+    expect(BacklogSyncModel.sameConnectionTarget(tested, { ...tested, credential: 'secret:OTHER' })).toBe(false)
+    expect(BacklogSyncModel.sameConnectionTarget(tested, { ...tested, baseUrl: 'https://evil.example' })).toBe(false)
+    expect(BacklogSyncModel.sameConnectionTarget(tested, { ...tested, options: { email: 'you@acme.dev' } })).toBe(false)
+    expect(
+      BacklogSyncModel.sameConnectionTarget({ kind: 'github', credential: '', baseUrl: '' }, { kind: 'github', credential: '', baseUrl: '', options: {} }),
+    ).toBe(true)
+    expect(BacklogSyncModel.sameConnectionTarget(undefined, tested)).toBe(false)
+  })
 })
