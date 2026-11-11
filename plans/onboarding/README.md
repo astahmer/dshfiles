@@ -1,17 +1,17 @@
 # Guided onboarding and feature discovery
 
-**Resume here:** P1, P2 and P3's **What's new** are on `main`. Next: land the `reachNarrow` phone paths (follow-up 7), then P3's opt-in usage suggestions from local tool-call history. Follow-ups are listed under _P1 follow-ups_; landing checks under _Landing checks_.
+**Resume here:** P1–P3 are on `main`. Next: land the `reachNarrow` phone paths (follow-up 7), then P4 (agent-led demo off by default, `dshx init` profile composer, docs page per pack). Follow-ups are listed under _P1 follow-ups_; landing checks under _Landing checks_.
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
-**Status:** P0, P1 and P2 landed on `main` (2026-11-11). P3: What's new landed (`jj:tspprznw`, `jj:yvnrmxpv`); phone `reach` paths (follow-up 7) in progress; usage suggestions next.
+**Status:** P0–P3 landed on `main` (2026-11-11): What's new (`jj:tspprznw`, `jj:yvnrmxpv`) and opt-in usage suggestions (`jj:qkyvwznv`, off by default). Phone `reach` paths (follow-up 7) in progress; P4 next.
 
 | Phase | Work                                                                                                                                                                | Status      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | P0    | Audience, owner, curated list, blocking-or-not, gallery home, packs                                                                                                 | done        |
 | P1    | Generated catalog + `onboarding` block schema + Knowledge section + gallery + packs (read-only) + self-ticking checklist + palette + wizard + `onboarding_overview` | done        |
 | P2    | **Enable / Disable pack** (exact preview, reversible) + **Show me where** (replay `reach` against the live UI)                                                      | done        |
-| P3    | **What's new** from jj/git history (since last visit; upstream since fork point) + opt-in usage suggestions                                                         | not started |
+| P3    | **What's new** from jj/git history (since last visit; upstream since fork point) + opt-in usage suggestions                                                         | done        |
 | P4    | Agent-led demo in a scratch thread (off by default) + `dshx init` profile composer + generated docs page per pack                                                   | not started |
 | P5    | AGENTS.md rule (each new plugin ships an onboarding block and joins a pack) + `features:check` error for a UI plugin without one                                    | not started |
 
@@ -48,6 +48,8 @@
 7. Many catalog `reach` paths are desktop-only: at 390 px Settings shows a **Sections** combobox instead of `button "General"`, and the rail tabs and the palette button are off screen, so a phone walk falls back to the 10 s "not on screen" message and **Next**. Fix in the catalogs (phone-specific steps) or add a reach-at-390 check.
 8. Show me where matches a plain name exactly and uses a substring only for a trailing `*`, as the grammar writes it (a substring fallback rang the wrong control in the e2e run). Only Chromium ran; WebKit is unverified.
 9. The wizard's "No composer is open" message is unreachable: without a composer on screen it opens a new thread draft with the prompt, which always succeeds.
+10. Usage suggestions read Usage's 100 most-used tools; a tool used outside that set reads as unused and may be suggested (Dismiss hides it). The "repeated prompts → prompt stash" rule is omitted: Usage never exposes prompt text, by design. The populated list is proven by a DOM test only (the scratch profile has too little usage to cross a threshold).
+11. Effect `Cache` lookups run under the services captured at layer build, so a span opened inside a lookup never reaches the request's tracer. Onboarding uses its own keyed `TtlCell` instead; other plugins that open spans inside `Cache.makeWith` lookups may have the same blind spot.
 
 ### Landing checks
 
