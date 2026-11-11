@@ -287,8 +287,9 @@ older Host ignores the bucket and returns its bounded series.
 
 ![Cache-expired warning in the composer meter line](docs/screenshots/idle-cache-warning.png)
 
-A provider keeps a prompt prefix cached for a while after the last request that
-used it. Message a long thread after that, and the request pays the full input
+Off by default (Settings › AI Accounts › Idle prompt cache › **Warn before an
+uncached send**) until a benchmark shows it saves more than it costs. A provider keeps a
+prompt prefix cached for a while after the last request that used it. Message a long thread after that, and the request pays the full input
 (or cache-write) rate for every prompt token. Once a thread sat idle past its
 route's lifetime, a chip opens the composer meter line: "cache expired · next
 send ≈$0.45". Its popover gives the idle time, the prompt tokens the next
@@ -314,7 +315,7 @@ Cache lifetimes names one (`route/model = minutes`, or `route/*`). DSH's
 native provider profile chooses what a request asks for with `cacheRetention`
 (`short`, the default; `long` asks Anthropic for 1 h and OpenAI for 24 h): give
 such a route its lifetime here. Threads under **From prompt size** (50K tokens by
-default) stay quiet; **Warn before an uncached send** turns it off.
+default) stay quiet; **Warn before an uncached send** turns the warning on or off.
 
 ## Editing
 

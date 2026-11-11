@@ -11,7 +11,7 @@ const warning = (page: Page) => page.locator('[data-ai-accounts-idle-cache]')
 
 When('the fake model answers in a fresh workspace whose prompt cache lasts one minute', async ({ page }: { page: Page }) => {
   const settings = await connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/settings-shell', apiId: 'settings-shell', version: 1 })
-  await settings('set', { namespace: 'ai-accounts', patch: { promptCacheMinutes: { 'commandcode_work/*': 1 }, idleCacheMinTokens: 0 } })
+  await settings('set', { namespace: 'ai-accounts', patch: { idleCacheWarning: true, promptCacheMinutes: { 'commandcode_work/*': 1 }, idleCacheMinTokens: 0 } })
   const root = await createScratchDirectory('dshx-ai-accounts-idle-cache-')
   const workspace = join(root, 'idle-cache')
   await mkdir(workspace)

@@ -49,7 +49,7 @@ export const usePreferences = () => {
     costPlacement: value?.costPlacement === 'separate' ? 'separate' : 'inside',
     pricingRefreshHours: value?.pricingRefreshHours ?? DEFAULT_CLIENT_SETTINGS.pricingRefreshHours,
     pricingOverrides: value?.pricingOverrides ?? {},
-    idleCacheWarning: value?.idleCacheWarning ?? true,
+    idleCacheWarning: value?.idleCacheWarning ?? false,
     idleCacheMinTokens: value?.idleCacheMinTokens ?? 50_000,
     promptCacheMinutes: value?.promptCacheMinutes ?? {},
     workHours: AiAccountsSchema.decode(workHoursSchema, value?.workHours),
