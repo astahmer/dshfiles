@@ -1653,6 +1653,20 @@ describe('client lazy chunks', () => {
     }
   })
 
+  it('renames a lazy chunk when its bytes change, so an immutable response cannot stick', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/heavy.ts'), "export const heavy = 'first'\n")
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry)
+    const names = async (): Promise<readonly string[]> =>
+      (await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })).output
+        .map(item => item.fileName)
+        .filter(fileName => /^client\.heavy\.[0-9a-f]{8}\.js$/u.test(fileName))
+    const first = await names()
+    expect(await names()).toEqual(first)
+    await writeFile(resolve(root, 'src/heavy.ts'), "export const heavy = 'second'\n")
+    expect(await names()).not.toEqual(first)
+  })
+
   it('keeps a target inlined when it shares a module with the entry', async () => {
     const root = await temporaryProject()
     await writeFile(resolve(root, 'src/state.ts'), 'export const registry = new Map<string, string>()\n')

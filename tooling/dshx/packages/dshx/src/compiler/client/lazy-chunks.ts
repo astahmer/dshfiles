@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { basename, isAbsolute, relative } from 'node:path'
 import type { Plugin, Rollup } from 'vite'
 import { DshxError } from '../../diagnostics.js'
@@ -40,15 +41,30 @@ const isNodeModule = (id: string): boolean => id.includes('/node_modules/')
 /** Bundler helpers carry no module state, so each chunk may keep its own copy. */
 const isBundlerHelper = (id: string): boolean => id.startsWith('\0rolldown/') || id.startsWith('\0vite/')
 
-const chunkFileName = (root: string, id: string): string => {
+const chunkFileName = (root: string, id: string, hash: string): string => {
   const path = id.replace(/[?#].*$/u, '')
   const stem =
     basename(path)
       .replace(/\.[^.]+$/u, '')
       .replace(/[^A-Za-z0-9._-]+/gu, '-')
       .replace(/^[^A-Za-z0-9]+/u, '') || 'chunk'
-  const hash = createHash('sha256').update(relative(root, path)).digest('hex').slice(0, 8)
   return `client.${stem}.${hash}.js`
+}
+
+/**
+ * The chunk name must change with the chunk's bytes: DSH serves plugin resources as immutable, so a name reused by
+ * different content would leave a browser pinned to the old chunk.
+ */
+const chunkHash = async (root: string, id: string): Promise<string> => {
+  const path = id.replace(/[?#].*$/u, '')
+  try {
+    return createHash('sha256')
+      .update(await readFile(path))
+      .digest('hex')
+      .slice(0, 8)
+  } catch {
+    return createHash('sha256').update(relative(root, path)).digest('hex').slice(0, 8)
+  }
 }
 
 export class ClientLazyChunks {
@@ -82,7 +98,7 @@ export class ClientLazyChunks {
           return null
         let fileName = state.fileNames.get(resolved.id)
         if (fileName === undefined) {
-          fileName = chunkFileName(options.root, resolved.id)
+          fileName = chunkFileName(options.root, resolved.id, await chunkHash(options.root, resolved.id))
           state.fileNames.set(resolved.id, fileName)
         }
         targets.set(resolved.id, fileName)
