@@ -179,9 +179,33 @@ interface ApiFacts {
   readonly details: readonly string[]
 }
 
+/** `export const <name> = { … <field>: '<value>' … }` in any owned plugin source, for an id shared as a constant. */
+const sharedConstantField = (name: string, field: string): string | undefined => {
+  const declaration = new RegExp(`export const ${name}\\s*=\\s*\\{([^}]*)\\}`, 'u')
+  for (const plugin of readdirSync(pluginsDir)) {
+    const sourceDir = join(pluginsDir, plugin, 'src')
+    if (!existsSync(sourceDir)) continue
+    for (const file of readdirSync(sourceDir)) {
+      if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue
+      const fields = declaration.exec(read(join(sourceDir, file)))?.[1]
+      const value = fields === undefined ? undefined : new RegExp(`\\b${field}:\\s*'([^']+)'`, 'u').exec(fields)?.[1]
+      if (value !== undefined) return value
+    }
+  }
+  return undefined
+}
+
+/** The definition's first `id:`, a string literal or `<shared constant>.<field>`. */
+const apiIdOf = (body: string): string => {
+  const match = /\bid:\s*(?:'([^']+)'|(\w+)\.(\w+))/u.exec(body)
+  if (match?.[1] !== undefined) return match[1]
+  const resolved = match?.[2] === undefined || match[3] === undefined ? undefined : sharedConstantField(match[2], match[3])
+  return resolved ?? 'unknown'
+}
+
 const apiDetails = (text: string, from: number): ApiFacts => {
   const body = text.slice(from)
-  const id = /id:\s*'([^']+)'/u.exec(body)?.[1] ?? 'unknown'
+  const id = apiIdOf(body)
   const methodsStart = body.indexOf('methods:')
   const methodText = methodsStart < 0 ? '' : body.slice(methodsStart)
   // A method is `name: method(` or `name: Something.method(` at the method map's indentation.
