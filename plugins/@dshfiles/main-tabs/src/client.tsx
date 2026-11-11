@@ -19,6 +19,7 @@ import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from 'react'
 import { Effect, Fiber, Schema } from 'effect'
 import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
+import { ProjectNames } from './project-names.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
 import { PanelIcon, StartPage, type StartSection } from './start-page.js'
@@ -411,6 +412,8 @@ export default defineClient({
             () => createThreadWorkspaceResolver({ byId, workspaces: workspaceItems, threadDirectories }),
             [byId, threadDirectories, workspaceItems],
           )
+          const showProjectName = settings.value?.showProjectName ?? false
+          const projectNames = useMemo(() => (showProjectName ? ProjectNames.byWorkspaceId(workspaceItems) : undefined), [showProjectName, workspaceItems])
           const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
           // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges,
           // and both read the one page-wide poll instead of each holding their own interval.
@@ -585,6 +588,8 @@ export default defineClient({
                 newTabKeys={shortcutOf('mainTabs.newTab')?.keys.join('') ?? ''}
                 renameThread={renameThread}
                 closeButtonPosition={closeButtonPosition}
+                fixedWidth={settings.value?.fixedTabWidth ?? false}
+                {...(projectNames === undefined ? {} : { projectNames })}
               />
               {startShown ? <StartPage sections={startSections()} t={props.t} /> : null}
             </div>

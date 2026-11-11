@@ -188,6 +188,29 @@ describe('TabStrip layout', () => {
     expect(title.className).toContain('dshx:flex-1')
     expect(title.className).toContain('dshx:truncate')
   })
+
+  it('sizes tabs to their titles and hides project names by default', () => {
+    mount()
+    const tab = screen.getByRole('tab', { name: 'Thread, Working' })
+    expect(tab.className).toContain('dshx:max-w-[190px]')
+    expect(tab.className).not.toContain('dshx:w-[160px]')
+    expect(tab.querySelector('[data-tab-project]')).toBeNull()
+  })
+
+  it('gives every tab the same width when fixed width is on', () => {
+    render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} fixedWidth />)
+    for (const tab of screen.getAllByRole('tab')) {
+      expect(tab.className).toContain('dshx:w-[160px]')
+      expect(tab.className).toContain('dshx:flex-none')
+    }
+  })
+
+  it('shows the project name before thread titles only', () => {
+    render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} projectNames={new Map([['workspace-1', 'dshfiles']])} />)
+    const thread = screen.getByRole('tab', { name: 'dshfiles / Thread, Working' })
+    expect(within(thread).getByText('dshfiles /')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Workbench' }).querySelector('[data-tab-project]')).toBeNull()
+  })
 })
 
 describe('TabStrip thread actions', () => {

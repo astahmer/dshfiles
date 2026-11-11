@@ -10,6 +10,10 @@ export const mainTabsSettings = defineSettings({
     closeButtonPosition: Schema.union(CLOSE_BUTTON_POSITIONS)
       .default(DEFAULT_CLOSE_BUTTON_POSITION)
       .description('Place tab close buttons to the left or right of titles. They show on the active tab and on hover.'),
+    fixedTabWidth: Schema.boolean()
+      .default(false)
+      .description('Give every tab in the strip the same width, so titles line up instead of sizing to their text.'),
+    showProjectName: Schema.boolean().default(false).description("Show the thread's project name before its title in thread tabs."),
     maxTabs: Schema.natural()
       .max(50)
       .default(10)

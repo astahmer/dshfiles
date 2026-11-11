@@ -33,6 +33,10 @@ interface TabStripProps {
   /** Rename one thread's explicit title; rejects when the Host refuses it. */
   readonly renameThread: (sessionId: string, title: string) => Promise<void>
   readonly closeButtonPosition?: CloseButtonPosition
+  /** Every tab gets the same width instead of sizing to its title. */
+  readonly fixedWidth?: boolean
+  /** Project name per thread workspace id, shown before thread titles; absent hides project names. */
+  readonly projectNames?: ReadonlyMap<string, string>
 }
 
 /** One dot per thread tab, most urgent first: a question or approval waits, then work in progress, then an unseen finish. */
@@ -226,7 +230,9 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
         }}
       >
         {tabs.map((tab, index) => {
-          const label = tab.status === null ? tab.title : `${tab.title}, ${t(statusLabel[tab.status])}`
+          const project = tab.kind === 'thread' && tab.workspaceId !== undefined ? props.projectNames?.get(tab.workspaceId) : undefined
+          const fullTitle = project === undefined ? tab.title : `${project} / ${tab.title}`
+          const label = tab.status === null ? fullTitle : `${fullTitle}, ${t(statusLabel[tab.status])}`
           const previous = tabs[index - 1]
           const closeButton = tab.pinned ? null : (
             <button
@@ -273,8 +279,10 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         tabIndex={tab.active || (activeId === undefined && index === 0) ? 0 : -1}
                         draggable={renamingTabId !== tab.id}
                         className={cn(
-                          'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:max-w-[190px] dshx:flex-[0_1_auto] dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-sm) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
-                          tab.pinned ? 'dshx:min-w-0' : 'dshx:min-w-[100px]',
+                          'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-sm) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
+                          props.fixedWidth === true
+                            ? 'dshx:w-[160px] dshx:flex-none'
+                            : cn('dshx:max-w-[190px] dshx:flex-[0_1_auto]', tab.pinned ? 'dshx:min-w-0' : 'dshx:min-w-[100px]'),
                           tab.active && 'dshx:bg-(--dsw-alias-markdown-tag) dshx:text-foreground dshx:hover:bg-(--dsw-alias-markdown-tag)',
                           !tab.available && 'dshx:opacity-50',
                           dropIndex === index && DROP_CARET,
@@ -324,6 +332,11 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         <span className="dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]">
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                           {tab.status === null ? null : <StatusDot size="sm" className={cn('dshx:flex-none', statusDotClass[tab.status])} />}
+                          {project === undefined ? null : (
+                            <span data-tab-project="" className="dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:text-(--dsw-alias-label-tertiary)">
+                              {project} /
+                            </span>
+                          )}
                           {tab.kind === 'thread' && renamingTabId === tab.id ? (
                             <InlineTitleEditor
                               value={tab.title}
@@ -341,7 +354,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                       </div>
                     </ContextMenuTrigger>
                   </TooltipTrigger>
-                  <TooltipContent>{tab.available ? tab.title : `${tab.title} — ${t('unavailable')}`}</TooltipContent>
+                  <TooltipContent>{tab.available ? fullTitle : `${fullTitle} — ${t('unavailable')}`}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
               <ContextMenuContent className="dshx-root">

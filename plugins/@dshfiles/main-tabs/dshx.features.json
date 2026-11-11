@@ -142,6 +142,20 @@
           "coveredBy": ["main-tabs.close-button-position-strip", "main-tabs.close-button-position-workbench", "main-tabs.close-button-position-publication"]
         },
         {
+          "key": "fixedTabWidth",
+          "defaultValue": "false",
+          "constraints": "Boolean; true gives every tab in the standalone strip the same 160px width instead of sizing it to its title. Workbench headers keep their own sizing.",
+          "choices": ["true", "false"],
+          "coveredBy": ["main-tabs.fixed-tab-width-default", "main-tabs.fixed-tab-width-strip"]
+        },
+        {
+          "key": "showProjectName",
+          "defaultValue": "false",
+          "constraints": "Boolean; true shows the owning project's folder name before thread titles in the standalone strip (thread workspaces and subagents resolve to their project). Panel and start tabs are unchanged; Workbench headers keep their own titles.",
+          "choices": ["true", "false"],
+          "coveredBy": ["main-tabs.fixed-tab-width-default", "main-tabs.project-name-strip", "main-tabs.project-name-folder"]
+        },
+        {
           "key": "maxTabs",
           "defaultValue": "10",
           "constraints": "Integer 0\u201350; past it the least recently used tab closes, skipping pinned, active and still-working (running or waiting for you) tabs. 0 keeps every tab.",
@@ -177,6 +191,30 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.fixed-tab-width-default",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "sizes tabs to their titles and hides project names by default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.fixed-tab-width-strip",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "gives every tab the same width when fixed width is on"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.project-name-strip",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "shows the project name before thread titles only"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.project-name-folder",
+          "file": "plugins/@dshfiles/main-tabs/src/project-names.test.ts",
+          "testName": "names each project workspace after its folder"
+        },
         {
           "kind": "unit-test",
           "id": "main-tabs.close-button-position-strip",
