@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "catalog-read-reuse",
+      "title": "Tasks and reminder catalogs keep their read until a schedule change",
+      "summary": "The native Tasks page, task tabs and the Session header's reminders from one owned fork of the stock row. Behaviour is the native one; a reminder catalog subscribed again keeps its last read while no schedule/changed event or connection reset happened since, so reopening a thread or the Tasks page no longer rereads schedule/list. A subscribed catalog still rereads on every change and reset.",
+      "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "work",
+      "currentSurface": "sidebar: Tasks page, task tabs and the Session header's reminders",
+      "configuration": [],
+      "states": ["first-read", "kept-read", "reread-after-change", "reread-after-reset"],
+      "failureModes": [
+        "A change missed while nothing subscribed moves the page-wide revision, so the next subscriber reads again instead of keeping a stale list.",
+        "A refused read keeps the native error state; the next change or reset reads again."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only fork: it calls the native schedule Remote methods whose Host spans belong to core; the Host half is the native no-op."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "schedule.keep-last-read",
+          "file": "plugins/@dshfiles/schedule/tests/catalog-source.test.ts",
+          "testName": "keeps its last read while no schedule change or reset happened since"
+        },
+        {
+          "kind": "unit-test",
+          "id": "schedule.reread-missed-change",
+          "file": "plugins/@dshfiles/schedule/tests/catalog-source.test.ts",
+          "testName": "reads again after a change it missed while nothing subscribed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "schedule.reread-while-subscribed",
+          "file": "plugins/@dshfiles/schedule/tests/catalog-source.test.ts",
+          "testName": "still rereads on a change while subscribed"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "schedule.no-browser-delta",
+          "reason": "The Tasks page and header reminders are the upstream components; the delta is when a catalog rereads schedule/list, which tests/catalog-source.test.ts counts across subscribe, change and reset, and every other vendored file equals the pinned tag (node scripts/native-fork-diff.mjs schedule)."
+        }
+      ]
+    }
+  ]
+}

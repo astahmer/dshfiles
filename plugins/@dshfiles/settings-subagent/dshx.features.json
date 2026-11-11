@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "subagent-settings",
+      "title": "Subagent settings",
+      "summary": "The native Subagent plugin page (recursion depth, concurrent count and subagent model selection) from one owned fork of the stock row. Behaviour is the native one; the model catalog read waits for the page's first connected generation instead of being repeated by its first reset, and joins any other page-wide read of the catalog in flight.",
+      "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Plugins \u203a Subagent",
+      "configuration": [],
+      "states": ["limits", "model-selection", "catalog-loading", "unserved"],
+      "failureModes": [
+        "A Host that serves neither subagent namespace hides the page, as natively.",
+        "A refused catalog read leaves the model picker in the native error state; the next connection reset reads again."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-client-ui-settings",
+          "boundary": "configForms serves the subagent and subagent model-selection sections the page edits.",
+          "deterministicFake": "Focused tests drive the controller with a typed remote and connection fake; the scratch journey uses the real settings shell."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only fork: it calls the native session/modelCatalog and settings Remote methods whose Host spans belong to core; the Host half is the native no-op."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-subagent.subagent-settings",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-subagent.catalog-read-once",
+          "file": "plugins/@dshfiles/settings-subagent/tests/catalog-read.test.ts",
+          "testName": "reads once at boot: the read waits for the first connected generation, which needs no reread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-subagent.catalog-read-shared",
+          "file": "plugins/@dshfiles/settings-subagent/tests/catalog-read.test.ts",
+          "testName": "shares one request with another owner reading the catalog at the same time"
+        }
+      ]
+    }
+  ]
+}

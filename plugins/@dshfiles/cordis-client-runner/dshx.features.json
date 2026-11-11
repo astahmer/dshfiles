@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "infrastructure",
+  "features": [
+    {
+      "id": "inspect-manifest-once",
+      "title": "Publish the Client inspect manifest once per connection",
+      "summary": "The native dynamic-package runner from one owned fork of the stock row. Behaviour is the native one; the page's inspect manifest is no longer sent before the connection is up and then again by the first reset: the first connected generation publishes it once, and every later generation publishes it again.",
+      "surfaces": ["client"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "client: dynamic Cordis package runner (no UI)",
+      "configuration": [],
+      "states": ["awaiting-connection", "published", "republished-after-reset"],
+      "failureModes": [
+        "A page that is already connected at setup publishes at setup, as natively.",
+        "A refused manifest sync is logged by the native runner and retried by the next connection reset."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only fork: it calls the native dynamicCordisRunner Remote methods whose Host spans belong to core; the Host half is the native no-op."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "cordis-client-runner.manifest-once",
+          "file": "plugins/@dshfiles/cordis-client-runner/tests/inspect-manifest.test.ts",
+          "testName": "is published once at boot: the first connected generation sends it, later ones send it again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "cordis-client-runner.manifest-connected",
+          "file": "plugins/@dshfiles/cordis-client-runner/tests/inspect-manifest.test.ts",
+          "testName": "is published at setup when the page is already connected"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "cordis-client-runner.no-browser-surface",
+          "reason": "The runner renders no UI: its delta is how many syncInspectManifest calls a page load sends, which tests/inspect-manifest.test.ts counts; every other vendored file equals the pinned tag (node scripts/native-fork-diff.mjs cordis-client-runner)."
+        }
+      ]
+    }
+  ]
+}

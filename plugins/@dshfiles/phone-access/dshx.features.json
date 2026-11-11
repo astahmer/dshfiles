@@ -72,7 +72,7 @@
           "kind": "custom",
           "span": "phone access serve",
           "file": "plugins/@dshfiles/phone-access/tests/tailnet.test.ts",
-          "testName": "records one bounded span even when Tailscale is absent"
+          "testName": "records one bounded span and refuses an invalid port without running Tailscale"
         }
       ]
     }

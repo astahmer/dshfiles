@@ -521,3 +521,16 @@ Then('the Web search page renders the owned fork instead of a placeholder', asyn
   })
   await finishJourneyAssertions(page)
 })
+
+When('the Subagent plugin page is opened in Settings', async ({ page }: { page: Page }) => {
+  await openGlobalPanel(page, 'Plugins')
+  await page.getByRole('button', { name: 'View Subagent', exact: true }).click()
+})
+
+Then('the Subagent page renders the owned fork instead of a placeholder', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-subagent-page-renders-the-fork', async () => {
+    await expect(page.getByRole('heading', { name: 'Subagent', exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Maximum recursion depth', { exact: true }).first()).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

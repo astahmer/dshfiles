@@ -10,7 +10,8 @@
     "locale",
     "LICENSE",
     "README.md",
-    "native-fork.json"
+    "native-fork.json",
+    "dshx.features.json"
   ],
   "type": "module",
   "main": "./dist/index.js",
@@ -104,5 +105,8 @@
         "@dshfiles/shared-runtime"
       ]
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }

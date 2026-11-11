@@ -50,12 +50,5 @@
         }
       ]
     }
-  ],
-  "ioDelegation": [
-    {
-      "file": "plugins/@dshfiles/session-log-window/src/window.ts",
-      "tracedBy": "session tail read",
-      "reason": "Every open runs inside the calling plugin's session tail read span, which records the window's bytes, frames and per-phase timings."
-    }
   ]
 }

@@ -455,7 +455,7 @@
           "kind": "unit-test",
           "id": "main-tabs.thread-tab-mention-menu",
           "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
-          "testName": "mentions a thread from its tab menu into the main composer"
+          "testName": "mentions a thread from its tab menu into the stage composer"
         },
         {
           "kind": "unit-test",

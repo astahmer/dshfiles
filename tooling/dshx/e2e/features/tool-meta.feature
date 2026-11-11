@@ -28,3 +28,20 @@ Feature: Tool call timing
     Then the tool card start time reads relative to now
     When the tool timing is turned off
     Then no tool card shows a timing
+
+  @scenario:tool-meta.read-code-card @scenario:tool-meta.file-diff-card
+  Scenario: A settled read shows its window as code and a settled write shows its diff
+    Given the isolated plugin composition of "@dshfiles/tool-meta, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model reads a window of one file and writes another in a fresh workspace
+    Then the read card names the file and numbers the window from the requested offset
+    And the write card shows the added lines as a collapsible diff
+
+  @scenario:tool-meta.approval-card
+  Scenario: A command asking for more access waits on a risk card until it is rejected
+    Given the isolated plugin composition of "@dshfiles/tool-meta, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model asks to run a deleting command with more access in a fresh workspace
+    Then the approval card rates the command destructive and shows the tool, its reason and the command
+    When the approval card is rejected with Escape
+    Then the approval card is gone and the command never ran
