@@ -7,6 +7,7 @@ import { useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
 import type { BacklogSort } from './backlog-sort.js'
+import { InboxFilters } from './inbox-filters.js'
 import { inboxRows, type InboxFilter } from './inbox-model.js'
 import { linkedThreadIds, type InboxThread } from './inbox-threads.js'
 import { LinkedThreadChips } from './linked-thread-chips.js'
@@ -24,14 +25,6 @@ const threadReasons = {
   error: { label: 'stopped with an error', Icon: CircleAlertIcon, tone: 'dshx:text-destructive' },
   'max-tokens': { label: 'ran out of tokens', Icon: CircleAlertIcon, tone: 'dshx:text-warning' },
 } satisfies Record<InboxThread['reason'], { readonly label: string; readonly Icon: typeof CheckIcon; readonly tone: string }>
-
-const filters: readonly { readonly value: InboxFilter; readonly label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'needs-input', label: 'Needs you' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'suggestions', label: 'Suggestions' },
-  { value: 'overdue', label: 'Overdue' },
-]
 
 /** Read is not done: an acknowledged request stays here until its attention is cleared. */
 const isUnread = (item: BacklogSummaryView): boolean => item.acknowledgedAt === null || item.acknowledgedAt < item.lastActivityAt
@@ -78,39 +71,14 @@ export const InboxView = (props: {
   const [filter, setFilter] = useState<InboxFilter>('all')
   const rows = inboxRows({ items: props.items, threads: props.threads, filter, sort: props.sort })
   const selection = useBacklogSelection({ items: rows.map(row => row.item), openId: props.openId, scope: filter })
+  const countOf = (value: InboxFilter): number => inboxRows({ items: props.items, threads: props.threads, filter: value }).length
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1">
       <section
         aria-label="Inbox"
         className="dshx:flex dshx:w-[400px] dshx:max-w-full dshx:shrink-0 dshx:flex-col dshx:border-r dshx:border-border dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-r-0"
       >
-        <div
-          role="tablist"
-          aria-label="Inbox filters"
-          className="dshx:flex dshx:h-10 dshx:shrink-0 dshx:items-end dshx:gap-2 dshx:overflow-x-auto dshx:overflow-y-hidden dshx:border-b dshx:border-border dshx:px-4 dshx:[scrollbar-width:none] dshx:[&::-webkit-scrollbar]:hidden"
-        >
-          {filters.map(entry => {
-            const count = inboxRows({ items: props.items, threads: props.threads, filter: entry.value }).length
-            return (
-              <button
-                key={entry.value}
-                role="tab"
-                type="button"
-                aria-selected={filter === entry.value}
-                onClick={() => setFilter(entry.value)}
-                className={cn(
-                  'dshx:flex dshx:h-full dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b-2 dshx:text-[13px] dshx:whitespace-nowrap dshx:transition-colors',
-                  filter === entry.value
-                    ? 'dshx:border-foreground dshx:font-medium dshx:text-foreground'
-                    : 'dshx:border-transparent dshx:text-muted-foreground dshx:hover:text-foreground',
-                )}
-              >
-                {entry.label}
-                {count === 0 ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{count}</span>}
-              </button>
-            )
-          })}
-        </div>
+        <InboxFilters countOf={countOf} filter={filter} onChange={setFilter} />
         {props.openInbox === undefined ? null : (
           <p className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
             Backlog items that need you also appear in the

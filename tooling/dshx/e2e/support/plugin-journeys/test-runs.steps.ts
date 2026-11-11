@@ -36,8 +36,8 @@ Then('the finished tool call shows a Vitest results card', async ({ page }: { pa
   await recordAssertion(page, 'test-runs-card-shows-vitest-results', async () => {
     const results = card.locator('[data-test-runs-card]')
     await expect(results).toBeVisible()
-    await expect(results.getByRole('tab', { name: /^all \d+$/ })).toBeVisible()
-    await expect(results.getByRole('tab', { name: /^failed 0$/ })).toBeVisible()
+    await expect(results.getByRole('radio', { name: /^all \d+$/ })).toBeVisible()
+    await expect(results.getByRole('radio', { name: /^failed 0$/ })).toBeVisible()
     await expect(results.getByText(/vitest-report\.test\.ts/)).toBeVisible()
   })
   await finishJourneyAssertions(page)

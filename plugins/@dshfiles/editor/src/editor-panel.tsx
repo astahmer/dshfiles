@@ -274,7 +274,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         <Button aria-label="Toggle file tree" aria-pressed={showTree} onClick={() => setShowTree(value => !value)} size="icon-xs" variant="ghost">
           <FolderTreeIcon />
         </Button>
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-0.5 dshx:overflow-x-auto" role="tablist">
+        <div aria-label="Open files" className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-0.5 dshx:overflow-x-auto" role="group">
           {sessionDocuments.map(document => (
             <div
               className={cn(
@@ -284,10 +284,9 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
               key={document.id}
             >
               <button
-                aria-selected={document.id === activeId}
+                aria-current={document.id === activeId}
                 className="dshx:min-w-0 dshx:truncate dshx:outline-none"
                 onClick={() => props.store.activate(sessionId, document.id)}
-                role="tab"
                 title={document.path}
                 type="button"
               >

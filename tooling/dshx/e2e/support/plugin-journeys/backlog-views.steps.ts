@@ -30,7 +30,7 @@ const showInboxFilter = async (page: Page, filter: string): Promise<void> => {
 Then('the Inbox filters stay on one line', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'backlog-inbox-filter-tabs', async () => {
     const whiteSpaces = await inbox(page)
-      .getByRole('tab')
+      .getByRole('radio')
       .evaluateAll(nodes => nodes.map(node => getComputedStyle(node).whiteSpace))
     expect(whiteSpaces.length).toBeGreaterThan(0)
     expect(whiteSpaces.every(whiteSpace => whiteSpace === 'nowrap')).toBe(true)

@@ -5,6 +5,7 @@ import { StatusIcon, ToolCard } from '@dshfiles/plugin-ui/components/tool-card'
 import { HeightReveal } from '@dshfiles/plugin-ui/components/motion/height-reveal'
 import { ShimmerText } from '@dshfiles/plugin-ui/components/motion/text'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { ChevronDownIcon, ChevronUpIcon, CircleCheckIcon, CopyIcon, RotateCwIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { animate, motionSafe, springs, staggers } from '@dshfiles/plugin-ui/motion'
@@ -252,29 +253,38 @@ const TallyBar = (props: { readonly tally: TestRun['testTally'] }) => {
 
 const FILTERS = ['all', 'failed', 'skipped', 'slow'] as const satisfies readonly Filter[]
 
-/** Filter tabs whose highlight slides to the selected one; they stay real tabs for assistive tech and tests. */
+/** A filter over one list, so a toggle group (one Tab stop, arrow keys) whose highlight slides to the selected filter. */
 const FilterTabs = (props: { readonly value: Filter; readonly counts: Readonly<Record<Filter, number>>; readonly onChange: (filter: Filter) => void }) => {
   const { ref, indicatorRef } = useSlidingIndicator<HTMLDivElement, HTMLSpanElement>(props.value)
   return (
-    <div className="dshx:relative dshx:flex dshx:flex-wrap dshx:gap-1" ref={ref} role="tablist">
+    <div className="dshx:relative" ref={ref}>
       <span aria-hidden className="dshx:pointer-events-none dshx:absolute dshx:rounded-md dshx:bg-muted dshx:opacity-0" ref={indicatorRef} />
-      {FILTERS.map(candidate => (
-        <button
-          aria-selected={props.value === candidate}
-          className={cn(
-            'dshx:relative dshx:rounded-md dshx:px-2 dshx:py-0.5 dshx:text-sm dshx:capitalize dshx:transition-colors dshx:motion-reduce:transition-none',
-            props.value === candidate ? 'dshx:font-medium' : 'dshx:text-muted-foreground dshx:hover:text-foreground',
-            props.counts[candidate] === 0 && candidate !== 'all' && 'dshx:opacity-50',
-          )}
-          data-indicator-key={candidate}
-          key={candidate}
-          onClick={() => props.onChange(candidate)}
-          role="tab"
-          type="button"
-        >
-          {candidate} <span className="dshx:tabular-nums">{props.counts[candidate]}</span>
-        </button>
-      ))}
+      <ToggleGroup
+        aria-label="Test filters"
+        className="dshx:flex-wrap"
+        onValueChange={next => {
+          const filter = FILTERS.find(candidate => candidate === next)
+          if (filter !== undefined) props.onChange(filter)
+        }}
+        spacing={1}
+        type="single"
+        value={props.value}
+      >
+        {FILTERS.map(candidate => (
+          <ToggleGroupItem
+            className={cn(
+              'dshx:relative dshx:h-auto dshx:min-w-0 dshx:px-2 dshx:py-0.5 dshx:font-normal dshx:capitalize dshx:transition-colors dshx:hover:bg-transparent dshx:data-[state=on]:bg-transparent dshx:data-[state=on]:text-foreground dshx:motion-reduce:transition-none',
+              props.value === candidate ? 'dshx:font-medium dshx:text-foreground' : 'dshx:text-muted-foreground dshx:hover:text-foreground',
+              props.counts[candidate] === 0 && candidate !== 'all' && 'dshx:opacity-50',
+            )}
+            data-indicator-key={candidate}
+            key={candidate}
+            value={candidate}
+          >
+            {candidate} <span className="dshx:tabular-nums">{props.counts[candidate]}</span>
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
     </div>
   )
 }

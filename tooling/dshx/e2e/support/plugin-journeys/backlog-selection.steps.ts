@@ -60,9 +60,9 @@ Then('the {string} backlog list supports coherent batch selection', async ({ pag
   await expect(selectedRows(rows)).toHaveCount(3)
 
   if (view === 'inbox') {
-    await page.getByRole('tab', { name: /^Blocked/ }).click()
+    await page.getByRole('radio', { name: /^Blocked/ }).click()
     await expect(rows).toHaveCount(0)
-    await page.getByRole('tab', { name: /^All/ }).click()
+    await page.getByRole('radio', { name: /^All/ }).click()
     await expect(rows).toHaveCount(3)
     await expect(selectedRows(rows)).toHaveCount(0)
   } else {
