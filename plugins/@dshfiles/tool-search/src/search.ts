@@ -200,23 +200,20 @@ const prepareTool = (schema: ToolSchema): PreparedTool => {
   }
 }
 
-/** Only the name and description feed the preparation, so identical text reuses one entry across registry projections. */
-const preparedTools = new Map<string, Map<string, PreparedTool>>()
+/**
+ * Only the name and description feed the preparation, so identical text reuses one entry across registry projections.
+ * Keyed by both (a tool name never holds NUL), so the map's own size bounds it.
+ */
+const preparedTools = new Map<string, PreparedTool>()
 const preparedLimit = 2048
-let preparedCount = 0
 
 const prepare = (schema: ToolSchema): PreparedTool => {
-  const cached = preparedTools.get(schema.name)?.get(schema.description)
+  const key = `${schema.name}\u0000${schema.description}`
+  const cached = preparedTools.get(key)
   if (cached !== undefined) return cached
   const prepared = prepareTool(schema)
-  if (preparedCount >= preparedLimit) {
-    preparedTools.clear()
-    preparedCount = 0
-  }
-  const byDescription = preparedTools.get(schema.name) ?? new Map<string, PreparedTool>()
-  byDescription.set(schema.description, prepared)
-  preparedTools.set(schema.name, byDescription)
-  preparedCount += 1
+  if (preparedTools.size >= preparedLimit) preparedTools.clear()
+  preparedTools.set(key, prepared)
   return prepared
 }
 
