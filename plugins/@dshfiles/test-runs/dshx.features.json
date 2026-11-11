@@ -143,9 +143,15 @@
         },
         {
           "kind": "unit-test",
+          "id": "test-runs.stack-trace-path-count",
+          "file": "plugins/@dshfiles/plugin-ui/tests/stack-frames.test.ts",
+          "testName": "ignores grep -c and scoped-package paths that look like Gecko frames"
+        },
+        {
+          "kind": "unit-test",
           "id": "test-runs.stack-trace-frames",
           "file": "plugins/@dshfiles/plugin-ui/tests/code-block.test.tsx",
-          "testName": "hides library frames behind a toggle and opens a frame at its line"
+          "testName": "folds library frames into one row, with no heading, and opens a frame at its line"
         }
       ],
       "telemetry": [

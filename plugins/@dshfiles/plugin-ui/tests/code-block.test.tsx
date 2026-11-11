@@ -57,15 +57,19 @@ describe('StackTrace', () => {
     ].join('\n'),
   )
 
-  it('hides library frames behind a toggle and opens a frame at its line', () => {
+  it('folds library frames into one row, with no heading, and opens a frame at its line', () => {
     const openFile = vi.fn()
-    const view = render(<StackTrace frames={report?.frames ?? []} heading="TypeError: price is not a number" openFile={openFile} />)
+    const view = render(<StackTrace frames={report?.frames ?? []} openFile={openFile} />)
     const list = view.getByRole('list', { name: 'Stack frames' })
     expect(list.textContent).toContain('total')
+    expect(list.textContent).toContain('cart.js:12')
     expect(list.textContent).not.toContain('_compile')
-    expect(view.getByText(/2 in your code · 1 in libraries/)).toBeTruthy()
+    expect(view.queryByRole('heading')).toBeNull()
 
-    fireEvent.click(view.getByRole('button', { name: 'Show library frames' }))
+    const library = view.getByRole('button', { name: '1 library frame' })
+    expect(library.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(library)
+    expect(library.getAttribute('aria-expanded')).toBe('true')
     expect(view.getByRole('list', { name: 'Stack frames' }).textContent).toContain('_compile')
 
     fireEvent.click(view.getByRole('button', { name: /^total/ }))

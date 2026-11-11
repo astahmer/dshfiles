@@ -75,7 +75,8 @@ Then('the finished tool call shows a stack trace card', async ({ page }: { page:
   await recordAssertion(page, 'test-runs-card-shows-stack-trace', async () => {
     const trace = card.locator('[data-stack-trace]')
     await expect(trace).toBeVisible()
-    await expect(trace.getByRole('heading', { name: 'TypeError: price is not a number' })).toBeVisible()
+    await expect(card.getByText('TypeError: price is not a number').first()).toBeVisible()
+    await expect(trace.getByRole('heading')).toHaveCount(0)
     await expect(trace.getByRole('list', { name: 'Stack frames' })).toContainText('total')
   })
   await finishJourneyAssertions(page)

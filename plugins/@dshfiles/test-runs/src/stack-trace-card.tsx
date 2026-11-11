@@ -32,7 +32,7 @@ export const StackTraceCard = (props: { readonly report: StackTraceReport; reado
           {props.report.message.includes('\n') && (
             <span className="dshx:font-mono dshx:text-xs dshx:break-words dshx:whitespace-pre-wrap dshx:text-muted-foreground">{props.report.message}</span>
           )}
-          <StackTrace frames={props.report.frames} heading={headline(props.report)} openFile={props.openFile} />
+          <StackTrace frames={props.report.frames} openFile={props.openFile} />
         </div>
       </ToolCard>
     </div>

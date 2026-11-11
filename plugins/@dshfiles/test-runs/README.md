@@ -11,8 +11,8 @@ A `bash` call that runs Vitest renders as a test-results card in the chat transc
 
 Any other command, or Vitest output the parser cannot read, keeps the native bash card. When that command printed an
 error with a stack trace (Node, Deno, Bun, a JVM exception or a Python traceback), a **Stack trace** card follows the
-native card: the error headline, your frames innermost first with library frames one toggle away, and each frame
-opening its file at its line. It reads the first trace only, through `StackFrames.extract` from `@dshfiles/plugin-ui`.
+native card: the error headline in the card row, then your frames innermost first as compact mono rows, each run of
+library frames folded into one "N library frames" row, and each frame opening its file at its line. It reads the first trace only, through `StackFrames.extract` from `@dshfiles/plugin-ui`.
 
 Built with dshx (no port). The design follows the "agent test runs" block from hextaui; nothing is vendored from it.
 

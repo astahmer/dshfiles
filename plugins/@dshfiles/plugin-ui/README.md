@@ -264,7 +264,7 @@ import { StackFrames } from '@dshfiles/plugin-ui/lib/stack-frames'
 
 ;<CodeBlock code={source} path="src/cart/pricing.ts" startLine={27} highlightLines={[29]} />
 const report = StackFrames.extract(output) // first error + frames in command output, or undefined
-;<StackTrace heading={`${report.errorName}: ${report.message}`} frames={report.frames} openFile={openFile} />
+;<StackTrace frames={report.frames} openFile={openFile} />
 ```
 
 - `CodeBlock` highlights with the Host's lazy Shiki grammars (`useCodeHighlighter`, grammar from `path` or `lang`) and
@@ -276,10 +276,12 @@ const report = StackFrames.extract(output) // first error + frames in command ou
   `file`, full `path`, `line` and `column`; application frames are `changed`, library and runtime frames
   (`node_modules`, `node:`, `site-packages`, `java.`) `existing`. `StackFrames.extract(output)` finds the first error in
   command output with its header (`TypeError: …`, a JVM `Exception in thread`, a Python traceback's last line) and its
-  frames; one frame-like line with no header above it is not a trace, and a `Caused by` chain ends it.
+  frames. With no header above, only two or more `at …` lines count as a trace; a `file:0` line (`grep -c`) or a Gecko
+  location that is not a URL or absolute file path is never a frame, and a `Caused by` chain ends it.
 - `StackTrace` shows the location, the `CodeFrame` (a `CodeBlock` numbered from the frame's first line, failing line
-  marked) and the frames in a `CallStackTree`, library frames behind a toggle. Selecting a frame calls
-  `openFile(path, { line })`. `locationFrame` turns a Vitest `file:line:column` location into a frame with no function
+  marked) and the frames as flat mono rows (name, then a dim `file:line`) with no card or heading of its own, so it sits
+  inside a `ToolCard`. Each run of library frames folds into one "N library frames" row that expands in place. Selecting
+  a frame calls `openFile(path, { line })`. `locationFrame` turns a Vitest `file:line:column` location into a frame with no function
   name (`bare`).
 
 Adopters: test-runs (failing tests, and the Stack trace card under any bash call that crashed) and traces (span

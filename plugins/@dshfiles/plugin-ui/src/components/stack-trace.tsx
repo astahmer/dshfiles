@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { ChevronRightIcon } from '../icons.js'
 import { cn } from '../lib/utils.js'
 import { CodeBlock, FilePath } from './code-block.js'
-import { CallStackTree, type CallFrame } from './motion/call-stack-tree.js'
+import type { CallFrame } from './motion/call-stack-tree.js'
 
 export interface SourceLocation {
   readonly file: string
@@ -64,62 +65,104 @@ export const locationFrame = (location: SourceLocation, index: number): CallFram
   status: /node_modules|^node:/.test(location.file) ? 'existing' : 'changed',
 })
 
+type StackRow = { readonly kind: 'frame'; readonly frame: CallFrame } | { readonly kind: 'library'; readonly id: string; readonly frames: readonly CallFrame[] }
+
+/** Each run of consecutive library frames becomes one row, unless the whole stack is library code. */
+const stackRows = (frames: readonly CallFrame[]): readonly StackRow[] => {
+  if (frames.every(frame => frame.status === 'existing')) return frames.map(frame => ({ kind: 'frame', frame }))
+  const rows: StackRow[] = []
+  for (const frame of frames) {
+    const previous = rows.at(-1)
+    if (frame.status !== 'existing') rows.push({ kind: 'frame', frame })
+    else if (previous?.kind === 'library') rows[rows.length - 1] = { ...previous, frames: [...previous.frames, frame] }
+    else rows.push({ kind: 'library', id: frame.id, frames: [frame] })
+  }
+  return rows
+}
+
+const ROW = 'dshx:flex dshx:min-h-6 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:rounded-sm dshx:px-1.5 dshx:@max-pane-narrow:min-h-11'
+const INTERACTIVE_ROW = 'dshx:text-left dshx:font-mono! dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/60'
+
+const FrameRow = (props: { readonly frame: CallFrame; readonly openFile: OpenFile | undefined }): JSX.Element => {
+  const frame = props.frame
+  const library = frame.status === 'existing'
+  const label = (
+    <>
+      <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', library ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}>
+        {frame.receiver !== undefined && <span className="dshx:text-muted-foreground">{frame.receiver}.</span>}
+        {frame.name}
+      </span>
+      {frame.bare !== true && frame.file !== undefined && (
+        <span className="dshx:max-w-[50%] dshx:shrink-0 dshx:truncate dshx:text-muted-foreground">
+          {frame.file}
+          {frame.line === undefined ? '' : `:${String(frame.line)}`}
+        </span>
+      )}
+    </>
+  )
+  const path = frame.path ?? frame.file
+  if (props.openFile === undefined || path === undefined) return <div className={ROW}>{label}</div>
+  return (
+    <button className={cn(ROW, INTERACTIVE_ROW)} onClick={() => props.openFile?.(path, frame.line === undefined ? {} : { line: frame.line })} type="button">
+      {label}
+    </button>
+  )
+}
+
 /**
- * Where an error happened: the location (opens the file when `openFile` is given), its code frame, and the call stack
- * as a `CallStackTree`, innermost first. Library and runtime frames (`status: 'existing'`) hide behind a toggle;
- * selecting a frame opens its file at its line.
+ * Where an error happened: the location (opens the file when `openFile` is given), its code frame, and the call stack as
+ * flat mono rows, innermost first. Each run of library and runtime frames (`status: 'existing'`) folds into one row that
+ * expands in place; selecting a frame opens its file at its line.
  */
 export const StackTrace = (props: {
-  /** The error as one line (`TypeError: price is not a number`); defaults to the frame count. */
-  readonly heading?: string | undefined
   readonly location?: SourceLocation | undefined
   readonly codeFrame?: readonly CodeFrameLine[]
   readonly frames: readonly CallFrame[]
   readonly openFile?: OpenFile | undefined
   readonly className?: string | undefined
 }): JSX.Element => {
-  const [showLibrary, setShowLibrary] = useState(false)
-  const libraryCount = props.frames.filter(frame => frame.status === 'existing').length
-  const ownCount = props.frames.length - libraryCount
-  const visible = showLibrary || ownCount === 0 ? props.frames : props.frames.filter(frame => frame.status !== 'existing')
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+  const toggle = (id: string) =>
+    setExpanded(previous => {
+      const next = new Set(previous)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   const codeFrame = props.codeFrame ?? []
-  const openFrame = (id: string) => {
-    const frame = props.frames.find(candidate => candidate.id === id)
-    const path = frame?.path ?? frame?.file
-    if (path === undefined) return
-    props.openFile?.(path, frame?.line === undefined ? {} : { line: frame.line })
-  }
   return (
-    <div className={cn('dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2', props.className)} data-stack-trace="">
+    <div className={cn('dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2', props.className)} data-stack-trace="">
       {props.location !== undefined && <LocationLink location={props.location} openFile={props.openFile} />}
       {codeFrame.length > 0 && <CodeFrame highlightLine={props.location?.line} lines={codeFrame} path={props.location?.file ?? ''} />}
       {props.frames.length > 0 && (
-        <CallStackTree
-          className="dshx:gap-2 dshx:rounded-lg dshx:p-3 dshx:@max-pane-narrow:p-2"
-          heading={props.heading ?? `${String(props.frames.length)} ${props.frames.length === 1 ? 'frame' : 'frames'}`}
-          listLabel="Stack frames"
-          roots={visible}
-          spacedRoots={false}
-          summary={
-            <span className="dshx:flex dshx:items-center dshx:gap-3 dshx:text-xs">
-              <span>
-                {ownCount} in your code
-                {libraryCount > 0 && ` · ${String(libraryCount)} in libraries`}
-              </span>
-              {libraryCount > 0 && ownCount > 0 && (
-                <button
-                  aria-pressed={showLibrary}
-                  className="dshx:text-foreground dshx:underline-offset-2 dshx:hover:underline"
-                  onClick={() => setShowLibrary(value => !value)}
-                  type="button"
-                >
-                  {showLibrary ? 'Hide library frames' : 'Show library frames'}
+        <ul aria-label="Stack frames" className="dshx:m-0 dshx:flex dshx:list-none dshx:flex-col dshx:p-0 dshx:font-mono dshx:text-xs">
+          {stackRows(props.frames).map(row => {
+            if (row.kind === 'frame')
+              return (
+                <li key={row.frame.id}>
+                  <FrameRow frame={row.frame} openFile={props.openFile} />
+                </li>
+              )
+            const open = expanded.has(row.id)
+            return (
+              <li key={row.id}>
+                <button aria-expanded={open} className={cn(ROW, INTERACTIVE_ROW, 'dshx:text-muted-foreground')} onClick={() => toggle(row.id)} type="button">
+                  <ChevronRightIcon className={cn('dshx:size-3 dshx:shrink-0', open && 'dshx:rotate-90')} />
+                  {row.frames.length} library {row.frames.length === 1 ? 'frame' : 'frames'}
                 </button>
-              )}
-            </span>
-          }
-          {...(props.openFile === undefined ? {} : { onSelectFrame: openFrame })}
-        />
+                {open && (
+                  <ul className="dshx:m-0 dshx:list-none dshx:p-0 dshx:pl-4">
+                    {row.frames.map(frame => (
+                      <li key={frame.id}>
+                        <FrameRow frame={frame} openFile={props.openFile} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            )
+          })}
+        </ul>
       )}
     </div>
   )

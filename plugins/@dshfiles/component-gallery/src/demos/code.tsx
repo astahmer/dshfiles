@@ -34,7 +34,7 @@ const PYTHON_CRASH = [
 const StackTraceDemo = (props: { readonly output: string }) => {
   const report = StackFrames.extract(props.output)
   if (report === undefined) return null
-  return <StackTrace frames={report.frames} heading={`${report.errorName}: ${report.message}`} openFile={() => undefined} />
+  return <StackTrace frames={report.frames} openFile={() => undefined} />
 }
 
 export const codeDemos: readonly GalleryDemo[] = [
@@ -60,7 +60,8 @@ export const codeDemos: readonly GalleryDemo[] = [
   {
     id: 'stack-trace-node',
     title: 'StackTrace',
-    description: 'A Node crash read from command output: your frames first, library frames one toggle away, each frame opening its file.',
+    description:
+      'A Node crash read from command output: your frames as mono rows, each run of library frames folded into one row, each frame opening its file.',
     source: "import { StackTrace } from '@dshfiles/plugin-ui/components/stack-trace'",
     wide: true,
     render: () => <StackTraceDemo output={NODE_CRASH} />,
