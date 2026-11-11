@@ -1,3 +1,4 @@
+import { hash as hashSha256 } from 'fast-sha256'
 import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { assign, fromCallback, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
@@ -121,10 +122,12 @@ const decodeText = (data: Uint8Array): string | undefined => {
   }
 }
 
+const hex = (bytes: Uint8Array): string => [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('')
+
+/** crypto.subtle is missing on a page opened over plain HTTP from a LAN or tailnet address; hash in JS there. */
 const sha256 = async (bytes: Uint8Array<ArrayBuffer>): Promise<string> => {
-  if (globalThis.crypto?.subtle === undefined) throw new Error('Saving needs a secure context (https or localhost) for content hashing.')
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+  const subtle = globalThis.crypto?.subtle
+  return subtle === undefined ? hex(hashSha256(bytes)) : hex(new Uint8Array(await subtle.digest('SHA-256', bytes)))
 }
 
 const read = fromPromise<DocumentView, ReadInput>(async ({ input, signal }) => {

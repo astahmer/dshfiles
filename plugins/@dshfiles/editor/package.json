@@ -39,6 +39,7 @@
     "@dshfiles/workbench": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:",
+    "fast-sha256": "1.3.0",
     "monaco-editor": "0.57.0"
   },
   "devDependencies": {
@@ -58,6 +59,7 @@
     "@deepseek-ai/dsh-storage": "catalog:",
     "@deepseek-ai/dsh-storage-domain": "catalog:",
     "@deepseek-ai/dsh-storage-json": "catalog:",
+    "@deepseek-ai/dsh-util-crypto": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
     "@effect/vitest": "catalog:",
     "@types/node": "22.20.5",
@@ -81,6 +83,7 @@
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-util-crypto": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "^3.18.4"
   },
   "dsh": {

@@ -1,3 +1,4 @@
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { parseSecretReference } from '@dshfiles/credential-port'
 import { isApiError } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
@@ -386,7 +387,7 @@ const CreateFailure = (props: { readonly providerKind: string; readonly text: st
             size="xs"
             variant="ghost"
             onClick={() => {
-              void navigator.clipboard?.writeText(hint.command ?? '').catch(() => undefined)
+              void writeClipboard(hint.command ?? '')
               setCopied(true)
             }}
           >

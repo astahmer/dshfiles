@@ -9,7 +9,7 @@ import type { InboxTranslate } from './inbox-locales.js'
 /** Opt-in, per browser: off until the user turns it on and grants permission (plan §4.8, push only for blocking). */
 const storedBlockingAlerts = createStoredValue({ key: 'dshfiles.attention-inbox.blocking-alerts.v1', schema: Schema.Boolean, fallback: false })
 
-const notificationsSupported = (): boolean => typeof window !== 'undefined' && 'Notification' in window
+const notificationsSupported = (): boolean => typeof window !== 'undefined' && window.isSecureContext && 'Notification' in window
 
 const Toggle = (props: { readonly t: InboxTranslate }): JSX.Element | null => {
   const enabled = storedBlockingAlerts.useValue()

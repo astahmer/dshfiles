@@ -57,6 +57,18 @@ const start = (remote: { readonly readBytes: FakeWorkspaceRead }) => {
 }
 
 describe('editorDocumentMachine', () => {
+  it('opens a document on a plain-HTTP page, which has no crypto.subtle', async () => {
+    vi.stubGlobal('crypto', { getRandomValues: globalThis.crypto.getRandomValues.bind(globalThis.crypto) })
+    try {
+      const { actor } = start({ readBytes: async () => ({ ok: true, value: documentValue('abc', 'v1') }) })
+      await vi.waitFor(() => expect(actor.getSnapshot().matches('ready')).toBe(true))
+      expect(actor.getSnapshot().context.sha256).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+      actor.stop()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('lands on error without keeping a buffer when the read fails', async () => {
     const { actor } = start({ readBytes: async () => ({ ok: false, error: { code: 'workspace-file/outside-workspace', message: 'gone' } }) })
     await vi.waitFor(() => expect(actor.getSnapshot().matches('error')).toBe(true))

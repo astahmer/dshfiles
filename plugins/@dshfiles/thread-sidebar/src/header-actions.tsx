@@ -1,3 +1,4 @@
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
@@ -203,16 +204,7 @@ export const HeaderThreadActions = ({
     })
   }
   const copy = async (value: string, successKey: 'threadSidebarIdCopied' | 'threadSidebarLinkCopied'): Promise<void> => {
-    try {
-      if (navigator.clipboard === undefined) {
-        setCopyStatus(t('threadSidebarClipboardFailure'))
-        return
-      }
-      await navigator.clipboard.writeText(value)
-      setCopyStatus(t(successKey))
-    } catch {
-      setCopyStatus(t('threadSidebarClipboardFailure'))
-    }
+    setCopyStatus(t((await writeClipboard(value)) ? successKey : 'threadSidebarClipboardFailure'))
   }
   const continueIn = async (projectId: string): Promise<void> => {
     setActionFailed(false)

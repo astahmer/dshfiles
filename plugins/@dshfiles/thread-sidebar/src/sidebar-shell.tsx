@@ -13,6 +13,7 @@ import {
   IconSearchOutlineRegular,
   IconSettingsOutlineRegular,
   IconUnarchiveOutlineRegular,
+  writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
 import { PhonePairingQr } from '@dshfiles/phone-pairing/contract'
@@ -977,7 +978,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               label: text(props.t, 'threadSidebarCopyLaunchUrl'),
               aliases: ['token', 'url', 'dshx', 'agent access'],
               icon: <LinkIcon className="dshx:size-4" />,
-              run: () => void navigator.clipboard.writeText(launchUrl),
+              run: () => void writeClipboard(launchUrl),
             },
           ]),
       ...(runCommand === null

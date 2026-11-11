@@ -1,3 +1,4 @@
+import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ReferencePreviewAnchor } from '@dshfiles/input-trigger/entity-reference'
 import { ClipboardListIcon, CopyIcon } from '@dshfiles/plugin-ui/icons'
 import { useRef } from 'react'
@@ -51,7 +52,7 @@ export const BacklogReferenceChip = ({ reference: ref, itemTitle, interactive = 
         <button
           aria-label={`Copy ${BacklogReference.label(ref)} reference`}
           className="dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-          onClick={() => void navigator.clipboard?.writeText(BacklogReference.label(ref)).catch(() => undefined)}
+          onClick={() => void writeClipboard(BacklogReference.label(ref))}
           type="button"
         >
           <CopyIcon aria-hidden className="dshx:size-3" />
