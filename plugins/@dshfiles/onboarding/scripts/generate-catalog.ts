@@ -23,9 +23,35 @@ const featureSchemaFile = join(repoRoot, 'tooling', 'dshx', 'packages', 'dshx', 
 const repoPath = (file: string): string => relative(repoRoot, file).split('\\').join('/')
 const read = (file: string): string => readFileSync(file, 'utf8')
 
-// SAFETY: features.ts exports featureCatalogIssues as (value: unknown) => readonly string[].
-// oxlint-disable-next-line antislop/no-unknown-parameters -- the dshx schema check is the decode boundary for each raw catalog.
-const featureSchema = (await import(pathToFileURL(featureSchemaFile).href)) as { readonly featureCatalogIssues: (value: unknown) => readonly string[] }
+interface ParsedReachStep {
+  readonly action: string
+  readonly by?: string
+  readonly name?: string
+  readonly value?: string
+  readonly key?: string
+  readonly seed?: string
+  readonly file?: string
+}
+
+// SAFETY: features.ts exports featureCatalogIssues as (value: unknown) => readonly string[] and parseReachStep as (step: string) => ParsedReachStep | undefined.
+const featureSchema = (await import(pathToFileURL(featureSchemaFile).href)) as {
+  // oxlint-disable-next-line antislop/no-unknown-parameters -- the dshx schema check is the decode boundary for each raw catalog.
+  readonly featureCatalogIssues: (value: unknown) => readonly string[]
+  readonly parseReachStep: (step: string) => ParsedReachStep | undefined
+}
+
+/** The dshx grammar's own parse of each step, so the page and the Agent never re-implement it. */
+const reachStep = (text: string) => {
+  const parsed = featureSchema.parseReachStep(text)
+  if (parsed === undefined) throw new Error(`reach step does not parse: ${text}`)
+  return {
+    text,
+    action: parsed.action,
+    by: parsed.by ?? null,
+    name: parsed.name ?? null,
+    value: parsed.value ?? parsed.key ?? parsed.seed ?? parsed.file ?? null,
+  }
+}
 
 const SUMMARY_LIMIT = 280
 const clip = (text: string): string => {
@@ -72,7 +98,7 @@ for (const name of readdirSync(pluginsDir).sort()) {
       summary: clip(feature.summary),
       destination: feature.destination ?? 'none',
       currentSurface: feature.currentSurface ?? null,
-      reach: feature.reach ?? [],
+      reach: (feature.reach ?? []).map(reachStep),
       onboarding: feature.onboarding ?? null,
     })
   }

@@ -112,6 +112,49 @@ describe('onboarding Host', () => {
     }
   })
 
+  it('serves one feature reach steps over its API and as the read-only onboarding_reach tool', async () => {
+    const host = await createTestHost()
+    host.ctx.provide('settings', {
+      configure: () => () => undefined,
+      describe: () => [{ ns: 'dshfiles-onboarding', value: { githubCheck: false, checklist: false } }],
+      update: async () => undefined,
+      replace: async () => undefined,
+    } as never)
+    host.ctx.provide('subprocess', {} as never)
+    try {
+      await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
+      const client = createHostApiClient(host.ctx, onboardingApi, '@test/caller')
+      const settings = await client.reach({ key: 'settings-shell#settings-shell-port' })
+      expect(settings.feature).toMatchObject({ walkable: true, unsupportedActions: [], destination: 'settings' })
+      expect(settings.feature?.steps.map(step => [step.action, step.locator, step.unsupported])).toEqual([
+        ['click', { kind: 'role', role: 'button', name: 'Account menu', match: 'exact' }, null],
+        ['click', { kind: 'role', role: 'menuitem', name: 'Settings', match: 'substring' }, null],
+        ['expect', { kind: 'role', role: 'button', name: 'General', match: 'exact' }, null],
+      ])
+      const seeded = await client.reach({ key: 'thread-sidebar#rename-thread-title' })
+      expect(seeded.feature).toMatchObject({ walkable: false, unsupportedActions: ['rightclick', 'seed'] })
+      expect((await client.reach({ key: 'nothing#here' })).feature).toBeNull()
+      await expect(client.reach({ key: '../etc' })).rejects.toThrow()
+
+      const tool = host.tools.get('onboarding_reach')
+      expect(tool?.name).toBe('onboarding_reach')
+      expect(tool?.isConcurrencySafe?.({})).toBe(true)
+      const text = JSON.stringify(
+        await host.tools.execute({
+          callId: ToolCallId('call-reach'),
+          name: 'onboarding_reach',
+          arguments: { key: 'thread-sidebar#idle-archive-policy' },
+          signal: new AbortController().signal,
+        }),
+      )
+      expect(text).toContain('1. Click \\"All threads\\" (button)')
+      expect(text).toContain('Right-click \\"Idle policy target\\" (text) — not replayable here')
+      expect(text).toContain('Docs: https://github.com/astahmer/dshfiles/blob/main/plugins/@dshfiles/thread-sidebar/README.md')
+    } finally {
+      await host.dispose()
+    }
+  })
+
   it('refuses a bare onboarding_pack_apply request, and relays the plugin manager verdict once confirmed', async () => {
     const host = await createTestHost()
     host.ctx.provide('settings', {

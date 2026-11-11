@@ -2,6 +2,7 @@ import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 import { OnboardingOverview, overviewInputSchema, overviewSchema } from './overview-model.js'
 import { PACK_ACTIONS, PackPlan, packOutcomeSchema } from './pack-plan.js'
+import { ReachModel, reachInputSchema, reachOutputSchema } from './reach-model.js'
 
 const shortName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
 
@@ -25,6 +26,13 @@ export const onboardingApi = defineApi({
       description:
         'What this DSH setup can do and what is still missing: the setup checklist (an AI account connected, project added, project is a jj or git repository, GitHub CLI signed in) read live from the Host, each plugin pack with every plugin enabled, disabled or not installed, and the catalogued features grouped by destination with where each lives and how to open it. Search with `query` (every word must match), narrow with `destination`; curated features only until a query is given unless `curatedOnly` says otherwise. `preview: { pack, action }` adds exactly what enabling or disabling that pack would install, switch, keep and need, and whether a restart follows. Changes nothing. Read-only.',
       tool: { name: 'onboarding_overview', readOnly: true, render: OnboardingOverview.render },
+    }),
+    reach: method({
+      input: reachInputSchema,
+      output: reachOutputSchema,
+      description:
+        'How to get to one catalogued feature in the app, step by step: each `reach` step with its action (click, hover, fill, press, expect…), the control it targets (an ARIA role, or text, label or title) and its accessible name, plus which steps this app cannot replay (seed, attach, right-click and shift-click are E2E-only) and why. Also names the destination the feature lives in, its Open route and its docs. Find `key` (`<plugin>#<feature>`) with onboarding_overview. The same data drives Show me where on Getting started. Changes nothing. Read-only.',
+      tool: { name: 'onboarding_reach', readOnly: true, render: ReachModel.render },
     }),
     applyPack: method({
       input: applyPackInputSchema,

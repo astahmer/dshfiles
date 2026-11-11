@@ -24,6 +24,20 @@ export const onboardingBlockSchema = Schema.Struct({
 })
 export type OnboardingBlock = typeof onboardingBlockSchema.Type
 
+/** The actions of the dshx `reach` grammar (`parseReachStep`). */
+export const REACH_ACTIONS = ['click', 'rightclick', 'shiftclick', 'hover', 'expect', 'fill', 'press', 'attach', 'seed'] as const
+export type ReachAction = (typeof REACH_ACTIONS)[number]
+
+/** One `reach` step as the dshx parser read it at generation time; `value` is the fill text, key, seed or file. */
+export const catalogReachStepSchema = Schema.Struct({
+  text: Schema.String,
+  action: Schema.Literals(REACH_ACTIONS),
+  by: Schema.NullOr(Schema.String.check(Schema.isPattern(/^[a-z]+$/u))),
+  name: Schema.NullOr(Schema.String),
+  value: Schema.NullOr(Schema.String),
+})
+export type CatalogReachStep = typeof catalogReachStepSchema.Type
+
 export const catalogFeatureSchema = Schema.Struct({
   key: Schema.String,
   plugin: Schema.String,
@@ -32,7 +46,7 @@ export const catalogFeatureSchema = Schema.Struct({
   summary: Schema.String,
   destination: Schema.String,
   currentSurface: Schema.NullOr(Schema.String),
-  reach: Schema.Array(Schema.String),
+  reach: Schema.Array(catalogReachStepSchema),
   onboarding: Schema.NullOr(onboardingBlockSchema),
 })
 export type CatalogFeature = typeof catalogFeatureSchema.Type

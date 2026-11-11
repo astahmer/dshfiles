@@ -3,6 +3,7 @@ import { PREREQUISITES, routeSchema, type CatalogFeature, type FeatureCatalog, t
 import { CURATED_BUNDLES } from './curation.js'
 import { PACK_ACTIONS, PackPlan, packPreviewSchema, pluginStateSchema, type PackPreview, type PluginState } from './pack-plan.js'
 import { PACKS } from './packs.js'
+import { ReachModel } from './reach-model.js'
 
 /** Rail destinations in rail order, then the active thread's regions; `none` sorts last. */
 export const DESTINATION_ORDER = [
@@ -54,6 +55,8 @@ export const featureRowSchema = Schema.Struct({
   doneWhen: Schema.NullOr(Schema.String),
   prerequisites: Schema.Array(Schema.Literals(PREREQUISITES)),
   reachSteps: Schema.Number,
+  /** Its first `reach` step can be replayed in the app: the row offers Show me where. */
+  walkable: Schema.Boolean,
 })
 export type FeatureRow = typeof featureRowSchema.Type
 
@@ -216,6 +219,7 @@ const rowOf = (feature: CatalogFeature): FeatureRow => {
     doneWhen: feature.onboarding?.doneWhen ?? null,
     prerequisites: feature.onboarding?.prerequisites ?? [],
     reachSteps: feature.reach.length,
+    walkable: ReachModel.walkable(feature),
   }
 }
 

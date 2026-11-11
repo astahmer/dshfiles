@@ -721,9 +721,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Activity Timeline: Activity",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Activity\"",
-        "expect textbox \"Search activity\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Activity\"",
+          "action": "click",
+          "by": "button",
+          "name": "Activity",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Search activity\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Search activity",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -747,11 +765,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Activity Timeline: Activity › receipt detail",
       "reach": [
-        "seed tool-call-thread",
-        "click tab \"Observe\"",
-        "click button \"Activity\"",
-        "click button \"Agent started work*\"",
-        "expect button \"Open Session\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Activity\"",
+          "action": "click",
+          "by": "button",
+          "name": "Activity",
+          "value": null
+        },
+        {
+          "text": "click button \"Agent started work*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agent started work*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Open Session\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open Session",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -775,10 +823,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox",
       "reach": [
-        "click tab \"Inbox\"",
-        "click button \"Needs you\"",
-        "expect heading \"Inbox\"",
-        "expect tab \"Needs you*\""
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "click button \"Needs you\"",
+          "action": "click",
+          "by": "button",
+          "name": "Needs you",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Needs you*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Needs you*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -791,8 +863,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "Inbox: Open on an item's subject",
       "reach": [
-        "click tab \"Inbox\"",
-        "expect text \"Needs you\""
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect text \"Needs you\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Needs you",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -827,9 +911,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "agents",
       "currentSurface": "left-nav: Messages › post",
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Messages\"",
-        "expect combobox \"Message a thread…\""
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Messages\"",
+          "action": "click",
+          "by": "button",
+          "name": "Messages",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Message a thread…\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Message a thread…",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -886,15 +988,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: todo_write tool card",
       "reach": [
-        "seed jev-setup-chat-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"pending\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
-        "press Enter",
-        "expect text \"Step 1 of 3*\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
-        "press Enter",
-        "expect button \"Step 2 of 3: Fix the rounding bug. Show the plan\"",
-        "click button \"Step 2 of 3: Fix the rounding bug. Show the plan\"",
-        "expect list \"Plan steps\""
+        {
+          "text": "seed jev-setup-chat-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "jev-setup-chat-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"pending\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call todo_write {\"todos\":[{\"content\":\"Read the pricing module\",\"status\":\"in_progress\"},{\"content\":\"Fix the rounding bug\",\"status\":\"pending\"},{\"content\":\"Run the cart tests\",\"status\":\"pending\"}]}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Step 1 of 3*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Step 1 of 3*",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call todo_write {\"todos\":[{\"content\":\"Read the pricing module\",\"status\":\"completed\"},{\"content\":\"Fix the rounding bug\",\"status\":\"in_progress\"},{\"content\":\"Run the cart tests\",\"status\":\"pending\"}]}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Step 2 of 3: Fix the rounding bug. Show the plan\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Step 2 of 3: Fix the rounding bug. Show the plan",
+          "value": null
+        },
+        {
+          "text": "click button \"Step 2 of 3: Fix the rounding bug. Show the plan\"",
+          "action": "click",
+          "by": "button",
+          "name": "Step 2 of 3: Fix the rounding bug. Show the plan",
+          "value": null
+        },
+        {
+          "text": "expect list \"Plan steps\"",
+          "action": "expect",
+          "by": "list",
+          "name": "Plan steps",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -907,10 +1063,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: plan chip beside plan mode",
       "reach": [
-        "seed jev-setup-chat-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
-        "press Enter",
-        "expect button \"Step 2 of 3: Fix the rounding bug. Show the plan\""
+        {
+          "text": "seed jev-setup-chat-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "jev-setup-chat-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call todo_write {\\\"todos\\\":[{\\\"content\\\":\\\"Read the pricing module\\\",\\\"status\\\":\\\"completed\\\"},{\\\"content\\\":\\\"Fix the rounding bug\\\",\\\"status\\\":\\\"in_progress\\\"},{\\\"content\\\":\\\"Run the cart tests\\\",\\\"status\\\":\\\"pending\\\"}]}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call todo_write {\"todos\":[{\"content\":\"Read the pricing module\",\"status\":\"completed\"},{\"content\":\"Fix the rounding bug\",\"status\":\"in_progress\"},{\"content\":\"Run the cart tests\",\"status\":\"pending\"}]}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Step 2 of 3: Fix the rounding bug. Show the plan\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Step 2 of 3: Fix the rounding bug. Show the plan",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -923,10 +1103,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: activity strip",
       "reach": [
-        "seed jev-setup-chat-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call bash {\\\"command\\\":\\\"sleep 20\\\",\\\"description\\\":\\\"Wait twenty seconds\\\"}]]\"",
-        "press Enter",
-        "expect button \"Running now: bash*\""
+        {
+          "text": "seed jev-setup-chat-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "jev-setup-chat-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call bash {\\\"command\\\":\\\"sleep 20\\\",\\\"description\\\":\\\"Wait twenty seconds\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call bash {\"command\":\"sleep 20\",\"description\":\"Wait twenty seconds\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Running now: bash*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Running now: bash*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -939,10 +1143,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: turn error row",
       "reach": [
-        "seed jev-setup-chat-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[fail The fake provider rejected this request]]\"",
-        "press Enter",
-        "expect button \"Ask to fix\""
+        {
+          "text": "seed jev-setup-chat-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "jev-setup-chat-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[fail The fake provider rejected this request]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[fail The fake provider rejected this request]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Ask to fix\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Ask to fix",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -955,8 +1183,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: meter line",
       "reach": [
-        "seed jev-setup-chat-thread",
-        "expect text \"compacts in*\""
+        {
+          "text": "seed jev-setup-chat-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "jev-setup-chat-thread"
+        },
+        {
+          "text": "expect text \"compacts in*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "compacts in*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -969,10 +1209,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Standard mode chip",
       "reach": [
-        "click button \"New thread\"",
-        "expect button \"Standard mode\"",
-        "click button \"Standard mode\"",
-        "expect menuitem \"Creator mode*\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect button \"Standard mode\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Standard mode",
+          "value": null
+        },
+        {
+          "text": "click button \"Standard mode\"",
+          "action": "click",
+          "by": "button",
+          "name": "Standard mode",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Creator mode*\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Creator mode*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -985,11 +1249,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "agent tool: ask_parent_question / answer_parent_question",
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
-        "expect region \"Tools (*\"",
-        "expect text \"ask_parent_question\""
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "expect text \"ask_parent_question\"",
+          "action": "expect",
+          "by": "text",
+          "name": "ask_parent_question",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1002,11 +1296,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: ask_parent_question expiry",
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
-        "expect region \"Tools (*\"",
-        "expect text \"ask_parent_question\""
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "expect text \"ask_parent_question\"",
+          "action": "expect",
+          "by": "text",
+          "name": "ask_parent_question",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1019,11 +1343,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: submit_markdown_feedback",
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
-        "expect region \"Tools (*\"",
-        "expect text \"submit_markdown_feedback\""
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "expect text \"submit_markdown_feedback\"",
+          "action": "expect",
+          "by": "text",
+          "name": "submit_markdown_feedback",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1036,11 +1390,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: resolve_parent_feedback",
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
-        "expect region \"Tools (*\"",
-        "expect text \"resolve_parent_feedback\""
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "expect text \"resolve_parent_feedback\"",
+          "action": "expect",
+          "by": "text",
+          "name": "resolve_parent_feedback",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1075,11 +1459,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "agent tool: list_thread_questions / answer_thread_question",
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
-        "expect region \"Tools (*\"",
-        "expect text \"list_thread_questions\""
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "expect text \"list_thread_questions\"",
+          "action": "expect",
+          "by": "text",
+          "name": "list_thread_questions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1092,13 +1506,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › Subagent question",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"commands, @ files or s*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
-        "press Enter",
-        "click tab \"Inbox\"",
-        "expect text \"A subagent asks: Deploy the release now?\"",
-        "click button \"Deploy\"",
-        "expect text \"Nothing needs you right now.\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or s*\" \"[[once call subagent {\\\"description\\\":\\\"Release check\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call ask_parent_question \\\\u007b\\\\u0022question\\\\u0022:\\\\u0022Deploy the release now?\\\\u0022,\\\\u0022options\\\\u0022:\\\\u005b\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Deploy\\\\u0022\\\\u007d,\\\\u007b\\\\u0022id\\\\u0022:\\\\u0022wait\\\\u0022,\\\\u0022label\\\\u0022:\\\\u0022Wait\\\\u0022\\\\u007d\\\\u005d,\\\\u0022recommendedOptionId\\\\u0022:\\\\u0022deploy\\\\u0022,\\\\u0022expiryBehavior\\\\u0022:\\\\u0022recommended\\\\u0022,\\\\u0022timeoutMs\\\\u0022:1800000\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or s*",
+          "value": "[[once call subagent {\"description\":\"Release check\",\"prompt\":\"\\u005b\\u005bonce call ask_parent_question \\u007b\\u0022question\\u0022:\\u0022Deploy the release now?\\u0022,\\u0022options\\u0022:\\u005b\\u007b\\u0022id\\u0022:\\u0022deploy\\u0022,\\u0022label\\u0022:\\u0022Deploy\\u0022\\u007d,\\u007b\\u0022id\\u0022:\\u0022wait\\u0022,\\u0022label\\u0022:\\u0022Wait\\u0022\\u007d\\u005d,\\u0022recommendedOptionId\\u0022:\\u0022deploy\\u0022,\\u0022expiryBehavior\\u0022:\\u0022recommended\\u0022,\\u0022timeoutMs\\u0022:1800000\\u007d\\u005d\\u005d\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect text \"A subagent asks: Deploy the release now?\"",
+          "action": "expect",
+          "by": "text",
+          "name": "A subagent asks: Deploy the release now?",
+          "value": null
+        },
+        {
+          "text": "click button \"Deploy\"",
+          "action": "click",
+          "by": "button",
+          "name": "Deploy",
+          "value": null
+        },
+        {
+          "text": "expect text \"Nothing needs you right now.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Nothing needs you right now.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1111,8 +1567,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › agent-questions.native-question",
       "reach": [
-        "click tab \"Inbox\"",
-        "expect heading \"Inbox\""
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1125,14 +1593,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: OTel spans (read in left-nav: Traces: Explorer)",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[once call ai_accounts_native_providers {}]] [[once call subagent {\\\"description\\\":\\\"Child trace\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022echo child-trace\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Child trace\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
-        "press Enter",
-        "expect text \"Child trace*\"",
-        "click button \"Traces\"",
-        "fill textbox \"Search traces\" \"execute_tool subagent\"",
-        "click row \"dshfiles enter_ai_application_system\"",
-        "expect tree \"Span waterfall\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"[[once call ai_accounts_native_providers {}]] [[once call subagent {\\\"description\\\":\\\"Child trace\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022echo child-trace\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Child trace\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "[[once call ai_accounts_native_providers {}]] [[once call subagent {\"description\":\"Child trace\",\"prompt\":\"\\u005b\\u005bonce call bash \\u007b\\u0022command\\u0022:\\u0022echo child-trace\\u0022,\\u0022description\\u0022:\\u0022Child trace\\u0022\\u007d\\u005d\\u005d\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Child trace*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Child trace*",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search traces\" \"execute_tool subagent\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search traces",
+          "value": "execute_tool subagent"
+        },
+        {
+          "text": "click row \"dshfiles enter_ai_application_system\"",
+          "action": "click",
+          "by": "row",
+          "name": "dshfiles enter_ai_application_system",
+          "value": null
+        },
+        {
+          "text": "expect tree \"Span waterfall\"",
+          "action": "expect",
+          "by": "tree",
+          "name": "Span waterfall",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1189,9 +1705,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: OTel spans (read in transcript: Traces view)",
       "reach": [
-        "seed tool-call-thread",
-        "click tab \"Traces\"",
-        "expect region \"Thread telemetry summary\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click tab \"Traces\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "expect region \"Thread telemetry summary\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Thread telemetry summary",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1204,12 +1738,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "left-nav: Agent Toolkit: Capabilities",
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
-        "expect region \"Tools (*\"",
-        "click radio \"Plugins\"",
-        "expect region \"Plugins (*\""
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "click radio \"Plugins\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Plugins",
+          "value": null
+        },
+        {
+          "text": "expect region \"Plugins (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Plugins (*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1222,13 +1792,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: Open the agent toolkit",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Toolkit thread\"",
-        "press Enter",
-        "click button \"Open command palette\"",
-        "click option \"Open the agent toolkit*\"",
-        "expect heading \"Agent toolkit\"",
-        "expect combobox \"Thread\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Toolkit thread\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Toolkit thread"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "click option \"Open the agent toolkit*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Open the agent toolkit*",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Thread\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Thread",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1241,13 +1853,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "thread panel: Context tab",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"context check\"",
-        "press Enter",
-        "expect text \"context check\"",
-        "click button \"Open right sidebar\"",
-        "click text \"Context\"",
-        "expect text \"loaded before your message\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"context check\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "context check"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"context check\"",
+          "action": "expect",
+          "by": "text",
+          "name": "context check",
+          "value": null
+        },
+        {
+          "text": "click button \"Open right sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open right sidebar",
+          "value": null
+        },
+        {
+          "text": "click text \"Context\"",
+          "action": "click",
+          "by": "text",
+          "name": "Context",
+          "value": null
+        },
+        {
+          "text": "expect text \"loaded before your message\"",
+          "action": "expect",
+          "by": "text",
+          "name": "loaded before your message",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1260,13 +1914,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "agents",
       "currentSurface": "left-nav: Agents",
       "reach": [
-        "click button \"Agents\"",
-        "expect text \"Start from a template\"",
-        "click button \"Reviews diffs and pull requests*\"",
-        "expect textbox \"Instructions\"",
-        "click button \"Create agent\"",
-        "expect text \"Saved.\"",
-        "expect text \"@reviewer\""
+        {
+          "text": "click button \"Agents\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "expect text \"Start from a template\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Start from a template",
+          "value": null
+        },
+        {
+          "text": "click button \"Reviews diffs and pull requests*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Reviews diffs and pull requests*",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Instructions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Instructions",
+          "value": null
+        },
+        {
+          "text": "click button \"Create agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "Create agent",
+          "value": null
+        },
+        {
+          "text": "expect text \"Saved.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Saved.",
+          "value": null
+        },
+        {
+          "text": "expect text \"@reviewer\"",
+          "action": "expect",
+          "by": "text",
+          "name": "@reviewer",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1279,8 +1975,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: @agent mention",
       "reach": [
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@agent:\"",
-        "expect text \"@dsh\""
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@agent:\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "@agent:"
+        },
+        {
+          "text": "expect text \"@dsh\"",
+          "action": "expect",
+          "by": "text",
+          "name": "@dsh",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1293,21 +2001,111 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "agents",
       "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), agent kind",
       "reach": [
-        "click button \"Agents\"",
-        "click button \"New agent\"",
-        "fill textbox \"Name\" \"Luna\"",
-        "click button \"Create agent\"",
-        "expect text \"@luna\"",
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Preview the agent mention\"",
-        "press Enter",
-        "click text \"Preview the agent mention\"",
-        "expect textbox \"Comment\"",
-        "fill textbox \"Comment\" \"Ping @{luna} about b:#1\"",
-        "click button \"Reply\"",
-        "click button \"Preview agent @luna\"",
-        "expect button \"Open in Agents\""
+        {
+          "text": "click button \"Agents\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"New agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New agent",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Name\" \"Luna\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Name",
+          "value": "Luna"
+        },
+        {
+          "text": "click button \"Create agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "Create agent",
+          "value": null
+        },
+        {
+          "text": "expect text \"@luna\"",
+          "action": "expect",
+          "by": "text",
+          "name": "@luna",
+          "value": null
+        },
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Preview the agent mention\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Preview the agent mention"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click text \"Preview the agent mention\"",
+          "action": "click",
+          "by": "text",
+          "name": "Preview the agent mention",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Comment\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Comment",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Comment\" \"Ping @{luna} about b:#1\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Comment",
+          "value": "Ping @{luna} about b:#1"
+        },
+        {
+          "text": "click button \"Reply\"",
+          "action": "click",
+          "by": "button",
+          "name": "Reply",
+          "value": null
+        },
+        {
+          "text": "click button \"Preview agent @luna\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preview agent @luna",
+          "value": null
+        },
+        {
+          "text": "expect button \"Open in Agents\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open in Agents",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1320,9 +2118,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "left-nav: Agent CLI threads",
       "reach": [
-        "click tab \"Knowledge\"",
-        "click button \"Agent CLI threads\"",
-        "expect text \"Threads other agent CLIs recorded on this machine*\""
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Agent CLI threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agent CLI threads",
+          "value": null
+        },
+        {
+          "text": "expect text \"Threads other agent CLIs recorded on this machine*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Threads other agent CLIs recorded on this machine*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1335,9 +2151,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "status-strip: Quota popover",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"Command Code 1:*\"",
-        "expect switch \"Enable Command Code 1\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"Command Code 1:*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Command Code 1:*",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Enable Command Code 1\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Enable Command Code 1",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1350,10 +2184,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "status-strip: Quota › Use this account for this thread",
       "reach": [
-        "seed tool-call-thread",
-        "rightclick button \"Command Code 1:*\"",
-        "click menuitem \"Use this account for this thread\"",
-        "expect dialog \"Use account for this thread\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "rightclick button \"Command Code 1:*\"",
+          "action": "rightclick",
+          "by": "button",
+          "name": "Command Code 1:*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Use this account for this thread\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Use this account for this thread",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Use account for this thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Use account for this thread",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1366,8 +2224,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "dialog: Add AI account",
       "reach": [
-        "click button \"Add AI account\"",
-        "expect dialog \"Add account\""
+        {
+          "text": "click button \"Add AI account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add AI account",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Add account\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Add account",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1380,8 +2250,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "status-strip: Quota meters",
       "reach": [
-        "seed tool-call-thread",
-        "expect group \"AI accounts usage*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect group \"AI accounts usage*\"",
+          "action": "expect",
+          "by": "group",
+          "name": "AI accounts usage*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1394,10 +2276,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"AI accounts\"",
-        "expect searchbox \"Search accounts and known models\"",
-        "expect complementary \"Provider accounts\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"AI accounts\"",
+          "action": "click",
+          "by": "button",
+          "name": "AI accounts",
+          "value": null
+        },
+        {
+          "text": "expect searchbox \"Search accounts and known models\"",
+          "action": "expect",
+          "by": "searchbox",
+          "name": "Search accounts and known models",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Provider accounts\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Provider accounts",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1410,10 +2316,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs",
       "reach": [
-        "seed tool-call-thread",
-        "click tab \"Settings\"",
-        "click button \"AI accounts\"",
-        "expect tab \"Models\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"AI accounts\"",
+          "action": "click",
+          "by": "button",
+          "name": "AI accounts",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Models\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Models",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1426,11 +2356,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts › Models",
       "reach": [
-        "seed tool-call-thread",
-        "click tab \"Settings\"",
-        "click button \"AI accounts\"",
-        "expect tab \"Models\"",
-        "expect searchbox \"Search models\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"AI accounts\"",
+          "action": "click",
+          "by": "button",
+          "name": "AI accounts",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Models\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Models",
+          "value": null
+        },
+        {
+          "text": "expect searchbox \"Search models\"",
+          "action": "expect",
+          "by": "searchbox",
+          "name": "Search models",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1443,9 +2403,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "status-strip: Quota › usage popover",
       "reach": [
-        "expect group \"AI accounts usage\"",
-        "click button \"AI accounts usage\"",
-        "expect region \"AI account usage\""
+        {
+          "text": "expect group \"AI accounts usage\"",
+          "action": "expect",
+          "by": "group",
+          "name": "AI accounts usage",
+          "value": null
+        },
+        {
+          "text": "click button \"AI accounts usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "AI accounts usage",
+          "value": null
+        },
+        {
+          "text": "expect region \"AI account usage\"",
+          "action": "expect",
+          "by": "region",
+          "name": "AI account usage",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1458,9 +2436,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: AI Accounts › strip short names",
       "reach": [
-        "click button \"Settings\"",
-        "click text \"AI Accounts\"",
-        "expect switch \"Short names in the strip\""
+        {
+          "text": "click button \"Settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click text \"AI Accounts\"",
+          "action": "click",
+          "by": "text",
+          "name": "AI Accounts",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Short names in the strip\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Short names in the strip",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1473,11 +2469,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: AI Accounts: Usage history",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Usage\"",
-        "click tab \"Quota\"",
-        "click radio \"History\"",
-        "expect text \"Quota history\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Quota\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Quota",
+          "value": null
+        },
+        {
+          "text": "click radio \"History\"",
+          "action": "click",
+          "by": "radio",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "expect text \"Quota history\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Quota history",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1490,12 +2516,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: AI Accounts: Quota forecast",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Usage\"",
-        "click tab \"Quota\"",
-        "click radio \"Forecast\"",
-        "click radio \"Hand-off\"",
-        "expect text \"Enable an account with quota to see where it is heading.\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Quota\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Quota",
+          "value": null
+        },
+        {
+          "text": "click radio \"Forecast\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Forecast",
+          "value": null
+        },
+        {
+          "text": "click radio \"Hand-off\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Hand-off",
+          "value": null
+        },
+        {
+          "text": "expect text \"Enable an account with quota to see where it is heading.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Enable an account with quota to see where it is heading.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1552,14 +2614,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: failed turn › Open AI Accounts",
       "reach": [
-        "seed credential-recovery",
-        "fill textbox \"commands, @ files or sessions*\" \"Reproduce missing credential recovery.\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "expect button \"Add or fix credentials\"",
-        "click button \"Add or fix credentials\"",
-        "expect complementary \"Provider accounts\"",
-        "expect button \"Add account\""
+        {
+          "text": "seed credential-recovery",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "credential-recovery"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"Reproduce missing credential recovery.\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "Reproduce missing credential recovery."
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Add or fix credentials\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Add or fix credentials",
+          "value": null
+        },
+        {
+          "text": "click button \"Add or fix credentials\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add or fix credentials",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Provider accounts\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Provider accounts",
+          "value": null
+        },
+        {
+          "text": "expect button \"Add account\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Add account",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1572,8 +2682,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › ai-accounts.quota-continuation",
       "reach": [
-        "click tab \"Inbox\"",
-        "expect heading \"Inbox\""
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1586,9 +2708,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: meter line",
       "reach": [
-        "seed jev-setup-chat-thread",
-        "click button \"cache expired*\"",
-        "expect button \"Compact first\""
+        {
+          "text": "seed jev-setup-chat-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "jev-setup-chat-thread"
+        },
+        {
+          "text": "click button \"cache expired*\"",
+          "action": "click",
+          "by": "button",
+          "name": "cache expired*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Compact first\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Compact first",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1601,17 +2741,83 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Annotate an element",
       "reach": [
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-        "click button \"Annotate an element\"",
-        "click button \"Pick element\"",
-        "expect text \"Click an element*\"",
-        "click button \"Annotate an element\"",
-        "expect textbox \"What is wrong or what should change?\"",
-        "fill textbox \"What is wrong or what should change?\" \"the tab strip overlaps the sidebar\"",
-        "click button \"Add\"",
-        "expect text \"Annotated UI feedback (1)\"",
-        "click button \"Annotate an element\"",
-        "expect text \"plugins/@dshfiles/annotations/src*\""
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "click button \"Annotate an element\"",
+          "action": "click",
+          "by": "button",
+          "name": "Annotate an element",
+          "value": null
+        },
+        {
+          "text": "click button \"Pick element\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pick element",
+          "value": null
+        },
+        {
+          "text": "expect text \"Click an element*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Click an element*",
+          "value": null
+        },
+        {
+          "text": "click button \"Annotate an element\"",
+          "action": "click",
+          "by": "button",
+          "name": "Annotate an element",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"What is wrong or what should change?\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "What is wrong or what should change?",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"What is wrong or what should change?\" \"the tab strip overlaps the sidebar\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "What is wrong or what should change?",
+          "value": "the tab strip overlaps the sidebar"
+        },
+        {
+          "text": "click button \"Add\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add",
+          "value": null
+        },
+        {
+          "text": "expect text \"Annotated UI feedback (1)\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Annotated UI feedback (1)",
+          "value": null
+        },
+        {
+          "text": "click button \"Annotate an element\"",
+          "action": "click",
+          "by": "button",
+          "name": "Annotate an element",
+          "value": null
+        },
+        {
+          "text": "expect text \"plugins/@dshfiles/annotations/src*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "plugins/@dshfiles/annotations/src*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1624,11 +2830,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "Backlog composer: Annotate an element",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "expect textbox \"Capture\"",
-        "click button \"Annotate an element\"",
-        "expect text \"None yet in this draft\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Annotate an element\"",
+          "action": "click",
+          "by": "button",
+          "name": "Annotate an element",
+          "value": null
+        },
+        {
+          "text": "expect text \"None yet in this draft\"",
+          "action": "expect",
+          "by": "text",
+          "name": "None yet in this draft",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1696,19 +2932,97 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: image previews (and composer attachments)",
       "reach": [
-        "click button \"New session\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
-        "expect button \"Remove image red.png\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
-        "expect button \"Remove image blue.png\"",
-        "click button \"red.png, click to view original\"",
-        "expect dialog \"Image preview\"",
-        "expect img \"red.png\"",
-        "press ArrowRight",
-        "expect img \"blue.png\"",
-        "expect button \"Image 2 of 2\"",
-        "click button \"Image 1 of 2\"",
-        "expect img \"red.png\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "expect button \"Remove image red.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image red.png",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/blue.png"
+        },
+        {
+          "text": "expect button \"Remove image blue.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image blue.png",
+          "value": null
+        },
+        {
+          "text": "click button \"red.png, click to view original\"",
+          "action": "click",
+          "by": "button",
+          "name": "red.png, click to view original",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Image preview\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Image preview",
+          "value": null
+        },
+        {
+          "text": "expect img \"red.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "red.png",
+          "value": null
+        },
+        {
+          "text": "press ArrowRight",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ArrowRight"
+        },
+        {
+          "text": "expect img \"blue.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "blue.png",
+          "value": null
+        },
+        {
+          "text": "expect button \"Image 2 of 2\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Image 2 of 2",
+          "value": null
+        },
+        {
+          "text": "click button \"Image 1 of 2\"",
+          "action": "click",
+          "by": "button",
+          "name": "Image 1 of 2",
+          "value": null
+        },
+        {
+          "text": "expect img \"red.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "red.png",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1721,9 +3035,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Background Jobs: Jobs",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Processes\"",
-        "expect text \"What runs on this host for your threads*\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Processes\"",
+          "action": "click",
+          "by": "button",
+          "name": "Processes",
+          "value": null
+        },
+        {
+          "text": "expect text \"What runs on this host for your threads*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "What runs on this host for your threads*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1736,9 +3068,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Background Jobs: Jobs › batch stop",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Jobs\"",
-        "expect checkbox \"Select all running jobs\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Jobs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Jobs",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Select all running jobs\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Select all running jobs",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1751,12 +3101,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Background Jobs: Jobs › outlived its turn",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call bash {\\\"command\\\":\\\"sleep 900\\\",\\\"description\\\":\\\"Hold a job past its turn\\\",\\\"run_in_background\\\":true}]]\"",
-        "press Enter",
-        "click tab \"Observe\"",
-        "click button \"Processes\"",
-        "expect text \"outlived its turn*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call bash {\\\"command\\\":\\\"sleep 900\\\",\\\"description\\\":\\\"Hold a job past its turn\\\",\\\"run_in_background\\\":true}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call bash {\"command\":\"sleep 900\",\"description\":\"Hold a job past its turn\",\"run_in_background\":true}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Processes\"",
+          "action": "click",
+          "by": "button",
+          "name": "Processes",
+          "value": null
+        },
+        {
+          "text": "expect text \"outlived its turn*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "outlived its turn*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1769,9 +3155,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "observe: Processes",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Processes\"",
-        "expect heading \"Processes\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Processes\"",
+          "action": "click",
+          "by": "button",
+          "name": "Processes",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Processes\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Processes",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1784,10 +3188,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels › Jobs",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"New tab\"",
-        "click button \"Jobs*\"",
-        "expect heading \"Jobs\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Jobs*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Jobs*",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Jobs\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Jobs",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1800,12 +3228,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: under the tool card that started the job; composer dock while it runs",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\\\",\\\"description\\\":\\\"Build\\\",\\\"run_in_background\\\":true}]]\"",
-        "press Enter",
-        "expect region \"Running background jobs\"",
-        "click button \"Show or hide the live output of *\"",
-        "expect text \"compiled module*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\\\",\\\"description\\\":\\\"Build\\\",\\\"run_in_background\\\":true}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "[[call bash {\"command\":\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\",\"description\":\"Build\",\"run_in_background\":true}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect region \"Running background jobs\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Running background jobs",
+          "value": null
+        },
+        {
+          "text": "click button \"Show or hide the live output of *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show or hide the live output of *",
+          "value": null
+        },
+        {
+          "text": "expect text \"compiled module*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "compiled module*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1818,20 +3282,104 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "expect textbox \"Capture\"",
-        "click button \"Items\"",
-        "expect textbox \"Capture\"",
-        "click button \"Board\"",
-        "expect textbox \"Capture\"",
-        "click button \"Projects\"",
-        "expect textbox \"Capture\"",
-        "click button \"Inbox\"",
-        "expect textbox \"Capture\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
-        "fill textbox \"Capture\" \"Inspect @Image 1\"",
-        "expect textbox \"Capture\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Board\"",
+          "action": "click",
+          "by": "button",
+          "name": "Board",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Projects\"",
+          "action": "click",
+          "by": "button",
+          "name": "Projects",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Inspect @Image 1\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Inspect @Image 1"
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1844,14 +3392,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: Backlog › Backlog settings",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Backlog settings\"",
-        "expect text \"Jev triage\"",
-        "expect checkbox \"Enable Jev\"",
-        "expect checkbox \"Triage new items automatically\"",
-        "expect textbox \"TypeSafe API key reference\"",
-        "expect button \"Save Jev settings\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog settings",
+          "value": null
+        },
+        {
+          "text": "expect text \"Jev triage\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Jev triage",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Enable Jev\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Enable Jev",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Triage new items automatically\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Triage new items automatically",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"TypeSafe API key reference\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "TypeSafe API key reference",
+          "value": null
+        },
+        {
+          "text": "expect button \"Save Jev settings\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Save Jev settings",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1864,26 +3460,146 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Feed",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Feed item to close\"",
-        "press Enter",
-        "fill textbox \"Capture\" \"Feed item to drop\"",
-        "press Enter",
-        "click button \"Feed\"",
-        "expect feed \"Backlog feed\"",
-        "rightclick text \"Feed item to close\"",
-        "hover menuitem \"Status\"",
-        "click menuitemradio \"Done\"",
-        "rightclick text \"Feed item to drop\"",
-        "hover menuitem \"Status\"",
-        "click menuitemradio \"Dropped\"",
-        "click button \"Done, 1 item\"",
-        "click button \"Dropped, 1 item\"",
-        "expect text \"Feed item to close\"",
-        "click textbox \"Capture\"",
-        "press ArrowUp",
-        "expect article \"Item b:#2\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Feed item to close\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Feed item to close"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Feed item to drop\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Feed item to drop"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "expect feed \"Backlog feed\"",
+          "action": "expect",
+          "by": "feed",
+          "name": "Backlog feed",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Feed item to close\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Feed item to close",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Feed item to drop\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Feed item to drop",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Dropped\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Dropped",
+          "value": null
+        },
+        {
+          "text": "click button \"Done, 1 item\"",
+          "action": "click",
+          "by": "button",
+          "name": "Done, 1 item",
+          "value": null
+        },
+        {
+          "text": "click button \"Dropped, 1 item\"",
+          "action": "click",
+          "by": "button",
+          "name": "Dropped, 1 item",
+          "value": null
+        },
+        {
+          "text": "expect text \"Feed item to close\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Feed item to close",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Capture\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "press ArrowUp",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ArrowUp"
+        },
+        {
+          "text": "expect article \"Item b:#2\"",
+          "action": "expect",
+          "by": "article",
+          "name": "Item b:#2",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1907,27 +3623,153 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Board / item detail",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Open [guide](https://example.com/guide) https://example.com\nRead [description](https://example.org/description) https://example.org\"",
-        "press Enter",
-        "expect link \"guide\"",
-        "click text \"b:#1\"",
-        "expect link \"description\"",
-        "click button \"example.com/guide\"",
-        "expect button \"Open in browser\"",
-        "expect button \"Copy URL\"",
-        "click button \"Copy URL\"",
-        "click button \"Board\"",
-        "rightclick article \"Card b:#1\"",
-        "hover menuitem \"Project\"",
-        "click menuitemradio \"sample\"",
-        "click article \"Card b:#1\"",
-        "expect complementary \"Item detail\"",
-        "expect separator \"Resize item detail\"",
-        "click button \"example.com/guide\"",
-        "expect button \"Open in browser\"",
-        "expect button \"Copy URL\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Open [guide](https://example.com/guide) https://example.com\nRead [description](https://example.org/description) https://example.org\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Open [guide](https://example.com/guide) https://example.com\nRead [description](https://example.org/description) https://example.org"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect link \"guide\"",
+          "action": "expect",
+          "by": "link",
+          "name": "guide",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "expect link \"description\"",
+          "action": "expect",
+          "by": "link",
+          "name": "description",
+          "value": null
+        },
+        {
+          "text": "click button \"example.com/guide\"",
+          "action": "click",
+          "by": "button",
+          "name": "example.com/guide",
+          "value": null
+        },
+        {
+          "text": "expect button \"Open in browser\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open in browser",
+          "value": null
+        },
+        {
+          "text": "expect button \"Copy URL\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Copy URL",
+          "value": null
+        },
+        {
+          "text": "click button \"Copy URL\"",
+          "action": "click",
+          "by": "button",
+          "name": "Copy URL",
+          "value": null
+        },
+        {
+          "text": "click button \"Board\"",
+          "action": "click",
+          "by": "button",
+          "name": "Board",
+          "value": null
+        },
+        {
+          "text": "rightclick article \"Card b:#1\"",
+          "action": "rightclick",
+          "by": "article",
+          "name": "Card b:#1",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Project\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Project",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"sample\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "sample",
+          "value": null
+        },
+        {
+          "text": "click article \"Card b:#1\"",
+          "action": "click",
+          "by": "article",
+          "name": "Card b:#1",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        },
+        {
+          "text": "expect separator \"Resize item detail\"",
+          "action": "expect",
+          "by": "separator",
+          "name": "Resize item detail",
+          "value": null
+        },
+        {
+          "text": "click button \"example.com/guide\"",
+          "action": "click",
+          "by": "button",
+          "name": "example.com/guide",
+          "value": null
+        },
+        {
+          "text": "expect button \"Open in browser\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open in browser",
+          "value": null
+        },
+        {
+          "text": "expect button \"Copy URL\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Copy URL",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1940,11 +3782,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Board › Configure board columns",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Board\"",
-        "click button \"Configure board columns\"",
-        "expect button \"Configure board columns\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Board\"",
+          "action": "click",
+          "by": "button",
+          "name": "Board",
+          "value": null
+        },
+        {
+          "text": "click button \"Configure board columns\"",
+          "action": "click",
+          "by": "button",
+          "name": "Configure board columns",
+          "value": null
+        },
+        {
+          "text": "expect button \"Configure board columns\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Configure board columns",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1957,24 +3829,132 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › rows",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"First selection item\"",
-        "press Enter",
-        "expect text \"First selection item\"",
-        "fill textbox \"Capture\" \"Second selection item\"",
-        "press Enter",
-        "click button \"Items\"",
-        "click checkbox \"Select b:#1\"",
-        "click checkbox \"Select b:#2\"",
-        "expect text \"2 selected\"",
-        "expect button \"Start thread\"",
-        "rightclick row \"Item b:#2\"",
-        "click menuitem \"Start thread (2)…\"",
-        "expect dialog \"Start thread\"",
-        "expect text \"· 2 items*\"",
-        "click button \"Cancel\"",
-        "expect text \"First selection item\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"First selection item\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "First selection item"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"First selection item\"",
+          "action": "expect",
+          "by": "text",
+          "name": "First selection item",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Second selection item\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Second selection item"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Select b:#1\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Select b:#1",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Select b:#2\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Select b:#2",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 selected\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 selected",
+          "value": null
+        },
+        {
+          "text": "expect button \"Start thread\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "rightclick row \"Item b:#2\"",
+          "action": "rightclick",
+          "by": "row",
+          "name": "Item b:#2",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Start thread (2)…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Start thread (2)…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Start thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "expect text \"· 2 items*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "· 2 items*",
+          "value": null
+        },
+        {
+          "text": "click button \"Cancel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Cancel",
+          "value": null
+        },
+        {
+          "text": "expect text \"First selection item\"",
+          "action": "expect",
+          "by": "text",
+          "name": "First selection item",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -1987,23 +3967,125 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › row menu",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"First menu selection item\"",
-        "press Enter",
-        "expect text \"First menu selection item\"",
-        "fill textbox \"Capture\" \"Second menu selection item\"",
-        "press Enter",
-        "click button \"Items\"",
-        "click checkbox \"Select b:#1\"",
-        "click checkbox \"Select b:#2\"",
-        "rightclick row \"Item b:#2\"",
-        "expect menuitem \"Start thread (2)…\"",
-        "expect menuitem \"Copy item IDs (2)\"",
-        "expect menuitem \"Copy item links (2)\"",
-        "expect menuitem \"Status (2)\"",
-        "expect menuitem \"Pin items (2)\"",
-        "expect menuitem \"Delete permanently (2)…\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"First menu selection item\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "First menu selection item"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"First menu selection item\"",
+          "action": "expect",
+          "by": "text",
+          "name": "First menu selection item",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Second menu selection item\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Second menu selection item"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Select b:#1\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Select b:#1",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Select b:#2\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Select b:#2",
+          "value": null
+        },
+        {
+          "text": "rightclick row \"Item b:#2\"",
+          "action": "rightclick",
+          "by": "row",
+          "name": "Item b:#2",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Start thread (2)…\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Start thread (2)…",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy item IDs (2)\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy item IDs (2)",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy item links (2)\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy item links (2)",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Status (2)\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Status (2)",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Pin items (2)\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Pin items (2)",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Delete permanently (2)…\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Delete permanently (2)…",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2027,11 +4109,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Backfill triage",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "expect textbox \"Capture\"",
-        "click button \"Backfill triage\"",
-        "expect text \"Runs Jev and the configured triage model*\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Backfill triage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backfill triage",
+          "value": null
+        },
+        {
+          "text": "expect text \"Runs Jev and the configured triage model*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Runs Jev and the configured triage model*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2088,35 +4200,209 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), backlog kind",
       "reach": [
-        "seed tool-call-thread",
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
-        "fill textbox \"Capture\" \"Ship the backlog reference preview\nRemember where the link goes.\"",
-        "press Enter",
-        "expect text \"Ship the backlog reference preview\"",
-        "click button \"New*\"",
-        "click button \"Select model*\"",
-        "click menuitem \"Model*\"",
-        "click menuitemradio \"dshx_fake_commandcode/gpt-6-luna\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Working on b:#1\"",
-        "press Enter",
-        "expect button \"Preview backlog item b:#1\"",
-        "click button \"Preview backlog item b:#1\"",
-        "expect text \"Backlog · b:#1\"",
-        "expect text \"Ship the backlog reference preview\"",
-        "expect img \"red.png\"",
-        "click button \"Open red.png\"",
-        "expect dialog \"Image preview\"",
-        "press ArrowRight",
-        "expect img \"blue.png\"",
-        "press Escape",
-        "expect button \"Open in Backlog\"",
-        "press Escape",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Following b:#1\"",
-        "press Enter",
-        "expect button \"Preview backlog item b:#1\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/blue.png"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Ship the backlog reference preview\nRemember where the link goes.\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Ship the backlog reference preview\nRemember where the link goes."
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Ship the backlog reference preview\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Ship the backlog reference preview",
+          "value": null
+        },
+        {
+          "text": "click button \"New*\"",
+          "action": "click",
+          "by": "button",
+          "name": "New*",
+          "value": null
+        },
+        {
+          "text": "click button \"Select model*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Select model*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Model*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Model*",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"dshx_fake_commandcode/gpt-6-luna\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "dshx_fake_commandcode/gpt-6-luna",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Working on b:#1\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Working on b:#1"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Preview backlog item b:#1\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Preview backlog item b:#1",
+          "value": null
+        },
+        {
+          "text": "click button \"Preview backlog item b:#1\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preview backlog item b:#1",
+          "value": null
+        },
+        {
+          "text": "expect text \"Backlog · b:#1\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Backlog · b:#1",
+          "value": null
+        },
+        {
+          "text": "expect text \"Ship the backlog reference preview\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Ship the backlog reference preview",
+          "value": null
+        },
+        {
+          "text": "expect img \"red.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "red.png",
+          "value": null
+        },
+        {
+          "text": "click button \"Open red.png\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open red.png",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Image preview\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Image preview",
+          "value": null
+        },
+        {
+          "text": "press ArrowRight",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ArrowRight"
+        },
+        {
+          "text": "expect img \"blue.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "blue.png",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "expect button \"Open in Backlog\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open in Backlog",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Following b:#1\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "Following b:#1"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Preview backlog item b:#1\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Preview backlog item b:#1",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2140,10 +4426,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Backlog › Inbox filter (links to the Inbox)",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Inbox\"",
-        "expect text \"Needs you\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Inbox\"",
+          "action": "click",
+          "by": "button",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect text \"Needs you\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Needs you",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2167,35 +4477,209 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › capture box",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "expect textbox \"Capture\"",
-        "expect button \"Dictate\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
-        "expect img \"red.png\"",
-        "click button \"Open red.png\"",
-        "expect dialog \"Image preview\"",
-        "expect button \"Image 2 of 2\"",
-        "press Escape",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
-        "expect text \"note.txt\"",
-        "click button \"Status\"",
-        "click menuitem \"In progress\"",
-        "click button \"Add a file or a reference\"",
-        "click menuitem \"Link a thread\"",
-        "expect dialog \"Link a thread\"",
-        "press Escape",
-        "fill textbox \"Capture\" \"rich capture with an image\"",
-        "press Enter",
-        "expect text \"rich capture with an image\"",
-        "click text \"rich capture with an image\"",
-        "expect img \"red.png\"",
-        "expect text \"note.txt\"",
-        "click button \"Open red.png\"",
-        "expect dialog \"Image preview\"",
-        "expect button \"Image 1 of 2\"",
-        "expect img \"red.png\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "expect button \"Dictate\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Dictate",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/blue.png"
+        },
+        {
+          "text": "expect img \"red.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "red.png",
+          "value": null
+        },
+        {
+          "text": "click button \"Open red.png\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open red.png",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Image preview\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Image preview",
+          "value": null
+        },
+        {
+          "text": "expect button \"Image 2 of 2\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Image 2 of 2",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/note.txt"
+        },
+        {
+          "text": "expect text \"note.txt\"",
+          "action": "expect",
+          "by": "text",
+          "name": "note.txt",
+          "value": null
+        },
+        {
+          "text": "click button \"Status\"",
+          "action": "click",
+          "by": "button",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"In progress\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "In progress",
+          "value": null
+        },
+        {
+          "text": "click button \"Add a file or a reference\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add a file or a reference",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Link a thread\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Link a thread",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Link a thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Link a thread",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"rich capture with an image\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "rich capture with an image"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"rich capture with an image\"",
+          "action": "expect",
+          "by": "text",
+          "name": "rich capture with an image",
+          "value": null
+        },
+        {
+          "text": "click text \"rich capture with an image\"",
+          "action": "click",
+          "by": "text",
+          "name": "rich capture with an image",
+          "value": null
+        },
+        {
+          "text": "expect img \"red.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "red.png",
+          "value": null
+        },
+        {
+          "text": "expect text \"note.txt\"",
+          "action": "expect",
+          "by": "text",
+          "name": "note.txt",
+          "value": null
+        },
+        {
+          "text": "click button \"Open red.png\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open red.png",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Image preview\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Image preview",
+          "value": null
+        },
+        {
+          "text": "expect button \"Image 1 of 2\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Image 1 of 2",
+          "value": null
+        },
+        {
+          "text": "expect img \"red.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "red.png",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2208,32 +4692,188 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Describe me with a screenshot\"",
-        "press Enter",
-        "click text \"Describe me with a screenshot\"",
-        "expect complementary \"Item detail\"",
-        "expect textbox \"Comment\"",
-        "fill textbox \"Comment\" \"A first reply\"",
-        "press Enter",
-        "expect text \"A first reply\"",
-        "click button \"Reply actions\"",
-        "click menuitem \"Edit reply\"",
-        "fill textbox \"Edit reply\" \"Updated reply\"",
-        "press Meta+Enter",
-        "expect text \"Updated reply\"",
-        "click button \"Reply actions\"",
-        "expect menuitem \"Delete reply\"",
-        "press Escape",
-        "expect button \"Add an image or file\"",
-        "click button \"Edit description\"",
-        "expect button \"Attach an image or file to this item\"",
-        "fill textbox \"Body\" \"@sample\"",
-        "expect option \"sample project reference\"",
-        "click option \"sample project reference\"",
-        "press Meta+Enter",
-        "expect text \"sample\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Describe me with a screenshot\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Describe me with a screenshot"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click text \"Describe me with a screenshot\"",
+          "action": "click",
+          "by": "text",
+          "name": "Describe me with a screenshot",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Comment\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Comment",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Comment\" \"A first reply\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Comment",
+          "value": "A first reply"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"A first reply\"",
+          "action": "expect",
+          "by": "text",
+          "name": "A first reply",
+          "value": null
+        },
+        {
+          "text": "click button \"Reply actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "Reply actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Edit reply\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Edit reply",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Edit reply\" \"Updated reply\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Edit reply",
+          "value": "Updated reply"
+        },
+        {
+          "text": "press Meta+Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Meta+Enter"
+        },
+        {
+          "text": "expect text \"Updated reply\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Updated reply",
+          "value": null
+        },
+        {
+          "text": "click button \"Reply actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "Reply actions",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Delete reply\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Delete reply",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "expect button \"Add an image or file\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Add an image or file",
+          "value": null
+        },
+        {
+          "text": "click button \"Edit description\"",
+          "action": "click",
+          "by": "button",
+          "name": "Edit description",
+          "value": null
+        },
+        {
+          "text": "expect button \"Attach an image or file to this item\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Attach an image or file to this item",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Body\" \"@sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Body",
+          "value": "@sample"
+        },
+        {
+          "text": "expect option \"sample project reference\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample project reference",
+          "value": null
+        },
+        {
+          "text": "click option \"sample project reference\"",
+          "action": "click",
+          "by": "option",
+          "name": "sample project reference",
+          "value": null
+        },
+        {
+          "text": "press Meta+Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Meta+Enter"
+        },
+        {
+          "text": "expect text \"sample\"",
+          "action": "expect",
+          "by": "text",
+          "name": "sample",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2246,21 +4886,111 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › project filter",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "expect textbox \"Capture\"",
-        "expect combobox \"Filter by project\"",
-        "expect combobox \"Project of the new item\"",
-        "click combobox \"Project of the new item\"",
-        "expect combobox \"Search projects\"",
-        "press Escape",
-        "click combobox \"Filter by project\"",
-        "expect option \"All projects\"",
-        "expect option \"No project\"",
-        "expect option \"sample*\"",
-        "click option \"sample*\"",
-        "click option \"No project\"",
-        "expect text \"2 projects\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Filter by project\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Filter by project",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Project of the new item\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Project of the new item",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Project of the new item\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Project of the new item",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Search projects\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Search projects",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "click combobox \"Filter by project\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Filter by project",
+          "value": null
+        },
+        {
+          "text": "expect option \"All projects\"",
+          "action": "expect",
+          "by": "option",
+          "name": "All projects",
+          "value": null
+        },
+        {
+          "text": "expect option \"No project\"",
+          "action": "expect",
+          "by": "option",
+          "name": "No project",
+          "value": null
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "click option \"sample*\"",
+          "action": "click",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "click option \"No project\"",
+          "action": "click",
+          "by": "option",
+          "name": "No project",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 projects\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 projects",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2273,10 +5003,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › header › Agent items",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Hide agent items\"",
-        "expect button \"Hide agent items\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Hide agent items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Hide agent items",
+          "value": null
+        },
+        {
+          "text": "expect button \"Hide agent items\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Hide agent items",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2300,38 +5054,230 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Start thread",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "expect textbox \"Capture\"",
-        "click button \"Feed\"",
-        "click button \"All statuses*\"",
-        "fill textbox \"Capture\" \"Start a thread from b:1\"",
-        "press Enter",
-        "expect text \"Start a thread from b:1\"",
-        "click button \"Feed\"",
-        "rightclick article \"Item b:#1\"",
-        "expect menuitem \"Start thread…\"",
-        "expect menuitem \"Status\"",
-        "expect menuitem \"Project\"",
-        "expect menuitem \"Copy item ID\"",
-        "expect menuitem \"Copy item link\"",
-        "click menuitem \"Start thread…\"",
-        "expect dialog \"Start thread\"",
-        "click button \"Cancel\"",
-        "click button \"Board\"",
-        "expect article \"Card b:#1\"",
-        "click article \"Card b:#1\"",
-        "expect complementary \"Item detail\"",
-        "click button \"Start thread\"",
-        "expect dialog \"Start thread\"",
-        "click button \"Cancel\"",
-        "click button \"Start thread\"",
-        "click combobox \"Thread project\"",
-        "expect option \"sample*\"",
-        "expect checkbox \"Open the thread when it is created\"",
-        "click button \"Cancel\"",
-        "hover button \"Start thread\"",
-        "expect tooltip \"Start a thread for this item\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "click button \"All statuses*\"",
+          "action": "click",
+          "by": "button",
+          "name": "All statuses*",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Start a thread from b:1\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Start a thread from b:1"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Start a thread from b:1\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Start a thread from b:1",
+          "value": null
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "rightclick article \"Item b:#1\"",
+          "action": "rightclick",
+          "by": "article",
+          "name": "Item b:#1",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Start thread…\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Start thread…",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Status\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Project\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Project",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy item ID\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy item ID",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy item link\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy item link",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Start thread…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Start thread…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Start thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Cancel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Cancel",
+          "value": null
+        },
+        {
+          "text": "click button \"Board\"",
+          "action": "click",
+          "by": "button",
+          "name": "Board",
+          "value": null
+        },
+        {
+          "text": "expect article \"Card b:#1\"",
+          "action": "expect",
+          "by": "article",
+          "name": "Card b:#1",
+          "value": null
+        },
+        {
+          "text": "click article \"Card b:#1\"",
+          "action": "click",
+          "by": "article",
+          "name": "Card b:#1",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        },
+        {
+          "text": "click button \"Start thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Start thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Cancel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Cancel",
+          "value": null
+        },
+        {
+          "text": "click button \"Start thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Thread project\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Thread project",
+          "value": null
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Open the thread when it is created\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Open the thread when it is created",
+          "value": null
+        },
+        {
+          "text": "click button \"Cancel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Cancel",
+          "value": null
+        },
+        {
+          "text": "hover button \"Start thread\"",
+          "action": "hover",
+          "by": "button",
+          "name": "Start thread",
+          "value": null
+        },
+        {
+          "text": "expect tooltip \"Start a thread for this item\"",
+          "action": "expect",
+          "by": "tooltip",
+          "name": "Start a thread for this item",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2344,13 +5290,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Set up missing secrets",
       "reach": [
-        "seed fake-secret-cli",
-        "seed backlog-jev-enabled",
-        "seed tool-call-thread",
-        "expect text \"Tool finished.\"",
-        "expect text \"Required secrets are missing\"",
-        "click button \"Set up missing secrets\"",
-        "expect textbox \"Secret value\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "seed backlog-jev-enabled",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "backlog-jev-enabled"
+        },
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        },
+        {
+          "text": "expect text \"Required secrets are missing\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Required secrets are missing",
+          "value": null
+        },
+        {
+          "text": "click button \"Set up missing secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Set up missing secrets",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Secret value\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Secret value",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2363,11 +5351,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › row menu › tweet context",
       "reach": [
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Tweet context in backlog https://x.com/someone/status/123\"",
-        "press Enter",
-        "rightclick article \"Item b:#1\"",
-        "expect menuitem \"Retrieve tweet content\""
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Tweet context in backlog https://x.com/someone/status/123\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Tweet context in backlog https://x.com/someone/status/123"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "rightclick article \"Item b:#1\"",
+          "action": "rightclick",
+          "by": "article",
+          "name": "Item b:#1",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Retrieve tweet content\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Retrieve tweet content",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2380,24 +5398,132 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › backlog.attention",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Pick a cache key\"",
-        "press Enter",
-        "rightclick text \"Pick a cache key\"",
-        "hover menuitem \"Attention\"",
-        "click menuitemradio \"Needs you\"",
-        "click tab \"Inbox\"",
-        "expect text \"Pick a cache key needs your input*\"",
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "rightclick text \"Pick a cache key\"",
-        "hover menuitem \"Attention\"",
-        "click menuitemradio \"No attention\"",
-        "click tab \"Inbox\"",
-        "expect text \"Nothing needs you right now*\"",
-        "click tab \"Done*\"",
-        "expect text \"Pick a cache key needs your input*\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Pick a cache key\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Pick a cache key"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "rightclick text \"Pick a cache key\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Pick a cache key",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Attention\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Attention",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Needs you\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Needs you",
+          "value": null
+        },
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect text \"Pick a cache key needs your input*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Pick a cache key needs your input*",
+          "value": null
+        },
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Pick a cache key\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Pick a cache key",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Attention\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Attention",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"No attention\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "No attention",
+          "value": null
+        },
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect text \"Nothing needs you right now*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Nothing needs you right now*",
+          "value": null
+        },
+        {
+          "text": "click tab \"Done*\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Done*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Pick a cache key needs your input*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Pick a cache key needs your input*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2410,19 +5536,97 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog: Items › row menu › Link to … / Create in … / row selection › Create in… per binding / item detail › sync chips",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Backlog settings\"",
-        "click button \"Add Markdown files connection\"",
-        "click button \"Save connection\"",
-        "click button \"Add binding\"",
-        "fill textbox \"Folder\" \"/tmp/dshx-backlog-reach\"",
-        "click button \"Save binding\"",
-        "click button \"Backlog views\"",
-        "fill textbox \"Capture\" \"Mirror this item in files\"",
-        "press Enter",
-        "rightclick article \"Item b:#1\"",
-        "expect menuitem \"Create in Markdown files · /tmp/dshx-backlog-reach\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Add Markdown files connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add Markdown files connection",
+          "value": null
+        },
+        {
+          "text": "click button \"Save connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Save connection",
+          "value": null
+        },
+        {
+          "text": "click button \"Add binding\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add binding",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Folder\" \"/tmp/dshx-backlog-reach\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Folder",
+          "value": "/tmp/dshx-backlog-reach"
+        },
+        {
+          "text": "click button \"Save binding\"",
+          "action": "click",
+          "by": "button",
+          "name": "Save binding",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog views\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog views",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Mirror this item in files\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Mirror this item in files"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "rightclick article \"Item b:#1\"",
+          "action": "rightclick",
+          "by": "article",
+          "name": "Item b:#1",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Create in Markdown files · /tmp/dshx-backlog-reach\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Create in Markdown files · /tmp/dshx-backlog-reach",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2435,21 +5639,111 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: Backlog: Items › Backlog settings › Remote sync",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Backlog settings\"",
-        "expect textbox \"Remote item to import\"",
-        "click button \"Add Linear connection\"",
-        "expect textbox \"Linear key reference\"",
-        "expect button \"Test connection\"",
-        "click button \"Save connection\"",
-        "click button \"Add binding\"",
-        "fill textbox \"Team\" \"ENG\"",
-        "click button \"Save binding\"",
-        "expect button \"Import all open\"",
-        "click button \"Add Markdown files connection\"",
-        "click button \"Save connection\"",
-        "expect button \"Remove Markdown files\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog settings",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Remote item to import\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Remote item to import",
+          "value": null
+        },
+        {
+          "text": "click button \"Add Linear connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add Linear connection",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Linear key reference\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Linear key reference",
+          "value": null
+        },
+        {
+          "text": "expect button \"Test connection\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Test connection",
+          "value": null
+        },
+        {
+          "text": "click button \"Save connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Save connection",
+          "value": null
+        },
+        {
+          "text": "click button \"Add binding\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add binding",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Team\" \"ENG\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Team",
+          "value": "ENG"
+        },
+        {
+          "text": "click button \"Save binding\"",
+          "action": "click",
+          "by": "button",
+          "name": "Save binding",
+          "value": null
+        },
+        {
+          "text": "expect button \"Import all open\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Import all open",
+          "value": null
+        },
+        {
+          "text": "click button \"Add Markdown files connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add Markdown files connection",
+          "value": null
+        },
+        {
+          "text": "click button \"Save connection\"",
+          "action": "click",
+          "by": "button",
+          "name": "Save connection",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove Markdown files\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove Markdown files",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2462,13 +5756,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Relationships",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Rotate secret:GITHUB_TOKEN\"",
-        "press Enter",
-        "click text \"Rotate secret:GITHUB_TOKEN\"",
-        "expect complementary \"Item detail\"",
-        "expect button \"Reveal GITHUB_TOKEN\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Rotate secret:GITHUB_TOKEN\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Rotate secret:GITHUB_TOKEN"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click text \"Rotate secret:GITHUB_TOKEN\"",
+          "action": "click",
+          "by": "text",
+          "name": "Rotate secret:GITHUB_TOKEN",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        },
+        {
+          "text": "expect button \"Reveal GITHUB_TOKEN\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Reveal GITHUB_TOKEN",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2481,11 +5817,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog (every item label, reference card, mention chip and agent tool)",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Short alias demo\"",
-        "press Enter",
-        "expect text \"Short alias demo\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Short alias demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Short alias demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Short alias demo\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Short alias demo",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2498,12 +5864,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › activity › Show changes › Revert",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Revert demo\"",
-        "press Enter",
-        "click text \"Revert demo\"",
-        "expect complementary \"Item detail\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Revert demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Revert demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click text \"Revert demo\"",
+          "action": "click",
+          "by": "text",
+          "name": "Revert demo",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2516,18 +5918,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Activity › Conversation / Work log",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Two lane demo\"",
-        "press Enter",
-        "click text \"Two lane demo\"",
-        "click button \"Status of b:#1\"",
-        "press 2",
-        "fill textbox \"Comment\" \"Splitting the timeline into a conversation and a work log.\"",
-        "click button \"Reply\"",
-        "expect text \"Splitting the timeline*\"",
-        "hover list \"Conversation\"",
-        "expect list \"Conversation\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Two lane demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Two lane demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click text \"Two lane demo\"",
+          "action": "click",
+          "by": "text",
+          "name": "Two lane demo",
+          "value": null
+        },
+        {
+          "text": "click button \"Status of b:#1\"",
+          "action": "click",
+          "by": "button",
+          "name": "Status of b:#1",
+          "value": null
+        },
+        {
+          "text": "press 2",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "2"
+        },
+        {
+          "text": "fill textbox \"Comment\" \"Splitting the timeline into a conversation and a work log.\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Comment",
+          "value": "Splitting the timeline into a conversation and a work log."
+        },
+        {
+          "text": "click button \"Reply\"",
+          "action": "click",
+          "by": "button",
+          "name": "Reply",
+          "value": null
+        },
+        {
+          "text": "expect text \"Splitting the timeline*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Splitting the timeline*",
+          "value": null
+        },
+        {
+          "text": "hover list \"Conversation\"",
+          "action": "hover",
+          "by": "list",
+          "name": "Conversation",
+          "value": null
+        },
+        {
+          "text": "expect list \"Conversation\"",
+          "action": "expect",
+          "by": "list",
+          "name": "Conversation",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2551,11 +6025,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: Backlog › Backlog settings › Export",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Backlog settings\"",
-        "click button \"Export…\"",
-        "expect textbox \"Export file\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Export…\"",
+          "action": "click",
+          "by": "button",
+          "name": "Export…",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Export file\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Export file",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2568,24 +6072,132 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Shipped",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Ship the shipped digest\"",
-        "press Enter",
-        "fill textbox \"Capture\" \"Fix the period switcher\"",
-        "press Enter",
-        "click button \"Feed\"",
-        "expect feed \"Backlog feed\"",
-        "rightclick text \"Ship the shipped digest\"",
-        "hover menuitem \"Status\"",
-        "click menuitemradio \"Done\"",
-        "rightclick text \"Fix the period switcher\"",
-        "hover menuitem \"Status\"",
-        "click menuitemradio \"Done\"",
-        "click button \"Shipped\"",
-        "expect heading \"Shipped\"",
-        "click radio \"Day\"",
-        "expect listitem \"Today: 2 shipped\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Ship the shipped digest\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Ship the shipped digest"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Fix the period switcher\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Fix the period switcher"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "expect feed \"Backlog feed\"",
+          "action": "expect",
+          "by": "feed",
+          "name": "Backlog feed",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Ship the shipped digest\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Ship the shipped digest",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Fix the period switcher\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Fix the period switcher",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "click button \"Shipped\"",
+          "action": "click",
+          "by": "button",
+          "name": "Shipped",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Shipped\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Shipped",
+          "value": null
+        },
+        {
+          "text": "click radio \"Day\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Day",
+          "value": null
+        },
+        {
+          "text": "expect listitem \"Today: 2 shipped\"",
+          "action": "expect",
+          "by": "listitem",
+          "name": "Today: 2 shipped",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2598,24 +6210,132 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Shipped › Summarize",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Ship the shipped digest\"",
-        "press Enter",
-        "fill textbox \"Capture\" \"Fix the period switcher\"",
-        "press Enter",
-        "click button \"Feed\"",
-        "expect feed \"Backlog feed\"",
-        "rightclick text \"Ship the shipped digest\"",
-        "hover menuitem \"Status\"",
-        "click menuitemradio \"Done\"",
-        "rightclick text \"Fix the period switcher\"",
-        "hover menuitem \"Status\"",
-        "click menuitemradio \"Done\"",
-        "click button \"Shipped\"",
-        "expect heading \"Shipped\"",
-        "click radio \"Day\"",
-        "expect listitem \"Today: 2 shipped\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Ship the shipped digest\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Ship the shipped digest"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Fix the period switcher\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Fix the period switcher"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Feed\"",
+          "action": "click",
+          "by": "button",
+          "name": "Feed",
+          "value": null
+        },
+        {
+          "text": "expect feed \"Backlog feed\"",
+          "action": "expect",
+          "by": "feed",
+          "name": "Backlog feed",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Ship the shipped digest\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Ship the shipped digest",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Fix the period switcher\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Fix the period switcher",
+          "value": null
+        },
+        {
+          "text": "hover menuitem \"Status\"",
+          "action": "hover",
+          "by": "menuitem",
+          "name": "Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Done\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "click button \"Shipped\"",
+          "action": "click",
+          "by": "button",
+          "name": "Shipped",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Shipped\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Shipped",
+          "value": null
+        },
+        {
+          "text": "click radio \"Day\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Day",
+          "value": null
+        },
+        {
+          "text": "expect listitem \"Today: 2 shipped\"",
+          "action": "expect",
+          "by": "listitem",
+          "name": "Today: 2 shipped",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2628,12 +6348,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Items › priority column",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"!2 Priority demo\"",
-        "press Enter",
-        "click button \"Items\"",
-        "expect table \"Backlog items\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!2 Priority demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!2 Priority demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "expect table \"Backlog items\"",
+          "action": "expect",
+          "by": "table",
+          "name": "Backlog items",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2646,14 +6402,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Sub-issues",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Sub-issue demo\"",
-        "press Enter",
-        "click text \"Sub-issue demo\"",
-        "expect complementary \"Item detail\"",
-        "click button \"Add sub-issue\"",
-        "expect textbox \"Sub-issue title\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Sub-issue demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Sub-issue demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click text \"Sub-issue demo\"",
+          "action": "click",
+          "by": "text",
+          "name": "Sub-issue demo",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        },
+        {
+          "text": "click button \"Add sub-issue\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add sub-issue",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Sub-issue title\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Sub-issue title",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2666,20 +6470,104 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Ready",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"!1 Fix the login outage\"",
-        "press Enter",
-        "fill textbox \"Capture\" \"!2 Write the release notes\"",
-        "press Enter",
-        "fill textbox \"Capture\" \"!2 Review the claim lease sweep\"",
-        "press Enter",
-        "fill textbox \"Capture\" \"!4 Tidy the changelog\"",
-        "press Enter",
-        "fill textbox \"Capture\" \"Plan the team offsite\"",
-        "press Enter",
-        "click button \"Ready\"",
-        "expect table \"Backlog items\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!1 Fix the login outage\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!1 Fix the login outage"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!2 Write the release notes\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!2 Write the release notes"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!2 Review the claim lease sweep\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!2 Review the claim lease sweep"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"!4 Tidy the changelog\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "!4 Tidy the changelog"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Plan the team offsite\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Plan the team offsite"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Ready\"",
+          "action": "click",
+          "by": "button",
+          "name": "Ready",
+          "value": null
+        },
+        {
+          "text": "expect table \"Backlog items\"",
+          "action": "expect",
+          "by": "table",
+          "name": "Backlog items",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2692,12 +6580,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Owner · Delegate › Release",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Claim demo\"",
-        "press Enter",
-        "click text \"Claim demo\"",
-        "expect complementary \"Item detail\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Claim demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Claim demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click text \"Claim demo\"",
+          "action": "click",
+          "by": "text",
+          "name": "Claim demo",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Item detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Item detail",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2710,12 +6634,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Items, Board and item detail › agent chip",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Run state demo\"",
-        "press Enter",
-        "click button \"Items\"",
-        "expect table \"Backlog items\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Run state demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Run state demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "expect table \"Backlog items\"",
+          "action": "expect",
+          "by": "table",
+          "name": "Backlog items",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2728,22 +6688,118 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Ship structured sections #backlog !2\"",
-        "press Enter",
-        "click button \"Items\"",
-        "click text \"b:#1\"",
-        "fill textbox \"New criterion\" \"Stored as fields in the op log\"",
-        "press Enter",
-        "fill textbox \"New criterion\" \"Editable in the peek\"",
-        "press Enter",
-        "fill textbox \"New criterion\" \"Searchable with has:criteria\"",
-        "press Enter",
-        "click checkbox \"Stored as fields in the op log\"",
-        "fill textbox \"Pull request URL\" \"https://github.com/astahmer/dshfiles/pull/579\"",
-        "press Enter",
-        "expect region \"Acceptance criteria\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Ship structured sections #backlog !2\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Ship structured sections #backlog !2"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"New criterion\" \"Stored as fields in the op log\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "New criterion",
+          "value": "Stored as fields in the op log"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"New criterion\" \"Editable in the peek\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "New criterion",
+          "value": "Editable in the peek"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"New criterion\" \"Searchable with has:criteria\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "New criterion",
+          "value": "Searchable with has:criteria"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click checkbox \"Stored as fields in the op log\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Stored as fields in the op log",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Pull request URL\" \"https://github.com/astahmer/dshfiles/pull/579\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Pull request URL",
+          "value": "https://github.com/astahmer/dshfiles/pull/579"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect region \"Acceptance criteria\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Acceptance criteria",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2756,13 +6812,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › capture box",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Login fails on Safari /template Bug report\"",
-        "press Enter",
-        "click button \"Items\"",
-        "click text \"b:#1\"",
-        "expect region \"Acceptance criteria\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Login fails on Safari /template Bug report\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Login fails on Safari /template Bug report"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "expect region \"Acceptance criteria\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Acceptance criteria",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2775,14 +6873,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail, Items, Inbox",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Renew the certificate\"",
-        "press Enter",
-        "click button \"Items\"",
-        "click text \"b:#1\"",
-        "click button \"Due date of b:#1\"",
-        "expect menuitem \"Tomorrow\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Renew the certificate\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Renew the certificate"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "click button \"Due date of b:#1\"",
+          "action": "click",
+          "by": "button",
+          "name": "Due date of b:#1",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Tomorrow\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Tomorrow",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2795,14 +6941,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Repeat",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Water the plants\"",
-        "press Enter",
-        "click button \"Items\"",
-        "click text \"b:#1\"",
-        "click button \"Repeat b:#1\"",
-        "expect menuitem \"Weekly\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Water the plants\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Water the plants"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "click button \"Repeat b:#1\"",
+          "action": "click",
+          "by": "button",
+          "name": "Repeat b:#1",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Weekly\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Weekly",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2815,16 +7009,76 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item menu › Merge into…, triage duplicate suggestion",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Composer drops chips\"",
-        "press Enter",
-        "fill textbox \"Capture\" \"Chips vanish on paste\"",
-        "press Enter",
-        "click button \"Items\"",
-        "rightclick text \"Chips vanish on paste\"",
-        "click menuitem \"Merge into…\"",
-        "expect dialog \"Merge b:#2 into another item\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Composer drops chips\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Composer drops chips"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Chips vanish on paste\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Chips vanish on paste"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Chips vanish on paste\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Chips vanish on paste",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Merge into…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Merge into…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Merge b:#2 into another item\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Merge b:#2 into another item",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2837,13 +7091,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item detail › Waits on, Pull requests",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Ship after the PR\"",
-        "press Enter",
-        "click button \"Items\"",
-        "click text \"b:#1\"",
-        "expect region \"Gates\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Ship after the PR\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Ship after the PR"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "click text \"b:#1\"",
+          "action": "click",
+          "by": "text",
+          "name": "b:#1",
+          "value": null
+        },
+        {
+          "text": "expect region \"Gates\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Gates",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2856,13 +7152,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › item menu › Schedule nightly triage; Projects › overview",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Triage the inbox nightly\"",
-        "press Enter",
-        "click button \"Items\"",
-        "rightclick text \"Triage the inbox nightly\"",
-        "expect menuitem \"Make recurring\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Triage the inbox nightly\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Triage the inbox nightly"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Items",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Triage the inbox nightly\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Triage the inbox nightly",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Make recurring\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Make recurring",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2875,10 +7213,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "left-nav: Backlog › Projects › project overview › Agent guidance",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Projects\"",
-        "expect heading \"Projects\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Projects\"",
+          "action": "click",
+          "by": "button",
+          "name": "Projects",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Projects\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Projects",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2891,11 +7253,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: Backlog › Backlog settings › Hosts",
       "reach": [
-        "seed multi-host-hosts",
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Backlog settings\"",
-        "expect region \"Hosts\""
+        {
+          "text": "seed multi-host-hosts",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "multi-host-hosts"
+        },
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog settings",
+          "value": null
+        },
+        {
+          "text": "expect region \"Hosts\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Hosts",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2908,10 +7300,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "Backlog settings › Remote sync › Add Jira connection (rendered by @dshfiles/backlog)",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Backlog settings\"",
-        "expect button \"Add Jira connection\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog settings",
+          "value": null
+        },
+        {
+          "text": "expect button \"Add Jira connection\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Add Jira connection",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2924,10 +7340,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "Backlog settings › Remote sync › Add Notion connection (rendered by @dshfiles/backlog)",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "click button \"Backlog settings\"",
-        "expect button \"Add Notion connection\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog settings",
+          "value": null
+        },
+        {
+          "text": "expect button \"Add Notion connection\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Add Notion connection",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2962,18 +7402,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: Ask a side question (btw)",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Side question thread\"",
-        "press Enter",
-        "click button \"Open command palette\"",
-        "click option \"Ask a side question (btw)*\"",
-        "expect dialog \"Ask a side question\"",
-        "press Escape",
-        "press ControlOrMeta+Alt+Slash",
-        "expect dialog \"Ask a side question\"",
-        "press Escape",
-        "click button \"Ask a side question (btw)\"",
-        "expect dialog \"Ask a side question\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Side question thread\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Side question thread"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "click option \"Ask a side question (btw)*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Ask a side question (btw)*",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Ask a side question\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Ask a side question",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "press ControlOrMeta+Alt+Slash",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+Slash"
+        },
+        {
+          "text": "expect dialog \"Ask a side question\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Ask a side question",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "click button \"Ask a side question (btw)\"",
+          "action": "click",
+          "by": "button",
+          "name": "Ask a side question (btw)",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Ask a side question\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Ask a side question",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -2986,9 +7498,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "rail: Settings › Capabilities hub (already on the rail)",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"Capabilities hub\"",
-        "expect heading \"Capabilities hub\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities hub\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities hub",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Capabilities hub\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Capabilities hub",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3023,8 +7553,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: windowed rendering",
       "reach": [
-        "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3037,9 +7579,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: image links",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "expect text \"Image gallery scope\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Image gallery scope\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Image gallery scope",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3052,12 +7612,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "client: chat focus contract",
       "reach": [
-        "seed tool-call-thread",
-        "seed otlp-session-turns",
-        "click button \"Open the trace of turn*\"",
-        "click treeitem \"execute_tool bash*\"",
-        "click button \"Show in chat\"",
-        "expect tab \"Chat\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "seed otlp-session-turns",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-session-turns"
+        },
+        {
+          "text": "click button \"Open the trace of turn*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open the trace of turn*",
+          "value": null
+        },
+        {
+          "text": "click treeitem \"execute_tool bash*\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "execute_tool bash*",
+          "value": null
+        },
+        {
+          "text": "click button \"Show in chat\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show in chat",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Chat\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Chat",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3092,10 +7688,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: find bar",
       "reach": [
-        "seed tool-call-thread",
-        "press ControlOrMeta+f",
-        "fill textbox \"Find in thread\" \"bash\"",
-        "expect text \"Tool call\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "press ControlOrMeta+f",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+f"
+        },
+        {
+          "text": "fill textbox \"Find in thread\" \"bash\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Find in thread",
+          "value": "bash"
+        },
+        {
+          "text": "expect text \"Tool call\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool call",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3108,13 +7728,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: route-change row",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"dshx_fake_commandcode/gpt-6-luna*\"",
-        "click text \"Effort\"",
-        "click text \"High\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Say hello\"",
-        "press Enter",
-        "expect note \"Effort*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"dshx_fake_commandcode/gpt-6-luna*\"",
+          "action": "click",
+          "by": "button",
+          "name": "dshx_fake_commandcode/gpt-6-luna*",
+          "value": null
+        },
+        {
+          "text": "click text \"Effort\"",
+          "action": "click",
+          "by": "text",
+          "name": "Effort",
+          "value": null
+        },
+        {
+          "text": "click text \"High\"",
+          "action": "click",
+          "by": "text",
+          "name": "High",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Say hello\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "Say hello"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect note \"Effort*\"",
+          "action": "expect",
+          "by": "note",
+          "name": "Effort*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3127,8 +7789,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: opening position",
       "reach": [
-        "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3141,11 +7815,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: Threads / Files search",
       "reach": [
-        "seed tool-call-thread",
-        "press Meta+Shift+P",
-        "click tab \"Threads\"",
-        "fill combobox \"Search the command palette\" \"Fake thread title\"",
-        "expect option \"Fake thread title*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "press Meta+Shift+P",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Meta+Shift+P"
+        },
+        {
+          "text": "click tab \"Threads\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Fake thread title\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Fake thread title"
+        },
+        {
+          "text": "expect option \"Fake thread title*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "Fake thread title*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3158,10 +7862,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: action registry",
       "reach": [
-        "click button \"New thread\"",
-        "click button \"Open command palette\"",
-        "expect option \"New thread*\"",
-        "expect option \"Use dark theme*\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "expect option \"New thread*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "New thread*",
+          "value": null
+        },
+        {
+          "text": "expect option \"Use dark theme*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "Use dark theme*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3174,9 +7902,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: Commands",
       "reach": [
-        "press Meta+Shift+P",
-        "fill combobox \"Search the command palette\" \"Toggle sidebar\"",
-        "expect option \"Toggle sidebar*\""
+        {
+          "text": "press Meta+Shift+P",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Meta+Shift+P"
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Toggle sidebar\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Toggle sidebar"
+        },
+        {
+          "text": "expect option \"Toggle sidebar*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "Toggle sidebar*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3200,10 +7946,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: prefixes",
       "reach": [
-        "press Meta+Shift+P",
-        "fill combobox \"Search the command palette\" \"<task: capture from palette\"",
-        "click option \"Open capture composer: task: capture from palette*\"",
-        "expect textbox \"Capture\""
+        {
+          "text": "press Meta+Shift+P",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Meta+Shift+P"
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"<task: capture from palette\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "<task: capture from palette"
+        },
+        {
+          "text": "click option \"Open capture composer: task: capture from palette*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Open capture composer: task: capture from palette*",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Capture\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3216,11 +7986,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: Ask DSH",
       "reach": [
-        "press Meta+Shift+P",
-        "press Tab",
-        "fill combobox \"Search the command palette\" \"how do I rebind a shortcut?\"",
-        "click option \"Ask DSH: how do I rebind a shortcut?\"",
-        "expect text \"Ask DSH · how do I rebind a shortcut?\""
+        {
+          "text": "press Meta+Shift+P",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Meta+Shift+P"
+        },
+        {
+          "text": "press Tab",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Tab"
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"how do I rebind a shortcut?\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "how do I rebind a shortcut?"
+        },
+        {
+          "text": "click option \"Ask DSH: how do I rebind a shortcut?\"",
+          "action": "click",
+          "by": "option",
+          "name": "Ask DSH: how do I rebind a shortcut?",
+          "value": null
+        },
+        {
+          "text": "expect text \"Ask DSH · how do I rebind a shortcut?\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Ask DSH · how do I rebind a shortcut?",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3255,9 +8055,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "left-nav: Component gallery",
       "reach": [
-        "click tab \"Knowledge\"",
-        "click button \"Component gallery\"",
-        "expect heading \"Components\""
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Component gallery\"",
+          "action": "click",
+          "by": "button",
+          "name": "Component gallery",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Components\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Components",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3325,11 +8143,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "Settings: Conversation cleanup",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings\"",
-        "click button \"Conversation cleanup\"",
-        "click button \"Preview cleanup\"",
-        "expect text \"Conversations to delete\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Conversation cleanup\"",
+          "action": "click",
+          "by": "button",
+          "name": "Conversation cleanup",
+          "value": null
+        },
+        {
+          "text": "click button \"Preview cleanup\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preview cleanup",
+          "value": null
+        },
+        {
+          "text": "expect text \"Conversations to delete\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Conversations to delete",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3353,8 +8201,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "dialog: app confirm, alert and toast primitives",
       "reach": [
-        "seed app-dialog-sample",
-        "expect alertdialog \"Delete Old draft?\""
+        {
+          "text": "seed app-dialog-sample",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "app-dialog-sample"
+        },
+        {
+          "text": "expect alertdialog \"Delete Old draft?\"",
+          "action": "expect",
+          "by": "alertdialog",
+          "name": "Delete Old draft?",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3367,8 +8227,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "toast: app toast stack",
       "reach": [
-        "seed app-dialog-sample",
-        "expect text \"Draft saved\""
+        {
+          "text": "seed app-dialog-sample",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "app-dialog-sample"
+        },
+        {
+          "text": "expect text \"Draft saved\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Draft saved",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3414,12 +8286,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Editor: Artifacts",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"Collapse sidebar\"",
-        "click button \"New tab\"",
-        "click button \"Editor: Artifacts\"",
-        "click button \"New artifact\"",
-        "expect textbox \"Artifact title\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"Collapse sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Editor: Artifacts\"",
+          "action": "click",
+          "by": "button",
+          "name": "Editor: Artifacts",
+          "value": null
+        },
+        {
+          "text": "click button \"New artifact\"",
+          "action": "click",
+          "by": "button",
+          "name": "New artifact",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Artifact title\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Artifact title",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3432,14 +8340,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Editor: Files",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"Collapse sidebar\"",
-        "click button \"New tab\"",
-        "click button \"Editor: Files\"",
-        "expect tree \"Workspace files\"",
-        "click text \"README.md\"",
-        "click button \"Preview\"",
-        "expect heading \"Sample\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"Collapse sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Editor: Files\"",
+          "action": "click",
+          "by": "button",
+          "name": "Editor: Files",
+          "value": null
+        },
+        {
+          "text": "expect tree \"Workspace files\"",
+          "action": "expect",
+          "by": "tree",
+          "name": "Workspace files",
+          "value": null
+        },
+        {
+          "text": "click text \"README.md\"",
+          "action": "click",
+          "by": "text",
+          "name": "README.md",
+          "value": null
+        },
+        {
+          "text": "click button \"Preview\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preview",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Sample\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Sample",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3452,12 +8408,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Workspace files › file row",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"Collapse sidebar\"",
-        "click button \"New tab\"",
-        "click button \"Workspace files*\"",
-        "click text \"README.md\"",
-        "expect tab \"README.md\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"Collapse sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Workspace files*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Workspace files*",
+          "value": null
+        },
+        {
+          "text": "click text \"README.md\"",
+          "action": "click",
+          "by": "text",
+          "name": "README.md",
+          "value": null
+        },
+        {
+          "text": "expect tab \"README.md\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "README.md",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3503,7 +8495,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "shell: frame regions",
       "reach": [
-        "expect button \"New session\""
+        {
+          "text": "expect button \"New session\"",
+          "action": "expect",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3516,7 +8514,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "shell: panel widths",
       "reach": [
-        "expect button \"New session\""
+        {
+          "text": "expect button \"New session\"",
+          "action": "expect",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3529,7 +8533,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "shell: collapsed sidebar",
       "reach": [
-        "expect button \"New session\""
+        {
+          "text": "expect button \"New session\"",
+          "action": "expect",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3553,7 +8563,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "shell: status strip",
       "reach": [
-        "expect region \"Threads\""
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3566,9 +8582,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "Settings › General › Status bar",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"Status bar\"",
-        "expect button \"Move Quota up\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Status bar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Status bar",
+          "value": null
+        },
+        {
+          "text": "expect button \"Move Quota up\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Move Quota up",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3581,13 +8615,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "status-strip: Show hidden status items",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"Status bar\"",
-        "click switch \"Working\"",
-        "expect button \"Show hidden status items\"",
-        "click switch \"Restart\"",
-        "click button \"Show hidden status items\"",
-        "expect menuitem \"Show Working\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Status bar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Status bar",
+          "value": null
+        },
+        {
+          "text": "click switch \"Working\"",
+          "action": "click",
+          "by": "switch",
+          "name": "Working",
+          "value": null
+        },
+        {
+          "text": "expect button \"Show hidden status items\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Show hidden status items",
+          "value": null
+        },
+        {
+          "text": "click switch \"Restart\"",
+          "action": "click",
+          "by": "switch",
+          "name": "Restart",
+          "value": null
+        },
+        {
+          "text": "click button \"Show hidden status items\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show hidden status items",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Show Working\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Show Working",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3600,10 +8676,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "shell: status strip",
       "reach": [
-        "rightclick button \"AI accounts usage\"",
-        "expect menuitem \"Hide this item\"",
-        "click menuitem \"Open Quota\"",
-        "expect radio \"Accounts\""
+        {
+          "text": "rightclick button \"AI accounts usage\"",
+          "action": "rightclick",
+          "by": "button",
+          "name": "AI accounts usage",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Hide this item\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Hide this item",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Open Quota\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open Quota",
+          "value": null
+        },
+        {
+          "text": "expect radio \"Accounts\"",
+          "action": "expect",
+          "by": "radio",
+          "name": "Accounts",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3682,10 +8782,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "plugins-page: View HMR updates",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"Plugins\"",
-        "click button \"View HMR updates\"",
-        "expect text \"Nothing is waiting*\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugins\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugins",
+          "value": null
+        },
+        {
+          "text": "click button \"View HMR updates\"",
+          "action": "click",
+          "by": "button",
+          "name": "View HMR updates",
+          "value": null
+        },
+        {
+          "text": "expect text \"Nothing is waiting*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Nothing is waiting*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3698,8 +8822,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › hmr-gate.deferred-update",
       "reach": [
-        "click tab \"Inbox\"",
-        "expect heading \"Inbox\""
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3712,7 +8848,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "status-strip: Restart pending",
       "reach": [
-        "expect region \"Threads\""
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3725,7 +8867,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: hmr-gate deferral",
       "reach": [
-        "expect region \"Threads\""
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3738,10 +8886,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: html_render card",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Sales dashboard\\\",\\\"html\\\":\\\"<style>body{display:grid;gap:12px}.bars{display:flex;align-items:end;gap:8px;height:140px}.bars div{flex:1;background:var(--dsh-accent);border-radius:4px 4px 0 0}</style><h2>Q3 revenue</h2><div class='bars'><div style='height:40%'></div><div style='height:65%'></div><div style='height:52%'></div><div style='height:90%'></div></div><p id='status' style='color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Rendered by an inline script'</script>\\\",\\\"height\\\":300}]]\"",
-        "press Enter",
-        "expect region \"Sales dashboard\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Sales dashboard\\\",\\\"html\\\":\\\"<style>body{display:grid;gap:12px}.bars{display:flex;align-items:end;gap:8px;height:140px}.bars div{flex:1;background:var(--dsh-accent);border-radius:4px 4px 0 0}</style><h2>Q3 revenue</h2><div class='bars'><div style='height:40%'></div><div style='height:65%'></div><div style='height:52%'></div><div style='height:90%'></div></div><p id='status' style='color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Rendered by an inline script'</script>\\\",\\\"height\\\":300}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call html_render {\"title\":\"Sales dashboard\",\"html\":\"<style>body{display:grid;gap:12px}.bars{display:flex;align-items:end;gap:8px;height:140px}.bars div{flex:1;background:var(--dsh-accent);border-radius:4px 4px 0 0}</style><h2>Q3 revenue</h2><div class='bars'><div style='height:40%'></div><div style='height:65%'></div><div style='height:52%'></div><div style='height:90%'></div></div><p id='status' style='color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Rendered by an inline script'</script>\",\"height\":300}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect region \"Sales dashboard\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Sales dashboard",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3754,13 +8926,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: html_preview card",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call write {\\\"file_path\\\":\\\"index.html\\\",\\\"content\\\":\\\"<h2>Workspace page</h2><p style='color:var(--dsh-accent)'>Shown from the thread workspace</p>\\\"}]]\"",
-        "press Enter",
-        "expect text \"Tool finished.\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_preview {\\\"path\\\":\\\"index.html\\\",\\\"title\\\":\\\"Workspace page\\\"}]]\"",
-        "press Enter",
-        "expect region \"Workspace page\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call write {\\\"file_path\\\":\\\"index.html\\\",\\\"content\\\":\\\"<h2>Workspace page</h2><p style='color:var(--dsh-accent)'>Shown from the thread workspace</p>\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call write {\"file_path\":\"index.html\",\"content\":\"<h2>Workspace page</h2><p style='color:var(--dsh-accent)'>Shown from the thread workspace</p>\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_preview {\\\"path\\\":\\\"index.html\\\",\\\"title\\\":\\\"Workspace page\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call html_preview {\"path\":\"index.html\",\"title\":\"Workspace page\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect region \"Workspace page\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Workspace page",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3773,13 +8987,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: html_render_screenshot",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Screenshot target\\\",\\\"html\\\":\\\"<h2 style='color:var(--dsh-accent)'>Screenshot target</h2>\\\"}]]\"",
-        "press Enter",
-        "expect region \"Screenshot target\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render_screenshot {}]]\"",
-        "press Enter",
-        "expect text \"Tool finished.\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render {\\\"title\\\":\\\"Screenshot target\\\",\\\"html\\\":\\\"<h2 style='color:var(--dsh-accent)'>Screenshot target</h2>\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call html_render {\"title\":\"Screenshot target\",\"html\":\"<h2 style='color:var(--dsh-accent)'>Screenshot target</h2>\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect region \"Screenshot target\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Screenshot target",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"[[call html_render_screenshot {}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "[[call html_render_screenshot {}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3792,20 +9048,104 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: @ menu",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"deploy\"",
-        "press Enter",
-        "expect text \"This turn failed\"",
-        "expect text \"deploy\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"fix the deploy script\"",
-        "press Enter",
-        "expect text \"This turn failed\"",
-        "expect text \"fix the deploy script\"",
-        "click button \"New thread\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@fix\"",
-        "expect option \"fix the deploy script*\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"deploy\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "deploy"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"This turn failed\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed",
+          "value": null
+        },
+        {
+          "text": "expect text \"deploy\"",
+          "action": "expect",
+          "by": "text",
+          "name": "deploy",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"fix the deploy script\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "fix the deploy script"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"This turn failed\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed",
+          "value": null
+        },
+        {
+          "text": "expect text \"fix the deploy script\"",
+          "action": "expect",
+          "by": "text",
+          "name": "fix the deploy script",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@fix\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "@fix"
+        },
+        {
+          "text": "expect option \"fix the deploy script*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "fix the deploy script*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3840,16 +9180,76 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "overlay: shared reference preview card; composer: @ menu groups",
       "reach": [
-        "seed tool-call-thread",
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "fill textbox \"Capture\" \"Shared reference card demo\"",
-        "press Enter",
-        "click tab \"Fake thread title\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Working on b:#1\"",
-        "press Enter",
-        "hover button \"Preview backlog item b:#1\"",
-        "expect text \"Backlog · b:#1\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Shared reference card demo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Shared reference card demo"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click tab \"Fake thread title\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Fake thread title",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Working on b:#1\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "Working on b:#1"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "hover button \"Preview backlog item b:#1\"",
+          "action": "hover",
+          "by": "button",
+          "name": "Preview backlog item b:#1",
+          "value": null
+        },
+        {
+          "text": "expect text \"Backlog · b:#1\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Backlog · b:#1",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3895,26 +9295,146 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: run row Workspace segment",
       "reach": [
-        "click button \"New session\"",
-        "expect button \"Workspace: *\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Keep this draft\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
-        "expect button \"Remove image red.png\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
-        "expect button \"Remove file note.txt\"",
-        "click button \"Workspace: *\"",
-        "click option \"Own workspace*\"",
-        "expect status \"thread-*\"",
-        "expect text \"sample · thread-*\"",
-        "expect text \"Keep this draft\"",
-        "expect button \"Remove image red.png\"",
-        "expect button \"Remove file note.txt\"",
-        "click button \"Workspace: *\"",
-        "click option \"In place*\"",
-        "expect text \"sample\"",
-        "expect text \"Keep this draft\"",
-        "expect button \"Remove image red.png\"",
-        "expect button \"Remove file note.txt\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect button \"Workspace: *\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Workspace: *",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Keep this draft\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Keep this draft"
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "expect button \"Remove image red.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image red.png",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/note.txt"
+        },
+        {
+          "text": "expect button \"Remove file note.txt\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove file note.txt",
+          "value": null
+        },
+        {
+          "text": "click button \"Workspace: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Workspace: *",
+          "value": null
+        },
+        {
+          "text": "click option \"Own workspace*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Own workspace*",
+          "value": null
+        },
+        {
+          "text": "expect status \"thread-*\"",
+          "action": "expect",
+          "by": "status",
+          "name": "thread-*",
+          "value": null
+        },
+        {
+          "text": "expect text \"sample · thread-*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "sample · thread-*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Keep this draft\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Keep this draft",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove image red.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image red.png",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove file note.txt\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove file note.txt",
+          "value": null
+        },
+        {
+          "text": "click button \"Workspace: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Workspace: *",
+          "value": null
+        },
+        {
+          "text": "click option \"In place*\"",
+          "action": "click",
+          "by": "option",
+          "name": "In place*",
+          "value": null
+        },
+        {
+          "text": "expect text \"sample\"",
+          "action": "expect",
+          "by": "text",
+          "name": "sample",
+          "value": null
+        },
+        {
+          "text": "expect text \"Keep this draft\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Keep this draft",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove image red.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image red.png",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove file note.txt\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove file note.txt",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3938,23 +9458,125 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: new-thread destination bar",
       "reach": [
-        "click button \"New thread\"",
-        "click button \"Choose workspace\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect button \"Workspace: *\"",
-        "click button \"Workspace: *\"",
-        "click option \"Own workspace*\"",
-        "expect text \"sample · thread-*\"",
-        "expect button \"Workspace: Own workspace*\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"previous workspace thread\"",
-        "press Enter",
-        "expect text \"previous workspace thread\"",
-        "click button \"New thread\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-        "expect button \"Choose workspace\"",
-        "expect button \"Workspace: Own workspace*\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Workspace: *\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Workspace: *",
+          "value": null
+        },
+        {
+          "text": "click button \"Workspace: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Workspace: *",
+          "value": null
+        },
+        {
+          "text": "click option \"Own workspace*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Own workspace*",
+          "value": null
+        },
+        {
+          "text": "expect text \"sample · thread-*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "sample · thread-*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Workspace: Own workspace*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Workspace: Own workspace*",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"previous workspace thread\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "previous workspace thread"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"previous workspace thread\"",
+          "action": "expect",
+          "by": "text",
+          "name": "previous workspace thread",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "expect button \"Choose workspace\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "expect button \"Workspace: Own workspace*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Workspace: Own workspace*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3967,10 +9589,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: New thread draft",
       "reach": [
-        "click button \"New thread\"",
-        "expect button \"Workspace: *\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"prepared while writing\"",
-        "expect text \"prepared while writing\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect button \"Workspace: *\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Workspace: *",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"prepared while writing\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "prepared while writing"
+        },
+        {
+          "text": "expect text \"prepared while writing\"",
+          "action": "expect",
+          "by": "text",
+          "name": "prepared while writing",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -3983,13 +9629,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "thread-header: Current thread workspace menu",
       "reach": [
-        "seed rebase-ready-thread",
-        "expect button \"Current thread workspace: thread-*\"",
-        "click button \"Current thread workspace: thread-*\"",
-        "expect text \"Land on main\"",
-        "expect button \"Land this thread on main\"",
-        "expect button \"Open thread workspaces in side panel\"",
-        "expect button \"Download thread log\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "expect button \"Current thread workspace: thread-*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Current thread workspace: thread-*",
+          "value": null
+        },
+        {
+          "text": "click button \"Current thread workspace: thread-*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Current thread workspace: thread-*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Land on main\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Land on main",
+          "value": null
+        },
+        {
+          "text": "expect button \"Land this thread on main\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Land this thread on main",
+          "value": null
+        },
+        {
+          "text": "expect button \"Open thread workspaces in side panel\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open thread workspaces in side panel",
+          "value": null
+        },
+        {
+          "text": "expect button \"Download thread log\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Download thread log",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4002,18 +9690,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "thread-header: Current thread workspace › Integrate",
       "reach": [
-        "seed rebase-ready-thread",
-        "hover button \"Current thread workspace: thread-*\"",
-        "expect heading \"Revision graph\"",
-        "press Escape",
-        "click button \"Current thread workspace: thread-*\"",
-        "expect button \"Land this thread on main\"",
-        "expect text \"1 to land\"",
-        "press Escape",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/rebase\"",
-        "press Enter",
-        "expect text \"Landed 1 revision(s) on main.\"",
-        "expect button \"Mark this landed thread done\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "hover button \"Current thread workspace: thread-*\"",
+          "action": "hover",
+          "by": "button",
+          "name": "Current thread workspace: thread-*",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Revision graph\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Revision graph",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "click button \"Current thread workspace: thread-*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Current thread workspace: thread-*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Land this thread on main\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Land this thread on main",
+          "value": null
+        },
+        {
+          "text": "expect text \"1 to land\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 to land",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/rebase\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "/rebase"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Landed 1 revision(s) on main.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Landed 1 revision(s) on main.",
+          "value": null
+        },
+        {
+          "text": "expect button \"Mark this landed thread done\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Mark this landed thread done",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4026,10 +9786,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Land on main › revisions",
       "reach": [
-        "seed rebase-ready-thread",
-        "expect button \"Land on main\"",
-        "click button \"1 revision(s) ready to land on main.*\"",
-        "expect text \"Seeded work to rebase\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "expect button \"Land on main\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Land on main",
+          "value": null
+        },
+        {
+          "text": "click button \"1 revision(s) ready to land on main.*\"",
+          "action": "click",
+          "by": "button",
+          "name": "1 revision(s) ready to land on main.*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Seeded work to rebase\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Seeded work to rebase",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4042,19 +9826,97 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Land",
       "reach": [
-        "seed rebase-ready-thread",
-        "click button \"Current thread workspace: thread-*\"",
-        "expect button \"Open thread workspaces in side panel\"",
-        "click button \"Open thread workspaces in side panel\"",
-        "expect heading \"Land\"",
-        "expect button \"Land\"",
-        "expect button \"Land all*\"",
-        "click button \"View details\"",
-        "click button \"Preview\"",
-        "expect text \"You\"",
-        "click tab \"Land\"",
-        "click button \"Workspaces\"",
-        "expect heading \"Land\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Current thread workspace: thread-*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Current thread workspace: thread-*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Open thread workspaces in side panel\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open thread workspaces in side panel",
+          "value": null
+        },
+        {
+          "text": "click button \"Open thread workspaces in side panel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open thread workspaces in side panel",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Land\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "expect button \"Land\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "expect button \"Land all*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Land all*",
+          "value": null
+        },
+        {
+          "text": "click button \"View details\"",
+          "action": "click",
+          "by": "button",
+          "name": "View details",
+          "value": null
+        },
+        {
+          "text": "click button \"Preview\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preview",
+          "value": null
+        },
+        {
+          "text": "expect text \"You\"",
+          "action": "expect",
+          "by": "text",
+          "name": "You",
+          "value": null
+        },
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Workspaces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Land\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Land",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4067,16 +9929,76 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Land › Needs you",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"Workspaces\"",
-        "expect heading \"Land\"",
-        "expect button \"Needs you*\"",
-        "click button \"Refresh\"",
-        "click button \"All*\"",
-        "expect button \"Completed*\"",
-        "click button \"Needs you*\"",
-        "click button \"All*\"",
-        "expect button \"Conflicts*\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Workspaces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Land\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "expect button \"Needs you*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Needs you*",
+          "value": null
+        },
+        {
+          "text": "click button \"Refresh\"",
+          "action": "click",
+          "by": "button",
+          "name": "Refresh",
+          "value": null
+        },
+        {
+          "text": "click button \"All*\"",
+          "action": "click",
+          "by": "button",
+          "name": "All*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Completed*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Completed*",
+          "value": null
+        },
+        {
+          "text": "click button \"Needs you*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Needs you*",
+          "value": null
+        },
+        {
+          "text": "click button \"All*\"",
+          "action": "click",
+          "by": "button",
+          "name": "All*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Conflicts*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Conflicts*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4089,13 +10011,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Land › row details",
       "reach": [
-        "seed rebase-ready-thread",
-        "click button \"Current thread workspace: thread-*\"",
-        "expect button \"Open thread workspaces in side panel\"",
-        "click button \"Open thread workspaces in side panel\"",
-        "expect heading \"Land\"",
-        "click button \"View details\"",
-        "expect button \"Preview\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Current thread workspace: thread-*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Current thread workspace: thread-*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Open thread workspaces in side panel\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open thread workspaces in side panel",
+          "value": null
+        },
+        {
+          "text": "click button \"Open thread workspaces in side panel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open thread workspaces in side panel",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Land\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"View details\"",
+          "action": "click",
+          "by": "button",
+          "name": "View details",
+          "value": null
+        },
+        {
+          "text": "expect button \"Preview\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Preview",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4108,10 +10072,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Land › empty state",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"Workspaces\"",
-        "expect heading \"Land\"",
-        "expect text \"No thread workspaces.\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Workspaces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Land\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "expect text \"No thread workspaces.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "No thread workspaces.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4124,11 +10112,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Choose workspace",
       "reach": [
-        "seed rebase-ready-thread",
-        "click button \"New session\"",
-        "click button \"Choose workspace\"",
-        "expect tab \"Projects\"",
-        "expect option \"No folder*\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Projects\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Projects",
+          "value": null
+        },
+        {
+          "text": "expect option \"No folder*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "No folder*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4141,8 +10159,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land",
       "reach": [
-        "click tab \"Inbox\"",
-        "expect heading \"Inbox\""
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4155,9 +10185,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: above the input bar",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"setup my workspace\"",
-        "expect text \"Setting up\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"setup my workspace\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "setup my workspace"
+        },
+        {
+          "text": "expect text \"Setting up\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Setting up",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4170,13 +10218,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Projects › Main branch",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings\"",
-        "click button \"Projects\"",
-        "expect region \"Main branch\"",
-        "click combobox \"Main branch of sample\"",
-        "click option \"develop\"",
-        "expect text \"Chosen here\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Projects\"",
+          "action": "click",
+          "by": "button",
+          "name": "Projects",
+          "value": null
+        },
+        {
+          "text": "expect region \"Main branch\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Main branch",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Main branch of sample\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Main branch of sample",
+          "value": null
+        },
+        {
+          "text": "click option \"develop\"",
+          "action": "click",
+          "by": "option",
+          "name": "develop",
+          "value": null
+        },
+        {
+          "text": "expect text \"Chosen here\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Chosen here",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4200,20 +10290,104 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › landmarks",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "click button \"Choose repository\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect button \"Locate Current\"",
-        "click button \"Compare\"",
-        "expect region \"Revision comparison\"",
-        "click combobox \"Comparison target\"",
-        "click option \"Another revision…\"",
-        "expect combobox \"Choose revision target\"",
-        "click combobox \"Choose revision target\"",
-        "expect combobox \"Search loaded revisions\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Locate Current\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Locate Current",
+          "value": null
+        },
+        {
+          "text": "click button \"Compare\"",
+          "action": "click",
+          "by": "button",
+          "name": "Compare",
+          "value": null
+        },
+        {
+          "text": "expect region \"Revision comparison\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Revision comparison",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Comparison target\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Comparison target",
+          "value": null
+        },
+        {
+          "text": "click option \"Another revision…\"",
+          "action": "click",
+          "by": "option",
+          "name": "Another revision…",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Choose revision target\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Choose revision target",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Choose revision target\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Choose revision target",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Search loaded revisions\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Search loaded revisions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4226,24 +10400,132 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "click button \"Choose repository\"",
-        "click button \"Filter by scope\"",
-        "click menuitemradio \"Workspaces\"",
-        "expect text \"JJ workspace\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect button \"Sample project*\"",
-        "expect checkbox \"Hide immutable\"",
-        "click checkbox \"Hide immutable\"",
-        "expect checkbox \"Hide immutable\"",
-        "expect text \"(no description)\"",
-        "click button \"Choose repository\"",
-        "click button \"Filter by scope\"",
-        "click menuitemradio \"Workspaces\"",
-        "expect text \"JJ workspace\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter by scope\"",
+          "action": "click",
+          "by": "button",
+          "name": "Filter by scope",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Workspaces\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect text \"JJ workspace\"",
+          "action": "expect",
+          "by": "text",
+          "name": "JJ workspace",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Sample project*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Hide immutable\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Hide immutable",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Hide immutable\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Hide immutable",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Hide immutable\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Hide immutable",
+          "value": null
+        },
+        {
+          "text": "expect text \"(no description)\"",
+          "action": "expect",
+          "by": "text",
+          "name": "(no description)",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter by scope\"",
+          "action": "click",
+          "by": "button",
+          "name": "Filter by scope",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Workspaces\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect text \"JJ workspace\"",
+          "action": "expect",
+          "by": "text",
+          "name": "JJ workspace",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4256,15 +10538,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › revision detail",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "click button \"Choose repository\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect button \"Sample project*\"",
-        "click button \"Sample project*\"",
-        "expect button \"Full diff\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Sample project*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "click button \"Sample project*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Full diff\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Full diff",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4288,9 +10624,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "composer: Changes since branching from main",
       "reach": [
-        "seed rebase-ready-thread",
-        "click button \"Changes since branching from main*\"",
-        "expect text \"seeded-work.md\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Changes since branching from main*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Changes since branching from main*",
+          "value": null
+        },
+        {
+          "text": "expect text \"seeded-work.md\"",
+          "action": "expect",
+          "by": "text",
+          "name": "seeded-work.md",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4303,16 +10657,76 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › revision menu",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "click button \"Choose repository\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect button \"Sample project*\"",
-        "rightclick button \"Sample project*\"",
-        "click menuitem \"New change here\"",
-        "expect group \"Confirm new change\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Sample project*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "rightclick button \"Sample project*\"",
+          "action": "rightclick",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"New change here\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "New change here",
+          "value": null
+        },
+        {
+          "text": "expect group \"Confirm new change\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Confirm new change",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4325,15 +10739,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › workspace overflow chip",
       "reach": [
-        "seed shared-workspaces",
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "click button \"Choose repository\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "click button \"Show 2 more workspaces\"",
-        "expect text \"review-05\""
+        {
+          "text": "seed shared-workspaces",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "shared-workspaces"
+        },
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Show 2 more workspaces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show 2 more workspaces",
+          "value": null
+        },
+        {
+          "text": "expect text \"review-05\"",
+          "action": "expect",
+          "by": "text",
+          "name": "review-05",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4346,16 +10814,76 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › New workspace here",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "click button \"Choose repository\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect button \"Sample project*\"",
-        "rightclick button \"Sample project*\"",
-        "click menuitem \"New workspace here…\"",
-        "expect group \"Create workspace at this revision\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Sample project*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "rightclick button \"Sample project*\"",
+          "action": "rightclick",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"New workspace here…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "New workspace here…",
+          "value": null
+        },
+        {
+          "text": "expect group \"Create workspace at this revision\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Create workspace at this revision",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4368,25 +10896,139 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "transcript: jj: reference links",
       "reach": [
-        "seed chat-reference-thread",
-        "hover link \"Jujutsu bookmark: Sample project (main)\"",
-        "expect text \"Revision graph · main\"",
-        "expect text \"default@*\"",
-        "expect text \"Commit ID:*\"",
-        "expect text \"Change ID:*\"",
-        "press Escape",
-        "click link \"Jujutsu bookmark: Sample project (main)\"",
-        "expect button \"Jujutsu view settings\"",
-        "click button \"Jujutsu view settings\"",
-        "expect text \"Open Jujutsu refs from chat\"",
-        "click menuitem \"Chat reference click (focus revision)\"",
-        "expect text \"Focus revision\"",
-        "expect text \"Compare with main/default and show history path\"",
-        "press Escape",
-        "expect button \"Full diff\"",
-        "hover link \"Jujutsu bookmark: Sample project (main)\"",
-        "expect text \"Commit ID:*\"",
-        "expect text \"Change ID:*\""
+        {
+          "text": "seed chat-reference-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "chat-reference-thread"
+        },
+        {
+          "text": "hover link \"Jujutsu bookmark: Sample project (main)\"",
+          "action": "hover",
+          "by": "link",
+          "name": "Jujutsu bookmark: Sample project (main)",
+          "value": null
+        },
+        {
+          "text": "expect text \"Revision graph · main\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Revision graph · main",
+          "value": null
+        },
+        {
+          "text": "expect text \"default@*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "default@*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Commit ID:*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Commit ID:*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Change ID:*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Change ID:*",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "click link \"Jujutsu bookmark: Sample project (main)\"",
+          "action": "click",
+          "by": "link",
+          "name": "Jujutsu bookmark: Sample project (main)",
+          "value": null
+        },
+        {
+          "text": "expect button \"Jujutsu view settings\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Jujutsu view settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Jujutsu view settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Jujutsu view settings",
+          "value": null
+        },
+        {
+          "text": "expect text \"Open Jujutsu refs from chat\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Open Jujutsu refs from chat",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Chat reference click (focus revision)\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Chat reference click (focus revision)",
+          "value": null
+        },
+        {
+          "text": "expect text \"Focus revision\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Focus revision",
+          "value": null
+        },
+        {
+          "text": "expect text \"Compare with main/default and show history path\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Compare with main/default and show history path",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "expect button \"Full diff\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Full diff",
+          "value": null
+        },
+        {
+          "text": "hover link \"Jujutsu bookmark: Sample project (main)\"",
+          "action": "hover",
+          "by": "link",
+          "name": "Jujutsu bookmark: Sample project (main)",
+          "value": null
+        },
+        {
+          "text": "expect text \"Commit ID:*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Commit ID:*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Change ID:*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Change ID:*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4399,18 +11041,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › Clean up workspaces",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "click button \"Choose repository\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "click button \"Repository actions\"",
-        "click menuitem \"Clean up JJ workspaces…\"",
-        "expect text \"Clean up workspaces\"",
-        "expect checkbox \"Select all eligible items\"",
-        "expect text \"No workspace qualifies.\"",
-        "expect text \"0 empty revisions will be abandoned.\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Repository actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "Repository actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Clean up JJ workspaces…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Clean up JJ workspaces…",
+          "value": null
+        },
+        {
+          "text": "expect text \"Clean up workspaces\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Clean up workspaces",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Select all eligible items\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Select all eligible items",
+          "value": null
+        },
+        {
+          "text": "expect text \"No workspace qualifies.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "No workspace qualifies.",
+          "value": null
+        },
+        {
+          "text": "expect text \"0 empty revisions will be abandoned.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "0 empty revisions will be abandoned.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4423,17 +11137,83 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › Remove workspace",
       "reach": [
-        "seed rebase-ready-thread",
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "click button \"Choose repository\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect button \"Sample project*\"",
-        "rightclick text \"Seeded work to rebase\"",
-        "click menuitem \"Remove workspace thread-*\"",
-        "expect group \"Confirm removing workspace*\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Sample project*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Seeded work to rebase\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Seeded work to rebase",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Remove workspace thread-*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Remove workspace thread-*",
+          "value": null
+        },
+        {
+          "text": "expect group \"Confirm removing workspace*\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Confirm removing workspace*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4446,15 +11226,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "land",
       "currentSurface": "left-nav: Source control",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"Source control\"",
-        "click button \"Choose repository\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect textbox \"Working copy description\"",
-        "expect button \"Jujutsu view settings\"",
-        "expect button \"Repository actions\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Source control\"",
+          "action": "click",
+          "by": "button",
+          "name": "Source control",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect textbox \"Working copy description\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Working copy description",
+          "value": null
+        },
+        {
+          "text": "expect button \"Jujutsu view settings\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Jujutsu view settings",
+          "value": null
+        },
+        {
+          "text": "expect button \"Repository actions\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Repository actions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4467,21 +11301,111 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "left-nav: Revision graph › per-tab repository",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "click button \"Choose repository\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect button \"Sample project*\"",
-        "click button \"Open this repository in a new tab\"",
-        "expect tab \"Jujutsu · sample*\"",
-        "expect button \"Locate Current\"",
-        "click tab \"Land\"",
-        "click button \"Source control\"",
-        "expect textbox \"Working copy description\"",
-        "click tab \"Jujutsu · sample*\"",
-        "expect button \"Locate Current\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose repository\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose repository",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Sample project*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Sample project*",
+          "value": null
+        },
+        {
+          "text": "click button \"Open this repository in a new tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open this repository in a new tab",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Jujutsu · sample*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Jujutsu · sample*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Locate Current\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Locate Current",
+          "value": null
+        },
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Source control\"",
+          "action": "click",
+          "by": "button",
+          "name": "Source control",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Working copy description\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Working copy description",
+          "value": null
+        },
+        {
+          "text": "click tab \"Jujutsu · sample*\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Jujutsu · sample*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Locate Current\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Locate Current",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4505,10 +11429,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Network access",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings\"",
-        "click button \"Network access\"",
-        "expect switch \"LAN access\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Network access\"",
+          "action": "click",
+          "by": "button",
+          "name": "Network access",
+          "value": null
+        },
+        {
+          "text": "expect switch \"LAN access\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "LAN access",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4521,10 +11469,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "main-tabs: tab semantics",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"Collapse sidebar\"",
-        "click button \"New tab\"",
-        "expect region \"Choose a view\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"Collapse sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "expect region \"Choose a view\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Choose a view",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4537,29 +11509,167 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "main-tabs: tab strip",
       "reach": [
-        "seed tool-call-thread",
-        "rightclick tab \"*\"",
-        "expect menuitem \"Open in side panel\"",
-        "expect menuitem \"Copy\"",
-        "click menuitem \"Copy\"",
-        "expect menuitem \"Copy thread ID\"",
-        "expect menuitem \"Copy thread link\"",
-        "press Escape",
-        "rightclick tab \"*\"",
-        "expect menuitem \"Change status\"",
-        "expect menuitem \"@Mention thread\"",
-        "press Escape",
-        "rightclick tab \"*\"",
-        "click menuitem \"Edit title\"",
-        "fill textbox \"Edit title\" \"Renamed thread\"",
-        "press Enter",
-        "expect tab \"Renamed thread*\"",
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "click button \"Main tabs\"",
-        "expect radio \"left\"",
-        "click radio \"right\"",
-        "expect radio \"right\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "rightclick tab \"*\"",
+          "action": "rightclick",
+          "by": "tab",
+          "name": "*",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Open in side panel\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Open in side panel",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Copy\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Copy",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy thread ID\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy thread ID",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy thread link\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy thread link",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "rightclick tab \"*\"",
+          "action": "rightclick",
+          "by": "tab",
+          "name": "*",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Change status\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Change status",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"@Mention thread\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "@Mention thread",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "rightclick tab \"*\"",
+          "action": "rightclick",
+          "by": "tab",
+          "name": "*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Edit title\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Edit title",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Edit title\" \"Renamed thread\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Edit title",
+          "value": "Renamed thread"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect tab \"Renamed thread*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Renamed thread*",
+          "value": null
+        },
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "click button \"Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "expect radio \"left\"",
+          "action": "expect",
+          "by": "radio",
+          "name": "left",
+          "value": null
+        },
+        {
+          "text": "click radio \"right\"",
+          "action": "click",
+          "by": "radio",
+          "name": "right",
+          "value": null
+        },
+        {
+          "text": "expect radio \"right\"",
+          "action": "expect",
+          "by": "radio",
+          "name": "right",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4572,11 +11682,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "main-tabs: New tab",
       "reach": [
-        "press ControlOrMeta+Alt+KeyT",
-        "expect tab \"Start\"",
-        "expect option \"New thread\"",
-        "fill label \"Search tabs and panels\" \"Jujutsu\"",
-        "expect option \"Jujutsu\""
+        {
+          "text": "press ControlOrMeta+Alt+KeyT",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+KeyT"
+        },
+        {
+          "text": "expect tab \"Start\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Start",
+          "value": null
+        },
+        {
+          "text": "expect option \"New thread\"",
+          "action": "expect",
+          "by": "option",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill label \"Search tabs and panels\" \"Jujutsu\"",
+          "action": "fill",
+          "by": "label",
+          "name": "Search tabs and panels",
+          "value": "Jujutsu"
+        },
+        {
+          "text": "expect option \"Jujutsu\"",
+          "action": "expect",
+          "by": "option",
+          "name": "Jujutsu",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4589,15 +11729,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "keyboard: tab jumps",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"Plugins\"",
-        "rightclick tab \"Plugins\"",
-        "click menuitem \"Keep open\"",
-        "click tab \"Land\"",
-        "click button \"History\"",
-        "expect heading \"Jujutsu\"",
-        "press ControlOrMeta+Alt+Digit1",
-        "expect tab \"Plugins\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugins\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugins",
+          "value": null
+        },
+        {
+          "text": "rightclick tab \"Plugins\"",
+          "action": "rightclick",
+          "by": "tab",
+          "name": "Plugins",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Keep open\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Keep open",
+          "value": null
+        },
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"History\"",
+          "action": "click",
+          "by": "button",
+          "name": "History",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Jujutsu\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Jujutsu",
+          "value": null
+        },
+        {
+          "text": "press ControlOrMeta+Alt+Digit1",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "ControlOrMeta+Alt+Digit1"
+        },
+        {
+          "text": "expect tab \"Plugins\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Plugins",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4621,19 +11815,97 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "main-tabs: kept thread tab focus",
       "reach": [
-        "seed tool-call-thread",
-        "rightclick tab \"*\"",
-        "click menuitem \"Keep open\"",
-        "click tab \"Work\"",
-        "click button \"Backlog\"",
-        "expect tab \"Backlog*\"",
-        "click textbox \"Capture\"",
-        "press a",
-        "press b",
-        "press c",
-        "expect tab \"Backlog*\"",
-        "press Enter",
-        "expect tab \"Backlog*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "rightclick tab \"*\"",
+          "action": "rightclick",
+          "by": "tab",
+          "name": "*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Keep open\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Keep open",
+          "value": null
+        },
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Backlog*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Backlog*",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Capture\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Capture",
+          "value": null
+        },
+        {
+          "text": "press a",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "a"
+        },
+        {
+          "text": "press b",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "b"
+        },
+        {
+          "text": "press c",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "c"
+        },
+        {
+          "text": "expect tab \"Backlog*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Backlog*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect tab \"Backlog*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Backlog*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4657,11 +11929,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: MCP endpoint",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings\"",
-        "click button \"MCP endpoint\"",
-        "click button \"Generate token\"",
-        "expect button \"Rotate\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"MCP endpoint\"",
+          "action": "click",
+          "by": "button",
+          "name": "MCP endpoint",
+          "value": null
+        },
+        {
+          "text": "click button \"Generate token\"",
+          "action": "click",
+          "by": "button",
+          "name": "Generate token",
+          "value": null
+        },
+        {
+          "text": "expect button \"Rotate\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Rotate",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4674,10 +11976,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"MCP servers\"",
-        "expect heading \"Global MCP servers\"",
-        "expect combobox \"Transport\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"MCP servers\"",
+          "action": "click",
+          "by": "button",
+          "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Global MCP servers\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Global MCP servers",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Transport\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Transport",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4690,15 +12016,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers › Add MCP server › Advanced: request headers",
       "reach": [
-        "seed fake-secret-cli",
-        "click tab \"Settings\"",
-        "click button \"MCP servers\"",
-        "click button \"Advanced: request headers\"",
-        "click button \"Add\"",
-        "click textbox \"Request headers from credentials: credential reference 1\"",
-        "click button \"Bind a secret\"",
-        "click text \"GITHUB_TOKEN@prod\"",
-        "expect textbox \"Request headers from credentials: credential reference 1\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"MCP servers\"",
+          "action": "click",
+          "by": "button",
+          "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "click button \"Advanced: request headers\"",
+          "action": "click",
+          "by": "button",
+          "name": "Advanced: request headers",
+          "value": null
+        },
+        {
+          "text": "click button \"Add\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Request headers from credentials: credential reference 1\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Request headers from credentials: credential reference 1",
+          "value": null
+        },
+        {
+          "text": "click button \"Bind a secret\"",
+          "action": "click",
+          "by": "button",
+          "name": "Bind a secret",
+          "value": null
+        },
+        {
+          "text": "click text \"GITHUB_TOKEN@prod\"",
+          "action": "click",
+          "by": "text",
+          "name": "GITHUB_TOKEN@prod",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Request headers from credentials: credential reference 1\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Request headers from credentials: credential reference 1",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4711,22 +12091,118 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: @ MCP mentions",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"MCP servers\"",
-        "click combobox \"Transport\"",
-        "click option \"Local command (stdio)\"",
-        "fill textbox \"Display name\" \"Echo server\"",
-        "fill textbox \"Command and arguments\" \"node tooling/dshx/e2e/support/fake-mcp-server.mjs\"",
-        "click button \"Add server\"",
-        "expect text \"Native client loaded · 1 Host tools registered\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"MCP autocomplete tool context\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"@echo\"",
-        "expect option \"Echo server*\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"@e2e\"",
-        "expect option \"e2e_echo*\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"MCP servers\"",
+          "action": "click",
+          "by": "button",
+          "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Transport\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Transport",
+          "value": null
+        },
+        {
+          "text": "click option \"Local command (stdio)\"",
+          "action": "click",
+          "by": "option",
+          "name": "Local command (stdio)",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Display name\" \"Echo server\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Display name",
+          "value": "Echo server"
+        },
+        {
+          "text": "fill textbox \"Command and arguments\" \"node tooling/dshx/e2e/support/fake-mcp-server.mjs\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Command and arguments",
+          "value": "node tooling/dshx/e2e/support/fake-mcp-server.mjs"
+        },
+        {
+          "text": "click button \"Add server\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add server",
+          "value": null
+        },
+        {
+          "text": "expect text \"Native client loaded · 1 Host tools registered\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Native client loaded · 1 Host tools registered",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"MCP autocomplete tool context\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "MCP autocomplete tool context"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"@echo\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "@echo"
+        },
+        {
+          "text": "expect option \"Echo server*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "Echo server*",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"@e2e\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "@e2e"
+        },
+        {
+          "text": "expect option \"e2e_echo*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "e2e_echo*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4761,9 +12237,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: MCP Servers: Servers › batch actions",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"MCP servers\"",
-        "expect checkbox \"Select all servers\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"MCP servers\"",
+          "action": "click",
+          "by": "button",
+          "name": "MCP servers",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Select all servers\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Select all servers",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4809,9 +12303,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "left-nav: Memory",
       "reach": [
-        "click tab \"Knowledge\"",
-        "click button \"Memory\"",
-        "expect tab \"Notes\""
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Memory\"",
+          "action": "click",
+          "by": "button",
+          "name": "Memory",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Notes\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Notes",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4824,15 +12336,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), memory kind",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"memory: n:1\"",
-        "press Enter",
-        "expect button \"Preview memory n:1\"",
-        "click button \"Preview memory n:1\"",
-        "expect text \"Not found\"",
-        "expect text \"Nothing stored for n:1\"",
-        "expect text \"No valid note n:1*\"",
-        "expect button \"Open in Memory\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"memory: n:1\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "memory: n:1"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Preview memory n:1\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Preview memory n:1",
+          "value": null
+        },
+        {
+          "text": "click button \"Preview memory n:1\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preview memory n:1",
+          "value": null
+        },
+        {
+          "text": "expect text \"Not found\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Not found",
+          "value": null
+        },
+        {
+          "text": "expect text \"Nothing stored for n:1\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Nothing stored for n:1",
+          "value": null
+        },
+        {
+          "text": "expect text \"No valid note n:1*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "No valid note n:1*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Open in Memory\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open in Memory",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4845,10 +12411,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "left-nav: Memory › Analytics",
       "reach": [
-        "click tab \"Knowledge\"",
-        "click button \"Memory\"",
-        "click tab \"Analytics\"",
-        "expect text \"Recall\""
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Memory\"",
+          "action": "click",
+          "by": "button",
+          "name": "Memory",
+          "value": null
+        },
+        {
+          "text": "click tab \"Analytics\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Analytics",
+          "value": null
+        },
+        {
+          "text": "expect text \"Recall\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Recall",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4861,10 +12451,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "left-nav: Memory › Select notes",
       "reach": [
-        "click tab \"Knowledge\"",
-        "click button \"Memory\"",
-        "click button \"Select notes\"",
-        "expect checkbox \"Select all visible notes\""
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Memory\"",
+          "action": "click",
+          "by": "button",
+          "name": "Memory",
+          "value": null
+        },
+        {
+          "text": "click button \"Select notes\"",
+          "action": "click",
+          "by": "button",
+          "name": "Select notes",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Select all visible notes\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Select all visible notes",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4877,12 +12491,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: @ menu files and threads",
       "reach": [
-        "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
-        "press Enter",
-        "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
-        "expect text \"Threads · @f: files\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Seed a mention target"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "@t:"
+        },
+        {
+          "text": "expect text \"Threads · @f: files\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Threads · @f: files",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4895,13 +12545,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "composer and transcript: thread chips",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
-        "expect text \"Threads · @f: files\"",
-        "press Enter",
-        "press Enter",
-        "expect link \"Referenced session*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "@t:"
+        },
+        {
+          "text": "expect text \"Threads · @f: files\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Threads · @f: files",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect link \"Referenced session*\"",
+          "action": "expect",
+          "by": "link",
+          "name": "Referenced session*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4925,11 +12617,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: model picker",
       "reach": [
-        "seed tool-call-thread",
-        "click button \", reasoning *\"",
-        "expect list \"Models and accounts\"",
-        "hover button \"Reasoning effort: *\"",
-        "expect button \"High\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \", reasoning *\"",
+          "action": "click",
+          "by": "button",
+          "name": ", reasoning *",
+          "value": null
+        },
+        {
+          "text": "expect list \"Models and accounts\"",
+          "action": "expect",
+          "by": "list",
+          "name": "Models and accounts",
+          "value": null
+        },
+        {
+          "text": "hover button \"Reasoning effort: *\"",
+          "action": "hover",
+          "by": "button",
+          "name": "Reasoning effort: *",
+          "value": null
+        },
+        {
+          "text": "expect button \"High\"",
+          "action": "expect",
+          "by": "button",
+          "name": "High",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4964,12 +12686,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: model picker › Fallback chain",
       "reach": [
-        "seed tool-call-thread",
-        "click button \", reasoning *\"",
-        "click button \"Details for*\"",
-        "expect region \"Fallbacks\"",
-        "click button \"Add fallback\"",
-        "expect list \"Fallback order\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \", reasoning *\"",
+          "action": "click",
+          "by": "button",
+          "name": ", reasoning *",
+          "value": null
+        },
+        {
+          "text": "click button \"Details for*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Details for*",
+          "value": null
+        },
+        {
+          "text": "expect region \"Fallbacks\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Fallbacks",
+          "value": null
+        },
+        {
+          "text": "click button \"Add fallback\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add fallback",
+          "value": null
+        },
+        {
+          "text": "expect list \"Fallback order\"",
+          "action": "expect",
+          "by": "list",
+          "name": "Fallback order",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -4982,13 +12740,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: model picker fan-out selection",
       "reach": [
-        "seed tool-call-thread",
-        "click button \", reasoning *\"",
-        "shiftclick button \"Use gpt-6-luna*\"",
-        "shiftclick button \"Use claude-sonnet-5-5*\"",
-        "expect text \"2 models selected\"",
-        "click button \"Fan out…\"",
-        "expect dialog \"Send to several models\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \", reasoning *\"",
+          "action": "click",
+          "by": "button",
+          "name": ", reasoning *",
+          "value": null
+        },
+        {
+          "text": "shiftclick button \"Use gpt-6-luna*\"",
+          "action": "shiftclick",
+          "by": "button",
+          "name": "Use gpt-6-luna*",
+          "value": null
+        },
+        {
+          "text": "shiftclick button \"Use claude-sonnet-5-5*\"",
+          "action": "shiftclick",
+          "by": "button",
+          "name": "Use claude-sonnet-5-5*",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 models selected\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 models selected",
+          "value": null
+        },
+        {
+          "text": "click button \"Fan out…\"",
+          "action": "click",
+          "by": "button",
+          "name": "Fan out…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Send to several models\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Send to several models",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5001,13 +12801,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: draft model selection",
       "reach": [
-        "click button \"New thread\"",
-        "click button \"Choose workspace\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect button \"Send message\"",
-        "expect button \"Select model*\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Send message\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect button \"Select model*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Select model*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5020,12 +12862,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "composer: Run on Local › Add host",
       "reach": [
-        "click button \"New session\"",
-        "click button \"Run on Local\"",
-        "click option \"Add host…\"",
-        "expect dialog \"Add host\"",
-        "click button \"SSH destination\"",
-        "expect text \"Enter a custom destination…\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Run on Local\"",
+          "action": "click",
+          "by": "button",
+          "name": "Run on Local",
+          "value": null
+        },
+        {
+          "text": "click option \"Add host…\"",
+          "action": "click",
+          "by": "option",
+          "name": "Add host…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Add host\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Add host",
+          "value": null
+        },
+        {
+          "text": "click button \"SSH destination\"",
+          "action": "click",
+          "by": "button",
+          "name": "SSH destination",
+          "value": null
+        },
+        {
+          "text": "expect text \"Enter a custom destination…\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Enter a custom destination…",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5038,23 +12916,125 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Hosts",
       "reach": [
-        "seed multi-host-hosts",
-        "click tab \"Observe\"",
-        "click button \"Hosts\"",
-        "expect heading \"Hosts\"",
-        "expect text \"3 registered*\"",
-        "expect button \"Open host\"",
-        "click button \"Clone project\"",
-        "expect textbox \"Git repository URL\"",
-        "fill textbox \"Git repository URL\" \"git@github.com:owner/repo.git\"",
-        "expect checkbox \"Copy selected local files\"",
-        "click textbox \"Folder on Build box\"",
-        "press Tab",
-        "press Space",
-        "expect checkbox \"Also scan ignored files\"",
-        "expect text \"Files are never selected automatically. Credential-like names are blocked; review each other file.\"",
-        "click button \"Cancel\"",
-        "expect heading \"Hosts\""
+        {
+          "text": "seed multi-host-hosts",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "multi-host-hosts"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Hosts\"",
+          "action": "click",
+          "by": "button",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Hosts\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "expect text \"3 registered*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "3 registered*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Open host\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Open host",
+          "value": null
+        },
+        {
+          "text": "click button \"Clone project\"",
+          "action": "click",
+          "by": "button",
+          "name": "Clone project",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Git repository URL\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Git repository URL",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Git repository URL\" \"git@github.com:owner/repo.git\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Git repository URL",
+          "value": "git@github.com:owner/repo.git"
+        },
+        {
+          "text": "expect checkbox \"Copy selected local files\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Copy selected local files",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Folder on Build box\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Folder on Build box",
+          "value": null
+        },
+        {
+          "text": "press Tab",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Tab"
+        },
+        {
+          "text": "press Space",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Space"
+        },
+        {
+          "text": "expect checkbox \"Also scan ignored files\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Also scan ignored files",
+          "value": null
+        },
+        {
+          "text": "expect text \"Files are never selected automatically. Credential-like names are blocked; review each other file.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Files are never selected automatically. Credential-like names are blocked; review each other file.",
+          "value": null
+        },
+        {
+          "text": "click button \"Cancel\"",
+          "action": "click",
+          "by": "button",
+          "name": "Cancel",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Hosts\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Hosts",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5078,13 +13058,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Update hosts",
       "reach": [
-        "seed multi-host-hosts",
-        "click tab \"Observe\"",
-        "click button \"Hosts\"",
-        "expect heading \"Hosts\"",
-        "click button \"Update hosts\"",
-        "expect heading \"Update hosts\"",
-        "expect button \"Update all\""
+        {
+          "text": "seed multi-host-hosts",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "multi-host-hosts"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Hosts\"",
+          "action": "click",
+          "by": "button",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Hosts\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "click button \"Update hosts\"",
+          "action": "click",
+          "by": "button",
+          "name": "Update hosts",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Update hosts\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Update hosts",
+          "value": null
+        },
+        {
+          "text": "expect button \"Update all\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Update all",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5097,13 +13119,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Sync checkout",
       "reach": [
-        "seed multi-host-hosts",
-        "click tab \"Observe\"",
-        "click button \"Hosts\"",
-        "expect heading \"Hosts\"",
-        "click button \"Sync checkout\"",
-        "expect textbox \"Checkout on Build box\"",
-        "expect button \"Check\""
+        {
+          "text": "seed multi-host-hosts",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "multi-host-hosts"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Hosts\"",
+          "action": "click",
+          "by": "button",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Hosts\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "click button \"Sync checkout\"",
+          "action": "click",
+          "by": "button",
+          "name": "Sync checkout",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Checkout on Build box\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Checkout on Build box",
+          "value": null
+        },
+        {
+          "text": "expect button \"Check\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Check",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5116,14 +13180,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Hosts › Edit host",
       "reach": [
-        "seed multi-host-hosts",
-        "click tab \"Observe\"",
-        "click button \"Hosts\"",
-        "expect heading \"Hosts\"",
-        "click button \"Edit Build box\"",
-        "expect heading \"Edit host\"",
-        "expect radio \"Weight 2\"",
-        "expect switch \"Fetch jj before new threads\""
+        {
+          "text": "seed multi-host-hosts",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "multi-host-hosts"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Hosts\"",
+          "action": "click",
+          "by": "button",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Hosts\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Hosts",
+          "value": null
+        },
+        {
+          "text": "click button \"Edit Build box\"",
+          "action": "click",
+          "by": "button",
+          "name": "Edit Build box",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Edit host\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Edit host",
+          "value": null
+        },
+        {
+          "text": "expect radio \"Weight 2\"",
+          "action": "expect",
+          "by": "radio",
+          "name": "Weight 2",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Fetch jj before new threads\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Fetch jj before new threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5158,10 +13270,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Run on Local chip",
       "reach": [
-        "seed multi-host-hosts",
-        "click button \"New session\"",
-        "click button \"Run on Local\"",
-        "expect text \"Auto\""
+        {
+          "text": "seed multi-host-hosts",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "multi-host-hosts"
+        },
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Run on Local\"",
+          "action": "click",
+          "by": "button",
+          "name": "Run on Local",
+          "value": null
+        },
+        {
+          "text": "expect text \"Auto\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Auto",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5185,9 +13321,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: @t: remote threads",
       "reach": [
-        "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
-        "expect text \"Threads · @f: files\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "@t:"
+        },
+        {
+          "text": "expect text \"Threads · @f: files\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Threads · @f: files",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5200,8 +13354,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: All remote threads",
       "reach": [
-        "click button \"All remote threads, including ones started on a host\"",
-        "expect heading \"Remote threads\""
+        {
+          "text": "click button \"All remote threads, including ones started on a host\"",
+          "action": "click",
+          "by": "button",
+          "name": "All remote threads, including ones started on a host",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Remote threads\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Remote threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5214,10 +13380,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-header: Open mirrored thread on its host",
       "reach": [
-        "click button \"Sidebar settings\"",
-        "click checkbox \"Show remote threads in a separate group\"",
-        "click button \"Remote threads started from this DSH\"",
-        "expect heading \"Remote threads\""
+        {
+          "text": "click button \"Sidebar settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Sidebar settings",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Show remote threads in a separate group\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Show remote threads in a separate group",
+          "value": null
+        },
+        {
+          "text": "click button \"Remote threads started from this DSH\"",
+          "action": "click",
+          "by": "button",
+          "name": "Remote threads started from this DSH",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Remote threads\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Remote threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5230,10 +13420,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "conversation composer seat of a mirrored thread",
       "reach": [
-        "click button \"Sidebar settings\"",
-        "click checkbox \"Show remote threads in a separate group\"",
-        "click button \"Remote threads started from this DSH\"",
-        "expect heading \"Remote threads\""
+        {
+          "text": "click button \"Sidebar settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Sidebar settings",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Show remote threads in a separate group\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Show remote threads in a separate group",
+          "value": null
+        },
+        {
+          "text": "click button \"Remote threads started from this DSH\"",
+          "action": "click",
+          "by": "button",
+          "name": "Remote threads started from this DSH",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Remote threads\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Remote threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5246,10 +13460,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-header: Current thread workspace",
       "reach": [
-        "click button \"Sidebar settings\"",
-        "click checkbox \"Show remote threads in a separate group\"",
-        "click button \"Remote threads started from this DSH\"",
-        "expect heading \"Remote threads\""
+        {
+          "text": "click button \"Sidebar settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Sidebar settings",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Show remote threads in a separate group\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Show remote threads in a separate group",
+          "value": null
+        },
+        {
+          "text": "click button \"Remote threads started from this DSH\"",
+          "action": "click",
+          "by": "button",
+          "name": "Remote threads started from this DSH",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Remote threads\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Remote threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5262,10 +13500,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "right sidebar: Terminal tab of a mirrored thread",
       "reach": [
-        "click button \"Sidebar settings\"",
-        "click checkbox \"Show remote threads in a separate group\"",
-        "click button \"Remote threads started from this DSH\"",
-        "expect heading \"Remote threads\""
+        {
+          "text": "click button \"Sidebar settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Sidebar settings",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Show remote threads in a separate group\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Show remote threads in a separate group",
+          "value": null
+        },
+        {
+          "text": "click button \"Remote threads started from this DSH\"",
+          "action": "click",
+          "by": "button",
+          "name": "Remote threads started from this DSH",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Remote threads\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Remote threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5278,9 +13540,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started; palette: Onboarding: Getting started",
       "reach": [
-        "click tab \"Knowledge\"",
-        "click button \"Getting started\"",
-        "expect heading \"Getting started\""
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Getting started\"",
+          "action": "click",
+          "by": "button",
+          "name": "Getting started",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Getting started\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Getting started",
+          "value": null
+        }
       ],
       "onboarding": {
         "firstAction": "Open Knowledge › Getting started and fix each open checklist item.",
@@ -5299,10 +13579,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "rail: Knowledge › Getting started › Packs › Enable pack / Disable pack",
       "reach": [
-        "click tab \"Knowledge\"",
-        "click button \"Getting started\"",
-        "click button \"Enable pack: Observe & perf\"",
-        "expect dialog \"Enable Observe & perf\""
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Getting started\"",
+          "action": "click",
+          "by": "button",
+          "name": "Getting started",
+          "value": null
+        },
+        {
+          "text": "click button \"Enable pack: Observe & perf\"",
+          "action": "click",
+          "by": "button",
+          "name": "Enable pack: Observe & perf",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Enable Observe & perf\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Enable Observe & perf",
+          "value": null
+        }
       ],
       "onboarding": {
         "firstAction": "Open Knowledge › Getting started and press Enable pack on a pack you want.",
@@ -5321,10 +13625,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "empty thread view (first run); palette: Onboarding: Show the setup wizard",
       "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Show the setup wizard\"",
-        "click option \"Onboarding: Show the setup wizard*\"",
-        "expect region \"Connect an AI account\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Show the setup wizard\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Show the setup wizard"
+        },
+        {
+          "text": "click option \"Onboarding: Show the setup wizard*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Onboarding: Show the setup wizard*",
+          "value": null
+        },
+        {
+          "text": "expect region \"Connect an AI account\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Connect an AI account",
+          "value": null
+        }
       ],
       "onboarding": {
         "prerequisites": [
@@ -5402,8 +13730,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: loopback gateway, terminal QR and the sidebar footer's pairing popover",
       "reach": [
-        "click button \"Show pairing QR code\"",
-        "expect text \"Phone access is off. Ask the agent to enable it, then open this again.\""
+        {
+          "text": "click button \"Show pairing QR code\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show pairing QR code",
+          "value": null
+        },
+        {
+          "text": "expect text \"Phone access is off. Ask the agent to enable it, then open this again.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Phone access is off. Ask the agent to enable it, then open this again.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5416,9 +13756,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "rail: Settings › Plugin guide (already on the rail)",
       "reach": [
-        "click tab \"Settings\"",
-        "click button \"Plugin guide\"",
-        "expect heading \"Plugin guide\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugin guide\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugin guide",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Plugin guide\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Plugin guide",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5519,8 +13877,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "thread-header: Dev servers and previews",
       "reach": [
-        "click button \"Dev servers and previews\"",
-        "expect region \"Dev servers\""
+        {
+          "text": "click button \"Dev servers and previews\"",
+          "action": "click",
+          "by": "button",
+          "name": "Dev servers and previews",
+          "value": null
+        },
+        {
+          "text": "expect region \"Dev servers\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Dev servers",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5555,9 +13925,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "work",
       "currentSurface": "rail: Work › Automations (already on the rail)",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Automations\"",
-        "expect heading \"Automations\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Automations\"",
+          "action": "click",
+          "by": "button",
+          "name": "Automations",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Automations\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Automations",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5570,9 +13958,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: /automations/webhook/<id> route",
       "reach": [
-        "click tab \"Work\"",
-        "click button \"Automations\"",
-        "expect heading \"Automations\""
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Automations\"",
+          "action": "click",
+          "by": "button",
+          "name": "Automations",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Automations\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Automations",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5585,11 +13991,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Project checks",
       "reach": [
-        "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"/project-checks\"",
-        "expect option \"Project checks*\"",
-        "click option \"Project checks*\"",
-        "expect heading \"Project checks\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"/project-checks\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "/project-checks"
+        },
+        {
+          "text": "expect option \"Project checks*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "Project checks*",
+          "value": null
+        },
+        {
+          "text": "click option \"Project checks*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Project checks*",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Project checks\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Project checks",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5624,8 +14060,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Prompts",
       "reach": [
-        "click button \"Prompts\"",
-        "expect heading \"Saved prompts\""
+        {
+          "text": "click button \"Prompts\"",
+          "action": "click",
+          "by": "button",
+          "name": "Prompts",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Saved prompts\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Saved prompts",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5660,12 +14108,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Prompts › All threads; Ctrl+R; palette: Search prompt history",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Deploy the quartz service to staging\"",
-        "press Enter",
-        "click button \"Prompts\"",
-        "click tab \"All threads\"",
-        "expect heading \"Prompt history\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Deploy the quartz service to staging\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "Deploy the quartz service to staging"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Prompts\"",
+          "action": "click",
+          "by": "button",
+          "name": "Prompts",
+          "value": null
+        },
+        {
+          "text": "click tab \"All threads\"",
+          "action": "click",
+          "by": "tab",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Prompt history\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Prompt history",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5678,21 +14162,111 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: draft attachments",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Attachment draft thread\"",
-        "press Enter",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Draft with attachments\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
-        "expect button \"Remove file note.txt\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Other thread\"",
-        "press Enter",
-        "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
-        "click button \"Back\"",
-        "expect button \"Remove image red.png\"",
-        "expect button \"Remove file note.txt\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Attachment draft thread\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Attachment draft thread"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Draft with attachments\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "Draft with attachments"
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/note.txt"
+        },
+        {
+          "text": "expect button \"Remove file note.txt\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove file note.txt",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Other thread\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Other thread"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "click button \"Back\"",
+          "action": "click",
+          "by": "button",
+          "name": "Back",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove image red.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image red.png",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove file note.txt\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove file note.txt",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5716,13 +14290,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: Create pull request from this thread (dialog)",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Open a pull request\"",
-        "press Enter",
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"pull request\"",
-        "click option \"Create pull request from this thread*\"",
-        "expect dialog \"Create pull request\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Open a pull request\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Open a pull request"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"pull request\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "pull request"
+        },
+        {
+          "text": "click option \"Create pull request from this thread*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Create pull request from this thread*",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Create pull request\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Create pull request",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5735,29 +14351,167 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "left-nav: Review",
       "reach": [
-        "seed rebase-ready-thread",
-        "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
-        "press Enter",
-        "expect text \"pulls.review · main..@*\"",
-        "click tab \"Land\"",
-        "click button \"Review\"",
-        "expect heading \"Review\"",
-        "expect text \"main..@\"",
-        "expect text \"1 file\"",
-        "expect text \"seeded-work.md*\"",
-        "expect text \"Docs\"",
-        "click button \"Choose project or workspace\"",
-        "expect dialog \"Choose project or workspace\"",
-        "click button \"Filter by scope\"",
-        "click menuitemradio \"Workspaces\"",
-        "expect option \"thread-*\"",
-        "click option \"thread-*\"",
-        "expect text \"thread-*\"",
-        "click button \"Choose project or workspace\"",
-        "click button \"Filter by scope\"",
-        "click menuitemradio \"Workspaces\"",
-        "expect option \"thread-*\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "/pulls"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"pulls.review · main..@*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "pulls.review · main..@*",
+          "value": null
+        },
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Review\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Review\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Review",
+          "value": null
+        },
+        {
+          "text": "expect text \"main..@\"",
+          "action": "expect",
+          "by": "text",
+          "name": "main..@",
+          "value": null
+        },
+        {
+          "text": "expect text \"1 file\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 file",
+          "value": null
+        },
+        {
+          "text": "expect text \"seeded-work.md*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "seeded-work.md*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Docs\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Docs",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose project or workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose project or workspace",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Choose project or workspace\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Choose project or workspace",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter by scope\"",
+          "action": "click",
+          "by": "button",
+          "name": "Filter by scope",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Workspaces\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect option \"thread-*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "thread-*",
+          "value": null
+        },
+        {
+          "text": "click option \"thread-*\"",
+          "action": "click",
+          "by": "option",
+          "name": "thread-*",
+          "value": null
+        },
+        {
+          "text": "expect text \"thread-*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "thread-*",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose project or workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose project or workspace",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter by scope\"",
+          "action": "click",
+          "by": "button",
+          "name": "Filter by scope",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Workspaces\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect option \"thread-*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "thread-*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5770,12 +14524,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "left-nav: Review › Summarize",
       "reach": [
-        "seed rebase-ready-thread",
-        "click tab \"Land\"",
-        "click button \"Review\"",
-        "expect button \"Summarize\"",
-        "click button \"Summarize\"",
-        "expect text \"The model call failed*\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Review\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review",
+          "value": null
+        },
+        {
+          "text": "expect button \"Summarize\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Summarize",
+          "value": null
+        },
+        {
+          "text": "click button \"Summarize\"",
+          "action": "click",
+          "by": "button",
+          "name": "Summarize",
+          "value": null
+        },
+        {
+          "text": "expect text \"The model call failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "The model call failed*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5788,9 +14578,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "left-nav: Review › reviewed marks",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"Review\"",
-        "expect checkbox \"Select all files in this review\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Review\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Select all files in this review\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Select all files in this review",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5803,13 +14611,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes",
       "reach": [
-        "seed rebase-ready-thread",
-        "click button \"Review workspace changes: *\"",
-        "expect region \"Land\"",
-        "click radio \"Whole thread\"",
-        "expect text \"0/1 viewed\"",
-        "click checkbox \"Mark viewed: seeded-work.md\"",
-        "expect text \"1/1 viewed\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Review workspace changes: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review workspace changes: *",
+          "value": null
+        },
+        {
+          "text": "expect region \"Land\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click radio \"Whole thread\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Whole thread",
+          "value": null
+        },
+        {
+          "text": "expect text \"0/1 viewed\"",
+          "action": "expect",
+          "by": "text",
+          "name": "0/1 viewed",
+          "value": null
+        },
+        {
+          "text": "click checkbox \"Mark viewed: seeded-work.md\"",
+          "action": "click",
+          "by": "checkbox",
+          "name": "Mark viewed: seeded-work.md",
+          "value": null
+        },
+        {
+          "text": "expect text \"1/1 viewed\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1/1 viewed",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5822,10 +14672,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes",
       "reach": [
-        "seed rebase-ready-thread",
-        "click button \"Review workspace changes: *\"",
-        "click radio \"Whole thread\"",
-        "expect text \"Every change since this thread left*\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Review workspace changes: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review workspace changes: *",
+          "value": null
+        },
+        {
+          "text": "click radio \"Whole thread\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Whole thread",
+          "value": null
+        },
+        {
+          "text": "expect text \"Every change since this thread left*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Every change since this thread left*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5838,16 +14712,76 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes › Revisions",
       "reach": [
-        "seed rebase-ready-thread",
-        "click button \"Open right sidebar\"",
-        "click text \"Jujutsu\"",
-        "expect region \"Revisions\"",
-        "rightclick text \"Seeded work to rebase\"",
-        "click menuitem \"Select for review\"",
-        "rightclick text \"Sample project\"",
-        "click menuitem \"Select for review\"",
-        "click button \"Review together\"",
-        "expect text \"2 revisions\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Open right sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open right sidebar",
+          "value": null
+        },
+        {
+          "text": "click text \"Jujutsu\"",
+          "action": "click",
+          "by": "text",
+          "name": "Jujutsu",
+          "value": null
+        },
+        {
+          "text": "expect region \"Revisions\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Revisions",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Seeded work to rebase\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Seeded work to rebase",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Select for review\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Select for review",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Sample project\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Sample project",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Select for review\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Select for review",
+          "value": null
+        },
+        {
+          "text": "click button \"Review together\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review together",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 revisions\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 revisions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5871,14 +14805,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "right-pane: Changes › Land",
       "reach": [
-        "seed rebase-ready-thread",
-        "click button \"Review workspace changes: *\"",
-        "expect region \"Land\"",
-        "expect text \"1 revision to land\"",
-        "click button \"Land 1 revision on main\"",
-        "expect alertdialog \"Land 1 revision on main?\"",
-        "click button \"Land on main\"",
-        "expect text \"Landed 1 revision on main.\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Review workspace changes: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review workspace changes: *",
+          "value": null
+        },
+        {
+          "text": "expect region \"Land\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "expect text \"1 revision to land\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 revision to land",
+          "value": null
+        },
+        {
+          "text": "click button \"Land 1 revision on main\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land 1 revision on main",
+          "value": null
+        },
+        {
+          "text": "expect alertdialog \"Land 1 revision on main?\"",
+          "action": "expect",
+          "by": "alertdialog",
+          "name": "Land 1 revision on main?",
+          "value": null
+        },
+        {
+          "text": "click button \"Land on main\"",
+          "action": "click",
+          "by": "button",
+          "name": "Land on main",
+          "value": null
+        },
+        {
+          "text": "expect text \"Landed 1 revision on main.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Landed 1 revision on main.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5946,18 +14928,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: queued messages › Move to thread",
       "reach": [
-        "click text \"Queue source\"",
-        "click button \"Move queued message to another thread\"",
-        "expect dialog \"Move to thread\"",
-        "click option \"Busy target*\"",
-        "expect text \"Moved to the queue of Busy target.\"",
-        "click button \"Dismiss\"",
-        "click button \"Move queued message to another thread\"",
-        "click option \"Idle target*\"",
-        "expect button \"Remove image red.png\"",
-        "expect button \"Remove image blue.png\"",
-        "click text \"Busy target\"",
-        "expect text \"first queued, with an image and a file\""
+        {
+          "text": "click text \"Queue source\"",
+          "action": "click",
+          "by": "text",
+          "name": "Queue source",
+          "value": null
+        },
+        {
+          "text": "click button \"Move queued message to another thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "Move queued message to another thread",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Move to thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Move to thread",
+          "value": null
+        },
+        {
+          "text": "click option \"Busy target*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Busy target*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Moved to the queue of Busy target.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Moved to the queue of Busy target.",
+          "value": null
+        },
+        {
+          "text": "click button \"Dismiss\"",
+          "action": "click",
+          "by": "button",
+          "name": "Dismiss",
+          "value": null
+        },
+        {
+          "text": "click button \"Move queued message to another thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "Move queued message to another thread",
+          "value": null
+        },
+        {
+          "text": "click option \"Idle target*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Idle target*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove image red.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image red.png",
+          "value": null
+        },
+        {
+          "text": "expect button \"Remove image blue.png\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Remove image blue.png",
+          "value": null
+        },
+        {
+          "text": "click text \"Busy target\"",
+          "action": "click",
+          "by": "text",
+          "name": "Busy target",
+          "value": null
+        },
+        {
+          "text": "expect text \"first queued, with an image and a file\"",
+          "action": "expect",
+          "by": "text",
+          "name": "first queued, with an image and a file",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5970,10 +15024,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: queued messages › attachment previews",
       "reach": [
-        "seed queue-preview-thread",
-        "expect group \"2 attachments\"",
-        "expect img \"red.png\"",
-        "expect text \"note.txt\""
+        {
+          "text": "seed queue-preview-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "queue-preview-thread"
+        },
+        {
+          "text": "expect group \"2 attachments\"",
+          "action": "expect",
+          "by": "group",
+          "name": "2 attachments",
+          "value": null
+        },
+        {
+          "text": "expect img \"red.png\"",
+          "action": "expect",
+          "by": "img",
+          "name": "red.png",
+          "value": null
+        },
+        {
+          "text": "expect text \"note.txt\"",
+          "action": "expect",
+          "by": "text",
+          "name": "note.txt",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -5986,10 +15064,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Send later; dock: Scheduled messages",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Ship the weekly report\"",
-        "click button \"Send later\"",
-        "expect group \"Send at\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Ship the weekly report\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task, / commands, @ files or sessions",
+          "value": "Ship the weekly report"
+        },
+        {
+          "text": "click button \"Send later\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send later",
+          "value": null
+        },
+        {
+          "text": "expect group \"Send at\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Send at",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6024,9 +15126,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "left-nav: Resource Packs: Resources (not mounted)",
       "reach": [
-        "click tab \"Knowledge\"",
-        "click button \"Resources\"",
-        "expect heading \"Resources\""
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Resources\"",
+          "action": "click",
+          "by": "button",
+          "name": "Resources",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Resources\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Resources",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6061,8 +15181,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: pasted thread mentions",
       "reach": [
-        "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6075,10 +15207,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: image references",
       "reach": [
-        "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
-        "expect text \"Image 1\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "expect text \"Image 1\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Image 1",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6091,10 +15247,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: image reference chips",
       "reach": [
-        "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
-        "expect text \"Image 1\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+          "action": "attach",
+          "by": null,
+          "name": null,
+          "value": "tooling/dshx/e2e/fixtures/attachments/red.png"
+        },
+        {
+          "text": "expect text \"Image 1\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Image 1",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6107,11 +15287,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-header: click title to rename",
       "reach": [
-        "seed tool-call-thread",
-        "click title \"Click to rename\"",
-        "fill textbox \"Rename thread\" \"Header rename\"",
-        "press Enter",
-        "expect button \"Header rename\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click title \"Click to rename\"",
+          "action": "click",
+          "by": "title",
+          "name": "Click to rename",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Rename thread\" \"Header rename\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Rename thread",
+          "value": "Header rename"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Header rename\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Header rename",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6135,8 +15345,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: ArrowUp recall",
       "reach": [
-        "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6149,8 +15371,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: large paste as file",
       "reach": [
-        "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6163,11 +15397,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: run row above the new-thread input; summary chip on the meter line",
       "reach": [
-        "click button \"New session\"",
-        "expect group \"Run settings\"",
-        "expect button \"Choose workspace\"",
-        "expect button \"Run on Local\"",
-        "expect button \"Workspace: *\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect group \"Run settings\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Run settings",
+          "value": null
+        },
+        {
+          "text": "expect button \"Choose workspace\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "expect button \"Run on Local\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Run on Local",
+          "value": null
+        },
+        {
+          "text": "expect button \"Workspace: *\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Workspace: *",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6191,15 +15455,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: Secrets",
       "reach": [
-        "seed fake-secret-cli",
-        "seed rebase-ready-thread",
-        "click tab \"Settings\"",
-        "click button \"Secrets\"",
-        "click button \"Choose a project folder…\"",
-        "expect dialog \"Choose a project folder\"",
-        "click button \"Filter by scope\"",
-        "click menuitemradio \"Workspaces\"",
-        "expect text \"JJ workspace\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Secrets",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose a project folder…\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose a project folder…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Choose a project folder\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Choose a project folder",
+          "value": null
+        },
+        {
+          "text": "click button \"Filter by scope\"",
+          "action": "click",
+          "by": "button",
+          "name": "Filter by scope",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Workspaces\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Workspaces",
+          "value": null
+        },
+        {
+          "text": "expect text \"JJ workspace\"",
+          "action": "expect",
+          "by": "text",
+          "name": "JJ workspace",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6212,11 +15530,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: Secrets › reveal",
       "reach": [
-        "seed fake-secret-cli",
-        "click tab \"Settings\"",
-        "click button \"Secrets\"",
-        "hover button \"Reveal GITHUB_TOKEN\"",
-        "expect text \"Click to reveal\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Secrets",
+          "value": null
+        },
+        {
+          "text": "hover button \"Reveal GITHUB_TOKEN\"",
+          "action": "hover",
+          "by": "button",
+          "name": "Reveal GITHUB_TOKEN",
+          "value": null
+        },
+        {
+          "text": "expect text \"Click to reveal\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Click to reveal",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6229,14 +15577,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: Secrets › Add secret",
       "reach": [
-        "seed fake-secret-cli",
-        "click tab \"Settings\"",
-        "click button \"Secrets\"",
-        "click button \"Add secret\"",
-        "fill textbox \"New secret name\" \"STRIPE_API_KEY\"",
-        "fill textbox \"New secret value\" \"scratch-fake-typed-value\"",
-        "click button \"Actions for STRIPE_API_KEY\"",
-        "expect menuitem \"Generate on this Host\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Secrets",
+          "value": null
+        },
+        {
+          "text": "click button \"Add secret\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add secret",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"New secret name\" \"STRIPE_API_KEY\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "New secret name",
+          "value": "STRIPE_API_KEY"
+        },
+        {
+          "text": "fill textbox \"New secret value\" \"scratch-fake-typed-value\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "New secret value",
+          "value": "scratch-fake-typed-value"
+        },
+        {
+          "text": "click button \"Actions for STRIPE_API_KEY\"",
+          "action": "click",
+          "by": "button",
+          "name": "Actions for STRIPE_API_KEY",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Generate on this Host\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Generate on this Host",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6249,14 +15645,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "left-nav: Secrets › Add with details",
       "reach": [
-        "seed fake-secret-cli",
-        "click tab \"Settings\"",
-        "click button \"Secrets\"",
-        "click button \"More ways to add a secret\"",
-        "click menuitem \"Add with details…\"",
-        "click radio \"Enter a value*\"",
-        "click button \"Advanced*\"",
-        "expect dialog \"Add secret\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Secrets",
+          "value": null
+        },
+        {
+          "text": "click button \"More ways to add a secret\"",
+          "action": "click",
+          "by": "button",
+          "name": "More ways to add a secret",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Add with details…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Add with details…",
+          "value": null
+        },
+        {
+          "text": "click radio \"Enter a value*\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Enter a value*",
+          "value": null
+        },
+        {
+          "text": "click button \"Advanced*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Advanced*",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Add secret\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Add secret",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6269,15 +15713,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: secret-reference fields › Bind",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "fill searchbox \"Search settings\" \"Memory Jev secret\"",
-        "expect textbox \"Jev secret\"",
-        "click textbox \"Jev secret\"",
-        "expect button \"Bind a secret\"",
-        "click button \"Bind a secret\"",
-        "click button \"Add a new secret\"",
-        "expect textbox \"Secret value\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "fill searchbox \"Search settings\" \"Memory Jev secret\"",
+          "action": "fill",
+          "by": "searchbox",
+          "name": "Search settings",
+          "value": "Memory Jev secret"
+        },
+        {
+          "text": "expect textbox \"Jev secret\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Jev secret",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Jev secret\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Jev secret",
+          "value": null
+        },
+        {
+          "text": "expect button \"Bind a secret\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Bind a secret",
+          "value": null
+        },
+        {
+          "text": "click button \"Bind a secret\"",
+          "action": "click",
+          "by": "button",
+          "name": "Bind a secret",
+          "value": null
+        },
+        {
+          "text": "click button \"Add a new secret\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add a new secret",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Secret value\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Secret value",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6290,13 +15788,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: secret-reference fields › repair",
       "reach": [
-        "seed fake-secret-cli",
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "fill searchbox \"Search settings\" \"Memory Jev secret\"",
-        "fill textbox \"Jev secret\" \"secret:MISSING_REPAIR_ALIAS\"",
-        "expect region \"Secret reference repair\"",
-        "expect button \"Set value\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "fill searchbox \"Search settings\" \"Memory Jev secret\"",
+          "action": "fill",
+          "by": "searchbox",
+          "name": "Search settings",
+          "value": "Memory Jev secret"
+        },
+        {
+          "text": "fill textbox \"Jev secret\" \"secret:MISSING_REPAIR_ALIAS\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Jev secret",
+          "value": "secret:MISSING_REPAIR_ALIAS"
+        },
+        {
+          "text": "expect region \"Secret reference repair\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Secret reference repair",
+          "value": null
+        },
+        {
+          "text": "expect button \"Set value\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Set value",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6320,13 +15860,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Secret request",
       "reach": [
-        "seed fake-secret-cli",
-        "seed tool-call-thread",
-        "click button \"New session\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"[[call request_secret {\\\"alias\\\":\\\"SYNTHETIC_REQUESTED_TOKEN\\\",\\\"purpose\\\":\\\"Call the synthetic API.\\\"}]]\"",
-        "press Enter",
-        "click button \"Enter value\"",
-        "expect button \"Create and bind\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"[[call request_secret {\\\"alias\\\":\\\"SYNTHETIC_REQUESTED_TOKEN\\\",\\\"purpose\\\":\\\"Call the synthetic API.\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "[[call request_secret {\"alias\":\"SYNTHETIC_REQUESTED_TOKEN\",\"purpose\":\"Call the synthetic API.\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Enter value\"",
+          "action": "click",
+          "by": "button",
+          "name": "Enter value",
+          "value": null
+        },
+        {
+          "text": "expect button \"Create and bind\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Create and bind",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6339,13 +15921,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "plugins-page: View @dshfiles/backlog › Jev secret",
       "reach": [
-        "seed fake-secret-cli",
-        "click tab \"Settings\"",
-        "click button \"Plugins\"",
-        "click button \"View @dshfiles/backlog\"",
-        "click textbox \"Jev secret\"",
-        "click button \"Add secret\"",
-        "expect button \"Add and bind\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugins\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugins",
+          "value": null
+        },
+        {
+          "text": "click button \"View @dshfiles/backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "View @dshfiles/backlog",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Jev secret\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Jev secret",
+          "value": null
+        },
+        {
+          "text": "click button \"Add secret\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add secret",
+          "value": null
+        },
+        {
+          "text": "expect button \"Add and bind\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Add and bind",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6358,12 +15982,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: turn tail › Set up missing secrets",
       "reach": [
-        "seed fake-secret-cli",
-        "seed backlog-jev-enabled",
-        "seed jev-setup-chat-thread",
-        "expect button \"Set up missing secrets\"",
-        "click button \"Set up missing secrets\"",
-        "expect textbox \"Secret value\""
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "seed backlog-jev-enabled",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "backlog-jev-enabled"
+        },
+        {
+          "text": "seed jev-setup-chat-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "jev-setup-chat-thread"
+        },
+        {
+          "text": "expect button \"Set up missing secrets\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Set up missing secrets",
+          "value": null
+        },
+        {
+          "text": "click button \"Set up missing secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Set up missing secrets",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Secret value\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Secret value",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6409,8 +16069,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: session event stream",
       "reach": [
-        "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6434,8 +16106,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer dock: Waiting for a free slot; Settings › General: Running threads limit",
       "reach": [
-        "click button \"New session\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6514,10 +16198,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Undo last turn",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"Undo last turn\"",
-        "hover button \"Redo the undone turn and its files\"",
-        "expect text \"Redo the undone turn and its files\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"Undo last turn\"",
+          "action": "click",
+          "by": "button",
+          "name": "Undo last turn",
+          "value": null
+        },
+        {
+          "text": "hover button \"Redo the undone turn and its files\"",
+          "action": "hover",
+          "by": "button",
+          "name": "Redo the undone turn and its files",
+          "value": null
+        },
+        {
+          "text": "expect text \"Redo the undone turn and its files\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Redo the undone turn and its files",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6530,12 +16238,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Rewind to an earlier turn",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"Add a second turn to rewind past\"",
-        "press Enter",
-        "click button \"Rewind to an earlier turn\"",
-        "click menuitem \"Rewind to here · Turn 1\"",
-        "expect text \"Rewind to before turn*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"Add a second turn to rewind past\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "Add a second turn to rewind past"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Rewind to an earlier turn\"",
+          "action": "click",
+          "by": "button",
+          "name": "Rewind to an earlier turn",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Rewind to here · Turn 1\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Rewind to here · Turn 1",
+          "value": null
+        },
+        {
+          "text": "expect text \"Rewind to before turn*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Rewind to before turn*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6548,12 +16292,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: turn action row",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"echo one > reach-1.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
-        "press Enter",
-        "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"echo two > reach-2.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
-        "press Enter",
-        "expect button \"Restore to after this turn\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"echo one > reach-1.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "[[call bash {\"command\":\"echo one > reach-1.txt\",\"description\":\"Checkpoint reach\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"[[call bash {\\\"command\\\":\\\"echo two > reach-2.txt\\\",\\\"description\\\":\\\"Checkpoint reach\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "[[call bash {\"command\":\"echo two > reach-2.txt\",\"description\":\"Checkpoint reach\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Restore to after this turn\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Restore to after this turn",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6566,10 +16346,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Models section",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "click button \"Models\"",
-        "expect heading \"Models\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "click button \"Models\"",
+          "action": "click",
+          "by": "button",
+          "name": "Models",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Models\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Models",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6582,9 +16386,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "sidebar: Account menu › Settings",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "expect button \"General\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "expect button \"General\"",
+          "action": "expect",
+          "by": "button",
+          "name": "General",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6597,10 +16419,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "main-tabs: New tab › Settings",
       "reach": [
-        "click button \"Collapse sidebar\"",
-        "click button \"New tab\"",
-        "click button \"Settings\"",
-        "expect button \"General\""
+        {
+          "text": "click button \"Collapse sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "expect button \"General\"",
+          "action": "expect",
+          "by": "button",
+          "name": "General",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6613,9 +16459,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "sidebar: Settings trigger release mark › General",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "expect button \"Check for DSH updates\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "expect button \"Check for DSH updates\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Check for DSH updates",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6628,10 +16492,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: the Settings page in the stage",
       "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Settings: General\"",
-        "click option \"Settings: General*\"",
-        "expect tab \"Settings\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Settings\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6644,10 +16532,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: task groups in the Settings navigation",
       "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Settings: General\"",
-        "click option \"Settings: General*\"",
-        "expect group \"Models & accounts\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "expect group \"Models & accounts\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Models & accounts",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6660,11 +16572,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Search settings",
       "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Settings: General\"",
-        "click option \"Settings: General*\"",
-        "fill searchbox \"Search settings\" \"max tabs\"",
-        "expect text \"1 Setting Found\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "fill searchbox \"Search settings\" \"max tabs\"",
+          "action": "fill",
+          "by": "searchbox",
+          "name": "Search settings",
+          "value": "max tabs"
+        },
+        {
+          "text": "expect text \"1 Setting Found\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 Setting Found",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6677,13 +16619,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Search settings › section controls",
       "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Settings: General\"",
-        "click option \"Settings: General*\"",
-        "fill searchbox \"Search settings\" \"coding view\"",
-        "expect text \"1 Setting Found\"",
-        "click button \"Show coding view*\"",
-        "expect switch \"Show coding view\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "fill searchbox \"Search settings\" \"coding view\"",
+          "action": "fill",
+          "by": "searchbox",
+          "name": "Search settings",
+          "value": "coding view"
+        },
+        {
+          "text": "expect text \"1 Setting Found\"",
+          "action": "expect",
+          "by": "text",
+          "name": "1 Setting Found",
+          "value": null
+        },
+        {
+          "text": "click button \"Show coding view*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show coding view*",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Show coding view\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Show coding view",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6696,11 +16680,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: plugin pages",
       "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Settings: General\"",
-        "click option \"Settings: General*\"",
-        "click button \"Main tabs\"",
-        "expect spinbutton \"Max tabs\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "click button \"Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "expect spinbutton \"Max tabs\"",
+          "action": "expect",
+          "by": "spinbutton",
+          "name": "Max tabs",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6713,13 +16727,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Reset to default",
       "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Settings: General\"",
-        "click option \"Settings: General*\"",
-        "click button \"Main tabs\"",
-        "fill spinbutton \"Max tabs\" \"8\"",
-        "press Enter",
-        "expect button \"Reset to default\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "click button \"Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "fill spinbutton \"Max tabs\" \"8\"",
+          "action": "fill",
+          "by": "spinbutton",
+          "name": "Max tabs",
+          "value": "8"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Reset to default\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Reset to default",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6732,14 +16788,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: plugin page › JSON",
       "reach": [
-        "click text \"More\"",
-        "click menuitem \"Settings*\"",
-        "click button \"Main tabs\"",
-        "fill spinbutton \"Max tabs\" \"8\"",
-        "press Enter",
-        "expect button \"Reset to default\"",
-        "click radio \"JSON\"",
-        "expect tab \"Overrides\""
+        {
+          "text": "click text \"More\"",
+          "action": "click",
+          "by": "text",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "click button \"Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "fill spinbutton \"Max tabs\" \"8\"",
+          "action": "fill",
+          "by": "spinbutton",
+          "name": "Max tabs",
+          "value": "8"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect button \"Reset to default\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Reset to default",
+          "value": null
+        },
+        {
+          "text": "click radio \"JSON\"",
+          "action": "click",
+          "by": "radio",
+          "name": "JSON",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Overrides\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Overrides",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6752,11 +16856,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "agent tool: settings_inspect",
       "reach": [
-        "click tab \"Agents\"",
-        "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
-        "expect region \"Tools (*\"",
-        "expect text \"settings_inspect\""
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"Capabilities\"",
+          "action": "click",
+          "by": "button",
+          "name": "Capabilities",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Agent toolkit\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Agent toolkit",
+          "value": null
+        },
+        {
+          "text": "expect region \"Tools (*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Tools (*",
+          "value": null
+        },
+        {
+          "text": "expect text \"settings_inspect\"",
+          "action": "expect",
+          "by": "text",
+          "name": "settings_inspect",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6769,10 +16903,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: plugin page › entry card; agent tools: plugin_inventory, plugin_set_enabled",
       "reach": [
-        "click text \"More\"",
-        "click menuitem \"Settings*\"",
-        "click button \"Main tabs\"",
-        "expect switch \"Plugin enabled\""
+        {
+          "text": "click text \"More\"",
+          "action": "click",
+          "by": "text",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "click button \"Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Plugin enabled\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Plugin enabled",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6785,11 +16943,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Open configuration file",
       "reach": [
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"Settings: General\"",
-        "click option \"Settings: General*\"",
-        "click button \"More ways to open the configuration file\"",
-        "expect menuitem \"Copy path\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "click button \"More ways to open the configuration file\"",
+          "action": "click",
+          "by": "button",
+          "name": "More ways to open the configuration file",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Copy path\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Copy path",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6802,9 +16990,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Tools & MCP › Jev › Key",
       "reach": [
-        "click button \"Settings\"",
-        "fill searchbox \"Search settings\" \"Jev\"",
-        "expect text \"Key\""
+        {
+          "text": "click button \"Settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "fill searchbox \"Search settings\" \"Jev\"",
+          "action": "fill",
+          "by": "searchbox",
+          "name": "Search settings",
+          "value": "Jev"
+        },
+        {
+          "text": "expect text \"Key\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Key",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6883,12 +17089,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "right-pane: native resources as workbench panels",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"Search threads\"",
-        "click tab \"Everything\"",
-        "fill combobox \"Search the command palette\" \"New terminal\"",
-        "click option \"New terminal*\"",
-        "expect tab \"Terminal*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"Search threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Search threads",
+          "value": null
+        },
+        {
+          "text": "click tab \"Everything\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Everything",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"New terminal\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "New terminal"
+        },
+        {
+          "text": "click option \"New terminal*\"",
+          "action": "click",
+          "by": "option",
+          "name": "New terminal*",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Terminal*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Terminal*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6901,12 +17143,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "terminal and composer",
       "reach": [
-        "seed tool-call-thread",
-        "click tab \"Fake thread title\"",
-        "click button \"Open command palette\"",
-        "fill combobox \"Search the command palette\" \"New terminal\"",
-        "click option \"New terminal*\"",
-        "expect tab \"Terminal*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click tab \"Fake thread title\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Fake thread title",
+          "value": null
+        },
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"New terminal\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "New terminal"
+        },
+        {
+          "text": "click option \"New terminal*\"",
+          "action": "click",
+          "by": "option",
+          "name": "New terminal*",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Terminal*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Terminal*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6985,8 +17263,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: Vitest results card",
       "reach": [
-        "seed tool-call-thread",
-        "expect text \"Tool finished.\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -6999,8 +17289,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: Stack trace card under a bash call",
       "reach": [
-        "seed tool-call-thread",
-        "expect text \"Tool finished.\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7013,10 +17315,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Thread sharing",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings\"",
-        "click button \"Thread sharing\"",
-        "expect button \"Create share link\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread sharing\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread sharing",
+          "value": null
+        },
+        {
+          "text": "expect button \"Create share link\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Create share link",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7029,10 +17355,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Thread sharing",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings\"",
-        "click button \"Thread sharing\"",
-        "expect button \"Download HTML\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread sharing\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread sharing",
+          "value": null
+        },
+        {
+          "text": "expect button \"Download HTML\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Download HTML",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7045,10 +17395,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Thread sharing",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings\"",
-        "click button \"Thread sharing\"",
-        "expect button \"Start publishing\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread sharing\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread sharing",
+          "value": null
+        },
+        {
+          "text": "expect button \"Start publishing\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Start publishing",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7061,10 +17435,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "Observe › Notifications",
       "reach": [
-        "seed tool-call-thread",
-        "click tab \"Observe\"",
-        "click button \"Notifications\"",
-        "expect heading \"Notifications\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Notifications\"",
+          "action": "click",
+          "by": "button",
+          "name": "Notifications",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Notifications\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Notifications",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7077,13 +17475,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: No folder row › Turn into project",
       "reach": [
-        "click button \"New session\"",
-        "click button \"Choose workspace\"",
-        "click option \"No folder*\"",
-        "click button \"Send message\"",
-        "click button \"Thread actions\"",
-        "click menuitem \"Turn into project\"",
-        "expect text \"Turned into project*\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "click option \"No folder*\"",
+          "action": "click",
+          "by": "option",
+          "name": "No folder*",
+          "value": null
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Turn into project\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Turn into project",
+          "value": null
+        },
+        {
+          "text": "expect text \"Turned into project*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Turned into project*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7096,9 +17536,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: Send to several models…",
       "reach": [
-        "click button \"Open command palette\"",
-        "click text \"Send to several models…\"",
-        "expect dialog \"Send to several models\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "click text \"Send to several models…\"",
+          "action": "click",
+          "by": "text",
+          "name": "Send to several models…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Send to several models\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Send to several models",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7111,16 +17569,76 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "main-tabs: New tab › Thread Sidebar views",
       "reach": [
-        "expect region \"Threads\"",
-        "expect button \"Collapse sidebar\"",
-        "click button \"Collapse sidebar\"",
-        "expect button \"Expand sidebar\"",
-        "expect toolbar \"Sidebar navigation\"",
-        "expect button \"More sidebar destinations\"",
-        "click button \"More sidebar destinations\"",
-        "expect text \"Customize sidebar\"",
-        "click button \"More sidebar destinations\"",
-        "expect button \"More sidebar destinations\""
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "expect button \"Collapse sidebar\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"Collapse sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "expect button \"Expand sidebar\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Expand sidebar",
+          "value": null
+        },
+        {
+          "text": "expect toolbar \"Sidebar navigation\"",
+          "action": "expect",
+          "by": "toolbar",
+          "name": "Sidebar navigation",
+          "value": null
+        },
+        {
+          "text": "expect button \"More sidebar destinations\"",
+          "action": "expect",
+          "by": "button",
+          "name": "More sidebar destinations",
+          "value": null
+        },
+        {
+          "text": "click button \"More sidebar destinations\"",
+          "action": "click",
+          "by": "button",
+          "name": "More sidebar destinations",
+          "value": null
+        },
+        {
+          "text": "expect text \"Customize sidebar\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Customize sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"More sidebar destinations\"",
+          "action": "click",
+          "by": "button",
+          "name": "More sidebar destinations",
+          "value": null
+        },
+        {
+          "text": "expect button \"More sidebar destinations\"",
+          "action": "expect",
+          "by": "button",
+          "name": "More sidebar destinations",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7133,13 +17651,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "left-nav: Thread Sidebar: Board",
       "reach": [
-        "expect region \"Threads\"",
-        "expect button \"Group: Status\"",
-        "click tab \"Threads\"",
-        "click button \"Board\"",
-        "expect region \"Thread board\"",
-        "expect region \"Active column\"",
-        "expect button \"Group: Status\""
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "expect button \"Group: Status\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Group: Status",
+          "value": null
+        },
+        {
+          "text": "click tab \"Threads\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"Board\"",
+          "action": "click",
+          "by": "button",
+          "name": "Board",
+          "value": null
+        },
+        {
+          "text": "expect region \"Thread board\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Thread board",
+          "value": null
+        },
+        {
+          "text": "expect region \"Active column\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Active column",
+          "value": null
+        },
+        {
+          "text": "expect button \"Group: Status\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Group: Status",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7152,11 +17712,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: All threads › Group: Status",
       "reach": [
-        "expect region \"Threads\"",
-        "click button \"Group: Status\"",
-        "expect text \"Arrange manually\"",
-        "press Escape",
-        "expect button \"Group: Status\""
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"Group: Status\"",
+          "action": "click",
+          "by": "button",
+          "name": "Group: Status",
+          "value": null
+        },
+        {
+          "text": "expect text \"Arrange manually\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Arrange manually",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "expect button \"Group: Status\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Group: Status",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7169,7 +17759,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "status-strip: N working",
       "reach": [
-        "expect region \"Threads\""
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7182,25 +17778,139 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: project header › New chat",
       "reach": [
-        "click button \"New thread\"",
-        "click button \"Choose workspace\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Project header example\"",
-        "press Enter",
-        "expect text \"Project header example\"",
-        "click button \"All threads\"",
-        "click button \"Group: Status\"",
-        "click menuitemradio \"Project\"",
-        "expect button \"New chat in sample\"",
-        "click button \"New chat in sample\"",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unsent project prompt\"",
-        "expect text \"Draft: Unsent project prompt\"",
-        "click text \"Project header example\" at 16,8",
-        "click text \"Draft: Unsent project prompt\" at 16,8",
-        "expect text \"Unsent project prompt\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Project header example\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Project header example"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Project header example\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Project header example",
+          "value": null
+        },
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"Group: Status\"",
+          "action": "click",
+          "by": "button",
+          "name": "Group: Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Project\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Project",
+          "value": null
+        },
+        {
+          "text": "expect button \"New chat in sample\"",
+          "action": "expect",
+          "by": "button",
+          "name": "New chat in sample",
+          "value": null
+        },
+        {
+          "text": "click button \"New chat in sample\"",
+          "action": "click",
+          "by": "button",
+          "name": "New chat in sample",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unsent project prompt\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Unsent project prompt"
+        },
+        {
+          "text": "expect text \"Draft: Unsent project prompt\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Draft: Unsent project prompt",
+          "value": null
+        },
+        {
+          "text": "click text \"Project header example\" at 16,8",
+          "action": "click",
+          "by": "text",
+          "name": "Project header example",
+          "value": null
+        },
+        {
+          "text": "click text \"Draft: Unsent project prompt\" at 16,8",
+          "action": "click",
+          "by": "text",
+          "name": "Draft: Unsent project prompt",
+          "value": null
+        },
+        {
+          "text": "expect text \"Unsent project prompt\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Unsent project prompt",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7213,19 +17923,97 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: Archive › Undo",
       "reach": [
-        "click button \"New thread\"",
-        "click button \"Choose workspace\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Archive me later\"",
-        "press Enter",
-        "expect text \"Archive me later\"",
-        "click button \"More thread actions\"",
-        "click menuitem \"Archive\"",
-        "click button \"Archived*\"",
-        "click text \"Archive me later\"",
-        "expect banner \"This thread is archived.\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Archive me later\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Archive me later"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Archive me later\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Archive me later",
+          "value": null
+        },
+        {
+          "text": "click button \"More thread actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Archive\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Archive",
+          "value": null
+        },
+        {
+          "text": "click button \"Archived*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Archived*",
+          "value": null
+        },
+        {
+          "text": "click text \"Archive me later\"",
+          "action": "click",
+          "by": "text",
+          "name": "Archive me later",
+          "value": null
+        },
+        {
+          "text": "expect banner \"This thread is archived.\"",
+          "action": "expect",
+          "by": "banner",
+          "name": "This thread is archived.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7238,18 +18026,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Manage views",
       "reach": [
-        "expect group \"Thread list view\"",
-        "click button \"All threads\"",
-        "expect button \"All threads\"",
-        "expect button \"Done\"",
-        "click button \"Thread list settings\"",
-        "click button \"Manage views\"",
-        "click button \"Add view\"",
-        "expect checkbox \"Working\"",
-        "expect checkbox \"Turn finished\"",
-        "expect checkbox \"Inactive\"",
-        "expect checkbox \"Archived\"",
-        "expect checkbox \"Show count on tab\""
+        {
+          "text": "expect group \"Thread list view\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Thread list view",
+          "value": null
+        },
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "expect button \"All threads\"",
+          "action": "expect",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "expect button \"Done\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Done",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread list settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread list settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Manage views\"",
+          "action": "click",
+          "by": "button",
+          "name": "Manage views",
+          "value": null
+        },
+        {
+          "text": "click button \"Add view\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add view",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Working\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Working",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Turn finished\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Turn finished",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Inactive\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Inactive",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Archived\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Archived",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Show count on tab\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Show count on tab",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7262,18 +18122,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › idle policy",
       "reach": [
-        "click button \"All threads\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Idle policy target\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "rightclick text \"Idle policy target\" at 8,8",
-        "click menuitem \"Auto-settle behavior\"",
-        "expect menuitemradio \"Settle after idle threshold\"",
-        "press Escape",
-        "press Escape",
-        "click button \"Thread list settings\"",
-        "expect checkbox \"Settle inactive threads\""
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Idle policy target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Idle policy target"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Idle policy target\" at 8,8",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Idle policy target",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Auto-settle behavior\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Auto-settle behavior",
+          "value": null
+        },
+        {
+          "text": "expect menuitemradio \"Settle after idle threshold\"",
+          "action": "expect",
+          "by": "menuitemradio",
+          "name": "Settle after idle threshold",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "click button \"Thread list settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread list settings",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Settle inactive threads\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Settle inactive threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7286,12 +18218,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Remote group",
       "reach": [
-        "click button \"All threads\"",
-        "expect button \"All threads\"",
-        "click button \"All threads\"",
-        "expect region \"Threads\"",
-        "click button \"Thread list settings\"",
-        "expect region \"Thread list settings\""
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "expect button \"All threads\"",
+          "action": "expect",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "expect region \"Threads\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread list settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread list settings",
+          "value": null
+        },
+        {
+          "text": "expect region \"Thread list settings\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Thread list settings",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7304,16 +18272,76 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › settled archive delay",
       "reach": [
-        "click button \"All threads\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Settled archive target\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "click button \"More thread actions\"",
-        "click menuitem \"Settle\"",
-        "expect status \"This thread is settled.\"",
-        "click button \"Thread list settings\"",
-        "expect group \"Archive settled threads\""
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Settled archive target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Settled archive target"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "click button \"More thread actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settle\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settle",
+          "value": null
+        },
+        {
+          "text": "expect status \"This thread is settled.\"",
+          "action": "expect",
+          "by": "status",
+          "name": "This thread is settled.",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread list settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread list settings",
+          "value": null
+        },
+        {
+          "text": "expect group \"Archive settled threads\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Archive settled threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7326,15 +18354,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Mute",
       "reach": [
-        "click button \"All threads\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mute target\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "rightclick text \"Mute target\" at 8,8",
-        "click menuitem \"Mute thread\"",
-        "click menuitem \"Until tomorrow morning\"",
-        "expect img \"Muted\""
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mute target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Mute target"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Mute target\" at 8,8",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Mute target",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Mute thread\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Mute thread",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Until tomorrow morning\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Until tomorrow morning",
+          "value": null
+        },
+        {
+          "text": "expect img \"Muted\"",
+          "action": "expect",
+          "by": "img",
+          "name": "Muted",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7347,18 +18429,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Mark unread",
       "reach": [
-        "click button \"All threads\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread target\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread neighbour\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "rightclick text \"Unread target\" at 8,8",
-        "click menuitem \"Mark unread\"",
-        "expect img \"Unread\""
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Unread target"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread neighbour\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Unread neighbour"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Unread target\" at 8,8",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Unread target",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Mark unread\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Mark unread",
+          "value": null
+        },
+        {
+          "text": "expect img \"Unread\"",
+          "action": "expect",
+          "by": "img",
+          "name": "Unread",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7371,10 +18525,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "thread-list: finished-turn unread marks",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"thread sidebar finished turn e2e target\"",
-        "click button \"Send message\"",
-        "expect text \"Turn finished\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"thread sidebar finished turn e2e target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "thread sidebar finished turn e2e target"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"Turn finished\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Turn finished",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7387,20 +18565,104 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Notifications › Thread notifications",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings\"",
-        "click button \"Thread notifications\"",
-        "expect group \"Thread notifications\"",
-        "expect button \"Approval needed: Off\"",
-        "expect button \"Turn stopped: Off\"",
-        "expect button \"Agent messages: In-app and system\"",
-        "expect button \"Snooze notifications\"",
-        "click button \"Snooze notifications\"",
-        "expect button \"Resume notifications\"",
-        "click button \"Resume notifications\"",
-        "expect button \"Snooze notifications\"",
-        "expect button \"In-app notification position\"",
-        "expect button \"In-app notification timeout\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread notifications\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread notifications",
+          "value": null
+        },
+        {
+          "text": "expect group \"Thread notifications\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Thread notifications",
+          "value": null
+        },
+        {
+          "text": "expect button \"Approval needed: Off\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Approval needed: Off",
+          "value": null
+        },
+        {
+          "text": "expect button \"Turn stopped: Off\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Turn stopped: Off",
+          "value": null
+        },
+        {
+          "text": "expect button \"Agent messages: In-app and system\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Agent messages: In-app and system",
+          "value": null
+        },
+        {
+          "text": "expect button \"Snooze notifications\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Snooze notifications",
+          "value": null
+        },
+        {
+          "text": "click button \"Snooze notifications\"",
+          "action": "click",
+          "by": "button",
+          "name": "Snooze notifications",
+          "value": null
+        },
+        {
+          "text": "expect button \"Resume notifications\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Resume notifications",
+          "value": null
+        },
+        {
+          "text": "click button \"Resume notifications\"",
+          "action": "click",
+          "by": "button",
+          "name": "Resume notifications",
+          "value": null
+        },
+        {
+          "text": "expect button \"Snooze notifications\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Snooze notifications",
+          "value": null
+        },
+        {
+          "text": "expect button \"In-app notification position\"",
+          "action": "expect",
+          "by": "button",
+          "name": "In-app notification position",
+          "value": null
+        },
+        {
+          "text": "expect button \"In-app notification timeout\"",
+          "action": "expect",
+          "by": "button",
+          "name": "In-app notification timeout",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7413,10 +18675,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "thread-list: Sidebar settings › Customize sidebar",
       "reach": [
-        "click button \"Sidebar settings\"",
-        "expect heading \"Customize sidebar\"",
-        "click button \"Move up: Settle\"",
-        "expect checkbox \"Settle\""
+        {
+          "text": "click button \"Sidebar settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Sidebar settings",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Customize sidebar\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Customize sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"Move up: Settle\"",
+          "action": "click",
+          "by": "button",
+          "name": "Move up: Settle",
+          "value": null
+        },
+        {
+          "text": "expect checkbox \"Settle\"",
+          "action": "expect",
+          "by": "checkbox",
+          "name": "Settle",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7429,10 +18715,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "sidebar-footer: More menu",
       "reach": [
-        "click button \"New tab\"",
-        "click button \"Thread Sidebar: Navigation\"",
-        "click button \"More sidebar destinations\"",
-        "expect option \"Settings\""
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Thread Sidebar: Navigation\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread Sidebar: Navigation",
+          "value": null
+        },
+        {
+          "text": "click button \"More sidebar destinations\"",
+          "action": "click",
+          "by": "button",
+          "name": "More sidebar destinations",
+          "value": null
+        },
+        {
+          "text": "expect option \"Settings\"",
+          "action": "expect",
+          "by": "option",
+          "name": "Settings",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7456,13 +18766,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "thread-list: Search threads",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Palette search target\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "click button \"Search threads\"",
-        "fill combobox \"*\" \"Palette search target\"",
-        "expect option \"Palette search target*\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Palette search target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Palette search target"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "click button \"Search threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Search threads",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"*\" \"Palette search target\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "*",
+          "value": "Palette search target"
+        },
+        {
+          "text": "expect option \"Palette search target*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "Palette search target*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7475,9 +18827,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: child threads",
       "reach": [
-        "click button \"Thread list settings\"",
-        "click button \"Finished subagents: Fold into “N finished”\"",
-        "expect menuitemradio \"Hide them\""
+        {
+          "text": "click button \"Thread list settings\"",
+          "action": "click",
+          "by": "button",
+          "name": "Thread list settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Finished subagents: Fold into “N finished”\"",
+          "action": "click",
+          "by": "button",
+          "name": "Finished subagents: Fold into “N finished”",
+          "value": null
+        },
+        {
+          "text": "expect menuitemradio \"Hide them\"",
+          "action": "expect",
+          "by": "menuitemradio",
+          "name": "Hide them",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7490,17 +18860,83 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-header: Pin / More menu",
       "reach": [
-        "click button \"New thread\"",
-        "click button \"Choose workspace\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Header actions target\"",
-        "press Enter",
-        "expect group \"Thread actions\"",
-        "click button \"More thread actions\"",
-        "expect menuitem \"Archive\"",
-        "expect menuitem \"Settle\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": "sample"
+        },
+        {
+          "text": "expect option \"sample*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "sample*",
+          "value": null
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Header actions target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Header actions target"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect group \"Thread actions\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Thread actions",
+          "value": null
+        },
+        {
+          "text": "click button \"More thread actions\"",
+          "action": "click",
+          "by": "button",
+          "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Archive\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Archive",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Settle\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Settle",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7513,10 +18949,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "status-strip: Restart pending",
       "reach": [
-        "seed pending-restart",
-        "expect button \"Restart pending*\"",
-        "click button \"Restart pending*\"",
-        "expect text \"Restart DSH yourself to load them.\""
+        {
+          "text": "seed pending-restart",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "pending-restart"
+        },
+        {
+          "text": "expect button \"Restart pending*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Restart pending*",
+          "value": null
+        },
+        {
+          "text": "click button \"Restart pending*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Restart pending*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Restart DSH yourself to load them.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Restart DSH yourself to load them.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7562,21 +19022,111 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Mention",
       "reach": [
-        "click button \"All threads\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention target\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention source\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "rightclick text \"Mention target\" at 8,8",
-        "click menuitem \"@Mention thread\"",
-        "expect title \"Mention target\"",
-        "rightclick text \"Mention source\" at 8,8",
-        "click menuitem \"Follow-up in a new thread\"",
-        "expect text \"Follow-up after @session:*\""
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Mention target"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention source\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Mention source"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Mention target\" at 8,8",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Mention target",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"@Mention thread\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "@Mention thread",
+          "value": null
+        },
+        {
+          "text": "expect title \"Mention target\"",
+          "action": "expect",
+          "by": "title",
+          "name": "Mention target",
+          "value": null
+        },
+        {
+          "text": "rightclick text \"Mention source\" at 8,8",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Mention source",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Follow-up in a new thread\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Follow-up in a new thread",
+          "value": null
+        },
+        {
+          "text": "expect text \"Follow-up after @session:*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Follow-up after @session:*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7589,15 +19139,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: @ skills",
       "reach": [
-        "click button \"All threads\"",
-        "click button \"New thread\"",
-        "press Escape",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@e2e-skill-mentions\"",
-        "click textbox \"Describe what you want to build, / commands, @ files or sessions\"",
-        "press End",
-        "press x",
-        "press Backspace",
-        "expect option \"e2e-skill-mentions*\""
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@e2e-skill-mentions\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "@e2e-skill-mentions"
+        },
+        {
+          "text": "click textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": null
+        },
+        {
+          "text": "press End",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "End"
+        },
+        {
+          "text": "press x",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "x"
+        },
+        {
+          "text": "press Backspace",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Backspace"
+        },
+        {
+          "text": "expect option \"e2e-skill-mentions*\"",
+          "action": "expect",
+          "by": "option",
+          "name": "e2e-skill-mentions*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7610,13 +19214,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "thread-list: Usage limit group",
       "reach": [
-        "seed quota-blocked-thread",
-        "expect region \"Needs you\"",
-        "expect button \"Resume all\"",
-        "click button \"Group: Status\"",
-        "click menuitemradio \"Arrange manually\"",
-        "expect region \"Usage limit\"",
-        "expect button \"Resume this thread\""
+        {
+          "text": "seed quota-blocked-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "quota-blocked-thread"
+        },
+        {
+          "text": "expect region \"Needs you\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Needs you",
+          "value": null
+        },
+        {
+          "text": "expect button \"Resume all\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Resume all",
+          "value": null
+        },
+        {
+          "text": "click button \"Group: Status\"",
+          "action": "click",
+          "by": "button",
+          "name": "Group: Status",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"Arrange manually\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "Arrange manually",
+          "value": null
+        },
+        {
+          "text": "expect region \"Usage limit\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Usage limit",
+          "value": null
+        },
+        {
+          "text": "expect button \"Resume this thread\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Resume this thread",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7629,12 +19275,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Open in side panel",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Hover actions target\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "hover text \"Hover actions target\" at 8,8",
-        "expect button \"Settle\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Hover actions target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Hover actions target"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "hover text \"Hover actions target\" at 8,8",
+          "action": "hover",
+          "by": "text",
+          "name": "Hover actions target",
+          "value": null
+        },
+        {
+          "text": "expect button \"Settle\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Settle",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7680,12 +19362,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Edit title",
       "reach": [
-        "seed tool-call-thread",
-        "rightclick text \"sample\"",
-        "click menuitem \"Edit title\"",
-        "fill textbox \"Edit title\" \"Sidebar rename\"",
-        "press Enter",
-        "expect text \"Sidebar rename\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "rightclick text \"sample\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "sample",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Edit title\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Edit title",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Edit title\" \"Sidebar rename\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Edit title",
+          "value": "Sidebar rename"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Sidebar rename\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Sidebar rename",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7698,10 +19416,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread-list: row menu › Continue in project",
       "reach": [
-        "seed tool-call-thread",
-        "rightclick text \"sample\"",
-        "click menuitem \"Continue in project\"",
-        "expect menuitem \"sample\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "rightclick text \"sample\"",
+          "action": "rightclick",
+          "by": "text",
+          "name": "sample",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Continue in project\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Continue in project",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"sample\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "sample",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7736,14 +19478,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › Turn finished",
       "reach": [
-        "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\":\\\"echo inbox\\\",\\\"description\\\":\\\"Inbox check\\\"}]]\"",
-        "press Enter",
-        "click tab \"Inbox\"",
-        "expect text \"Turn failed.\"",
-        "click button \"Open\"",
-        "click tab \"Inbox\"",
-        "click tab \"Done*\"",
-        "expect text \"Resolved\""
+        {
+          "text": "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\":\\\"echo inbox\\\",\\\"description\\\":\\\"Inbox check\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or s*",
+          "value": "[[call bash {\"command\":\"echo inbox\",\"description\":\"Inbox check\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect text \"Turn failed.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Turn failed.",
+          "value": null
+        },
+        {
+          "text": "click button \"Open\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open",
+          "value": null
+        },
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "click tab \"Done*\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Done*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Resolved\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Resolved",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7756,12 +19546,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "shell: Navigation list (21 entries) and collapsed icon rail",
       "reach": [
-        "click tab \"Observe\"",
-        "expect navigation \"Observe pages\"",
-        "click button \"Traces\"",
-        "expect heading \"Traces\"",
-        "click tab \"Threads\"",
-        "expect button \"Board\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "expect navigation \"Observe pages\"",
+          "action": "expect",
+          "by": "navigation",
+          "name": "Observe pages",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Traces\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click tab \"Threads\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "expect button \"Board\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Board",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7796,9 +19622,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Thread sidebar › Layout",
       "reach": [
-        "click tab \"Settings\"",
-        "click radio \"Free docking\"",
-        "expect tab \"Thread Sidebar: Threads\""
+        {
+          "text": "click tab \"Settings\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click radio \"Free docking\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Free docking",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Thread Sidebar: Threads\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Thread Sidebar: Threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7811,11 +19655,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "palette: Where did a page go?",
       "reach": [
-        "click tab \"Land\"",
-        "click button \"Where did a page go?\"",
-        "expect heading \"Where did a page go?\"",
-        "click button \"Open Observe › Usage\"",
-        "expect tab \"Observe\""
+        {
+          "text": "click tab \"Land\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Land",
+          "value": null
+        },
+        {
+          "text": "click button \"Where did a page go?\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where did a page go?",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Where did a page go?\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Where did a page go?",
+          "value": null
+        },
+        {
+          "text": "click button \"Open Observe › Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open Observe › Usage",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Observe\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7850,9 +19724,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › Waiting threads",
       "reach": [
-        "click tab \"Inbox\"",
-        "click button \"Waiting threads\"",
-        "expect heading \"Waiting threads\""
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "click button \"Waiting threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Waiting threads",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Waiting threads\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Waiting threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7865,12 +19757,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: subagent tool row; composer dock while the child works",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
-        "press Enter",
-        "expect region \"Working subagents\"",
-        "click button \"Show or hide the progress of *\"",
-        "expect text \"In bash*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "[[once call subagent {\"description\":\"Long child\",\"prompt\":\"\\u005b\\u005bonce call bash \\u007b\\u0022command\\u0022:\\u0022sleep 300\\u0022,\\u0022description\\u0022:\\u0022Busy\\u0022\\u007d\\u005d\\u005d\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect region \"Working subagents\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Working subagents",
+          "value": null
+        },
+        {
+          "text": "click button \"Show or hide the progress of *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show or hide the progress of *",
+          "value": null
+        },
+        {
+          "text": "expect text \"In bash*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "In bash*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7883,23 +19811,125 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "threads: row context menu → Notify “…” when this thread finishes",
       "reach": [
-        "click button \"All threads\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify spare\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify target\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify supervisor\"",
-        "click button \"Send message\"",
-        "expect text \"This turn failed*\"",
-        "hover tab \"Threads\"",
-        "rightclick button \"Notify target*\" at 8,8",
-        "click menuitem \"Notify “Notify supervisor” when this thread finishes\"",
-        "expect menuitemradio \"Only when stuck\""
+        {
+          "text": "click button \"All threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "All threads",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify spare\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Notify spare"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify target\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Notify target"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Notify supervisor\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Notify supervisor"
+        },
+        {
+          "text": "click button \"Send message\"",
+          "action": "click",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"This turn failed*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "This turn failed*",
+          "value": null
+        },
+        {
+          "text": "hover tab \"Threads\"",
+          "action": "hover",
+          "by": "tab",
+          "name": "Threads",
+          "value": null
+        },
+        {
+          "text": "rightclick button \"Notify target*\" at 8,8",
+          "action": "rightclick",
+          "by": "button",
+          "name": "Notify target*",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Notify “Notify supervisor” when this thread finishes\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Notify “Notify supervisor” when this thread finishes",
+          "value": null
+        },
+        {
+          "text": "expect menuitemradio \"Only when stuck\"",
+          "action": "expect",
+          "by": "menuitemradio",
+          "name": "Only when stuck",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7923,11 +19953,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "threads",
       "currentSurface": "thread row menu: Export… (also command palette: Export this thread…)",
       "reach": [
-        "seed tool-call-thread",
-        "rightclick text \"Fake thread title\" at 24,10",
-        "click menuitem \"Export…\"",
-        "expect dialog \"Export thread\"",
-        "expect text \"Saved *\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "rightclick text \"Fake thread title\" at 24,10",
+          "action": "rightclick",
+          "by": "text",
+          "name": "Fake thread title",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Export…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Export…",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Export thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Export thread",
+          "value": null
+        },
+        {
+          "text": "expect text \"Saved *\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Saved *",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7940,10 +20000,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "command palette: Import thread…",
       "reach": [
-        "click button \"Open command palette\"",
-        "click option \"Import thread*\"",
-        "expect dialog \"Import thread\"",
-        "expect button \"Choose a .dshthread file\""
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "click option \"Import thread*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Import thread*",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Import thread\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Import thread",
+          "value": null
+        },
+        {
+          "text": "expect button \"Choose a .dshthread file\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Choose a .dshthread file",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -7989,10 +20073,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: tool call timing",
       "reach": [
-        "seed tool-call-thread",
-        "click text \"Completed in*\"",
-        "click text \"Ran commands\"",
-        "expect note \"Took*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click text \"Completed in*\"",
+          "action": "click",
+          "by": "text",
+          "name": "Completed in*",
+          "value": null
+        },
+        {
+          "text": "click text \"Ran commands\"",
+          "action": "click",
+          "by": "text",
+          "name": "Ran commands",
+          "value": null
+        },
+        {
+          "text": "expect note \"Took*\"",
+          "action": "expect",
+          "by": "note",
+          "name": "Took*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8049,9 +20157,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: OTLP receiver (read in left-nav: Traces: Explorer)",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Traces\"",
-        "expect heading \"Traces\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Traces\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Traces",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8064,14 +20190,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Traces",
       "reach": [
-        "seed otlp-sample-trace",
-        "click tab \"Observe\"",
-        "click button \"Traces\"",
-        "click tab \"Traces\"",
-        "fill textbox \"Search traces\" \"POST /orders\"",
-        "click row \"dshx-sample POST /orders*\"",
-        "click treeitem \"charge card*\"",
-        "expect complementary \"Span detail\""
+        {
+          "text": "seed otlp-sample-trace",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-sample-trace"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click tab \"Traces\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search traces\" \"POST /orders\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search traces",
+          "value": "POST /orders"
+        },
+        {
+          "text": "click row \"dshx-sample POST /orders*\"",
+          "action": "click",
+          "by": "row",
+          "name": "dshx-sample POST /orders*",
+          "value": null
+        },
+        {
+          "text": "click treeitem \"charge card*\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "charge card*",
+          "value": null
+        },
+        {
+          "text": "expect complementary \"Span detail\"",
+          "action": "expect",
+          "by": "complementary",
+          "name": "Span detail",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8084,12 +20258,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "conversation-view: Traces / Requests tabs",
       "reach": [
-        "seed tool-call-thread",
-        "seed otlp-session-turns",
-        "click tab \"Traces\"",
-        "expect region \"Thread telemetry summary\"",
-        "click tab \"Requests\"",
-        "expect region \"Request log\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "seed otlp-session-turns",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-session-turns"
+        },
+        {
+          "text": "click tab \"Traces\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "expect region \"Thread telemetry summary\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Thread telemetry summary",
+          "value": null
+        },
+        {
+          "text": "click tab \"Requests\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Requests",
+          "value": null
+        },
+        {
+          "text": "expect region \"Request log\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Request log",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8102,11 +20312,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Logs",
       "reach": [
-        "seed otlp-sample-trace",
-        "click tab \"Observe\"",
-        "click button \"Traces\"",
-        "click tab \"Logs\"",
-        "expect list \"Logs\""
+        {
+          "text": "seed otlp-sample-trace",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-sample-trace"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click tab \"Logs\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Logs",
+          "value": null
+        },
+        {
+          "text": "expect list \"Logs\"",
+          "action": "expect",
+          "by": "list",
+          "name": "Logs",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8119,10 +20359,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Operations / Errors",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Traces\"",
-        "click tab \"Operations\"",
-        "expect combobox \"Window\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click tab \"Operations\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Operations",
+          "value": null
+        },
+        {
+          "text": "expect combobox \"Window\"",
+          "action": "expect",
+          "by": "combobox",
+          "name": "Window",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8135,11 +20399,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Service map",
       "reach": [
-        "seed otlp-sample-trace",
-        "click tab \"Observe\"",
-        "click button \"Traces\"",
-        "click tab \"Service map\"",
-        "expect img \"Service map\""
+        {
+          "text": "seed otlp-sample-trace",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-sample-trace"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click tab \"Service map\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Service map",
+          "value": null
+        },
+        {
+          "text": "expect img \"Service map\"",
+          "action": "expect",
+          "by": "img",
+          "name": "Service map",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8152,11 +20446,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Metrics",
       "reach": [
-        "seed otlp-sample-trace",
-        "click tab \"Observe\"",
-        "click button \"Traces\"",
-        "click tab \"Metrics\"",
-        "expect img \"Chart of*\""
+        {
+          "text": "seed otlp-sample-trace",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-sample-trace"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click tab \"Metrics\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Metrics",
+          "value": null
+        },
+        {
+          "text": "expect img \"Chart of*\"",
+          "action": "expect",
+          "by": "img",
+          "name": "Chart of*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8169,17 +20493,83 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Traces: Explorer › Alerts",
       "reach": [
-        "seed otlp-sample-trace",
-        "click tab \"Observe\"",
-        "click button \"Traces\"",
-        "click tab \"Alerts*\"",
-        "click button \"New rule\"",
-        "fill label \"Rule name*\" \"Sample order errors\"",
-        "fill label \"Service\" \"dshx-sample\"",
-        "fill label \"Minimum spans*\" \"1\"",
-        "click button \"Save rule\"",
-        "click button \"Evaluate now\"",
-        "expect list \"Firing alerts\""
+        {
+          "text": "seed otlp-sample-trace",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-sample-trace"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click tab \"Alerts*\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Alerts*",
+          "value": null
+        },
+        {
+          "text": "click button \"New rule\"",
+          "action": "click",
+          "by": "button",
+          "name": "New rule",
+          "value": null
+        },
+        {
+          "text": "fill label \"Rule name*\" \"Sample order errors\"",
+          "action": "fill",
+          "by": "label",
+          "name": "Rule name*",
+          "value": "Sample order errors"
+        },
+        {
+          "text": "fill label \"Service\" \"dshx-sample\"",
+          "action": "fill",
+          "by": "label",
+          "name": "Service",
+          "value": "dshx-sample"
+        },
+        {
+          "text": "fill label \"Minimum spans*\" \"1\"",
+          "action": "fill",
+          "by": "label",
+          "name": "Minimum spans*",
+          "value": "1"
+        },
+        {
+          "text": "click button \"Save rule\"",
+          "action": "click",
+          "by": "button",
+          "name": "Save rule",
+          "value": null
+        },
+        {
+          "text": "click button \"Evaluate now\"",
+          "action": "click",
+          "by": "button",
+          "name": "Evaluate now",
+          "value": null
+        },
+        {
+          "text": "expect list \"Firing alerts\"",
+          "action": "expect",
+          "by": "list",
+          "name": "Firing alerts",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8192,12 +20582,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Boards",
       "reach": [
-        "seed otlp-sample-trace",
-        "click tab \"Observe\"",
-        "click button \"Traces\"",
-        "click tab \"Boards\"",
-        "click radio \"Slow tools\"",
-        "expect text \"execute_tool spans by gen_ai.tool.name, slowest p95 first.\""
+        {
+          "text": "seed otlp-sample-trace",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-sample-trace"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "click tab \"Boards\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Boards",
+          "value": null
+        },
+        {
+          "text": "click radio \"Slow tools\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Slow tools",
+          "value": null
+        },
+        {
+          "text": "expect text \"execute_tool spans by gen_ai.tool.name, slowest p95 first.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "execute_tool spans by gen_ai.tool.name, slowest p95 first.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8210,18 +20636,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: browser interaction spans",
       "reach": [
-        "seed rebase-ready-thread",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Second thread for a switch\"",
-        "press Enter",
-        "expect text \"Second thread for a switch*\"",
-        "click text \"Seeded thread to rebase\" at 12,8",
-        "click tab \"Observe\"",
-        "click button \"Traces\"",
-        "expect heading \"Traces\"",
-        "fill textbox \"Search traces\" \"thread switch\"",
-        "click row \"dshfiles-web thread switch\"",
-        "expect tree \"Span waterfall\""
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Second thread for a switch\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Second thread for a switch"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Second thread for a switch*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Second thread for a switch*",
+          "value": null
+        },
+        {
+          "text": "click text \"Seeded thread to rebase\" at 12,8",
+          "action": "click",
+          "by": "text",
+          "name": "Seeded thread to rebase",
+          "value": null
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Traces\"",
+          "action": "click",
+          "by": "button",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Traces\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search traces\" \"thread switch\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search traces",
+          "value": "thread switch"
+        },
+        {
+          "text": "click row \"dshfiles-web thread switch\"",
+          "action": "click",
+          "by": "row",
+          "name": "dshfiles-web thread switch",
+          "value": null
+        },
+        {
+          "text": "expect tree \"Span waterfall\"",
+          "action": "expect",
+          "by": "tree",
+          "name": "Span waterfall",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8234,10 +20732,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: Open the trace of turn",
       "reach": [
-        "seed tool-call-thread",
-        "seed otlp-session-turns",
-        "click button \"Open the trace of turn*\"",
-        "expect tree \"Span waterfall\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "seed otlp-session-turns",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-session-turns"
+        },
+        {
+          "text": "click button \"Open the trace of turn*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open the trace of turn*",
+          "value": null
+        },
+        {
+          "text": "expect tree \"Span waterfall\"",
+          "action": "expect",
+          "by": "tree",
+          "name": "Span waterfall",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8250,10 +20772,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "conversation-view: Traces tab › cost",
       "reach": [
-        "seed tool-call-thread",
-        "seed otlp-session-turns",
-        "click tab \"Traces\"",
-        "expect region \"Thread telemetry summary\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "seed otlp-session-turns",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "otlp-session-turns"
+        },
+        {
+          "text": "click tab \"Traces\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Traces",
+          "value": null
+        },
+        {
+          "text": "expect region \"Thread telemetry summary\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Thread telemetry summary",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8266,8 +20812,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox › traces.alert-firing",
       "reach": [
-        "click tab \"Inbox\"",
-        "expect heading \"Inbox\""
+        {
+          "text": "click tab \"Inbox\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Inbox",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Inbox\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Inbox",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8302,8 +20860,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: turn summary footer",
       "reach": [
-        "seed tool-call-thread",
-        "expect text \"Tool finished.\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8316,15 +20886,69 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: turn walkthrough row",
       "reach": [
-        "seed tool-call-thread",
-        "expect text \"Tool finished.\"",
-        "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
-        "press Enter",
-        "expect text \"Walkthrough\"",
-        "click button \"Walkthrough\"",
-        "expect text \"walkthrough.md\"",
-        "click button \"Open walkthrough.md\"",
-        "expect tab \"walkthrough.md\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect text \"Tool finished.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool finished.",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Message or run a task*\" \"[[call write {\\\"file_path\\\":\\\"notes/walkthrough.md\\\",\\\"content\\\":\\\"one two\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Message or run a task*",
+          "value": "[[call write {\"file_path\":\"notes/walkthrough.md\",\"content\":\"one two\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Walkthrough\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Walkthrough",
+          "value": null
+        },
+        {
+          "text": "click button \"Walkthrough\"",
+          "action": "click",
+          "by": "button",
+          "name": "Walkthrough",
+          "value": null
+        },
+        {
+          "text": "expect text \"walkthrough.md\"",
+          "action": "expect",
+          "by": "text",
+          "name": "walkthrough.md",
+          "value": null
+        },
+        {
+          "text": "click button \"Open walkthrough.md\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open walkthrough.md",
+          "value": null
+        },
+        {
+          "text": "expect tab \"walkthrough.md\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "walkthrough.md",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8381,14 +21005,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Requests",
       "reach": [
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a usage request\"",
-        "press Enter",
-        "click tab \"Observe\"",
-        "click button \"Usage\"",
-        "click button \"Re-index thread logs\"",
-        "click tab \"Requests\"",
-        "expect heading \"Request log\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a usage request\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or sessions",
+          "value": "Seed a usage request"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click button \"Re-index thread logs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Re-index thread logs",
+          "value": null
+        },
+        {
+          "text": "click tab \"Requests\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Requests",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Request log\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Request log",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8401,14 +21073,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Charts",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Usage\"",
-        "click tab \"Cost\"",
-        "expect text \"Cost over time\"",
-        "click text \"1 y\"",
-        "expect text \"Usage distribution\"",
-        "click text \"Daily calendar\"",
-        "expect text \"Cache savings (estimate)\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Cost\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Cost",
+          "value": null
+        },
+        {
+          "text": "expect text \"Cost over time\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Cost over time",
+          "value": null
+        },
+        {
+          "text": "click text \"1 y\"",
+          "action": "click",
+          "by": "text",
+          "name": "1 y",
+          "value": null
+        },
+        {
+          "text": "expect text \"Usage distribution\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Usage distribution",
+          "value": null
+        },
+        {
+          "text": "click text \"Daily calendar\"",
+          "action": "click",
+          "by": "text",
+          "name": "Daily calendar",
+          "value": null
+        },
+        {
+          "text": "expect text \"Cache savings (estimate)\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Cache savings (estimate)",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8421,11 +21141,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Charts › Jev",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Usage\"",
-        "click tab \"Cost\"",
-        "expect text \"Jev API usage\"",
-        "expect text \"Usage by API key · calendar month to date\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Cost\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Cost",
+          "value": null
+        },
+        {
+          "text": "expect text \"Jev API usage\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Jev API usage",
+          "value": null
+        },
+        {
+          "text": "expect text \"Usage by API key · calendar month to date\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Usage by API key · calendar month to date",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8438,13 +21188,55 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Tools & Jev",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Usage\"",
-        "click tab \"Tools\"",
-        "expect text \"Tool calls over time\"",
-        "expect text \"Most-used tools\"",
-        "expect text \"Output by category\"",
-        "expect text \"Every tool\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Tools\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Tools",
+          "value": null
+        },
+        {
+          "text": "expect text \"Tool calls over time\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Tool calls over time",
+          "value": null
+        },
+        {
+          "text": "expect text \"Most-used tools\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Most-used tools",
+          "value": null
+        },
+        {
+          "text": "expect text \"Output by category\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Output by category",
+          "value": null
+        },
+        {
+          "text": "expect text \"Every tool\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Every tool",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8468,11 +21260,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "observe: Usage › Quota",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Usage\"",
-        "click tab \"Quota\"",
-        "click radio \"Forecast\"",
-        "expect radio \"Accounts\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Usage\"",
+          "action": "click",
+          "by": "button",
+          "name": "Usage",
+          "value": null
+        },
+        {
+          "text": "click tab \"Quota\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Quota",
+          "value": null
+        },
+        {
+          "text": "click radio \"Forecast\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Forecast",
+          "value": null
+        },
+        {
+          "text": "expect radio \"Accounts\"",
+          "action": "expect",
+          "by": "radio",
+          "name": "Accounts",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8485,10 +21307,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels › Cost",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"New tab\"",
-        "click button \"Cost*\"",
-        "expect text \"Per turn\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Cost*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Cost*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Per turn\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Per turn",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8501,10 +21347,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: question form",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the release notes use?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
-        "press Enter",
-        "expect text \"Which layout should the release notes use?\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"question\\\":\\\"Which layout should the release notes use?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin\\\"},{\\\"label\\\":\\\"One flat list\\\"}]}],\\\"timeout\\\":-1}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "[[once call ask_user_question {\"questions\":[{\"id\":\"layout\",\"question\":\"Which layout should the release notes use?\",\"options\":[{\"label\":\"Grouped by plugin\"},{\"label\":\"One flat list\"}]}],\"timeout\":-1}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Which layout should the release notes use?\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Which layout should the release notes use?",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8517,10 +21387,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "transcript",
       "currentSurface": "transcript: question form",
       "reach": [
-        "seed tool-call-thread",
-        "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"header\\\":\\\"Release notes\\\",\\\"question\\\":\\\"Pick a layout for [the 0.2 release notes](https://example.test/notes)\\\\n\\\\nBoth drafts list the same **12 changes**:\\\\n\\\\n| Layout | Lines |\\\\n| --- | ---: |\\\\n| Grouped | 48 |\\\\n| Flat | 31 |\\\\n\\\\n```html preview Lines per layout\\\\n<style>body{margin:8px;display:grid;gap:8px}.bars{display:flex;align-items:end;gap:8px;height:110px}.bars div{flex:1;border-radius:4px 4px 0 0;background:var(--dsh-accent)}</style><div class='bars'><div style='height:100%'></div><div style='height:64%'></div></div><p id='status' style='margin:0;color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Grouped 48 lines, flat 31 lines'</script>\\\\n```\\\\n\\\\nWhich one should ship?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin (Recommended)\\\",\\\"description\\\":\\\"Each plugin gets a heading, in the order of `profiles/web/package.json`.\\\"},{\\\"label\\\":\\\"One flat list\\\",\\\"description\\\":\\\"Shorter, but **no grouping**; see [the draft](https://example.test/flat).\\\"}]}],\\\"timeout\\\":-1}]]\"",
-        "press Enter",
-        "expect region \"Lines per layout\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or sessions*\" \"[[once call ask_user_question {\\\"questions\\\":[{\\\"id\\\":\\\"layout\\\",\\\"header\\\":\\\"Release notes\\\",\\\"question\\\":\\\"Pick a layout for [the 0.2 release notes](https://example.test/notes)\\\\n\\\\nBoth drafts list the same **12 changes**:\\\\n\\\\n| Layout | Lines |\\\\n| --- | ---: |\\\\n| Grouped | 48 |\\\\n| Flat | 31 |\\\\n\\\\n```html preview Lines per layout\\\\n<style>body{margin:8px;display:grid;gap:8px}.bars{display:flex;align-items:end;gap:8px;height:110px}.bars div{flex:1;border-radius:4px 4px 0 0;background:var(--dsh-accent)}</style><div class='bars'><div style='height:100%'></div><div style='height:64%'></div></div><p id='status' style='margin:0;color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Grouped 48 lines, flat 31 lines'</script>\\\\n```\\\\n\\\\nWhich one should ship?\\\",\\\"options\\\":[{\\\"label\\\":\\\"Grouped by plugin (Recommended)\\\",\\\"description\\\":\\\"Each plugin gets a heading, in the order of `profiles/web/package.json`.\\\"},{\\\"label\\\":\\\"One flat list\\\",\\\"description\\\":\\\"Shorter, but **no grouping**; see [the draft](https://example.test/flat).\\\"}]}],\\\"timeout\\\":-1}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or sessions*",
+          "value": "[[once call ask_user_question {\"questions\":[{\"id\":\"layout\",\"header\":\"Release notes\",\"question\":\"Pick a layout for [the 0.2 release notes](https://example.test/notes)\\n\\nBoth drafts list the same **12 changes**:\\n\\n| Layout | Lines |\\n| --- | ---: |\\n| Grouped | 48 |\\n| Flat | 31 |\\n\\n```html preview Lines per layout\\n<style>body{margin:8px;display:grid;gap:8px}.bars{display:flex;align-items:end;gap:8px;height:110px}.bars div{flex:1;border-radius:4px 4px 0 0;background:var(--dsh-accent)}</style><div class='bars'><div style='height:100%'></div><div style='height:64%'></div></div><p id='status' style='margin:0;color:var(--dsh-muted)'>Script blocked</p><script>document.getElementById('status').textContent='Grouped 48 lines, flat 31 lines'</script>\\n```\\n\\nWhich one should ship?\",\"options\":[{\"label\":\"Grouped by plugin (Recommended)\",\"description\":\"Each plugin gets a heading, in the order of `profiles/web/package.json`.\"},{\"label\":\"One flat list\",\"description\":\"Shorter, but **no grouping**; see [the draft](https://example.test/flat).\"}]}],\"timeout\":-1}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect region \"Lines per layout\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Lines per layout",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8588,9 +21482,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "knowledge",
       "currentSurface": "left-nav: Whiteboard",
       "reach": [
-        "click tab \"Knowledge\"",
-        "click button \"Whiteboard\"",
-        "expect heading \"Whiteboards\""
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Whiteboard\"",
+          "action": "click",
+          "by": "button",
+          "name": "Whiteboard",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Whiteboards\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Whiteboards",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8625,10 +21537,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "thread-header: conversation toolbar",
       "reach": [
-        "seed tool-call-thread",
-        "expect button \"More thread actions\"",
-        "expect tab \"Chat\"",
-        "expect tab \"Trajectory\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect button \"More thread actions\"",
+          "action": "expect",
+          "by": "button",
+          "name": "More thread actions",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Chat\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Chat",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Trajectory\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Trajectory",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8641,17 +21577,83 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: right pane",
       "reach": [
-        "click button \"Search threads\"",
-        "click tab \"Everything\"",
-        "fill combobox \"Search the command palette\" \"Toggle the right pane\"",
-        "click option \"Toggle the right pane*\"",
-        "expect tab \"New tab\"",
-        "click button \"Close New tab\"",
-        "click button \"Search threads\"",
-        "click tab \"Everything\"",
-        "fill combobox \"Search the command palette\" \"Toggle the right pane\"",
-        "click option \"Toggle the right pane*\"",
-        "expect region \"Choose a view\""
+        {
+          "text": "click button \"Search threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Search threads",
+          "value": null
+        },
+        {
+          "text": "click tab \"Everything\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Everything",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Toggle the right pane\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Toggle the right pane"
+        },
+        {
+          "text": "click option \"Toggle the right pane*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Toggle the right pane*",
+          "value": null
+        },
+        {
+          "text": "expect tab \"New tab\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Close New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "Close New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Search threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Search threads",
+          "value": null
+        },
+        {
+          "text": "click tab \"Everything\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Everything",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Toggle the right pane\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Toggle the right pane"
+        },
+        {
+          "text": "click option \"Toggle the right pane*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Toggle the right pane*",
+          "value": null
+        },
+        {
+          "text": "expect region \"Choose a view\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Choose a view",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8664,12 +21666,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: Hide tab row",
       "reach": [
-        "rightclick tab \"Thread Sidebar: Threads\"",
-        "click menuitem \"Hide tab row\"",
-        "hover button \"Search threads\"",
-        "expect button \"Show tab row\"",
-        "click button \"Show tab row\"",
-        "expect tab \"Thread Sidebar: Threads\""
+        {
+          "text": "rightclick tab \"Thread Sidebar: Threads\"",
+          "action": "rightclick",
+          "by": "tab",
+          "name": "Thread Sidebar: Threads",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Hide tab row\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Hide tab row",
+          "value": null
+        },
+        {
+          "text": "hover button \"Search threads\"",
+          "action": "hover",
+          "by": "button",
+          "name": "Search threads",
+          "value": null
+        },
+        {
+          "text": "expect button \"Show tab row\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Show tab row",
+          "value": null
+        },
+        {
+          "text": "click button \"Show tab row\"",
+          "action": "click",
+          "by": "button",
+          "name": "Show tab row",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Thread Sidebar: Threads\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Thread Sidebar: Threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8682,10 +21720,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: AI Accounts: Preview tab",
       "reach": [
-        "expect tab \"AI Accounts: Preview\"",
-        "rightclick tab \"AI Accounts: Preview\"",
-        "click menuitem \"Hide tab row\"",
-        "expect button \"Add AI account\""
+        {
+          "text": "expect tab \"AI Accounts: Preview\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "AI Accounts: Preview",
+          "value": null
+        },
+        {
+          "text": "rightclick tab \"AI Accounts: Preview\"",
+          "action": "rightclick",
+          "by": "tab",
+          "name": "AI Accounts: Preview",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Hide tab row\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Hide tab row",
+          "value": null
+        },
+        {
+          "text": "expect button \"Add AI account\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Add AI account",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8698,9 +21760,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: Float panel",
       "reach": [
-        "rightclick tab \"Thread Sidebar: Threads\"",
-        "click menuitem \"Float panel\"",
-        "expect button \"Search threads\""
+        {
+          "text": "rightclick tab \"Thread Sidebar: Threads\"",
+          "action": "rightclick",
+          "by": "tab",
+          "name": "Thread Sidebar: Threads",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Float panel\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Float panel",
+          "value": null
+        },
+        {
+          "text": "expect button \"Search threads\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Search threads",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8713,9 +21793,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: main conversation tab",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"New thread\"",
-        "expect text \"Into the Unknown\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect text \"Into the Unknown\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Into the Unknown",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8728,8 +21826,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "main-tabs: New tab chooser",
       "reach": [
-        "click button \"New tab\"",
-        "expect region \"Choose a view\""
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "expect region \"Choose a view\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Choose a view",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8742,9 +21852,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: panel drag",
       "reach": [
-        "click button \"Collapse sidebar\"",
-        "click button \"Pane options\"",
-        "expect menuitem \"Toggle the bottom panel\""
+        {
+          "text": "click button \"Collapse sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"Pane options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pane options",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Toggle the bottom panel\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Toggle the bottom panel",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8757,14 +21885,62 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: tab semantics",
       "reach": [
-        "seed tool-call-thread",
-        "expect button \"New tab\"",
-        "click button \"Account menu\"",
-        "click menuitem \"Settings*\"",
-        "click button \"Main tabs\"",
-        "expect radio \"left\"",
-        "click radio \"right\"",
-        "expect radio \"right\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "expect button \"New tab\"",
+          "action": "expect",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "click button \"Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Main tabs",
+          "value": null
+        },
+        {
+          "text": "expect radio \"left\"",
+          "action": "expect",
+          "by": "radio",
+          "name": "left",
+          "value": null
+        },
+        {
+          "text": "click radio \"right\"",
+          "action": "click",
+          "by": "radio",
+          "name": "right",
+          "value": null
+        },
+        {
+          "text": "expect radio \"right\"",
+          "action": "expect",
+          "by": "radio",
+          "name": "right",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8777,11 +21953,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "main-tabs: New tab › Terminal: Terminal",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"New tab\"",
-        "fill textbox \"Search views\" \"Terminal\"",
-        "click button \"Terminal: Terminal\"",
-        "expect tab \"Terminal*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Search views\" \"Terminal\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Search views",
+          "value": "Terminal"
+        },
+        {
+          "text": "click button \"Terminal: Terminal\"",
+          "action": "click",
+          "by": "button",
+          "name": "Terminal: Terminal",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Terminal*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Terminal*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8794,11 +22000,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "thread-panel",
       "currentSurface": "workbench: Choose a view › Thread panels",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"New tab\"",
-        "expect group \"Thread panels\"",
-        "click button \"route, cost per turn*\"",
-        "expect text \"List-price estimates of this thread*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"New tab\"",
+          "action": "click",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        },
+        {
+          "text": "expect group \"Thread panels\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Thread panels",
+          "value": null
+        },
+        {
+          "text": "click button \"route, cost per turn*\"",
+          "action": "click",
+          "by": "button",
+          "name": "route, cost per turn*",
+          "value": null
+        },
+        {
+          "text": "expect text \"List-price estimates of this thread*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "List-price estimates of this thread*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8822,12 +22058,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "right-pane: native preview, diff and terminal resources",
       "reach": [
-        "seed tool-call-thread",
-        "click button \"Search threads\"",
-        "click tab \"Everything\"",
-        "fill combobox \"Search the command palette\" \"New terminal\"",
-        "click option \"New terminal*\"",
-        "expect tab \"Terminal*\""
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "click button \"Search threads\"",
+          "action": "click",
+          "by": "button",
+          "name": "Search threads",
+          "value": null
+        },
+        {
+          "text": "click tab \"Everything\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Everything",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"New terminal\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "New terminal"
+        },
+        {
+          "text": "click option \"New terminal*\"",
+          "action": "click",
+          "by": "option",
+          "name": "New terminal*",
+          "value": null
+        },
+        {
+          "text": "expect tab \"Terminal*\"",
+          "action": "expect",
+          "by": "tab",
+          "name": "Terminal*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8840,9 +22112,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: Pane options › Split",
       "reach": [
-        "click button \"Pane options\"",
-        "click menuitem \"Split right\"",
-        "expect region \"Choose a view\""
+        {
+          "text": "click button \"Pane options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pane options",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Split right\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Split right",
+          "value": null
+        },
+        {
+          "text": "expect region \"Choose a view\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Choose a view",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8855,10 +22145,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "workbench: Pane options › Layouts",
       "reach": [
-        "click button \"Collapse sidebar\"",
-        "click button \"Pane options\"",
-        "click menuitem \"Layouts\"",
-        "expect dialog \"Saved layouts\""
+        {
+          "text": "click button \"Collapse sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"Pane options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pane options",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Layouts\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Layouts",
+          "value": null
+        },
+        {
+          "text": "expect dialog \"Saved layouts\"",
+          "action": "expect",
+          "by": "dialog",
+          "name": "Saved layouts",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8871,11 +22185,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: right pane and bottom panel",
       "reach": [
-        "click button \"Collapse sidebar\"",
-        "click button \"Pane options\"",
-        "click menuitem \"Open right pane\"",
-        "click button \"Expand sidebar\"",
-        "expect button \"Close pane\""
+        {
+          "text": "click button \"Collapse sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Collapse sidebar",
+          "value": null
+        },
+        {
+          "text": "click button \"Pane options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pane options",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Open right pane\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Open right pane",
+          "value": null
+        },
+        {
+          "text": "click button \"Expand sidebar\"",
+          "action": "click",
+          "by": "button",
+          "name": "Expand sidebar",
+          "value": null
+        },
+        {
+          "text": "expect button \"Close pane\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Close pane",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8888,9 +22232,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "workbench: Pane options › Reset layout",
       "reach": [
-        "click button \"Pane options\"",
-        "click menuitem \"Reset layout\"",
-        "expect button \"New tab\""
+        {
+          "text": "click button \"Pane options\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pane options",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Reset layout\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Reset layout",
+          "value": null
+        },
+        {
+          "text": "expect button \"New tab\"",
+          "action": "expect",
+          "by": "button",
+          "name": "New tab",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8914,10 +22276,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace",
       "reach": [
-        "click button \"New session\"",
-        "click button \"Choose workspace\"",
-        "click menuitem \"Add workspace*\"",
-        "expect textbox \"Enter a folder path\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Add workspace*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Add workspace*",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Enter a folder path\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Enter a folder path",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8930,12 +22316,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace › Clone repository",
       "reach": [
-        "click button \"New session\"",
-        "click button \"Choose workspace\"",
-        "click menuitem \"Add workspace*\"",
-        "click button \"New\"",
-        "click menuitem \"Clone repository…\"",
-        "expect textbox \"Repository URL\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Add workspace*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Add workspace*",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Clone repository…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Clone repository…",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Repository URL\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Repository URL",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8948,8 +22370,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Remove",
       "reach": [
-        "click button \"Choose workspace\"",
-        "expect textbox \"Search projects or enter a folder path\""
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Search projects or enter a folder path\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Search projects or enter a folder path",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -8962,12 +22396,48 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: Choose workspace › Add workspace › New project",
       "reach": [
-        "click button \"New session\"",
-        "click button \"Choose workspace\"",
-        "click menuitem \"Add workspace*\"",
-        "click button \"New\"",
-        "click menuitem \"New project…\"",
-        "expect textbox \"Project name\""
+        {
+          "text": "click button \"New session\"",
+          "action": "click",
+          "by": "button",
+          "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Choose workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Choose workspace",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Add workspace*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Add workspace*",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"New project…\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "New project…",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Project name\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Project name",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -9024,11 +22494,41 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "Add workspace › setup step",
       "reach": [
-        "click button \"Add workspace\"",
-        "fill textbox \"Enter a folder path\" \"~/projects/sample\"",
-        "press Enter",
-        "click button \"Select this folder\"",
-        "expect text \"Jujutsu repository*\""
+        {
+          "text": "click button \"Add workspace\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add workspace",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Enter a folder path\" \"~/projects/sample\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Enter a folder path",
+          "value": "~/projects/sample"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"Select this folder\"",
+          "action": "click",
+          "by": "button",
+          "name": "Select this folder",
+          "value": null
+        },
+        {
+          "text": "expect text \"Jujutsu repository*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Jujutsu repository*",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -9041,10 +22541,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "settings",
       "currentSurface": "settings: Projects",
       "reach": [
-        "click button \"Account menu\"",
-        "click menuitem \"Settings\"",
-        "click button \"Projects\"",
-        "expect region \"Declared project settings\""
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings",
+          "value": null
+        },
+        {
+          "text": "click button \"Projects\"",
+          "action": "click",
+          "by": "button",
+          "name": "Projects",
+          "value": null
+        },
+        {
+          "text": "expect region \"Declared project settings\"",
+          "action": "expect",
+          "by": "region",
+          "name": "Declared project settings",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -9057,9 +22581,27 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "composer",
       "currentSurface": "composer: New thread draft",
       "reach": [
-        "click button \"New thread\"",
-        "expect button \"Send message\"",
-        "expect text \"sample\""
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "expect button \"Send message\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Send message",
+          "value": null
+        },
+        {
+          "text": "expect text \"sample\"",
+          "action": "expect",
+          "by": "text",
+          "name": "sample",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -9072,10 +22614,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "left-nav: Worktree Memory: RAM",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Processes\"",
-        "click tab \"RAM\"",
-        "expect text \"Node process origins\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Processes\"",
+          "action": "click",
+          "by": "button",
+          "name": "Processes",
+          "value": null
+        },
+        {
+          "text": "click tab \"RAM\"",
+          "action": "click",
+          "by": "tab",
+          "name": "RAM",
+          "value": null
+        },
+        {
+          "text": "expect text \"Node process origins\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Node process origins",
+          "value": null
+        }
       ],
       "onboarding": null
     },
@@ -9088,10 +22654,34 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "observe",
       "currentSurface": "status-strip: Orphans warning; Observe › Processes › RAM: Scratch DSH Hosts",
       "reach": [
-        "click tab \"Observe\"",
-        "click button \"Processes\"",
-        "click tab \"RAM\"",
-        "expect text \"Node process origins\""
+        {
+          "text": "click tab \"Observe\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Observe",
+          "value": null
+        },
+        {
+          "text": "click button \"Processes\"",
+          "action": "click",
+          "by": "button",
+          "name": "Processes",
+          "value": null
+        },
+        {
+          "text": "click tab \"RAM\"",
+          "action": "click",
+          "by": "tab",
+          "name": "RAM",
+          "value": null
+        },
+        {
+          "text": "expect text \"Node process origins\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Node process origins",
+          "value": null
+        }
       ],
       "onboarding": null
     }

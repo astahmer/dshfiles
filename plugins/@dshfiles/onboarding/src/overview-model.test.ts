@@ -116,7 +116,10 @@ const tinyCatalog: FeatureCatalog = {
       summary: 'Tasks and ideas.',
       destination: 'work',
       currentSurface: 'rail: Work › Backlog',
-      reach: ['click tab "Work"', 'expect heading "Backlog"'],
+      reach: [
+        { text: 'click tab "Work"', action: 'click', by: 'tab', name: 'Work', value: null },
+        { text: 'expect heading "Backlog"', action: 'expect', by: 'heading', name: 'Backlog', value: null },
+      ],
       onboarding: null,
     },
     {
@@ -138,7 +141,10 @@ const tinyCatalog: FeatureCatalog = {
       summary: 'Ask aside.',
       destination: 'threads',
       currentSurface: null,
-      reach: [],
+      reach: [
+        { text: 'seed tool-call-thread', action: 'seed', by: null, name: null, value: 'tool-call-thread' },
+        { text: 'expect text "Side"', action: 'expect', by: 'text', name: 'Side', value: null },
+      ],
       onboarding: { prerequisites: ['account'], firstAction: 'Type /btw.', doneWhen: 'A side answer shows.', open: { command: '@dshfiles/btw.open' } },
     },
   ],
@@ -152,7 +158,8 @@ describe('feature search', () => {
       ['btw#side', { command: '@dshfiles/btw.open' }],
       ['backlog#items', { panel: 'dshfiles-backlog-panel' }],
     ])
-    expect(curated.rows[0]).toMatchObject({ firstAction: 'Type /btw.', prerequisites: ['account'] })
+    expect(curated.rows[0]).toMatchObject({ firstAction: 'Type /btw.', prerequisites: ['account'], walkable: false })
+    expect(curated.rows[1]).toMatchObject({ reachSteps: 2, walkable: true })
 
     const searched = OnboardingOverview.features(tinyCatalog, { query: 'backlog', curatedDefault: true })
     expect(searched.curatedOnly).toBe(false)

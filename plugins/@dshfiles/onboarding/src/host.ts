@@ -9,6 +9,7 @@ import { FEATURE_CATALOG } from './generated/feature-catalog.js'
 import { OnboardingOverview } from './overview-model.js'
 import { PackControls } from './pack-controls.js'
 import { PackPlan } from './pack-plan.js'
+import { ReachModel } from './reach-model.js'
 import { onboardingSettings } from './settings.js'
 import { SetupFacts } from './setup-facts.js'
 
@@ -69,6 +70,8 @@ export default DshxPlugin.make({
             preview,
           })
         }),
+      reach: request =>
+        Effect.succeed(ReachModel.reach({ catalog: FEATURE_CATALOG, key: request.key, routeOf: feature => OnboardingOverview.rowOf(feature).route })),
       applyPack: request =>
         Effect.gen(function* () {
           const controls = yield* PackControls
