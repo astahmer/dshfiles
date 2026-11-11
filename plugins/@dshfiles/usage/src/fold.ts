@@ -121,7 +121,7 @@ const requestRowSchema = Schema.Struct({
   messageId: nullableString,
   turn: nullableNumber,
   step: nullableNumber,
-  purpose: Schema.Literals(['agent', 'subagent', 'compaction', 'title', 'memory', 'other']),
+  purpose: Schema.Literals(REQUEST_PURPOSES),
   source: Schema.Literals(['log', 'live']),
   provider: Schema.String,
   model: Schema.String,
@@ -131,7 +131,7 @@ const requestRowSchema = Schema.Struct({
   usage: Schema.NullOr(
     Schema.Struct({ input: Schema.Number, cacheRead: Schema.Number, cacheWrite: Schema.Number, output: Schema.Number, reasoning: Schema.Number }),
   ),
-  status: Schema.Literals(['ok', 'aborted', 'failed']),
+  status: Schema.Literals(REQUEST_STATUSES),
   stopReason: nullableString,
   errorCode: nullableString,
 })

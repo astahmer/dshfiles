@@ -24,11 +24,12 @@ const STATUS_CHIPS: readonly { readonly value: RequestStatus | 'all'; readonly l
   { value: 'failed', label: 'Failed' },
 ]
 
-const STATUS_LABEL = { ok: 'OK', aborted: 'Aborted', failed: 'Failed' } satisfies Readonly<Record<RequestStatus, string>>
+const STATUS_LABEL = { ok: 'OK', aborted: 'Aborted', failed: 'Failed', unknown: 'Unknown' } satisfies Readonly<Record<RequestStatus, string>>
 const STATUS_DOT = {
   ok: 'dshx:bg-success',
   aborted: 'dshx:bg-warning',
   failed: 'dshx:bg-destructive',
+  unknown: 'dshx:bg-muted-foreground',
 } satisfies Readonly<Record<RequestStatus, string>>
 
 type SortColumn = RequestQuery['sort']

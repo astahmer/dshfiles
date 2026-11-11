@@ -71,6 +71,12 @@ const nonnegativeInteger = Schema.Number.check(Schema.isInt(), Schema.isGreaterT
 const OTEL_TOOL_CATEGORIES = ['api', 'mcp', 'plugin', 'tool', 'skill', 'other'] as const
 const OTEL_TOOL_OUTCOMES = ['success', 'error', 'interrupted', 'unknown', 'pending'] as const
 const toolCategory = Schema.Literals(OTEL_TOOL_CATEGORIES)
+const storedPurpose = Schema.Literals(UsageFoldModel.REQUEST_PURPOSES).pipe(
+  Schema.catchDecoding(() => Effect.succeed(Option.some<RequestRow['purpose']>('other'))),
+)
+const storedStatus = Schema.Literals(UsageFoldModel.REQUEST_STATUSES).pipe(
+  Schema.catchDecoding(() => Effect.succeed(Option.some<RequestRow['status']>('unknown'))),
+)
 const toolOutcome = Schema.Literals(OTEL_TOOL_OUTCOMES)
 
 const requestRowSchema = Schema.Struct({
@@ -84,7 +90,7 @@ const requestRowSchema = Schema.Struct({
   message_id: textColumn,
   turn: numberColumn,
   step: numberColumn,
-  purpose: Schema.Literals(UsageFoldModel.REQUEST_PURPOSES),
+  purpose: storedPurpose,
   provider: Schema.String,
   model: Schema.String,
   started_at: Schema.Number,
@@ -95,7 +101,7 @@ const requestRowSchema = Schema.Struct({
   cache_write: numberColumn,
   output: numberColumn,
   cost: numberColumn,
-  status: Schema.Literals(UsageFoldModel.REQUEST_STATUSES),
+  status: storedStatus,
   stop_reason: textColumn,
   error_code: textColumn,
 })
@@ -392,14 +398,14 @@ const boundedRouteField = Schema.String.check(Schema.isMaxLength(200))
 const modelCountRowSchema = Schema.Struct({
   provider: boundedRouteField,
   model: boundedRouteField,
-  purpose: Schema.Literals(UsageFoldModel.REQUEST_PURPOSES),
-  status: Schema.Literals(UsageFoldModel.REQUEST_STATUSES),
+  purpose: storedPurpose,
+  status: storedStatus,
   calls: integer,
 })
 const modelTokenRowSchema = Schema.Struct({
   provider: boundedRouteField,
   model: boundedRouteField,
-  purpose: Schema.Literals(UsageFoldModel.REQUEST_PURPOSES),
+  purpose: storedPurpose,
   input: integer,
   cacheRead: integer,
   cacheWrite: integer,
@@ -409,8 +415,8 @@ const modelTokenRowSchema = Schema.Struct({
 const modelDurationRowSchema = Schema.Struct({
   provider: boundedRouteField,
   model: boundedRouteField,
-  purpose: Schema.Literals(UsageFoldModel.REQUEST_PURPOSES),
-  status: Schema.Literals(UsageFoldModel.REQUEST_STATUSES),
+  purpose: storedPurpose,
+  status: storedStatus,
   calls: integer,
   durationSumMs: Schema.Number,
   ...otelBucketRowFields,
