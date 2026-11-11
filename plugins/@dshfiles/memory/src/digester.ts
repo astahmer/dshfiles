@@ -84,6 +84,9 @@ export class Digester extends Context.Service<
         const log = yield* sessions.read(sessionId)
         const own = log.events.slice(log.inheritedEventCount)
         if (own.findLastIndex(event => event.type === 'turn/start') > own.findLastIndex(event => event.type === 'turn/end')) return 'running' as const
+        // Nothing new since the last digest: skip the classifier and the model, which cost a call each per idle re-digest.
+        const through = yield* repo.indexedThrough(sessionId)
+        if ((own.at(-1)?.seq ?? -1) <= through && (yield* repo.thread(sessionId)) !== undefined) return 'unchanged' as const
         const project = yield* projects.of(log.header.cwd)
         const extraSignals = yield* jevSignals(log)
         const material = ThreadDigestRules.readThread({
@@ -94,7 +97,6 @@ export class Digester extends Context.Service<
           now: yield* Clock.currentTimeMillis,
           extraSignals,
         })
-        const through = yield* repo.indexedThrough(sessionId)
         yield* repo.indexMessages({
           thread: sessionId,
           project,

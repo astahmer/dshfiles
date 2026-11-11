@@ -259,6 +259,20 @@ describe('memory services', () => {
     }).pipe(Effect.scoped),
   )
 
+  it.effect('re-digests an unchanged thread without asking the classifier or the model again', () =>
+    Effect.gen(function* () {
+      const memory = yield* harness({ jev: { probability: 0.9 } })
+      const thread = halyardThread('session-14141414-0000-4000-8000-000000000000', memory.root)
+      memory.fakes.logs.set(thread.header.id, thread.log())
+      expect(yield* memory.digester.digest(thread.header.id)).toBe('new')
+      const asks = memory.fakes.jevAsks.length
+      const summaries = memory.fakes.summaries.length
+      expect(yield* memory.digester.digest(thread.header.id)).toBe('unchanged')
+      expect(memory.fakes.jevAsks.length).toBe(asks)
+      expect(memory.fakes.summaries.length).toBe(summaries)
+    }).pipe(Effect.scoped),
+  )
+
   it.effect('joins a digest already running for the same thread instead of starting another', () =>
     Effect.gen(function* () {
       const memory = yield* harness({})
