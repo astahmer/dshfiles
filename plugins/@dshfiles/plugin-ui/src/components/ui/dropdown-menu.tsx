@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '../../lib/utils.js'
+import { useViewportClamp } from '../../hooks/viewport-clamp.js'
 import { CheckIcon, ChevronRightIcon, CircleIcon } from 'lucide-react'
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
 
@@ -170,8 +171,10 @@ function DropdownMenuSubTrigger({
 }
 
 function DropdownMenuSubContent({ className, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
+  const clampRef = useViewportClamp()
   return (
     <DropdownMenuPrimitive.SubContent
+      ref={clampRef}
       data-slot="dropdown-menu-sub-content"
       className={cn(
         'dshx:z-[1100] dshx:min-w-[8rem] dshx:origin-(--radix-dropdown-menu-content-transform-origin) dshx:overflow-hidden dshx:rounded-md dshx:border dshx:bg-popover dshx:p-1 dshx:text-popover-foreground dshx:shadow-lg dshx:data-[side=bottom]:slide-in-from-top-2 dshx:data-[side=left]:slide-in-from-right-2 dshx:data-[side=right]:slide-in-from-left-2 dshx:data-[side=top]:slide-in-from-bottom-2 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=closed]:zoom-out-95 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0 dshx:data-[state=open]:zoom-in-95',
