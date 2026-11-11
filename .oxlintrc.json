@@ -149,6 +149,8 @@
     "plugins/@dshfiles/agent-loop/src/native/**",
     "plugins/@dshfiles/sidebar-right/src/native/**",
     "plugins/@dshfiles/sidebar-terminal/src/native/**",
+    "plugins/@dshfiles/tool-fs/src/native/**",
+    "plugins/@dshfiles/tool-bash/src/native/**",
     "plugins/@dshfiles/phone-pairing/experiments/**"
   ],
   "overrides": [

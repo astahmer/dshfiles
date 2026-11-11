@@ -51,6 +51,8 @@
     "plugins/@dshfiles/sidebar-terminal/src/native/**",
     "plugins/@dshfiles/storage-domain/src/native/**",
     "plugins/@dshfiles/storage-json/src/native/**",
+    "plugins/@dshfiles/tool-fs/src/native/**",
+    "plugins/@dshfiles/tool-bash/src/native/**",
     "**/*.snapshot.json",
     "plugins/@dshfiles/plugin-guide/src/generated/**",
     "plugins/@dshfiles/onboarding/src/generated/**",
