@@ -122,7 +122,7 @@
           "kind": "unit-test",
           "id": "session-controller.browser-event",
           "file": "plugins/@dshfiles/session-controller/tests/browser-event.test.ts",
-          "testName": "drops provider replay state from assistant events and keeps everything else"
+          "testName": "drops provider replay state and the settled stream past its first token, and keeps everything else"
         },
         {
           "kind": "gherkin",

@@ -28,8 +28,8 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "bench:owned": "pnpm build && OWNED_BENCH=1 vitest run tests/owned-search.spec.ts",
-    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
-    "bench:commit": "pnpm build && WORKER_COMMIT_BENCH=1 vitest run tests/group-commit-latency.bench.spec.ts"
+    "bench:commit": "pnpm build && WORKER_COMMIT_BENCH=1 vitest run tests/group-commit-latency.bench.spec.ts",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
     "@dshfiles/session-log-window": "workspace:*",
