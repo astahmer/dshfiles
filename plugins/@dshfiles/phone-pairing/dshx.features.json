@@ -68,6 +68,11 @@
           "id": "phone-pairing.offer-contract",
           "file": "plugins/@dshfiles/phone-pairing/tests/offer-contract.test.ts",
           "testName": "serves one single-use offer to the sidebar popover and reports disabled phone access"
+        },
+        {
+          "kind": "gherkin",
+          "id": "phone-pairing.sidebar-qr-off",
+          "featureFile": "tooling/dshx/e2e/features/phone-pairing.feature"
         }
       ],
       "telemetry": [
@@ -82,8 +87,20 @@
         {
           "kind": "custom",
           "span": "phone pairing tunnel",
-          "file": "plugins/@dshfiles/phone-pairing/tests/gateway-native.e2e.test.ts",
-          "testName": "pairs by code and proxies the authenticated app"
+          "file": "plugins/@dshfiles/phone-pairing/tests/tunnel.test.ts",
+          "testName": "records one bounded tunnel span and starts no provider for a manual origin"
+        },
+        {
+          "kind": "custom",
+          "span": "phone pairing gateway listen",
+          "file": "plugins/@dshfiles/phone-pairing/tests/gateway.test.ts",
+          "testName": "records one bounded listen span and one native cookie span without addresses"
+        },
+        {
+          "kind": "custom",
+          "span": "phone pairing native cookie",
+          "file": "plugins/@dshfiles/phone-pairing/tests/gateway.test.ts",
+          "testName": "records one bounded listen span and one native cookie span without addresses"
         }
       ]
     }

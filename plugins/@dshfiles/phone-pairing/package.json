@@ -27,13 +27,15 @@
     "build": "node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js build",
     "test": "vitest run tests",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "3.18.5",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@effect/platform-node": "catalog:",
     "@nuintun/qrcode": "5.1.0",
     "effect": "catalog:"
   },
@@ -44,7 +46,6 @@
     "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
-    "@effect/platform-node": "catalog:",
     "@standard-schema/spec": "1.1.0",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
