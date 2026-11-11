@@ -16,6 +16,9 @@ const turnEnd = (sessionId: string, kind = 'completed', reason?: string): Thread
   event: { type: 'turn/end', data: { reason: reason === undefined ? { kind } : { kind, reason: { kind: reason } } } } as ThreadEvent['event'],
 })
 
+/** Lets the forked listener move every offered event into its burst before the test clock moves. */
+const drained = Effect.repeat(Effect.yieldNow, { times: 10 })
+
 /** A monitor that counts `gh pr view` calls the way the real one makes them: one per watched pull request per pass. */
 const countingMonitor = (watchedBySession: ReadonlyMap<string, readonly string[]>) => {
   const ghCalls: string[] = []
@@ -62,7 +65,30 @@ describe('pull-request refresh triggers', () => {
       const events = yield* Queue.unbounded<ThreadEvent>()
       const fiber = yield* Effect.forkChild(refreshOnThreadEvents({ monitor, events: Stream.fromQueue(events) }))
       yield* Queue.offerAll(events, [call('thread-a', 'c1', 'jj git push -b feat'), result('thread-a', 'c1'), turnEnd('thread-a'), turnEnd('thread-b')])
+      yield* drained
       yield* TestClock.adjust(Duration.seconds(3))
+      expect(ghCalls).toEqual(['acme/widget#7'])
+      yield* Fiber.interrupt(fiber)
+    }),
+  )
+
+  it.effect('the settings switch event refresh off and set its debounce, read for every burst', () =>
+    Effect.gen(function* () {
+      const { monitor, ghCalls } = countingMonitor(new Map([['thread-a', ['acme/widget#7']]]))
+      const events = yield* Queue.unbounded<ThreadEvent>()
+      let config = { enabled: false, debounce: Duration.seconds(10) }
+      const fiber = yield* Effect.forkChild(refreshOnThreadEvents({ monitor, events: Stream.fromQueue(events), config: Effect.sync(() => config) }))
+      yield* Queue.offer(events, turnEnd('thread-a'))
+      yield* drained
+      yield* TestClock.adjust(Duration.seconds(10))
+      expect(ghCalls).toEqual([])
+
+      config = { enabled: true, debounce: Duration.seconds(10) }
+      yield* Queue.offer(events, turnEnd('thread-a'))
+      yield* drained
+      yield* TestClock.adjust(Duration.seconds(9))
+      expect(ghCalls).toEqual([])
+      yield* TestClock.adjust(Duration.seconds(1))
       expect(ghCalls).toEqual(['acme/widget#7'])
       yield* Fiber.interrupt(fiber)
     }),
@@ -86,11 +112,12 @@ describe('pull-request refresh triggers', () => {
         Effect.gen(function* () {
           const { monitor, ghCalls } = countingMonitor(watched)
           const events = yield* Queue.unbounded<ThreadEvent>()
-          const sweeper = yield* Effect.forkChild(sweepWatched({ monitor, every: sweep }))
+          const sweeper = yield* Effect.forkChild(sweepWatched({ monitor, every: Effect.succeed(sweep) }))
           const listener = withEvents ? yield* Effect.forkChild(refreshOnThreadEvents({ monitor, events: Stream.fromQueue(events) })) : undefined
           for (const minute of [17, 41]) {
             yield* TestClock.adjust(Duration.minutes(minute === 17 ? 17 : 24))
             yield* Queue.offerAll(events, [call('thread-a', `push-${String(minute)}`, 'jj git push'), result('thread-a', `push-${String(minute)}`)])
+            yield* drained
             const before = ghCalls.length
             yield* TestClock.adjust(Duration.seconds(3))
             if (withEvents) expect(ghCalls.slice(before)).toEqual(['acme/widget#1'])

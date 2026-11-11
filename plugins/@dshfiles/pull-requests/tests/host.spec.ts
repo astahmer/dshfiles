@@ -1,6 +1,9 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Loader } from '@deepseek-ai/cordis-plugin-loader'
+import { ConfigEditor } from '@deepseek-ai/dsh-config-editor'
+import { SettingsForms } from '@deepseek-ai/dsh-settings'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomainPlugin from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
@@ -17,6 +20,12 @@ const mountedHost = Effect.acquireRelease(
     const storageRoot = await mkdtemp(join(tmpdir(), 'pull-requests-host-'))
     const host = await createTestHost()
     await host.ctx.plugin(LocalSubprocessRuntime)
+    // The plugin declares a settings namespace, so the Host must serve settings forms.
+    await host.ctx.plugin(Loader)
+    new ConfigEditor(host.ctx)
+    new SettingsForms(host.ctx)
+    // No profile on disk: the namespace has no stored document, so the plugin runs on its schema defaults.
+    host.ctx.settings.describe = () => []
     await host.ctx.plugin(Storage)
     await host.ctx.plugin(StorageJson, { root: storageRoot })
     await host.ctx.plugin(StorageDomainPlugin, { backend: 'json' })

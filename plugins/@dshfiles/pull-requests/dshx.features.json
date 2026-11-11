@@ -10,7 +10,26 @@
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tools: pull_request_link, pull_request_watch, pull_request_list",
-      "configuration": [],
+      "configuration": [
+        {
+          "key": "refreshOnThreadEvents",
+          "defaultValue": "true",
+          "constraints": "Boolean; off leaves only the sweep.",
+          "coveredBy": ["pull-requests.event-refresh-settings"]
+        },
+        {
+          "key": "eventDebounceSeconds",
+          "defaultValue": "3",
+          "constraints": "Whole seconds from 1 to 60.",
+          "coveredBy": ["pull-requests.event-refresh-settings"]
+        },
+        {
+          "key": "sweepMinutes",
+          "defaultValue": "10",
+          "constraints": "Whole minutes from 1 to 120.",
+          "coveredBy": ["pull-requests.event-refresh"]
+        }
+      ],
       "states": ["linked", "watched", "rate-limited", "merged", "closed"],
       "failureModes": [
         "If gh is missing, unauthenticated, or returns an invalid response, the watcher keeps its last known state and records a bounded error code; a later poll retries.",
@@ -48,6 +67,12 @@
           "id": "pull-requests.event-refresh",
           "file": "plugins/@dshfiles/pull-requests/tests/refresh-triggers.spec.ts",
           "testName": "one hour, five watched pull requests, two pushes: gh calls before and after"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pull-requests.event-refresh-settings",
+          "file": "plugins/@dshfiles/pull-requests/tests/refresh-triggers.spec.ts",
+          "testName": "the settings switch event refresh off and set its debounce, read for every burst"
         },
         {
           "kind": "not-applicable",
