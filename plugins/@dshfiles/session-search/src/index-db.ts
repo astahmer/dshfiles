@@ -447,7 +447,7 @@ export class SearchIndex {
             )
           const prompts: (string | number | null)[] = []
           const promptPlaceholders: string[] = []
-          for (const [index, document] of chunk.entries()) {
+          for (const [index, document] of chunkDocuments.entries()) {
             if (!isUserPrompt(document)) continue
             promptPlaceholders.push('(?, ?, ?, ?, ?, ?)')
             const human = document.humanPrompt === undefined ? null : document.humanPrompt ? 1 : 0
