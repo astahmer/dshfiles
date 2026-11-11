@@ -4,7 +4,7 @@
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
-**Status:** P0, P1 and P2 landed on `main` (2026-11-11); P3 not started.
+**Status:** P0, P1 and P2 landed on `main` (2026-11-11); P3 in progress (What's new) alongside follow-up 7 (phone `reach` paths); usage suggestions follow What's new.
 
 | Phase | Work                                                                                                                                                                | Status      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
@@ -382,3 +382,6 @@ None open: P0 closed all seven (owner, audience, blocking, gallery home, screens
 | 2026-11-11 | The checklist is one Host read, never stored                                                            | The page and the agent tool must agree; the facts change outside DSH (`gh auth login`)                             |
 | 2026-11-11 | Phases P1–P5 as listed; P2 starts only after P1 is verified                                             | User decision                                                                                                      |
 | 2026-11-11 | The wizard is a non-modal card, not a dialog                                                            | A modal is a gate in practice and failed the scratch boot's no-modal-overlay check; Escape and Skip close the card |
+| 2026-11-11 | A Show me where walk moves focus to its card's first button                                             | Keyboard users must reach Next and End; the walk is user-started, so focus follows the user's action               |
+| 2026-11-11 | What's new reads history on the Host at request time, not a build-time list                             | A generated list with a staleness test would fail CI on every unrelated commit                                     |
+| 2026-11-11 | Phone walks use an optional `reachNarrow` catalog path                                                  | Desktop `reach` targets controls that do not render below 640 px                                                  |
