@@ -1,10 +1,10 @@
 # Guided onboarding and feature discovery
 
-**Resume here:** P1 landed on `main` with its fixups (importer lockfile, `plugin-guide` catalog, boot-task inputs, `profiles/web` seed row, all `jj:knxlmnlw`-lineage). P2 is in progress: **Enable / Disable pack** first (exact preview, install through the profile toolchain, enable through the plugin manager, never a restart), then **Show me where** (replay `reach` against the live DOM). Remaining P1 follow-ups are listed under _P1 follow-ups_.
+**Resume here:** P1 and P2's **Enable / Disable pack** are on `main` (`jj:rromxyqx`, `jj:sqtoxzzv`, plus the `plugin-guide` regeneration). P2's remaining half is **Show me where**: replay a feature's `reach` steps against the live DOM by role + accessible name, highlight only, stop cleanly on a step this surface cannot replay. P1 follow-ups are listed under _P1 follow-ups_.
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
-**Status:** P0 decided, P1 landed on `main` (2026-11-11); P2 in progress (Enable / Disable pack).
+**Status:** P0 and P1 landed on `main`; P2 in progress — Enable / Disable pack landed, Show me where being built (2026-11-11).
 
 | Phase | Work                                                                                                                                                                | Status      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
@@ -14,6 +14,16 @@
 | P3    | **What's new** from jj/git history (since last visit; upstream since fork point) + opt-in usage suggestions                                                         | not started |
 | P4    | Agent-led demo in a scratch thread (off by default) + `dshx init` profile composer + generated docs page per pack                                                   | not started |
 | P5    | AGENTS.md rule (each new plugin ships an onboarding block and joins a pack) + `features:check` error for a UI plugin without one                                    | not started |
+
+### P2 progress
+
+| Step | Work                                                                                                                  | Status              |
+| ---- | --------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1    | Exact preview (install / change / fine / kept / blocked / prerequisites / restart) per pack, from live plugin state    | done: `jj:rromxyqx` |
+| 2    | Apply through the plugin manager, install through the checkout's `dshx add`, one at a time, cancellable, never a restart | done: `jj:rromxyqx` |
+| 3    | `onboarding_pack_apply` write tool (needs `confirm: true`, refuses a bare request) + preview through `onboarding_overview` | done: `jj:rromxyqx` |
+| 4    | Credential-aware account checklist item (AI accounts read, provider routes only as fallback)                          | done: `jj:rromxyqx` |
+| 5    | Show me where: read tool + walk overlay replaying `reach`, unsupported steps explained                                | in progress         |
 
 ### P1 progress
 
@@ -28,11 +38,12 @@
 
 ### P1 follow-ups
 
-1. The `account` item counts registered model provider routes, not working credentials (a fresh profile already registers two). Being fixed in P2: read enabled saved accounts through the AI accounts Host contract, fall back to provider routes only when it is absent, and say which check ran.
+1. ~~The `account` item counts registered model provider routes, not working credentials~~ — done: it reads enabled, signed-in accounts through the AI accounts Host API and only falls back to provider routes when that plugin is absent, saying which check ran.
 2. The wizard is a non-modal card (top right), not a dialog: a modal blocked the scratch boot's "no modal overlay" check and is a gate in practice. Escape skips it.
 3. `src/generated/feature-catalog.ts` goes stale whenever any `dshx.features.json` changes, like `plugin-guide`'s catalog: regenerate both when landing (`pnpm --dir plugins/@dshfiles/onboarding generate`).
 4. ~~The plugin is not in the `profiles/web` seed yet~~ — landed: the seed lists it as a link dependency and as a profile bundle.
-5. Pre-existing repository drift found while landing, untouched because other lanes own it: `features:check` fails for `session-log-window`, `settings-subagent` and `tool-meta`; the web-profile contract check fails for `conversation-cleanup`, `tool-bash` and `tool-fs`; 68 other `turbo.json` files plus three missing ones (`sidebar-terminal`, `tool-bash`, `tool-fs`) are stale against `browser-tasks.mjs --write`.
+5. Pre-existing repository drift found while landing, untouched because other lanes own it: `features:check` fails for ten packages (`cordis-cards`, `cordis-client-runner`, `main-tabs`, `phone-access`, `phone-pairing`, `schedule`, `session-controller`, `session-log-window`, `settings-subagent`, `tool-meta`); the web-profile contract check fails for `conversation-cleanup`, `tool-bash` and `tool-fs`; 68 other `turbo.json` files plus three missing ones (`sidebar-terminal`, `tool-bash`, `tool-fs`) are stale against `browser-tasks.mjs --write`.
+6. The managed supervisor's state has no supported contract: `thread-sidebar` does not export its restart API as a module, so pack results name both restart routes and never claim the supervisor is active. Exporting that contract is the follow-up if the copy should become exact.
 
 ## Goal
 
@@ -275,7 +286,7 @@ Decisions above, 2026-11-11.
 2. **Apply:** installed rows are enabled live through the plugin manager; missing ones are added through the supported profile-sync path and applied by thread-sidebar's `autoRestartWhenIdle` (or the user's restart). The result names what changed and what waits for a restart.
 3. **Disable pack:** the reverse for that pack's plugins that no other enabled pack needs; never disables a Core plugin.
 4. **Show me where:** a button per feature with `reach` replays its click/hover steps against the live DOM by role + accessible name, highlighting each control in turn (Next / Escape), and stops with a clear message at the first unresolvable step.
-5. Agent parity: `onboarding_pack_preview` (read) and `onboarding_pack_apply` (write; explicit `confirm: true`, `action: enable|disable`).
+5. Agent parity: the preview is an input of the existing read-only `onboarding_overview` (`preview: { pack, action }`), and `onboarding_pack_apply` (write; explicit `confirm: true`, `action: enable|disable`) applies one pack. Two tools, one preview model — a separate preview tool would restate the same schema.
 
 **Acceptance:** preview lists exactly the rows apply changes (unit test on a fake plugin manager); enable then disable restores the original enablement; a Core plugin is never disabled; Show me where highlights the first two steps of a real feature in a scratch DSH and stops cleanly on a missing control; 390 px and keyboard checks hold.
 
