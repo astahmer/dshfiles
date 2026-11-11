@@ -10,7 +10,7 @@ import { Deferred, Effect, Exit, Fiber, Schedule, Scope } from 'effect'
 import { TestClock } from 'effect/testing'
 import { UsageHistorySchedule } from './usage-history-schedule.js'
 import { UsageHistoryPromiseModel } from './usage-history-promise.js'
-import type { AccountProfile, UsageCard } from './api.js'
+import { aiAccountsApi, type AccountProfile, type UsageCard } from './api.js'
 import type { QuotaSnapshot } from './usage-history-model.js'
 import { createUsageHistoryService, type AccountUsageReader } from './usage-recorder.js'
 
@@ -109,6 +109,17 @@ describe('usage history collection', () => {
     const histories = await service.readMany(['claude_a', 'codex_a'], 0)
     expect(histories.map(history => history.instanceId)).toEqual(['claude_a', 'codex_a'])
     expect(histories.map(history => history.points)).toEqual([await service.read('claude_a', 0), await service.read('codex_a', 0)])
+  })
+
+  it('serves stored readings that the history API output accepts with no excess property', async () => {
+    const ctx = await openContext()
+    const service = createUsageHistoryService(ctx)
+    await service.collect([profile('claude_a', 'claude')], async () => okCard(10, Date.now() + 3_600_000))
+    const points = await service.read('claude_a', 0)
+    expect(points).toHaveLength(1)
+    const output = aiAccountsApi.methods.history.output
+    if (output === undefined || !('~standard' in output)) throw new Error('history must declare a Standard Schema output')
+    expect((await output['~standard'].validate({ instanceId: 'claude_a', points })).issues).toBeUndefined()
   })
 
   it('records every enabled account that answers, of every provider kind, and skips failures', async () => {

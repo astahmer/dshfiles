@@ -665,20 +665,7 @@ export const aiAccountsApi = defineApi({
      */
     catalog: method({
       input: Schema.Struct({ instanceId: AiAccountsSchema.id(64) }),
-      output: Schema.Struct({
-        instanceId: AiAccountsSchema.id(64),
-        models: Schema.Array(
-          Schema.Struct({
-            id: AiAccountsSchema.id(200),
-            name: Schema.String.check(Schema.isMaxLength(200)),
-            efforts: AiAccountsSchema.list(
-              Schema.Struct({ id: Schema.String.check(Schema.isMaxLength(64)), name: Schema.String.check(Schema.isMaxLength(80)) }),
-              12,
-            ),
-            defaultEffort: Schema.NullOr(Schema.String.check(Schema.isMaxLength(32))),
-          }),
-        ),
-      }),
+      output: accountsCatalogSchema,
       description: 'One account’s model catalog with the reasoning levels each model supports. Read-only.',
       tool: {
         name: 'ai_accounts_catalog',
@@ -702,7 +689,8 @@ export const aiAccountsApi = defineApi({
       }),
       output: Schema.Struct({
         instanceId: AiAccountsSchema.id(64),
-        points: AiAccountsSchema.list(usageHistoryPointSchema, MAX_USAGE_HISTORY_POINTS),
+        // Stored rows carry their account; the forecast batch strips it, so only this read declares it.
+        points: AiAccountsSchema.list(Schema.Struct({ ...usageHistoryPointSchema.fields, instanceId: AiAccountsSchema.id(64) }), MAX_USAGE_HISTORY_POINTS),
       }),
       description: 'Stored quota readings for one account over a window, oldest first. Read-only.',
       tool: {

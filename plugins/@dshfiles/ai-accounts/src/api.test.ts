@@ -9,6 +9,8 @@ import {
   forecastHistoryBatchInputSchema,
   prepareAccountConnectionInputSchema,
   type AccountDraft,
+  type AccountsCatalog,
+  aiAccountsApi,
 } from './api.js'
 
 const draft: AccountDraft = {
@@ -109,6 +111,19 @@ describe('forecast history batch boundary', () => {
     'rejects invalid account batches',
     input => expect(Schema.decodeUnknownResult(forecastHistoryBatchInputSchema)(input)._tag === 'Success').toBe(false),
   )
+})
+
+describe('catalog output boundary', () => {
+  it('accepts the account-added flag and the refresh warning the Host sends', async () => {
+    const catalog: AccountsCatalog = {
+      instanceId: 'claude_1',
+      models: [{ id: 'claude-opus-5', name: 'Claude Opus 5', efforts: [], defaultEffort: null, accountAdditional: true }],
+      warning: 'Live catalog refresh failed; showing the last-known model list.',
+    }
+    const output = aiAccountsApi.methods.catalog.output
+    if (output === undefined || !('~standard' in output)) throw new Error('catalog must declare a Standard Schema output')
+    expect((await output['~standard'].validate(catalog)).issues).toBeUndefined()
+  })
 })
 
 describe('account model labels', () => {
