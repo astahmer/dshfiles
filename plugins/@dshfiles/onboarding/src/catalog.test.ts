@@ -77,13 +77,13 @@ describe('packs', () => {
     expect(new Set(PACKS.map(pack => pack.id)).size).toBe(PACKS.length)
   })
 
-  it('point every key setting at a namespace and field a plugin declares', () => {
-    const allSettings = pluginDirectories.map(settingsSources).join('\n')
+  it('point every key setting at a namespace and field one of the pack plugins declares', () => {
     for (const pack of PACKS)
       for (const setting of pack.keySettings) {
-        expect(allSettings, `${pack.id}: ${setting.entryId}`).toContain(`namespace: '${setting.entryId}'`)
+        const owners = pack.plugins.map(settingsSources).filter(source => source.includes(`namespace: '${setting.entryId}'`))
+        expect(owners, `${pack.id}: ${setting.entryId}`).toHaveLength(1)
         const field = setting.fieldPath[0] ?? ''
-        expect(allSettings, `${pack.id}: ${setting.entryId}.${field}`).toMatch(new RegExp(`\\b${field}: Schema\\.`, 'u'))
+        expect(owners[0], `${pack.id}: ${setting.entryId}.${field}`).toMatch(new RegExp(`\\b${field}: Schema\\.`, 'u'))
       }
   }, 30_000)
 
