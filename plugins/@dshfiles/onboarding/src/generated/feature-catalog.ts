@@ -334,9 +334,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "onboarding",
-      "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and a read-only onboarding_overview agent tool.",
+      "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs, what changed in owned plugins since your last visit and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and read-only onboarding_overview and…",
       "ui": true,
-      "features": 5
+      "features": 6
     },
     {
       "name": "optmem-core",
@@ -13714,6 +13714,45 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": {
         "firstAction": "Open Knowledge › Getting started and press Show me where on a feature.",
         "doneWhen": "The walk rings the feature's final control and says you reached it.",
+        "open": {
+          "panel": "dshfiles-onboarding"
+        }
+      }
+    },
+    {
+      "key": "onboarding#whats-new",
+      "plugin": "onboarding",
+      "id": "whats-new",
+      "title": "See what changed in your plugins since your last visit",
+      "summary": "Getting started's What's new lists every feat(<plugin>) and fix(<plugin>) change to an owned plugin, grouped by plugin with its catalog description, newest first, at most 50, each with its date. It is read on the Host from the jj (or git) history of the dshfiles checkout this pr…",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › What's new",
+      "reach": [
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Getting started\"",
+          "action": "click",
+          "by": "button",
+          "name": "Getting started",
+          "value": null
+        },
+        {
+          "text": "expect region \"What's new*\"",
+          "action": "expect",
+          "by": "region",
+          "name": "What's new*",
+          "value": null
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open Knowledge › Getting started and read What's new.",
+        "doneWhen": "You pressed Mark as seen, so the next change reads New.",
         "open": {
           "panel": "dshfiles-onboarding"
         }
