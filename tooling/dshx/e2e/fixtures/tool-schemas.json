@@ -1,5 +1,5 @@
 {
-  "hostBundles": 80,
+  "hostBundles": 83,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -62,6 +62,7 @@
     "@dshfiles/settings-subagent",
     "@dshfiles/settings-web-search",
     "@dshfiles/shared-streams",
+    "@dshfiles/sidebar-terminal",
     "@dshfiles/storage-domain",
     "@dshfiles/storage-json",
     "@dshfiles/test-runs",
@@ -69,6 +70,8 @@
     "@dshfiles/thread-sidebar",
     "@dshfiles/thread-transfer",
     "@dshfiles/tool-ask-user",
+    "@dshfiles/tool-bash",
+    "@dshfiles/tool-fs",
     "@dshfiles/tool-meta",
     "@dshfiles/tool-search",
     "@dshfiles/traces",
@@ -82,12 +85,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 620,
-  "apiToolBindings": 433,
-  "apiToolNameCount": 433,
-  "apiToolSchemas": 432,
+  "apiMethods": 640,
+  "apiToolBindings": 447,
+  "apiToolNameCount": 447,
+  "apiToolSchemas": 446,
   "definedTools": 24,
-  "tools": 456,
+  "tools": 470,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -2085,6 +2088,37 @@
       }
     },
     {
+      "name": "auto_restart_postpone",
+      "description": "Hold the automatic DSH restart for some minutes (default 60); the updates stay pending. Run only when the user asked to postpone the restart. Reverse with resumeAutoRestart.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "minutes": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "auto_restart_resume",
+      "description": "Drop a postponement of the automatic DSH restart. Run only when the user asked to let it restart again.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "auto_restart_status",
+      "description": "The automatic restart that applies pending Host updates once DSH is idle: its phase, the pending updates, what keeps DSH busy, when it would restart and any postponement. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "automation_delete",
       "description": "Delete an automation and its run history; its webhook URL stops answering. Threads it started are kept. Requires confirm: true. Call only when the user asked for this.",
       "parameters": {
@@ -3049,7 +3083,7 @@
     },
     {
       "name": "backlog_link_pr",
-      "description": "Link a pull request to an item as a first-class PR link: its state and checks show on the item (watched through the newest thread linked to the item), and merging it closes the item when `closes` is on. Only for the user's request or this thread's own task.",
+      "description": "Link a pull request to an item as a first-class PR link: its state and checks show on the item (the item watches it, and so does the newest thread linked to the item), and merging it closes the item when `closes` is on. Only for the user's request or this thread's own task.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -3295,7 +3329,7 @@
     },
     {
       "name": "backlog_pull_requests",
-      "description": "The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed) and checks, read from the pull-requests plugin. A PR no thread watches shows `unknown`; `available: false` when that plugin is not loaded. Read-only.",
+      "description": "The pull requests an item links (URL links and PR gates) with their live state (open, merged, closed), checks and when that state was last read, and its linked GitHub issues with their open/closed state, read through the pull-requests plugin. Open items watch their PRs on their own; a PR not yet read shows `unknown`; `available: false` when that plugin is not loaded. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -8015,6 +8049,31 @@
       }
     },
     {
+      "name": "notify_user",
+      "description": "Send the user a notification (title and body, optionally linking a thread) through their configured notification routes. Call only when the user asked to be notified, or when a long task or routine reaches a result or a blocker that needs the user’s attention; never for progress updates. The text appears in the operating system notification center: never include secrets or credentials. Rate-limited per thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "description": "Short headline, such as “Migration finished”.",
+            "type": "string"
+          },
+          "body": {
+            "description": "What happened and what the user should look at.",
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Thread a click opens. Omit for the calling thread; null for a notification about no thread."
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "plugin_guide_search",
       "description": "Search the DSH plugin extension surfaces a plugin may use: dshx SDK entry points, native Client slots, owned registries, client contracts, Host APIs, shared modules and feature-catalog surfaces. Each entry names its import, scope, mode, registration shape, additive-or-replacement risk, source file and docs. Static build-time catalog, never live occupancy. Read-only.",
       "parameters": {
@@ -8828,6 +8887,22 @@
       "parameters": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "prompt_history_search",
+      "description": "Search the prompts the user sent across every top-level thread, newest first, each text once: the newest prompts the historyRetention setting keeps, without prompts longer than historyMaxChars. `text` keeps prompts holding every word (the last may be a prefix); without it the newest prompts are listed. `limit` defaults to 30. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
         "additionalProperties": false
       }
     },
@@ -9816,6 +9891,134 @@
         },
         "required": [
           "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scheduled_send_cancel",
+      "description": "Cancel one scheduled message so it is never sent. Returns it, so it can be scheduled again with scheduled_send_create. Call only when the user asked to cancel it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scheduled_send_create",
+      "description": "Schedule a message to be sent into a thread at sendAt (Unix epoch milliseconds, in the future), as if the user sent it then; with model, the thread switches to that model and effort first. Agents default to their own thread. Call only when the user asked to send something later.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "sendAt": {
+            "type": "integer"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "reasoningEffort": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "text",
+          "sendAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scheduled_send_list",
+      "description": "List the messages scheduled to be sent later, soonest first: one thread when sessionId is given (agents default to their own thread), else every thread. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scheduled_send_now",
+      "description": "Send one scheduled message now instead of at its time. Call only when the user asked to send it now.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scheduled_send_update",
+      "description": "Change the text, send time, or model and effort of one scheduled message (model null keeps the thread’s own). A failed send is rescheduled. Call only when the user asked to change it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "sendAt": {
+            "type": "integer"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "reasoningEffort": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id"
         ],
         "additionalProperties": false
       }
@@ -10883,7 +11086,7 @@
     },
     {
       "name": "thread_subscribe",
-      "description": "Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) is queued into the subscriber and wakes it when it is idle. Defaults the subscriber to the calling thread. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.",
+      "description": "Subscribe a thread to another thread's turn completions: when the target finishes, fails, or stops to ask a question, one compact notice (status plus a short answer preview, never the transcript) reaches the subscriber: it wakes an idle subscriber, joins a running one at its next step, and several ends merge into one notice. Defaults the subscriber to the calling thread. level picks which ends reach it: all, outcomes (landed, failed, question), stuck (failed, question, blocked, truncated) or never; default (or omitted on a new pair) follows the user's setting. Subscribing an existing pair changes its level; omitting level keeps it. Refused for a thread watching itself or a pair that would wake each other. Call it when the user asked you to wait on another thread's result, or right before you end a turn that waits on one — the subscription is that opt-in, and without it nothing wakes you.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -10892,6 +11095,16 @@
           },
           "subscriberSessionId": {
             "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "all",
+              "outcomes",
+              "stuck",
+              "never",
+              "default"
+            ]
           }
         },
         "required": [
@@ -11668,6 +11881,26 @@
       }
     },
     {
+      "name": "traces_reclaim_space",
+      "description": "Give the span store's free pages back to the disk and report the bytes freed. Run only when the user asked to reclaim space, and pass confirm: true. An incremental store moves only the pages behind its free ones (2.4 s for 27 MB free); an older store is rewritten once with a full VACUUM (blocks the Host for seconds: 3.4 s for a 62 MB store) and is incremental afterwards. Stored telemetry is kept.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "description": "Must be true. On a store that is not incremental yet this runs one full VACUUM that blocks the DSH Host for its duration (seconds: 3.4 s for a 62 MB store) and converts the file.",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "traces_search",
       "description": "Search stored OpenTelemetry traces, newest first: root span, duration, span and error counts, services and list-price cost of their model calls. Filter by service, operation, error status, minimum duration, time range, text, DSH session or turn. Read-only.",
       "parameters": {
@@ -11827,8 +12060,35 @@
       }
     },
     {
+      "name": "traces_stalls",
+      "description": "DSH Host event-loop stalls (spans 'host event-loop stall', recorded when the loop was blocked past the eventLoopStallMs setting), newest first, each with up to 8 spans that were open while it lasted, ranked by overlap times the share of the span the stall fills, so the blocking work ranks above the turn around it. SQLite busy waits show as 'sqlite lock wait' spans. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "windowMinutes": {
+            "type": "integer",
+            "description": "Look-back window in minutes; defaults to 60."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Stalls to return, newest first; defaults to 20."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "traces_status",
       "description": "The OTLP receiver: viewer mode, listen address and state (listening, port in use, off), request and item counters, forwarding, what the store retains, where this DSH process exports its own spans and metrics, and a diagnosis of why telemetry does or does not arrive. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "traces_store_space",
+      "description": "The span store's SQLite file: page size, page and free-page counts in pages and bytes, its auto_vacuum mode, and how traces_reclaim_space would give the free pages back (incremental-vacuum, or a one-time converting vacuum for a file created before incremental auto_vacuum). Read-only.",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -12113,6 +12373,23 @@
       "parameters": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "usage_thread_family_cost",
+      "description": "A thread's own list-price cost and its family cost: the thread plus every subagent session below it (subagents of subagents included), with each descendant's cost, requests and tokens. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "description": "The thread whose own cost and subagent (descendant) cost to total.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
         "additionalProperties": false
       }
     },
