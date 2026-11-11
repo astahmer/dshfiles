@@ -17,7 +17,21 @@ to read the file itself, outside the sandbox check and without an `fs/observed` 
 
 ## Local delta
 
-None yet: `src/native` and `locale` equal upstream.
+| File                        | Change                                                                                                                                                                                                                      |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/read.ts`        | `offset` accepts a negative integer to read from the end (`-50` = the last 50 lines, at most `limit`); the parameter description says so; the call card titles it `(last 50 lines)`                                         |
+| `src/native/read-render.ts` | an offset past the end returns the file's last lines (at most 50, and `limit`) under a `(Offset N is past the end of the file (T lines); …)` line instead of failing; a shortened line never keeps half of a surrogate pair |
+| `src/native/read-target.ts` | a missing file's error adds `Did you mean: …?` from `src/missing-path.ts`                                                                                                                                                   |
+| `src/missing-path.ts`       | owned: close names in the requested directory (other case, other extension, one or two typos), then files with the same name elsewhere in the project                                                                       |
+
+Reading from the end keeps only the last lines while it scans, so memory stays bounded by `limit`; the byte cap drops the
+earliest of them first. The `fs/observed` receipt and the sandbox path are unchanged: the window is still computed from
+one `ctx.fs` read after one stat. Suggestions list directories through `ctx.fs.listDir` only on a miss: the requested
+directory, then a breadth-first walk of the Session's directory that skips hidden, `node_modules`, `dist`, `build`,
+`target` and `coverage` directories, stops at depth 8, 2,000 directories or 5 hits. `read_image` shares the not-found
+path, so it suggests the same way. `src/read.test.ts` runs the real `read` tool over `@deepseek-ai/dsh-fs-local` on a
+temporary directory; `src/missing-path.test.ts` covers the name ranking, other case included (macOS file systems are
+case-insensitive, so the integration test cannot miss on case).
 
 ## Wiring
 

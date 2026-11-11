@@ -5,18 +5,21 @@
  * @module @deepseek-ai/dsh-tool-fs/read-render
  */
 
-import { FsError } from '@deepseek-ai/dsh-fs'
-
 /** Default maximum characters returned for a single line (the `readMaxLineLength` config). */
 export const READ_MAX_LINE_LENGTH = 2000
 
 /** Default maximum bytes returned for selected file lines (the `readMaxBytes` config). */
 export const READ_MAX_BYTES = 50 * 1024
 
+/** Lines an offset past the end of the file still returns, from the end, beside the line count. */
+export const PAST_END_LINES = 50
+
 /** Resolved read window. The consumer applies its defaults/caps before calling. */
 export interface ReadWindow {
   /** 1-based first line to return. */
   offset: number
+  /** Return the last `fromEnd` lines (at most `limit`) instead of a window from `offset`. */
+  fromEnd?: number
   /** Maximum number of lines to return. */
   limit: number
   /** Maximum characters returned for a single line; overflow is truncated with a suffix. */
@@ -35,6 +38,10 @@ export interface FileTextLine {
 
 /** The windowed result {@link buildWindow} produces from a file's decoded text. */
 export interface WindowResult {
+  /** 1-based number of the first returned line (the requested offset unless reading from the end). */
+  offset: number
+  /** Whether the requested offset was past the end, so the lines are the file's last ones. */
+  pastEnd: boolean
   /** Returned lines, already numbered. */
   lines: FileTextLine[]
   /** Exact total line count in the file. */
@@ -53,6 +60,8 @@ export interface FileReadOutcome {
   totalLines: number
   /** Whether selected output hit the byte cap. */
   truncatedByBytes?: true
+  /** The requested offset when it was past the end and the lines are the file's last ones. */
+  pastEndOffset?: number
 }
 
 interface WindowAccumulator {
@@ -60,14 +69,30 @@ interface WindowAccumulator {
   totalLines: number
   outputBytes: number
   truncatedByBytes: boolean
+  /** The most recent lines (already shortened), kept while reading from the end or before reaching `offset`. */
+  tail: string[]
 }
 
 function newAccumulator(): WindowAccumulator {
-  return { lines: [], totalLines: 0, outputBytes: 0, truncatedByBytes: false }
+  return { lines: [], totalLines: 0, outputBytes: 0, truncatedByBytes: false, tail: [] }
 }
 
 function truncateLine(line: string, maxLineLength: number): string {
-  return line.length > maxLineLength ? `${line.substring(0, maxLineLength)}... (line truncated to ${maxLineLength} chars)` : line
+  if (line.length <= maxLineLength) return line
+  // Never keep half of a surrogate pair: an astral character spans two UTF-16 units.
+  const lastKept = line.charCodeAt(maxLineLength - 1)
+  const end = lastKept >= 0xd800 && lastKept <= 0xdbff ? maxLineLength - 1 : maxLineLength
+  return `${line.substring(0, end)}... (line truncated to ${maxLineLength} chars)`
+}
+
+function tailSize(request: ReadWindow): number {
+  return Math.min(request.fromEnd ?? PAST_END_LINES, request.limit)
+}
+
+function rememberTail(acc: WindowAccumulator, rawLine: string, request: ReadWindow): void {
+  const size = tailSize(request)
+  acc.tail.push(truncateLine(rawLine, request.maxLineLength))
+  if (acc.tail.length > size * 2) acc.tail.splice(0, acc.tail.length - size)
 }
 
 function lineByteSize(line: string, currentLineCount: number): number {
@@ -76,7 +101,12 @@ function lineByteSize(line: string, currentLineCount: number): number {
 
 function consumeLine(acc: WindowAccumulator, rawLine: string, request: ReadWindow): void {
   acc.totalLines += 1
-  if (acc.truncatedByBytes || acc.totalLines < request.offset || acc.lines.length >= request.limit) return
+  if (request.fromEnd !== undefined || acc.totalLines < request.offset) {
+    rememberTail(acc, rawLine, request)
+    return
+  }
+  if (acc.tail.length > 0) acc.tail = []
+  if (acc.truncatedByBytes || acc.lines.length >= request.limit) return
 
   const text = truncateLine(rawLine, request.maxLineLength)
   const bytes = lineByteSize(text, acc.lines.length)
@@ -92,26 +122,43 @@ function stripCarriageReturn(line: string): string {
   return line.endsWith('\r') ? line.slice(0, -1) : line
 }
 
-function finish(acc: WindowAccumulator, request: ReadWindow, displayPath: string): WindowResult {
-  if (!acc.truncatedByBytes && request.offset > acc.totalLines && !(acc.totalLines === 0 && request.offset === 1)) {
-    throw new FsError(`offset ${request.offset} is out of range for "${displayPath}" (${acc.totalLines} lines)`, 'FS_NOT_FOUND')
+/** The file's last lines within the byte cap, dropping the earliest ones first. */
+function finishFromEnd(acc: WindowAccumulator, request: ReadWindow, pastEnd: boolean): WindowResult {
+  const kept = acc.tail.slice(-tailSize(request))
+  const texts: string[] = []
+  let bytes = 0
+  for (const text of kept.toReversed()) {
+    const size = lineByteSize(text, texts.length)
+    if (bytes + size > request.maxBytes) break
+    bytes += size
+    texts.unshift(text)
   }
-  return { lines: acc.lines, totalLines: acc.totalLines, truncatedByBytes: acc.truncatedByBytes }
+  const first = acc.totalLines - texts.length + 1
+  return {
+    offset: texts.length === 0 ? 1 : first,
+    pastEnd,
+    lines: texts.map((text, index) => ({ number: first + index, text })),
+    totalLines: acc.totalLines,
+    truncatedByBytes: false,
+  }
+}
+
+function finish(acc: WindowAccumulator, request: ReadWindow): WindowResult {
+  if (request.fromEnd !== undefined) return finishFromEnd(acc, request, false)
+  if (request.offset > acc.totalLines && !(acc.totalLines === 0 && request.offset === 1)) return finishFromEnd(acc, request, true)
+  return { offset: request.offset, pastEnd: false, lines: acc.lines, totalLines: acc.totalLines, truncatedByBytes: acc.truncatedByBytes }
 }
 
 /**
  * Build one window from streamed or whole-file chunks, enforcing line and byte caps while still
- * scanning to an exact total line count, and throwing `FS_NOT_FOUND` when the requested offset is
- * past EOF.
+ * scanning to an exact total line count. `fromEnd`, or an offset past EOF, returns the file's last lines.
  * @param chunks - decoded text chunks in file order; chunk boundaries carry no meaning.
  * @param request - the resolved window; the caller has already applied its defaults and caps.
- * @param displayPath - the caller-facing path used in the offset-out-of-range error.
  * @returns the numbered window lines, the total line count seen, and the byte-cap truncation flag.
  */
 export async function buildWindow(
   chunks: AsyncIterable<string> | Iterable<string>,
   request: ReadWindow,
-  displayPath: string,
 ): Promise<WindowResult> {
   const acc = newAccumulator()
   // One char past the truncation point is enough to prove a line overflows.
@@ -140,7 +187,7 @@ export async function buildWindow(
     appendToLineBuffer(chunk.slice(startPos))
   }
   if (lineBuffer.length > 0) flushLine()
-  return finish(acc, request, displayPath)
+  return finish(acc, request)
 }
 
 /**
@@ -159,9 +206,12 @@ export function formatReadOutput(displayPath: string, outcome: FileReadOutcome):
   } else {
     footer = `(End of file - total ${outcome.totalLines} lines)`
   }
+  const pastEnd = outcome.pastEndOffset === undefined
+    ? ''
+    : `(Offset ${outcome.pastEndOffset} is past the end of the file (${outcome.totalLines} lines); showing the last ${outcome.lines.length} lines.)\n\n`
   const body = outcome.lines.length > 0
-    ? `${outcome.lines.map(line => `${line.number}: ${line.text}`).join('\n')}\n\n${footer}`
-    : footer
+    ? `${pastEnd}${outcome.lines.map(line => `${line.number}: ${line.text}`).join('\n')}\n\n${footer}`
+    : `${pastEnd}${footer}`
   return `<path>${displayPath}</path>
 <type>file</type>
 <content>

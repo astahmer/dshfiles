@@ -5,7 +5,7 @@
     {
       "id": "file-tools",
       "title": "read, write, edit and read_image tools",
-      "summary": "The forked filesystem tools keep upstream's sandbox checks, approvals and fs/observed receipts.",
+      "summary": "The forked filesystem tools keep upstream's sandbox checks, approvals and fs/observed receipts; read also reads from the end with a negative offset, answers an offset past the end with the last lines and the line count, suggests close names for a missing file, and never splits a character when it shortens a long line.",
       "surfaces": ["host"],
       "configuration": [],
       "states": ["read", "written", "edited"],
@@ -13,12 +13,42 @@
       "externalDependencies": [],
       "verification": [
         {
-          "kind": "not-applicable",
-          "id": "tool-fs.vendored",
-          "reason": "Vendored upstream source with no local delta yet; scripts/native-fork-diff.mjs proves it equals the pinned tag."
+          "kind": "unit-test",
+          "id": "tool-fs.read-from-end",
+          "file": "plugins/@dshfiles/tool-fs/src/read.test.ts",
+          "testName": "reads from the end with a negative offset"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-fs.past-end",
+          "file": "plugins/@dshfiles/tool-fs/src/read.test.ts",
+          "testName": "returns the last lines and the line count for an offset past the end"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-fs.missing-suggestions",
+          "file": "plugins/@dshfiles/tool-fs/src/read.test.ts",
+          "testName": "suggests close names when the file is missing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-fs.close-names",
+          "file": "plugins/@dshfiles/tool-fs/src/missing-path.test.ts",
+          "testName": "ranks other case, then other extension, then small typos, and ignores unrelated names"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-fs.surrogate-safe",
+          "file": "plugins/@dshfiles/tool-fs/src/read.test.ts",
+          "testName": "never cuts a multi-byte character when it shortens a long line"
         }
       ],
-      "telemetry": [{ "kind": "automatic", "source": "agent-tool" }],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tools: read, write, edit, read_image"

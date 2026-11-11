@@ -8,6 +8,7 @@ import { FsError } from '@deepseek-ai/dsh-fs'
 import type { FsInfo, FsTarget } from '@deepseek-ai/dsh-fs'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import { sessionResolveOptions } from './session-cwd.ts'
+import { suggestMissingPaths } from '../missing-path.ts'
 
 /**
  * Resolve a model-supplied path, observe absence, and require a regular file.
@@ -21,11 +22,14 @@ export async function resolveRegularReadTarget(
   exec: ToolExecution,
   requestedPath: string,
 ): Promise<{ target: FsTarget; info: FsInfo }> {
-  const target = await ctx.fs.resolve(requestedPath, await sessionResolveOptions(ctx, exec))
+  const resolveOptions = await sessionResolveOptions(ctx, exec)
+  const target = await ctx.fs.resolve(requestedPath, resolveOptions)
   const info = await ctx.fs.stat(target, exec.signal)
   if (info === undefined) {
     ctx.emit('fs/observed', target, { kind: 'absent' }, exec)
-    throw new FsError(`cannot read "${target.displayPath}": not found`, 'FS_NOT_FOUND')
+    const suggestions = await suggestMissingPaths({ ctx, requestedPath, resolveOptions })
+    const hint = suggestions.length === 0 ? '' : ` Did you mean: ${suggestions.join(', ')}?`
+    throw new FsError(`cannot read "${target.displayPath}": not found.${hint}`, 'FS_NOT_FOUND')
   }
   if (info.type !== 'file') {
     throw new FsError(`cannot read "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
