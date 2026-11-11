@@ -160,6 +160,10 @@ export interface SidebarPreferences {
   resumeAfterRestartMaxThreads: number
   /** Seconds after boot before the automatic resume, so plugins and providers finish loading. */
   resumeAfterRestartDelaySeconds: number
+  /** Restart DSH by itself to apply a pending Host update once everything stayed idle. */
+  autoRestartWhenIdle: boolean
+  /** Seconds DSH must stay idle before that automatic restart. */
+  autoRestartQuietSeconds: number
   /** The level of a thread subscription that sets none. */
   subscriptionNoticeLevel: SubscriptionNoticeLevel
   /** How a running subscriber hears a notice: steered into its live turn, or queued behind it. */
@@ -239,6 +243,8 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   resumeAfterRestart: false,
   resumeAfterRestartMaxThreads: 5,
   resumeAfterRestartDelaySeconds: 10,
+  autoRestartWhenIdle: true,
+  autoRestartQuietSeconds: 60,
   subscriptionNoticeLevel: 'all',
   subscriptionDelivery: 'steer',
   maxChildren: 3,

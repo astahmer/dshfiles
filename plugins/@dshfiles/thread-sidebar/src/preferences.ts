@@ -208,6 +208,11 @@ const preferencesInputFields = {
     Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(600)),
     () => DEFAULT_PREFERENCES.resumeAfterRestartDelaySeconds,
   ),
+  autoRestartWhenIdle: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.autoRestartWhenIdle),
+  autoRestartQuietSeconds: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(30)).check(Schema.isLessThanOrEqualTo(3600)),
+    () => DEFAULT_PREFERENCES.autoRestartQuietSeconds,
+  ),
   subscriptionNoticeLevel: SchemaHelpers.withDecodedDefault(Schema.Literals(SUBSCRIPTION_NOTICE_LEVELS), () => DEFAULT_PREFERENCES.subscriptionNoticeLevel),
   subscriptionDelivery: SchemaHelpers.withDecodedDefault(Schema.Literals(SUBSCRIPTION_DELIVERY_MODES), () => DEFAULT_PREFERENCES.subscriptionDelivery),
   maxChildren: SchemaHelpers.withDecodedDefault(
