@@ -39,3 +39,29 @@ export const seedRowsComposingNestedBundles = (seedPatch: string, bundleIds: rea
     .filter(entry => nestedName.test(entry))
     .join('\n')
 }
+
+/** A native fork composed in place of the upstream package it vendors. */
+export interface NestedForkSwap {
+  readonly packageId: string
+  readonly upstreamPackage: string
+}
+
+/**
+ * The seed rows that nest a fork's upstream package, with that child renamed to the fork. A preset-child fork the seed
+ * leaves on the stock package (`@dshfiles/tool-fs` as `preset-standard`'s `tool-fs`) has no row of its own, so booting
+ * it alone composes it the way opting in does: the seed's row with that one `name` swapped.
+ * @param seedPatch - The seed's `cordis.patch.yml` text.
+ * @param forks - The forks to swap in, each with the upstream package its `native-fork.json` names.
+ * @returns The rewritten rows as patch text (empty when none), in seed order.
+ */
+export const seedRowsSwappingNestedForks = (seedPatch: string, forks: readonly NestedForkSwap[]): string =>
+  topLevelEntries(seedPatch)
+    .flatMap(entry => {
+      let swapped = entry
+      for (const fork of forks) {
+        const nestedName = new RegExp(`^( {4,}(?:- )?name:\\s*)(['"]?)${escaped(fork.upstreamPackage)}\\2\\s*$`, 'gm')
+        swapped = swapped.replace(nestedName, `$1$2${fork.packageId}$2`)
+      }
+      return swapped === entry ? [] : [swapped]
+    })
+    .join('\n')
