@@ -187,7 +187,7 @@ export class Recall extends Context.Service<
         const project = yield* projectOf(caller.session.header)
         const agentScope = yield* scopes.of(caller.id)
         const withThreads = yield* recallGate(yield* firstUserText.pipe(Effect.orElseSucceed(() => undefined)))
-        const key = `${project}|${withThreads}|${agentScope ?? ''}`
+        const key = `${project}|${withThreads}|${agentScope ?? ''}|${current.blockBytes}|${current.crossProject}|${current.blockStaleDays}`
         const version = yield* repo.version
         const cached = (yield* Ref.get(blockCache)).get(key)
         const text =

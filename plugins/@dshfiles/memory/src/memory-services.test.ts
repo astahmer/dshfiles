@@ -14,7 +14,7 @@ import { TestClock } from 'effect/testing'
 
 import { AgentScopes } from './agent-scopes.ts'
 import { Digester } from './digester.ts'
-import { Embedder } from './embedder.ts'
+import { Embedder, MemorySettingsTag } from './embedder.ts'
 import { SessionLogUnavailable } from './errors.ts'
 import { memoryServices } from './memory-layer.ts'
 import { MemoryRepo, type NoteInput } from './memory-repo.ts'
@@ -176,6 +176,7 @@ const harness = (options: {
       repo: Context.get(services, MemoryRepo),
       digester: Context.get(services, Digester),
       embedder: Context.get(services, Embedder),
+      settings: Context.get(services, MemorySettingsTag),
     }
   }).pipe(Effect.provide(platformLayer))
 
@@ -303,6 +304,23 @@ describe('memory services', () => {
       const blockB = yield* memory.recall.startBlock(memory.caller('session-bbbbbbbb'), none)
       expect(blockB).toContain('Hannah Okafor')
       expect(Buffer.byteLength(blockB)).toBeLessThanOrEqual(settings().blockBytes)
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('renders a new thread’s block again when its settings change, without a memory write', () =>
+    Effect.gen(function* () {
+      const memory = yield* harness({})
+      const first = halyardThread('session-11111111-0000-4000-8000-000000000000', memory.root)
+      memory.fakes.logs.set(first.header.id, first.log())
+      yield* memory.digester.digest(first.header.id)
+      yield* memory.repo.addNote(note(memory.root, 'Northwind contact is Hannah Okafor.'))
+      const none = Effect.succeed(undefined)
+      const wide = yield* memory.recall.startBlock(memory.caller('session-wide'), none)
+      expect(wide).toContain('Hannah Okafor')
+      yield* memory.settings.update({ blockBytes: Math.floor(Buffer.byteLength(wide) / 2) })
+      const narrow = yield* memory.recall.startBlock(memory.caller('session-narrow'), none)
+      expect(narrow).not.toBe(wide)
+      expect(narrow).toBe((yield* memory.recall.previewStartBlock(memory.root)).text)
     }).pipe(Effect.scoped),
   )
 
