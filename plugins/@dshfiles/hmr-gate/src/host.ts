@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineHost } from '@dshfiles/dshx/host'
-import { Option } from 'effect'
+import { Effect, Option } from 'effect'
 import * as Schema from 'effect/Schema'
 import type {} from '@deepseek-ai/dsh-client-modules'
 import type {} from '@deepseek-ai/dsh-hmr'
@@ -11,6 +11,7 @@ import { DeferredUpdateAttention } from './host/attention.js'
 import { BundleWatch, type BundleWatcherHandle } from './host/bundle-watcher-promise.js'
 import type { BundleRead, BundleStat } from './host/bundle-watcher.js'
 import { HmrGateModel, digestOf, hostArtifactOf } from './host/gate.js'
+import { HostReload, type HostReloadOutcome } from './host/host-reload.js'
 
 /**
  * The Web client's HMR transport, with one added rule: a rebuilt client bundle is
@@ -54,6 +55,12 @@ interface GateRuntime {
   deferred: () => readonly DeferredPackage[]
 }
 
+/** Loader row config. `hostReload` is the experimental in-process Host reload; off unless the profile row sets it. */
+const gateConfigSchema = Schema.Struct({ hostReload: Schema.optional(Schema.Boolean) }).pipe(Schema.withDecodingDefault(Effect.succeed({})))
+const gateConfigStandardSchema = { '~standard': Schema.toStandardSchemaV1(gateConfigSchema)['~standard'] }
+
+const HOST_RELOAD_HISTORY = 16
+
 let runtime: GateRuntime | undefined
 
 const frame = (value: ServerFrame): string => `data: ${JSON.stringify(value)}\n\n`
@@ -65,8 +72,17 @@ const isEnoent = (error: unknown): boolean => {
   return Option.isSome(parsed) && parsed.value.code === 'ENOENT'
 }
 
-const registerGate = (ctx: Context): GateRuntime => {
+const registerGate = (ctx: Context, hostReloadEnabled: boolean): GateRuntime => {
   const gate = new HmrGateModel()
+  const hostReloads: { id: string; outcome: HostReloadOutcome['kind']; detail: string }[] = []
+  let reloadQueue = Promise.resolve()
+  let disposed = false
+  ctx.effect(
+    () => () => {
+      disposed = true
+    },
+    'hmr-gate: host reload queue',
+  )
   const watched = new Map<string, WatchRow>()
   const connections = new Set<ServerResponse>()
 
@@ -140,6 +156,33 @@ const registerGate = (ctx: Context): GateRuntime => {
       return
     }
     ctx.logger.info('HMR deferred (%s): the running Host has not loaded %s', id, facts?.hostPath ?? 'its Host half')
+    publishDeferred()
+    const hostPath = facts?.hostPath
+    if (!hostReloadEnabled || hostPath === undefined) return
+    const packageName = HostReload.optedInPackage(hostPath)
+    if (packageName === undefined) return
+    reloadQueue = reloadQueue.then(() => reloadHost(id, hostPath, packageName))
+  }
+
+  /** Replace an opted-in package's Host half in place; on success its held-back client rebuild applies in step. */
+  const reloadHost = async (id: string, hostPath: string, packageName: string): Promise<void> => {
+    if (disposed || !gate.deferred().includes(id)) return
+    const outcome = await HostReload.reload(ctx, hostPath, packageName).catch((error: unknown): HostReloadOutcome => ({
+      kind: 'failed',
+      reason: 'activation-failed',
+      restored: false,
+      message: String(error),
+    }))
+    const detail = outcome.kind === 'reloaded' ? `${String(outcome.durationMs)} ms` : outcome.reason
+    hostReloads.unshift({ id, outcome: outcome.kind, detail })
+    hostReloads.length = Math.min(hostReloads.length, HOST_RELOAD_HISTORY)
+    if (disposed) return
+    if (outcome.kind !== 'reloaded') {
+      ctx.logger.warn('Host reload of %s %s (%s); it keeps waiting for a DSH restart', packageName, outcome.kind, detail)
+      return
+    }
+    ctx.logger.info('Host reload of %s applied in %d ms (%d modules re-evaluated)', packageName, outcome.durationMs, outcome.evicted)
+    for (const released of gate.release([hostPath])) applyRebuild(released)
     publishDeferred()
   }
 
@@ -220,7 +263,7 @@ const registerGate = (ctx: Context): GateRuntime => {
   })
 
   return {
-    status: () => ({ deferred: [...deferredPackages()], watched: watched.size }),
+    status: () => ({ deferred: [...deferredPackages()], watched: watched.size, hostReload: { enabled: hostReloadEnabled, recent: [...hostReloads] } }),
     deferred: deferredPackages,
   }
 }
@@ -233,7 +276,9 @@ export default defineHost({
   name: 'dshfiles-hmr-gate',
   apis: [hmrGateHostApi],
   inject: ['clientModules', 'webServer'],
-  setup: (ctx: Context) => {
-    runtime = registerGate(ctx)
+  Config: gateConfigStandardSchema,
+  setup: (ctx: Context, config: unknown) => {
+    const decoded = Schema.decodeUnknownOption(gateConfigSchema)(config)
+    runtime = registerGate(ctx, Option.isSome(decoded) && decoded.value.hostReload === true)
   },
 })

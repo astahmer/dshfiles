@@ -74,7 +74,19 @@ artifact on disk matches the loaded one again:
 - This replaces the stock row, so `webWork` profile composition must disable
   `client-hmr`; the bundled `cordis.patch.yml` does that.
 - It gates _announcements_, not Host loading: a Host restart is still the only way
-  to run the new Host half in this profile.
+  to run the new Host half in this profile, unless the experimental Host reload
+  below is switched on.
+
+## Experimental: in-process Host reload
+
+Off by default. With `config: { hostReload: true }` on the `dshfiles-hmr-gate`
+Loader row, a deferred rebuild of a plugin whose `package.json` declares
+`"dshx": { "hostReload": "safe" }` replaces that plugin's Host half inside the
+running DSH, then applies its client rebuild in step. A refused or failed reload
+keeps the plugin waiting for a restart; `hmr_gate_status` lists recent attempts.
+No plugin opts in yet: Effect (`DshxPlugin.make`) plugins need the dshx
+activation-slot fix first. Feasibility per plugin class, the scratch leak run and
+the rollout: [host reload](docs/host-reload.md).
 
 ## Verify
 

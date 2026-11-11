@@ -16,9 +16,22 @@ const deferredPackageSchema = Schema.Struct({
   reason: gateReasonSchema,
 })
 
+/** The experimental in-process Host reload: whether the profile row enabled it, and its latest attempts, newest first. */
+const hostReloadStatusSchema = Schema.Struct({
+  enabled: Schema.Boolean,
+  recent: Schema.Array(
+    Schema.Struct({
+      id: Schema.String.check(Schema.isMaxLength(256)),
+      outcome: Schema.Literals(['reloaded', 'refused', 'failed']),
+      detail: Schema.String.check(Schema.isMaxLength(600)),
+    }),
+  ).check(Schema.isMaxLength(16)),
+})
+
 const hmrGateStatusSchema = Schema.Struct({
   deferred: Schema.Array(deferredPackageSchema).check(Schema.isMaxLength(64)),
   watched: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(4096)),
+  hostReload: Schema.optional(hostReloadStatusSchema),
 })
 
 export type DeferredPackage = typeof deferredPackageSchema.Type

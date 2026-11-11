@@ -151,6 +151,72 @@
           "reason": "Client-only: it reads the deferred packages the hmr-gate event stream already delivered."
         }
       ]
+    },
+    {
+      "id": "host-reload",
+      "title": "Experimental in-process Host reload for opted-in plugins",
+      "summary": "With the hmr-gate row's hostReload config on, a rebuilt Host half of a plugin whose package.json declares dshx.hostReload \"safe\" is replaced inside the running DSH: its own modules are evicted from the ESM cache and imported again, the Loader contract (name, inject, Config) is checked, the old Cordis fiber is disposed and the new one starts in the same Loader row. On success the held-back client rebuild applies in step; a refused or failed reload keeps the plugin listed as waiting for a restart.",
+      "reach": ["expect region \"Threads\""],
+      "surfaces": ["host"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: hmr-gate deferral",
+      "configuration": [
+        {
+          "key": "hostReload",
+          "defaultValue": "false",
+          "constraints": "Boolean on the dshfiles-hmr-gate Loader row; also needs dshx.hostReload \"safe\" in the rebuilt plugin's package.json.",
+          "coveredBy": ["hmr-gate.host-reload-unit-row-config"]
+        }
+      ],
+      "states": ["off", "reloaded", "refused", "failed"],
+      "failureModes": [
+        "A plugin without the opt-in, or with the row config off, keeps the restart deferral exactly as before.",
+        "A changed Loader name, inject or Config is refused (contract-changed) and the previous code keeps running.",
+        "A Host bundle that throws on import is refused (import-failed); the ESM cache entries are restored and the previous code keeps running.",
+        "A Host bundle whose activation fails is removed and the previous generation is started again; this depends on the dshx activation-slot fix (see docs/host-reload.md).",
+        "cordis-plugin-loader before 1.0.6 keeps no Entry module namespace: the reload is refused (no-module-namespace)."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.host-reload-unit-row-config",
+          "file": "plugins/@dshfiles/hmr-gate/src/host-config.test.ts",
+          "testName": "activates a row without config (host reload off) and accepts hostReload: true"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.host-reload-unit-opt-in",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/host-reload.test.ts",
+          "testName": "names the package only when its manifest declares dshx.hostReload \"safe\""
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.host-reload-unit-contract",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/host-reload.test.ts",
+          "testName": "accepts a code-only change and refuses a changed name, inject or Config"
+        },
+        {
+          "kind": "unit-test",
+          "id": "hmr-gate.host-reload-unit-eviction",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/host-reload.test.ts",
+          "testName": "selects the package own files, never its node_modules or another package"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "hmr-gate.host-reload-scratch",
+          "reason": "The swap needs a running Host with Node's internal ESM cache and a rebuilt bundle; it was driven on a scratch DSH through the inspector (docs/host-reload.md, prototype section), not a Gherkin scenario."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "host-reload apply",
+          "file": "plugins/@dshfiles/hmr-gate/src/host/host-reload.test.ts",
+          "testName": "records a host-reload apply span naming the package and refuses without a Loader"
+        }
+      ]
     }
   ]
 }
