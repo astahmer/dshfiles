@@ -1,3 +1,4 @@
+import { secretAliasSchemaEffect, secretEnvironmentSchemaEffect } from '@dshfiles/credential-port/effect'
 import { Schema } from 'effect'
 
 /**
@@ -9,7 +10,7 @@ export class SecretArgumentRules {
   static readonly aliasIssue = (value: string): string | undefined => {
     if (value.length === 0) return 'Enter an alias.'
     if (value.length > 128) return 'An alias is at most 128 characters.'
-    if (!/^[A-Za-z_][A-Za-z0-9_-]*$/u.test(value)) return 'Start with a letter or _, then use letters, digits, _ or -.'
+    if (!Schema.is(secretAliasSchemaEffect)(value)) return 'Start with a letter or _, then use letters, digits, _ or -.'
     return undefined
   }
 
@@ -17,7 +18,7 @@ export class SecretArgumentRules {
   static readonly environmentIssue = (value: string): string | undefined => {
     if (value.length === 0) return 'Enter an environment.'
     if (value.length > 256) return 'An environment is at most 256 characters.'
-    if (!/^[A-Za-z0-9_-]+$/u.test(value)) return 'Use letters, digits, _ or -.'
+    if (!Schema.is(secretEnvironmentSchemaEffect)(value)) return 'Use letters, digits, _ or -.'
     return undefined
   }
 

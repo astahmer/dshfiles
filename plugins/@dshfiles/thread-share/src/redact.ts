@@ -4,6 +4,8 @@
  * before sharing it.
  */
 
+import { parseSecretReference } from '@dshfiles/credential-port'
+
 export const REDACTED = '[redacted]'
 
 interface Rule {
@@ -12,9 +14,6 @@ interface Rule {
   /** Replacement; `$1` keeps a captured prefix such as `api_key=`. */
   readonly replacement: string | ((match: string, prefix: string) => string)
 }
-
-/** `secret:ALIAS` and `secret:ALIAS@env` name a vault entry, not a value, so they stay readable. */
-const SECRET_REFERENCE = /^secret:[A-Za-z0-9_.-]+(?:@[\w-]+)?$/
 
 /** Ordered: the PEM block first, so its body is not half-matched by a shorter rule. */
 const SECRET_RULES: readonly Rule[] = [
@@ -35,7 +34,8 @@ const SECRET_RULES: readonly Rule[] = [
     name: 'assignment',
     pattern:
       /\b((?:api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|private[_-]?key|token|secret)["']?\s*[:=]\s*["']?)(?!secret:)[^\s"'`,;]{8,}/gi,
-    replacement: (match, prefix) => (SECRET_REFERENCE.test(match) ? match : `${prefix}${REDACTED}`),
+    // A `secret:ALIAS` reference names a vault entry, not a value, so it stays readable.
+    replacement: (match, prefix) => (parseSecretReference(match) === null ? `${prefix}${REDACTED}` : match),
   },
 ]
 

@@ -74,6 +74,13 @@ it('redacts secrets, the workspace path and home paths from transcript text', ()
   expect(result.rules).toEqual(expect.arrayContaining(['anthropic-openai-key', 'github-token', 'aws-access-key', 'bearer', 'private-key', 'workspace-path']))
 })
 
+it('keeps only what the credential port parses as a secret reference', () => {
+  const result = redactText('secret:DB_PASSWORD@staging and secret:db.password.prod2 and secret:9livesAndCounting')
+  expect(result.text).toContain('secret:DB_PASSWORD@staging')
+  expect(result.text).not.toContain('db.password.prod2')
+  expect(result.text).not.toContain('9livesAndCounting')
+})
+
 it('escapes every transcript character before applying code and paragraph markup', () => {
   const html = SharePage.message('<script>alert(1)</script> and `<b>`\n\n```js\nconst x = "<img onerror=x>"\n```')
   expect(html).not.toContain('<script>')

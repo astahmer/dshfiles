@@ -1,4 +1,5 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
+import { parseSecretReference } from '@dshfiles/credential-port'
 import { Effect, Schema } from 'effect'
 
 const ONLY_WHEN_ASKED = 'Call only when the user asked for this.'
@@ -33,9 +34,9 @@ export const modelSchema = Schema.Struct({
 
 const secretReference = Schema.Trim.check(
   Schema.isMaxLength(4096),
-  Schema.isPattern(/^secret:[A-Za-z_][A-Za-z0-9_-]*(?:@[A-Za-z0-9_-]+)?$/u, {
-    message: 'Store the webhook secret as a secret:ALIAS reference from the Secret Catalog, never the value itself.',
-  }),
+  Schema.makeFilter(text =>
+    parseSecretReference(text) === null ? 'Store the webhook secret as a secret:ALIAS reference from the Secret Catalog, never the value itself.' : undefined,
+  ),
 )
 
 const ratePerMinute = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(120))

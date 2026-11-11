@@ -25,6 +25,7 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/session-controller": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
