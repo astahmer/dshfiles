@@ -272,8 +272,14 @@ test('a scenario-level impact is never wider than the task-level impact it repla
   assert.ok(total >= 190, `every scenario should be planned, saw ${String(total)}`)
   const affected = impactOfBundle(owners, '@dshfiles/command-palette')
   const affectedOwners = new Set(affected.map(scenario => scenario.owner))
-  // command-palette reaches far fewer scenarios than the task count its digest already fans out to.
-  assert.ok(affected.length > 0 && affected.length < 60, `expected a handful of scenarios, saw ${String(affected.length)}`)
+  // A task-level impact reruns every scenario of each owner whose task digest includes the bundle; the scenario-level one
+  // keeps only the scenarios whose own composition does. Relative bounds keep this true as journeys are added.
+  const ownerLevel = [...owners.entries()].filter(([owner]) => affectedOwners.has(owner)).reduce((sum, [, owner]) => sum + owner.scenarios.length, 0)
+  assert.ok(
+    affected.length > 0 && affected.length < ownerLevel,
+    `expected fewer than the ${String(ownerLevel)} scenarios of its owners, saw ${String(affected.length)}`,
+  )
+  assert.ok(affected.length * 4 < total, `expected a small share of all ${String(total)} scenarios, saw ${String(affected.length)}`)
   assert.ok(affectedOwners.size < owners.size)
 })
 
