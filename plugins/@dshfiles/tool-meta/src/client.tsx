@@ -7,6 +7,7 @@ import { createElement, type ComponentType, type ReactNode } from 'react'
 import { ApprovalCard } from './approval-card.js'
 import { DiffToolCard, type DiffTranslate } from './diff-tool-card.js'
 import { TOOL_META_LOCALE_NAMESPACE, toolMetaLocale } from './locales.js'
+import { NativeToolView } from './native-tool-view.js'
 import { ReadToolCard, type ReadTranslate } from './read-tool-card.js'
 import { ToolCallSections, type ToolCallSectionProps } from './tool-call-sections.js'
 import { installToolCallTreeWrapper, isToolCallTreeWrapped } from './tool-call-tree.js'
@@ -44,6 +45,7 @@ const APPROVAL_CARD_PRIORITY = 0.5
  */
 const FILE_CARD_TOOLS = ['read', 'edit', 'write', 'apply_patch'] as const
 const FILE_CARD_PRIORITY = -10
+const REGISTRANT = '@dshfiles/tool-meta'
 
 /** The chat and the tool renderer load beside this plugin; past this they are not coming. */
 const WRAP_DEADLINE_MS = 15_000
@@ -84,12 +86,11 @@ export default defineClient({
     }, 'tool-meta: report a missing tool-call renderer')
     const conversation = (key: Parameters<ReadTranslate>[0] | Parameters<DiffTranslate>[0], params?: Record<string, string | number>): string =>
       ctx.locale.bind('conversation')(key, params)
+    /** This plugin's own file cards, which the native fallback must never pick. */
+    const ownCards = new Set<unknown>()
     /** The native view this plugin shadows, rendered when a card has nothing better to show. */
     const NativeView = ({ toolName, view }: { readonly toolName: string; readonly view: ToolCallViewProps }): ReactNode => {
-      const fallback = ctx.slots
-        .entries('tool.call.toolview')
-        .filter(entry => entry.options.key === toolName)
-        .toSorted((left, right) => (left.options.priority ?? 0) - (right.options.priority ?? 0))[0]
+      const fallback = NativeToolView.pick({ entries: ctx.slots.entries('tool.call.toolview'), toolName, registrant: REGISTRANT, own: ownCards })
       // SAFETY: the ledger erases component types; every entry in a `tool.call.toolview` cell takes ToolCallViewProps.
       const Native = fallback?.component as ComponentType<ToolCallViewProps> | undefined
       return Native === undefined ? null : createElement(Native, view)
@@ -106,10 +107,11 @@ export default defineClient({
       if (!enabled && props.toolName !== 'apply_patch') return native
       return <DiffToolCard call={props} native={native} t={conversation} useDisclosure={props.useDisclosure} />
     })
+    ownCards.add(ReadView).add(DiffView)
     for (const toolName of FILE_CARD_TOOLS) {
       ctx.slots.inject('tool.call.toolview', () =>
         ctx.slots.register(
-          { name: 'tool.call.toolview', key: toolName, priority: FILE_CARD_PRIORITY, registrant: '@dshfiles/tool-meta', locale: 'conversation' },
+          { name: 'tool.call.toolview', key: toolName, priority: FILE_CARD_PRIORITY, registrant: REGISTRANT, locale: 'conversation' },
           toolName === 'read' ? ReadView : DiffView,
         ),
       )
