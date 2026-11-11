@@ -254,6 +254,8 @@
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/backlog-views.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/backlog-work-queue.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/backlog.steps.ts",
+        "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/platform-modifier.ts",
+        "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/workbench.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/package.json",
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/cordis.patch.yml",
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/package.json",
