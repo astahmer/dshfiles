@@ -154,10 +154,8 @@
       "summary": "Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_history_search agent tool reads the same Host method.",
       "reach": [
         "seed tool-call-thread",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Deploy the quartz service to staging\"",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Deploy the quartz service to staging\"",
         "press Enter",
-        "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
         "click button \"Prompts\"",
         "click tab \"All threads\"",
         "expect heading \"Prompt history\""

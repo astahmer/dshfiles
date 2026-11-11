@@ -365,9 +365,6 @@
       "summary": "Schedule the composer's message from Send later (presets or a picked time); it waits above the composer with its time and optional model and effort, can be edited, sent now or cancelled back into the composer, survives a Host restart in plugin storage, and is sent once through the session controller under its own request id. Agent tools scheduled_send_list/create/update/cancel/now call the same Host methods.",
       "reach": [
         "seed tool-call-thread",
-        "click button \"New thread\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Send later demo\"",
-        "press Enter",
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Ship the weekly report\"",
         "click button \"Send later\"",
         "expect group \"Send at\""
