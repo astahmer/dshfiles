@@ -12,7 +12,7 @@ import { StateFiles } from './runtime-files.js'
 import { SessionEvents, attentionRecorder, inflightTracker, type SessionEvent } from './session-events.js'
 import { threadSidebarSettings } from './settings.js'
 import { fakeSidebarHost, makeFakeHost, type FakeHost } from './sidebar-host.test-support.js'
-import { SidebarSettings, type SidebarSettingsValue } from './sidebar-settings.js'
+import { SidebarSettings, ThreadSidebarSettings, type SidebarSettingsValue } from './sidebar-settings.js'
 import { temporaryStateFiles } from './state-files.test-support.js'
 import { jsonStorageDomain } from './storage.test-support.js'
 
@@ -26,6 +26,8 @@ const withWiring = <A, E>(
     readonly boot?: boolean
     readonly resumeAfterRestart?: boolean
     readonly resumeAfterRestartMaxThreads?: number
+    /** Serve the stored settings only once the plugin is active, as DSH does, and the schema defaults before. */
+    readonly storedAfterActivation?: boolean
   },
   body: (input: {
     readonly publish: (event: SessionEvent['event'], sessionId?: string) => Effect.Effect<void>
@@ -39,11 +41,20 @@ const withWiring = <A, E>(
     const pubsub = yield* PubSub.unbounded<SessionEvent>()
     const fake = yield* makeFakeHost
     const files = yield* StateFiles
-    const settings = Settings.layerTest<SidebarSettingsValue>('thread-sidebar', {
+    const stored: SidebarSettingsValue = {
       ...threadSidebarSettings.schema({}),
       resumeAfterRestart: options.resumeAfterRestart ?? false,
       resumeAfterRestartMaxThreads: options.resumeAfterRestartMaxThreads ?? 5,
-    })
+    }
+    const settings =
+      options.storedAfterActivation === true
+        ? Layer.effect(
+            ThreadSidebarSettings,
+            Effect.map(ThreadSidebarSettings, defaults =>
+              ThreadSidebarSettings.of({ ...defaults, loaded: Effect.succeed(stored).pipe(Effect.delay('20 millis')) }),
+            ),
+          ).pipe(Layer.provide(Settings.layerTest<SidebarSettingsValue>('thread-sidebar', threadSidebarSettings.schema({}))))
+        : Settings.layerTest<SidebarSettingsValue>('thread-sidebar', stored)
     const reported = yield* Ref.make<ReadonlyArray<AutoResumeOutcome>>([])
     const consumers =
       options.boot === true
@@ -188,6 +199,16 @@ describe('thread-sidebar Host event wiring', () => {
         expect((yield* recoveryRows).map(([sessionId]) => sessionId).toSorted()).toEqual(['restart-b', 'restart-c'])
         // Once: a second resume of the same row finds nothing to resume.
         expect(yield* Recoveries.use(recoveries => recoveries.resume('restart-a'))).toBe(false)
+      }),
+    ),
+  )
+
+  it.effect('resumes after a restart when the setting loads only once the plugin is active, not from the schema defaults', () =>
+    withWiring({ boot: true, resumeAfterRestart: true, storedAfterActivation: true, seed: seedRestartRows }, ({ fake, reported }) =>
+      Effect.gen(function* () {
+        const outcomes = yield* eventually(Effect.andThen(TestClock.adjust('10 seconds'), Ref.get(reported)), sent => sent.length > 0)
+        expect(outcomes[0]?.resumed).toHaveLength(4)
+        expect(yield* Ref.get(fake.prompts)).toHaveLength(4)
       }),
     ),
   )

@@ -54,6 +54,7 @@ export class SidebarSettings extends Context.Service<
     readonly policy: Effect.Effect<AutoSettlePolicy>
     /** Every change of the auto-settle policy after the current one; other sidebar writes do not emit. */
     readonly policyChanges: Stream.Stream<AutoSettlePolicy>
+    /** Read once at boot: waits for the stored value, which DSH serves only once the plugin is active. */
     readonly autoResume: Effect.Effect<AutoResumePolicy>
     readonly autoRestart: Effect.Effect<AutoRestartPolicy>
     readonly subscriptionNoticeLevel: Effect.Effect<SubscriptionNoticeLevel>
@@ -101,7 +102,7 @@ export class SidebarSettings extends Context.Service<
           Stream.changesWith((left, right) => autoSettlePolicyKey(left) === autoSettlePolicyKey(right)),
           Stream.drop(1),
         ),
-        autoResume: Effect.map(settings.get, value => ({
+        autoResume: Effect.map(settings.loaded, value => ({
           enabled: value.resumeAfterRestart,
           maxThreads: value.resumeAfterRestartMaxThreads,
           delaySeconds: value.resumeAfterRestartDelaySeconds,
