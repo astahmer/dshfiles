@@ -159,7 +159,8 @@ const subprocessInjectProblems = (directory: string): string[] => {
   if (!existsSync(source)) return []
   const texts = sourceFiles(source).map(file => readFileSync(file, 'utf8'))
   const spawns = texts.some(text => text.includes("'@dshfiles/dshx/effect/child-process-spawner'"))
-  const injects = texts.some(text => /inject:\s*\[[^\]]*'subprocess'/.test(text))
+  // `DshxPlugin.make({ inject: [...] })` or a raw Cordis plugin's `export const inject = [...]`.
+  const injects = texts.some(text => /inject\s*[:=]\s*\[[^\]]*'subprocess'/.test(text))
   return spawns && !injects ? ["uses DshChildProcessSpawner without inject: ['subprocess'] — add it to DshxPlugin.make so Cordis waits for the service."] : []
 }
 
