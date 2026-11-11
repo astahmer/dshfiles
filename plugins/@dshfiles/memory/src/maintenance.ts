@@ -17,6 +17,8 @@ export const Maintenance = Layer.effectDiscard(
     const digester = yield* Digester
 
     const retention = Effect.gen(function* () {
+      // Pruning on the schema default (365 days) before the stored setting loads would drop what the user keeps.
+      yield* settings.loaded
       const pruned = yield* repo.prune((yield* settings.get).retentionDays)
       if (pruned.threads + pruned.messages > 0)
         yield* Effect.logInfo(`memory: retention dropped ${pruned.threads} digest(s) and ${pruned.messages} indexed message(s)`)

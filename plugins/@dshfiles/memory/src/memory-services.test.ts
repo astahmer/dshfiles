@@ -10,7 +10,7 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { Jev, JevStatusRejected, JevVerdict, type JevRequest } from '@dshfiles/jev'
 import { settingsShellSettings } from '@dshfiles/settings-shell/settings'
 import { describe, expect, it } from '@effect/vitest'
-import { Context, Effect, Fiber, FileSystem, Layer, Option, Path, Schedule } from 'effect'
+import { Context, Deferred, Duration, Effect, Fiber, FileSystem, Layer, Option, Path, Ref, Schedule } from 'effect'
 import { TestClock } from 'effect/testing'
 
 import { AgentScopes } from './agent-scopes.ts'
@@ -18,6 +18,7 @@ import { Digester } from './digester.ts'
 import { Embedder, MemorySettingsTag } from './embedder.ts'
 import { SessionLogUnavailable } from './errors.ts'
 import { SharedJevSettingsTag } from './memory-jev.ts'
+import { Maintenance } from './maintenance.ts'
 import { memoryServices } from './memory-layer.ts'
 import { MemoryRepo, type NoteInput } from './memory-repo.ts'
 import { Recall, type Caller } from './recall.ts'
@@ -66,8 +67,8 @@ const harness = (options: {
   readonly embedder?: boolean
   readonly jev?: { readonly probability?: number; readonly status?: number }
   readonly slowTitles?: boolean
-  /** Serve `settings` only once the plugin is active, as DSH does, and the schema defaults before. */
-  readonly settingsAfterActivation?: boolean
+  /** Serve the schema defaults until `settings` load this long after the build, as DSH does once the plugin is active. */
+  readonly settingsLoadAfter?: Duration.Input
   /** Compose settings-shell's shared Jev key, stored with this value. */
   readonly sharedJevSecret?: string
 }) =>
@@ -150,7 +151,7 @@ const harness = (options: {
       Layer.succeed(Jev, jev),
       memorySettingsLayer({
         stored: settings({ ...(options.embedder === true && { embeddingProvider: embedderPath }), ...options.settings }),
-        afterActivation: options.settingsAfterActivation === true,
+        loadAfter: options.settingsLoadAfter,
       }),
       options.sharedJevSecret === undefined
         ? Layer.empty
@@ -190,17 +191,25 @@ const harness = (options: {
       embedder: Context.get(services, Embedder),
       settings: Context.get(services, MemorySettingsTag),
       sharedJev: Context.getOption(services, SharedJevSettingsTag),
+      services,
     }
   }).pipe(Effect.provide(platformLayer))
 
-/** Settings as DSH serves them while the plugin activates: the schema defaults, with `stored` loading later. */
-const memorySettingsLayer = (input: { readonly stored: MemorySettings; readonly afterActivation: boolean }) =>
-  input.afterActivation
-    ? Layer.effect(
-        MemorySettingsTag,
-        Effect.map(MemorySettingsTag, defaults => MemorySettingsTag.of({ ...defaults, loaded: Effect.succeed(input.stored).pipe(Effect.delay('20 millis')) })),
-      ).pipe(Layer.provide(Settings.layerTest(memorySettings.namespace, settings())))
-    : Settings.layerTest(memorySettings.namespace, input.stored)
+/** Settings as DSH serves them while the plugin activates: the schema defaults, with `stored` loading `loadAfter` later. */
+const memorySettingsLayer = (input: { readonly stored: MemorySettings; readonly loadAfter: Duration.Input | undefined }) => {
+  const loadAfter = input.loadAfter
+  if (loadAfter === undefined) return Settings.layerTest(memorySettings.namespace, input.stored)
+  return Layer.effect(
+    MemorySettingsTag,
+    Effect.gen(function* () {
+      const defaults = yield* MemorySettingsTag
+      const current = yield* Ref.make(yield* defaults.get)
+      const loaded = yield* Deferred.make<MemorySettings>()
+      yield* Ref.set(current, input.stored).pipe(Effect.andThen(Deferred.succeed(loaded, input.stored)), Effect.delay(loadAfter), Effect.forkScoped)
+      return MemorySettingsTag.of({ ...defaults, get: Ref.get(current), loaded: Deferred.await(loaded) })
+    }),
+  ).pipe(Layer.provide(Settings.layerTest(memorySettings.namespace, settings())))
+}
 
 const halyardThread = (id: string, cwd: string) => {
   const thread = createThread({ id, cwd })
@@ -396,10 +405,32 @@ describe('memory services', () => {
 
   it.live('moves the earlier Jev key that loads only once the plugin is active into the empty shared key', () =>
     Effect.gen(function* () {
-      const memory = yield* harness({ settings: { jevSecret: 'secret:MEMORY_JEV' }, settingsAfterActivation: true, sharedJevSecret: '' })
+      const memory = yield* harness({ settings: { jevSecret: 'secret:MEMORY_JEV' }, settingsLoadAfter: '20 millis', sharedJevSecret: '' })
       const shared = Option.getOrThrow(memory.sharedJev)
       const adopted = yield* shared.get.pipe(Effect.repeat({ until: value => value.jevSecret !== '', schedule: Schedule.spaced('10 millis'), times: 100 }))
       expect(adopted.jevSecret).toBe('secret:MEMORY_JEV')
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect('keeps old digests the stored retention keeps when the setting loads after the first retention pass is due', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(400 * 86_400_000)
+      const memory = yield* harness({ settings: { retentionDays: 0 }, settingsLoadAfter: '40 seconds' })
+      yield* memory.repo.putThread({
+        id: 'session-old',
+        project: '/p/x',
+        parent: null,
+        title: 'Old thread',
+        decision: 'An old investigation of INC-100.',
+        digest: 'An old investigation of INC-100.',
+        source: 'trail',
+        lastSeq: 10,
+        updatedAt: 0,
+      })
+      yield* Layer.build(Maintenance.pipe(Layer.provide(Layer.succeedContext(memory.services))))
+      yield* TestClock.adjust('30 seconds')
+      yield* TestClock.adjust('15 seconds')
+      expect(yield* memory.repo.thread('session-old')).toBeDefined()
     }).pipe(Effect.scoped),
   )
 
