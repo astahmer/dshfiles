@@ -109,6 +109,17 @@ no-op.
   `background-jobs history pass`, `session tail read` (session-controller),
   `otlp ingest` (traces receiver, metrics and logs only) and
   `jj-integration workspace sync`.
+- `host event-loop stall` (traces): a root span for each stretch the Host
+  event loop was blocked past `eventLoopStallMs` (100 ms), from a 100 ms
+  timer-drift probe that costs about 0.6 ms of CPU per second. `traces_stalls`
+  lists them with the spans that overlapped each one, so a stall names its
+  owner without a live CPU profile
+  ([details](../plugins/@dshfiles/traces/README.md#event-loop-stalls)).
+- `sqlite lock wait` (`@dshfiles/sqlite-store`): a transaction that waited at
+  least 50 ms for its store's connection or another connection's write lock,
+  with the file name and the wait; `sqlite-store incremental vacuum` when a
+  bounded pass returned free pages
+  ([details](../plugins/@dshfiles/sqlite-store/README.md#lock-waits)).
 - `dshx checkout sync` records its own span, continuing a `TRACEPARENT`
   environment variable when set.
 - A dshx span opened while an agent-telemetry span is active becomes its child:
