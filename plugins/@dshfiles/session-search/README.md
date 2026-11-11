@@ -92,14 +92,14 @@ five terms, unfiltered and conversation-filtered, 5 warm-up requests then 10 rou
 digest matched the pre-migration one. Node 22.23.3; the machine carried load 27–37 on 10 CPUs from unrelated work, so
 CPU time is reported beside wall time.
 
-| Signal                                            | Before (`DatabaseSync`) | After (`SqliteStore`) |
-| ------------------------------------------------- | ----------------------- | --------------------- |
-| Replacement ingest, wall                          | 6.39 s                  | 5.92 s                |
-| Replacement ingest, process CPU                   | 5.11 s                  | 5.42 s                |
-| Replacement ingest throughput                     | 3,946 docs/s            | 4,259 docs/s          |
-| Search p50 / p95                                  | 10.7 / 24.7 ms          | 10.0 / 21.7 ms        |
-| Search p50 / p95 (second pair, load 36)           | 10.4 / 30.5 ms          | 9.9 / 22.6 ms         |
-| Response digests over the 10 requests             | baseline                | identical             |
+| Signal                                  | Before (`DatabaseSync`) | After (`SqliteStore`) |
+| --------------------------------------- | ----------------------- | --------------------- |
+| Replacement ingest, wall                | 6.39 s                  | 5.92 s                |
+| Replacement ingest, process CPU         | 5.11 s                  | 5.42 s                |
+| Replacement ingest throughput           | 3,946 docs/s            | 4,259 docs/s          |
+| Search p50 / p95                        | 10.7 / 24.7 ms          | 10.0 / 21.7 ms        |
+| Search p50 / p95 (second pair, load 36) | 10.4 / 30.5 ms          | 9.9 / 22.6 ms         |
+| Response digests over the 10 requests   | baseline                | identical             |
 
 A naive first port — one statement per document and one delete per mapped rowid — cost 3.7× the CPU and 3–7× the wall
 time of `DatabaseSync`. The write path now batches 100 documents per `INSERT ... VALUES`, derives contiguous FTS5

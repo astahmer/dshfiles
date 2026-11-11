@@ -347,9 +347,10 @@ export class SearchIndex {
           for (const document of chunk)
             values.push(document.text, document.sessionId, document.seq, document.type, document.time, document.surface, document.truncated ? 1 : 0)
           const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ')
-          const inserted = yield* this.sql
-            .unsafe(`INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES ${placeholders}`, values)
-            .raw
+          const inserted = yield* this.sql.unsafe(
+            `INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES ${placeholders}`,
+            values,
+          ).raw
           const chunkLast = Schema.decodeUnknownSync(insertedRowSchema)(inserted).lastInsertRowid
           const chunkFirst = chunkLast - chunk.length + 1
           for (let index = 0; index < chunk.length; index += 1) rowids.push(chunkFirst + index)
@@ -368,7 +369,16 @@ export class SearchIndex {
           for (const [index, document] of chunk.entries()) {
             if (!isConversation(document)) continue
             conversationPlaceholders.push('(?, ?, ?, ?, ?, ?, ?, ?)')
-            conversation.push(chunkRowids[index] ?? 0, document.text, document.sessionId, document.seq, document.type, document.time, document.surface, document.truncated ? 1 : 0)
+            conversation.push(
+              chunkRowids[index] ?? 0,
+              document.text,
+              document.sessionId,
+              document.seq,
+              document.type,
+              document.time,
+              document.surface,
+              document.truncated ? 1 : 0,
+            )
           }
           if (conversationPlaceholders.length > 0)
             yield* this.sql.unsafe(
