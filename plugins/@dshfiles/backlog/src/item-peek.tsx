@@ -216,45 +216,49 @@ const AddLink = (props: { readonly id: number }): JSX.Element => {
 
 const TitleField = (props: { readonly id: number; readonly title: string }): JSX.Element => {
   const actions = useBacklogActions()
-  const [title, setTitle] = useState(props.title)
-  const [editing, setEditing] = useState(false)
-  useEffect(() => {
-    setTitle(props.title)
-  }, [props.title])
-  const save = (): void => {
-    setEditing(false)
-    if (title.trim() !== '' && title !== props.title) actions.update.mutate({ id: props.id, title })
+  const autosave = useAutosave<string>({
+    initial: props.title,
+    save: async title => {
+      if (title.trim() !== '' && title !== props.title) await actions.update.mutateAsync({ id: props.id, title })
+    },
+  })
+  const begin = (): void => {
+    autosave.send({ type: 'begin', value: props.title })
   }
-  if (editing)
+  if (autosave.state !== 'synced' && autosave.state !== 'saved')
     return (
-      <textarea
-        aria-label="Title"
-        autoFocus
-        rows={1}
-        value={title}
-        onChange={event => setTitle(event.currentTarget.value.replace(/\n/g, ''))}
-        onBlur={save}
-        onKeyDown={event => {
-          if (event.key === 'Enter') {
-            event.preventDefault()
-            event.currentTarget.blur()
-          }
-          if (event.key === 'Escape') {
-            setTitle(props.title)
-            setEditing(false)
-          }
-        }}
-        className="dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:bg-transparent dshx:text-xl dshx:font-semibold dshx:leading-snug dshx:tracking-tight dshx:text-foreground dshx:outline-none"
-      />
+      <div className="dshx:flex dshx:flex-col dshx:gap-1">
+        <textarea
+          aria-label="Title"
+          autoFocus
+          rows={1}
+          value={autosave.draft}
+          onChange={event => autosave.send({ type: 'edit', value: event.currentTarget.value.replace(/\n/g, '') })}
+          onBlur={() => autosave.send({ type: 'flush' })}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              autosave.send({ type: 'flush' })
+            }
+            if (event.key === 'Escape') autosave.send({ type: 'cancel' })
+          }}
+          className="dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:bg-transparent dshx:text-xl dshx:font-semibold dshx:leading-snug dshx:tracking-tight dshx:text-foreground dshx:outline-none"
+        />
+        {autosave.error === null ? null : (
+          <p role="alert" className="dshx:text-[11px] dshx:text-destructive">
+            {errorMessage(autosave.error, 'The title could not be saved. Edit it and press Enter to retry, or Escape to keep the old title.')}
+          </p>
+        )}
+      </div>
     )
   return (
     <div className="dshx:flex dshx:items-start dshx:gap-1">
       <BacklogText
         text={props.title}
-        onActivate={() => setEditing(true)}
+        onActivate={begin}
         className="dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:text-xl dshx:font-semibold dshx:leading-snug dshx:tracking-tight dshx:text-foreground dshx:[&>div]:text-xl! dshx:[&>div]:leading-snug! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0"
       />
-      <Button aria-label="Edit title" onClick={() => setEditing(true)} size="icon-xs" type="button" variant="ghost">
+      <Button aria-label="Edit title" onClick={begin} size="icon-xs" type="button" variant="ghost">
         <PencilIcon aria-hidden />
       </Button>
     </div>
