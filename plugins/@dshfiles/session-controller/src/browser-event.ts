@@ -12,26 +12,34 @@ const assistantDataSchema = passthrough(
   }),
 )
 
-const textRunSchema = passthrough(Schema.Struct({
-  type: Schema.Literals(['text-chunks', 'reasoning-chunks']),
-  dt: Schema.Array(Schema.Number),
-  texts: Schema.Array(Schema.String),
-}))
-const toolRunSchema = passthrough(Schema.Struct({
-  type: Schema.Literal('tool-call-chunks'),
-  dt: Schema.Array(Schema.Number),
-  name: Schema.optional(Schema.String),
-  args: Schema.Array(Schema.String),
-}))
-const chunkRecordSchema = passthrough(Schema.Struct({
-  type: Schema.Literal('chunk'),
-  chunk: passthrough(Schema.Struct({
-    type: Schema.String,
-    text: Schema.optional(Schema.String),
-    argumentsDelta: Schema.optional(Schema.String),
+const textRunSchema = passthrough(
+  Schema.Struct({
+    type: Schema.Literals(['text-chunks', 'reasoning-chunks']),
+    dt: Schema.Array(Schema.Number),
+    texts: Schema.Array(Schema.String),
+  }),
+)
+const toolRunSchema = passthrough(
+  Schema.Struct({
+    type: Schema.Literal('tool-call-chunks'),
+    dt: Schema.Array(Schema.Number),
     name: Schema.optional(Schema.String),
-  })),
-}))
+    args: Schema.Array(Schema.String),
+  }),
+)
+const chunkRecordSchema = passthrough(
+  Schema.Struct({
+    type: Schema.Literal('chunk'),
+    chunk: passthrough(
+      Schema.Struct({
+        type: Schema.String,
+        text: Schema.optional(Schema.String),
+        argumentsDelta: Schema.optional(Schema.String),
+        name: Schema.optional(Schema.String),
+      }),
+    ),
+  }),
+)
 
 type WithReplayState = Schema.Schema.Type<typeof withReplayStateSchema>
 
@@ -84,7 +92,13 @@ export class BrowserEvent {
   /** @returns `record` when its last member is the first token, a trimmed copy when later members follow it. */
   private static firstTokenOf(record: unknown): unknown {
     const text = Schema.decodeUnknownResult(textRunSchema)(record)
-    if (text._tag === 'Success') return BrowserEvent.trimRun(record, text.success, 'texts', text.success.texts.findIndex(fragment => fragment !== ''))
+    if (text._tag === 'Success')
+      return BrowserEvent.trimRun(
+        record,
+        text.success,
+        'texts',
+        text.success.texts.findIndex(fragment => fragment !== ''),
+      )
     const tool = Schema.decodeUnknownResult(toolRunSchema)(record)
     if (tool._tag === 'Success') {
       const first = tool.success.name === undefined ? tool.success.args.findIndex(fragment => fragment !== '') : 0
@@ -93,9 +107,10 @@ export class BrowserEvent {
     const raw = Schema.decodeUnknownResult(chunkRecordSchema)(record)
     if (raw._tag === 'Failure') return undefined
     const chunk = raw.success.chunk
-    const token = chunk.type === 'text-delta' || chunk.type === 'reasoning-delta'
-      ? (chunk.text ?? '') !== ''
-      : chunk.type === 'tool-call-delta' && ((chunk.argumentsDelta ?? '') !== '' || chunk.name !== undefined)
+    const token =
+      chunk.type === 'text-delta' || chunk.type === 'reasoning-delta'
+        ? (chunk.text ?? '') !== ''
+        : chunk.type === 'tool-call-delta' && ((chunk.argumentsDelta ?? '') !== '' || chunk.name !== undefined)
     return token ? record : undefined
   }
 

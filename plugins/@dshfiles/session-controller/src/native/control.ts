@@ -6,7 +6,7 @@ import type {
   Session, SessionId,
 } from '@deepseek-ai/dsh-session'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
-import { diffProjection, projectionCell } from '@dshfiles/session-source-port/projection-patch'
+import { ProjectionPatches } from '@dshfiles/session-source-port/projection-patch'
 import type {
   SessionControlBaseline,
   SessionControlFrame,
@@ -101,7 +101,7 @@ export class ProjectionPatchEncoder {
   private readonly sent = new Map<string, JsonValue>()
 
   encode(frame: Extract<SessionControlFrame, { readonly type: 'projection' }>): SessionControlFrame {
-    const cell = projectionCell(frame.sessionId, frame.key)
+    const cell = ProjectionPatches.cell(frame.sessionId, frame.key)
     const previous = this.sent.get(cell)
     this.sent.delete(cell)
     this.sent.set(cell, frame.value)
@@ -110,7 +110,7 @@ export class ProjectionPatchEncoder {
       if (oldest.done !== true) this.sent.delete(oldest.value)
     }
     if (previous === undefined) return frame
-    const patch = diffProjection(previous, frame.value)
+    const patch = ProjectionPatches.diff(previous, frame.value)
     if (patch === 'replace') return frame
     return { type: 'projection-patch', sessionId: frame.sessionId, key: frame.key, patch, seq: frame.seq }
   }

@@ -28,7 +28,7 @@ import {
 } from './sessions/history-records.ts'
 import type { SessionEventLikeEntry, SessionLiveEventEntry } from './contract/events.ts'
 import type { SessionRemotes } from './sessions/remotes.ts'
-import { applyProjectionPatch, decodeProjectionPatch, projectionCell } from '@dshfiles/session-source-port/projection-patch'
+import { ProjectionPatches } from '@dshfiles/session-source-port/projection-patch'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { assertSessionWireEvent } from './session-wire-event.ts'
 
@@ -131,7 +131,7 @@ export function createSessionControlStream(
   // stream keeps that value per cell; a new stream generation starts from its baseline with no cells.
   const cells = new Map<string, JsonValue>()
   const update = (frame: SessionControlDeltaFrame): void => {
-    const cell = projectionCell(frame.sessionId, frame.key)
+    const cell = ProjectionPatches.cell(frame.sessionId, frame.key)
     if (frame.type === 'projection') {
       cells.set(cell, frame.value)
       options.accept(frame)
@@ -139,7 +139,7 @@ export function createSessionControlStream(
     }
     const previous = cells.get(cell)
     if (previous === undefined) throw new RemoteError('gateway/internal', `session control patch for an unknown ${frame.key} value`, {})
-    const value = applyProjectionPatch(previous, decodeProjectionPatch(frame.patch))
+    const value = ProjectionPatches.apply(previous, ProjectionPatches.decode(frame.patch))
     cells.set(cell, value)
     options.accept({ type: 'projection', sessionId: frame.sessionId, key: frame.key, value, seq: frame.seq })
   }

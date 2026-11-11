@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
-import { applyProjectionPatch, decodeProjectionPatch } from '@dshfiles/session-source-port/projection-patch'
+import { ProjectionPatches } from '@dshfiles/session-source-port/projection-patch'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { ControlQueue, ProjectionPatchEncoder } from './control.ts'
 
@@ -40,7 +40,7 @@ describe('the control queue', () => {
       const sent = encoder.encode(frame('a', turns))
       if (sent.type !== 'projection-patch') throw new Error(`expected a patch, got ${sent.type}`)
       expect(JSON.stringify(sent).length).toBeLessThan(JSON.stringify(frame('a', turns)).length / 5)
-      held = applyProjectionPatch(held, decodeProjectionPatch(JSON.parse(JSON.stringify(sent.patch))))
+      held = ProjectionPatches.apply(held, ProjectionPatches.decode(JSON.parse(JSON.stringify(sent.patch))))
       expect(held).toEqual(cost(turns))
       expect(sent.seq).toBe(turns)
     }

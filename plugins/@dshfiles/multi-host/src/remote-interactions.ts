@@ -1,4 +1,4 @@
-import { applyProjectionPatch, decodeProjectionPatch, projectionCell, type PatchJson } from '@dshfiles/session-source-port/projection-patch'
+import { ProjectionPatches, type PatchJson } from '@dshfiles/session-source-port/projection-patch'
 import { Clock, Context, Deferred, Duration, Effect, Layer, Option, PubSub, RcMap, Ref, Schedule, Schema, type Scope, Stream } from 'effect'
 import { remoteApprovalWireSchema, remoteQuestionWireSchema, type RemoteInteraction } from './api.js'
 import type { Gateway, RemoteEventOutcome } from './connectors/gateway.js'
@@ -43,6 +43,9 @@ const decodeProjection = Schema.decodeUnknownOption(
     ),
   ]),
 )
+/** A control-stream patch that does not fit the value this connection holds; the connection ends and reopens. */
+class ProjectionPatchMisfit extends Schema.TaggedError<ProjectionPatchMisfit>()('ProjectionPatchMisfit', { key: Schema.String }) {}
+
 const decodeClaimFrame = Schema.decodeUnknownOption(Schema.Struct({ remainingMs: Schema.Number }).pipe(SchemaFields.passthrough))
 
 /** A held request: what clients read, its timed-wait deadline, and the end that releases the claim on the owner. */
@@ -264,17 +267,18 @@ export class RemoteInteractions extends Context.Service<
                 onNone: () => Effect.void,
                 onSome: update =>
                   Effect.flatMap(
-                    Effect.try(() => {
-                      const cell = projectionCell(update.sessionId, update.key)
+                    Effect.suspend(() => {
+                      const cell = ProjectionPatches.cell(update.sessionId, update.key)
                       if (update.type === 'projection') {
                         cells.set(cell, update.value)
-                        return update.value
+                        return Effect.succeed(update.value)
                       }
                       const previous = cells.get(cell)
-                      if (previous === undefined) throw new Error(`session control patch for an unknown ${update.key} value`)
-                      const value = applyProjectionPatch(previous, decodeProjectionPatch(update.patch))
-                      cells.set(cell, value)
-                      return value
+                      if (previous === undefined) return Effect.fail(new ProjectionPatchMisfit({ key: update.key }))
+                      return Effect.try({
+                        try: () => ProjectionPatches.apply(previous, ProjectionPatches.decode(update.patch)),
+                        catch: () => new ProjectionPatchMisfit({ key: update.key }),
+                      }).pipe(Effect.tap(value => Effect.sync(() => cells.set(cell, value))))
                     }),
                     value => PubSub.publish(projected, { sessionId: update.sessionId, key: update.key, value, seq: update.seq }),
                   ),

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { applyProjectionPatch, decodeProjectionPatch, diffProjection, type PatchJson } from './projection-patch.ts'
+import { ProjectionPatches, type PatchJson } from './projection-patch.ts'
 
 const roundTrip = (previous: PatchJson, next: PatchJson) => {
-  const patch = diffProjection(previous, next)
-  return { patch, value: patch === 'replace' ? next : applyProjectionPatch(previous, patch) }
+  const patch = ProjectionPatches.diff(previous, next)
+  return { patch, value: patch === 'replace' ? next : ProjectionPatches.apply(previous, patch) }
 }
 
 const turn = (index: number) => ({ turn: index, groups: [{ provider: 'anthropic', model: 'claude-opus', usage: { input: index * 1000, output: index * 37 } }] })
@@ -21,37 +21,46 @@ describe('projection patches', () => {
 
   it('round-trips appends, tail edits, truncation, key deletion and additions', () => {
     const cases: readonly (readonly [PatchJson, PatchJson])[] = [
-      [[1, 2, 3], [1, 2, 3, 4]],
-      [[1, 2, 3], [1, 2, 9]],
+      [
+        [1, 2, 3],
+        [1, 2, 3, 4],
+      ],
+      [
+        [1, 2, 3],
+        [1, 2, 9],
+      ],
       [[1, 2, 3], [1]],
-      [{ a: 1, b: { c: [1, 2] }, gone: true }, { a: 1, b: { c: [1, 2, 3] }, added: 'x' }],
+      [
+        { a: 1, b: { c: [1, 2] }, gone: true },
+        { a: 1, b: { c: [1, 2, 3] }, added: 'x' },
+      ],
       [{ a: [{ id: 1 }, { id: 2 }] }, { a: [{ id: 1 }, { id: 3 }] }],
     ]
     for (const [previous, next] of cases) expect(roundTrip(previous, next).value).toEqual(next)
   })
 
   it('replaces scalars, type changes and patches that would not be smaller', () => {
-    expect(diffProjection(1, 2)).toBe('replace')
-    expect(diffProjection([1], { a: 1 })).toBe('replace')
-    expect(diffProjection({ a: 1 }, { a: 2 })).toBe('replace')
-    expect(diffProjection({ a: [1, 2] }, { a: [1, 2] })).toEqual({ o: {} })
-    expect(diffProjection('same', 'same')).toBe('replace')
+    expect(ProjectionPatches.diff(1, 2)).toBe('replace')
+    expect(ProjectionPatches.diff([1], { a: 1 })).toBe('replace')
+    expect(ProjectionPatches.diff({ a: 1 }, { a: 2 })).toBe('replace')
+    expect(ProjectionPatches.diff({ a: [1, 2] }, { a: [1, 2] })).toEqual({ o: {} })
+    expect(ProjectionPatches.diff('same', 'same')).toBe('replace')
   })
 
   it('refuses a patch that does not fit the value it was computed from', () => {
     const long = Array.from({ length: 20 }, (_, index) => `entry-${index}`)
-    const patch = diffProjection(long, [...long, 'next'])
+    const patch = ProjectionPatches.diff(long, [...long, 'next'])
     if (patch === 'replace') throw new Error('expected a patch')
-    expect(() => applyProjectionPatch(['entry-0'], patch)).toThrow(/does not fit/)
-    expect(() => applyProjectionPatch('text', { o: {} })).toThrow(/does not fit/)
+    expect(() => ProjectionPatches.apply(['entry-0'], patch)).toThrow(/does not fit/)
+    expect(() => ProjectionPatches.apply('text', { o: {} })).toThrow(/does not fit/)
   })
 })
 
-describe('decodeProjectionPatch', () => {
-  it('accepts what diffProjection produces and rejects other shapes', () => {
-    const patch = diffProjection({ a: Array.from({ length: 20 }, (_, index) => index) }, { a: Array.from({ length: 21 }, (_, index) => index) })
-    expect(decodeProjectionPatch(JSON.parse(JSON.stringify(patch)))).toEqual(patch)
-    expect(() => decodeProjectionPatch({ a: -1, i: [] })).toThrow()
-    expect(() => decodeProjectionPatch({ x: 1 })).toThrow()
+describe('ProjectionPatches.decode', () => {
+  it('accepts what ProjectionPatches.diff produces and rejects other shapes', () => {
+    const patch = ProjectionPatches.diff({ a: Array.from({ length: 20 }, (_, index) => index) }, { a: Array.from({ length: 21 }, (_, index) => index) })
+    expect(ProjectionPatches.decode(JSON.parse(JSON.stringify(patch)))).toEqual(patch)
+    expect(() => ProjectionPatches.decode({ a: -1, i: [] })).toThrow()
+    expect(() => ProjectionPatches.decode({ x: 1 })).toThrow()
   })
 })
