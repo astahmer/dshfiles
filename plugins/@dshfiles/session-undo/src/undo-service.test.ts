@@ -9,7 +9,7 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Deferred, Effect, Fiber, Layer, Option, Ref } from 'effect'
-import { type LiveThread, LiveThreadsUnavailable, SessionForkFailed, SessionUndo, sharingThreads, UndoFiles, UndoSessions } from './undo-service.js'
+import { FilesRestoreFailed, type LiveThread, LiveThreadsUnavailable, SessionForkFailed, SessionUndo, sharingThreads, UndoFiles, UndoSessions } from './undo-service.js'
 
 const storageHost = Layer.effect(
   HostContext,
@@ -34,7 +34,7 @@ const storageHost = Layer.effect(
 
 /** A VCS provider is external to the plugin: this workspace's "files" are one string and snapshots are numbered copies. */
 const workspace = (initial: string, snapshot?: Effect.Effect<void>, options?: { readonly namesRevisions: boolean }) => {
-  const state = { files: initial, snapshots: new Map<string, string>(), taken: 0 }
+  const state = { files: initial, snapshots: new Map<string, string>(), taken: 0, restores: 0, failRestoreAfter: Number.POSITIVE_INFINITY }
   const take = (): string => {
     const id = `snap-${String(state.snapshots.size + 1)}`
     state.snapshots.set(id, state.files)
@@ -52,10 +52,12 @@ const workspace = (initial: string, snapshot?: Effect.Effect<void>, options?: { 
         }),
       ),
     restore: input =>
-      Effect.sync(() => {
+      Effect.suspend(() => {
+        state.restores += 1
+        if (state.restores > state.failRestoreAfter) return Effect.fail(new FilesRestoreFailed({ provider: input.provider, cause: new Error('disk full') }))
         const previous = take()
         state.files = state.snapshots.get(input.snapshot) ?? state.files
-        return previous
+        return Effect.succeed(previous)
       }),
   })
   return { state, files }
@@ -238,9 +240,44 @@ describe('session undo', () => {
         yield* turn({ sessionId: 's1', turn: 1, forkAtSeq: 4 })
         files.state.files = 'v1'
         sessions.state.failFork = true
-        expect((yield* Effect.flip(service.undo('s1')))._tag).toBe('SessionForkFailed')
+        const failed = yield* Effect.flip(service.undo('s1'))
+        expect(failed._tag).toBe('SessionForkFailed')
+        expect(failed.message).toMatch('its files were put back')
         expect(files.state.files).toBe('v1')
         expect(sessions.state.archived.size).toBe(0)
+      }),
+    ),
+  )
+
+  it.effect('says the files were not touched when the fork fails without a file restore', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const files = workspace('v0', Effect.void)
+        const sessions = sessionsFake()
+        const service = yield* undoWith({ files: files.files, sessions: sessions.sessions })
+        yield* service.turnStarted({ sessionId: 's1', turn: 1, forkAtSeq: 4, cwd: '/scratch' })
+        yield* service.whenReady('s1')
+        sessions.state.failFork = true
+        const failed = yield* Effect.flip(service.undo('s1'))
+        expect(failed._tag).toBe('SessionForkFailed')
+        expect(failed.message).toMatch('files were not touched')
+      }),
+    ),
+  )
+
+  it.effect('reports the workspace left at the rewound turn when putting the files back fails', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const { files, sessions, service, turn } = yield* setup
+        yield* turn({ sessionId: 's1', turn: 1, forkAtSeq: 4 })
+        files.state.files = 'v1'
+        sessions.state.failFork = true
+        files.state.failRestoreAfter = 1
+        const failed = yield* Effect.flip(service.undo('s1'))
+        expect(failed).toMatchObject({ _tag: 'ForkRollbackFailed', cwd: '/repo' })
+        expect(failed.message).toMatch('start of turn 1')
+        expect(failed.message).toMatch('jj op log')
+        expect(files.state.files).toBe('v0')
       }),
     ),
   )

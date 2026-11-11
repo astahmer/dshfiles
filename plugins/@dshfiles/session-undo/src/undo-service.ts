@@ -84,11 +84,22 @@ export class FilesRestoreFailed extends Schema.TaggedError<FilesRestoreFailed>()
 
 export class SessionForkFailed extends Schema.TaggedError<SessionForkFailed>()(
   'SessionForkFailed',
-  { cause: Schema.optional(Schema.Defect()) },
+  { cause: Schema.optional(Schema.Defect()), filesPutBack: Schema.optional(Schema.Boolean) },
   { dshxWireCode: 'session-fork-failed' },
 ) {
   override get message(): string {
-    return 'The conversation could not be forked before the turn, so its files were put back. Retry, or restart DSH if it keeps failing.'
+    const files = this.filesPutBack === true ? 'so its files were put back' : 'and its files were not touched'
+    return `The conversation could not be forked before the turn, ${files}. Retry, or restart DSH if it keeps failing.`
+  }
+}
+
+export class ForkRollbackFailed extends Schema.TaggedError<ForkRollbackFailed>()(
+  'ForkRollbackFailed',
+  { provider: Schema.String, cwd: Schema.String, turn: Schema.Number, cause: Schema.optional(Schema.Defect()) },
+  { dshxWireCode: 'fork-rollback-failed' },
+) {
+  override get message(): string {
+    return `The conversation could not be forked, and putting the files back through ${this.provider} failed too: ${this.cwd} is now at the start of turn ${String(this.turn)}, while the thread still holds the later turns. Recover the later files from the version-control history (with jj: \`jj op log\`, then \`jj op restore <operation before the rewind>\`), then retry.`
   }
 }
 
@@ -270,6 +281,7 @@ export class SessionUndo extends Context.Service<
       | LiveThreadsUnavailable
       | FilesRestoreFailed
       | SessionForkFailed
+      | ForkRollbackFailed
       | UndoHistoryUnavailable
     >
     readonly redo: (
@@ -446,8 +458,13 @@ export class SessionUndo extends Context.Service<
         const forkId = yield* sessions
           .fork({ sessionId, atSeq: undone.forkAtSeq })
           .pipe(
-            Effect.tapError(() =>
-              previous === null || provider === null ? Effect.void : Effect.ignore(files.restore({ provider, cwd: undone.cwd, snapshot: previous })),
+            Effect.catch(error =>
+              previous === null || provider === null
+                ? Effect.fail(error)
+                : files.restore({ provider, cwd: undone.cwd, snapshot: previous }).pipe(
+                    Effect.mapError(cause => new ForkRollbackFailed({ provider, cwd: undone.cwd, turn: undone.turn, cause })),
+                    Effect.andThen(Effect.fail(new SessionForkFailed({ cause: error.cause, filesPutBack: true }))),
+                  ),
             ),
           )
         yield* store(forkId, UndoHistory.forked({ source, forkId, undone, index, previous }))
