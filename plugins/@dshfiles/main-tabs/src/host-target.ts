@@ -1,3 +1,4 @@
+import { type ThreadDirectories, WorkspacePaths } from '@dshfiles/thread-sidebar/thread-directories'
 import type { HostTarget } from '@dshfiles/workbench/tabs'
 
 interface SessionRow {
@@ -15,13 +16,12 @@ export interface HostView {
   readonly projectId: string | null
 }
 
-const THREADS_DIRECTORY_SUFFIX = '-threads'
+const NO_THREAD_DIRECTORIES: ThreadDirectories = new Map()
 
-/** jj-integration puts a thread's own workspace at `<project>-threads/<name>`; thread-sidebar files it under `<project>`. */
-const owningProject = (workspace: WorkspaceRow, byPath: ReadonlyMap<string, WorkspaceRow>): WorkspaceRow => {
-  const parent = workspace.path.slice(0, Math.max(workspace.path.lastIndexOf('/'), workspace.path.lastIndexOf('\\')))
-  if (!parent.endsWith(THREADS_DIRECTORY_SUFFIX)) return workspace
-  return byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)) ?? workspace
+/** A thread's own workspace files under the project thread-sidebar attributes it to, custom threads directory included. */
+const owningProject = (workspace: WorkspaceRow, byPath: ReadonlyMap<string, WorkspaceRow>, threadDirectories: ThreadDirectories): WorkspaceRow => {
+  const projectPath = WorkspacePaths.projectPathOf({ path: workspace.path, threadDirectories })
+  return projectPath === workspace.path ? workspace : (byPath.get(projectPath) ?? workspace)
 }
 
 /** Lineage longer than this is a cycle; real subagent chains are a few levels deep. */
@@ -32,17 +32,19 @@ const MAX_LINEAGE_HOPS = 1_000
  * times a second while a turn streams, so the fold must not follow it.
  */
 const projectBySessionOf = (() => {
-  const byWorkspaces = new WeakMap<readonly WorkspaceRow[], ReadonlyMap<string, string>>()
-  return (workspaces: readonly WorkspaceRow[]): ReadonlyMap<string, string> => {
-    const cached = byWorkspaces.get(workspaces)
+  const byWorkspaces = new WeakMap<readonly WorkspaceRow[], WeakMap<ThreadDirectories, ReadonlyMap<string, string>>>()
+  return (workspaces: readonly WorkspaceRow[], threadDirectories: ThreadDirectories): ReadonlyMap<string, string> => {
+    const byDirectories = byWorkspaces.get(workspaces) ?? new WeakMap<ThreadDirectories, ReadonlyMap<string, string>>()
+    byWorkspaces.set(workspaces, byDirectories)
+    const cached = byDirectories.get(threadDirectories)
     if (cached !== undefined) return cached
     const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
     const bySession = new Map<string, string>()
     for (const workspace of workspaces) {
-      const project = owningProject(workspace, byPath)
+      const project = owningProject(workspace, byPath, threadDirectories)
       for (const sessionId of workspace.sessionIds) bySession.set(sessionId, project.workspaceId)
     }
-    byWorkspaces.set(workspaces, bySession)
+    byDirectories.set(threadDirectories, bySession)
     return bySession
   }
 })()
@@ -51,8 +53,9 @@ const projectBySessionOf = (() => {
 export const createThreadWorkspaceResolver = (input: {
   readonly byId: Readonly<Record<string, SessionRow | undefined>>
   readonly workspaces: readonly WorkspaceRow[]
+  readonly threadDirectories?: ThreadDirectories | undefined
 }): ((sessionId: string) => string | undefined) => {
-  const bySession = projectBySessionOf(input.workspaces)
+  const bySession = projectBySessionOf(input.workspaces, input.threadDirectories ?? NO_THREAD_DIRECTORIES)
   return (sessionId: string): string | undefined => {
     let cursor: string | undefined = sessionId
     for (let hop = 0; cursor !== undefined && hop < MAX_LINEAGE_HOPS; hop += 1) {
@@ -73,11 +76,13 @@ export const readHostView = (input: {
   readonly currentSessionId: string | undefined
   readonly byId: Readonly<Record<string, SessionRow | undefined>>
   readonly workspaces: readonly WorkspaceRow[]
+  readonly threadDirectories?: ThreadDirectories | undefined
 }): HostView => {
   if (input.activePanelId !== null) return { target: { kind: 'panel', panelId: input.activePanelId }, projectId: null }
   const currentSessionId = input.currentSessionId
   if (currentSessionId === undefined || !Object.hasOwn(input.byId, currentSessionId) || input.byId[currentSessionId] === undefined)
     return { target: null, projectId: null }
-  const projectId = createThreadWorkspaceResolver({ byId: input.byId, workspaces: input.workspaces })(currentSessionId) ?? null
+  const projectId =
+    createThreadWorkspaceResolver({ byId: input.byId, workspaces: input.workspaces, threadDirectories: input.threadDirectories })(currentSessionId) ?? null
   return { target: { kind: 'thread', sessionId: currentSessionId }, projectId }
 }

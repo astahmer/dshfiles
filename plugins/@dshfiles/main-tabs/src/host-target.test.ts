@@ -44,6 +44,18 @@ describe('createThreadWorkspaceResolver', () => {
     expect(pathReads).toBe(firstFold)
   })
 
+  it('files a thread workspace in a custom threads directory under the project its VCS provider reported', () => {
+    const custom = [
+      { workspaceId: 'w-sample', path: '/projects/sample', sessionIds: ['main'] },
+      { workspaceId: 'w-custom', path: '/elsewhere/sample/thread-1b7a8c', sessionIds: ['custom-thread'] },
+    ]
+    const byId = byIdOf([{ id: 'custom-thread', retainedBy: {} }])
+    expect(createThreadWorkspaceResolver({ byId, workspaces: custom })('custom-thread')).toBe('w-custom')
+    expect(
+      createThreadWorkspaceResolver({ byId, workspaces: custom, threadDirectories: new Map([['/elsewhere/sample', '/projects/sample']]) })('custom-thread'),
+    ).toBe('w-sample')
+  })
+
   it('stops on a parent cycle', () => {
     const resolve = createThreadWorkspaceResolver({ byId: { a: { parentId: 'b' }, b: { parentId: 'a' } }, workspaces })
     expect(resolve('a')).toBeUndefined()

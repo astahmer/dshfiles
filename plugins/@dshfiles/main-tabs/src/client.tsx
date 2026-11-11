@@ -6,12 +6,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient, runHostCommand, useRegistry, useSettings } from '@dshfiles/dshx/client'
 import { openInteraction, redactIdentifier, startInteraction } from '@dshfiles/dshx/tracing/client'
 import type { BeforeMainOwnerProps } from '@dshfiles/frame-layout/regions'
 import { useThreadAttention } from '@dshfiles/thread-sidebar/attention-client'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { DestinationSections, KNOWN_SECTIONS } from '@dshfiles/thread-sidebar/destinations'
+import { threadSidebarThreadDirectoriesApi, useThreadDirectories, WorkspacePaths, type ThreadDirectories } from '@dshfiles/thread-sidebar/thread-directories'
 import { PanelTitles } from '@dshfiles/workbench/panel-titles'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
@@ -204,15 +205,36 @@ export default defineClient({
 
     ctx.effect(() => {
       let reported = ''
+      let disposed = false
+      // A custom threads directory is only known to the Host's VCS providers: ask once per project set.
+      let threadDirectories: ThreadDirectories = new Map()
+      let askedProjectPaths = ''
+      const refreshThreadDirectories = (workspaces: readonly { readonly path: string }[]): void => {
+        const projectPaths = [...new Set(WorkspacePaths.projects({ rows: workspaces }).map(workspace => workspace.path))].sort()
+        const key = projectPaths.join('\n')
+        if (key === askedProjectPaths || projectPaths.length === 0) return
+        askedProjectPaths = key
+        void createApiClient(ctx, threadSidebarThreadDirectoriesApi)
+          .list({ projectPaths })
+          .then(reportedDirectories => {
+            if (disposed || askedProjectPaths !== key) return
+            threadDirectories = WorkspacePaths.threadDirectoriesOf(reportedDirectories.directories)
+            report()
+          })
+          .catch(() => undefined)
+      }
       const report = (): void => {
         const sessions = ctx.sessions.list.getSnapshot()
         // Before the list arrives, "no Session in the main view" is not yet a fact.
         if (sessions.phase !== 'ready') return
+        const workspaces = HostSnapshotsModel.selectStableWorkspaceItems(ctx.workspaces.list.getSnapshot().items)
+        refreshThreadDirectories(workspaces)
         const view = readHostView({
           activePanelId: ctx.layout.panelInfo.getSnapshot().activePanelId,
           currentSessionId: ctx.uiSession.adapter.current.getSnapshot().key,
           byId: sessions.byId,
-          workspaces: HostSnapshotsModel.selectStableWorkspaceItems(ctx.workspaces.list.getSnapshot().items),
+          workspaces,
+          threadDirectories,
         })
         // The Host cannot name a scope, so a scoped tab on screen reports itself; otherwise the panel is bare.
         const snapshot = actor.getSnapshot()
@@ -237,7 +259,10 @@ export default defineClient({
         ctx.uiSession.adapter.current.subscribe(report),
       ]
       report()
-      return () => disposers.forEach(dispose => dispose())
+      return () => {
+        disposed = true
+        disposers.forEach(dispose => dispose())
+      }
     }, 'main-tabs: follow the main view')
 
     let focusThreadInSidebar = true
@@ -379,7 +404,11 @@ export default defineClient({
           const rowsById: Readonly<Record<string, SessionSummary | undefined>> = byId
           const sessionOf = (sessionId: string): SessionSummary | undefined => (Object.hasOwn(rowsById, sessionId) ? rowsById[sessionId] : undefined)
           const workspaceItems = props.useWorkspaces(state => HostSnapshotsModel.selectStableWorkspaceItems(state.items))
-          const workspaceForThread = useMemo(() => createThreadWorkspaceResolver({ byId, workspaces: workspaceItems }), [byId, workspaceItems])
+          const threadDirectories = useThreadDirectories(workspaceItems)
+          const workspaceForThread = useMemo(
+            () => createThreadWorkspaceResolver({ byId, workspaces: workspaceItems, threadDirectories }),
+            [byId, threadDirectories, workspaceItems],
+          )
           const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
           // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges,
           // and both read the one page-wide poll instead of each holding their own interval.
