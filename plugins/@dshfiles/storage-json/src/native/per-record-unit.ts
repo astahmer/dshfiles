@@ -39,7 +39,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { Dirent } from 'node:fs'
 import { StorageError } from '@deepseek-ai/dsh-storage'
@@ -75,8 +75,8 @@ const writeBootstrapMarker = async (descriptor: KvUnitDescriptor, dir: string): 
 
 /**
  * Open one `per-record`-layout unit under `root`: the unit directory is
- * `<root>/<name>/`. Loads lazily on the first `loadAll` — this unit holds no
- * state, so opening touches nothing on the medium.
+ * `<root>/<name>/`. A legacy whole-unit file is prepared before opening so
+ * lazy readers cannot skip the one-time migration or its completion marker.
  * @param descriptor - Static identity and shape of the unit.
  * @param root - Absolute backend root directory.
  * @param onClose - Backend callback releasing the unit's open-slot.
@@ -87,7 +87,18 @@ export async function openPerRecordUnit(
   root: string,
   onClose: () => void,
 ): Promise<KvUnit> {
-  return new PerRecordJsonUnit(descriptor, join(root, descriptor.name), onClose)
+  const dir = join(root, descriptor.name)
+  if (!hasBootstrapMarker(descriptor, dir)) {
+    let legacyExists = true
+    try {
+      await access(join(root, `${descriptor.name}.json`))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      legacyExists = false
+    }
+    if (legacyExists) await loadPerRecordState(descriptor, dir)
+  }
+  return new PerRecordJsonUnit(descriptor, dir, onClose)
 }
 
 /**
@@ -197,7 +208,6 @@ async function bootstrapLegacyUnit(descriptor: KvUnitDescriptor, dir: string, st
   const tree = join(staging, 'tree')
   const previous = join(staging, 'previous')
   let movedPrevious = false
-  let published = false
   try {
     await mkdir(tree, { mode: 0o700 })
     for (const row of rows) {
@@ -221,7 +231,6 @@ async function bootstrapLegacyUnit(descriptor: KvUnitDescriptor, dir: string, st
     try {
       await rename(tree, dir)
       await fsyncDirectory(dirname(dir))
-      published = true
     } catch (error) {
       if (movedPrevious) await rename(previous, dir)
       throw error
@@ -229,7 +238,7 @@ async function bootstrapLegacyUnit(descriptor: KvUnitDescriptor, dir: string, st
     for (const row of rows) state.tables.get(row.table)?.set(row.key, row.value)
     if (descriptor.hasGlobal && document.global !== undefined) state.global = document.global
   } finally {
-    if (published || !movedPrevious) await rm(staging, { recursive: true, force: true })
+    if (!movedPrevious) await rm(staging, { recursive: true, force: true })
   }
 }
 

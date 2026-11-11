@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -64,6 +64,23 @@ describe('lazy hydration over the fork json backend', () => {
     // The legacy document is never changed or deleted.
     expect(JSON.parse(await readFile(join(root, 'demo.json'), 'utf8'))).toEqual(legacy)
     await domain.close()
+  })
+
+  it('does not resurrect legacy records after deleting the last pre-marker lazy row', async () => {
+    const root = await makeRoot()
+    await mkdir(join(root, 'demo', 'items'), { recursive: true })
+    await writeFile(join(root, 'demo.json'), JSON.stringify({ unit: { name: 'demo', version: 1 }, tables: { items: { a: { label: 'a', count: 1 } } } }))
+    await writeFile(join(root, 'demo', 'items', 'a.json'), JSON.stringify({ version: 1, record: { label: 'a', count: 1 } }))
+    const first = await harness(root)
+    const domain = await first.facility.open(spec)
+    expect(domain.table('items').get('a')).toEqual({ label: 'a', count: 1 })
+    await domain.table('items').delete('a')
+    await domain.close()
+
+    const second = await harness(root)
+    const reopened = await second.facility.open(spec)
+    expect(reopened.table('items').size).toBe(0)
+    await reopened.close()
   })
 
   it('writes through the fork backend and reopens from the tree', async () => {

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -51,9 +51,7 @@ describe('synchronous per-record reads', () => {
     const root = await makeRoot()
     const legacy = { unit: { name: 'demo', version: 3 }, global: null, tables: { items: { '../escaped': { label: 'a' } } } }
     await writeFile(join(root, 'demo.json'), JSON.stringify(legacy))
-    const { backend, unit } = await openUnit(root)
-    await expect(unit.loadAll()).rejects.toThrow(/not path-safe/)
-    await backend.close()
+    await expect(openUnit(root)).rejects.toThrow(/not path-safe/)
   })
 
   it('keeps an already-migrated tree authoritative after its last record is deleted', async () => {
@@ -69,6 +67,18 @@ describe('synchronous per-record reads', () => {
     const reopened = await openUnit(root)
     expect((await reopened.unit.loadAll()).tables.items).toEqual({})
     await reopened.backend.close()
+  })
+
+  it('preserves unrelated files from an existing empty record tree during migration', async () => {
+    const root = await makeRoot()
+    await mkdir(join(root, 'demo'), { recursive: true })
+    await writeFile(join(root, 'demo', 'notes.txt'), 'keep')
+    await writeFile(join(root, 'demo.json'), JSON.stringify({ unit: { name: 'demo', version: 3 }, tables: { items: { a: { label: 'a' } } } }))
+    const opened = await openUnit(root)
+    await opened.backend.close()
+    const backup = (await readdir(root)).find(name => name.startsWith('.demo-migration-'))
+    expect(backup).toBeDefined()
+    expect(await readFile(join(root, backup!, 'previous', 'notes.txt'), 'utf8')).toBe('keep')
   })
 
   it('does not resurrect deleted rows from a migrated legacy unit', async () => {
