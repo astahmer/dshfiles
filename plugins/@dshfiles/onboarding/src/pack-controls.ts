@@ -11,28 +11,13 @@ import {
   type StepStatus,
   type Toolchain,
 } from './pack-plan.js'
+import { PluginManagerEdge, type PackManagerSurface } from './plugin-manager-promise.js'
 
 const MAX_DETAIL = 300
 const INSTALL_TIMEOUT = Duration.minutes(5)
 const DSHX_BIN = ['tooling', 'dshx', 'packages', 'dshx', 'dist', 'cli', 'bin.js'] as const
 const PROFILE_SYNC = ['scripts', 'profile-sync.ts'] as const
 const SELF = '@dshfiles/onboarding'
-
-/** What these controls read of the plugin manager; `PluginManager` satisfies it with its branded entry ids. */
-export interface PackManagerSurface<Id extends string> {
-  listPlugins(): Promise<readonly { readonly entryId: Id; readonly moduleName: string; readonly enabled: boolean; readonly readOnlyReason?: string }[]>
-  setPluginEnabled(
-    id: Id,
-    enabled: boolean,
-  ): Promise<{
-    readonly changed: boolean
-    readonly application: 'applied' | 'restart-required' | 'overridden' | 'failed' | 'cancelled'
-    readonly restartReason?: string
-    readonly error?: { readonly code: string; readonly diagnostic?: string }
-  }>
-  /** Absent on a manager without bundle records: the toolchain then cannot be located. */
-  listBundles?(): Promise<readonly { readonly name: string; readonly source?: string }[]>
-}
 
 /** The profile the Host booted: its name for commands, its home only ever passed to dshx, never shown. */
 export interface BootProfile {
@@ -92,7 +77,7 @@ export class PackControls extends Context.Service<
 
         const rows = Effect.suspend(() => {
           const manager = input.manager()
-          return manager === undefined ? Effect.succeed(null) : Effect.tryPromise(() => manager.listPlugins()).pipe(Effect.orElseSucceed(() => null))
+          return manager === undefined ? Effect.succeed(null) : PluginManagerEdge.listPlugins(manager).pipe(Effect.orElseSucceed(() => null))
         })
         const entries = Effect.map(rows, listed => (listed === null ? null : PackPlan.entriesOf(listed)))
 
@@ -103,7 +88,7 @@ export class PackControls extends Context.Service<
           const profile = input.profile()
           if (profile === undefined) return { kind: 'manual', reason: 'This Host was not started from a DSH profile it can name.' }
           const manager = input.manager()
-          const bundles = yield* Effect.tryPromise(() => manager?.listBundles?.() ?? Promise.resolve([])).pipe(Effect.orElseSucceed(() => []))
+          const bundles = yield* PluginManagerEdge.listBundles(manager).pipe(Effect.orElseSucceed(() => []))
           const source = bundles.find(bundle => bundle.name === SELF)?.source?.replace(/^(link|file):/u, '')
           const unlinked = 'This profile does not link Getting started from a dshfiles checkout, so the repository toolchain is not on this Host.'
           if (source === undefined || !path.isAbsolute(source)) return { kind: 'manual', reason: unlinked }
@@ -212,7 +197,7 @@ export class PackControls extends Context.Service<
               })
               const row = current?.find(candidate => candidate.entryId === entryId)
               if (manager === undefined || row === undefined) return Effect.succeed(step('failed', `entry ${entryId} is no longer listed`))
-              return Effect.tryPromise(() => manager.setPluginEnabled(row.entryId, action === 'enable')).pipe(
+              return PluginManagerEdge.setPluginEnabled({ manager, id: row.entryId, enabled: action === 'enable' }).pipe(
                 Effect.map(result =>
                   step(
                     result.application,

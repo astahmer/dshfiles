@@ -335,13 +335,13 @@
         {
           "kind": "unit-test",
           "id": "onboarding.walk-evidence",
-          "file": "plugins/@dshfiles/onboarding/src/walk-controller.test.ts",
+          "file": "plugins/@dshfiles/onboarding/src/walk-controller.client.test.ts",
           "testName": "advances a click step only when that element is clicked, never for another one or twice for one gesture"
         },
         {
           "kind": "unit-test",
           "id": "onboarding.walk-cleanup",
-          "file": "plugins/@dshfiles/onboarding/src/walk-controller.test.ts",
+          "file": "plugins/@dshfiles/onboarding/src/walk-controller.client.test.ts",
           "testName": "ends on Escape unless a menu or dialog already handled it, and releases every listener, observer and timer"
         },
         {

@@ -124,6 +124,14 @@ const accountItem = (facts: AccountFacts): Pick<ChecklistItem, 'state' | 'detail
   return { state: 'todo', detail: 'No AI account is saved yet.' }
 }
 
+const GITHUB_STATE = {
+  'signed-in': 'done',
+  'signed-out': 'todo',
+  missing: 'todo',
+  failed: 'unknown',
+  off: 'off',
+} as const satisfies Record<ChecklistFacts['github'], ChecklistItem['state']>
+
 const accountsRoute: Route = { panel: 'ai-accounts' }
 const projectsRoute: Route = { settings: { section: 'dshfiles-workspace-folder-picker-projects' } }
 
@@ -165,7 +173,7 @@ const checklist = (facts: ChecklistFacts): readonly ChecklistItem[] => {
     {
       id: 'github',
       title: 'The GitHub CLI is signed in',
-      state: facts.github === 'signed-in' ? 'done' : facts.github === 'off' ? 'off' : facts.github === 'failed' ? 'unknown' : 'todo',
+      state: GITHUB_STATE[facts.github],
       detail: {
         'signed-in': 'gh is signed in to github.com.',
         'signed-out': 'gh is installed but not signed in to github.com.',

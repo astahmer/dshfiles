@@ -6,7 +6,8 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { NodeServices } from '@effect/platform-node'
 import { Effect, Layer } from 'effect'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PackControls, type PackManagerSurface } from './pack-controls.js'
+import { PackControls } from './pack-controls.js'
+import type { PackManagerSurface } from './plugin-manager-promise.js'
 
 const scratch = mkdtempSync(join(tmpdir(), 'onboarding-packs-'))
 afterAll(() => rmSync(scratch, { recursive: true, force: true }))

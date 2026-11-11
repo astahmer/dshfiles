@@ -10,6 +10,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import * as Schema from 'effect/Schema'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(here, '..')
@@ -59,35 +60,40 @@ const clip = (text: string): string => {
   return flat.length <= SUMMARY_LIMIT ? flat : `${flat.slice(0, SUMMARY_LIMIT - 1).trimEnd()}…`
 }
 
-interface RawFeature {
-  readonly id: string
-  readonly title: string
-  readonly summary: string
-  readonly surfaces: readonly string[]
-  readonly destination?: string
-  readonly currentSurface?: string
-  readonly reach?: readonly string[]
-  readonly onboarding?: unknown
-}
+const manifestSchema = Schema.fromJsonString(Schema.Struct({ description: Schema.optional(Schema.Unknown) }))
+const jsonSchema = Schema.fromJsonString(Schema.Unknown)
+/** The fields read here; the full dshx check runs first, so this only narrows what it already accepted. */
+const catalogSchema = Schema.Struct({
+  features: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      title: Schema.String,
+      summary: Schema.String,
+      surfaces: Schema.Array(Schema.String),
+      destination: Schema.optional(Schema.String),
+      currentSurface: Schema.optional(Schema.String),
+      reach: Schema.optional(Schema.Array(Schema.String)),
+      onboarding: Schema.optional(Schema.Unknown),
+    }),
+  ),
+})
 
 const plugins: unknown[] = []
 const features: unknown[] = []
 for (const name of readdirSync(pluginsDir).sort()) {
   const packageFile = join(pluginsDir, name, 'package.json')
   if (!existsSync(packageFile)) continue
-  // SAFETY: every owned package.json is a JSON object; only `description` is read and checked to be a string.
-  const manifest = JSON.parse(read(packageFile)) as { readonly description?: unknown }
+  const manifest = Schema.decodeUnknownSync(manifestSchema)(read(packageFile))
   const description = typeof manifest.description === 'string' ? clip(manifest.description) : ''
   const catalogFile = join(pluginsDir, name, 'dshx.features.json')
   if (!existsSync(catalogFile)) {
     plugins.push({ name, description, ui: false, features: 0 })
     continue
   }
-  const raw: unknown = JSON.parse(read(catalogFile))
+  const raw = Schema.decodeUnknownSync(jsonSchema)(read(catalogFile))
   const issues = featureSchema.featureCatalogIssues(raw)
   if (issues.length > 0) throw new Error(`${repoPath(catalogFile)} fails the dshx feature schema:\n- ${issues.join('\n- ')}`)
-  // SAFETY: featureCatalogIssues returned no issue, so the value is a valid DshxFeatureCatalog.
-  const catalog = raw as { readonly features: readonly RawFeature[] }
+  const catalog = Schema.decodeUnknownSync(catalogSchema)(raw)
   plugins.push({ name, description, ui: catalog.features.some(feature => feature.surfaces.includes('client')), features: catalog.features.length })
   for (const feature of catalog.features) {
     features.push({

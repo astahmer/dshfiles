@@ -112,7 +112,7 @@ const ChecklistRow = (props: {
             <Button
               aria-label={`Copy ${item.fix.shellCommand}`}
               className={TOUCH}
-              onClick={() => void props.copy(item.fix.shellCommand ?? '').then(setCopied)}
+              onClick={async () => setCopied(await props.copy(item.fix.shellCommand ?? ''))}
               size="sm"
               variant="ghost"
             >
