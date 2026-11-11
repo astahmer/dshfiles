@@ -1,0 +1,4 @@
+/** A changed image's current version inside the comparison body. */
+.figure { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin: 0; padding: 12px 16px; min-height: 0; overflow: auto; }
+.image { display: block; max-width: 100%; max-height: 420px; object-fit: contain; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); }
+.caption { font: var(--dsw-font-xs-13); color: var(--dsw-alias-label-tertiary); }

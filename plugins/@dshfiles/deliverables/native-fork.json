@@ -8,14 +8,35 @@
     "path": "packages/client/ui-deliverables"
   },
   "files": [
-    { "upstream": "src/client", "local": "src/native" },
-    { "upstream": "src/index.ts", "local": "src/host.ts" },
-    { "upstream": "src/changes.ts", "local": "src/changes.ts" },
-    { "upstream": "src/present-open.ts", "local": "src/present-open.ts" },
-    { "upstream": "src/presented.ts", "local": "src/presented.ts" },
-    { "upstream": "src/css-modules.d.ts", "local": "src/css-modules.d.ts" },
-    { "upstream": "locale", "local": "locale" }
+    {
+      "upstream": "src/client",
+      "local": "src/native"
+    },
+    {
+      "upstream": "src/index.ts",
+      "local": "src/host.ts"
+    },
+    {
+      "upstream": "src/changes.ts",
+      "local": "src/changes.ts"
+    },
+    {
+      "upstream": "src/present-open.ts",
+      "local": "src/present-open.ts"
+    },
+    {
+      "upstream": "src/presented.ts",
+      "local": "src/presented.ts"
+    },
+    {
+      "upstream": "src/css-modules.d.ts",
+      "local": "src/css-modules.d.ts"
+    },
+    {
+      "upstream": "locale",
+      "local": "locale"
+    }
   ],
-  "delta": [],
-  "added": []
+  "delta": ["src/host.ts", "src/native/ChangedFiles.tsx", "src/native/FileDiff.tsx", "src/native/ReviewTab.tsx", "src/native/locales.ts"],
+  "added": ["src/native/ChangedImage.module.css", "src/native/ChangedImage.tsx"]
 }

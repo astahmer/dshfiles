@@ -34,6 +34,66 @@
           "reason": "Every vendored file equals the pinned tag (node scripts/native-fork-diff.mjs deliverables)."
         }
       ]
+    },
+    {
+      "id": "changed-image-preview",
+      "title": "Changed images preview instead of the binary placeholder",
+      "summary": "A changed png, jpg, jpeg, gif, webp, svg or avif file that the card or review tab would answer with \"Binary file\" or \"File too large\" shows the image itself, labelled Current version. The Host route api/changes.image serves the listed file's current bytes: only inside the Session's working directory after resolving symlinks, only an image extension, under its own media type with a sandboxing Content-Security-Policy and nosniff, and at most 8 MB. The turn-start (\"before\") bytes are not shown: workspaceChanges serves no bytes, its turn-start snapshot objects live in a Session-private temporary object directory, and neither jj nor git records the working copy at turn start, so the current file is the only correct side available.",
+      "reach": [
+        "seed tool-call-thread",
+        "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\": \\\"git init -q && echo git-ready\\\", \\\"description\\\": \\\"Track the sample with git\\\"}]]\"",
+        "press Enter",
+        "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\": \\\"mkdir -p shots && printf %s iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAIAAAAuKetIAAAAY0lEQVR4nO3PQQkAMAzAwMqpfz0TMxF7HINABFzm7H7dcEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAWPXf4oENM33goPAAAAAElFTkSuQmCC | base64 -d > shots/red-$(date +%s).png\\\", \\\"description\\\": \\\"Add a screenshot\\\"}]]\"",
+        "press Enter",
+        "expect text \"Edited red-*\"",
+        "hover text \"Edited red-*\"",
+        "expect text \"Current version\""
+      ],
+      "surfaces": ["client", "host"],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "chat transcript: a changed image row's hover preview in the Edited files card, and the review tab",
+      "configuration": [],
+      "states": ["loading", "image", "moved-or-deleted", "too-large", "outside-workspace", "read-error"],
+      "failureModes": [
+        "An image deleted or moved after the turn shows that it is no longer in the workspace and to restore it from version control.",
+        "An image larger than 8 MB answers 413 and the card says to open the file in the sidebar or an external app.",
+        "A listed image outside the working directory, directly or through a symlink or .., answers 403 and the card says to open it in an external app.",
+        "Any other failed read shows Retry."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "One bounded local file read per request inside Connection's authenticated route; it fetches nothing, spawns nothing and runs no long job."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "deliverables.image-instead-of-binary",
+          "file": "plugins/@dshfiles/deliverables/tests/file-diff-image.test.tsx",
+          "testName": "reads a changed image instead of the binary placeholder"
+        },
+        {
+          "kind": "unit-test",
+          "id": "deliverables.image-stays-in-workspace",
+          "file": "plugins/@dshfiles/deliverables/tests/changed-image.test.ts",
+          "testName": "refuses a symlink, a parent path and an absolute path leaving the workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "deliverables.image-size-cap",
+          "file": "plugins/@dshfiles/deliverables/tests/changed-image.test.ts",
+          "testName": "answers 413 above the size cap instead of reading the file"
+        },
+        {
+          "kind": "unit-test",
+          "id": "deliverables.svg-sandboxed",
+          "file": "plugins/@dshfiles/deliverables/tests/changed-image.test.ts",
+          "testName": "serves an SVG as an image under a sandboxing policy"
+        }
+      ]
     }
   ]
 }

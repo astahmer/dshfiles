@@ -65,6 +65,11 @@ export const zh = {
   'diff.unchanged': '两侧内容相同',
   'diff.coarse': '逐行对比超时，按整个文件替换显示',
   'diff.truncated': '只显示前 {count} 行',
+  'image.current': '当前版本',
+  'image.missing': '该图片已不在工作区中（已移动或删除）；可从版本控制恢复后再预览',
+  'image.tooLarge': '图片超过 8 MB，无法在此预览；请在侧边栏或外部程序中打开该文件',
+  'image.outside': '图片位于工作区之外，无法在此预览；请在外部程序中打开该文件',
+  'image.error': '无法读取图片',
 }
 
 /** English dictionary (same key set). */
@@ -129,6 +134,11 @@ export const en: Record<DeliverablesKey, string> = {
   'diff.unchanged': 'Both sides hold the same lines',
   'diff.coarse': 'Line comparison timed out; shown as a whole-file replacement',
   'diff.truncated': 'Showing the first {count} lines',
+  'image.current': 'Current version',
+  'image.missing': 'This image is no longer in the workspace (moved or deleted). Restore it from version control to preview it.',
+  'image.tooLarge': 'Image larger than 8 MB; open the file in the sidebar or an external app to view it.',
+  'image.outside': 'Image is outside the workspace; open the file in an external app to view it.',
+  'image.error': 'Could not read the image',
 }
 
 /** Union of this namespace's dictionary keys. */

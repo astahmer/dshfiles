@@ -14,6 +14,7 @@ import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceChangedFile } from '@deepseek-ai/dsh-workspace-changes/types'
 import { changedFileUrl, changesDiffUrl, changesSummaryUrl, parseChangesReviewAddress } from '../changes.ts'
+import { changesImageUrl } from '../changed-image.ts'
 import type { ChangesDiffStore } from './changes-diff.ts'
 import type { ChangesSummaryStore } from './changes-summary.ts'
 import type { PresentedOpenController } from './present-open.ts'
@@ -153,7 +154,7 @@ export function ReviewTab({
       </div>
       {summaryState === 'loading' && <p className={diffCss.status} role="status">{t('diff.loading')}</p>}
       {summaryState === 'missing' && <p className={diffCss.status}>{t('diff.missing')}</p>}
-      {file !== undefined && <FileDiff state={diffState} split={split} wrap={wrap} t={t}
+      {file !== undefined && <FileDiff state={diffState} split={split} wrap={wrap} t={t} imageUrl={changesImageUrl({ sessionId, seq, index })}
         retry={() => { void loadChangesDiff(sessionId, seq, index) }} />}
     </div>
   )

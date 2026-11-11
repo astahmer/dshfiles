@@ -4,6 +4,7 @@ import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import { FileTypeIcon, HoverCard, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, SessionStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { changesDiffUrl, type ChangesSummary } from '../changes.ts'
+import { changesImageUrl } from '../changed-image.ts'
 import type { DeliverablesInjected } from './Deliverables.tsx'
 import { FileDiff } from './FileDiff.tsx'
 import diffCss from './FileDiff.module.css'
@@ -117,6 +118,6 @@ function ChangedFilePreview({ sessionId, seq, index, display, useChangesDiff, lo
   }, [state, sessionId, seq, index, loadChangesDiff])
   return <div className={`${diffCss.root} ${css.preview}`} data-changes-hover-preview>
     <div className={diffCss.header}><span className={css.previewPath} data-changes-preview-path>{display}</span></div>
-    <FileDiff state={state} split={false} wrap={false} t={t} retry={() => { void loadChangesDiff(sessionId, seq, index) }} />
+    <FileDiff state={state} split={false} wrap={false} t={t} imageUrl={changesImageUrl({ sessionId, seq, index })} retry={() => { void loadChangesDiff(sessionId, seq, index) }} />
   </div>
 }

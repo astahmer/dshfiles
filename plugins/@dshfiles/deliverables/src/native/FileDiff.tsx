@@ -6,6 +6,8 @@ import type { CodeHighlighter, HighlightSpan } from '@deepseek-ai/dsh-client-ui-
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceDiffHunk } from '@deepseek-ai/dsh-workspace-changes/types'
 import type { ChangesDiff } from '../changes.ts'
+import { imageTypeOf } from '../changed-image.ts'
+import { ChangedImage } from './ChangedImage.tsx'
 import type { ChangesDiffState } from './changes-diff.ts'
 import type { NS } from './locales.ts'
 import css from './FileDiff.module.css'
@@ -138,16 +140,21 @@ function noteOf(diff: Extract<ChangesDiff, { kind: 'text' }>): 'diff.created' | 
  * @param props - comparison state, layout choices, retry action, and localized copy.
  * @returns the comparison or its loading, unavailable, or error state.
  */
-export function FileDiff({ state, split, wrap, retry, t }: {
+export function FileDiff({ state, split, wrap, retry, imageUrl, t }: {
   state: ChangesDiffState | undefined
   split: boolean
   wrap: boolean
   retry: () => void
+  /** Address of the file's current bytes; a binary or oversized image renders from it instead of the placeholder. */
+  imageUrl?: string
 } & PropsLocale<typeof NS>): ReactNode {
   if (state === undefined || state === 'loading') return <p className={css.status} role="status">{t('diff.loading')}</p>
   if (state === 'missing') return <p className={css.status}>{t('diff.missing')}</p>
   if (state === 'error') {
     return <div className={css.status}><span>{t('diff.error')}</span><Button size="sm" onClick={retry}>{t('presented.retry')}</Button></div>
+  }
+  if (state.kind !== 'text' && imageUrl !== undefined && imageTypeOf(state.path) !== undefined) {
+    return <ChangedImage url={imageUrl} alt={state.display} t={t} />
   }
   if (state.kind === 'binary') return <p className={css.status}>{t('diff.binary')}</p>
   if (state.kind === 'oversized') return <p className={css.status}>{t('diff.oversized')}</p>
