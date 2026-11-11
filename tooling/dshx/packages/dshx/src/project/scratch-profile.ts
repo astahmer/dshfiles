@@ -182,6 +182,9 @@ const isolatedHostEnvironment = (home: string, profileRoot: string, source: Node
     HOME: home,
     DSH_HOME: home,
     DSHX_BOOT_PROFILE_ROOT: profileRoot,
+    // Corepack locates its installed package managers through the cache home the scratch HOME hides; without the real
+    // one it re-downloads the pinned pnpm, which the scratch Host's egress guard refuses.
+    COREPACK_HOME: source.COREPACK_HOME ?? join(source.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'node', 'corepack'),
     XDG_CACHE_HOME: join(home, 'cache'),
     XDG_CONFIG_HOME: join(home, 'config'),
     XDG_DATA_HOME: join(home, 'data'),

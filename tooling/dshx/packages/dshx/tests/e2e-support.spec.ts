@@ -99,6 +99,16 @@ describe('E2E scratch profile provisioning', () => {
     expect(environment.GH_TOKEN).toBeUndefined()
   })
 
+  it('keeps the real corepack home, so a pinned package manager runs without a download', () => {
+    expect(isolatedHostEnvironment('/scratch/home', '/scratch/profile', { XDG_CACHE_HOME: '/real/cache' })).toMatchObject({
+      COREPACK_HOME: '/real/cache/node/corepack',
+      XDG_CACHE_HOME: '/scratch/home/cache',
+    })
+    expect(isolatedHostEnvironment('/scratch/home', '/scratch/profile', { COREPACK_HOME: '/real/corepack', XDG_CACHE_HOME: '/real/cache' }).COREPACK_HOME).toBe(
+      '/real/corepack',
+    )
+  })
+
   it('refuses to treat an unprepared empty profile as a client boot pass', async () => {
     const dshHome = await mkdtemp(join(tmpdir(), 'dshx-unprepared-home-'))
     const result = await checkClientBoot({
