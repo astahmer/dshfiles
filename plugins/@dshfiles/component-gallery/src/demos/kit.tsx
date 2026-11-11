@@ -85,6 +85,7 @@ export const kitDemos: readonly GalleryDemo[] = [
           <Badge variant="info">info</Badge>
           <Badge variant="success">success</Badge>
           <Badge variant="warning">warning</Badge>
+          <Badge variant="danger">danger</Badge>
           <Badge variant="destructive">destructive</Badge>
         </div>
         <div className={row}>

@@ -18,6 +18,7 @@ const badgeVariants = cva(
         info: 'dshx:bg-info/15 dshx:text-info',
         success: 'dshx:bg-success/15 dshx:text-success',
         warning: 'dshx:bg-warning/15 dshx:text-warning',
+        danger: 'dshx:bg-destructive/15 dshx:text-destructive',
         muted: 'dshx:bg-muted dshx:text-muted-foreground',
       },
     },

@@ -403,7 +403,7 @@ export function TraceStatusBadge({ state }: { readonly state: 'live' | 'done' | 
     )
   if (state === 'failed')
     return (
-      <Badge variant="outline" className="dshx:border-destructive/40 dshx:bg-destructive/10 dshx:text-destructive">
+      <Badge variant="danger" className="dshx:border-destructive/40 dshx:bg-destructive/10">
         Failed
       </Badge>
     )
