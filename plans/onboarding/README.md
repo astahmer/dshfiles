@@ -1,10 +1,10 @@
 # Guided onboarding and feature discovery
 
-**Resume here:** P1–P4, the phone walks and follow-ups 12/14 are on `main`. Next: P5. Decide first which UI plugins must join a pack (52 are in none, some are shared libraries), then add an `onboarding` block to the 79 UI plugins without one and make `features:check` fail when one is missing.
+**Resume here:** P1–P4 and P5a are on `main`. Only P5b remains: every UI plugin joins a pack or an explicit infrastructure exemption, enforced by `features:check`. It waits on the user’s choice (A: place feature plugins in packs plus an exemption list; B: all into Core; C: drop the pack rule).
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
-**Status:** P0–P4 landed on `main` (2026-11-11), plus phone walks: `reachNarrow` in the dshx schema and `dshx dev open --narrow` (`jj:qnxypzlv`, `jj:ptzxknvo`), 84 curated features with a proven phone walk (`jj:xqsvupzm`), and Show me where following it below 640 px (`jj:nryommuz`). P5 next.
+**Status:** P0–P4 and P5a landed on `main` (2026-11-11): 85 `onboarding` blocks on 70 UI plugins, 9 infrastructure-only plugins exempt, `features:check` fails a UI plugin without a block, curation now list-based (curated set unchanged at 284). P5b (pack membership) waits on a user decision.
 
 | Phase | Work                                                                                                                                                                | Status      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
@@ -13,7 +13,7 @@
 | P2    | **Enable / Disable pack** (exact preview, reversible) + **Show me where** (replay `reach` against the live UI)                                                      | done        |
 | P3    | **What's new** from jj/git history (since last visit; upstream since fork point) + opt-in usage suggestions                                                         | done        |
 | P4    | Agent-led demo in a scratch thread (off by default) + `dshx init` profile composer + generated docs page per pack                                                   | done        |
-| P5    | AGENTS.md rule (each new plugin ships an onboarding block and joins a pack) + `features:check` error for a UI plugin without one                                    | not started |
+| P5    | AGENTS.md rule (each new plugin ships an onboarding block and joins a pack) + `features:check` error for a UI plugin without one                                    | P5a done; P5b waits on a decision |
 
 ### P2 progress
 
