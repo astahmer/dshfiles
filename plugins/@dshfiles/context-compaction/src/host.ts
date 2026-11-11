@@ -1,5 +1,5 @@
 import type {} from '@deepseek-ai/dsh-agent'
-import { BasicCompactionEngine, type ResolvedConfig } from '@deepseek-ai/dsh-compaction-basic'
+import type { ResolvedConfig } from '@deepseek-ai/dsh-compaction-basic'
 import type { ImageBlock, Message } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-token-meter'
 import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
@@ -16,6 +16,8 @@ import { serializedMessageBytes, summarizeInChunks, SummaryRequestFailed } from 
 import { observedIdleCandidate } from './idle-candidate.js'
 import { DEFAULT_IDLE_COMPACTION, type IdleCompactionPolicy } from './idle-compaction.js'
 import { idleGenerationStart } from './idle-generation.js'
+import { compactionEngine, type SummaryRequest } from './compaction-engine.js'
+import { isProviderContextOverflow } from './context-overflow.js'
 import { sweepIdleCompaction, type IdleCompactionCandidate } from './idle-compaction-sweep.js'
 
 const SWEEP_INTERVAL_MS = 60_000
@@ -36,10 +38,17 @@ const IdleCompactionConfig = Schema.Struct({
   ),
 })
 
+const BackgroundSummaryConfig = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+  startRatio: Schema.Number.check(Schema.isGreaterThan(0), Schema.isLessThan(1)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(0.85))),
+})
+
 const CompactionConfig = Schema.Struct({
   maxTokens: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(8_192))),
   /** `warm` is not available yet: a prefix-identical ping cannot reach the Session's cost total. See the README. */
   idleCacheStrategy: Schema.Literals(['off', 'compact']).pipe(Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_IDLE_COMPACTION.strategy))),
+  // Off by default: a prepared summary the conversation moves past is a billed request that is thrown away.
+  backgroundSummary: BackgroundSummaryConfig.pipe(Schema.withDecodingDefaultKey(Effect.succeed({ enabled: false }))),
   idle: IdleCompactionConfig.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
 })
 
@@ -49,19 +58,6 @@ const idlePolicyOf = (config: typeof CompactionConfig.Type): IdleCompactionPolic
   lifetimeMinutes: config.idle.lifetimeMinutes,
   leadMinutes: config.idle.leadMinutes,
 })
-
-type SummarizeInput = Parameters<BasicCompactionEngine['summarize']>[0]
-type CompactionAgent = Parameters<BasicCompactionEngine['summarize']>[1]
-type SummaryResult = Awaited<ReturnType<BasicCompactionEngine['summarize']>>
-
-interface SummaryRequest {
-  readonly input: SummarizeInput
-  readonly agent: CompactionAgent
-  readonly config: BasicCompactionEngine['config']
-  readonly signal: AbortSignal | undefined
-  /** The stock engine's single summary request. */
-  readonly base: (input: SummarizeInput, signal?: AbortSignal) => Promise<SummaryResult>
-}
 
 const failureMessages = {
   'model-info': 'Could not read the summarization model’s context capacity.',
@@ -77,9 +73,6 @@ class ContextCompactionFailure extends Schema.TaggedError<ContextCompactionFailu
     return failureMessages[this.reason]
   }
 }
-
-const ContextOverflow = Schema.Struct({ code: Schema.Literal('CONTEXT_WINDOW_EXCEEDED') })
-const isContextOverflow = Schema.is(ContextOverflow)
 
 const hasImages = (message: Message) => message.content.some(block => block.type === 'image')
 
@@ -112,29 +105,10 @@ const summarizeBounded = Effect.fn('context compaction run')(function* (request:
     summarize: candidate =>
       Effect.tryPromise({
         try: () => request.base(candidate, request.signal),
-        catch: cause => new SummaryRequestFailed({ contextOverflow: isContextOverflow(cause), cause }),
+        catch: cause => new SummaryRequestFailed({ contextOverflow: isProviderContextOverflow(cause), cause }),
       }),
   })
 })
-
-/** The stock engine with its single summary request bounded to the route's safe input, split and reduced as needed. */
-const engineWith = (summarize: (request: SummaryRequest) => Promise<SummaryResult>, onConfig: (config: ResolvedConfig) => void) =>
-  class ContextCompactionEngine extends BasicCompactionEngine {
-    constructor(...args: ConstructorParameters<typeof BasicCompactionEngine>) {
-      super(...args)
-      onConfig(this.config)
-    }
-
-    protected override summarize(input: SummarizeInput, agent: CompactionAgent, signal?: AbortSignal): Promise<SummaryResult> {
-      return summarize({
-        input,
-        agent,
-        config: this.config,
-        signal,
-        base: (candidate, candidateSignal) => super.summarize(candidate, agent, candidateSignal),
-      })
-    }
-  }
 
 class CompactionThresholdFailure extends Schema.TaggedError<CompactionThresholdFailure>()(
   'CompactionThresholdFailure',
@@ -160,19 +134,26 @@ const CompactionEngine = (config: typeof CompactionConfig.Type) =>
       const llm = yield* Llm
       const summarize = yield* DshxPlugin.callbackWithSignal(summarizeBounded)
       let policy: ResolvedConfig | undefined
+      const engineAbort = new AbortController()
       // A failed provider request reaches the engine as the provider's own error, as the stock engine throws it.
-      const engine = engineWith(
-        request =>
+      const engine = compactionEngine({
+        summarize: request =>
           summarize({ signal: request.signal }, request).catch((error: unknown) => {
             throw error instanceof SummaryRequestFailed ? error.cause : error
           }),
-        resolved => {
+        onConfig: resolved => {
           policy = resolved
         },
-      )
+        background: config.backgroundSummary,
+        signal: engineAbort.signal,
+      })
       yield* Effect.acquireRelease(
         Effect.sync(() => host.ctx.plugin(engine, { maxTokens: config.maxTokens })),
-        fiber => Effect.promise(() => fiber.dispose()),
+        fiber =>
+          Effect.promise(() => {
+            engineAbort.abort()
+            return fiber.dispose()
+          }),
       )
       // One sweep owns every visible thread. The Session controller resumes a cold Agent under its own admission and
       // hold, so this timer never touches `ctx.agents` directly.

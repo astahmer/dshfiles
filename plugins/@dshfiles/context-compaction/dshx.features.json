@@ -5,7 +5,7 @@
     {
       "id": "bounded-compaction",
       "title": "Bounded compaction summaries",
-      "summary": "Summarizes oversized conversation history in bounded, tool-balanced requests before the native durable compaction transaction commits.",
+      "summary": "Summarizes oversized conversation history in bounded, tool-balanced requests before the native durable compaction transaction commits. A request the provider still rejects as too large is retried with older tool outputs and exchanges shortened (the newest exchange intact) before it is split.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",
@@ -13,7 +13,8 @@
       "configuration": [],
       "states": ["ready", "summarizing", "checkpoint-written", "summary-failed"],
       "failureModes": [
-        "A system prompt, tool catalog, or one indivisible tool transaction can exceed the safe request budget; compaction fails without rewriting the session history.",
+        "A system prompt, tool catalog, or one indivisible tool transaction with nothing long enough to shorten can exceed the safe request budget; compaction fails without rewriting the session history.",
+        "Shortened tool outputs and older exchange text keep only their first 1,024 and last 512 characters in the summary request, so the summary can miss detail from their middle.",
         "An image-bearing request without model-declared image pricing cannot be safely sized and fails before dispatch."
       ],
       "externalDependencies": [],
@@ -23,6 +24,12 @@
           "id": "context-compaction.chunked-summary",
           "file": "tests/chunked-summary.spec.ts",
           "testName": "splits oversized input while keeping tool calls with their results"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.overflow-shortening",
+          "file": "tests/chunked-summary.spec.ts",
+          "testName": "answers a provider overflow by shortening older tool outputs and keeping the newest exchange intact"
         },
         {
           "kind": "not-applicable",
@@ -37,6 +44,115 @@
           "file": "tests/chunked-summary.spec.ts",
           "testName": "records bounded summary request metadata"
         },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
+      ]
+    },
+    {
+      "id": "background-summary",
+      "title": "Background compaction summaries",
+      "summary": "Opt-in: once a thread nears its compaction threshold, the engine summarizes the span the next compaction would replace beside the running turn, then commits it instantly at the threshold if that span is unchanged. Off by default: a summary the conversation moves past is a billed request thrown away.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: agent pre-step listener, no UI",
+      "configuration": [
+        {
+          "key": "backgroundSummary.enabled",
+          "defaultValue": "false",
+          "constraints": "Each background summary is a billed compaction request on the thread's Session, counted whether applied or discarded; turn it on only after a measurement.",
+          "choices": ["true", "false"],
+          "coveredBy": ["context-compaction.background-summary", "context-compaction.background-discard"]
+        },
+        {
+          "key": "backgroundSummary.startRatio",
+          "defaultValue": "0.85",
+          "constraints": "Fraction of the compaction threshold, in (0, 1), at which the summary starts.",
+          "coveredBy": ["context-compaction.background-summary"]
+        }
+      ],
+      "states": ["off", "below-start", "preparing", "prepared", "applied", "discarded"],
+      "failureModes": [
+        "A prepared summary whose span changed (a manual compaction, pruning, an earlier compaction) is discarded and the compaction runs as usual; its request still counts toward the Session's cost.",
+        "A failed background request is logged; the automatic compaction then summarizes as usual and the next background attempt waits for the next surface generation.",
+        "A prepared span that alone does not bring the thread under its threshold is followed by the usual blocking compaction."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.background-summary",
+          "file": "tests/engine.integration.spec.ts",
+          "testName": "applies a summary prepared in the background without a compaction request at the threshold"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.background-discard",
+          "file": "tests/engine.integration.spec.ts",
+          "testName": "never applies a prepared summary to a span it did not summarize"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "context-compaction.background-browser-journey",
+          "reason": "This Host-only engine behavior has no browser surface; a real agent loop drives it in the engine integration tests."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "context compaction background summary",
+          "file": "tests/engine.integration.spec.ts",
+          "testName": "applies a summary prepared in the background without a compaction request at the threshold"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
+      ]
+    },
+    {
+      "id": "overflow-recognition",
+      "title": "Provider context-overflow recognition",
+      "summary": "Recognizes context-overflow failures the core does not code as CONTEXT_WINDOW_EXCEEDED (Anthropic, Gemini, Bedrock, llama.cpp, xAI, Moonshot, Copilot, GLM, Cohere wording, along the cause chain) and gives them the stock recovery: one overflow compaction, then a retry. Also ignores a compaction headroom buffer that would leave the model no pressure budget.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: agent request-error listener, no UI",
+      "configuration": [],
+      "states": ["not-overflow", "recovered", "retries-exhausted"],
+      "failureModes": [
+        "A provider wording outside the list still fails the turn as before; add it to src/context-overflow.ts.",
+        "Recovery stops after maxOverflowRetries per turn and the original request error is kept."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.overflow-wording",
+          "file": "tests/context-overflow.spec.ts",
+          "testName": "recognizes %s"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.overflow-recovery",
+          "file": "tests/engine.integration.spec.ts",
+          "testName": "recovers from a provider overflow the core does not code as CONTEXT_WINDOW_EXCEEDED"
+        },
+        {
+          "kind": "unit-test",
+          "id": "context-compaction.headroom-ignored",
+          "file": "tests/engine.integration.spec.ts",
+          "testName": "compacts a route whose headroom buffer leaves no room"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "context-compaction.overflow-browser-journey",
+          "reason": "This Host-only recovery has no browser surface; a real agent loop drives it in the engine integration tests."
+        }
+      ],
+      "telemetry": [
         {
           "kind": "automatic",
           "source": "model-stream"
@@ -148,13 +264,13 @@
     {
       "id": "compaction-threshold",
       "title": "Next automatic compaction for a thread",
-      "summary": "The threshold API (agent tool compaction_threshold) returns the token count at which automatic compaction next runs for one live thread: the running engine's policy, the thread's routed model and context window, its output reservation, and the engine's own pressure reading. agent-plan shows it beside the composer's context meter.",
+      "summary": "The threshold API (agent tool compaction_threshold) returns the token count at which automatic compaction next runs for one live thread: the running engine's policy, the thread's routed model and context window, its output reservation, and the engine's own pressure reading. A headroom buffer that leaves no pressure budget is ignored, as the engine ignores it. agent-plan shows it beside the composer's context meter.",
       "surfaces": ["host", "api", "tool"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: threshold API and agent tool",
       "configuration": [],
-      "states": ["unrouted-null", "no-window-null", "no-budget-null", "threshold"],
+      "states": ["unrouted-null", "no-window-null", "no-budget-null", "threshold", "headroom-ignored"],
       "failureModes": ["The route's model info lookup can fail; the API returns compaction-threshold-failure naming the route to fix in Settings › Models."],
       "externalDependencies": [],
       "verification": [

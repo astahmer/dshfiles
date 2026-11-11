@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-token-meter'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { describe, expect, it } from 'vitest'
-import { compactionThresholdTokens } from '../src/compaction-threshold.js'
+import { compactionSpec, compactionThresholdTokens } from '../src/compaction-threshold.js'
 import plugin from '../src/host.js'
 
 /** compaction-basic's documented defaults. */
@@ -21,8 +21,18 @@ describe('the compaction threshold', () => {
     expect(compactionThresholdTokens({ config, route: { provider: 'p', model: 'other' }, contextWindow: 1_000_000, reservedCompletionTokens: 0 })).toBe(800_000)
   })
 
+  it('ignores a headroom buffer that leaves the model no room', () => {
+    // 64,000 - 8,192 output leaves 55,808 tokens, less than the 65,536 headroom: the stock engine refuses the route.
+    expect(compactionSpec({ config: DEFAULTS, route, contextWindow: 64_000, reservedCompletionTokens: 8_192 })).toEqual({
+      thresholdTokens: 51_200,
+      retainTokens: 8_929,
+      headroomApplied: false,
+    })
+    expect(compactionSpec({ config: DEFAULTS, route, contextWindow: 200_000, reservedCompletionTokens: 8_192 })?.headroomApplied).toBe(true)
+  })
+
   it('is null where the engine skips proactive compaction', () => {
-    expect(compactionThresholdTokens({ config: DEFAULTS, route, contextWindow: 64_000, reservedCompletionTokens: 8_192 })).toBeNull()
+    expect(compactionThresholdTokens({ config: DEFAULTS, route, contextWindow: 8_000, reservedCompletionTokens: 8_192 })).toBeNull()
     expect(
       compactionThresholdTokens({
         config: { thresholdRatio: 0.8, headroomTokens: 65_536, retainTokens: 900_000, modelPolicies: [] },
