@@ -198,7 +198,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "diffs-review",
       "description": "Review this thread's changes in one scrollable diff, grouped by review scope and marked as you read.",
       "ui": true,
-      "features": 10
+      "features": 11
     },
     {
       "name": "editor",
@@ -253,6 +253,12 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "description": "Agent tool html_render: a self-contained HTML page shown in the chat transcript as a sandboxed, themed card.",
       "ui": true,
       "features": 3
+    },
+    {
+      "name": "image-preview",
+      "description": "Which changed files preview as images, the guarded Host response that serves their bytes, and the browser hook that shows them, shared by the plugins that preview images.",
+      "ui": true,
+      "features": 1
     },
     {
       "name": "input-trigger",
@@ -7232,10 +7238,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Backlog views\"",
+          "text": "click button \"Close\"",
           "action": "click",
           "by": "button",
-          "name": "Backlog views",
+          "name": "Close",
           "value": null
         },
         {
@@ -11604,6 +11610,47 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       }
     },
     {
+      "key": "diffs-review#changed-image-preview",
+      "plugin": "diffs-review",
+      "id": "changed-image-preview",
+      "title": "See changed images in a review instead of a dropped binary file",
+      "summary": "The Changes facet, the Review page and the combined revisions review show each changed image: before and after side by side when both are known revisions (a jj or git range's base and head, a revision and its parent), else the one version there is, labelled (Current for the work…",
+      "destination": "thread-panel",
+      "currentSurface": "right-pane: Changes, Review page",
+      "reach": [
+        {
+          "text": "seed rebase-ready-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "rebase-ready-thread"
+        },
+        {
+          "text": "click button \"Review workspace changes: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Review workspace changes: *",
+          "value": null
+        },
+        {
+          "text": "click radio \"Uncommitted\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Uncommitted",
+          "value": null
+        },
+        {
+          "text": "expect text \"The working-copy revision only.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "The working-copy revision only.",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "diffs-review#package-json-table",
       "plugin": "diffs-review",
       "id": "package-json-table",
@@ -12647,6 +12694,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "image-preview#image-preview-response",
+      "plugin": "image-preview",
+      "id": "image-preview-response",
+      "title": "One guarded way to serve and show a changed image",
+      "summary": "Name the previewable image types, answer with their bytes under nosniff and a sandboxing policy within an 8 MB cap, and read them into a blob URL in the browser.",
+      "destination": "none",
+      "currentSurface": "host and client: library",
+      "reach": [],
       "reachNarrow": null,
       "onboarding": null
     },
@@ -25150,7 +25209,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "thread-sidebar",
       "id": "subagent-live-preview",
       "title": "Live subagent preview in the transcript and above the composer",
-      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation.",
+      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working chi…",
       "destination": "transcript",
       "currentSurface": "transcript: subagent tool row; composer dock while the child works",
       "reach": [
