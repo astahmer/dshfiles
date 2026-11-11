@@ -60,6 +60,8 @@ export interface FallbackChainProps extends Omit<React.HTMLAttributes<HTMLElemen
   /** Makes the cards draggable and Alt+Arrow movable; called with the moved card's index and its new index. */
   readonly onReorder?: ((from: number, to: number) => void) | undefined
   readonly reorderDisabled?: boolean
+  /** Dollar formatter of the host screen, so the chain matches its other amounts. */
+  readonly formatCost?: ((usd: number) => string) | undefined
 }
 
 const SQUARES = 28
@@ -117,6 +119,7 @@ export function FallbackChain({
   density = 'comfortable',
   onReorder,
   reorderDisabled = false,
+  formatCost: formatUsd = formatCost,
   className,
   ...props
 }: FallbackChainProps) {
@@ -230,7 +233,7 @@ export function FallbackChain({
         {priced ? (
           <>
             <span aria-hidden className="dshx:h-4 dshx:w-px dshx:bg-border" />
-            <RollingNumber value={cost} format={formatCost} className="dshx:shrink-0" />
+            <RollingNumber value={cost} format={formatUsd} className="dshx:shrink-0" />
           </>
         ) : null}
         {actions}
@@ -311,6 +314,7 @@ export function FallbackChain({
                   index={index}
                   elapsed={elapsedOf(attempt)}
                   compact={compact}
+                  formatUsd={formatUsd}
                   reorder={
                     reorder === undefined
                       ? undefined
@@ -423,9 +427,10 @@ const AttemptCard = React.forwardRef<
     readonly index: number
     readonly elapsed: number
     readonly compact: boolean
+    readonly formatUsd: (usd: number) => string
     readonly reorder: CardReorder | undefined
   }
->(function AttemptCard({ attempt, index, elapsed, compact, reorder }, ref) {
+>(function AttemptCard({ attempt, index, elapsed, compact, formatUsd, reorder }, ref) {
   const cardRef = React.useRef<HTMLLIElement | null>(null)
   const statusRef = React.useRef<HTMLSpanElement>(null)
   const { status } = attempt
@@ -534,7 +539,7 @@ const AttemptCard = React.forwardRef<
                 {status === 'trying' && attempt.statusLabel === undefined ? <ShimmerText className="dshx:text-info">Trying…</ShimmerText> : statusText(attempt)}
               </span>
               {showTime ? (
-                <span className="dshx:shrink-0 dshx:text-sm dshx:text-muted-foreground dshx:tabular-nums">{formatCost(attempt.cost ?? 0)}</span>
+                <span className="dshx:shrink-0 dshx:text-sm dshx:text-muted-foreground dshx:tabular-nums">{formatUsd(attempt.cost ?? 0)}</span>
               ) : null}
             </span>
             {timeoutMs === undefined ? null : (
@@ -586,7 +591,7 @@ const AttemptCard = React.forwardRef<
             {attempt.cost === undefined && timeoutMs === undefined ? null : (
               <>
                 <dt className="dshx:text-muted-foreground">Cost</dt>
-                <dd className="dshx:text-right dshx:tabular-nums">{formatCost(attempt.cost ?? 0)}</dd>
+                <dd className="dshx:text-right dshx:tabular-nums">{formatUsd(attempt.cost ?? 0)}</dd>
               </>
             )}
             {attempt.price ? (

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
+import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import { aiAccountsModelFallbackApi, FALLBACK_RETURN_POLICIES, type FallbackRoute, type ModelFallbackSnapshot } from '@dshfiles/ai-accounts/model-fallback-api'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -162,6 +163,7 @@ export const FallbacksSection = (props: {
           }
         })}
         density="compact"
+        formatCost={CostEstimateModel.formatUsd}
         heading="Fallback chain"
         onReorder={(from, to) => save(ModelPickerModel.reorderedFallback(chain, from, to))}
         reorderDisabled={disabled}
