@@ -96,6 +96,34 @@ describe('request costs', () => {
     }).pipe(Effect.provide(usageRepoTest())),
   )
 
+  it.effect('counts a thread in a custom threads directory under its repository name', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      const commit = (input: { readonly sessionId: string; readonly cwd: string }) =>
+        store.commitLogSlice({
+          path: `/${input.sessionId}`,
+          sessionId: input.sessionId,
+          offset: 1,
+          size: 1,
+          mtimeMs: 1,
+          state: '{}',
+          session: { id: input.sessionId, cwd: input.cwd, parentSession: null, subagent: false, createdAt: 0, title: input.sessionId },
+          rows: [request({ id: input.sessionId, startedAt: 1_000, sessionId: input.sessionId })],
+        })
+      yield* commit({ sessionId: 'session-custom', cwd: '/home/user/threads/dshfiles/thread-1b7a8c' })
+      yield* commit({ sessionId: 'session-default', cwd: '/home/user/dev/dshfiles-threads/thread-2c8b9d' })
+      yield* commit({ sessionId: 'session-plain', cwd: '/home/user/dev/nixfiles' })
+      const rows = (yield* store.requests({ from: 0, to: 10_000, sort: 'cost', direction: 'desc', limit: 10 })).rows
+      expect(new Map(rows.map(row => [row.id, row.project]))).toEqual(
+        new Map([
+          ['session-custom', 'dshfiles'],
+          ['session-default', 'dshfiles'],
+          ['session-plain', 'nixfiles'],
+        ]),
+      )
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
+
   it.effect('reports cache savings and a turn count beside the list-price cost', () =>
     Effect.gen(function* () {
       const store = yield* UsageRepo

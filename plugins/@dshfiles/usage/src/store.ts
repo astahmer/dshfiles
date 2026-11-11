@@ -54,11 +54,17 @@ const LIVE_MATCH_WINDOW_MS = 2 * 60_000
 const SERIES_KEYS = 6
 const OTHER_KEY = 'Other'
 
-/** `~/dev/dshfiles-threads/dshfiles-221d06c1` is a thread workspace of `dshfiles`. */
+const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
+
+/**
+ * The project name a cwd is counted under. `~/dev/dshfiles-threads/dshfiles-221d06c1` is a thread workspace of
+ * `dshfiles`; a custom `threadsDirectory` nests `<dir>/<repository name>/thread-…`, so that parent names the project.
+ */
 const projectOf = (cwd: string | null): string | null => {
   if (cwd === null || cwd.length === 0) return null
   const parent = basename(dirname(cwd))
   if (parent.endsWith('-threads') && parent.length > '-threads'.length) return parent.slice(0, -'-threads'.length)
+  if (THREAD_WORKSPACE_NAME.test(basename(cwd)) && parent.length > 0) return parent
   return basename(cwd)
 }
 
