@@ -26,7 +26,7 @@ test('auto build is the default and skips source-only related runs', () => {
 
 test('auto build skips source-only related runs and builds dist loaders and full dependents', () => {
   assert.ok(sourceOnlyBuild(dryRunAutoBuild('plugins/@dshfiles/shared-streams/src/shim.ts').build))
-  const distLoader = dryRunAutoBuild('plugins/@dshfiles/editor/src/host.ts')
+  const distLoader = dryRunAutoBuild('plugins/@dshfiles/apply-patch/src/host.ts')
   assert.equal(distLoader.build.required, true)
   assert.match(distLoader.build.reason, /loads dist/)
   const dependent = dryRunAutoBuild('plugins/@dshfiles/usage/src/command-identifiers.ts')
