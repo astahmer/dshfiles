@@ -30,6 +30,25 @@
       ],
       "outputs": ["dist/**", "build/**", ".cache/*.tsbuildinfo"]
     },
+    "@dshfiles/dshx#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.md",
+        "!tests/**",
+        "!**/*.{test,spec}.{ts,tsx,js,mjs}",
+        "!e2e/**",
+        "!bench/**",
+        "!dshx.features.json",
+        "!.cache/**",
+        "!.turbo/**",
+        "!dist/**",
+        "!build/**",
+        "!node_modules/**",
+        "!.vite/**"
+      ],
+      "outputs": ["dist/**", ".cache/*.tsbuildinfo", "runtime-store/**"]
+    },
     "@dshfiles/ui-styles#build": {
       "dependsOn": ["^build"],
       "inputs": [

@@ -78,6 +78,13 @@ describe('host runtime store', () => {
     expect((await snapshotOf(first)).hash).not.toBe(snapshot.hash)
   })
 
+  it('publishes from the dshx build the same snapshot a consumer build imports, so a cached consumer bundle still loads', async () => {
+    const project = await workspace()
+    const own = await HostRuntimeStore.publishOwn({ runtimeRoot: join(project.dshx, 'dist'), entries: [project.entry] })
+    expect(own.directory).toBe(join(project.dshx, 'runtime-store', own.hash))
+    expect((await snapshotOf(project)).hash).toBe(own.hash)
+  })
+
   it('never rewrites a published snapshot', async () => {
     const project = await workspace()
     const original = await snapshotOf(project)

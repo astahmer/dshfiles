@@ -309,6 +309,18 @@ const captureRuntime = async (options: { readonly runtimeRoot: string; readonly 
   return { packageRoot, runtimeRoot, graph, files, hash: contentHash(files) }
 }
 
+/**
+ * Publish the snapshot of the built runtime without a consumer. The dshx build runs this so its own build outputs hold
+ * the snapshot every consumer's Host bundle imports: a consumer bundle replayed from a build cache never re-publishes it.
+ */
+const publishOwn = async (options: {
+  readonly runtimeRoot: string
+  readonly entries: readonly string[]
+}): Promise<{ readonly hash: string; readonly directory: string }> => {
+  const captured = await captureRuntime(options)
+  return { hash: captured.hash, directory: await publish(join(captured.packageRoot, STORE_DIRECTORY), captured.hash, captured.files) }
+}
+
 /** The bare-specifier path of one runtime module inside a published snapshot. */
 const modulePath = (runtimeRoot: string, file: string): string => relative(runtimeRoot, file).split(sep).join('/')
 
@@ -431,6 +443,7 @@ const plugin = (options: {
 
 export class HostRuntimeStore {
   static readonly prepare = prepare
+  static readonly publishOwn = publishOwn
   static readonly prune = prune
   static readonly plugin = plugin
 }

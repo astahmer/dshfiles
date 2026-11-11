@@ -494,6 +494,11 @@ async function hostConfig(
   return config
 }
 
+export class HostRuntimeSnapshot {
+  /** Publish the Host runtime snapshot of this built dshx, the one every consumer's Host bundle imports. */
+  static readonly publish = () => HostRuntimeStore.publishOwn({ runtimeRoot: RUNTIME_ROOT, entries: RUNTIME_ENTRIES })
+}
+
 /** Start a Host watcher without awaiting a successful initial build. */
 export async function watchHost(options: BuildHostOptions): Promise<BuildWatcher> {
   const paths = await resolveOptions(options)

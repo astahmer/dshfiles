@@ -173,7 +173,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/copy-ambient.mjs",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-ambient.mjs && node scripts/publish-runtime-store.mjs",
     "prepack": "pnpm build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
