@@ -76,6 +76,11 @@
           "testName": "reads a changed image instead of the binary placeholder"
         },
         {
+          "kind": "not-applicable",
+          "id": "deliverables.image-preview-browser",
+          "reason": "No Gherkin scenario drives a turn that writes an image yet; its reach steps run that turn on a scratch DSH with dshx dev open deliverables/changed-image-preview and showed Current version in the hover preview and the review tab, and the route and FileDiff branches are unit-tested."
+        },
+        {
           "kind": "unit-test",
           "id": "deliverables.image-stays-in-workspace",
           "file": "plugins/@dshfiles/deliverables/tests/changed-image.test.ts",

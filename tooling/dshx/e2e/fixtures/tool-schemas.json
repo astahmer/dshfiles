@@ -1,5 +1,5 @@
 {
-  "hostBundles": 85,
+  "hostBundles": 86,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -76,6 +76,7 @@
     "@dshfiles/tool-fs",
     "@dshfiles/tool-meta",
     "@dshfiles/tool-search",
+    "@dshfiles/tool-subagent",
     "@dshfiles/traces",
     "@dshfiles/turn-summary",
     "@dshfiles/tweet-context",

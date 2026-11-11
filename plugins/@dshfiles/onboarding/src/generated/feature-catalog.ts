@@ -177,6 +177,12 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "features": 1
     },
     {
+      "name": "deliverables",
+      "description": "Owned native changed-files card, review tab and delivery cards that preview changed images instead of the binary placeholder.",
+      "ui": true,
+      "features": 2
+    },
+    {
       "name": "dialogs",
       "description": "The app's confirm, alert, prompt and select dialogs and its toasts, provided to every plugin through the dshx Dialogs and Toasts contracts",
       "ui": true,
@@ -11075,6 +11081,90 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "deliverables#changed-files-card",
+      "plugin": "deliverables",
+      "id": "changed-files-card",
+      "title": "Changed-files card and review tab",
+      "summary": "The native \"Edited N files\" card under a turn, its per-file hover comparison, the right-sidebar review tab, delivery cards and closing-prose file mentions, from one owned fork of the stock row.",
+      "destination": "transcript",
+      "currentSurface": "chat transcript: the card under a turn that edited files, and the review tab it opens",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "Ask the agent to edit a file, then open a row of the Edited files card under its reply.",
+        "doneWhen": "The file's changes show under the row or in the review tab."
+      }
+    },
+    {
+      "key": "deliverables#changed-image-preview",
+      "plugin": "deliverables",
+      "id": "changed-image-preview",
+      "title": "Changed images preview instead of the binary placeholder",
+      "summary": "A changed png, jpg, jpeg, gif, webp, svg or avif file that the card or review tab would answer with \"Binary file\" or \"File too large\" shows the image itself, labelled Current version. The Host route api/changes.image serves the listed file's current bytes: only inside the Sessio…",
+      "destination": "transcript",
+      "currentSurface": "chat transcript: a changed image row's hover preview in the Edited files card, and the review tab",
+      "reach": [
+        {
+          "text": "seed tool-call-thread",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "tool-call-thread"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\": \\\"git init -q && echo git-ready\\\", \\\"description\\\": \\\"Track the sample with git\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or s*",
+          "value": "[[call bash {\"command\": \"git init -q && echo git-ready\", \"description\": \"Track the sample with git\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\": \\\"mkdir -p shots && printf %s iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAIAAAAuKetIAAAAY0lEQVR4nO3PQQkAMAzAwMqpfz0TMxF7HINABFzm7H7dcEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAWPXf4oENM33goPAAAAAElFTkSuQmCC | base64 -d > shots/red-$(date +%s).png\\\", \\\"description\\\": \\\"Add a screenshot\\\"}]]\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "commands, @ files or s*",
+          "value": "[[call bash {\"command\": \"mkdir -p shots && printf %s iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAIAAAAuKetIAAAAY0lEQVR4nO3PQQkAMAzAwMqpfz0TMxF7HINABFzm7H7dcEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAWPXf4oENM33goPAAAAAElFTkSuQmCC | base64 -d > shots/red-$(date +%s).png\", \"description\": \"Add a screenshot\"}]]"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Edited red-*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Edited red-*",
+          "value": null
+        },
+        {
+          "text": "hover text \"Edited red-*\"",
+          "action": "hover",
+          "by": "text",
+          "name": "Edited red-*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Current version\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Current version",
+          "value": null
+        }
+      ],
       "reachNarrow": null,
       "onboarding": null
     },
