@@ -12,6 +12,7 @@ export default defineConfig({
       '@dshfiles/credential-port',
       '@dshfiles/usage',
       '@dshfiles/jev',
+      '@dshfiles/jj-cli',
       '@dshfiles/sqlite-store',
     ],
   },

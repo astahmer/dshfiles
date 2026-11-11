@@ -1,6 +1,7 @@
 import { Cache, Context, Duration, Effect, Exit, FileSystem, Layer, Option, Path, Ref, type PlatformError } from 'effect'
 import type { JjRunError } from './errors.ts'
 import { Jj, type JjCommand, type JjOutput } from './jj.ts'
+import { storeRootOf } from './store-root.ts'
 import { trackViewRead, type TrackedViewReads, type ViewReadKey } from './view-read-tracker.ts'
 
 /** Subcommands that only read the repository view, whose output is a function of the operation head. */
@@ -39,12 +40,8 @@ export class JjViewReads extends Context.Service<
 
     const findOperationHeadsDirectory = (directory: string): Effect.Effect<Option.Option<string>, PlatformError.PlatformError> =>
       Effect.gen(function* () {
-        const marker = path.join(directory, '.jj', 'repo')
-        const info = yield* fileSystem.stat(marker).pipe(Effect.option)
-        if (Option.isSome(info)) {
-          const store = info.value.type === 'Directory' ? marker : path.resolve(directory, '.jj', (yield* fileSystem.readFileString(marker)).trim())
-          return Option.some(path.join(store, 'op_heads', 'heads'))
-        }
+        const store = yield* storeRootOf(directory).pipe(Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, path))
+        if (store !== undefined) return Option.some(path.join(store, 'op_heads', 'heads'))
         const parent = path.dirname(directory)
         if (parent === directory) return Option.none<string>()
         return yield* findOperationHeadsDirectory(parent)

@@ -1,4 +1,4 @@
-import { JjViewReads, type JjRunError } from '@dshfiles/jj-cli'
+import { JjViewReads, storeRootOf, type JjRunError } from '@dshfiles/jj-cli'
 import { KeyedMutex } from '@dshfiles/dshx/effect/keyed-mutex'
 import { commandAttributes } from '@dshfiles/dshx/tracing'
 import { Context, Duration, Effect, Fiber, FiberMap, FileSystem, Layer, Option, Path, type PlatformError, Ref, Schema } from 'effect'
@@ -357,15 +357,14 @@ const make = Effect.gen(function* () {
         : Effect.fail(jjFailed(`jj ${args.join(' ').slice(0, 120)}: ${output.stderr.trim().slice(0, 400)}`)),
     )
 
-  /** `<root>/.jj/repo` is the store in the owning checkout and a pointer file in every other workspace. */
-  const storeRootOf = Effect.fnUntraced(function* (workspaceRoot: string) {
-    const marker = path.join(workspaceRoot, '.jj', 'repo')
-    const info = yield* fileSystem.stat(marker).pipe(Effect.option)
-    if (Option.isNone(info)) return undefined
-    if (info.value.type === 'Directory') return workspaceRoot
-    const pointer = yield* fileSystem.readFileString(marker).pipe(Effect.mapError(filesFailed(`Could not read the jj store pointer of ${workspaceRoot}.`)))
-    return path.dirname(path.dirname(path.resolve(path.dirname(marker), pointer.trim())))
-  })
+  /** The checkout that owns the jj store a workspace root uses. */
+  const owningCheckoutOf = (workspaceRoot: string) =>
+    storeRootOf(workspaceRoot).pipe(
+      Effect.provideService(FileSystem.FileSystem, fileSystem),
+      Effect.provideService(Path.Path, path),
+      Effect.mapError(filesFailed(`Could not read the jj store pointer of ${workspaceRoot}.`)),
+      Effect.map(store => (store === undefined ? undefined : path.dirname(path.dirname(store)))),
+    )
 
   const changeIdOf = Effect.fnUntraced(function* (revision: string, cwd: string) {
     const changeId = (yield* jj(['log', '--no-graph', '-r', revision, '-T', 'change_id'], cwd)).trim()
@@ -632,7 +631,7 @@ const make = Effect.gen(function* () {
     const output = yield* run(['--ignore-working-copy', 'root'], target)
     if (output.exitCode !== 0) return yield* notARepository
     const workspaceRoot = output.stdout.trim()
-    const repoRoot = (yield* storeRootOf(workspaceRoot)) ?? workspaceRoot
+    const repoRoot = (yield* owningCheckoutOf(workspaceRoot)) ?? workspaceRoot
     const isThread = workspaceRoot !== repoRoot && path.dirname(workspaceRoot) === (yield* threadsDirectory(repoRoot))
     return { repoRoot, workspaceRoot, threadName: isThread ? path.basename(workspaceRoot) : undefined, vcs: 'jj' } satisfies ThreadLocation
   })
@@ -1616,7 +1615,7 @@ const make = Effect.gen(function* () {
       }
       if (!(yield* exists(path.join(reportedRoot, '.jj')))) continue
       const actualRoot = yield* fileSystem.realPath(reportedRoot).pipe(Effect.mapError(filesFailed(`Could not resolve ${reportedRoot}.`)))
-      if (actualRoot !== reportedRoot || (yield* storeRootOf(actualRoot)) !== realRepoRoot) continue
+      if (actualRoot !== reportedRoot || (yield* owningCheckoutOf(actualRoot)) !== realRepoRoot) continue
       const readWorkingCopyId = run(['--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'commit_id'], actualRoot).pipe(
         Effect.map(output => (output.exitCode === 0 && isCommitId(output.stdout.trim()) ? output.stdout.trim() : undefined)),
         Effect.orElseSucceed(() => undefined),
@@ -1788,7 +1787,7 @@ const make = Effect.gen(function* () {
   })
 
   const preferredBookmark = (target: string) =>
-    Effect.flatMap(storeRootOf(target).pipe(Effect.orElseSucceed(() => undefined)), root => bookmarkFor(root ?? target))
+    Effect.flatMap(owningCheckoutOf(target).pipe(Effect.orElseSucceed(() => undefined)), root => bookmarkFor(root ?? target))
 
   /**
    * Local bookmarks, and the nearest one the workspace at `path` builds on. A workspace started from a remote bookmark

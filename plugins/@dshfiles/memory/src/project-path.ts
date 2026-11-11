@@ -1,24 +1,14 @@
 import { DshxPlugin } from '@dshfiles/dshx/effect'
+import { storeRootOf } from '@dshfiles/jj-cli'
 import { Cache, Context, Deferred, Duration, Effect, FileSystem, Layer, Path } from 'effect'
 
 import { MemoryRepo } from './memory-repo.ts'
 
 /** Secondary JJ workspaces point at the owning checkout's store; memory should use that project path. */
 const jjProjectRootAt = Effect.fnUntraced(function* (workspaceRoot: string) {
-  const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const pointerPath = path.join(workspaceRoot, '.jj', 'repo')
-  const metadata = yield* Effect.option(fs.stat(pointerPath))
-  if (metadata._tag === 'None') return undefined
-  if (metadata.value.type === 'Directory') return workspaceRoot
-  if (metadata.value.type !== 'File' || Number(metadata.value.size) > 4_096) return undefined
-  const pointer = (yield* fs.readFileString(pointerPath).pipe(Effect.orElseSucceed(() => ''))).trim()
-  if (pointer.length === 0) return undefined
-  const storePath = path.resolve(path.dirname(pointerPath), pointer)
-  if (path.basename(storePath) !== 'repo' || path.basename(path.dirname(storePath)) !== '.jj') return undefined
-  const store = yield* Effect.option(fs.stat(storePath))
-  if (store._tag === 'None' || store.value.type !== 'Directory') return undefined
-  return path.dirname(path.dirname(storePath))
+  const store = yield* storeRootOf(workspaceRoot).pipe(Effect.orElseSucceed(() => undefined))
+  return store === undefined ? undefined : path.dirname(path.dirname(store))
 })
 
 /** The project a working directory belongs to: its canonical path, or the owning checkout of a JJ workspace. */

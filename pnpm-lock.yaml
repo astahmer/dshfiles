@@ -4527,6 +4527,9 @@ importers:
       '@dshfiles/jev':
         specifier: workspace:*
         version: link:../jev
+      '@dshfiles/jj-cli':
+        specifier: workspace:*
+        version: link:../jj-cli
       '@dshfiles/optmem-core':
         specifier: workspace:*
         version: link:../optmem-core

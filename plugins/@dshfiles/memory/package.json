@@ -41,6 +41,7 @@
     "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/jev": "workspace:*",
+    "@dshfiles/jj-cli": "workspace:*",
     "@dshfiles/optmem-core": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/settings-shell": "workspace:*",
