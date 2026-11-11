@@ -148,6 +148,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
+import { useThreadDirectories } from './use-thread-directories.js'
 import { workspaceName, workspaceNameLabel } from './workspace-paths.js'
 import {
   failedResumeNotice,
@@ -1654,6 +1655,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const workspaceState = props.useWorkspaces(state => state)
   // Every workspace frame re-emits all items and id lists as new objects; derivations key on content.
   const workspaceItems = HostSnapshotsModel.selectStableWorkspaceItems(workspaceState.items)
+  const threadDirectories = useThreadDirectories(workspaceItems)
   const archivedIdList = useStableValue(workspaceState.archivedSessionIds, HostSnapshotsModel.sameIds)
   const pinnedIdList = useStableValue(workspaceState.pinnedSessionIds, HostSnapshotsModel.sameIds)
   const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
@@ -1776,8 +1778,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const threadView = isBoard ? boardViewSettings : listThreadView
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
   const localProjectsForRemoteThreads = useMemo(
-    () => SidebarOrganization.projectWorkspaces(workspaceItems).map(workspace => ({ workspaceId: workspace.workspaceId, path: workspace.path })),
-    [workspaceItems],
+    () =>
+      SidebarOrganization.projectWorkspaces({ workspaces: workspaceItems, threadDirectories }).map(workspace => ({
+        workspaceId: workspace.workspaceId,
+        path: workspace.path,
+      })),
+    [threadDirectories, workspaceItems],
   )
   const remoteThreads = useRemoteSidebarThreads(props.wide !== false, localProjectsForRemoteThreads)
   const remoteRunningSessionIds = useMemo(
@@ -1871,8 +1877,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // Project attribution reads only ids and folders; a streaming turn republishes the list without changing either.
   const folderRowsById = useStableValue(sessionState.byId, sameFolderRows)
   const workspaceBySession = useMemo(
-    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceItems, sessions: sessionsForAutoArchive(sessionState.ids, folderRowsById) }),
-    [folderRowsById, sessionState.ids, workspaceItems],
+    () =>
+      SidebarOrganization.workspaceForSessions({
+        workspaces: workspaceItems,
+        sessions: sessionsForAutoArchive(sessionState.ids, folderRowsById),
+        threadDirectories,
+      }),
+    [folderRowsById, sessionState.ids, threadDirectories, workspaceItems],
   )
   /** The workspace a Session really lives in, for the deep link; grouping keeps using the project attribution. */
   const realWorkspaceBySession = useMemo(() => {
@@ -1889,11 +1900,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const defaultProjectTitle = props.tSidebar('threadSidebarDefaultProject')
   const displayWorkspaces = useMemo(
     () =>
-      SidebarOrganization.projectWorkspaces(workspaceItems).map(workspace => ({
+      SidebarOrganization.projectWorkspaces({ workspaces: workspaceItems, threadDirectories }).map(workspace => ({
         id: workspace.workspaceId,
         title: workspace.title.length > 0 ? workspace.title : defaultProjectTitle,
       })),
-    [defaultProjectTitle, workspaceItems],
+    [defaultProjectTitle, threadDirectories, workspaceItems],
   )
   /** Project folder per workspace id: the project row's icon is resolved from it on the Host. */
   const workspacePathById = useMemo(() => new Map<string, string>(workspaceItems.map(workspace => [workspace.workspaceId, workspace.path])), [workspaceItems])
@@ -2712,7 +2723,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (draftsCleaning) return
     setDraftsCleaning(true)
     try {
-      const plan = DraftThreadsModel.planCleanup({ drafts: draftSessions, workspaces: workspaceItems })
+      const plan = DraftThreadsModel.planCleanup({ drafts: draftSessions, workspaces: workspaceItems, threadDirectories })
       let archived = 0
       for (const sessionId of plan.sessionIds) {
         try {

@@ -420,6 +420,26 @@ test('a session without a workspace falls back to the project its recorded cwd b
   assert.equal(map.get('no-cwd'), undefined)
 })
 
+test('a thread workspace in a custom threads directory is attributed to the project its VCS provider reported', () => {
+  const project = workspaceView({ id: 'project', path: '/dev/dshfiles' })
+  const thread = workspaceView({ id: 'thread', path: '/elsewhere/dshfiles/thread-a', sessionIds: ['accounted'] })
+  const workspaces = [project, thread]
+  const sessions = [sessionSummary({ id: 'accounted' }), sessionSummary({ id: 'forgotten', cwd: '/elsewhere/dshfiles/thread-b' })]
+  const threadDirectories = new Map([['/elsewhere/dshfiles', '/dev/dshfiles']])
+
+  const reported = SidebarOrganization.workspaceForSessions({ workspaces, sessions, threadDirectories })
+  assert.equal(reported.get('accounted'), 'project')
+  assert.equal(reported.get('forgotten'), 'project')
+  assert.deepEqual(
+    SidebarOrganization.projectWorkspaces({ workspaces, threadDirectories }).map(workspace => workspace.workspaceId),
+    ['project'],
+  )
+
+  const unreported = SidebarOrganization.workspaceForSessions({ workspaces, sessions })
+  assert.equal(unreported.get('accounted'), 'thread')
+  assert.equal(unreported.get('forgotten'), undefined)
+})
+
 test('a deep link names the thread workspace the session lives in, not its owning project', () => {
   const project = workspaceView({ id: 'project', path: '/dev/dshfiles' })
   const thread = workspaceView({ id: 'thread', path: '/dev/dshfiles-threads/thread-a', sessionIds: ['accounted', 'shared'] })

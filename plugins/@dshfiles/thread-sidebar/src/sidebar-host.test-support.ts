@@ -42,6 +42,7 @@ export const fakeSidebarHost = (fake: FakeHost, options: { readonly exitHook?: b
       runningJobCount: Ref.get(fake.jobs),
       sessions: Ref.get(fake.sessions),
       workspaces: Effect.succeed([]),
+      threadDirectories: Effect.succeed(new Map()),
       archivedSessionIds: Effect.succeed([]),
       pinnedSessionIds: Effect.succeed([]),
       flushPersistence: Effect.flatMap(Ref.get(fake.persistenceFails), fails =>

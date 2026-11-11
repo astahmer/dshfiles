@@ -62,4 +62,13 @@ describe('planDraftCleanup', () => {
     expect(plan.workspacePaths).toEqual(['/repo-threads/thread-5bb5a4'])
     expect(DraftThreadsModel.planCleanup({ drafts: [], workspaces }).workspacePaths).toEqual([])
   })
+
+  it('forgets a draft-only thread workspace in a custom threads directory its provider reported', () => {
+    const custom = [{ path: '/elsewhere/repo/thread-5bb5a4', sessionIds: [SessionId('session-a')] }]
+    expect(DraftThreadsModel.planCleanup({ drafts: [session('session-a')], workspaces: custom }).workspacePaths).toEqual([])
+    const threadDirectories = new Map([['/elsewhere/repo', '/repo']])
+    expect(DraftThreadsModel.planCleanup({ drafts: [session('session-a')], workspaces: custom, threadDirectories }).workspacePaths).toEqual([
+      '/elsewhere/repo/thread-5bb5a4',
+    ])
+  })
 })

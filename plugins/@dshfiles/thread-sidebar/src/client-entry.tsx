@@ -57,6 +57,9 @@ import { HoverPrefetch } from './hover-prefetch.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { SidebarOrganization } from './organization.js'
+import { WorkspacePaths } from './workspace-paths.js'
+import { threadSidebarThreadDirectoriesApi } from './thread-directories-api.js'
+import { useThreadDirectories } from './use-thread-directories.js'
 import { PromptLinkModel, type PromptLink } from './prompt-link.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PaletteBridge } from './palette-bridge.js'
@@ -965,6 +968,7 @@ export default defineClient({
             unpinSession,
             openThread,
             continueInProject: async (sessionId: SessionSummary['id'], projectId: string) => (await continueInProject(sessionId, projectId)).continuedSessionId,
+            useThreadDirectories,
           }),
         },
         decorate(HeaderThreadActions),
@@ -1050,10 +1054,20 @@ export default defineClient({
         })
       })
 
+    /** The registered projects, leaving out thread workspaces a VCS provider keeps in a custom threads directory. */
+    const projectWorkspacesNow = async () => {
+      const workspaces = ctx.workspaces.list.getSnapshot().items
+      const projectPaths = WorkspacePaths.projects({ rows: workspaces }).map(workspace => workspace.path)
+      const reported = await createApiClient(ctx, threadSidebarThreadDirectoriesApi)
+        .list({ projectPaths })
+        .catch(() => ({ directories: [] }))
+      return SidebarOrganization.projectWorkspaces({ workspaces, threadDirectories: WorkspacePaths.threadDirectoriesOf(reported.directories) })
+    }
+
     /** A fresh thread whose composer holds the link's prompt; it is never sent from here. */
     const openPromptLink = async (link: PromptLink): Promise<void> => {
       await workspacesReady()
-      const projects = SidebarOrganization.projectWorkspaces(ctx.workspaces.list.getSnapshot().items)
+      const projects = await projectWorkspacesNow()
       const named = link.project === undefined ? undefined : PromptLinkModel.projectFor({ projects, reference: link.project })
       if (link.project !== undefined && named === undefined) {
         console.warn(`thread-sidebar: prompt link project ${link.project} is not a registered project; the draft opens in the current one`)
@@ -1112,7 +1126,9 @@ export default defineClient({
       drafts: ctx.get('sessionDrafts')?.list,
       startProjectSession: (projectId: string) => {
         // Recheck at the click: deleted or remote projects must never fall back to the current project.
-        const project = SidebarOrganization.projectWorkspaces(ctx.workspaces.list.getSnapshot().items).find(item => item.workspaceId === projectId)
+        const project = SidebarOrganization.projectWorkspaces({ workspaces: ctx.workspaces.list.getSnapshot().items }).find(
+          item => item.workspaceId === projectId,
+        )
         // Every New chat gets its own identity; unfinished drafts are reopened from their rows.
         if (project !== undefined) ctx.uiWorkspace.startSession(project.workspaceId)
       },

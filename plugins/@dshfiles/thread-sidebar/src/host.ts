@@ -20,6 +20,7 @@ import { ClientModules } from './client-modules-promise.js'
 import { FinishedTurnAttention } from './inbox-provider.js'
 import { InflightTurns } from './inflight-turns.js'
 import { threadSidebarMachineApi } from './machine-api.js'
+import { threadSidebarThreadDirectoriesApi } from './thread-directories-api.js'
 import { MachineName } from './machine-name.js'
 import { threadSidebarNavigationApi } from './navigation-api.js'
 import { notificationHistoryApi } from './notification-history-api.js'
@@ -234,6 +235,9 @@ export default DshxPlugin.make({
       record: input => NavigationCounter.use(counter => Effect.as(counter.record(input), { recorded: true })),
       counts: () => NavigationCounter.use(counter => counter.counts),
       reset: () => NavigationCounter.use(counter => counter.reset),
+    }),
+    Api.bind(threadSidebarThreadDirectoriesApi, {
+      list: input => ThreadActions.use(actions => actions.threadDirectories(input)),
     }),
     Api.bind(threadSidebarMachineApi, {
       name: () => MachineName.use(machine => Effect.map(machine.name, name => ({ name }))),

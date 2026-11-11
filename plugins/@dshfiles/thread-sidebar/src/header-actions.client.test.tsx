@@ -38,6 +38,7 @@ const labels = {
   threadSidebarReferencedBy: 'Referenced by',
 } satisfies Readonly<Record<string, string>>
 
+const NO_THREAD_DIRECTORIES: ReadonlyMap<string, string> = new Map()
 const labelFor = (key: string): string => Object.entries(labels).find(([label]) => label === key)?.[1] ?? key
 
 type ClusterResize = (entries: readonly { readonly contentRect: { readonly width: number } }[]) => void
@@ -92,6 +93,7 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
     unpinSession,
     openThread: vi.fn(),
     continueInProject: vi.fn(async () => sessionId),
+    useThreadDirectories: () => NO_THREAD_DIRECTORIES,
     t: key => labelFor(key),
   }
   const actions = (

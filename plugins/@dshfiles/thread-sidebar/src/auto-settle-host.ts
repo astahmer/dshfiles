@@ -46,7 +46,11 @@ export class AutoSettleSources extends Context.Service<
           }))
           return {
             sessions,
-            workspaceBySession: SidebarOrganization.workspaceForSessions({ workspaces: yield* host.workspaces, sessions }),
+            workspaceBySession: SidebarOrganization.workspaceForSessions({
+              workspaces: yield* host.workspaces,
+              sessions,
+              threadDirectories: yield* host.threadDirectories,
+            }),
             archivedSessionIds: new Set(yield* host.archivedSessionIds),
             pinnedSessionIds: new Set(yield* host.pinnedSessionIds),
             settledSessionIds: new Set(yield* settings.settledSessionIds),

@@ -86,6 +86,7 @@
     "@dshfiles/session-controller": "workspace:*",
     "@dshfiles/settings-shell": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/vcs-provider-port": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
     "@dshfiles/workspace-folder-picker": "workspace:*",
     "@effect/platform-node": "catalog:",

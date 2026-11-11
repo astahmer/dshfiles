@@ -5,7 +5,7 @@ import type { FolderInspection } from '@dshfiles/workspace-folder-picker/project
 import { Effect, Option, Schedule, Schema } from 'effect'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
-import { WorkspacePaths } from './workspace-paths.js'
+import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
 
 /** One Host verb as the actions read it; its failure carries the Host's own error as `cause`. */
 export type HostEffect<A> = Effect.Effect<A, ThreadHostCallFailed>
@@ -38,6 +38,8 @@ export interface ThreadActionDeps {
   /** Full-text search over session messages; the reference lookup asks it for one session id. */
   readonly searchThreadContent: (query: string, limit: number) => HostEffect<readonly ThreadReferenceMention[]>
   readonly projects: () => readonly ProjectRow[]
+  /** Where the VCS providers put these projects' thread workspaces; a custom threads directory is only known here. */
+  readonly threadDirectories: (projectPaths: readonly string[]) => HostEffect<ThreadDirectories>
   readonly archivedSessionIds: () => readonly string[]
   readonly pinnedSessionIds: () => readonly string[]
   readonly settledSessionIds: () => readonly string[]
@@ -151,6 +153,9 @@ export interface ThreadSelectModelInput {
   readonly provider: string
   readonly model: string
   readonly reasoningEffort?: string | undefined
+}
+export interface ThreadDirectoriesInput {
+  readonly projectPaths: readonly string[]
 }
 export interface ProjectRegisterInput {
   readonly path: string
@@ -308,6 +313,13 @@ const projectIdForPath = (deps: ThreadActionDeps, cwd: string | undefined): stri
     return undefined
   }
 }
+
+const MAX_THREAD_DIRECTORIES = 1000
+const NO_THREAD_DIRECTORIES: ThreadDirectories = new Map()
+
+/** The providers' thread directories, or none: grouping falls back to the default layout rather than failing. */
+const reportedThreadDirectories = (deps: ThreadActionDeps, projectPaths: readonly string[]) =>
+  deps.threadDirectories(projectPaths).pipe(Effect.orElseSucceed(() => NO_THREAD_DIRECTORIES))
 
 /** Run one Host verb, reporting its failure the way the actions API always has. */
 const attempt = <A>(effect: HostEffect<A>, message: string) => Effect.mapError(effect, error => failure(error, message))
@@ -599,16 +611,29 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     }
   }),
 
-  projectList: () =>
-    Effect.sync(() => ({
-      // A project list names projects: the jj workspaces threads run in are workspaces of one, so they stay out.
-      projects: WorkspacePaths.projects(deps.projects()).map(project => ({
+  projectList: Effect.fn('thread actions project list')(function* () {
+    // A project list names projects: the thread workspaces threads run in are workspaces of one, so they stay out.
+    const candidates = WorkspacePaths.projects({ rows: deps.projects() })
+    const threadDirectories = yield* reportedThreadDirectories(
+      deps,
+      candidates.map(project => project.path),
+    )
+    return {
+      projects: WorkspacePaths.projects({ rows: candidates, threadDirectories }).map(project => ({
         projectId: project.projectId,
         title: project.title,
         path: project.path,
         threadCount: project.sessionIds.length,
       })),
-    })).pipe(Effect.withSpan('thread actions project list')),
+    }
+  }),
+
+  threadDirectories: Effect.fn('thread actions thread directories')(function* (input: ThreadDirectoriesInput) {
+    const threadDirectories = yield* reportedThreadDirectories(deps, input.projectPaths)
+    return {
+      directories: [...threadDirectories].slice(0, MAX_THREAD_DIRECTORIES).map(([threadsDirectory, repoRoot]) => ({ threadsDirectory, repoRoot })),
+    }
+  }),
 
   projectRegister: Effect.fn('thread actions project register')(function* ({ input }: ThreadActionContext<ProjectRegisterInput>) {
     const inspection = yield* Effect.option(attempt(deps.inspectProject(input.path), `Could not inspect ${input.path}.`))

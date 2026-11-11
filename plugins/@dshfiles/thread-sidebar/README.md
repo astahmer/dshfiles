@@ -264,8 +264,12 @@ the Host once per row, archive refuses while a selected thread is running, and
 every verb honors the Apply actions to child threads preference. Archive keeps
 its undo notice and clears the selection when it succeeds.
 
-**Project attribution.** A `jj-integration` thread workspace
-(`<repository>-threads/<thread>`) is attributed to its owning repository. A
+**Project attribution.** A thread workspace is attributed to its owning
+repository. Its folder comes from the VCS providers (jj-integration,
+git-worktrees) through `@dshfiles/vcs-provider-port`'s `threadsDirectories`,
+so a custom `threadsDirectory` setting (`<dir>/<repository name>/<thread>`)
+groups correctly; with no provider answering, the default
+`<repository>-threads/<thread>` layout applies. A
 session the Host accounts to no workspace at all — for example after its thread
 workspace registration was deleted, or when it was created with an explicit
 `cwd` instead of a workspace — is attributed to the project its recorded `cwd`

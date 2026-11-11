@@ -16,6 +16,8 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Context, Effect, Layer, Option } from 'effect'
 import type { RebasedThread } from './rebased-threads.js'
 import { HostCallFailed, HostCapabilityMissing } from './sidebar-errors.js'
+import { loadThreadDirectories } from './thread-directories-host.js'
+import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
 
 type SessionListItem = Awaited<ReturnType<CordisContext['sessionController']['list']>>['items'][number]
 
@@ -62,6 +64,8 @@ export class SidebarHost extends Context.Service<
     readonly runningJobCount: Effect.Effect<number>
     readonly sessions: Effect.Effect<ReadonlyArray<HostSession>, HostCallFailed>
     readonly workspaces: Effect.Effect<ReadonlyArray<HostWorkspace>>
+    /** Where the VCS providers put the registered projects' thread workspaces; empty without a provider. */
+    readonly threadDirectories: Effect.Effect<ThreadDirectories>
     readonly archivedSessionIds: Effect.Effect<ReadonlyArray<string>>
     readonly pinnedSessionIds: Effect.Effect<ReadonlyArray<string>>
     readonly flushPersistence: Effect.Effect<void, HostCapabilityMissing | HostCallFailed>
@@ -119,6 +123,13 @@ export class SidebarHost extends Context.Service<
         ),
         workspaces: Effect.sync(() =>
           ctx.workspaceRegistry.list().map(workspace => ({ workspaceId: workspace.id, path: workspace.path, sessionIds: [...workspace.sessionIds] })),
+        ),
+        threadDirectories: Effect.suspend(() =>
+          loadThreadDirectories({
+            ctx,
+            packageId: host.packageId,
+            projectPaths: WorkspacePaths.projects({ rows: ctx.workspaceRegistry.list() }).map(workspace => workspace.path),
+          }),
         ),
         archivedSessionIds: Effect.sync(() => [...ctx.workspaceRegistry.archivedSessionIds]),
         pinnedSessionIds: Effect.sync(() => [...ctx.workspaceRegistry.pinnedSessionIds]),

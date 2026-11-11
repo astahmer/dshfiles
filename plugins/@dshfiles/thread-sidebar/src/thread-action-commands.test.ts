@@ -17,6 +17,7 @@ const actionsLayer = (input: { readonly settled: Ref.Ref<ReadonlyArray<string>>;
     listThreadRelations: unused,
     searchThreadContent: unused,
     projects: () => [],
+    threadDirectories: () => Effect.succeed(new Map()),
     archivedSessionIds: () => [],
     pinnedSessionIds: () => [],
     settledSessionIds: () => [],

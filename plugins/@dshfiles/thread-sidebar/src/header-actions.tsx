@@ -20,6 +20,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, ArchiveRestoreIcon, BellIcon, BellOffIcon, CopyIcon, EllipsisIcon, PauseIcon, PinIcon, PinOffIcon } from '@dshfiles/plugin-ui/icons'
 import { useLayoutEffect, useMemo, useState } from 'react'
+import type { ThreadDirectories } from './workspace-paths.js'
 import { ThreadMuteModel, THREAD_MUTE_OPTIONS, type ThreadMuteOption } from './thread-mute.js'
 import { ThreadChildrenModel } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
@@ -39,6 +40,8 @@ interface HeaderThreadActionsInjected {
   openThread: (sessionId: SessionSummary['id']) => void
   /** Fork the thread into another project and settle it; resolves to the continuing thread. */
   continueInProject: (sessionId: SessionSummary['id'], projectId: string) => Promise<SessionSummary['id']>
+  /** Where the VCS providers keep each project's thread workspaces, so a custom threads directory groups correctly. */
+  useThreadDirectories: (workspaces: readonly { readonly path: string }[]) => ThreadDirectories
 }
 
 // Only the slot props this component reads, so a test can supply them without the whole runtime surface.
@@ -100,6 +103,7 @@ export const HeaderThreadActions = ({
   unpinSession,
   openThread,
   continueInProject,
+  useThreadDirectories,
   t,
 }: HeaderThreadActionsProps) => {
   const sessionState = useSessions(HostSnapshotsModel.selectStableSessionListState)
@@ -117,9 +121,10 @@ export const HeaderThreadActions = ({
   // Only lineage, blankness, running and folder feed the derivations below; a streaming turn republishes the list
   // several times a second with none of them changed, and three mounted conversations each render this header.
   const actionRowsById = useStableValue(sessionState.byId, sameActionRows)
+  const threadDirectories = useThreadDirectories(workspaceItems)
   const workspaceBySession = useMemo(
-    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceItems, sessions: Object.values(actionRowsById) }),
-    [actionRowsById, workspaceItems],
+    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceItems, sessions: Object.values(actionRowsById), threadDirectories }),
+    [actionRowsById, threadDirectories, workspaceItems],
   )
   const { targetIds, descendantRunning } = useMemo(() => {
     const sessions = Object.values(actionRowsById)

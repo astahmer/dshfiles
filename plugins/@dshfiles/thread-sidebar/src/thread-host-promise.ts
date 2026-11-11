@@ -16,6 +16,7 @@ import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { SidebarSettings } from './sidebar-settings.js'
 import { createThreadActions, type HostEffect, type ThreadActionDeps, type ThreadActionSet } from './thread-actions.js'
 import { uniqueProjectTitle } from './project-titles.js'
+import { loadThreadDirectories } from './thread-directories-host.js'
 
 const PROMPT_TIMEOUT_MS = 15_000
 
@@ -93,6 +94,7 @@ export class ThreadActions extends Context.Service<ThreadActions, ThreadActionSe
             path: workspace.path,
             sessionIds: [...workspace.sessionIds],
           })),
+        threadDirectories: projectPaths => loadThreadDirectories({ ctx, packageId, projectPaths }),
         archivedSessionIds: () => [...ctx.workspaceRegistry.archivedSessionIds],
         pinnedSessionIds: () => [...ctx.workspaceRegistry.pinnedSessionIds],
         settledSessionIds: settings.settledSessionIdsNow,

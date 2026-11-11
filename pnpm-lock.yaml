@@ -8486,6 +8486,9 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      '@dshfiles/vcs-provider-port':
+        specifier: workspace:*
+        version: link:../vcs-provider-port
       '@dshfiles/workbench':
         specifier: workspace:*
         version: link:../workbench

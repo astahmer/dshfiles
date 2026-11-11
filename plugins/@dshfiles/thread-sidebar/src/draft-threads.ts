@@ -2,6 +2,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import * as Schema from 'effect/Schema'
 import { threadWorkspaceName } from '@dshfiles/jj-integration/api'
+import { type ThreadDirectories, WorkspacePaths, workspaceName } from './workspace-paths.js'
 
 /**
  * An empty draft thread: a Session that never got a first prompt. The Host titles a thread only after its first turn
@@ -28,15 +29,9 @@ interface DraftCleanupPlan {
   readonly workspacePaths: readonly string[]
 }
 
-/** Paths of `<repository>-threads/<thread-…>` are the disposable workspaces jj-integration provisions per thread. */
-const THREADS_DIRECTORY_SUFFIX = '-threads'
-
-const isThreadWorkspacePath = (path: string): boolean => {
-  const segments = path.split('/')
-  const name = segments.at(-1)
-  const parent = segments.at(-2)
-  return name !== undefined && parent !== undefined && parent.endsWith(THREADS_DIRECTORY_SUFFIX) && Schema.is(threadWorkspaceName)(name)
-}
+/** A `thread-…` folder in a project's thread directory is a disposable workspace provisioned for one thread. */
+const isThreadWorkspacePath = (input: { readonly path: string; readonly threadDirectories: ThreadDirectories | undefined }): boolean =>
+  WorkspacePaths.isJjWorkspace(input) && Schema.is(threadWorkspaceName)(workspaceName(input.path))
 
 export class DraftThreadsModel {
   /** A thread the user never prompted, so it carries no title and no history worth a row. */
@@ -63,10 +58,11 @@ export class DraftThreadsModel {
   static readonly planCleanup = (input: {
     readonly drafts: readonly DraftThreadSession[]
     readonly workspaces: readonly ThreadWorkspaceRef[]
+    readonly threadDirectories?: ThreadDirectories | undefined
   }): DraftCleanupPlan => {
     const draftIds = new Set(input.drafts.map(draft => draft.id))
     const workspacePaths = input.workspaces
-      .filter(workspace => isThreadWorkspacePath(workspace.path))
+      .filter(workspace => isThreadWorkspacePath({ path: workspace.path, threadDirectories: input.threadDirectories }))
       .filter(workspace => workspace.sessionIds.length > 0 && workspace.sessionIds.every(sessionId => draftIds.has(sessionId)))
       .map(workspace => workspace.path)
     return { sessionIds: input.drafts.map(draft => draft.id), workspacePaths }

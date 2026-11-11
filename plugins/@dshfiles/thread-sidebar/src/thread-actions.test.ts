@@ -43,6 +43,7 @@ const effectDeps = (deps: FixtureDeps): ThreadActionDeps => ({
   readTitles: hostVerb(deps.readTitles),
   listThreadRelations: hostVerb(deps.listThreadRelations),
   searchThreadContent: hostVerb(deps.searchThreadContent),
+  threadDirectories: hostVerb(deps.threadDirectories),
   setSettled: hostVerb(deps.setSettled),
   archive: hostVerb(deps.archive),
   unarchive: hostVerb(deps.unarchive),
@@ -90,6 +91,7 @@ const createThreadActions = (deps: FixtureDeps) => {
     selectModel: call(actions.selectModel),
     fanOut: call(actions.fanOut),
     projectList: () => Effect.runPromise(actions.projectList()),
+    threadDirectories: (input: { readonly projectPaths: readonly string[] }) => Effect.runPromise(actions.threadDirectories(input)),
     projectRegister: call(actions.projectRegister),
     projectRename: call(actions.projectRename),
     projectDelete: call(actions.projectDelete),
@@ -105,6 +107,7 @@ const createDeps = (overrides: Partial<FixtureDeps> = {}): FixtureDeps => ({
   listThreadRelations: async () => [],
   searchThreadContent: async () => [],
   projects: () => [],
+  threadDirectories: async () => new Map(),
   archivedSessionIds: () => [],
   pinnedSessionIds: () => [],
   settledSessionIds: () => [],
@@ -768,6 +771,37 @@ describe('thread actions: projects', () => {
     )
 
     expect((await actions.projectList()).projects.map(project => project.projectId)).toEqual(['project-1', 'project-2'])
+  })
+
+  test('lists projects without thread workspaces a VCS provider keeps in a custom threads directory', async () => {
+    const workspace = (projectId: string, path: string): ProjectRow => ({ projectId, title: path.split('/').at(-1) ?? path, path, sessionIds: [] })
+    const asked: string[][] = []
+    const projects = [workspace('project-1', '/work/dshfiles'), workspace('workspace-1', '/elsewhere/dshfiles/thread-1b7a8c')]
+    const reporting = createThreadActions(
+      createDeps({
+        projects: () => projects,
+        threadDirectories: async projectPaths => {
+          asked.push([...projectPaths])
+          return new Map([['/elsewhere/dshfiles', '/work/dshfiles']])
+        },
+      }),
+    )
+    const failing = createThreadActions(
+      createDeps({
+        projects: () => projects,
+        threadDirectories: async () => {
+          throw new Error('no provider')
+        },
+      }),
+    )
+
+    expect((await reporting.projectList()).projects.map(project => project.projectId)).toEqual(['project-1'])
+    expect(asked).toEqual([['/work/dshfiles', '/elsewhere/dshfiles/thread-1b7a8c']])
+    expect(await reporting.threadDirectories({ projectPaths: ['/work/dshfiles'] })).toEqual({
+      directories: [{ threadsDirectory: '/elsewhere/dshfiles', repoRoot: '/work/dshfiles' }],
+    })
+    expect((await failing.projectList()).projects.map(project => project.projectId)).toEqual(['project-1', 'workspace-1'])
+    expect(await failing.threadDirectories({ projectPaths: ['/work/dshfiles'] })).toEqual({ directories: [] })
   })
 
   test('moves a thread into a project', async () => {
