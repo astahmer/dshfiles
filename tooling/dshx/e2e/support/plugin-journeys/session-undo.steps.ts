@@ -8,6 +8,18 @@ import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThre
 
 const projects = new WeakMap<Page, string>()
 
+const threadComposer = (page: Page) => page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })
+
+/** The New thread view can stay on screen after a thread starts, so open the started thread before sending into it. */
+const openStartedThread = async (page: Page): Promise<void> => {
+  if (await threadComposer(page).isVisible().catch(() => false)) return
+  const thread = page.getByRole('treeitem', { name: /^Fake thread title/u }).first()
+  // Before the first turn the thread does not exist yet: its message is sent from the New thread composer.
+  if (!(await thread.isVisible().catch(() => false))) return
+  await thread.click()
+  await expect(threadComposer(page)).toBeVisible({ timeout: 30_000 })
+}
+
 const projectFor = (page: Page): string => {
   const project = projects.get(page)
   if (project === undefined) throw new Error('No scratch project was created in this scenario.')
@@ -59,6 +71,7 @@ Then('the project is still a git-only repository', async ({ page }: { page: Page
 })
 
 When('the thread asks bash to write {string}', async ({ page }: { page: Page }, file: string) => {
+  await openStartedThread(page)
   await sendMessage(page, `[[call bash ${JSON.stringify({ command: `echo written > ${file}`, description: 'Undo journey write' })}]]`)
 })
 
@@ -68,6 +81,7 @@ When('the thread asks bash to write {string}', async ({ page }: { page: Page }, 
  * a scratch DSH from this checkout can fail every tool call ("reading 'prepare'", the agent loop's tool scheduler).
  */
 When('the thread runs a turn that leaves {string} in the project', async ({ page }: { page: Page }, file: string) => {
+  await openStartedThread(page)
   await sendMessage(page, `Rewind journey turn for ${file}`)
   await writeFile(join(projectFor(page), file), `left by the turn for ${file}\n`)
 })
