@@ -167,6 +167,23 @@ export function createSettingsClientRuntime(ctx: ContextLike): SettingsClientRun
   }
 }
 
+/**
+ * Read one Settings contract from a plugin service, outside any component, through the same official mirror as
+ * `useSettings`. The value is `undefined` until the Host answers, and stays so on a Host that does not register the
+ * namespace: callers fall back to their defaults. Forced by `@dshfiles/sidebar-right`, whose resident-Session window
+ * is a controller policy, not a rendered value.
+ * @param ctx - the plugin's Client context.
+ * @param contract - the Settings contract to read.
+ * @returns the decoded value and its change subscription.
+ */
+export function observeSettings<Schema extends z<any, object>, ClientValue extends object>(
+  ctx: ContextLike,
+  contract: SettingsContract<Schema, ClientValue>,
+): { readonly getSnapshot: () => ClientValue | undefined; readonly subscribe: (listener: () => void) => () => void } {
+  const { scope } = createSettingsClientRuntime(ctx).binding(contract)
+  return { getSnapshot: () => scope.getSnapshot().value, subscribe: listener => scope.subscribe(listener) }
+}
+
 /** Wrap a Slot component with the Settings runtime owned by its Client Fiber. */
 export function provideSettingsContext(component: (props: any) => ReactNode, client: SettingsClientRuntime): (props: any) => ReactNode {
   return (props: any) => runtime().createElement(context().Provider, { value: client }, runtime().createElement(component, props))

@@ -854,6 +854,31 @@ describe('client compiler', () => {
     expect(plugin.inject).toEqual(['slots', 'configForms'])
   })
 
+  it('infers settingsScope from observeSettings in a plugin setup', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      [
+        "import { defineClient, observeSettings } from '@dshfiles/dshx/client'",
+        "import { defineSettings } from '@dshfiles/dshx/settings'",
+        "const schema = Object.assign(value => value, { toJSON: () => ({ type: 'object' }) })",
+        "const settings = defineSettings({ namespace: 'fixture', schema })",
+        'export default defineClient({ setup(ctx) { observeSettings(ctx, settings).subscribe(() => {}) } })',
+        '',
+      ].join('\n'),
+    )
+    await buildClient({
+      packageId: '@dshx/fixture-plugin',
+      root,
+      entry: 'src/client.tsx',
+      outDir: 'dist',
+      inject: ['@deepseek-ai/dsh-client-ui-settings'],
+    })
+    const code = await readFile(resolve(root, 'dist/client.js'), 'utf8')
+    expect(code).toContain('settingsCapability: true')
+    expect(code).not.toContain('@dshfiles/dshx/settings')
+  })
+
   it('does not infer Settings when an imported hook is removed by tree-shaking', async () => {
     const root = await temporaryProject()
     await writeFile(

@@ -68,7 +68,7 @@ export const createApiClient = ApiRuntimeModel.createClient
 /** Call a dshx API discovered through `dshxRegistryApi` without importing its contract. */
 export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient
 export type { RegisteredApiSpec } from '../api/runtime.js'
-export { useSettings } from '../settings/client.js'
+export { observeSettings, useSettings } from '../settings/client.js'
 export { SettingsWriteJournal } from '../settings/write-journal.js'
 export type { JournaledSettingsForm, SettingsWriteOp } from '../settings/write-journal.js'
 export type { SettingsMutationState, SettingsReadError, SettingsState } from '../settings/types.js'

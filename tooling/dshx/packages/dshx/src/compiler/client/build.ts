@@ -263,7 +263,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `import { ApiRuntimeModel } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           'export const createApiClient = ApiRuntimeModel.createClient',
           'export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient',
-          `export { useSettings } from ${JSON.stringify(VIRTUAL_CLIENT_SETTINGS_HOOK)}`,
+          `export { observeSettings, useSettings } from ${JSON.stringify(VIRTUAL_CLIENT_SETTINGS_HOOK)}`,
           `import { SettingsPageRendererModel } from ${JSON.stringify(SETTINGS_PAGE_RENDERER_PATH)}`,
           'export const provideSettingsPageRenderer = SettingsPageRendererModel.provide',
           `import { BrowserBroker } from ${JSON.stringify(CLIENT_BROKER_PATH)}`,
@@ -315,8 +315,9 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
       }
       if (id === VIRTUAL_CLIENT_SETTINGS_HOOK) {
         return [
-          `import { useSettings as useSettingsImplementation } from ${JSON.stringify(SETTINGS_CLIENT_PATH)}`,
+          `import { observeSettings as observeSettingsImplementation, useSettings as useSettingsImplementation } from ${JSON.stringify(SETTINGS_CLIENT_PATH)}`,
           'export function useSettings(...args) { return useSettingsImplementation(...args) }',
+          'export function observeSettings(...args) { return observeSettingsImplementation(...args) }',
           '',
         ].join('\n')
       }
@@ -393,7 +394,7 @@ function clientCapabilitiesPlugin(options: BuildClientOptions): Plugin {
       const settingsRetained = retainedHookExports(chunk.modules, VIRTUAL_CLIENT_SETTINGS_HOOK).length > 0
       const apiRetained = [VIRTUAL_CLIENT_API_HOOKS, VIRTUAL_CLIENT_HOST_STORAGE].some(module => retainedHookExports(chunk.modules, module).length > 0)
       if (settingsRetained && !(options.inject ?? []).includes(SETTINGS_PROVIDER_PACKAGE)) {
-        throw new DshxError('DSHX1203', 'useSettings() requires the official Settings Scope provider package edge.', {
+        throw new DshxError('DSHX1203', 'useSettings()/observeSettings() requires the official Settings Scope provider package edge.', {
           hint: `Add ${JSON.stringify(SETTINGS_PROVIDER_PACKAGE)} to package.json dsh.client.inject, then rebuild.`,
         })
       }

@@ -2,7 +2,7 @@ import Schema from '@deepseek-ai/schemastery'
 import React from 'react'
 import type { SettingsContract } from '../src/settings/index.js'
 import type { SettingsClientRuntime } from '../src/settings/client.js'
-import { createSettingsClientRuntime, useSettings } from '../src/settings/client.js'
+import { createSettingsClientRuntime, observeSettings, useSettings } from '../src/settings/client.js'
 import { defineSettings } from '../src/settings/index.js'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as EffectSchema from 'effect/Schema'
@@ -186,5 +186,37 @@ describe('useSettings', () => {
       mirror: { status: 'ready', view: { namespaces: [], writable: true }, error: 'refresh failed' },
     })
     expect(render(contract).error?.kind).toBe('sync-failed')
+  })
+})
+
+describe('observeSettings', () => {
+  it('reads the decoded value outside a component and follows its changes, undefined until the Host answers', () => {
+    const contract = defineSettings({ namespace: 'runtime-observe', schema: Schema.object({ limit: Schema.number().default(4) }) })
+    let snapshot: Record<string, unknown> = { status: 'loading', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false }
+    const listeners = new Set<() => void>()
+    const scope = {
+      getSnapshot: () => snapshot,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+      mutate: async () => true,
+    }
+    const configForms = { get: () => scope, describe: () => ({ getSnapshot: () => ({}), subscribe: () => () => undefined, ensure: () => Promise.resolve() }) }
+    const observed = observeSettings({ get: name => (name === 'configForms' ? configForms : undefined) }, contract)
+    expect(observed.getSnapshot()).toBeUndefined()
+    const changed = vi.fn()
+    const unsubscribe = observed.subscribe(changed)
+    snapshot = { status: 'ready', value: { limit: 0 }, base: {}, user: { limit: 0 }, revision: 1, writable: true }
+    for (const listener of listeners) listener()
+    expect(changed).toHaveBeenCalledTimes(1)
+    expect(observed.getSnapshot()).toEqual({ limit: 0 })
+    unsubscribe()
+    expect(listeners.size).toBe(0)
+  })
+
+  it('stays undefined without the official Settings provider, so callers keep their defaults', () => {
+    const contract = defineSettings({ namespace: 'runtime-observe-missing', schema: Schema.object({ limit: Schema.number().default(4) }) })
+    expect(observeSettings({ get: () => undefined }, contract).getSnapshot()).toBeUndefined()
   })
 })
