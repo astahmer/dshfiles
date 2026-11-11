@@ -1108,6 +1108,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/editor/open-file",
+      "kind": "module",
+      "title": "@dshfiles/editor/open-file",
+      "summary": "Cross-plugin entry point: any plugin opens a file in the editor with `window.dispatchEvent(new CustomEvent('dshfiles:open-file', { detail, cancelable: true }))`. The editor calls `preventDefault()` when it took the request, so `dispatchEvent` returning false means handled (same contract as `dshfiles:open-settings`).",
+      "publicSymbol": "OPEN_FILE_EVENT, EDITOR_FILES_PANE_ID, openFileRequestSchema, GO_TO_LINE_EVENT, goToLineRequestSchema, OpenFileRequest",
+      "importFrom": "@dshfiles/editor/open-file",
+      "owner": "@dshfiles/editor",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [
+        "Also exports: dispatchOpenFile, fileLinkParamsSchema, OpenFileAddress"
+      ],
+      "source": "plugins/@dshfiles/editor/src/open-file.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/fff-search/fff-worker",
       "kind": "module",
       "title": "@dshfiles/fff-search/fff-worker",
@@ -1279,7 +1301,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "jjIntegrationApi",
       "importFrom": "@dshfiles/jj-integration/api",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/api.ts:239",
+      "source": "plugins/@dshfiles/jj-integration/src/api.ts:240",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/jj-integration:jj-threads",
@@ -1557,7 +1579,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/multi-host/api",
       "summary": "Public module of @dshfiles/multi-host.",
-      "publicSymbol": "JsonValue, LocalProjectFileCandidate, jsonValueSchema, resourceSnapshotSchema, fileUploadValueSchema, sessionRepositoryReads",
+      "publicSymbol": "JsonValue, LocalProjectFileCandidate, jsonValueSchema, resourceSnapshotSchema, maxDirectoryEntries, directoryListingSchema",
       "importFrom": "@dshfiles/multi-host/api",
       "owner": "@dshfiles/multi-host",
       "scope": "client or host",
@@ -1568,7 +1590,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: sessionRepositoryWrites, remotePeerReadCalls, jjRevisionEffectSchema, jjThreadEffectSchema, jjRepositoryEffectSchema, jjRepositoriesEffectSchema, jjRevisionSchema, jjThreadSchema, jjRepositorySchema, jjRepositoriesSchema, JjRevisionView, JjThreadView, JjRepositoryView, nativeRpcSchema, nativeRpcResultSchema, ProjectOriginsInput, cloneProjectInputEffectSchema, remoteQuestionWireSchema"
+        "Also exports: fileReferenceCandidatesSchema, fileUploadValueSchema, jjThreadsApiIdentity, sessionRepositoryReads, sessionRepositoryWrites, remotePeerReadCalls, jjRevisionEffectSchema, jjThreadEffectSchema, jjRepositoryEffectSchema, jjRepositoriesEffectSchema, jjRevisionSchema, jjThreadSchema, jjRepositorySchema, jjRepositoriesSchema, JjRevisionView, JjThreadView, JjRepositoryView, nativeRpcSchema"
       ],
       "source": "plugins/@dshfiles/multi-host/src/api.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -1642,7 +1664,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "automationsApi",
       "importFrom": "@dshfiles/project-automations/api",
       "owner": "@dshfiles/project-automations",
-      "source": "plugins/@dshfiles/project-automations/src/automations-api.ts:131",
+      "source": "plugins/@dshfiles/project-automations/src/automations-api.ts:132",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/project-automations:project-automations",
@@ -2110,6 +2132,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupants": [],
       "details": [],
       "source": "plugins/@dshfiles/settings-shell/src/settings.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/settings-shell/open-settings",
+      "kind": "module",
+      "title": "@dshfiles/settings-shell/open-settings",
+      "summary": "Cross-plugin entry point: any plugin opens Settings with `window.dispatchEvent(new CustomEvent('dshfiles:open-settings', { detail, cancelable: true }))`. The shell calls `preventDefault()` when it took the request, so `dispatchEvent` returning false means handled (the same contract as `dshfiles:open-file`).",
+      "publicSymbol": "OPEN_SETTINGS_EVENT, openSettingsRequestSchema, OpenSettingsRequest, dispatchOpenSettings",
+      "importFrom": "@dshfiles/settings-shell/open-settings",
+      "owner": "@dshfiles/settings-shell",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/settings-shell/src/open-settings.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -2608,6 +2650,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "Also exports: WorkbenchTabsActions, WorkbenchTabsProvider, WorkbenchTabAsideHandler, workbenchTabs, connectWorkbenchTabs, WorkbenchTabDocking"
       ],
       "source": "plugins/@dshfiles/workbench/src/tabs.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workbench/panel-occurrence",
+      "kind": "module",
+      "title": "@dshfiles/workbench/panel-occurrence",
+      "summary": "Two projects open the same semantic tab id, so the Workbench scope key joins the panel id.",
+      "publicSymbol": "panelOccurrence, useWorkbenchScopeKey, panelOccurrenceStorageKey",
+      "importFrom": "@dshfiles/workbench/panel-occurrence",
+      "owner": "@dshfiles/workbench",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workbench/src/panel-occurrence.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
