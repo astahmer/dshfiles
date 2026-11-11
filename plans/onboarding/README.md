@@ -1,15 +1,15 @@
 # Guided onboarding and feature discovery
 
-**Resume here:** P1 is being built in the new `@dshfiles/onboarding` plugin (see the progress table). Next after P1 is P2: **Enable / Disable pack** with an exact preview, and **Show me where**. P3–P5 wait for a later turn.
+**Resume here:** P1 is done and verified (`jj:ourwpqzn`, `jj:lmwrwqwu`, `jj:zqpnxvso`). Start P2: **Enable / Disable pack** with an exact preview (a Host method over `pluginManager.listPlugins` / `setPluginEnabled`, plus the profile-sync path for plugins not installed) and **Show me where** (replay `reach` against the live DOM). Open follow-ups from P1 are listed under _P1 follow-ups_.
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
-**Status:** P0 decided (2026-11-11), P1 in progress.
+**Status:** P0 decided, P1 done (2026-11-11); P2 not started.
 
 | Phase | Work                                                                                                                                                                | Status      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | P0    | Audience, owner, curated list, blocking-or-not, gallery home, packs                                                                                                 | done        |
-| P1    | Generated catalog + `onboarding` block schema + Knowledge section + gallery + packs (read-only) + self-ticking checklist + palette + wizard + `onboarding_overview` | in progress |
+| P1    | Generated catalog + `onboarding` block schema + Knowledge section + gallery + packs (read-only) + self-ticking checklist + palette + wizard + `onboarding_overview` | done        |
 | P2    | **Enable / Disable pack** (exact preview, reversible) + **Show me where** (replay `reach` against the live UI)                                                      | not started |
 | P3    | **What's new** from jj/git history (since last visit; upstream since fork point) + opt-in usage suggestions                                                         | not started |
 | P4    | Agent-led demo in a scratch thread (off by default) + `dshx init` profile composer + generated docs page per pack                                                   | not started |
@@ -17,13 +17,20 @@
 
 ### P1 progress
 
-| Step | Work                                                                                               | Status      |
-| ---- | -------------------------------------------------------------------------------------------------- | ----------- |
-| 1    | `onboarding` block in the dshx feature catalog schema (valid and invalid cases tested)             | not started |
-| 2    | Plugin scaffold, packs data, curated list, catalog generator + staleness test                      | not started |
-| 3    | Host API: overview + self-ticking checklist (`gh` span), `onboarding_overview` read tool, settings | not started |
-| 4    | Client: Knowledge section page (checklist, packs, features), palette + New tab, wizard step        | not started |
-| 5    | Feature catalog, journey, 390 px check, screenshots, README                                        | not started |
+| Step | Work                                                                                               | Status              |
+| ---- | -------------------------------------------------------------------------------------------------- | ------------------- |
+| 1    | `onboarding` block in the dshx feature catalog schema (valid and invalid cases tested)             | done: `jj:ourwpqzn` |
+| 2    | Plugin scaffold, packs data, curated list, catalog generator + staleness test                      | done: `jj:lmwrwqwu` |
+| 3    | Host API: overview + self-ticking checklist (`gh` span), `onboarding_overview` read tool, settings | done: `jj:lmwrwqwu` |
+| 4    | Client: Knowledge section page (checklist, packs, features), palette + New tab, wizard step        | done: `jj:zqpnxvso` |
+| 5    | Feature catalog, journey, 390 px check, screenshots, README                                        | done: `jj:zqpnxvso` |
+
+### P1 follow-ups
+
+1. The `account` item counts registered model provider routes, not working credentials (a fresh profile already registers two). A credential-aware check needs the Models page's provider/credential join on the Host; until then the copy says what it measures and points at AI accounts.
+2. The wizard is a non-modal card (top right), not a dialog: a modal blocked the scratch boot's "no modal overlay" check and is a gate in practice. Escape skips it.
+3. `src/generated/feature-catalog.ts` goes stale whenever any `dshx.features.json` changes, like `plugin-guide`'s catalog: regenerate both when landing (`pnpm --dir plugins/@dshfiles/onboarding generate`).
+4. The plugin is not in the `profiles/web` seed yet; adding it is a profile decision (and P2's Enable pack can then install the rest).
 
 ## Goal
 
@@ -338,18 +345,19 @@ None open: P0 closed all seven (owner, audience, blocking, gallery home, screens
 
 ## Decisions log
 
-| Date       | Decision                                                                                                | Rationale                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 2026-11-11 | Reuse `settings.onboarding` instead of building a tour engine or patching core                          | The coordinator, the empty-view gate, ordering and replay already ship in `settings-shell`      |
-| 2026-11-11 | Generate the catalog at build time from `dshx.features.json`, not from a live Host read                 | Same precedent and staleness guarantee as `plugin-guide`; no Inspect dependency, no private API |
-| 2026-11-11 | Tour progress is browser-local                                                                          | `docs/client-state-ownership.md` classifies tour and tab state as presentation                  |
-| 2026-11-11 | Owner: new `@dshfiles/onboarding` plugin                                                                | User decision; keeps `settings-shell` and `plugin-guide` focused                                |
-| 2026-11-11 | Audience: anyone; adopt the whole setup, a plugin, a pack or a feature                                  | User decision                                                                                   |
-| 2026-11-11 | Non-blocking and replayable                                                                             | User decision; matches OpenCode/Codex "only when needed" and keeps the app usable               |
-| 2026-11-11 | Gallery in Knowledge + palette + New tab chooser                                                        | User decision; AGENTS.md "each reusable view opens from both"                                   |
-| 2026-11-11 | Wizard has three steps; workspace isolation folds into Project                                          | User decision                                                                                   |
-| 2026-11-11 | Packs are data in `src/packs.ts`, validated against the plugin directories; a plugin may sit in several | User decision; one place to change, a test catches drift                                        |
-| 2026-11-11 | `onboarding` block lives in `dshx.features.json`, not a per-plugin framework                            | User decision (A3); the gallery, packs and agent tool read one source                           |
-| 2026-11-11 | Curated routes for bundles without a block live in `src/curation.ts` until P5                           | Avoids editing ~40 catalogs in P1; P5 makes blocks required                                     |
-| 2026-11-11 | The checklist is one Host read, never stored                                                            | The page and the agent tool must agree; the facts change outside DSH (`gh auth login`)          |
-| 2026-11-11 | Phases P1–P5 as listed; P2 starts only after P1 is verified                                             | User decision                                                                                   |
+| Date       | Decision                                                                                                | Rationale                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 2026-11-11 | Reuse `settings.onboarding` instead of building a tour engine or patching core                          | The coordinator, the empty-view gate, ordering and replay already ship in `settings-shell`                         |
+| 2026-11-11 | Generate the catalog at build time from `dshx.features.json`, not from a live Host read                 | Same precedent and staleness guarantee as `plugin-guide`; no Inspect dependency, no private API                    |
+| 2026-11-11 | Tour progress is browser-local                                                                          | `docs/client-state-ownership.md` classifies tour and tab state as presentation                                     |
+| 2026-11-11 | Owner: new `@dshfiles/onboarding` plugin                                                                | User decision; keeps `settings-shell` and `plugin-guide` focused                                                   |
+| 2026-11-11 | Audience: anyone; adopt the whole setup, a plugin, a pack or a feature                                  | User decision                                                                                                      |
+| 2026-11-11 | Non-blocking and replayable                                                                             | User decision; matches OpenCode/Codex "only when needed" and keeps the app usable                                  |
+| 2026-11-11 | Gallery in Knowledge + palette + New tab chooser                                                        | User decision; AGENTS.md "each reusable view opens from both"                                                      |
+| 2026-11-11 | Wizard has three steps; workspace isolation folds into Project                                          | User decision                                                                                                      |
+| 2026-11-11 | Packs are data in `src/packs.ts`, validated against the plugin directories; a plugin may sit in several | User decision; one place to change, a test catches drift                                                           |
+| 2026-11-11 | `onboarding` block lives in `dshx.features.json`, not a per-plugin framework                            | User decision (A3); the gallery, packs and agent tool read one source                                              |
+| 2026-11-11 | Curated routes for bundles without a block live in `src/curation.ts` until P5                           | Avoids editing ~40 catalogs in P1; P5 makes blocks required                                                        |
+| 2026-11-11 | The checklist is one Host read, never stored                                                            | The page and the agent tool must agree; the facts change outside DSH (`gh auth login`)                             |
+| 2026-11-11 | Phases P1–P5 as listed; P2 starts only after P1 is verified                                             | User decision                                                                                                      |
+| 2026-11-11 | The wizard is a non-modal card, not a dialog                                                            | A modal is a gate in practice and failed the scratch boot's no-modal-overlay check; Escape and Skip close the card |
