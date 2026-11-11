@@ -8,6 +8,7 @@ import { RegistryBuilder } from '../registry/build.js'
 import { RegistryClient } from '../registry/client.js'
 import { RegistryError, type RegistryIndexEntry } from '../registry/format.js'
 import type { SourceItemPlan } from '../registry/source-items.js'
+import { CliOutput } from './common.js'
 
 const HELP = `dshx registry — discover DSH plugins and plugin source, and publish your own registry.
 
@@ -103,11 +104,12 @@ export const runRegistryCli = async (
 ): Promise<number> => {
   const json = argv.includes('--json')
   const respond = <Data extends object>(command: string, data: Data, human: string): number => {
-    io.stdout.write(json ? `${JSON.stringify({ schemaVersion: 1, command, ok: true, data }, null, 2)}\n` : human)
+    if (json) CliOutput.emitEnvelope(io.stdout, { command, ok: true, data })
+    else io.stdout.write(human)
     return 0
   }
   const fail = (code: 'usage' | 'failed', message: string, hint: string): number => {
-    if (json) io.stdout.write(`${JSON.stringify({ schemaVersion: 1, command: 'registry', ok: false, error: { code, message, hint } }, null, 2)}\n`)
+    if (json) CliOutput.emitEnvelope(io.stdout, { command: 'registry', ok: false, error: { code, message, hint } })
     else io.stderr.write(`error: ${message}\n  fix: ${hint}\n`)
     return code === 'usage' ? 2 : 1
   }

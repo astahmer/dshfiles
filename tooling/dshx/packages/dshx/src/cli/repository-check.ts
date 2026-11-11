@@ -6,6 +6,7 @@ import { decodeJson } from '../json.js'
 import { BundleFreshness } from '../repository/bundle-freshness.js'
 import { PluginBoundaries } from '../repository/plugin-boundaries.js'
 import { RepositoryWorkspace, type WorkspacePackage } from '../repository/workspace.js'
+import { CliOutput } from './common.js'
 
 const HELP = `dshx check repo — repository health checks for a dshx monorepo or a standalone plugin repository.
 
@@ -114,7 +115,7 @@ export const runRepositoryCheckCli = (argv: readonly string[], io: { readonly st
   const command = 'check repo'
   const json = argv.includes('--json')
   const fail = (error: { readonly code: string; readonly message: string; readonly hint: string }): number => {
-    if (json) io.stdout.write(`${JSON.stringify({ schemaVersion: 1, command, ok: false, error }, null, 2)}\n`)
+    if (json) CliOutput.emitEnvelope(io.stdout, { command, ok: false, error })
     else io.stderr.write(`error: ${error.message}\n  fix: ${error.hint}\n`)
     return error.code === 'usage' ? 2 : 1
   }
@@ -138,7 +139,8 @@ export const runRepositoryCheckCli = (argv: readonly string[], io: { readonly st
     const packages = RepositoryWorkspace.packages({ root, decodeJson })
     const checks = (only === undefined ? checkNames : [only]).map(name => runCheck(name, root, packages))
     const ok = checks.every(check => check.ok)
-    io.stdout.write(json ? `${JSON.stringify({ schemaVersion: 1, command, ok, data: { root, checks } }, null, 2)}\n` : humanReport(checks))
+    if (json) CliOutput.emitEnvelope(io.stdout, { command, ok, data: { root, checks } })
+    else io.stdout.write(humanReport(checks))
     return ok ? 0 : 1
   } catch (error) {
     return fail({ code: 'failed', message: error instanceof Error ? error.message : String(error), hint: 'Run from inside a dshx repository, or pass --cwd.' })

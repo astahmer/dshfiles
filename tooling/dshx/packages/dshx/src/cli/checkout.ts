@@ -3,6 +3,7 @@ import type { Writable } from 'node:stream'
 import { CheckoutSyncError } from '../checkout/rebuild.js'
 import { syncCheckout, type CheckoutSyncResult } from '../checkout/sync.js'
 import { TracerModel } from '../tracing/tracer.js'
+import { CliOutput } from './common.js'
 
 const HELP = `dshx checkout sync — bring the jj checkout that runs DSH onto main.
 
@@ -68,11 +69,7 @@ export const runCheckoutCli = async (argv: readonly string[], io: { readonly std
   const command = `checkout ${action}`.trim()
   const json = argv.includes('--json')
   const fail = (error: CheckoutSyncError): number => {
-    if (json)
-      write(
-        io.stdout,
-        `${JSON.stringify({ schemaVersion: 1, command, ok: false, error: { code: error.code, message: error.message, hint: error.hint } }, null, 2)}\n`,
-      )
+    if (json) CliOutput.emitEnvelope(io.stdout, { command, ok: false, error: { code: error.code, message: error.message, hint: error.hint } })
     else write(io.stderr, `error: ${error.message}\n  fix: ${error.hint}\n`)
     return error.code === 'usage' ? 2 : 1
   }
@@ -142,7 +139,8 @@ export const runCheckoutCli = async (argv: readonly string[], io: { readonly std
       },
     )
     const ok = result.status === 'synced' || result.status === 'up-to-date' || result.status === 'would-sync'
-    write(io.stdout, json ? `${JSON.stringify({ schemaVersion: 1, command, ok, data: result }, null, 2)}\n` : humanReport(result))
+    if (json) CliOutput.emitEnvelope(io.stdout, { command, ok, data: result })
+    else write(io.stdout, humanReport(result))
     return ok ? 0 : 1
   } catch (error) {
     if (error instanceof CheckoutSyncError) return fail(error)

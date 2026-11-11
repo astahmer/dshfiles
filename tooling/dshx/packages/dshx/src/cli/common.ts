@@ -5,6 +5,9 @@ import type { CliIO } from './run.js'
 
 export type TerminalStyle = Parameters<typeof styleText>[0]
 
+/** The `--json` result every command group shares: `data` on a completed run, `error` when it could not run. */
+type CliEnvelope = { readonly command: string; readonly ok: boolean } & ({ readonly data: unknown } | { readonly error: unknown })
+
 const require = createRequire(import.meta.url)
 
 const packageVersion = (): string => {
@@ -29,6 +32,11 @@ export class CliOutput {
   static readonly write = (stream: Writable, text: string): void => {
     if (CliOutput.options.get(stream)?.quiet) return
     stream.write(text)
+  }
+
+  static readonly emitEnvelope = (stream: Writable, envelope: CliEnvelope): void => {
+    const outcome = 'data' in envelope ? { data: envelope.data } : { error: envelope.error }
+    stream.write(`${JSON.stringify({ schemaVersion: 1, command: envelope.command, ok: envelope.ok, ...outcome }, null, 2)}\n`)
   }
 
   static readonly paint = (stream: Writable, style: TerminalStyle, text: string): string => {

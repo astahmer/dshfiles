@@ -226,7 +226,7 @@ export async function runCli(argv: readonly string[], options: CliRunOptions = {
       const groupIndex = argv.indexOf(group)
       const action = argv.slice(groupIndex + 1).find(token => actions.has(token))
       const command = action === undefined ? group : `${group} ${action}`
-      write(io.stdout, `${JSON.stringify({ schemaVersion: 1, command, ok: false, error: { code: 'usage', message } }, null, 2)}\n`)
+      CliOutput.emitEnvelope(io.stdout, { command, ok: false, error: { code: 'usage', message } })
     } else {
       write(io.stderr, `error: ${message}\n`)
       write(io.stderr, 'Run "dshx --help" for usage.\n')

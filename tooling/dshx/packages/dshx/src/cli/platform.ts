@@ -19,6 +19,7 @@ import { runCommunicationCommand } from '../communication/cli.js'
 import { connectMultiHost, type MultiHost, type RuntimeStatusValue } from '../platform/dshx-channel.js'
 import { nativeRpcRequestSchema } from '../platform/native-rpc.js'
 import { SessionDigestModel } from '../platform/session-digest.js'
+import { CliOutput } from './common.js'
 
 const runFile = promisify(execFile)
 const engineRange = '^22.19.0 || >=24.0.0'
@@ -74,7 +75,7 @@ function safeMessage(error: unknown) {
 
 function emitResult<Result extends JsonValue | object>(args: CliArgs, io: PlatformCliIO, data: Result, message: string): void {
   if (args.json) {
-    write(io.stdout, `${JSON.stringify({ schemaVersion: 1, command: commandName(args), ok: true, data }, null, 2)}\n`)
+    CliOutput.emitEnvelope(io.stdout, { command: commandName(args), ok: true, data })
     return
   }
   if (args.quiet) return
@@ -84,7 +85,7 @@ function emitResult<Result extends JsonValue | object>(args: CliArgs, io: Platfo
 function emitError(args: CliArgs, io: PlatformCliIO, error: unknown): number {
   const problem = safeMessage(error)
   if (args.json) {
-    write(io.stdout, `${JSON.stringify({ schemaVersion: 1, command: commandName(args), ok: false, error: problem }, null, 2)}\n`)
+    CliOutput.emitEnvelope(io.stdout, { command: commandName(args), ok: false, error: problem })
   } else {
     write(io.stderr, `error [${problem.code}]: ${problem.message}\n`)
   }
@@ -216,23 +217,11 @@ function changeMessage(action: string, target: string, result: import('../platfo
 function emitRejectedChange(args: CliArgs, io: PlatformCliIO, action: string, target: string, result: import('../platform/client.js').ChangeResult): number {
   const message = changeMessage(action, target, result)
   if (args.json) {
-    write(
-      io.stdout,
-      `${JSON.stringify(
-        {
-          schemaVersion: 1,
-          command: commandName(args),
-          ok: false,
-          error: {
-            code: `change-${result.application}`,
-            message,
-            details: changeData(result),
-          },
-        },
-        null,
-        2,
-      )}\n`,
-    )
+    CliOutput.emitEnvelope(io.stdout, {
+      command: commandName(args),
+      ok: false,
+      error: { code: `change-${result.application}`, message, details: changeData(result) },
+    })
   } else {
     write(io.stderr, `error [change-${result.application}]: ${message}\n`)
   }
@@ -1003,10 +992,11 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
         if (result.status === 'refused') {
           const message = `DSH cannot install ${JSON.stringify(spec)}: ${result.reason}`
           if (args.json) {
-            write(
-              runtime.io.stdout,
-              `${JSON.stringify({ schemaVersion: 1, command: commandName(args), ok: false, error: { code: `plugin-${result.problem}`, message, details: result } }, null, 2)}\n`,
-            )
+            CliOutput.emitEnvelope(runtime.io.stdout, {
+              command: commandName(args),
+              ok: false,
+              error: { code: `plugin-${result.problem}`, message, details: result },
+            })
           } else {
             write(runtime.io.stderr, `error [plugin-${result.problem}]: ${message}\n`)
           }

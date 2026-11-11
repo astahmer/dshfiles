@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util'
 import type { Writable } from 'node:stream'
 import { sweepScratch } from '../scratch/sweep.js'
+import { CliOutput } from './common.js'
 
 const HELP = `dshx scratch sweep — stop scratch DSH Hosts nobody owns any more, and prune old scratch state.
 
@@ -39,7 +40,7 @@ export const runScratchSweepCli = async (argv: readonly string[], io: { readonly
   const result = await sweepScratch({ dryRun })
   const ok = result.leftRunning.length === 0
   if (values.json === true) {
-    io.stdout.write(`${JSON.stringify({ schemaVersion: 1, command: 'scratch sweep', ok, data: { dryRun, ...result } }, null, 2)}\n`)
+    CliOutput.emitEnvelope(io.stdout, { command: 'scratch sweep', ok, data: { dryRun, ...result } })
     return ok ? 0 : 1
   }
   const lines = result.actions.map(action => `  ${dryRun ? 'would ' : ''}${action.kind.padEnd(19)} ${action.target} — ${action.reason}`)

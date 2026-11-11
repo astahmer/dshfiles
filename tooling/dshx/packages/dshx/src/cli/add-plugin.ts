@@ -9,6 +9,7 @@ import { RegistryClient } from '../registry/client.js'
 import { RegistryError } from '../registry/format.js'
 import { SourceItems, type SourceItemPlan, type SourceTarget } from '../registry/source-items.js'
 import { humanSourcePlan } from './registry.js'
+import { CliOutput } from './common.js'
 
 const SHARED_OPTIONS = `  --profile <name>      Target profile (default "probe"; "web" only when named explicitly).
   --home <dir>          DSH home (default $DSH_HOME or ~/.dsh).
@@ -137,7 +138,7 @@ export const runProfilePluginCli = async (
 ): Promise<number> => {
   const json = argv.includes('--json')
   const fail = (code: 'usage' | 'failed', message: string, hint: string): number => {
-    if (json) io.stdout.write(`${JSON.stringify({ schemaVersion: 1, command, ok: false, error: { code, message, hint } }, null, 2)}\n`)
+    if (json) CliOutput.emitEnvelope(io.stdout, { command, ok: false, error: { code, message, hint } })
     else io.stderr.write(`error: ${message}\n  fix: ${hint}\n`)
     return code === 'usage' ? 2 : 1
   }
@@ -177,13 +178,8 @@ export const runProfilePluginCli = async (
   }
   try {
     const plan = (await sourcePlan()) ?? (await profilePlan())
-    io.stdout.write(
-      json
-        ? `${JSON.stringify({ schemaVersion: 1, command, ok: true, data: plan }, null, 2)}\n`
-        : 'packageName' in plan
-          ? humanReport(plan)
-          : humanSourcePlan(plan),
-    )
+    if (json) CliOutput.emitEnvelope(io.stdout, { command, ok: true, data: plan })
+    else io.stdout.write('packageName' in plan ? humanReport(plan) : humanSourcePlan(plan))
     return 0
   } catch (error) {
     if (error instanceof ProfilePluginError || error instanceof RegistryError) return fail('failed', error.message, error.hint)

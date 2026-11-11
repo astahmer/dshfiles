@@ -3,6 +3,7 @@ import * as Result from 'effect/Result'
 import * as Schema from 'effect/Schema'
 import type { Writable } from 'node:stream'
 import { DEFAULT_IDLE_TIMEOUT_MINUTES, DEFAULT_WARN_MINUTES, ScratchError, ScratchStateRuntime, scratchNameSchema } from '../scratch/state.js'
+import { CliOutput } from './common.js'
 
 export const SCRATCH_ACTIONS: ReadonlySet<string> = new Set(['up', 'doctor', 'open', 'shot', 'keep', 'down'])
 
@@ -190,16 +191,13 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
   const command = `dev ${action}`
   const json = argv.includes('--json')
   const fail = (error: ScratchError): number => {
-    if (json)
-      write(
-        io.stdout,
-        `${JSON.stringify({ schemaVersion: 1, command, ok: false, error: { code: error.code, message: error.message, hint: error.hint } }, null, 2)}\n`,
-      )
+    if (json) CliOutput.emitEnvelope(io.stdout, { command, ok: false, error: { code: error.code, message: error.message, hint: error.hint } })
     else write(io.stderr, `error: ${error.message}\n  fix: ${error.hint}\n`)
     return error.code === 'usage' ? 2 : 1
   }
   const succeed = <Data>(data: Data, human: string, ok = true): number => {
-    write(io.stdout, json ? `${JSON.stringify({ schemaVersion: 1, command, ok, data }, null, 2)}\n` : human)
+    if (json) CliOutput.emitEnvelope(io.stdout, { command, ok, data })
+    else write(io.stdout, human)
     return ok ? 0 : 1
   }
 
