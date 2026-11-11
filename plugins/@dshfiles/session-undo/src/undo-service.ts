@@ -455,18 +455,16 @@ export class SessionUndo extends Context.Service<
         if (provider !== null && undone.snapshot !== null)
           yield* refuseSharedDirectory({ sessionId, cwd: undone.cwd, except: [], verb, allow: options?.allowSharedDirectory })
         const previous = provider === null || undone.snapshot === null ? null : yield* files.restore({ provider, cwd: undone.cwd, snapshot: undone.snapshot })
-        const forkId = yield* sessions
-          .fork({ sessionId, atSeq: undone.forkAtSeq })
-          .pipe(
-            Effect.catch(error =>
-              previous === null || provider === null
-                ? Effect.fail(error)
-                : files.restore({ provider, cwd: undone.cwd, snapshot: previous }).pipe(
-                    Effect.mapError(cause => new ForkRollbackFailed({ provider, cwd: undone.cwd, turn: undone.turn, cause })),
-                    Effect.andThen(Effect.fail(new SessionForkFailed({ cause: error.cause, filesPutBack: true }))),
-                  ),
-            ),
-          )
+        const forkId = yield* sessions.fork({ sessionId, atSeq: undone.forkAtSeq }).pipe(
+          Effect.catch(error =>
+            previous === null || provider === null
+              ? Effect.fail(error)
+              : files.restore({ provider, cwd: undone.cwd, snapshot: previous }).pipe(
+                  Effect.mapError(cause => new ForkRollbackFailed({ provider, cwd: undone.cwd, turn: undone.turn, cause })),
+                  Effect.andThen(Effect.fail(new SessionForkFailed({ cause: error.cause, filesPutBack: true }))),
+                ),
+          ),
+        )
         yield* store(forkId, UndoHistory.forked({ source, forkId, undone, index, previous }))
         yield* sessions.copyModel({ from: sessionId, to: forkId })
         yield* sessions.archive(sessionId)

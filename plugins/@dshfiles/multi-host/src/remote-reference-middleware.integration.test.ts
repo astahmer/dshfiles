@@ -48,10 +48,7 @@ const remoteSnapshot = {
 const offlineSessionId = SessionId('offline-session')
 const offlineMention = formatSessionReferenceMention({ sessionId: offlineSessionId, label: 'Offline host' })
 
-const runAgent = async (input: {
-  readonly recordedThreads: readonly { readonly sessionId: string; readonly runtimeId: string }[]
-  readonly text?: string
-}) => {
+const runAgent = async (input: { readonly recordedThreads: readonly { readonly sessionId: string; readonly runtimeId: string }[]; readonly text?: string }) => {
   const ctx = new Context()
   let disposeAgent: (() => Promise<void>) | undefined
   const adapter = new ReferenceCaptureAdapter()

@@ -9,7 +9,16 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Deferred, Effect, Fiber, Layer, Option, Ref } from 'effect'
-import { FilesRestoreFailed, type LiveThread, LiveThreadsUnavailable, SessionForkFailed, SessionUndo, sharingThreads, UndoFiles, UndoSessions } from './undo-service.js'
+import {
+  FilesRestoreFailed,
+  type LiveThread,
+  LiveThreadsUnavailable,
+  SessionForkFailed,
+  SessionUndo,
+  sharingThreads,
+  UndoFiles,
+  UndoSessions,
+} from './undo-service.js'
 
 const storageHost = Layer.effect(
   HostContext,

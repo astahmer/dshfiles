@@ -47,7 +47,12 @@ const gitConfigStamp = (path: string) =>
     )}:${info.size}`
   }).pipe(Effect.orElseSucceed(() => ''))
 
-const cacheOrigin = (input: { readonly request: OriginRequest; readonly origin: string | null; readonly stamp?: string; readonly durationMs?: number }): void => {
+const cacheOrigin = (input: {
+  readonly request: OriginRequest
+  readonly origin: string | null
+  readonly stamp?: string
+  readonly durationMs?: number
+}): void => {
   const now = Date.now()
   for (const [key, value] of originCache) if (value.expiresAt <= now) originCache.delete(key)
   while (originCache.size >= maxCacheEntries) {

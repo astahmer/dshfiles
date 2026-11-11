@@ -44,6 +44,10 @@ const astGrepBoundaries = [
   'plugins/@dshfiles/sqlite-store/src/sqlite-store.ts',
   // The `turn-admission-api` dshx module of session-controller: forwards the policy and snapshot contract chat reads.
   'plugins/@dshfiles/session-controller/src/turn-admission-api.ts',
+  // The `revision-graph` dshx module of jj-integration: the layout and row cell jujutsu and diffs-review draw with.
+  'plugins/@dshfiles/jj-integration/src/revision-graph.ts',
+  // The `thread-directories` dshx module of thread-sidebar: the thread-folder API and hook other plugins group by.
+  'plugins/@dshfiles/thread-sidebar/src/thread-directories.ts',
   'plugins/@dshfiles/input-trigger/src/client/index.ts',
   'plugins/@dshfiles/main-tabs/src/workbench-tabs.ts',
   'plugins/@dshfiles/rich-composer/src/conversation-contract.ts',

@@ -6,8 +6,8 @@
     "antislop(no-runtime-typeof)": 26,
     "antislop(no-unknown-parameters)": 197,
     "antislop(no-unknown-returns)": 96,
-    "antislop(no-unsafe-dictionary-type)": 151,
-    "antislop(require-safety-comment-for-type-assertion)": 285,
+    "antislop(no-unsafe-dictionary-type)": 149,
+    "antislop(require-safety-comment-for-type-assertion)": 280,
     "react(purity)": 0,
     "react-hooks(exhaustive-deps)": 0,
     "ui-guidance(no-native-title)": 62

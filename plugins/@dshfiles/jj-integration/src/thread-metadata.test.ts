@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { jjSettingsTest } from './jj-settings.js'
 import { ThreadMetadata } from './thread-metadata.js'
@@ -28,7 +28,7 @@ describe('thread land metadata', () => {
     writeFileSync(file, JSON.stringify({ 'thread-aaaaaa': { at: 1 }, 'thread-bbbbbb': { at: 'not-a-number' } }))
     expect(await run(ThreadMetadata.use(metadata => metadata.read(repoRoot)))).toEqual({ 'thread-aaaaaa': { at: 1 } })
     await run(ThreadMetadata.use(metadata => metadata.record(repoRoot, 'thread-cccccc', noIds)))
-    const written = JSON.parse(readFileSync(file, 'utf8'))
+    const written = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)))(readFileSync(file, 'utf8'))
     expect(Object.keys(written).sort()).toEqual(['thread-aaaaaa', 'thread-bbbbbb', 'thread-cccccc'])
     expect(written['thread-bbbbbb']).toEqual({ at: 'not-a-number' })
   })

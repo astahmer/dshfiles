@@ -171,7 +171,9 @@ export default definePlugin({
         name: 'phone_pairing_enable',
         description:
           'Enable phone access: starts the gateway and the tunnel, prints a QR, and persists the choice. Call only when the user asked to enable phone access.',
-        parameters: { provider: { type: 'string', enum: [...providers], description: 'Optional; omitted keeps the saved choice or picks the best available.' } },
+        parameters: {
+          provider: { type: 'string', enum: [...providers], description: 'Optional; omitted keeps the saved choice or picks the best available.' },
+        },
         output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] },
         execute: async args => {
           const started = await start(decodeEnableArgs(args).provider)

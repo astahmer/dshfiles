@@ -180,6 +180,17 @@ export const threadStoreLayer = Layer.effect(
         Effect.withSpan('thread store publish'),
       )
 
-    return ThreadStore.of({ sessionFormat: SESSION_FORMAT_VERSION, read, readAttachment, saveAttachment, create, projects, attach, archive, publish, home: homedir() })
+    return ThreadStore.of({
+      sessionFormat: SESSION_FORMAT_VERSION,
+      read,
+      readAttachment,
+      saveAttachment,
+      create,
+      projects,
+      attach,
+      archive,
+      publish,
+      home: homedir(),
+    })
   }),
 )

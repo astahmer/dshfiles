@@ -1038,10 +1038,7 @@ const effectMultiHostApi = defineApi({
     }),
     runtimeFileReferences: method({
       input: Schema.Struct({ runtimeId: idSchema, sessionId: sessionIdSchema, query: Schema.String.check(Schema.isMaxLength(4096)) }),
-      output: Schema.Union([
-        Schema.Struct({ ok: Schema.Literal(true), candidates: fileReferenceCandidatesSchema }),
-        failedSchema,
-      ]),
+      output: Schema.Union([Schema.Struct({ ok: Schema.Literal(true), candidates: fileReferenceCandidatesSchema }), failedSchema]),
       description: 'List file and directory mentions for one remote Session cwd. Read-only.',
       tool: { name: 'multi_host_file_references', readOnly: true, render: compactJson },
     }),

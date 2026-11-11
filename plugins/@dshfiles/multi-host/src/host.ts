@@ -1002,11 +1002,7 @@ const handlers = Api.handlers(multiHostApi, {
   }),
   runtimePluginCall: Effect.fn('multi-host runtime plugin call')(function* (input) {
     const mutation = input.method === 'provision' || input.method === 'noFolder'
-    return yield* withRuntime(
-      input.runtimeId,
-      gateway => gateway.pluginApi(jjThreadsApiIdentity)(input.method, input.input),
-      { mutation },
-    ).pipe(
+    return yield* withRuntime(input.runtimeId, gateway => gateway.pluginApi(jjThreadsApiIdentity)(input.method, input.input), { mutation }).pipe(
       Effect.map(value => ({ ok: true as const, value })),
       Effect.catch(error => Effect.succeed(pluginCallFailure({ error, mutation }))),
     )
@@ -1186,11 +1182,7 @@ const handlers = Api.handlers(multiHostApi, {
       if (!owner.ok) return owner
       const repositories = yield* withRuntime(
         owner.runtimeId,
-        gateway =>
-          Effect.flatMap(
-            gateway.pluginApi(jjThreadsApiIdentity)('repositories', {}),
-            decodeJjRepositories,
-          ),
+        gateway => Effect.flatMap(gateway.pluginApi(jjThreadsApiIdentity)('repositories', {}), decodeJjRepositories),
         { mutation: false },
       )
       return { ok: true as const, repositories }
