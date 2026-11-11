@@ -1,16 +1,16 @@
 # Guided onboarding and feature discovery
 
-**Resume here:** P1 and P2's **Enable / Disable pack** are on `main` (`jj:rromxyqx`, `jj:sqtoxzzv`, plus the `plugin-guide` regeneration). P2's remaining half is **Show me where**: replay a feature's `reach` steps against the live DOM by role + accessible name, highlight only, stop cleanly on a step this surface cannot replay. P1 follow-ups are listed under _P1 follow-ups_.
+**Resume here:** P1 and P2 are on `main`. Start P3: **What's new** from jj history (since the last visit; since the fork point for forkers) and opt-in usage suggestions from local tool-call history. Before P3, consider follow-up 7 (phone `reach` paths), which limits Show me where at 390 px. Follow-ups are listed under _P1 follow-ups_; landing checks under _Landing checks_.
 
 **As of:** 2026-11-11. Backlog item `b:qrmm`.
 
-**Status:** P0 and P1 landed on `main`; P2 in progress — Enable / Disable pack landed, Show me where being built (2026-11-11).
+**Status:** P0, P1 and P2 landed on `main` (2026-11-11); P3 not started.
 
 | Phase | Work                                                                                                                                                                | Status      |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | P0    | Audience, owner, curated list, blocking-or-not, gallery home, packs                                                                                                 | done        |
 | P1    | Generated catalog + `onboarding` block schema + Knowledge section + gallery + packs (read-only) + self-ticking checklist + palette + wizard + `onboarding_overview` | done        |
-| P2    | **Enable / Disable pack** (exact preview, reversible) + **Show me where** (replay `reach` against the live UI)                                                      | in progress |
+| P2    | **Enable / Disable pack** (exact preview, reversible) + **Show me where** (replay `reach` against the live UI)                                                      | done        |
 | P3    | **What's new** from jj/git history (since last visit; upstream since fork point) + opt-in usage suggestions                                                         | not started |
 | P4    | Agent-led demo in a scratch thread (off by default) + `dshx init` profile composer + generated docs page per pack                                                   | not started |
 | P5    | AGENTS.md rule (each new plugin ships an onboarding block and joins a pack) + `features:check` error for a UI plugin without one                                    | not started |
@@ -23,7 +23,8 @@
 | 2    | Apply through the plugin manager, install through the checkout's `dshx add`, one at a time, cancellable, never a restart | done: `jj:rromxyqx` |
 | 3    | `onboarding_pack_apply` write tool (needs `confirm: true`, refuses a bare request) + preview through `onboarding_overview` | done: `jj:rromxyqx` |
 | 4    | Credential-aware account checklist item (AI accounts read, provider routes only as fallback)                          | done: `jj:rromxyqx` |
-| 5    | Show me where: read tool + walk overlay replaying `reach`, unsupported steps explained                                | in progress         |
+| 5    | Show me where: `onboarding_reach` read tool + walk overlay replaying `reach`, unsupported steps explained             | done: `jj:xynxyzsx`, `jj:nwynnrsw`, `jj:trqvxxvq` |
+| 6    | Audit: cleared the lint/Effect ratchet debt P1–P2 added (JSON.parse + casts, cascading ternary, `void then`, inline Promise adapters) | done: `jj:llpxvroo` |
 
 ### P1 progress
 
@@ -44,6 +45,13 @@
 4. ~~The plugin is not in the `profiles/web` seed yet~~ — landed: the seed lists it as a link dependency and as a profile bundle.
 5. Pre-existing repository drift found while landing, untouched because other lanes own it: `features:check` fails for ten packages (`cordis-cards`, `cordis-client-runner`, `main-tabs`, `phone-access`, `phone-pairing`, `schedule`, `session-controller`, `session-log-window`, `settings-subagent`, `tool-meta`); the web-profile contract check fails for `conversation-cleanup`, `tool-bash` and `tool-fs`; 68 other `turbo.json` files plus three missing ones (`sidebar-terminal`, `tool-bash`, `tool-fs`) are stale against `browser-tasks.mjs --write`.
 6. The managed supervisor's state has no supported contract: `thread-sidebar` does not export its restart API as a module, so pack results name both restart routes and never claim the supervisor is active. Exporting that contract is the follow-up if the copy should become exact.
+7. Many catalog `reach` paths are desktop-only: at 390 px Settings shows a **Sections** combobox instead of `button "General"`, and the rail tabs and the palette button are off screen, so a phone walk falls back to the 10 s "not on screen" message and **Next**. Fix in the catalogs (phone-specific steps) or add a reach-at-390 check.
+8. Show me where matches a plain name exactly and uses a substring only for a trailing `*`, as the grammar writes it (a substring fallback rang the wrong control in the e2e run). Only Chromium ran; WebKit is unverified.
+9. The wizard's "No composer is open" message is unreachable: without a composer on screen it opens a new thread draft with the prompt, which always succeeds.
+
+### Landing checks
+
+P1–P2 passed `oxlint` but landed with debt in the stricter ratchets, found later by an audit. Before landing onboarding work, run the onboarding package's `test`, `typecheck` and `build`, `check:e2e onboarding --force`, and `features:check`, plus these repository ratchets and grep their output for `onboarding`: `node scripts/lint-ratchet.ts oxlint`, `node scripts/lint-ratchet.ts ast-grep`, `pnpm run check:effect-antislop`, `pnpm run check:effect-native`, `pnpm run knip`. Regenerate `plugin-guide` and the onboarding catalog after any `dshx.features.json` change, and update catalog test references after renaming a test file.
 
 ## Goal
 
