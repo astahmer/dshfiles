@@ -4,6 +4,7 @@ import { OnboardingOverview, overviewInputSchema, overviewSchema } from './overv
 import { PACK_ACTIONS, PackPlan, packOutcomeSchema } from './pack-plan.js'
 import { ReachModel, reachInputSchema, reachOutputSchema } from './reach-model.js'
 import { SuggestionsModel, suggestionsInputSchema, suggestionsSchema } from './suggestions-model.js'
+import { TryItModel, tryItInputSchema, tryItOutputSchema } from './try-it-model.js'
 import { WhatsNewModel, whatsNewInputSchema, whatsNewSchema } from './whats-new-model.js'
 
 const shortName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64))
@@ -56,6 +57,13 @@ export const onboardingApi = defineApi({
       description:
         "Enable or disable one plugin pack of the active profile. Call only when the user asked to enable or disable that pack, after showing them onboarding_overview's preview; `confirm: true` is required and a call without it changes nothing. Existing plugin rows switch through the plugin manager (its applied / restart-required / overridden verdict is relayed); missing owned bundles install one at a time with the dshfiles checkout's dshx add, or come back as the exact command to run when this Host cannot reach that toolchain. The Core pack is never disabled, a disable keeps plugins another fully enabled pack shares, and nothing restarts DSH: the result says what waits for a restart. Reverse it with the other action.",
       tool: { name: 'onboarding_pack_apply', render: PackPlan.renderOutcome },
+    }),
+    tryIt: method({
+      input: tryItInputSchema,
+      output: tryItOutputSchema,
+      description:
+        "Start a demo of one catalogued feature (`feature`, its key from onboarding_overview) or one plugin pack (`pack`): a new thread whose first message, built only from the feature catalog, asks the agent there to show that feature in this setup with read-only tools and to ask before any write. The message is sent at once, so the new thread runs on the user's default model and spends tokens on their account. Call only when the user asked for this demo; `confirm: true` is required and a call without it starts nothing. Refused while the onboarding `tryIt` setting is off (the default). Returns the new thread's id; stop or archive that thread to end the demo.",
+      tool: { name: 'onboarding_try_it', render: TryItModel.render },
     }),
   },
 })

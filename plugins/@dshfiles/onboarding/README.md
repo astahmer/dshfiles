@@ -14,6 +14,8 @@
 
 ![Get features suggested from what you already do](docs/screenshots/usage-suggestions.png)
 
+![Try a feature with the agent in a new thread](docs/screenshots/try-it.png)
+
 Getting started for anyone adopting dshfiles: the whole setup, one plugin, a pack of plugins or one feature. It never
 blocks the app, makes no model request, and changes the profile only when you confirm a pack change.
 
@@ -128,6 +130,27 @@ Off by default (`suggestions`): while off, the section offers **Turn on in Setti
 5. **Without Usage.** The section says Usage is not running and to enable it (Settings › Plugins, Observe & perf pack),
    with Try again. A tool used rarely (outside the 100 most used) can read as unused; Dismiss hides its suggestion.
 
+## Try it
+
+Off by default (`tryIt`), because each demo spends model tokens. While off, no Try it control renders: a line on
+every row would repeat the same offer, and the feature's own gallery row (**Try a feature with the agent in a new
+thread**) opens the setting.
+
+1. **Where.** Every feature row, and every pack card with at least one enabled plugin, gets **Try it**.
+2. **Confirm.** A dialog says it starts a new thread and sends a demo prompt at once, which runs on your default model
+   and spends tokens on your current AI account. Nothing is sent before **Start demo**; Cancel, Escape and the overlay
+   close it with nothing sent and return focus to the button.
+3. **Prompt.** Built on the Host only from the generated catalog (title, summary, the `onboarding` first action and
+   done-when, the replayable `reach` steps) or the pack definition and each plugin's description
+   (`src/try-it-model.ts`); the request names a key, never text. It tells the agent to check what is installed with
+   `onboarding_overview` and `onboarding_reach`, show rather than change, and ask before any write.
+4. **Send.** The Host starts the thread through Thread actions (`@dshfiles/thread-sidebar`'s `thread-actions` API,
+   the path behind `thread_create`): create, title `Try it · <feature>`, first message queued; then the page opens
+   it. A page click runs in the Host's default directory; the agent tool runs in the calling thread's directory.
+5. **Recovery.** Without thread-sidebar the dialog says to enable it (Settings › Plugins, Core pack) and restart. A
+   refused first message keeps the dialog open with **Open thread**; send it again there or archive the thread. Stop
+   or archive a demo thread to end it: the tokens it spent are not refundable.
+
 ## Show me where
 
 1. **Walk.** A non-modal card (feature title, `Step 2 of 5 · Click "Settings"`, **Next**, **End**) and a ring around the
@@ -164,6 +187,7 @@ All apply live; none needs a restart.
 | `curatedOnly` | `true`  | List only curated features until you search.                                                          |
 | `whatsNew`    | `true`  | Show What's new; off hides it and reads no history, for the page and `onboarding_whats_new` alike.    |
 | `suggestions` | `false` | Suggest unused features from local tool use (Usage plugin counts, 10 min cache); off reads nothing.   |
+| `tryIt`       | `false` | Offer Try it, a demo thread that spends tokens once you confirm; off hides it and the tool refuses.   |
 
 ## Agent tools
 
@@ -181,7 +205,10 @@ All apply live; none needs a restart.
 5. `onboarding_suggestions` (read-only, `onboarding/suggestions`) returns the same suggestions, with the counts and
    feature row of each. While the `suggestions` setting is off it refuses with `suggestions-off` and reads nothing.
    Dismissing a suggestion is per browser and has no tool.
-6. Opening a page, replaying the wizard and walking Show me where are presentation and have no tool: the Agent gives
+6. `onboarding_try_it` (write, `onboarding/tryIt`) starts the same demo thread Try it starts, for one `feature` key or
+   one `pack`, and returns its thread id. It runs only when the user asked: `confirm: true` has no default, and it
+   refuses with `try-it-off` while the `tryIt` setting is off. Stop or archive the thread to end the demo.
+7. Opening a page, replaying the wizard and walking Show me where are presentation and have no tool: the Agent gives
    the user the steps from `onboarding_reach`, and the user walks them.
 
 ## Data
@@ -214,4 +241,5 @@ preview opens `onboarding pack preview`, an apply `onboarding pack apply`, and e
 span with the plugin and exit code. Each uncached What's new read opens one `onboarding history read` span with the VCS,
 its state and the entry and upstream counts; `onboarding/whatsNew` and its tool get the automatic spans. Each uncached
 Suggestions read opens one `onboarding suggestions read` span with its state and suggestion count (the two Usage calls
-are its children); `onboarding/suggestions` and its tool get the automatic spans.
+are its children); `onboarding/suggestions` and its tool get the automatic spans. `onboarding/tryIt` and its tool get
+the automatic spans; the thread it starts is Thread actions' `thread actions create` span.

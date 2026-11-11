@@ -89,6 +89,11 @@ const useApplyPack = (): GettingStartedProps['applyPack'] => {
   return useCallback(input => api.applyPack(input), [api])
 }
 
+const useStartTryIt = (): GettingStartedProps['startTryIt'] => {
+  const api = useApi(onboardingApi)
+  return useCallback(input => api.tryIt(input), [api])
+}
+
 export default defineClient({
   name: '@dshfiles/onboarding',
   inject: ['slots', 'uiWorkspace'],
@@ -155,9 +160,11 @@ export default defineClient({
               loadOverview={useLoadOverview()}
               loadSuggestions={useLoadSuggestions()}
               loadWhatsNew={useLoadWhatsNew()}
+              openThread={sessionId => ctx.uiWorkspace.openSession(sessionId)}
               routes={routes}
               settings={useOnboardingSettings()}
               showWhere={WalkStore.start}
+              startTryIt={useStartTryIt()}
               startWizard={WizardStore.request}
             />
           </PluginQueryProvider>

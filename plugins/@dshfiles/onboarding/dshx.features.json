@@ -595,6 +595,96 @@
           "testName": "serves one feature reach steps over its API and as the read-only onboarding_reach tool"
         }
       ]
+    },
+    {
+      "id": "try-it",
+      "title": "Try a feature with the agent in a new thread",
+      "summary": "Off by default because each demo spends tokens. With Settings › Onboarding › tryIt on, every feature row and every pack card with an enabled plugin on Getting started has Try it. It opens a dialog that says it starts a new thread and sends a demo prompt at once, which runs on your default model and spends tokens on your current AI account; nothing is sent before Start demo, and Cancel, Escape or the overlay close it with nothing sent. Start demo asks the Host, which builds the prompt only from the generated feature catalog (title, summary, the onboarding first action and done-when, the replayable reach steps) or the pack definition, tells the agent to check what is installed with onboarding_overview and onboarding_reach, show rather than change, and ask before any write, then starts the thread through Thread actions (thread-sidebar's thread_create path) and opens it. A refused first message keeps the dialog open with Open thread. The onboarding_try_it agent tool starts the same demo only with confirm: true and refuses while the setting is off. Stop or archive the thread to end a demo.",
+      "reach": ["click tab \"Knowledge\"", "click button \"Getting started\"", "expect list \"Features\""],
+      "surfaces": ["client", "host", "api", "tool", "settings"],
+      "surface": "detail",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › Features / Packs › Try it",
+      "configuration": [
+        {
+          "key": "tryIt",
+          "defaultValue": "false",
+          "constraints": "Boolean, off by default; off renders no Try it control and the onboarding_try_it tool refuses, so no thread starts and no tokens are spent.",
+          "coveredBy": ["onboarding.try-it-off", "onboarding.try-it-tool"]
+        }
+      ],
+      "states": ["off", "confirming", "starting", "started", "prompt-refused", "failed"],
+      "failureModes": [
+        "Thread actions (thread-sidebar) not running: the dialog and the tool say to enable thread-sidebar in Settings › Plugins and restart DSH; no thread starts.",
+        "Thread actions refuses to create the thread: the dialog shows its reason with Try again.",
+        "The thread starts but refuses its first message: the dialog says so and offers Open thread; send the message again there or archive the thread.",
+        "An older Host without the method: the dialog shows the Host error with Try again; restart DSH to load the new Host half.",
+        "A page click runs the demo in the Host's default directory, not the project on screen; the agent tool runs it in the calling thread's directory."
+      ],
+      "externalDependencies": [
+        {
+          "id": "thread-actions-create",
+          "boundary": "The @dshfiles/thread-sidebar thread-actions API create method (title and first message), called in process through HostApis; an absent owner is refused before anything starts.",
+          "deterministicFake": "src/host.test.ts mounts a fake @dshfiles/thread-sidebar Host serving the same contract and records every create."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Turn on Try it in Settings › Onboarding, then press Try it on a feature in Knowledge › Getting started.",
+        "doneWhen": "A Try it thread opens and the agent shows the feature without changing anything.",
+        "open": {
+          "settings": {
+            "entryId": "dshfiles-onboarding",
+            "fieldPath": ["tryIt"]
+          }
+        }
+      },
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "onboarding.try-it",
+          "featureFile": "tooling/dshx/e2e/features/onboarding.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.try-it-prompt",
+          "file": "plugins/@dshfiles/onboarding/src/try-it-model.test.ts",
+          "testName": "builds a feature demo prompt only from its catalog row, onboarding block and replayable reach steps"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.try-it-off",
+          "file": "plugins/@dshfiles/onboarding/src/try-it.client.test.tsx",
+          "testName": "is off by default: no Try it control on a feature row or a pack card"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.try-it-cancel",
+          "file": "plugins/@dshfiles/onboarding/src/try-it.client.test.tsx",
+          "testName": "names the token cost before anything starts, and Cancel sends nothing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "onboarding.try-it-start",
+          "file": "plugins/@dshfiles/onboarding/src/try-it.client.test.tsx",
+          "testName": "starts exactly one confirmed demo for the feature and opens its thread"
+        },
+        {
+          "kind": "host-test",
+          "id": "onboarding.try-it-tool",
+          "file": "plugins/@dshfiles/onboarding/src/host.test.ts",
+          "testName": "starts no demo thread while tryIt is off or without confirm, and once on sends the catalog prompt through thread actions"
+        }
+      ]
     }
   ]
 }

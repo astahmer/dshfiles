@@ -2,17 +2,21 @@ import { Api, DshxPlugin, HostContext } from '@dshfiles/dshx/effect'
 import { DshChildProcessSpawner } from '@dshfiles/dshx/effect/child-process-spawner'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Settings } from '@dshfiles/dshx/effect/settings'
+import { SessionId } from '@dshfiles/dshx/ids'
+import { threadActionsApi } from '@dshfiles/thread-sidebar/thread-actions-api'
 import { NodeFileSystem, NodePath } from '@effect/platform-node'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { onboardingApi } from './api.js'
 import { FEATURE_CATALOG } from './generated/feature-catalog.js'
 import { OnboardingOverview } from './overview-model.js'
 import { PackControls } from './pack-controls.js'
 import { PackPlan } from './pack-plan.js'
+import { PACKS } from './packs.js'
 import { ReachModel } from './reach-model.js'
 import { onboardingSettings } from './settings.js'
 import { SetupFacts } from './setup-facts.js'
 import { SUGGESTIONS_OFF_MESSAGE, SuggestionsOffError } from './suggestions-model.js'
+import { TRY_IT_OFF_MESSAGE, TRY_IT_UNAVAILABLE_MESSAGE, TryItModel, TryItOffError, TryItTargetError, TryItUnavailableError } from './try-it-model.js'
 import { UsageSuggestions } from './usage-suggestions.js'
 import { WhatsNewHistory } from './whats-new-history.js'
 
@@ -61,7 +65,7 @@ export default DshxPlugin.make({
   name: 'dshfiles-onboarding',
   inject: ['subprocess'],
   settings: [onboardingSettings],
-  layer: Layer.mergeAll(facts, packs, whatsNew, suggestions),
+  layer: Layer.mergeAll(facts, packs, whatsNew, suggestions, HostApis.layer),
   apis: [
     Api.bind(onboardingApi, {
       overview: request =>
@@ -104,6 +108,38 @@ export default DshxPlugin.make({
         Effect.gen(function* () {
           const controls = yield* PackControls
           return yield* controls.apply({ pack: request.pack, action: request.action, plugins: request.plugins, prerequisites: yield* prerequisitesNow })
+        }),
+      tryIt: (request, call) =>
+        Effect.gen(function* () {
+          const settings = yield* SetupFacts.use(setup => setup.settings)
+          if (!settings.tryIt) return yield* new TryItOffError({ message: TRY_IT_OFF_MESSAGE })
+          const demo = TryItModel.demoOf({ catalog: FEATURE_CATALOG, packs: PACKS, request })
+          if (demo === null)
+            return yield* new TryItTargetError({
+              message: 'Name exactly one catalogued `feature` key or one `pack` id; onboarding_overview lists both. No thread was started.',
+            })
+          const hostApis = yield* HostApis
+          if (!(yield* hostApis.isServed(threadActionsApi))) return yield* new TryItUnavailableError({ message: TRY_IT_UNAVAILABLE_MESSAGE })
+          // An agent's demo runs in its own project; a click on the page runs in the Host's default directory.
+          const cwd = call.caller.kind === 'agent' ? call.caller.cwd : undefined
+          const thread = cwd === undefined || cwd === '' ? { title: demo.title, text: demo.text } : { title: demo.title, text: demo.text, cwd }
+          const created = yield* hostApis
+            .client(threadActionsApi)
+            .create(thread)
+            .pipe(
+              Effect.mapError(error => new TryItUnavailableError({ message: `Thread actions could not start the demo thread (${error.message}). Try again.` })),
+            )
+          const sessionId = yield* Schema.decodeUnknownEffect(SessionId)(created.sessionId).pipe(
+            Effect.mapError(
+              () => new TryItUnavailableError({ message: 'Thread actions returned no usable thread id. Look for the new thread in the sidebar.' }),
+            ),
+          )
+          return {
+            sessionId,
+            title: created.title ?? demo.title,
+            prompt: created.prompt ?? 'refused',
+            promptError: created.promptError ?? (created.prompt === undefined ? 'Thread actions did not report the first message.' : null),
+          }
         }),
     }),
   ],

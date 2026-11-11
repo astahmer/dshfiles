@@ -336,7 +336,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "onboarding",
       "description": "Getting started: a Knowledge page with a self-ticking setup checklist, plugin packs, what changed in owned plugins since your last visit and a searchable gallery of every catalogued feature, a three-step setup wizard while no thread is open, and read-only onboarding_overview and…",
       "ui": true,
-      "features": 7
+      "features": 8
     },
     {
       "name": "optmem-core",
@@ -13812,6 +13812,50 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "agent tool: onboarding_reach; read by Show me where on Knowledge › Getting started",
       "reach": [],
       "onboarding": null
+    },
+    {
+      "key": "onboarding#try-it",
+      "plugin": "onboarding",
+      "id": "try-it",
+      "title": "Try a feature with the agent in a new thread",
+      "summary": "Off by default because each demo spends tokens. With Settings › Onboarding › tryIt on, every feature row and every pack card with an enabled plugin on Getting started has Try it. It opens a dialog that says it starts a new thread and sends a demo prompt at once, which runs on yo…",
+      "destination": "knowledge",
+      "currentSurface": "rail: Knowledge › Getting started › Features / Packs › Try it",
+      "reach": [
+        {
+          "text": "click tab \"Knowledge\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Knowledge",
+          "value": null
+        },
+        {
+          "text": "click button \"Getting started\"",
+          "action": "click",
+          "by": "button",
+          "name": "Getting started",
+          "value": null
+        },
+        {
+          "text": "expect list \"Features\"",
+          "action": "expect",
+          "by": "list",
+          "name": "Features",
+          "value": null
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Turn on Try it in Settings › Onboarding, then press Try it on a feature in Knowledge › Getting started.",
+        "doneWhen": "A Try it thread opens and the agent shows the feature without changing anything.",
+        "open": {
+          "settings": {
+            "entryId": "dshfiles-onboarding",
+            "fieldPath": [
+              "tryIt"
+            ]
+          }
+        }
+      }
     },
     {
       "key": "optmem-core#credential-redaction",

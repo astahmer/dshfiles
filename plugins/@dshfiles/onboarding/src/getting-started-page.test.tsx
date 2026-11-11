@@ -90,9 +90,11 @@ const renderPage = (input: { readonly registered: readonly string[]; readonly pa
         loadOverview={(request, _signal) => loadOverview(request)}
         loadSuggestions={loadSuggestions}
         loadWhatsNew={loadWhatsNew}
+        openThread={vi.fn()}
         routes={services}
         settings={{ ...ONBOARDING_DEFAULTS, packs: input.packs ?? true, whatsNew: input.whatsNew ?? true }}
         showWhere={showWhere}
+        startTryIt={vi.fn(async () => Promise.reject(new Error('Try it is off in these tests.')))}
         startWizard={startWizard}
       />
     </PluginQueryProvider>,

@@ -7,6 +7,7 @@ import { DshxEffect } from '@dshfiles/dshx/effect'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { threadActionsApi } from '@dshfiles/thread-sidebar/thread-actions-api'
 import { usageApi } from '@dshfiles/usage/api'
 import { NodeServices } from '@effect/platform-node'
 import { Effect, Layer } from 'effect'
@@ -419,6 +420,108 @@ describe('onboarding Host', () => {
       expect(applied).toContain('"results":[{"plugin":"goal-tool"')
     } finally {
       await host.dispose()
+    }
+  })
+
+  it('starts no demo thread while tryIt is off or without confirm, and once on sends the catalog prompt through thread actions', async () => {
+    const created: { readonly title: string | undefined; readonly text: string | undefined; readonly cwd: string | undefined }[] = []
+    const unused = (): never => {
+      throw new Error('not called by onboarding')
+    }
+    const fakeThreadActions = defineHost({
+      apis: [
+        threadActionsApi.host({
+          create: ({ input }) => {
+            created.push({ title: input.title, text: input.text, cwd: input.cwd })
+            return { sessionId: 'session-demo', title: input.title ?? 'untitled', prompt: 'accepted' as const }
+          },
+          list: unused,
+          archive: unused,
+          unarchive: unused,
+          settle: unused,
+          unsettle: unused,
+          pin: unused,
+          unpin: unused,
+          rename: unused,
+          fork: unused,
+          continueIn: unused,
+          fanOut: unused,
+          prompt: unused,
+          stop: unused,
+          selectModel: unused,
+          status: unused,
+          references: unused,
+          projectList: unused,
+          projectRegister: unused,
+          projectRename: unused,
+          projectDelete: unused,
+          projectReorder: unused,
+          move: unused,
+        }),
+      ],
+    })
+    const mount = async (input: { readonly tryIt: boolean; readonly withThreadActions: boolean }) => {
+      const host = await createTestHost()
+      host.ctx.provide('settings', {
+        configure: () => () => undefined,
+        describe: () => [{ ns: 'dshfiles-onboarding', value: { githubCheck: false, checklist: false, tryIt: input.tryIt } }],
+        update: async () => undefined,
+        replace: async () => undefined,
+      } as never)
+      host.ctx.provide('subprocess', {} as never)
+      if (input.withThreadActions) await host.mount(fakeThreadActions, { packageId: '@dshfiles/thread-sidebar' })
+      await host.mount(onboardingHost, { packageId: '@dshfiles/onboarding' })
+      return host
+    }
+    const execute = (host: Awaited<ReturnType<typeof createTestHost>>, args: { readonly feature?: string; readonly pack?: string; readonly confirm?: true }) =>
+      host.tools
+        .execute({ callId: ToolCallId(`call-${String(created.length)}`), name: 'onboarding_try_it', arguments: args, signal: new AbortController().signal })
+        .then(
+          value => JSON.stringify(value),
+          (error: unknown) => String(error),
+        )
+
+    const off = await mount({ tryIt: false, withThreadActions: true })
+    try {
+      expect(await execute(off, { feature: 'onboarding#usage-suggestions', confirm: true })).toMatch(/Try it is off, so no thread was started/u)
+      await expect(createHostApiClient(off.ctx, onboardingApi, '@test/caller').tryIt({ pack: 'observe', confirm: true })).rejects.toThrow(/Try it is off/u)
+      expect(off.tools.get('onboarding_try_it')?.isConcurrencySafe?.({})).not.toBe(true)
+      expect(created).toEqual([])
+    } finally {
+      await off.dispose()
+    }
+
+    const absent = await mount({ tryIt: true, withThreadActions: false })
+    try {
+      expect(await execute(absent, { feature: 'onboarding#usage-suggestions', confirm: true })).toMatch(/Enable thread-sidebar in Settings › Plugins/u)
+    } finally {
+      await absent.dispose()
+    }
+
+    const on = await mount({ tryIt: true, withThreadActions: true })
+    try {
+      expect(await execute(on, { feature: 'onboarding#usage-suggestions' })).toMatch(/confirm/u)
+      expect(await execute(on, { feature: 'onboarding#no-such-feature', confirm: true })).toMatch(/Name exactly one catalogued/u)
+      expect(await execute(on, { feature: 'onboarding#usage-suggestions', pack: 'observe', confirm: true })).toMatch(/Name exactly one catalogued/u)
+      expect(created).toEqual([])
+
+      const started = await execute(on, { feature: 'onboarding#usage-suggestions', confirm: true })
+      expect(started).toContain('Started the demo thread session-demo')
+      expect(created).toHaveLength(1)
+      expect(created[0]?.title).toBe('Try it · Get features suggested from what you already do')
+      expect(created[0]?.text).toContain('catalog key `onboarding#usage-suggestions`')
+      expect(created[0]?.text).toContain('Ask me before any write')
+
+      const client = createHostApiClient(on.ctx, onboardingApi, '@test/caller')
+      expect(await client.tryIt({ pack: 'observe', confirm: true })).toEqual({
+        sessionId: 'session-demo',
+        title: 'Try it · Observe & perf',
+        prompt: 'accepted',
+        promptError: null,
+      })
+      expect(created[1]?.cwd).toBeUndefined()
+    } finally {
+      await on.dispose()
     }
   })
 })

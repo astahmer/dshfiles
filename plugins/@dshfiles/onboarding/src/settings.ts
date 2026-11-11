@@ -23,6 +23,11 @@ export const onboardingSettings = defineSettings({
       .description(
         'Suggest features you have not used yet from your local tool use (aggregate counts from the Usage plugin, read at most every 10 minutes while Getting started or the agent asks). No network or model request. Off reads nothing.',
       ),
+    tryIt: Schema.boolean()
+      .default(false)
+      .description(
+        'Offer Try it on Getting started features and packs, and allow the onboarding_try_it agent tool: after you confirm, it starts a new thread that sends a demo prompt to your default model, which spends tokens on your account. Off shows no Try it control and the tool refuses.',
+      ),
   }),
   applies: 'live',
 })
@@ -38,4 +43,5 @@ export const ONBOARDING_DEFAULTS: OnboardingSettings = {
   curatedOnly: true,
   whatsNew: true,
   suggestions: false,
+  tryIt: false,
 }

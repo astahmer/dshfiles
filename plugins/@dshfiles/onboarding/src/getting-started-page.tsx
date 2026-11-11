@@ -14,6 +14,7 @@ import {
   PlayIcon,
   SearchIcon,
   SettingsIcon,
+  SparklesIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -28,6 +29,7 @@ import { SuggestionsSection, type SuggestionsSectionProps } from './suggestions-
 import { SuggestionsStore } from './suggestions-store.js'
 import { SuggestionsWindow } from './suggestions-window.js'
 import { TOUCH } from './touch.js'
+import { TryItDialog, type TryItDialogProps, type TryItTarget } from './try-it-dialog.js'
 import { WhatsNewSection, type WhatsNewSectionProps } from './whats-new-section.js'
 import { WhatsNewStore } from './whats-new-store.js'
 
@@ -72,6 +74,8 @@ export interface GettingStartedProps {
   readonly showWhere: (featureKey: string) => void
   readonly loadWhatsNew: WhatsNewSectionProps['loadWhatsNew']
   readonly loadSuggestions: SuggestionsSectionProps['loadSuggestions']
+  readonly startTryIt: TryItDialogProps['startTryIt']
+  readonly openThread: TryItDialogProps['openThread']
 }
 
 const ChecklistRow = (props: {
@@ -135,9 +139,13 @@ const PackCard = (props: {
   readonly pack: PackView
   readonly routes: RouteServices
   readonly onChange: (action: PackAction, trigger: HTMLButtonElement) => void
+  /** Absent while the `tryIt` setting is off. */
+  readonly onTryIt: ((trigger: HTMLButtonElement) => void) | null
 }): ReactNode => {
   const { pack } = props
   const enabled = pack.plugins.filter(plugin => plugin.state === 'enabled').length
+  const onTryIt = enabled > 0 ? props.onTryIt : null
+  const changeable = !pack.core && !pack.plugins.every(plugin => plugin.state === 'unknown')
   return (
     <li className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3" data-pack={pack.id}>
       <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-2">
@@ -186,34 +194,50 @@ const PackCard = (props: {
           ))}
         </div>
       )}
-      {pack.core || pack.plugins.every(plugin => plugin.state === 'unknown') ? null : (
+      {!changeable && onTryIt === null ? null : (
         <div className="dshx:flex dshx:flex-wrap dshx:gap-2 dshx:border-t dshx:border-border dshx:pt-2">
-          <Button
-            aria-label={`Enable pack: ${pack.title}`}
-            className={TOUCH}
-            onClick={event => props.onChange('enable', event.currentTarget)}
-            size="sm"
-            variant="outline"
-          >
-            Enable pack
-          </Button>
-          <Button
-            aria-label={`Disable pack: ${pack.title}`}
-            className={TOUCH}
-            onClick={event => props.onChange('disable', event.currentTarget)}
-            size="sm"
-            variant="ghost"
-          >
-            Disable pack
-          </Button>
+          {onTryIt === null ? null : (
+            <Button aria-label={`Try it: ${pack.title}`} className={TOUCH} onClick={event => onTryIt(event.currentTarget)} size="sm" variant="outline">
+              <SparklesIcon /> Try it
+            </Button>
+          )}
+          {changeable ? (
+            <>
+              <Button
+                aria-label={`Enable pack: ${pack.title}`}
+                className={TOUCH}
+                onClick={event => props.onChange('enable', event.currentTarget)}
+                size="sm"
+                variant="outline"
+              >
+                Enable pack
+              </Button>
+              <Button
+                aria-label={`Disable pack: ${pack.title}`}
+                className={TOUCH}
+                onClick={event => props.onChange('disable', event.currentTarget)}
+                size="sm"
+                variant="ghost"
+              >
+                Disable pack
+              </Button>
+            </>
+          ) : null}
         </div>
       )}
     </li>
   )
 }
 
-const FeatureItem = (props: { readonly row: FeatureRow; readonly routes: RouteServices; readonly showWhere: (featureKey: string) => void }): ReactNode => {
+const FeatureItem = (props: {
+  readonly row: FeatureRow
+  readonly routes: RouteServices
+  readonly showWhere: (featureKey: string) => void
+  /** Absent while the `tryIt` setting is off. */
+  readonly onTryIt: ((trigger: HTMLButtonElement) => void) | null
+}): ReactNode => {
   const { row } = props
+  const onTryIt = props.onTryIt
   const route = row.route
   const canOpen = route !== null && Routes.available(route, props.routes)
   return (
@@ -234,9 +258,20 @@ const FeatureItem = (props: { readonly row: FeatureRow; readonly routes: RouteSe
           size="sm"
           variant="ghost"
         >
-          <LocateFixedIcon /> Show me where
+          <LocateFixedIcon /> {onTryIt === null ? 'Show me where' : <span className="dshx:@max-pane-narrow:sr-only">Show me where</span>}
         </Button>
       ) : null}
+      {onTryIt === null ? null : (
+        <Button
+          aria-label={`Try it: ${row.title}`}
+          className={cn('dshx:shrink-0', TOUCH)}
+          onClick={event => onTryIt(event.currentTarget)}
+          size="sm"
+          variant="ghost"
+        >
+          <SparklesIcon /> <span className="dshx:@max-pane-narrow:sr-only">Try it</span>
+        </Button>
+      )}
       {canOpen ? (
         <Button
           aria-label={`Open ${row.title}`}
@@ -287,6 +322,12 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
   const checklist = data?.checklist ?? null
   const queryClient = useQueryClient()
   const [packTarget, setPackTarget] = useState<PackTarget | null>(null)
+  const [tryItTarget, setTryItTarget] = useState<TryItTarget | null>(null)
+  const tryIt = props.settings.tryIt
+  const openTryIt = (target: TryItTarget, button: HTMLButtonElement): void => {
+    trigger.current = button
+    setTryItTarget(target)
+  }
   const trigger = useRef<HTMLButtonElement | null>(null)
   const loadOverview = props.loadOverview
   const loadPreview = useCallback(
@@ -369,6 +410,7 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
                       trigger.current = button
                       setPackTarget({ pack: pack.id, title: pack.title, action })
                     }}
+                    onTryIt={tryIt ? button => openTryIt({ pack: pack.id, title: pack.title }, button) : null}
                     pack={pack}
                     routes={props.routes}
                   />
@@ -426,7 +468,13 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
             ) : (
               <ul aria-label="Features" className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border">
                 {(data?.features.rows ?? []).map(row => (
-                  <FeatureItem key={row.key} routes={props.routes} row={row} showWhere={props.showWhere} />
+                  <FeatureItem
+                    key={row.key}
+                    onTryIt={tryIt ? button => openTryIt({ feature: row.key, title: row.title }, button) : null}
+                    routes={props.routes}
+                    row={row}
+                    showWhere={props.showWhere}
+                  />
                 ))}
               </ul>
             )}
@@ -444,6 +492,15 @@ export const GettingStartedPage = (props: GettingStartedProps): ReactNode => {
         }}
         onSettled={refresh}
         target={packTarget}
+      />
+      <TryItDialog
+        onClose={() => {
+          setTryItTarget(null)
+          requestAnimationFrame(() => trigger.current?.focus())
+        }}
+        openThread={props.openThread}
+        startTryIt={props.startTryIt}
+        target={tryIt ? tryItTarget : null}
       />
     </main>
   )
