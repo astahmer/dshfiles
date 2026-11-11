@@ -1,5 +1,6 @@
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
 import { SharedJevKey } from '@dshfiles/credential-port/jev-key'
+import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { Llm } from '@dshfiles/dshx/effect/llm'
 import { Jev, type JevCredential } from '@dshfiles/jev'
 import { Clock, Context, Effect, FiberSet, Layer, Option, Redacted } from 'effect'
@@ -72,14 +73,21 @@ export class Triage extends Context.Service<
       // a composition without settings-shell, where only the earlier key and the environment apply.
       const shared = yield* Effect.serviceOption(SharedJevSettingsTag)
       const sharedKey = Option.match(shared, { onNone: () => Effect.succeed(''), onSome: service => Effect.map(service.get, value => value.jevSecret) })
+      // Both keys load only once the plugin is active, after this layer is built: adopting from the schema defaults would
+      // find no earlier key, so wait for the stored values.
       if (Option.isSome(shared)) {
-        const legacy = (yield* settings.get).jevSecret
-        yield* SharedJevKey.adopt(shared.value, legacy).pipe(
+        const sharedSettings = shared.value
+        yield* Effect.gen(function* () {
+          const legacy = (yield* settings.loaded).jevSecret
+          yield* sharedSettings.loaded
+          return yield* SharedJevKey.adopt(sharedSettings, legacy)
+        }).pipe(
           Effect.tap(result =>
             result.kind === 'deferred'
               ? Effect.logWarning('backlog: the earlier Jev key stays in Backlog settings until the shared key can be written', result.cause)
               : Effect.void,
           ),
+          DshxPlugin.detached,
           Effect.forkScoped,
         )
       }

@@ -4,9 +4,10 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { Llm } from '@dshfiles/dshx/effect/llm'
 import { Jev } from '@dshfiles/jev'
 import { describe, expect, it } from '@effect/vitest'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schedule } from 'effect'
 
 import { AiActivity } from './ai-activity.js'
+import { BacklogSettingsTag, SharedJevSettingsTag, sharedJevSettingsTestLayer } from './backlog-settings.js'
 import type { BacklogItem } from './item.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { BacklogStore } from './store.js'
@@ -33,10 +34,20 @@ const item = (id: number, title: string, fields: Partial<BacklogItem> = {}): Bac
   ...fields,
 })
 
+/** Settings as DSH serves them while the plugin activates: the schema defaults, with `stored` loading later. */
+const activatingSettings = (stored: Partial<BacklogSettings>) =>
+  Layer.effect(
+    BacklogSettingsTag,
+    Effect.map(BacklogSettingsTag, defaults =>
+      BacklogSettingsTag.of({ ...defaults, loaded: Effect.map(defaults.get, value => ({ ...value, ...stored })).pipe(Effect.delay('20 millis')) }),
+    ),
+  )
+
 /** The triage service over a real store, with only Jev, the model and the Secret Catalog replaced at their edges. */
-const triageLayer = (settings: Partial<BacklogSettings>) =>
+const triageLayer = (settings: Partial<BacklogSettings>, options: { readonly afterActivation?: boolean } = {}) =>
   Triage.layer.pipe(
-    Layer.provideMerge(BacklogTestStore.layer({ settings })),
+    options.afterActivation === true ? Layer.provideMerge(activatingSettings(settings)) : layer => layer,
+    Layer.provideMerge(BacklogTestStore.layer({ settings: options.afterActivation === true ? {} : settings })),
     Layer.provideMerge(AiActivity.layer),
     Layer.provideMerge(Layer.succeed(Jev, Jev.of({ ask: () => Effect.die('unused') }))),
     Layer.provideMerge(Layer.succeed(Llm, Llm.of({ complete: () => Effect.die('unused') } as never))),
@@ -234,6 +245,19 @@ describe('backlog triage host span', () => {
       const span = recorder.span('backlog triage pass')
       expect(span.attributes['dshx.backlog.item_id']).toBe(created.item.id)
     }).pipe(Effect.provide(triageLayer({ jevEnabled: false })), Effect.scoped, Effect.provide(DshxEffect.tracerLayer)),
+  )
+})
+
+describe('Backlog shared Jev key', () => {
+  it.live('moves the earlier Jev key that loads only once the plugin is active into the empty shared key', () =>
+    Effect.gen(function* () {
+      const shared = yield* SharedJevSettingsTag
+      const adopted = yield* shared.get.pipe(Effect.repeat({ until: value => value.jevSecret !== '', schedule: Schedule.spaced('10 millis'), times: 100 }))
+      expect(adopted.jevSecret).toBe('secret:BACKLOG_JEV')
+    }).pipe(
+      Effect.provide(triageLayer({ jevSecret: 'secret:BACKLOG_JEV' }, { afterActivation: true }).pipe(Layer.provideMerge(sharedJevSettingsTestLayer('')))),
+      Effect.scoped,
+    ),
   )
 })
 
