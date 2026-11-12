@@ -667,7 +667,15 @@
 
   /* The zero-width column still lays its occupant out; hide it from pointer, focus and assistive tech so only the
      occupant's own phone navigation (portalled outside the frame) answers. */
-  :global([data-shell-phone-nav]) .sidebarCol {
+  /* The phone list opens by expanding the sidebar, which also makes a drawer frame slide its column in over a mask:
+     both must stay down, or an empty column and its mask cover the occupant's list. The drawer rule outranks a plain
+     `.sidebarCol`, hence the matching selector. */
+  :global([data-shell-phone-nav]) .sidebarCol,
+  :global([data-shell-phone-nav]) .frame[data-sidebar-drawer] .sidebarCol {
     visibility: hidden;
+  }
+
+  :global([data-shell-phone-nav]) .frame[data-sidebar-drawer] .drawerMask {
+    display: none;
   }
 }
