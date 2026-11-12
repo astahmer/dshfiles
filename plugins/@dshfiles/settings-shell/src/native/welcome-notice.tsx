@@ -11,7 +11,7 @@ import { defineLocale } from '@dshfiles/dshx/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { welcomeNoticeMachine, type WelcomeNoticeScopeState } from './welcome-notice-machine.js'
 
 export const WELCOME_STEP_ID = 'welcome-notice'
@@ -49,6 +49,7 @@ export type WelcomeTranslate = TranslateNS<typeof WELCOME_LOCALE_NAMESPACE>
 export const welcomeLocale = defineLocale(WELCOME_LOCALE_NAMESPACE, { en, zh })
 
 const ackSchema = Schema.Struct({ [WELCOME_NOTICE_ACK_FIELD]: Schema.String })
+const previewNoticeSchema = Schema.Struct({ previewNotice: Schema.Boolean })
 
 type WelcomeNoticeActor = ActorRefFrom<typeof welcomeNoticeMachine>
 
@@ -85,6 +86,19 @@ export class WelcomeNoticeStore {
       },
     })
   }
+
+  /**
+   * dshfiles hides the upstream notice unless `previewNotice` is on, so a fresh profile meets one first-run surface (the
+   * setup card). `pending` while the Host settings load; a scope that never answers counts as off.
+   */
+  readonly visibility = (): 'pending' | 'hidden' | 'shown' => {
+    const snapshot = this.scope.getSnapshot()
+    if (snapshot.writable && snapshot.status === 'loading') return 'pending'
+    const parsed = Schema.decodeUnknownOption(previewNoticeSchema)(snapshot.value)
+    return Option.isSome(parsed) && parsed.value.previewNotice ? 'shown' : 'hidden'
+  }
+
+  readonly subscribeScope = (listener: () => void): (() => void) => this.scope.subscribe(listener)
 
   /** Begin following the bound scope (idempotent) and publish its current answer. */
   load(): void {
@@ -149,7 +163,7 @@ const OnboardingModal = (props: { readonly title: string; readonly focusTitle: b
   )
 }
 
-/** The versioned preview notice, shown once per notice version on the empty Hero. */
+/** The versioned preview notice, shown once per notice version on the empty Hero while `previewNotice` is on. */
 export const WelcomeNotice = (props: {
   readonly complete: () => void
   readonly controller: WelcomeNoticeStore
@@ -157,6 +171,7 @@ export const WelcomeNotice = (props: {
 }): JSX.Element | null => {
   const { complete, controller, t } = props
   const actor = controller.actor
+  const visibility = useSyncExternalStore(controller.subscribeScope, controller.visibility, controller.visibility)
   const waiting = useSelector(actor, snapshot => snapshot.matches('sync') || snapshot.matches('loading'))
   const saving = useSelector(actor, snapshot => snapshot.matches('saving'))
   const acknowledged = useSelector(actor, snapshot => snapshot.context.acknowledged)
@@ -165,9 +180,9 @@ export const WelcomeNotice = (props: {
     controller.load()
   }, [controller])
   useEffect(() => {
-    if (acknowledged) complete()
-  }, [acknowledged, complete])
-  if (waiting || acknowledged) return null
+    if (acknowledged || visibility === 'hidden') complete()
+  }, [acknowledged, visibility, complete])
+  if (visibility !== 'shown' || waiting || acknowledged) return null
   return (
     <OnboardingModal focusTitle title={t('welcomeTitle')}>
       <div className="dshx:text-base dshx:leading-6 dshx:text-muted-foreground dshx:[&_p]:m-0 dshx:[&_p+p]:mt-3">

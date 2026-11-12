@@ -257,18 +257,21 @@ Deliberate differences from upstream:
   the `ui-settings-general` namespace, which only the switched-off native row serves, and a Loader patch cannot give
   this row that id. So the step is ported too (`src/native/welcome-notice.tsx`): it shadows the `welcome-notice`
   onboarding entry and stores `welcomeNoticeVersion` in `dshfiles-settings-shell`. Someone who acknowledged the native
-  notice sees it once more after switching. Its version is checked like the shell's.
+  notice sees it once more after switching. Its version is checked like the shell's. dshfiles hides it unless
+  `previewNotice` is on (plan `calm-onboarding` C1): the step still shadows the native one, then completes at once, so a
+  fresh profile meets one first-run surface, Getting started's setup card.
 - DSH 0.2.1 dropped the settings snapshot's explicit `mode`: the welcome store derives its process-local case from
   `writable`, which is the only remaining signal for a Host document that refuses writes, so a remote browser still
   acknowledges the notice for the session instead of getting a save error it cannot clear.
 
 ## Settings (`dshfiles-settings-shell`)
 
-| Key            | Default | Meaning                                                                                                |
-| -------------- | ------- | ------------------------------------------------------------------------------------------------------ |
-| `openIn`       | `auto`  | Retired and hidden: Settings always opens as the page in the stage; a saved value still validates.     |
-| `releaseCheck` | `true`  | Check GitHub for newer DSH releases every few hours and badge the trigger. Live; off keeps the button. |
-| `jevSecret`    | `''`    | The one TypeSafe Jev key (`secret:ALIAS[@env]`, Secret Catalog picker), read by Backlog and Memory.    |
+| Key             | Default | Meaning                                                                                                                |
+| --------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `openIn`        | `auto`  | Retired and hidden: Settings always opens as the page in the stage; a saved value still validates.                     |
+| `previewNotice` | `false` | Show DeepSeek Harness's own preview notice before the first thread. Off: the setup card is the only first-run surface. |
+| `releaseCheck`  | `true`  | Check GitHub for newer DSH releases every few hours and badge the trigger. Live; off keeps the button.                 |
+| `jevSecret`     | `''`    | The one TypeSafe Jev key (`secret:ALIAS[@env]`, Secret Catalog picker), read by Backlog and Memory.                    |
 
 ### One Jev key
 

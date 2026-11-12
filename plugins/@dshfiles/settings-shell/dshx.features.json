@@ -12,11 +12,18 @@
       "surface": "settingsSection",
       "destination": "settings",
       "currentSurface": "sidebar: Account menu › Settings",
-      "configuration": [],
+      "configuration": [
+        {
+          "key": "previewNotice",
+          "defaultValue": "false",
+          "constraints": "Boolean; on shows DeepSeek Harness's own preview notice before the first thread, once per notice version.",
+          "coveredBy": ["settings-shell.preview-notice-hidden"]
+        }
+      ],
       "states": ["closed", "open", "compact-navigation", "onboarding", "disconnected", "update-available"],
       "failureModes": [
         "When the running DSH ships another version of the native Settings package, the Host warns at boot and General shows the running version, so the port is refreshed instead of drifting silently.",
-        "The native welcome notice stores its acknowledgement in the switched-off row's namespace, so the shell ports that step and keeps the acknowledgement in its own namespace; someone who acknowledged the native notice sees it once more."
+        "The native welcome notice stores its acknowledgement in the switched-off row's namespace, so the shell ports that step and keeps the acknowledgement in its own namespace; someone who acknowledged the native notice sees it once more. It stays hidden unless previewNotice is on, so a fresh profile meets one first-run surface."
       ],
       "externalDependencies": [],
       "verification": [
@@ -35,6 +42,12 @@
           "id": "settings-shell.upstream-version",
           "file": "plugins/@dshfiles/settings-shell/src/upstream-version.test.ts",
           "testName": "matches the native Settings package this workspace builds against"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.preview-notice-hidden",
+          "file": "plugins/@dshfiles/settings-shell/src/native/welcome-notice.test.tsx",
+          "testName": "skips the upstream preview notice by default, so the setup card is the only first-run surface"
         }
       ],
       "telemetry": [

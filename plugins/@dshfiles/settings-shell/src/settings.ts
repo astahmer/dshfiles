@@ -10,6 +10,9 @@ export const settingsShellSettings = defineSettings({
       .hidden()
       .description('Retired: the gear, the palette and Mod+, always open the Settings page in the stage.'),
     welcomeNoticeVersion: Schema.string().default('').hidden().description('The welcome notice version last acknowledged.'),
+    previewNotice: Schema.boolean()
+      .default(false)
+      .description("Show DeepSeek Harness's own preview notice before the first thread. Off: Getting started's setup card is the only first-run surface."),
     releaseCheck: Schema.boolean()
       .default(true)
       .description(
