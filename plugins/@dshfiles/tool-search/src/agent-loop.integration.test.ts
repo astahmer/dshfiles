@@ -9,6 +9,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { ToolRuntime, defineTool } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { describe, expect, it } from 'vitest'
 import toolSearch from './host.js'
 import { serializedSchemaBytes } from './schema-measurement.js'
@@ -49,14 +50,14 @@ class ScriptedToolSearchAdapter extends LlmAdapter {
     if (options.sessionId === undefined) throw new Error('AgentLoop did not attach a session id')
     const session = this.ctx.sessions.get(options.sessionId)
     if (session === undefined) throw new Error('AgentLoop session was not published')
-    const breakdown = this.ctx.sessionProjections.stateOf(session, 'contextBreakdown')
+    const breakdown = this.ctx.sessionProjections.snapshot(session, ['contextBreakdown']).values.contextBreakdown
     if (breakdown === undefined) throw new Error('TokenMeter did not register contextBreakdown')
 
     const tools = options.tools ?? []
     this.requests.push({
       toolNames: tools.map(tool => tool.name).sort(),
       schemaBytes: serializedSchemaBytes(JSON.stringify(tools)),
-      toolsTokens: breakdown.breakdown.toolsTokens,
+      toolsTokens: breakdown.toolsTokens,
     })
 
     this.requestIndex += 1
@@ -89,6 +90,7 @@ const runScenario = async (progressive: boolean): Promise<ScenarioResult> => {
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(TokenMeter)
     await ctx.plugin(AgentLoop)
 
@@ -176,6 +178,7 @@ const runPresetToolScenario = async (config: { readonly mode: 'cache-safe' | 'pr
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(TokenMeter)
     await ctx.plugin(AgentLoop)
     ctx.tools.register(textTool({ name: 'glob', description: 'Find files by glob pattern.', run: () => 'none' }))

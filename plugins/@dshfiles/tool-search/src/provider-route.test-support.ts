@@ -31,14 +31,14 @@ export const measureRequest = (ctx: Context, options: GenerateOptions): Provider
   if (options.sessionId === undefined) throw new Error('AgentLoop did not attach a session id.')
   const session = ctx.sessions.get(options.sessionId)
   if (session === undefined) throw new Error('AgentLoop session was not published.')
-  const breakdown = ctx.sessionProjections.stateOf(session, 'contextBreakdown')
+  const breakdown = ctx.sessionProjections.snapshot(session, ['contextBreakdown']).values.contextBreakdown
   if (breakdown === undefined) throw new Error('TokenMeter did not register contextBreakdown.')
   const tools = options.tools ?? []
   return {
     toolNames: tools.map(tool => tool.name).sort(),
     schemaBytes: serializedSchemaBytes(JSON.stringify(tools)),
-    toolsTokens: breakdown.breakdown.toolsTokens,
-    contextTokens: breakdown.breakdown.systemTokens + breakdown.breakdown.messageTokens + breakdown.breakdown.toolsTokens,
+    toolsTokens: breakdown.toolsTokens,
+    contextTokens: breakdown.systemTokens + breakdown.messageTokens + breakdown.toolsTokens,
     elapsedMs: 0,
     usage: undefined,
     finishKind: undefined,
@@ -97,6 +97,8 @@ const createCodexProfile = (): ResolvedPiAiProviderProfile => {
     transport: 'sse',
     streamIdleTimeoutMs: 300_000,
     maxRequestImageBytes: 20_971_520,
+    maxRequestImages: 50,
+    imageOffloadCountQuantum: 10,
     requestImagePixelBudget: 4_194_304,
     requestImageMaxBytes: 1_048_576,
     retryPolicy: {

@@ -1,7 +1,7 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, type ToolSchema, type UserMessage } from '@deepseek-ai/dsh-llm'
-import type {} from '@deepseek-ai/dsh-system-prompt'
-import type {} from '@deepseek-ai/dsh-tools'
+import { projectToolSchema, type ToolExecutor } from '@deepseek-ai/dsh-tools'
+import { ToolExecutionPipeline, executeToolBatch } from '@deepseek-ai/dsh-tools/pipeline'
 import { DshxPlugin, HostContext, HostEvents, Tool } from '@dshfiles/dshx/effect'
 import { Context, Effect, Exit, Layer, Ref, Schema, Scope } from 'effect'
 import { serializedSchemaBytes } from './schema-measurement.js'
@@ -10,6 +10,8 @@ import { TOOL_CALL_NAME, toolCallDefinition } from './tool-call.js'
 import { ToolSetDeltaModel } from './tool-set-delta.js'
 
 const TOOL_SET_SOURCE = 'dshfiles-tool-search'
+/** The native executor's batch concurrency (`@deepseek-ai/dsh-tool-executor-native`), kept for the agents this plugin executes for. */
+const NATIVE_MAX_PARALLEL_TOOL_CALLS = 10
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -355,25 +357,30 @@ class ToolSearch extends Context.Service<
             execute: (input, call) => describeMatches({ state, call, query: input.query, limit: input.limit }),
           })
 
-        /** The request declares the same tools for the whole Session: deferred globals are filtered from each assembly. */
+        /**
+         * The request declares the same tools for the whole Session: the agent's own executor leaves deferred globals out
+         * of its declarations, while they stay admitted, so `tool_call` and a call by real name still dispatch them.
+         */
         const attachCacheSafe = (state: AgentState) =>
           Effect.gen(function* () {
             const agent = state.agent
+            const pipeline = new ToolExecutionPipeline(ctx)
+            const executor: ToolExecutor = {
+              describe: tools => {
+                const deferred = deferredNames(state)
+                return { schemas: tools.filter(tool => !deferred.has(tool.name)).map(tool => projectToolSchema(tool, false)) }
+              },
+              execute: input => executeToolBatch(input, pipeline, () => NATIVE_MAX_PARALLEL_TOOL_CALLS),
+            }
             yield* owned(Tool.register(schemaSearchTool(state), { tools: agent.ctx.tools }))
-            const definition = toolCallDefinition({ agent, tools: ctx.tools, reserved: new Set([TOOL_SEARCH_NAME, TOOL_CALL_NAME]) })
+            const definition = toolCallDefinition({ agent, tools: ctx.tools, pipeline, reserved: new Set([TOOL_SEARCH_NAME, TOOL_CALL_NAME]) })
             yield* Effect.acquireRelease(
               ownedSync(() => agent.ctx.tools.register(definition)),
               unregister => ownedSync(unregister),
             )
             yield* Effect.acquireRelease(
-              Effect.sync(() =>
-                agent.ctx.on('system-prompt/assemble', async (_assembly, _context, next) => {
-                  const assembly = await next()
-                  const deferred = deferredNames(state)
-                  return { ...assembly, tools: assembly.tools.filter(tool => !deferred.has(tool.name)) }
-                }),
-              ),
-              dispose => Effect.sync(dispose),
+              ownedSync(() => agent.ctx.tools.setExecutor(executor)),
+              release => ownedSync(release),
             )
           })
 

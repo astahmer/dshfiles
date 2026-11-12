@@ -1,6 +1,7 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { ToolCallId, type ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { ToolDefinition, ToolExecutionResult, ToolExecutionToken, ToolRunContext, ToolRuntime } from '@deepseek-ai/dsh-tools'
+import type { ToolDefinition, ToolExecutionInput, ToolExecutionResult, ToolExecutionToken, ToolRunContext, ToolRuntime } from '@deepseek-ai/dsh-tools'
+import type { ToolExecutionPipeline } from '@deepseek-ai/dsh-tools/pipeline'
 import { Exit, JsonSchema, Schema, SchemaRepresentation } from 'effect'
 
 export const TOOL_CALL_NAME = 'tool_call'
@@ -55,14 +56,22 @@ const decodedTarget = (args: unknown) => {
   return Exit.isSuccess(exit) ? exit.value : undefined
 }
 
+const runNested = async (pipeline: ToolExecutionPipeline, input: ToolExecutionInput): Promise<ToolExecutionResult> => {
+  const prepared = await pipeline.prepare(input)
+  const outcome = prepared.kind === 'dispatch' ? await pipeline.dispatch(prepared.exec) : prepared
+  return pipeline.complete(prepared.exec, outcome)
+}
+
 /**
- * `tool_call { name, args }`: dispatch one tool the request does not declare through the registry's full pipeline
+ * `tool_call { name, args }`: dispatch one tool the request does not declare through the shared pipeline
  * (pre-execute policies, guards, approval, post-execute), as a nested call of this one. The tool list never changes,
  * so the provider's cached prompt prefix survives every discovery.
  */
 export const toolCallDefinition = (input: {
   readonly agent: Agent
-  readonly tools: Pick<ToolRuntime, 'get' | 'execute'>
+  readonly tools: Pick<ToolRuntime, 'get' | 'executable'>
+  /** The agent's executor pipeline: nested calls share its policies and the step's admitted tool set. */
+  readonly pipeline: ToolExecutionPipeline
   /** Names the proxy never dispatches: itself and tool_search. */
   readonly reserved: ReadonlySet<string>
 }): ToolDefinition => {
@@ -91,17 +100,18 @@ export const toolCallDefinition = (input: {
       if (Exit.isFailure(exit)) throw failure(`Invalid tool_call arguments: ${String(exit.cause)}`)
       const call = exit.value
       if (input.reserved.has(call.name)) throw failure(`tool_call cannot call ${call.name}; call it directly.`)
-      const definition = target(call.name)
+      const definition = input.reserved.has(call.name) ? undefined : input.tools.executable(call.name, input.agent, exec.toolSet)
       if (definition === undefined) throw failure(`Unknown tool "${call.name}". Find it with tool_search first, then pass its exact name.`)
       const callArgs = call.args ?? {}
       const issue = decoderFor(definition)?.(callArgs)
       if (issue !== undefined) throw failure(`Invalid arguments for ${call.name}: ${issue}`)
-      const result: ToolExecutionResult = await input.tools.execute({
+      const result = await runNested(input.pipeline, {
         callId: ToolCallId(`${exec.callId}:${call.name}`),
         rootCallId: exec.rootCallId,
         name: call.name,
         arguments: callArgs,
         agent: input.agent,
+        ...(exec.toolSet !== undefined && { toolSet: exec.toolSet }),
         parent: exec.token,
         signal: exec.signal,
       })

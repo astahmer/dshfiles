@@ -10,6 +10,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { ToolRuntime, type ToolDefinition } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import toolSearch from './host.js'
@@ -368,6 +369,7 @@ const runScenario = async (input: {
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(TokenMeter)
     await ctx.plugin(AgentLoop)
     ctx.systemPrompt.section({
