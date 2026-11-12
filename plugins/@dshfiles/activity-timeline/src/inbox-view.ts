@@ -46,6 +46,19 @@ const relativeAge = (at: number, now: number): string => {
   return `${String(Math.round(hours / 24))} d ago`
 }
 
+/** Which open control a row offers: review a finished turn, open a thread, or open a provider-owned page. */
+export type InboxOpenAction = 'review' | 'thread' | 'subject'
+
+/** A finished turn is work to review, not a thread to open for its own sake. */
+const openActionOf = (item: AttentionItem): InboxOpenAction => {
+  if (item.subject.kind !== 'session') return 'subject'
+  return item.source === 'thread-sidebar.finished-turn' ? 'review' : 'thread'
+}
+
+/** The thread or item an entry is about, so a row leads with what the user acts on rather than its source sentence. */
+const subjectTitleOf = (item: AttentionItem, sessionTitle: (sessionId: string) => string): string =>
+  item.subject.kind === 'session' ? sessionTitle(item.subject.id) : (item.subject.label ?? item.subject.id)
+
 /** What a row in `view` can undo: Reopen for Done and Snoozed, Unmute for Muted; resolved items have nothing to undo. */
 const undoOf = (item: AttentionItem, view: AttentionView): 'reopen' | 'unsnooze' | 'unmute' | null => {
   if (view === 'muted') return 'unmute'
@@ -60,6 +73,8 @@ const resumableIds = (items: readonly AttentionItem[]): readonly string[] =>
   items.filter(item => item.doneAt === null && item.resolvedAt === null && item.verbs.includes('Resume')).map(item => item.id)
 
 export class InboxView {
+  static readonly openActionOf = openActionOf
+  static readonly subjectTitleOf = subjectTitleOf
   static readonly sourceLabel = sourceLabel
   static readonly snoozeTarget = snoozeTarget
   static readonly severityGlyph = severityGlyph

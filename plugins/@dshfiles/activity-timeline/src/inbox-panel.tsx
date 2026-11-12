@@ -119,9 +119,11 @@ const InboxRow = (props: {
   const undo = InboxView.undoOf(item, props.view)
   const status = statusOf(item, props.view)
   const statusLabel = statusLabelOf(status, t)
-  const subjectLabel = item.subject.kind === 'session' ? props.sessionLabel(item.subject.id) : (item.subject.label ?? item.subject.id)
+  const title = InboxView.subjectTitleOf(item, props.sessionLabel)
   const opener = item.subject.kind === 'session' ? undefined : props.openers.get(item.subject.kind)
   const openable = item.subject.kind === 'session' || opener !== undefined
+  const openAction = InboxView.openActionOf(item)
+  const openLabel = openAction === 'review' ? t('reviewThread') : openAction === 'thread' ? t('openThread') : t('openSubject', { label: opener?.label ?? '' })
   const referencedThreadId =
     item.subject.kind === 'session'
       ? null
@@ -133,25 +135,14 @@ const InboxRow = (props: {
       data-severity={item.severity}
       status={status}
       statusLabel={statusLabel}
-      heading={item.reason}
+      heading={title}
       meta={
         <>
           <span>{InboxView.sourceLabel(item.source)}</span>
-          {openable ? (
-            <button
-              type="button"
-              className="dshx:min-w-0 dshx:max-w-full dshx:truncate dshx:text-left dshx:underline-offset-2 dshx:hover:underline"
-              onClick={() => props.onOpen(item)}
-            >
-              {subjectLabel}
-            </button>
-          ) : (
-            <span className="dshx:min-w-0 dshx:truncate">{subjectLabel}</span>
-          )}
           {referencedThreadId === null ? null : (
             <button
               type="button"
-              className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-info dshx:underline-offset-2 dshx:hover:underline"
+              className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-info dshx:underline-offset-2 dshx:hover:underline dshx:pointer-coarse:min-h-11"
               onClick={() => props.onOpenThread(referencedThreadId)}
             >
               <MessagesSquareIcon aria-hidden className="dshx:size-3" />
@@ -168,7 +159,12 @@ const InboxRow = (props: {
           ) : null}
         </>
       }
-      {...(item.detail === null ? {} : { description: item.detail })}
+      description={
+        <>
+          <span>{item.reason}</span>
+          {item.detail === null ? null : <span className="dshx:line-clamp-2">{item.detail}</span>}
+        </>
+      }
     >
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pb-2 dshx:pl-9">
         {open && item.verbs.includes('Answer') && item.choices.length > 0
@@ -177,7 +173,7 @@ const InboxRow = (props: {
                 key={choice.id}
                 size="sm"
                 variant={choice.recommended === true ? 'default' : 'outline'}
-                className="dshx:shrink dshx:max-w-full"
+                className="dshx:shrink dshx:max-w-full dshx:pointer-coarse:min-h-11"
                 disabled={props.busy}
                 onClick={() => props.onAct(item, 'Answer', choice.id)}
               >
@@ -188,25 +184,37 @@ const InboxRow = (props: {
           : null}
         {open
           ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).map(verb => (
-              <Button key={verb} size="sm" variant="outline" disabled={props.busy} onClick={() => props.onAct(item, verb)}>
+              <Button
+                key={verb}
+                size="sm"
+                variant="outline"
+                className="dshx:shrink dshx:pointer-coarse:min-h-11"
+                disabled={props.busy}
+                onClick={() => props.onAct(item, verb)}
+              >
                 {verb}
               </Button>
             ))
           : null}
         {openable ? (
-          <Button size="sm" variant={open && !item.verbs.includes('Answer') ? 'default' : 'ghost'} onClick={() => props.onOpen(item)}>
-            {t('open')}
+          <Button
+            size="sm"
+            variant={open && !item.verbs.includes('Answer') ? 'default' : 'ghost'}
+            className="dshx:shrink dshx:max-w-full dshx:pointer-coarse:min-h-11"
+            onClick={() => props.onOpen(item)}
+          >
+            <span className="dshx:truncate">{openLabel}</span>
           </Button>
         ) : null}
         {open && item.verbs.includes('Done') ? (
-          <Button size="sm" variant="ghost" disabled={props.busy} onClick={() => props.onDone(item)}>
+          <Button size="sm" variant="ghost" className="dshx:shrink dshx:pointer-coarse:min-h-11" disabled={props.busy} onClick={() => props.onDone(item)}>
             {t('done')}
           </Button>
         ) : null}
         {open && props.view !== 'snoozed' && item.verbs.includes('Snooze') ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost" disabled={props.busy}>
+              <Button size="sm" variant="ghost" className="dshx:shrink dshx:pointer-coarse:min-h-11" disabled={props.busy}>
                 <ClockIcon aria-hidden />
                 {t('snooze')}
               </Button>
@@ -221,19 +229,25 @@ const InboxRow = (props: {
           </DropdownMenu>
         ) : null}
         {undo === 'reopen' || undo === 'unsnooze' ? (
-          <Button size="sm" variant="outline" disabled={props.busy} onClick={() => props.onReopen(item)}>
+          <Button size="sm" variant="outline" className="dshx:shrink dshx:pointer-coarse:min-h-11" disabled={props.busy} onClick={() => props.onReopen(item)}>
             {undo === 'reopen' ? t('reopen') : t('unsnooze')}
           </Button>
         ) : null}
         {undo === 'unmute' ? (
-          <Button size="sm" variant="outline" disabled={props.busy} onClick={() => props.onMute(item.source, false)}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="dshx:shrink dshx:pointer-coarse:min-h-11"
+            disabled={props.busy}
+            onClick={() => props.onMute(item.source, false)}
+          >
             {t('unmuteSource')}
           </Button>
         ) : null}
         {open && item.verbs.includes('MuteSource') ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost" aria-label={t('more')}>
+              <Button size="sm" variant="ghost" className="dshx:pointer-coarse:size-11" aria-label={t('more')}>
                 <EllipsisIcon aria-hidden />
               </Button>
             </DropdownMenuTrigger>

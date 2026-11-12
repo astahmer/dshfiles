@@ -882,7 +882,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "activity-timeline",
       "id": "inbox-panel",
       "title": "Inbox page with one Needs you badge",
-      "summary": "An Inbox entry in the left navigation opens one page with Needs you and Other tabs (plus Snoozed, Done and Muted when they hold items). Each row shows a severity glyph, the reason, the source, a link to the thread and its verbs inline: answer choices, Open, Done, Snooze and Mute…",
+      "summary": "An Inbox entry in the left navigation opens one page with Needs you and Other tabs (plus Snoozed, Done and Muted when they hold items). Each row leads with the thread or item it is about, then the sentence saying what it is about and its detail, with one direct action (Review th…",
       "destination": "inbox",
       "currentSurface": "left-nav: Inbox",
       "reach": [
@@ -958,7 +958,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "activity-timeline",
       "id": "inbox-opens-subject",
       "title": "Open an Inbox item's source in one click",
-      "summary": "Every Inbox row whose subject another page owns offers Open: a thread subject opens the thread (an archived one says so), a backlog item opens that item in the Backlog page, and any text naming a thread gets an Open thread link. The page that owns a subject kind registers an ope…",
+      "summary": "Every Inbox row whose subject another page owns offers its own direct action: Review thread for a finished turn, Open thread for a thread subject (an archived one says so), and Open <subject> for a page such as a backlog item, which opens that item in the Backlog page. Any text…",
       "destination": "inbox",
       "currentSurface": "Inbox: Open on an item's subject",
       "reach": [

@@ -55,4 +55,34 @@ describe('inbox view', () => {
     expect(InboxView.sourceLabel('hmr-gate.deferred-update')).toBe('Restart needed')
     expect(InboxView.sourceLabel('custom.source')).toBe('custom.source')
   })
+
+  it('leads with the thread or item a ready item is about, not with its source sentence', () => {
+    const readyToLand = item({
+      source: 'jj-integration.ready-to-land',
+      severity: 'ready',
+      subject: { kind: 'session', id: 'session-2' },
+      verbs: ['Land', 'Open', 'Done', 'Snooze'],
+      reason: '“Ship the picker” is ready to land: 2 described revisions not on the bookmark yet.',
+    })
+    expect(InboxView.subjectTitleOf(readyToLand, () => 'Ship the picker')).toBe('Ship the picker')
+    expect(InboxView.openActionOf(readyToLand)).toBe('thread')
+
+    const finishedTurn = item({
+      source: 'thread-sidebar.finished-turn',
+      severity: 'ready',
+      verbs: ['Open', 'Done', 'Snooze'],
+      reason: 'Turn finished; ready to review.',
+    })
+    expect(InboxView.openActionOf(finishedTurn)).toBe('review')
+
+    const waitingItem = item({
+      source: 'backlog.attention',
+      severity: 'ready',
+      subject: { kind: 'backlog-item', id: '603', label: 'Make Other actionable' },
+      verbs: ['Done', 'Snooze'],
+      reason: 'b:kh4b Make Other actionable is waiting.',
+    })
+    expect(InboxView.subjectTitleOf(waitingItem, () => 'unused')).toBe('Make Other actionable')
+    expect(InboxView.openActionOf(waitingItem)).toBe('subject')
+  })
 })

@@ -10,16 +10,17 @@ Open the reusable **Activity Timeline: Activity** view from navigation or the Wo
 
 ## Inbox: one place for everything that needs you
 
-![Inbox page with one Needs you badge](docs/screenshots/inbox-panel.png)
+![Inbox rows leading with the thread they are about](docs/screenshots/inbox-panel.png)
 
-<img alt="Inbox at 390×844 in WebKit" src="docs/screenshots/inbox-panel-phone.png" width="195">
+<img alt="Inbox rows at 390×844" src="docs/screenshots/inbox-panel-phone.png" width="195">
 
 The plugin also owns the attention inbox of [the ADE plan](../../../docs/ade-ux/README.md#48-the-attention-model)
 (Phase 2a). The **Inbox** entry in the left navigation (a temporary home until the Phase 3 rail) carries the only
 badge, the Needs you count. The page has **Needs you** (blocking and failed items) and **Other** (ready items) tabs,
-plus **Snoozed**, **Done** and **Muted** when they hold items. Each row shows a severity glyph, the reason, the source,
-a link to the thread and its verbs inline: answer choices, Open, Done, Snooze (1 h, 4 h, tomorrow, until it changes)
-and Mute source. Every open item a provider marks resumable also gets one page-level **Resume all**, so a batch of
+plus **Snoozed**, **Done** and **Muted** when they hold items. Each row leads with the thread or item it is about,
+then the sentence that says what it is about and its detail, then one direct action and its verbs inline: answer
+choices, **Review thread** for a finished turn, **Open thread**, **Open backlog item** for a subject another page owns,
+Land, Done, Snooze (1 h, 4 h, tomorrow, until it changes) and Mute source. Row actions are 44 px on touch input. Every open item a provider marks resumable also gets one page-level **Resume all**, so a batch of
 usage-limit stops leaves the list in one click. The history tabs offer Reopen, Unsnooze and Unmute, so every user
 transition can be undone. Browser
 alerts for new blocking items are opt-in, per browser, below the list.
