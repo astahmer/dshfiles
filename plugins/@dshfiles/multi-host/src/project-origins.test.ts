@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { NodeServices } from '@effect/platform-node'
 import { tracerLayer } from '@dshfiles/dshx/effect'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Stream } from 'effect'
 import { TestClock } from 'effect/testing'
 import { expect, test } from 'vitest'
 import { HostDirectory } from './host-directory.js'
@@ -43,6 +43,7 @@ const testServices = (
         upsertRuntime: unused,
         removeRuntime: unused,
         removeHost: unused,
+        changes: Stream.empty,
       }),
     ),
     Layer.succeed(Ssh, Ssh.of({ run: input.sshRun ?? unused, exec: unused, tunnel: unused })),

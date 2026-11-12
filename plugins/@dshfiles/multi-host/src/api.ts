@@ -1331,6 +1331,10 @@ const effectMultiHostApi = defineApi({
       schema: Schema.Struct({}),
       description: 'What remote threads are waiting on changed. Read sessionInteractions again.',
     }),
+    inventoryChanged: event({
+      schema: Schema.Struct({}),
+      description: 'A host, a runtime, a runtime connection or a thread started here changed. Read list and threadList again.',
+    }),
   },
 })
 

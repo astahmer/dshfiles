@@ -1,4 +1,4 @@
-import { Context, Effect, FileSystem, Layer, Option, Path, Schema, Semaphore } from 'effect'
+import { Context, Effect, FileSystem, Layer, Option, Path, PubSub, Schema, Semaphore, Stream } from 'effect'
 import { MultiHostPaths } from './paths.js'
 import { PrivateFile } from './private-file.js'
 import { SchemaFields } from './schema.js'
@@ -27,6 +27,8 @@ export class RemoteThreads extends Context.Service<
     readonly list: Effect.Effect<readonly RemoteThread[]>
     readonly record: (thread: RemoteThread) => Effect.Effect<RemoteThread>
     readonly forget: (match: { readonly runtimeId: string; readonly sessionId?: string | undefined }) => Effect.Effect<number>
+    /** Fires after each saved change to the list. */
+    readonly changes: Stream.Stream<void>
   }
 >()('@dshfiles/multi-host/RemoteThreads') {
   static readonly layer = Layer.effect(
@@ -36,6 +38,7 @@ export class RemoteThreads extends Context.Service<
       const path = yield* Path.Path
       const threadsPath = (yield* MultiHostPaths).dataPath('threads.json')
       const lock = yield* Semaphore.make(1)
+      const saved = yield* PubSub.unbounded<void>()
       const provided = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>) =>
         effect.pipe(Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, path))
 
@@ -55,7 +58,10 @@ export class RemoteThreads extends Context.Service<
                 body: `${JSON.stringify({ schemaVersion: 1, threads: next.slice(-1000) }, null, 2)}\n`,
                 commit: 'rename',
               }),
-            ).pipe(Effect.catchCause(cause => Effect.logWarning('multi-host could not save its remote thread list', cause)))
+            ).pipe(
+              Effect.andThen(PubSub.publish(saved, undefined)),
+              Effect.catchCause(cause => Effect.logWarning('multi-host could not save its remote thread list', cause)),
+            )
             return result
           }),
         )
@@ -75,7 +81,7 @@ export class RemoteThreads extends Context.Service<
         })
       })
 
-      return RemoteThreads.of({ list: lock.withPermits(1)(readThreads), record, forget })
+      return RemoteThreads.of({ list: lock.withPermits(1)(readThreads), record, forget, changes: Stream.fromPubSub(saved) })
     }),
   )
 }

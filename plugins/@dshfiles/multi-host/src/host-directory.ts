@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { Context, Effect, FileSystem, Layer, Path, Result, Schema, Semaphore } from 'effect'
+import { Context, Effect, FileSystem, Layer, Path, PubSub, Result, Schema, Semaphore, Stream } from 'effect'
 import {
   ConnectorKindMismatch,
   DirectoryCorrupt,
@@ -143,6 +143,8 @@ export class HostDirectory extends Context.Service<
     readonly upsertRuntime: (record: RuntimeRecord) => Effect.Effect<RuntimeRecord, DirectoryWriteError | HostNotFound | ConnectorKindMismatch>
     readonly removeRuntime: (id: string) => Effect.Effect<boolean, DirectoryWriteError>
     readonly removeHost: (input: { readonly id: string; readonly removeDirectory: boolean }) => Effect.Effect<boolean, DirectoryWriteError | HostHasRuntimes>
+    /** Fires after each write of the directory file. */
+    readonly changes: Stream.Stream<void>
   }
 >()('@dshfiles/multi-host/HostDirectory') {
   static readonly layer = Layer.effect(
@@ -154,6 +156,7 @@ export class HostDirectory extends Context.Service<
       const directoryPath = paths.dataPath('directory.json')
       const legacyPath = paths.dataPath('hosts.json')
       const lock = yield* Semaphore.make(1)
+      const written = yield* PubSub.unbounded<void>()
       const provided = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>) =>
         effect.pipe(Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, path))
 
@@ -179,6 +182,7 @@ export class HostDirectory extends Context.Service<
         provided(PrivateFile.write({ path: directoryPath, body: `${JSON.stringify(next, null, 2)}\n`, commit: 'rename' })).pipe(
           Effect.andThen(fileSystem.remove(legacyPath, { force: true })),
           Effect.mapError(cause => new DirectoryWriteFailed({ cause })),
+          Effect.andThen(PubSub.publish(written, undefined)),
         )
 
       const read = lock.withPermits(1)(readFromDisk).pipe(Effect.withSpan('multi-host directory read'))
@@ -336,6 +340,7 @@ export class HostDirectory extends Context.Service<
         upsertRuntime,
         removeRuntime,
         removeHost,
+        changes: Stream.fromPubSub(written),
       })
     }),
   )

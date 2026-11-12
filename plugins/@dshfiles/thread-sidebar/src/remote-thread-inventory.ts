@@ -1,7 +1,7 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { multiHostApi, multiHostKeys, multiHostQueries, type MultiHostClient, type RemoteThreadSummary } from '@dshfiles/multi-host/destination'
+import { InventoryPoll, multiHostApi, multiHostKeys, multiHostQueries, type MultiHostClient, type RemoteThreadSummary } from '@dshfiles/multi-host/destination'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useMemo } from 'react'
 import { ThreadViewModel, type ThreadStatusFilters, type ThreadSourceFilter } from './thread-view.js'
@@ -199,10 +199,11 @@ export class RemoteThreadInventoryModel {
 
 export const useRemoteSidebarThreads = (enabled: boolean, localProjects: readonly LocalProject[]): readonly RemoteSidebarThread[] => {
   const api = useApi(multiHostApi)
+  const threadListInterval = InventoryPoll.use(pollIntervals.threadListMs)
   const startedHere = useQuery({
     queryKey: multiHostKeys.threads,
     queryFn: ({ signal }) => api.threadList(undefined, { signal }),
-    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : pollIntervals.threadListMs),
+    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : threadListInterval),
     retry: false,
     enabled,
   })

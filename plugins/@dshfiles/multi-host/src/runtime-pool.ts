@@ -59,6 +59,8 @@ export class RuntimePool extends Context.Service<
     readonly clearError: (runtimeId: string) => Effect.Effect<void>
     /** Every runtime id the moment a fresh connection to it is verified. */
     readonly connected: Stream.Stream<string>
+    /** Every runtime id whose connection opened or closed, or whose last error was recorded or cleared. */
+    readonly changes: Stream.Stream<string>
   }
 >()('@dshfiles/multi-host/RuntimePool') {
   static readonly layer = Layer.effect(
@@ -70,18 +72,20 @@ export class RuntimePool extends Context.Service<
       const generations = yield* Ref.make(new Map<string, number>())
       const errors = yield* Ref.make(new Map<string, ConnectionError>())
       const connections = yield* PubSub.unbounded<string>()
+      const changed = yield* PubSub.unbounded<string>()
       const nextGeneration = yield* Ref.make(1)
 
       const recordError = (runtimeId: string, error: unknown) =>
         Effect.flatMap(DateTime.now, now =>
           Ref.update(errors, current => new Map(current).set(runtimeId, { ...errorText(error), at: DateTime.formatIso(now) })),
-        )
+        ).pipe(Effect.andThen(PubSub.publish(changed, runtimeId)))
       const clearError = (runtimeId: string) =>
-        Ref.update(errors, current => {
+        Ref.modify(errors, current => {
+          if (!current.has(runtimeId)) return [false, current] as const
           const next = new Map(current)
           next.delete(runtimeId)
-          return next
-        })
+          return [true, next] as const
+        }).pipe(Effect.flatMap(cleared => (cleared ? PubSub.publish(changed, runtimeId) : Effect.void)))
 
       const leases: RcMap.RcMap<string, RuntimeLease, PoolError> = yield* RcMap.make({
         lookup: (runtimeId: string): Lookup =>
@@ -96,14 +100,14 @@ export class RuntimePool extends Context.Service<
             yield* directory.upsertRuntime({ ...runtime, identity, lastSeenAt: DateTime.formatIso(yield* DateTime.now) })
             const generation = yield* Ref.getAndUpdate(nextGeneration, value => value + 1)
             yield* Effect.acquireRelease(
-              Ref.update(generations, current => new Map(current).set(runtimeId, generation)),
+              Ref.update(generations, current => new Map(current).set(runtimeId, generation)).pipe(Effect.andThen(PubSub.publish(changed, runtimeId))),
               () =>
-                Ref.update(generations, current => {
-                  if (current.get(runtimeId) !== generation) return current
+                Ref.modify(generations, current => {
+                  if (current.get(runtimeId) !== generation) return [false, current] as const
                   const next = new Map(current)
                   next.delete(runtimeId)
-                  return next
-                }),
+                  return [true, next] as const
+                }).pipe(Effect.flatMap(closed => (closed ? PubSub.publish(changed, runtimeId) : Effect.void))),
             )
             yield* clearError(runtimeId)
             yield* PubSub.publish(connections, runtimeId)
@@ -140,6 +144,7 @@ export class RuntimePool extends Context.Service<
         lastError: runtimeId => Effect.map(Ref.get(errors), current => current.get(runtimeId)),
         clearError,
         connected: Stream.fromPubSub(connections),
+        changes: Stream.fromPubSub(changed),
       })
     }),
   )

@@ -12,6 +12,7 @@ import { CloneProjectDialog } from './clone-project-dialog.js'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { runtimePingRefetchInterval } from '../runtime-status-refresh-policy.js'
 import { DisconnectGrace } from './disconnect-grace.js'
+import { InventoryPoll } from './inventory-poll.js'
 import { multiHostQueries, type MultiHostClient } from './queries.js'
 import { hostDestination, openHostsPage, setHostDestination } from './state.js'
 
@@ -51,7 +52,8 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
   const [dialog, setDialog] = useState<'closed' | 'add'>('closed')
   const [cloneRuntimeId, setCloneRuntimeId] = useState<string | null>(null)
   const destination = hostDestination.useValue()
-  const directory = useQuery({ ...multiHostQueries.directory(api, open ? 4_000 : 30_000), enabled: props.unavailable !== true })
+  const closedInterval = InventoryPoll.use(30_000)
+  const directory = useQuery({ ...multiHostQueries.directory(api, open ? 4_000 : closedInterval), enabled: props.unavailable !== true })
   const resourcePool = useQuery({ ...multiHostQueries.resourcePool(api, open ? 5_000 : false), enabled: open && props.unavailable !== true })
   const hosts = directory.data?.hosts ?? []
   const runtimes = directory.data?.runtimes ?? []

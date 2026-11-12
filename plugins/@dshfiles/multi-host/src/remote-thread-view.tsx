@@ -6,6 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { errorMessage, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { multiHostApi } from './api.js'
+import { InventoryPoll } from './destination/inventory-poll.js'
 import { multiHostKeys, multiHostQueries } from './destination/queries.js'
 import { mergeInventory, type InventoryRow, type InventoryStatus } from './inventory.js'
 
@@ -23,7 +24,12 @@ const age = (updatedAt: number, now: number): string => {
  */
 export const RemoteThreadView = (props: { readonly onOpenSession: (sessionId: SessionId) => void }) => {
   const api = useApi(multiHostApi)
-  const threads = useQuery({ queryKey: multiHostKeys.threads, queryFn: ({ signal }) => api.threadList(undefined, { signal }), refetchInterval: 30_000 })
+  const threadsInterval = InventoryPoll.use(30_000)
+  const threads = useQuery({
+    queryKey: multiHostKeys.threads,
+    queryFn: ({ signal }) => api.threadList(undefined, { signal }),
+    refetchInterval: threadsInterval,
+  })
   const directory = useQuery(multiHostQueries.directory(api))
   const runtimes = directory.data?.runtimes ?? []
   const hosts = directory.data?.hosts ?? []

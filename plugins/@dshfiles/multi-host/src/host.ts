@@ -1650,6 +1650,25 @@ const InteractionEvents = Layer.effectDiscard(
   }),
 )
 
+/** Tell browsers to read the host directory and the threads started here again; a burst of writes becomes one read. */
+const InventoryEvents = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const directory = yield* HostDirectory
+    const threads = yield* RemoteThreads
+    const pool = yield* RuntimePool
+    yield* Stream.mergeAll([directory.changes, threads.changes, Stream.as(pool.changes, undefined)], { concurrency: 'unbounded' }).pipe(
+      Stream.groupedWithin(Number.MAX_SAFE_INTEGER, '100 millis'),
+      Stream.runForEach(() =>
+        Api.publish({ contract: multiHostApi, event: 'inventoryChanged', payload: {} }).pipe(
+          Effect.catchTag('PublishEventError', error => Effect.logWarning('multi-host: inventory change event refused', error.message)),
+        ),
+      ),
+      DshxPlugin.detached,
+      Effect.forkScoped,
+    )
+  }),
+)
+
 /** The reference middleware is optional: a Host without the Session controller still serves the tools. */
 const referenceMiddlewareLayer = Layer.effectDiscard(referenceMiddleware)
 
@@ -1667,7 +1686,7 @@ const runtimeLayer = Layer.mergeAll(RuntimeStatus.layer, ResourcePool.layer, Vie
 )
 
 const pluginLayer = (config: Schema.Schema.Type<typeof configSchema>) =>
-  Layer.mergeAll(RemoteSessionsLive, LaunchFilePublisher, InteractionEvents, referenceMiddlewareLayer).pipe(
+  Layer.mergeAll(RemoteSessionsLive, LaunchFilePublisher, InteractionEvents, InventoryEvents, referenceMiddlewareLayer).pipe(
     Layer.provideMerge(runtimeLayer),
     Layer.provideMerge(SessionOwners.layer),
     Layer.provideMerge(domainLayer({ configuredProfile: config?.profile })),
