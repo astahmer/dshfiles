@@ -11,6 +11,7 @@ import { ActorThreadLink } from './actor-thread-link.js'
 import { backlogSortTime, sortBacklogItems, type BacklogSort } from './backlog-sort.js'
 import type { BacklogStatus } from './item.js'
 import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
+import { imageTitleFallback } from './image-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
@@ -129,7 +130,7 @@ const FeedEntry = (props: {
               />
             ) : (
               <BacklogText
-                text={item.title}
+                text={imageTitleFallback(item.title)}
                 className={cn(
                   'dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:truncate dshx:text-sm dshx:font-medium dshx:[&>div]:truncate dshx:[&>div]:text-sm! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
                   closed &&
@@ -344,7 +345,7 @@ export const FeedView = (props: {
                 className="dshx:data-selected:bg-accent/70 dshx:flex dshx:h-7 dshx:max-w-64 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent"
               >
                 <ItemGlyphs.StatusIcon status={item.status} />
-                <span className="dshx:truncate">{item.title}</span>
+                <span className="dshx:truncate">{imageTitleFallback(item.title)}</span>
               </button>
             </BacklogItemMenu>
           ))}

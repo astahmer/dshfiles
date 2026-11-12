@@ -6,6 +6,7 @@ import type { BacklogSummaryView } from './api.js'
 import { nextBacklogMention } from './backlog-mention-text.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogItems } from './item.js'
+import { imageTitleFallback } from './image-title.js'
 import { formatBacklogMention } from './backlog-mention-text.js'
 
 const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp|backlog|b):/iu
@@ -44,7 +45,7 @@ const scopedQuery = (query: string): { readonly text: string; readonly scoped: b
 
 const candidateOf = (item: BacklogSummaryView, section: string): InputTriggerCandidate => ({
   name: BacklogReference.labelOf(item),
-  label: item.title,
+  label: imageTitleFallback(item.title),
   description: `${item.kind} · ${item.status}`,
   section,
   value: JSON.stringify({ ref: BacklogReference.refOf(item), title: item.title }),

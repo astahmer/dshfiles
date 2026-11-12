@@ -5,6 +5,7 @@ import { useRef } from 'react'
 
 import { previewBacklogReference } from './backlog-preview-request.js'
 import { BacklogReference } from './backlog-reference.js'
+import { imageTitleFallback } from './image-title.js'
 
 interface BacklogReferenceChipProps {
   /** The item's ref as written: `k3f9` or a legacy `12`. */
@@ -16,7 +17,7 @@ interface BacklogReferenceChipProps {
 /** One item reference: the same chip in the composer, a sent message, an answer and the panel, with the shared card on hover. */
 export const BacklogReferenceChip = ({ reference: ref, itemTitle, interactive = true }: BacklogReferenceChipProps): JSX.Element => {
   const reference = useRef<HTMLButtonElement | null>(null)
-  const resolvedTitle = itemTitle?.trim() ?? ''
+  const resolvedTitle = imageTitleFallback(itemTitle?.trim() ?? '')
   const label = resolvedTitle === '' ? BacklogReference.label(ref) : `${BacklogReference.label(ref)} · ${resolvedTitle}`
   const content = (
     <>

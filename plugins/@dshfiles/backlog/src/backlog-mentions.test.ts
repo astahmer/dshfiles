@@ -48,6 +48,15 @@ describe('backlog @ mentions', () => {
     expect(limits).toEqual([40, 5])
   })
 
+  it('shows a readable image title without changing the stored mention value', async () => {
+    const title = '![image.png](dsh-context://v1/image/image_abc123)'
+    const source = BacklogMentions.createSource({ section: 'Backlog', search: async () => [summary(12, title)] })
+    const session = { sessionId: 'session-abc123' } as never
+    const candidates = await source.candidates(session, request('b:image') as never)
+    expect(candidates[0]?.label).toBe('Image: image.png')
+    expect(JSON.parse(candidates[0]?.value ?? '{}')).toEqual({ ref: '12', title })
+  })
+
   it('sends a chip as text naming b:<id>, so the thread signal sees it', async () => {
     const source = BacklogMentions.createSource({ section: 'Backlog', search: async () => [] })
     const picked = source.onPick({ candidate: { name: 'b:12', value: JSON.stringify({ id: 12, title: 'Composer drops chips' }) } } as never)

@@ -17,6 +17,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEven
 import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
+import { imageTitleFallback } from './image-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
 import { WorkGlyphs } from './work-glyphs.js'
@@ -99,7 +100,7 @@ const CardFace = (props: {
           />
         ) : (
           <BacklogText
-            text={item.title}
+            text={imageTitleFallback(item.title)}
             className="dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:leading-snug dshx:font-medium dshx:text-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-snug! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0"
           />
         )}

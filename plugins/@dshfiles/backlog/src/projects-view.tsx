@@ -12,6 +12,7 @@ import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import { BacklogItems, type BacklogStatus } from './item.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { imageTitleFallback } from './image-title.js'
 import type { StartThreadItem } from './start-thread.js'
 import { BacklogQueries, type BacklogUpdateInput, useBacklogActions } from './use-backlog-actions.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
@@ -115,7 +116,7 @@ const ItemLine = (props: {
         className="dshx:flex dshx:h-9 dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
       >
         <ItemGlyphs.StatusIcon status={props.item.status} />
-        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.item.title}</span>
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{imageTitleFallback(props.item.title)}</span>
         <ItemGlyphs.AttentionBadge attention={props.item.attention} compact />
         <ItemGlyphs.ActorStack actorIds={props.item.actors.map(actor => actor.id)} max={2} />
         <span className="dshx:w-8 dshx:text-right dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(props.item.lastActivityAt)}</span>
@@ -393,7 +394,7 @@ const Overview = (props: {
                     >
                       <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(item.activity.last?.actor)}</span>{' '}
                       {item.activity.last === null ? '' : ItemGlyphs.describeEvent(item.activity.last, item.attention)} ·{' '}
-                      <span className="dshx:font-medium dshx:text-foreground">{item.title}</span>
+                      <span className="dshx:font-medium dshx:text-foreground">{imageTitleFallback(item.title)}</span>
                     </button>
                     <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
                   </li>

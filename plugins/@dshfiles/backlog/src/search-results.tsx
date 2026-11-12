@@ -8,6 +8,7 @@ import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { imageTitleFallback } from './image-title.js'
 import { StatusFilterBar } from './status-filter-bar.js'
 import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
@@ -121,7 +122,7 @@ export const SearchResults = (props: {
                 <ItemGlyphs.StatusIcon status={item.status} />
                 <BacklogMentionHandle item={item} className="dshx:w-12 dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground" />
                 <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">
-                  <Highlight text={item.title} terms={terms} />
+                  <Highlight text={imageTitleFallback(item.title)} terms={terms} />
                 </span>
                 <ItemGlyphs.AttentionBadge attention={item.attention} compact />
                 {item.freshness === 'fresh' ? null : (

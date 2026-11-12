@@ -8,6 +8,7 @@ import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi } from './api.js'
 import { InlineCompletion, type InlineToken } from './inline-completion.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { imageTitleFallback } from './image-title.js'
 import { ImageAttachmentReferenceModel } from './image-attachment-reference.js'
 import type { ComposerFile } from './composer-files.js'
 import { BacklogReference } from './backlog-reference.js'
@@ -84,7 +85,7 @@ export const useMentionCompletion = (props: {
             label: (
               <>
                 <ItemGlyphs.StatusIcon status={item.status} />
-                <span className="dshx:truncate">{item.title}</span>
+                <span className="dshx:truncate">{imageTitleFallback(item.title)}</span>
               </>
             ),
             hint: `${BacklogReference.labelOf(item)}`,

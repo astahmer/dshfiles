@@ -18,6 +18,7 @@ import { WorkGlyphs } from './work-glyphs.js'
 import { BacklogInlineTitle, useBacklogInlineRename } from './item-inline-title.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogText } from './item-text.js'
+import { imageTitleFallback } from './image-title.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogSelection } from './selection.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
@@ -106,7 +107,7 @@ const groupsOf = (items: readonly BacklogSummaryView[], by: GroupBy): Group[] =>
       items: items.filter(item => item.priority === priority),
     }))
   if (by === 'parent') {
-    const titles = new Map(items.map(item => [BacklogReference.refOf(item), item.title]))
+    const titles = new Map(items.map(item => [BacklogReference.refOf(item), imageTitleFallback(item.title)]))
     const parents = [...new Set(items.map(item => item.parent ?? ''))].sort()
     return parents.map(parent => ({
       key: parent,
@@ -267,7 +268,7 @@ const Row = (props: {
             />
           ) : (
             <BacklogText
-              text={item.title}
+              text={imageTitleFallback(item.title)}
               className={cn(
                 'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[13px] dshx:[&>div]:truncate dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
                 closed && 'dshx:text-muted-foreground dshx:line-through dshx:[&>div]:text-muted-foreground! dshx:[&>div]:line-through',

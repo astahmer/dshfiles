@@ -46,6 +46,7 @@ import { InlineCompletion } from './inline-completion.js'
 import { MentionMenu, useMentionCompletion } from './mention-completion.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { imageTitleFallback } from './image-title.js'
 import { BacklogProjectCommand } from './project-command.js'
 import { continueMarkdownList } from './list-continuation.js'
 import { BacklogProjects, ProjectPicker } from './project-picker.js'
@@ -157,7 +158,7 @@ const ReferenceDialog = (props: {
             {(items.data?.items ?? []).map(item => (
               <CommandItem key={item.id} value={`${item.title} ${BacklogReference.labelOf(item)}`} onSelect={() => props.onPickItem(item)}>
                 <ItemGlyphs.StatusIcon status={item.status} />
-                <span className="dshx:truncate">{item.title}</span>
+                <span className="dshx:truncate">{imageTitleFallback(item.title)}</span>
                 <span className="dshx:ml-auto dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">{BacklogReference.labelOf(item)}</span>
               </CommandItem>
             ))}

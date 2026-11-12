@@ -8,6 +8,7 @@ import { useState, type ReactNode } from 'react'
 import type { BacklogSummaryView } from './api.js'
 import type { BacklogSort } from './backlog-sort.js'
 import { InboxFilters } from './inbox-filters.js'
+import { imageTitleFallback } from './image-title.js'
 import { inboxRows, type InboxFilter } from './inbox-model.js'
 import { linkedThreadIds, type InboxThread } from './inbox-threads.js'
 import { LinkedThreadChips } from './linked-thread-chips.js'
@@ -32,7 +33,7 @@ const isUnread = (item: BacklogSummaryView): boolean => item.acknowledgedAt === 
 
 const headline = (item: BacklogSummaryView): ReactNode => {
   const actor = <span className="dshx:font-semibold dshx:text-foreground">{ItemGlyphs.actorName(item.activity.last?.actor ?? item.actors[0]?.id)}</span>
-  const title = <span className="dshx:font-semibold dshx:text-foreground">{item.title}</span>
+  const title = <span className="dshx:font-semibold dshx:text-foreground">{imageTitleFallback(item.title)}</span>
   if (item.attention === 'needs-input')
     return (
       <>
@@ -141,7 +142,7 @@ export const InboxView = (props: {
                       isUnread(item) ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
                     )}
                   >
-                    {hasItemReason ? headline(item) : item.title}
+                    {hasItemReason ? headline(item) : imageTitleFallback(item.title)}
                   </p>
                   {item.activity.last?.kind === 'commented' ? (
                     <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{item.activity.last.detail}</p>
