@@ -79,7 +79,7 @@ describe('pairing gateway', () => {
       const refused = await post(port, '/pair/redeem', { code: '000000' })
       expect(refused.status).toBe(403)
       const paired = await post(port, '/pair/redeem', { id: offer.id, secret: offer.secret })
-      expect(paired.status).toBe(303)
+      expect(paired.status).toBe(200)
       expect(paired.cookie).toMatch(/^__Host-dsh_phone=/)
       const page = await get(port, '/', paired.cookie)
       expect(page.status).toBe(200)

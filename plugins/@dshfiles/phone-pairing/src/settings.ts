@@ -8,7 +8,9 @@ export interface PhoneSettings {
   /** Omitted means "pick the best available": Tailscale first, then a public tunnel. */
   readonly provider?: Provider
   /** Public origin for the manual provider, set by the user. */
-  readonly origin?: string
+  readonly origin?: string | undefined
+  /** Gateway port passed to phone_pairing_enable when the configured `gatewayPort` was busy; wins over it. */
+  readonly port?: number | undefined
 }
 
 const DEFAULT: PhoneSettings = { enabled: false }
@@ -27,7 +29,9 @@ const settingsOf = (parsed: JsonValue): PhoneSettings => {
   )
     return DEFAULT
   const origin = 'origin' in parsed && typeof parsed.origin === 'string' && URL.canParse(parsed.origin) ? parsed.origin : undefined
-  return origin === undefined ? { enabled: parsed.enabled, provider: parsed.provider } : { enabled: parsed.enabled, provider: parsed.provider, origin }
+  const port =
+    'port' in parsed && typeof parsed.port === 'number' && Number.isInteger(parsed.port) && parsed.port >= 1 && parsed.port <= 65_535 ? parsed.port : undefined
+  return { enabled: parsed.enabled, provider: parsed.provider, origin, port }
 }
 
 /**

@@ -366,7 +366,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "phone-access",
       "description": "Print a scannable phone sign-in QR for a configured HTTPS origin (for example a Tailscale Serve hostname).",
       "ui": false,
-      "features": 1
+      "features": 2
     },
     {
       "name": "phone-pairing",
@@ -18586,6 +18586,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "At startup the Host runs a loopback rewrite proxy so a TLS-terminating tunnel (Tailscale Serve) can reach the native listener without a trustedHosts setting, detects the tailnet hostname, points Serve at that proxy, and prints one scannable sign-in QR. Configured https origins s…",
       "destination": "none",
       "currentSurface": "host: startup terminal output",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "phone-access#phone-edge-routes",
+      "plugin": "phone-access",
+      "id": "phone-edge-routes",
+      "title": "Share the phone origin with other Host plugins",
+      "summary": "The edge API (`@dshfiles/phone-access/edge-api`) reports whether the proxy listens and which public origins reach it, and lets a Host plugin claim paths and a cookie on that origin. Claimed requests go to the claimer's loopback port unchanged; the rest still reach the native lis…",
+      "destination": "none",
+      "currentSurface": "host: dshx API phone-access-edge (status, claimRoutes, releaseRoutes)",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

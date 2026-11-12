@@ -46,6 +46,21 @@ interface OfferRecord {
   attempts: number
 }
 
+/** Why a code no longer pairs: the phone page says which, so a refused code is never a guess. */
+export type RedeemRefusal = 'used' | 'expired' | 'replaced' | 'wrong' | 'rate-limited' | 'device-limit'
+
+export type RedeemResult = { readonly ok: true; readonly deviceId: string; readonly token: string } | { readonly ok: false; readonly reason: RedeemRefusal }
+
+/** A spent, expired or replaced offer, kept a while so a second try with its code is told why it fails. */
+interface RetiredOffer {
+  readonly secretDigest: string
+  readonly codeDigest: string
+  readonly reason: 'used' | 'expired' | 'replaced'
+  readonly until: number
+}
+
+const RETIRED_LIMIT = 32
+
 interface DeviceRecord {
   readonly id: string
   readonly name: string
@@ -75,6 +90,7 @@ export const createPairingStore = async (options: PairingStoreOptions) => {
   const redeemsPerMinute = options.redeemsPerMinute ?? 20
 
   const offers = new Map<string, OfferRecord>()
+  const retired = new Map<string, RetiredOffer>()
   const sessions = new Map<string, SessionRecord>()
   let devices: DeviceRecord[] = []
   let budget = { windowStart: 0, count: 0 }
@@ -121,9 +137,20 @@ export const createPairingStore = async (options: PairingStoreOptions) => {
 
   devices = await readDevices()
 
+  const retire = (id: string, offer: OfferRecord, reason: RetiredOffer['reason']): void => {
+    offers.delete(id)
+    retired.delete(id)
+    retired.set(id, { secretDigest: offer.secretDigest, codeDigest: offer.codeDigest, reason, until: now() + offerTtlMs })
+    for (const oldest of retired.keys()) {
+      if (retired.size <= RETIRED_LIMIT) break
+      retired.delete(oldest)
+    }
+  }
+
   const prune = (): void => {
     const time = now()
-    for (const [id, offer] of offers) if (offer.expiresAt <= time) offers.delete(id)
+    for (const [id, offer] of offers) if (offer.expiresAt <= time) retire(id, offer, 'expired')
+    for (const [id, offer] of retired) if (offer.until <= time) retired.delete(id)
     for (const [credential, session] of sessions) if (session.expiresAt <= time) sessions.delete(credential)
     devices = devices.filter(device => device.expiresAt > time)
   }
@@ -136,23 +163,63 @@ export const createPairingStore = async (options: PairingStoreOptions) => {
     return true
   }
 
-  const findOffer = (input: { readonly id?: string; readonly secret?: string; readonly code?: string }): [string, OfferRecord] | undefined => {
+  /** Whether the scanned secret or typed code belongs to this offer (pending or retired). */
+  const matches = (
+    input: { readonly secret?: string; readonly code?: string },
+    offer: { readonly secretDigest: string; readonly codeDigest: string },
+  ): boolean =>
+    (input.secret !== undefined && TOKEN_PATTERN.test(input.secret) && sameDigest(input.secret, offer.secretDigest)) ||
+    (input.code !== undefined && CODE_PATTERN.test(input.code) && sameDigest(input.code, offer.codeDigest))
+
+  const findOffer = <T extends { readonly secretDigest: string; readonly codeDigest: string }>(
+    from: ReadonlyMap<string, T>,
+    input: { readonly id?: string; readonly secret?: string; readonly code?: string },
+  ): [string, T] | undefined => {
     if (input.id !== undefined) {
-      const offer = offers.get(input.id)
-      if (offer === undefined) return undefined
-      if (input.secret !== undefined && TOKEN_PATTERN.test(input.secret) && sameDigest(input.secret, offer.secretDigest)) return [input.id, offer]
-      if (input.code !== undefined && CODE_PATTERN.test(input.code) && sameDigest(input.code, offer.codeDigest)) return [input.id, offer]
-      return undefined
+      const offer = from.get(input.id)
+      return offer !== undefined && matches(input, offer) ? [input.id, offer] : undefined
     }
     if (input.code === undefined || !CODE_PATTERN.test(input.code)) return undefined
-    for (const [id, offer] of offers) if (sameDigest(input.code, offer.codeDigest)) return [id, offer]
+    for (const [id, offer] of from) if (matches({ code: input.code }, offer)) return [id, offer]
     return undefined
   }
 
+  const attempt = async (input: { readonly id?: string; readonly secret?: string; readonly code?: string; readonly name?: string }): Promise<RedeemResult> => {
+    prune()
+    if (!spendBudget()) return { ok: false, reason: 'rate-limited' }
+    const match = findOffer(offers, input)
+    if (match === undefined) return { ok: false, reason: findOffer(retired, input)?.[1].reason ?? 'wrong' }
+    const [id, offer] = match
+    if (devices.length >= maxDevices) return { ok: false, reason: 'device-limit' }
+    offer.attempts += 1
+    retire(id, offer, 'used')
+    const credential = token()
+    const createdAt = now()
+    const device: DeviceRecord = {
+      id: token(),
+      name: (input.name ?? 'Phone').slice(0, 60),
+      tokenDigest: digest(credential),
+      createdAt,
+      expiresAt: createdAt + deviceTtlMs,
+      lastUsedAt: createdAt,
+    }
+    const next = [...devices, device]
+    await writeDevices(next)
+    devices = next
+    return { ok: true, deviceId: device.id, token: credential }
+  }
+
   return {
+    /**
+     * A new offer replaces the oldest pending one once `maxOffers` are open: the bound on guessable codes
+     * stays, and asking for a code never fails because earlier ones were never used.
+     */
     beginOffer: (): PairingOffer => {
       prune()
-      if (offers.size >= maxOffers) throw new Error('Too many pending pairing offers')
+      for (const [id, offer] of offers) {
+        if (offers.size < maxOffers) break
+        retire(id, offer, 'replaced')
+      }
       const id = token()
       const secret = token()
       const code = String(randomInt(0, 1_000_000)).padStart(6, '0')
@@ -161,6 +228,9 @@ export const createPairingStore = async (options: PairingStoreOptions) => {
       return { id, secret, code, expiresAt }
     },
 
+    /** One single-use redemption with the reason it was refused: used, expired, replaced, wrong, rate-limited or full. */
+    attempt,
+
     /** One single-use redemption: scanned secret or typed code in, device token out. */
     redeem: async (input: {
       readonly id?: string
@@ -168,28 +238,8 @@ export const createPairingStore = async (options: PairingStoreOptions) => {
       readonly code?: string
       readonly name?: string
     }): Promise<{ deviceId: string; token: string } | undefined> => {
-      prune()
-      if (!spendBudget()) return undefined
-      const match = findOffer(input)
-      if (match === undefined) return undefined
-      const [id, offer] = match
-      offer.attempts += 1
-      offers.delete(id)
-      if (devices.length >= maxDevices) throw new Error('Too many paired devices')
-      const credential = token()
-      const createdAt = now()
-      const device: DeviceRecord = {
-        id: token(),
-        name: (input.name ?? 'Phone').slice(0, 60),
-        tokenDigest: digest(credential),
-        createdAt,
-        expiresAt: createdAt + deviceTtlMs,
-        lastUsedAt: createdAt,
-      }
-      const next = [...devices, device]
-      await writeDevices(next)
-      devices = next
-      return { deviceId: device.id, token: credential }
+      const result = await attempt(input)
+      return result.ok ? { deviceId: result.deviceId, token: result.token } : undefined
     },
 
     authenticate: (credential: string): { deviceId: string; expiresAt: number } | undefined => {

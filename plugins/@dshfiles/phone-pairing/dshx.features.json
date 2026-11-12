@@ -12,12 +12,16 @@
       "currentSurface": "host: loopback gateway, terminal QR and the sidebar footer's pairing popover",
       "reach": ["click button \"Show pairing QR code\"", "expect text \"Phone access is off. Ask the agent to enable it, then open this again.\""],
       "configuration": [],
-      "states": ["disabled", "tunnel-ready", "offer-printed", "qr-popover-open", "paired", "unpaired", "revoked", "no-provider"],
+      "states": ["disabled", "tunnel-ready", "offer-printed", "qr-popover-open", "port-busy", "paired", "unpaired", "revoked", "no-provider"],
       "failureModes": [
         "Nothing is published until settings.json enables phone access; the disabled startup only prints the enable path and detected providers.",
         "A missing tunnel provider or unusable native cookie reports on the terminal and never exposes the native listener.",
-        "An expired, reused or rate-limited pairing attempt is refused without issuing a device.",
-        "Revocation stops new requests for that cookie but does not yet drop sockets already open."
+        "An expired, reused, replaced, wrong or rate-limited pairing attempt is refused without issuing a device, and the phone page says which and what to do next; a phone that already paired is told so, spends no code and gets Open DSH.",
+        "A page load with a device cookie DSH no longer accepts gets a Pair this phone again page, not a bare 401.",
+        "Revocation stops new requests for that cookie but does not yet drop sockets already open.",
+        "A busy gateway port (phone-access's proxy holds 3443 by default) starts no tunnel and leaves phone access off; phone_pairing_status names the holder, the lsof command and a free port, which phone_pairing_enable accepts as port.",
+        "More than eight pending codes replace the oldest instead of failing.",
+        "With phone-access listening on a public origin, pairing claims /pair and its cookie there through phone-access's edge API and runs no tailscale command; on its own route it takes only an HTTPS port nothing serves and turns off only that port while it still points at its gateway."
       ],
       "externalDependencies": [
         {
@@ -70,6 +74,48 @@
           "testName": "serves one single-use offer to the sidebar popover and reports disabled phone access"
         },
         {
+          "kind": "unit-test",
+          "id": "phone-pairing.redeem-json",
+          "file": "plugins/@dshfiles/phone-pairing/tests/landing.test.ts",
+          "testName": "answers a redeem with JSON and the device cookie, not a redirect the page fetch rejects"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.already-paired",
+          "file": "plugins/@dshfiles/phone-pairing/tests/landing.test.ts",
+          "testName": "tells a phone that already paired so, without spending another code"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.refusal-reasons",
+          "file": "plugins/@dshfiles/phone-pairing/tests/store.test.ts",
+          "testName": "names why a code no longer pairs"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.stale-cookie-page",
+          "file": "plugins/@dshfiles/phone-pairing/tests/landing.test.ts",
+          "testName": "shows a recovery page, not a bare 401, when a page load carries a device cookie DSH no longer accepts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.busy-port",
+          "file": "plugins/@dshfiles/phone-pairing/tests/access.test.ts",
+          "testName": "reports a busy gateway port with its holder and a free port, and starts no tunnel"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.shared-origin",
+          "file": "plugins/@dshfiles/phone-pairing/tests/access.test.ts",
+          "testName": "reuses phone-access’s origin: claims its routes, starts no tunnel, and only releases its claim when off"
+        },
+        {
+          "kind": "unit-test",
+          "id": "phone-pairing.own-route-only",
+          "file": "plugins/@dshfiles/phone-pairing/tests/tunnel-routes.test.ts",
+          "testName": "leaves Phone access QR’s https=443 alone: serves on 8443 and turns off only 8443"
+        },
+        {
           "kind": "gherkin",
           "id": "phone-pairing.sidebar-qr-off",
           "featureFile": "tooling/dshx/e2e/features/phone-pairing.feature"
@@ -98,11 +144,23 @@
         },
         {
           "kind": "custom",
+          "span": "phone pairing busy port",
+          "file": "plugins/@dshfiles/phone-pairing/tests/access.test.ts",
+          "testName": "records one busy-port span and suggests a free port next to it"
+        },
+        {
+          "kind": "custom",
           "span": "phone pairing native cookie",
           "file": "plugins/@dshfiles/phone-pairing/tests/gateway.test.ts",
           "testName": "records one bounded listen span and one native cookie span without addresses"
         }
       ]
+    }
+  ],
+  "ioDelegation": [
+    {
+      "file": "src/landing.ts",
+      "reason": "The Host only serves these pages and this script as strings; the fetch inside runs in the phone's browser against /pair/redeem, which the gateway answers without outbound I/O."
     }
   ]
 }
