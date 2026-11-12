@@ -28,6 +28,10 @@ Every tool except `list_projects` is one call of session-controller's
 `@dshfiles/mcp-endpoint`. A refused call (unknown thread, busy agent) comes back as an MCP tool error with DSH's
 message and code.
 
+## Plugin tools
+
+Settings › MCP endpoint › Plugin tools defaults to **Off**. Choose **Read-only** to expose read-only plugin agent tools, or **Read-write** to include writes. Calls use the existing plugin API bindings and their validation; destructive actions still require their explicit confirmation. The endpoint's own tools, dshx internal tools, and names already used by the thread tools are excluded. The current mode is checked on every call, including calls from clients with cached tool lists. Tools requiring an agent Session may fail because MCP calls identify this plugin, not a Session.
+
 ## Transport
 
 `/mcp` is a raw route on the Web server (`webServer.register`), outside DSH's cookie-authenticated `/api`. It speaks
@@ -45,6 +49,7 @@ servers do.
 - **This machine only, unless LAN access is on.** A peer that is not loopback or one of this machine's own interface
   addresses gets 403. LAN access is off by default; the switch in Settings turns it on. It does not bind DSH to the LAN
   — that is Settings › Network access.
+- **Plugin tools are off by default.** Enabling them gives every token holder the selected plugin capabilities; read-write includes mutation and destructive actions. Turn the setting off to refuse cached plugin-tool calls.
 - **No browser cross-origin calls.** A request carrying an `Origin` whose host differs from `Host` gets 403 (the MCP
   spec's DNS-rebinding rule).
 - Bodies over 1 MiB get 413.
@@ -52,7 +57,7 @@ servers do.
   Treat it like the launch URL.
 
 The agent sees the endpoint too: `mcp_endpoint_status` (read-only), `mcp_endpoint_revoke_token` (`confirm: true`
-required) and `mcp_endpoint_set_lan_access`. There is deliberately no tool that issues a token, so a token never
+required), `mcp_endpoint_set_lan_access`, and `mcp_endpoint_set_plugin_tools`. There is deliberately no tool that issues a token, so a token never
 lands in a transcript.
 
 ## Telemetry

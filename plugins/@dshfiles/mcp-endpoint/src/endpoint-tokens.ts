@@ -1,10 +1,13 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { PluginStorage } from '@dshfiles/dshx/effect/plugin-storage'
 import { Clock, Context, Effect, Layer, Option, Schema } from 'effect'
+import { pluginToolsSchema, type PluginToolsMode } from './endpoint-api.js'
 
 const NAMESPACE = '@dshfiles/mcp-endpoint'
 const TOKEN_KEY = 'token'
 const LAN_KEY = 'lan-enabled'
+const PLUGIN_TOOLS_KEY = 'plugin-tools'
+const decodePluginTools = Schema.decodeUnknownOption(pluginToolsSchema)
 const TOKEN_PREFIX = 'dshmcp_'
 
 const storedTokenSchema = Schema.Struct({
@@ -17,7 +20,7 @@ const decodeStoredToken = Schema.decodeUnknownOption(storedTokenSchema, { onExce
 export class EndpointStorageFailure extends Schema.TaggedError<EndpointStorageFailure>()(
   'EndpointStorageFailure',
   {
-    operation: Schema.Literals(['read-token', 'read-lan', 'write-token', 'write-lan', 'revoke-token']),
+    operation: Schema.Literals(['read-token', 'read-lan', 'read-plugin-tools', 'write-token', 'write-lan', 'write-plugin-tools', 'revoke-token']),
     cause: Schema.optional(Schema.Defect()),
   },
   { dshxWireCode: 'endpoint-storage-failure' },
@@ -54,6 +57,18 @@ const make = Effect.gen(function* () {
     yield* storage.set(LAN_KEY, enabled).pipe(Effect.mapError(failed('write-lan')))
   })
 
+  const pluginTools = Effect.fn('mcp endpoint plugin tools read')(function* () {
+    const stored = yield* storage.get(PLUGIN_TOOLS_KEY).pipe(Effect.mapError(failed('read-plugin-tools')))
+    return Option.getOrElse(
+      Option.flatMap(stored, entry => decodePluginTools(entry.value)),
+      () => 'off' as const,
+    )
+  })
+
+  const setPluginTools = Effect.fn('mcp endpoint plugin tools write')(function* (mode: PluginToolsMode) {
+    yield* storage.set(PLUGIN_TOOLS_KEY, mode).pipe(Effect.mapError(failed('write-plugin-tools')))
+  })
+
   /** Only the token's SHA-256 is stored: the value leaves the Host once, in the rotate response. */
   const rotate = Effect.fn('mcp endpoint token rotate')(function* () {
     const token = `${TOKEN_PREFIX}${randomBytes(32).toString('base64url')}`
@@ -74,7 +89,16 @@ const make = Effect.gen(function* () {
     return verdict
   })
 
-  return EndpointTokens.of({ tokenInfo: tokenInfo(), lanEnabled: lanEnabled(), setLanEnabled, rotate: rotate(), revoke: revoke(), verify })
+  return EndpointTokens.of({
+    tokenInfo: tokenInfo(),
+    lanEnabled: lanEnabled(),
+    setLanEnabled,
+    pluginTools: pluginTools(),
+    setPluginTools,
+    rotate: rotate(),
+    revoke: revoke(),
+    verify,
+  })
 })
 
 /** The endpoint's bearer token (stored as a hash) and its LAN access switch, in the plugin's storage namespace. */
@@ -84,6 +108,8 @@ export class EndpointTokens extends Context.Service<
     readonly tokenInfo: Effect.Effect<{ readonly createdAt: number } | null, EndpointStorageFailure>
     readonly lanEnabled: Effect.Effect<boolean, EndpointStorageFailure>
     readonly setLanEnabled: (enabled: boolean) => Effect.Effect<void, EndpointStorageFailure>
+    readonly pluginTools: Effect.Effect<PluginToolsMode, EndpointStorageFailure>
+    readonly setPluginTools: (mode: PluginToolsMode) => Effect.Effect<void, EndpointStorageFailure>
     readonly rotate: Effect.Effect<string, EndpointStorageFailure>
     readonly revoke: Effect.Effect<void, EndpointStorageFailure>
     readonly verify: (presented: string) => Effect.Effect<TokenVerdict, EndpointStorageFailure>

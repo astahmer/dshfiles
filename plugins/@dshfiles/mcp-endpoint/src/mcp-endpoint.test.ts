@@ -9,6 +9,8 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { defineApi, method } from '@dshfiles/dshx/api'
+import { Schema } from 'effect'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
@@ -79,6 +81,35 @@ const fixture = async () => {
     }),
     { packageId: '@dshfiles/session-controller' },
   )
+  const writes: string[] = []
+  const pluginApi = defineApi({
+    owner: '@test/plugin',
+    id: 'sample',
+    version: 1,
+    methods: {
+      read: method({ description: 'Read sample.', input: Schema.Struct({}), output: Schema.String, tool: { name: 'sample_read', readOnly: true } }),
+      write: method({
+        description: 'Write sample.',
+        input: Schema.Struct({ confirm: Schema.Literal(true) }),
+        output: Schema.String,
+        tool: { name: 'sample_write', readOnly: false },
+      }),
+    },
+  })
+  await host.mount(
+    defineHost({
+      apis: [
+        pluginApi.host({
+          read: () => 'sample output',
+          write: () => {
+            writes.push('write')
+            return 'written'
+          },
+        }),
+      ],
+    }),
+    { packageId: '@test/plugin' },
+  )
   await host.mount(endpointHost, { packageId: '@dshfiles/mcp-endpoint' })
   const route = routes.find(candidate => candidate.path === '/mcp')
   if (route === undefined) throw new Error('the Host registered no /mcp route')
@@ -87,7 +118,7 @@ const fixture = async () => {
   cleanups.push(() => new Promise(resolve => server.close(() => resolve())))
   // SAFETY: a TCP server listening on a port reports an AddressInfo, never a pipe path.
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/mcp`
-  return { ctx, url, created, endpoint: createHostApiClient(ctx, mcpEndpointApi, '@acme/settings') }
+  return { ctx, url, created, writes, endpoint: createHostApiClient(ctx, mcpEndpointApi, '@acme/settings') }
 }
 
 const connect = async (input: { readonly url: string; readonly token: string }) => {
@@ -178,6 +209,39 @@ it('drives threads through MCP tools backed by the sessions API, one span per re
 
   const refused = await client.callTool({ name: 'send_message', arguments: { sessionId: 'session-2', text: 'x', mode: 'nope' } })
   expect(refused.isError).toBe(true)
+})
+
+it('gates plugin tools by the current mode and validates writes', async () => {
+  const { url, endpoint, writes } = await fixture()
+  const { token } = await endpoint.rotateToken({})
+  const client = await connect({ url, token })
+  expect((await endpoint.status({})).pluginTools).toBe('off')
+  expect((await client.listTools()).tools.some(tool => tool.name === 'sample_read')).toBe(false)
+  expect((await client.callTool({ name: 'sample_read', arguments: {} })).isError).toBe(true)
+  expect((await endpoint.setPluginTools({ mode: 'read-only' })).pluginTools).toBe('read-only')
+  const readOnly = (await client.listTools()).tools
+  expect(readOnly.find(tool => tool.name === 'sample_read')?.annotations?.readOnlyHint).toBe(true)
+  expect(readOnly.some(tool => tool.name === 'sample_write' || tool.name.startsWith('mcp_endpoint_'))).toBe(false)
+  expect((await client.callTool({ name: 'sample_write', arguments: { confirm: true } })).isError).toBe(true)
+  expect(writes).toEqual([])
+  const recorder = recordSpans()
+  try {
+    expect(JSON.stringify((await client.callTool({ name: 'sample_read', arguments: {} })).content)).toContain('sample output')
+    expect(recorder.span('mcp request').attributes).toMatchObject({ 'gen_ai.tool.name': 'sample_read' })
+    expect(recorder.span('sample/read').attributes).toMatchObject({ 'dshx.api.caller': 'plugin', 'dshx.api.caller.package': '@dshfiles/mcp-endpoint' })
+    expect(recorder.span('sample/read').parentSpanId).toBe(recorder.span('mcp request').spanId)
+  } finally {
+    recorder.stop()
+  }
+  expect((await endpoint.setPluginTools({ mode: 'read-write' })).pluginTools).toBe('read-write')
+  const write = (await client.listTools()).tools.find(tool => tool.name === 'sample_write')
+  expect(write?.annotations?.readOnlyHint).toBe(false)
+  expect((await client.callTool({ name: 'sample_write', arguments: {} })).isError).toBe(true)
+  expect(writes).toEqual([])
+  expect(JSON.stringify((await client.callTool({ name: 'sample_write', arguments: { confirm: true } })).content)).toContain('written')
+  expect(writes).toEqual(['write'])
+  expect((await endpoint.setPluginTools({ mode: 'off' })).pluginTools).toBe('off')
+  expect((await client.callTool({ name: 'sample_write', arguments: { confirm: true } })).isError).toBe(true)
 })
 
 it('keeps LAN access off until the user turns it on', async () => {

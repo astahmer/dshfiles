@@ -66,6 +66,52 @@
       ]
     },
     {
+      "id": "mcp-endpoint-plugin-tools",
+      "title": "Expose plugin tools to MCP clients",
+      "summary": "Expose existing plugin agent tools through the authenticated MCP endpoint, subject to an off-by-default read-only or read-write setting.",
+      "surfaces": ["host", "integration", "api", "tool"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: /mcp endpoint",
+      "configuration": [
+        {
+          "key": "plugin-tools",
+          "defaultValue": "off",
+          "constraints": "Plugin storage; off, read-only, or read-write.",
+          "coveredBy": ["mcp-endpoint.plugin-tools"]
+        }
+      ],
+      "states": ["off", "read-only", "read-write"],
+      "failureModes": [
+        "Calls refused by the current mode return a tool error directing the user to Settings › MCP endpoint › plugin tools.",
+        "Plugin validation failures return a tool error with the DSH code and message; correct the arguments and retry."
+      ],
+      "externalDependencies": [],
+      "telemetry": [
+        { "kind": "automatic", "source": "api-dispatch" },
+        { "kind": "automatic", "source": "agent-tool" },
+        {
+          "kind": "custom",
+          "span": "mcp request",
+          "file": "plugins/@dshfiles/mcp-endpoint/src/mcp-endpoint.test.ts",
+          "testName": "gates plugin tools by the current mode and validates writes"
+        }
+      ],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "mcp-endpoint.plugin-tools",
+          "file": "plugins/@dshfiles/mcp-endpoint/src/mcp-endpoint.test.ts",
+          "testName": "gates plugin tools by the current mode and validates writes"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "mcp-endpoint.plugin-tools-browser",
+          "reason": "The MCP transport and authorization behavior are exercised over real HTTP by the Host test; no browser journey covers the mode control yet."
+        }
+      ]
+    },
+    {
       "id": "mcp-endpoint-settings",
       "title": "Issue the MCP token and copy the Claude Code command",
       "summary": "Settings › MCP endpoint shows the endpoint URL, generates or rotates the bearer token and shows it once with a copyable `claude mcp add --transport http dsh <url> --header \"Authorization: Bearer …\"` command, revokes it, and turns LAN access on or off. Only the token's SHA-256 is stored. The agent can read the status, revoke the token (explicit confirm) and switch LAN access; it cannot issue a token, so a token never enters a transcript.",

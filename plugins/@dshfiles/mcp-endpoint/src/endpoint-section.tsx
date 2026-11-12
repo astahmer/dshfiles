@@ -11,13 +11,14 @@ import {
   AlertDialogTrigger,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Schema } from 'effect'
 import { useId, useState } from 'react'
 import { claudeCommand } from './claude-command.js'
-import { endpointStatusSchema, mcpEndpointApi, type EndpointStatus } from './endpoint-api.js'
+import { endpointStatusSchema, mcpEndpointApi, pluginToolsSchema, type EndpointStatus, type PluginToolsMode } from './endpoint-api.js'
 
 const statusKey = ['mcp-endpoint', 'status'] as const
 
@@ -90,10 +91,14 @@ const EndpointControls = (props: { readonly status: EndpointStatus }): JSX.Eleme
     mutationFn: async (enabled: boolean) => Schema.decodeUnknownSync(endpointStatusSchema)(await api.setLanAccess({ enabled })),
     onSuccess: publish,
   })
+  const pluginTools = useMutation({
+    mutationFn: async (mode: PluginToolsMode) => Schema.decodeUnknownSync(endpointStatusSchema)(await api.setPluginTools({ mode })),
+    onSuccess: publish,
+  })
   const { status } = props
   const url = status.localUrl ?? `${window.location.origin}${status.path}`
   const pending = rotate.isPending || revoke.isPending
-  const failure = rotate.error ?? revoke.error ?? lan.error
+  const failure = rotate.error ?? revoke.error ?? lan.error ?? pluginTools.error
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
       <CopyField label="Endpoint URL" value={url} />
@@ -149,6 +154,26 @@ const EndpointControls = (props: { readonly status: EndpointStatus }): JSX.Eleme
           LAN access
         </label>
         <Switch id={lanId} checked={status.lanEnabled} disabled={lan.isPending} onCheckedChange={checked => lan.mutate(checked)} />
+      </div>
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-4">
+        <span className="dshx:text-sm dshx:font-medium">Plugin tools</span>
+        <Select
+          value={status.pluginTools}
+          disabled={pluginTools.isPending}
+          onValueChange={value => {
+            const mode = Schema.decodeUnknownOption(pluginToolsSchema)(value)
+            if (mode._tag === 'Some') pluginTools.mutate(mode.value)
+          }}
+        >
+          <SelectTrigger aria-label="Plugin tools">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="off">Off</SelectItem>
+            <SelectItem value="read-only">Read-only</SelectItem>
+            <SelectItem value="read-write">Read-write</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       {failure === null ? null : (
         <p role="alert" className="dshx:m-0 dshx:text-sm dshx:text-destructive">

@@ -37,7 +37,8 @@ const endpointStatus = Effect.fn('mcp endpoint status read')(function* () {
   const web = yield* EndpointWeb
   const lanEnabled = yield* tokens.lanEnabled
   const token = yield* tokens.tokenInfo
-  return { path: MCP_PATH, ...urlsOf(web.server), lanEnabled, token }
+  const pluginTools = yield* tokens.pluginTools
+  return { path: MCP_PATH, ...urlsOf(web.server), lanEnabled, pluginTools, token }
 })
 
 const McpSessionsLive = Layer.effect(
@@ -90,6 +91,7 @@ export default DshxPlugin.make({
           return { token, status: yield* endpointStatus() }
         }),
       revokeToken: () => EndpointTokens.use(tokens => tokens.revoke).pipe(Effect.andThen(endpointStatus())),
+      setPluginTools: input => EndpointTokens.use(tokens => tokens.setPluginTools(input.mode)).pipe(Effect.andThen(endpointStatus())),
       setLanAccess: input => EndpointTokens.use(tokens => tokens.setLanEnabled(input.enabled)).pipe(Effect.andThen(endpointStatus())),
     }),
   ],

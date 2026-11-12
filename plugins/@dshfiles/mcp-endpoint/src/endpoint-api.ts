@@ -1,11 +1,15 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import * as Schema from 'effect/Schema'
 
+export const pluginToolsSchema = Schema.Literals(['off', 'read-only', 'read-write'])
+export type PluginToolsMode = typeof pluginToolsSchema.Type
+
 export const endpointStatusSchema = Schema.Struct({
   path: Schema.String,
   localUrl: Schema.NullOr(Schema.String),
   lanUrl: Schema.NullOr(Schema.String),
   lanEnabled: Schema.Boolean,
+  pluginTools: pluginToolsSchema,
   token: Schema.NullOr(Schema.Struct({ createdAt: Schema.Number })),
 })
 
@@ -36,6 +40,12 @@ export const mcpEndpointApi = defineApi({
       input: Schema.Struct({ confirm: Schema.Literal(true) }),
       output: endpointStatusSchema,
       tool: { name: 'mcp_endpoint_revoke_token', readOnly: false },
+    }),
+    setPluginTools: method({
+      description: `Set which plugin tools MCP clients may use. ${ONLY_WHEN_ASKED}`,
+      input: Schema.Struct({ mode: pluginToolsSchema }),
+      output: endpointStatusSchema,
+      tool: { name: 'mcp_endpoint_set_plugin_tools', readOnly: false },
     }),
     setLanAccess: method({
       description: `Allow or refuse MCP clients on other machines; this machine is always allowed. ${ONLY_WHEN_ASKED}`,
