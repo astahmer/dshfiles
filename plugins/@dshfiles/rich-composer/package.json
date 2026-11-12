@@ -44,7 +44,8 @@
     "@dshfiles/session-controller": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/workbench": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "@dshfiles/plugin-ui": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

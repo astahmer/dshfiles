@@ -50,6 +50,8 @@
     "src/native/contract/snapshot.ts",
     "src/native/conversation/assembly.ts",
     "src/native/skeleton/ConversationHeader.tsx",
+    "src/native/skeleton/TodoPanel.tsx",
+    "src/native/skeleton/TodoPanel.module.css",
     "src/native/skeleton/DefaultConversationViews.tsx",
     "src/native/skeleton/control-row-layout.ts",
     "src/native/input/decorations.ts",

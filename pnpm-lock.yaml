@@ -6714,6 +6714,9 @@ importers:
       '@dshfiles/multi-host':
         specifier: workspace:*
         version: link:../multi-host
+      '@dshfiles/plugin-ui':
+        specifier: workspace:*
+        version: link:../plugin-ui
       '@dshfiles/session-controller':
         specifier: workspace:*
         version: link:../session-controller

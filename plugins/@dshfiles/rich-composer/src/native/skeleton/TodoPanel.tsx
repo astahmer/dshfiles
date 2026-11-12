@@ -10,6 +10,7 @@ import {
   IconChecklistOutlineRegular, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular, StateDot,
   type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { ComposerRow } from '@dshfiles/plugin-ui/components/composer-row'
 import { NS } from '../locales.ts'
 import css from './TodoPanel.module.css'
 
@@ -67,34 +68,35 @@ export function TodoPanel({ todos, t }: TodoPanelProps) {
   if (todos.length === 0) return null
 
   return (
-    <section className={css.root} data-testid="todo-panel" aria-label={t('todo.title')}>
-      <div className={css.body}>
-        <button
-          type="button"
-          className={css.header}
-          aria-expanded={!collapsed}
-          onClick={() => { setCollapsed(v => !v) }}
-        >
-          <span className={css.lead} aria-hidden><IconChecklistOutlineRegular /></span>
-          <span className={css.title}>{t('todo.title')}</span>
-          <span className={css.progress}>{progressLabel(todos, t)}</span>
+    <section data-testid="todo-panel" aria-label={t('todo.title')}>
+      <ComposerRow
+        icon={<IconChecklistOutlineRegular />}
+        label={t('todo.title')}
+        meta={progressLabel(todos, t)}
+        actions={
           <span className={css.chevron} aria-hidden>
             {collapsed ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
           </span>
-        </button>
+        }
+        expanded={!collapsed}
+        onSelect={() => { setCollapsed(v => !v) }}
+        selectLabel={t('todo.title')}
+      >
         {!collapsed && (
-          <ul className={css.list}>
-            {todos.map(item => (
-              <li key={item.content} className={css.item} data-status={item.status}>
-                <span className={css.glyph} role="img" aria-label={statusLabel(item.status, t)}>
-                  <StateDot state={statusDotState(item.status)} />
-                </span>
-                <span className={css.content}>{item.content}</span>
-              </li>
-            ))}
-          </ul>
+          <div className={css.body}>
+            <ul className={css.list}>
+              {todos.map(item => (
+                <li key={item.content} className={css.item} data-status={item.status}>
+                  <span className={css.glyph} role="img" aria-label={statusLabel(item.status, t)}>
+                    <StateDot state={statusDotState(item.status)} />
+                  </span>
+                  <span className={css.content}>{item.content}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-      </div>
+      </ComposerRow>
     </section>
   )
 }
