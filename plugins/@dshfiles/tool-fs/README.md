@@ -5,8 +5,8 @@ tools over the `ctx.fs` seam. Sandbox checks, approvals and the `fs/observed` re
 are upstream's, byte for byte.
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness), `packages/fs/tool-fs`
-- Package: `@deepseek-ai/dsh-tool-fs@0.2.1-rc.2`
-- Pinned revision: tag `dsh-v0.2.1-rc.2` (`687f282e8625c6b8d11ff58211a90524be2e4317`)
+- Package: `@deepseek-ai/dsh-tool-fs@0.2.2-rc.1`
+- Pinned revision: tag `dsh-v0.2.2-rc.1` (`66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`)
 - License: MIT, see [LICENSE](LICENSE)
 
 ## Why a fork

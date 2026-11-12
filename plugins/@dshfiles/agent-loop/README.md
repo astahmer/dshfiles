@@ -1,7 +1,7 @@
 # @dshfiles/agent-loop
 
-Owned fork of [`@deepseek-ai/dsh-agent-loop`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.2/packages/core/agent-loop)
-pinned at `dsh-v0.2.1-rc.2`. It replaces the `agent-loop` Loader row; the native row is disabled, DSH core stays untouched.
+Owned fork of [`@deepseek-ai/dsh-agent-loop`](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.1/packages/core/agent-loop)
+pinned at `dsh-v0.2.2-rc.1`. It replaces the `agent-loop` Loader row; the native row is disabled, DSH core stays untouched.
 Provenance and the delta list are in [`native-fork.json`](./native-fork.json); drift is checked with
 `node scripts/native-fork-diff.mjs agent-loop`.
 

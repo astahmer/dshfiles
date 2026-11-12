@@ -2,8 +2,8 @@ import { Context, resolveConfig } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
-import LlmRuntime, { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import LlmRuntime from '@deepseek-ai/dsh-llm'
+import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -14,7 +14,11 @@ import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as tool from './native/index.ts'
 import type { AllowedModelRoute } from './native/model-selection.ts'
-import { subagentModelSelectionPolicy } from './native/model-selection-state.ts'
+import {
+  followedSubagentModelSelectionProjectionDefinition,
+  followingSubagentModelSelection,
+  subagentModelSelectionPolicy,
+} from './native/model-selection-state.ts'
 
 const FAST = { provider: 'alpha', model: 'fast-model' }
 const ADDED = { provider: 'beta', model: 'added-model' }
@@ -55,6 +59,7 @@ const boot = async () => {
   const ctx = new Context()
   contexts.push(ctx)
   const updateSettings = await mountSettings(ctx, { enabled: true, allowedModels: [FAST] })
+  await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(LlmRuntime)
   await ctx.plugin(ToolRuntime)
@@ -63,43 +68,40 @@ const boot = async () => {
   await ctx.plugin(WorkingDirectoryService, { defaultDirectory: tmpdir() })
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SubagentRuntime)
+  const recorded = await ctx.sessionProjections.register(followedSubagentModelSelectionProjectionDefinition)
   const session = Session.create(SessionId('live-policy'))
-  await tool.apply(ctx, { provider: 'spawn', modelSelectionSettings: true }, session)
-  return { ctx, session, updateSettings }
-}
-
-let callCounter = 0
-const listModelsOutcome = async (ctx: Context, args: Record<string, string>): Promise<string> => {
-  try {
-    const result = await ctx.tools.execute({
-      signal: new AbortController().signal,
-      callId: ToolCallId(`list-${++callCounter}`),
-      name: 'list_subagent_models',
-      arguments: args,
-    })
-    return JSON.stringify(result)
-  } catch (error) {
-    return String(error)
-  }
+  session.append('subagent/model-selection-policy', { allowedModels: [FAST] })
+  const policy = followingSubagentModelSelection(recorded, () => ctx.get('subagentModelSelection'))
+  return { ctx, session, policy, recorded, updateSettings }
 }
 
 describe('subagent model selection in a running Session', () => {
-  it('allows a route added to the setting after the Session recorded its policy', async () => {
-    const { ctx, session, updateSettings } = await boot()
-    expect(subagentModelSelectionPolicy(ctx.sessionProjections, session)).toEqual([FAST])
-    expect(await listModelsOutcome(ctx, { provider: ADDED.provider })).toContain(`LLM provider \\"${ADDED.provider}\\" is not allowed for this Session`)
+  it('follows a route added to the setting after the Session recorded its policy', async () => {
+    const { session, policy, recorded, updateSettings } = await boot()
+    expect(subagentModelSelectionPolicy(policy, session)).toEqual([FAST])
 
     await updateSettings({ enabled: true, allowedModels: [FAST, ADDED] })
 
-    expect(await listModelsOutcome(ctx, { provider: ADDED.provider })).not.toContain('is not allowed for this Session')
-    expect(subagentModelSelectionPolicy(ctx.sessionProjections, session)).toEqual([FAST, ADDED])
+    expect(subagentModelSelectionPolicy(recorded, session)).toEqual([FAST])
+    expect(subagentModelSelectionPolicy(policy, session)).toEqual([FAST, ADDED])
+    expect(subagentModelSelectionPolicy(recorded, session)).toEqual([FAST, ADDED])
   })
 
   it('keeps the recorded routes when the setting is turned off mid-Session', async () => {
-    const { ctx, session, updateSettings } = await boot()
+    const { session, policy, updateSettings } = await boot()
     await updateSettings({ enabled: false, allowedModels: [ADDED] })
 
-    expect(await listModelsOutcome(ctx, { provider: FAST.provider })).not.toContain('is not allowed for this Session')
-    expect(subagentModelSelectionPolicy(ctx.sessionProjections, session)).toEqual([FAST])
+    expect(subagentModelSelectionPolicy(policy, session)).toEqual([FAST])
+  })
+
+  it('leaves a Session without a recorded policy restricted to its parent route', async () => {
+    const { policy } = await boot()
+    expect(subagentModelSelectionPolicy(policy, Session.create(SessionId('no-policy')))).toBeUndefined()
+  })
+
+  it('registers discovery and model-selectable delegation from the Agent-scoped composition', async () => {
+    const { ctx } = await boot()
+    await tool.apply(ctx, { provider: 'spawn', modelSelection: true, modelDiscovery: true })
+    expect(ctx.tools.get('list_subagent_models')).toBeDefined()
   })
 })

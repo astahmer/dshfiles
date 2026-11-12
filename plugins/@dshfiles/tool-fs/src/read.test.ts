@@ -7,7 +7,8 @@ import * as FsPolicy from '@deepseek-ai/dsh-fs-observation-policy'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { type ToolResult } from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import ToolRuntime, { type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as ToolFs from './native/index.ts'
@@ -27,6 +28,7 @@ beforeAll(async () => {
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(LocalFileSystem, { cwd: root })
   await ctx.plugin(WorkingDirectory, { defaultDirectory: root })
   await ctx.plugin(FsPolicy)
@@ -39,9 +41,14 @@ afterAll(async () => {
 })
 
 let calls = 0
-const read = async (args: Record<string, string | number>): Promise<{ readonly text: string; readonly result: ToolResult }> => {
+const read = async (args: Record<string, string | number>): Promise<{ readonly text: string; readonly result: ToolExecutionResult }> => {
   calls += 1
-  const result = await ctx.tools.execute({ callId: ToolCallId(`read-${calls}`), name: 'read', arguments: args, signal: new AbortController().signal })
+  const { results } = await ctx.tools.execute({
+    calls: [{ type: 'tool-call', id: ToolCallId(`read-${calls}`), name: 'read', arguments: JSON.stringify(args) }],
+    signal: new AbortController().signal,
+  })
+  const result = results[0]?.result
+  if (result === undefined) throw new Error('the read call settled no result')
   const block = result.content[0]
   return { text: block?.type === 'text' ? block.text : '', result }
 }

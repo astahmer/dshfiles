@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
-import { registerTimedAskUser } from './timed.ts'
+import { registerTimedAskUser, skippedAnswerGuidance } from './timed.ts'
 import { MARKDOWN_GUIDANCE, OPTION_DESCRIPTION, QUESTION_DESCRIPTION } from '../markdown-guidance.ts'
 import '@deepseek-ai/dsh-user-questions'
 
@@ -30,7 +30,8 @@ export const name = 'tool-ask-user'
 export const inject = ['tools', 'userQuestions']
 
 // dshfiles delta: the question form renders markdown, so the model is told how to use it.
-const description = 'Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. ' + MARKDOWN_GUIDANCE
+const description = 'Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding. '
+  + skippedAnswerGuidance + ' ' + MARKDOWN_GUIDANCE
 
 export function apply(ctx: Context, config: Config = {}): void {
   if (config.mode === 'timed') {

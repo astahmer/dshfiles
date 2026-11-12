@@ -7,6 +7,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
 import ForkedAgentLoop from '../src/native/index.ts'
@@ -66,6 +67,7 @@ const run = async (input: { readonly install: (ctx: Context) => Promise<void>; r
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(TokenMeter)
     await input.install(ctx)
 

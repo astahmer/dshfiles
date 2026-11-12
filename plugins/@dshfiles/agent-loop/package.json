@@ -38,6 +38,7 @@
     "@deepseek-ai/dsh-session-projection": "catalog:",
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-token-meter": "catalog:",
+    "@deepseek-ai/dsh-tool-executor-native": "0.2.2-rc.1",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "catalog:",

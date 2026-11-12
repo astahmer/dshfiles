@@ -6,6 +6,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { describe, expect, it } from 'vitest'
 import ForkedAgentLoop from '../src/native/index.ts'
@@ -42,6 +43,7 @@ describe('request retry', () => {
       await ctx.plugin(LlmRuntime)
       await ctx.plugin(AgentRegistry)
       await ctx.plugin(ToolRuntime)
+      await ctx.plugin(NativeToolExecutor)
       await ctx.plugin(TokenMeter)
       await ctx.plugin(ForkedAgentLoop)
       ctx.on('agent/request-error', () => Promise.resolve({ kind: 'retry' as const }))

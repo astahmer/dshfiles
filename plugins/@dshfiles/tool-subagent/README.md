@@ -5,32 +5,38 @@ Owned Host fork of DSH's `@deepseek-ai/dsh-tool-subagent` package, the model-fac
 setting in running threads, instead of being frozen when the thread started (b:rmkm).
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness), `packages/subagent/tool-subagent`
-- Package: `@deepseek-ai/dsh-tool-subagent@0.2.1-rc.2`
-- Pinned revision: tag `dsh-v0.2.1-rc.2` (`687f282e8625c6b8d11ff58211a90524be2e4317`)
+- Package: `@deepseek-ai/dsh-tool-subagent@0.2.2-rc.1`
+- Pinned revision: tag `dsh-v0.2.2-rc.1` (`66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`)
 - License: MIT, see [LICENSE](LICENSE)
 
 ## Why a fork
 
-Upstream reads `subagentModelSelection` once, when a fresh Session's delegation tool is composed, appends one
-`subagent/model-selection-policy` event, and hands that captured route list to the tool. The policy projection keeps
-the first event and ignores later ones, and children inherit the parent's recorded policy. Nothing re-reads the
-setting, so a route added later fails with `child LLM route "<provider>/<model>" is not allowed for this Session` until
-a new thread. The captured list and the projection both live inside this package, so no slot or settings plugin can
-reach them.
+Upstream's `subagent-model-selection-settings` row samples `subagentModelSelection` once, when a fresh Session's Agent
+is created, and appends one `subagent/model-selection-policy` event; children inherit the parent's recorded policy.
+The delegation tools read that policy through the shared `subagentModelSelectionPolicy` projection, which keeps the
+first event and ignores later ones. Nothing re-reads the setting, so a route added later fails with
+`child LLM route "<provider>/<model>" is not allowed for this Session` until a new thread. The policy reader lives
+inside this package, so no slot or settings plugin can reach it.
 
 ## Local delta
 
 | File                                  | Change                                                                                                                                                    |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/model-selection-state.ts` | the projection keeps the latest `subagent/model-selection-policy` event; `followSubagentModelSelection` appends a replacement when the saved list differs |
-| `src/native/index.ts`                 | the policy handed to the tools reads the setting on each use and follows it while enabled                                                                 |
+| `src/native/model-selection-state.ts` | adds `dshfilesSubagentModelSelectionPolicy`, a Host-only projection over the same events that keeps the latest one, and `followingSubagentModelSelection`, a policy reader that appends a replacement event when the enabled setting's route list differs from the recorded one |
+| `src/native/index.ts`                 | the delegation and `list_subagent_models` tools read the policy through that following reader                                                                                                                                                                           |
 
-Kept as upstream: a thread that started with selection off keeps a tool without `provider`/`model` fields, and turning
-selection off mid-thread keeps the last recorded routes, because the tool schema is fixed when it is installed. The
-projection key and `stateVersion` are unchanged, so existing Session checkpoints stay valid.
+The fork folds under its own key because the native settings row registers the shared `subagentModelSelectionPolicy`
+unit first, and the projection registry shares the first definition of a key, so a changed fold on the shared key
+would never run. The shared definition stays byte-for-byte upstream's.
+
+Kept as upstream: a Session that recorded no policy (selection was off when it started) stays restricted to its
+parent route, and turning selection off mid-thread keeps the last recorded routes. A child Session inherits the
+parent's first recorded policy from the native row, then follows the setting like any other Session while it is
+enabled. The settings service keeps its reader private; the fork calls it by name and looks the service up on each
+read, because a settings edit can replace the service instance.
 
 `src/live-model-selection.test.ts` mounts the real settings row behind the Loader, records a policy, edits the setting
-and calls `list_subagent_models`; it fails on the upstream source.
+and reads the policy through the following reader; it cannot pass on the upstream source, which has no such reader.
 
 ## Wiring
 

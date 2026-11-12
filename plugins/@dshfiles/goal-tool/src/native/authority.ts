@@ -52,8 +52,8 @@ function openTurnEvents(
 ): Pick<GoalToolExecution, 'events' | 'openTurnStartSeq'> {
   // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   const events = agent.session.snapshotEvents()
-  const boundary = ctx.sessionProjections.stateOf(agent.session, 'turnBoundary')
-  if (boundary === undefined || boundary.openTurnStartSeq === null) {
+  const boundary = ctx.agents.turnBoundaryOf(agent.session)
+  if (boundary.openTurnStartSeq === null) {
     reject('goal tools require an open model turn', 'GOAL_TOOL_DRIVER_REQUIRED')
   }
   return { events, openTurnStartSeq: boundary.openTurnStartSeq }
@@ -95,7 +95,7 @@ function someOpenTurnEvent(
 /** Whether host-attested human input appears in the current root-agent turn. */
 function hasDirectHumanInput(ctx: Context, execution: GoalToolExecution): boolean {
   if (!ctx.agents.roots().includes(execution.agent)) return false
-  const questions = ctx.sessionProjections.stateOf(execution.agent.session, 'userQuestions')?.questions
+  const questions = ctx.sessionProjections.snapshot(execution.agent.session, ['userQuestions']).values.userQuestions
   return someOpenTurnEvent(execution, event => event.type === 'user/message'
     && (event.data.source.kind === 'user' || isAcceptedQuestionReply(event.data.source, questions)))
 }
