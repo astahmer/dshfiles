@@ -76,7 +76,7 @@ export class HostAgents extends Context.Service<
       const list = Effect.sync((): readonly Agent[] => host.ctx.agents.list())
       return HostAgents.of({
         list,
-        isOwnedBy: (candidate, owner) => host.ctx.agents.isOwnedBy(candidate.id, owner),
+        isOwnedBy: (candidate, owner) => candidate.session.header.origin === 'subagent' && candidate.session.header.parentSession === owner.id,
         titleOf: agent => host.ctx.get('sessionTitle')?.get(agent.session)?.title,
         communicationAgents: Effect.map(list, agents =>
           agents.map((agent): CommunicationAgent => ({

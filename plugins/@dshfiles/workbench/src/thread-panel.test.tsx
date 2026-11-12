@@ -99,6 +99,8 @@ const emptySession = (): SessionSnapshot => ({
   openError: null,
   hasMore: false,
   loadingOlder: false,
+  historyWasPartial: false,
+  historyLoadStatus: 'idle',
   promptError: null,
   blank: true,
   lastAgentError: null,
@@ -206,9 +208,9 @@ describe('fixed Conversation native hero policy', () => {
     },
     { label: 'stale blank list cannot override a native turn', session: { blank: false }, summaryBlank: true, phase: 'active', hero: false },
     {
-      label: 'continuable parent availability pending',
+      label: 'a blank continuable subagent child',
       session: { subagent: { address: { mode: 'continuable', parentSessionId: b, childSessionId: a } } },
-      phase: 'settling',
+      phase: 'hero',
       hero: true,
     },
   ]

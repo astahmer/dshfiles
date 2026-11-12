@@ -203,6 +203,8 @@ const httpConfig = (url: string) => ({
   headers: { Authorization: 'Bearer test-access-token' },
   toolCallTimeoutMs: 5_000,
   failOnStartupError: false,
+  closeTimeoutMs: 5_000,
+  expandTemplates: false,
 })
 
 describe('MCP 2026-07-28 stateless client', () => {

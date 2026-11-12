@@ -587,13 +587,13 @@ const startAccountsHost = (input: {
                 instanceId: route.instanceId,
                 mutate: async current => {
                   const next = await mutate(current)
-                  if (next !== undefined && next.type !== 'oauth') throw new LlmError('GitHub Copilot uses OAuth credentials.', 'UNSUPPORTED_OPERATION')
+                  if (next !== undefined && next.type !== 'oauth') throw new LlmError('GitHub Copilot uses OAuth credentials.', 'INVALID_CREDENTIAL')
                   return next
                 },
               })
             }
             if (route === undefined || route.kind !== CODEX_KIND) {
-              throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
+              throw new LlmError('Codex credentials are owned by Codex CLI', 'NO_CREDENTIAL_STORE')
             }
             return CodexCredentialStore.forLayout(route.layout).modify(mutate)
           },
@@ -603,7 +603,7 @@ const startAccountsHost = (input: {
               await copilotCredentials.remove(route.instanceId)
               return
             }
-            throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
+            throw new LlmError('Codex credentials are owned by Codex CLI', 'NO_CREDENTIAL_STORE')
           },
         },
         authContext: {

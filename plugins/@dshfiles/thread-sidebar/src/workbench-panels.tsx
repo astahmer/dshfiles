@@ -13,7 +13,7 @@ import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { SidebarOrganization } from './organization.js'
 import { SidebarDockHost } from './sidebar-dock-host.js'
 import { SIDEBAR_PANE_ID } from '@dshfiles/workbench/shell-merge'
-import type { sidebarChildren } from './sidebar-contract.js'
+import { sidebarSectionHookContext, type sidebarChildren } from './sidebar-contract.js'
 
 type SidebarRenderSlot = PropsRenderSlots<keyof typeof sidebarChildren>['renderSlot']
 type FooterSlot = 'sidebar.footer.above' | 'sidebar.footer.action'
@@ -136,7 +136,7 @@ export const registerSidebarWorkbenchPanels = (
             </Button>
           )}
         </div>
-        {sources.renderSlot('sidebar.workspaces', { wide: true, expandSidebar: sources.expandSidebar })}
+        {sources.renderSlot('sidebar.workspaces', { wide: true, expandSidebar: sources.expandSidebar }, { hookContext: sidebarSectionHookContext })}
       </div>
     )
   }

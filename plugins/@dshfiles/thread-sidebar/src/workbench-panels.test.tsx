@@ -10,7 +10,7 @@ import { DEFAULT_PREFERENCES } from './organization.js'
 import { storedPreferences } from './preferences.js'
 import { registerSidebarWorkbenchPanels } from './workbench-panels.js'
 import { SidebarDockHost } from './sidebar-dock-host.js'
-import type { sidebarChildren } from './sidebar-contract.js'
+import { sidebarSectionHookContext, type sidebarChildren } from './sidebar-contract.js'
 
 afterEach(() => {
   cleanup()
@@ -24,7 +24,11 @@ const setup = (footerSources?: FooterSources) => {
   const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
   const panelInfo = createSnapshotStore<PanelInfo>({ activePanelId: null })
   const calls = vi.fn()
-  const renderSlot: PropsRenderSlots<keyof typeof sidebarChildren>['renderSlot'] = (slot, owner, options) => {
+  const renderSlot: PropsRenderSlots<keyof typeof sidebarChildren>['renderSlot'] = (
+    slot: string,
+    owner: Partial<{ readonly wide: boolean; readonly expandSidebar: () => void; readonly size: number; readonly active: boolean }>,
+    options?: Readonly<{ only?: string | undefined }>,
+  ) => {
     calls(slot, owner, options)
     return slot === 'sidebar.workspaces' ? (
       <section aria-label="Threads">{slot}</section>
@@ -148,7 +152,11 @@ describe('sidebar workbench panels', () => {
     render(<Panel panelId={definition.id} />)
     expect(screen.getByText('sidebar.workspaces')).toBeTruthy()
     expect(screen.getAllByRole('region', { name: 'Threads' })).toHaveLength(1)
-    expect(source.calls).toHaveBeenCalledWith('sidebar.workspaces', { wide: true, expandSidebar: source.expandSidebar }, undefined)
+    expect(source.calls).toHaveBeenCalledWith(
+      'sidebar.workspaces',
+      { wide: true, expandSidebar: source.expandSidebar },
+      { hookContext: sidebarSectionHookContext },
+    )
     fireEvent.click(screen.getByRole('button', { name: 'New thread' }))
     fireEvent.click(screen.getByRole('button', { name: 'Search threads' }))
     expect(source.startSession).toHaveBeenCalledTimes(1)

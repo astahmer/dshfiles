@@ -21,6 +21,9 @@ export interface LiveAgent {
 
 const sessionIdOf = Schema.decodeUnknownOption(SessionId)
 
+/** DSH 0.2.2 dropped `AgentRegistry.isOwnedBy`; a subagent Session names its direct creator in its header. */
+const isDirectChildOf = (child: Agent, parent: Agent): boolean => child.session.header.origin === 'subagent' && child.session.header.parentSession === parent.id
+
 /** The session list of the Host could not be read. */
 export class SessionListFailed extends Schema.TaggedError<SessionListFailed>()('SessionListFailed', { cause: Schema.optional(Schema.Defect()) }) {
   override get message(): string {
@@ -74,7 +77,13 @@ export class AgentDirectory extends Context.Service<
           Option.getOrUndefined(Option.flatMapNullishOr(sessionIdOf(childSessionId), id => context.sessions.get(id)?.header.parentSession)),
         isDirectChild: (childSessionId, parentSessionId) => {
           const parent = agentOf(parentSessionId)
-          return parent !== undefined && Option.exists(sessionIdOf(childSessionId), id => context.agents.isOwnedBy(id, parent))
+          return (
+            parent !== undefined &&
+            Option.exists(
+              Option.flatMapNullishOr(sessionIdOf(childSessionId), id => context.agents.get(id)),
+              child => isDirectChildOf(child, parent),
+            )
+          )
         },
         workspaceOf: Effect.fn('agent questions workspace read')(function* (sessionId: string) {
           const id = sessionIdOf(sessionId)
@@ -93,7 +102,7 @@ export class AgentDirectory extends Context.Service<
         notifyParent: Effect.fn('agent questions parent notify')(function* (input) {
           const child = agentOf(input.childSessionId)
           const parent = agentOf(input.parentSessionId)
-          if (child === undefined || parent === undefined || !context.agents.isOwnedBy(child.id, parent)) {
+          if (child === undefined || parent === undefined || !isDirectChildOf(child, parent)) {
             return yield* new ParentUnavailable({ subject: input.subject })
           }
           return String(yield* send({ from: child, to: parent.id, text: input.text }))
@@ -151,7 +160,13 @@ export class NativeQuestions extends Context.Service<
         Effect.promise(() => context.sessionProjections.register(questionWaitProjectionDefinition)),
         handle => Effect.promise(() => handle.dispose()),
       )
-      const liveRootIds = () => new Set(context.agents.roots().map(agent => String(agent.id)))
+      const liveRootIds = (): ReadonlySet<string> =>
+        new Set(
+          context.agents
+            .list()
+            .filter(agent => agent.session.header.origin !== 'subagent')
+            .map(agent => String(agent.id)),
+        )
       return NativeQuestions.of({
         liveRootIds,
         isLiveRoot: agent => Option.exists(sessionIdOf(agent.id), id => context.agents.get(id) === agent) && liveRootIds().has(agent.id),

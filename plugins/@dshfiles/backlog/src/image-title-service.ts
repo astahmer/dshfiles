@@ -10,6 +10,13 @@ import { ImageTitleModel } from './image-title.js'
 import { BacklogItems } from './item.js'
 import { BacklogStore } from './store.js'
 
+// dsh-session-title-llm declares the same purpose; an image title is a title side call, so recorders keep it out of thread requests.
+declare module '@deepseek-ai/dsh-llm/types' {
+  interface LlmRequestPurposeMap {
+    'session-title': true
+  }
+}
+
 /** Why one title-from-image attempt wrote nothing, and what the user can change about it. */
 type ImageTitleOutcome =
   | { readonly ok: true; readonly title: string }

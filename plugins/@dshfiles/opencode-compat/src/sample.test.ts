@@ -2,7 +2,6 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import Skill from '@deepseek-ai/dsh-skill'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
@@ -26,8 +25,7 @@ it('runs a representative plugin and disposes its contributions on disable', asy
     revision: 1,
   }
   host.ctx.provide('settings', { configure: () => () => undefined, describe: () => [document], update: async () => undefined, replace: async () => undefined })
-  const call = (name: string, args: { text?: string }) =>
-    host.tools.execute({ callId: ToolCallId('sample'), name, arguments: args, signal: new AbortController().signal })
+  const call = (name: string, args: { text?: string }) => host.runTool({ name, arguments: args })
   try {
     await host.ctx.plugin(Skill)
     await host.ctx.plugin(Storage)

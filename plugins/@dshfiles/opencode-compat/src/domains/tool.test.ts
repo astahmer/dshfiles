@@ -1,5 +1,4 @@
 import { fileURLToPath } from 'node:url'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { expect, it } from 'vitest'
 import { start } from '../runtime.js'
@@ -13,8 +12,7 @@ it('runs and reloads compat tools and hooks in the real tool runtime', async () 
     onUnsupported: 'report',
     domains: { tool: createToolDomain({ ctx: host.ctx }) },
   })
-  const call = (name: string, args: { text: string | number }) =>
-    host.tools.execute({ callId: ToolCallId('call'), name, arguments: args, signal: new AbortController().signal })
+  const call = (name: string, args: { text: string | number }) => host.runTool({ name, arguments: args })
   try {
     expect(manager.status()[0]?.error).toBeNull()
     expect(host.tools.get('oc_echo')).toBeDefined()

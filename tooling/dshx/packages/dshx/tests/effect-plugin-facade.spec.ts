@@ -113,9 +113,7 @@ describe('DshxPlugin.facade', () => {
       const api = greeterApi('facade-tool')
       const module = counted(async () => ({ default: greeterImplementation(api, { prefix: 'Tool', log: [] }) }))
       yield* mount(DshxPlugin.facade({ name: 'test-facade-tool', apis: [api], load: module.load }), '@test/facade-tool')
-      const result = yield* Effect.promise(() =>
-        host.tools.execute({ callId: 'call-1' as never, name: 'facade_tool_greet', arguments: { name: 'Ada' }, signal: new AbortController().signal }),
-      )
+      const result = yield* Effect.promise(() => host.runTool({ name: 'facade_tool_greet', arguments: { name: 'Ada' } }))
       expect(result).toMatchObject({ isError: false })
       expect(JSON.stringify(result)).toContain('Tool Ada')
       expect(module.loads).toEqual(['load'])

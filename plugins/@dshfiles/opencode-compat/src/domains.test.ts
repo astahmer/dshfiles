@@ -8,7 +8,6 @@ import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { createTestHost } from '@dshfiles/dshx/testing'
 import { recordSpans } from '@dshfiles/dshx/tracing'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { expect, it } from 'vitest'
 import plugin from './host.js'
 import { compatSettings } from './settings.js'
@@ -41,12 +40,7 @@ it('maps skills, context hooks and durable plugin storage', async () => {
       ],
     }))
     let mounted = await host.mount(plugin, { packageId: '@dshfiles/opencode-compat' })
-    const status = await host.tools.execute({
-      callId: ToolCallId('status'),
-      name: 'opencode_plugins_status',
-      arguments: {},
-      signal: new AbortController().signal,
-    })
+    const status = await host.runTool({ name: 'opencode_plugins_status', arguments: {} })
     expect(JSON.stringify(status.content)).toContain('loaded')
     const skill = await host.ctx.skills.get('compat-skill')
     expect(skill?.content).toBe('Hello')
@@ -55,15 +49,9 @@ it('maps skills, context hooks and durable plugin storage', async () => {
     expect(assembly.sections.some(section => section.text === 'opencode-compat: hello')).toBe(true)
     expect(assembly.sections.find(section => section.name === 'fixture')?.text).toBe('original edited')
     expect(assembly.sections.some(section => section.text === 'drop me')).toBe(false)
-    expect(assembly.tools.find(tool => tool.name === 'keep_me')?.description).toBe('changed description')
-    expect(assembly.tools.map(tool => tool.name)).toContain('keep_me')
-    expect(assembly.tools.map(tool => tool.name)).not.toContain('remove_me')
-    const afterAssembly = await host.tools.execute({
-      callId: ToolCallId('status-after'),
-      name: 'opencode_plugins_status',
-      arguments: {},
-      signal: new AbortController().signal,
-    })
+    expect(assembly.tools.find(tool => tool.name === 'keep_me')?.description).toBe('Keep')
+    expect(assembly.tools.map(tool => tool.name)).toEqual(expect.arrayContaining(['keep_me', 'remove_me']))
+    const afterAssembly = await host.runTool({ name: 'opencode_plugins_status', arguments: {} })
     expect(JSON.stringify(afterAssembly.content)).toContain('ctx.session.hook(context).messages')
     expect(JSON.stringify(afterAssembly.content)).not.toContain('ctx.session.hook(context).system.edit')
     expect(fixture.state.value).toEqual({ value: 1 })

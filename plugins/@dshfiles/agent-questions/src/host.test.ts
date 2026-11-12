@@ -9,7 +9,7 @@ import { AgentQuestionsTesting } from './test-support.js'
 
 interface TestAgent {
   readonly id: string
-  readonly session: { readonly header: { readonly cwd: string } }
+  readonly session: { readonly header: { readonly cwd: string; readonly origin?: 'subagent'; readonly parentSession?: string } }
 }
 
 const definitionSchema = Schema.Struct({
@@ -36,7 +36,7 @@ const runTool = (input: { readonly name: string; readonly args: unknown; readonl
 const mountedQuestions = Effect.gen(function* () {
   const workspace = yield* AgentQuestionsTesting.temporaryDirectory('agent-questions-host-')
   const root: TestAgent = { id: 'root-session', session: { header: { cwd: workspace } } }
-  const child: TestAgent = { id: 'child-session', session: { header: { cwd: workspace } } }
+  const child: TestAgent = { id: 'child-session', session: { header: { cwd: workspace, origin: 'subagent', parentSession: root.id } } }
   const agents = new Map([
     [root.id, root],
     [child.id, child],
@@ -50,8 +50,7 @@ const mountedQuestions = Effect.gen(function* () {
   const services = {
     agents: {
       get: (id: string) => agents.get(id),
-      roots: () => [root],
-      isOwnedBy: (childId: string, parent: TestAgent) => parentOf.get(childId) === parent.id,
+      list: () => [...agents.values()],
     },
     sessions: {
       list: () => [...agents.values()],

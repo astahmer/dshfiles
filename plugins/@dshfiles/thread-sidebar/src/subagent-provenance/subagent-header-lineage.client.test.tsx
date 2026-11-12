@@ -99,6 +99,8 @@ const session: SessionSnapshot = {
   openError: null,
   hasMore: false,
   loadingOlder: false,
+  historyWasPartial: false,
+  historyLoadStatus: 'idle',
   promptError: null,
   blank: false,
   lastAgentError: null,

@@ -37,8 +37,7 @@ class HeroPolicy {
     const active = conversation.activeTargets.size > 0 || (!session.blank && !session.awaitingFirstTurn) || session.running
     const blank = !active && !session.promptAttempted
     // Neither an unsent draft nor a count of user messages proves a native turn.
-    const parentAvailabilityPending = session.subagent?.address.mode === 'continuable' && session.subagent.parentAvailable === undefined
-    const settling = (blank && session.openState === 'loading' && summaryBlank !== true) || parentAvailabilityPending
+    const settling = blank && session.openState === 'loading' && summaryBlank !== true
     // A cold/loading/error snapshot alone cannot prove an empty Session. The
     // native list's authoritative blank summary is MainPanel's early proof.
     const hero = blank && (session.openState === 'open' || summaryBlank === true)

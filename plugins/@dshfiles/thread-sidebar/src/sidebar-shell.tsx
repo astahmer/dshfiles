@@ -85,7 +85,7 @@ import { threadSidebarRestartApi } from './restart-api.js'
 import { RestartBridge } from './restart-bridge.js'
 import { useAutoRestart } from './restart-status-item.js'
 import { useRestartMachine } from './use-restart-machine.js'
-import type { sidebarChildren } from './sidebar-contract.js'
+import { sidebarSectionHookContext, type sidebarChildren } from './sidebar-contract.js'
 import { SidebarContentSeat } from './sidebar-content-seat.js'
 import { DestinationShell, NEW_FOLDER_EVENT, SHOW_DESTINATION_EVENT, usePhoneLayout } from './destination-shell.js'
 import type { RailAction } from './rail-actions.js'
@@ -1328,12 +1328,16 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             stageSessionId={stageSession ?? null}
             collapsed={props.collapsed}
             renderPanelIcon={(panelId, size, active) => props.renderSlot('sidebar.panellist', { size, active }, { only: panelId })}
-            threadList={props.renderSlot('sidebar.workspaces', {
-              wide,
-              expandSidebar: () => {
-                if (props.collapsed) props.toggleSidebar()
+            threadList={props.renderSlot(
+              'sidebar.workspaces',
+              {
+                wide,
+                expandSidebar: () => {
+                  if (props.collapsed) props.toggleSidebar()
+                },
               },
-            })}
+              { hookContext: sidebarSectionHookContext },
+            )}
             // SAFETY: the destination shell only offers panel ids it read from this sidebar's panel metadata.
             selectPanel={panelId => selectPanel(panelId as SidebarPanelMetadata['id'])}
             startSession={() => startSession()}

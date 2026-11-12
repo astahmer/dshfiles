@@ -141,11 +141,11 @@ export class MeasuredCodexAdapter extends PiAiAdapter {
           read: async provider => (provider === benchmarkAccount ? credentialStore.read() : undefined),
           list: async () => [{ providerId: benchmarkAccount, type: 'oauth' as const }],
           modify: async (provider, mutate) => {
-            if (provider !== benchmarkAccount) throw new LlmError('Only the benchmark Codex account is configured.', 'UNSUPPORTED_OPERATION')
+            if (provider !== benchmarkAccount) throw new LlmError('Only the benchmark Codex account is configured.', 'NO_CREDENTIAL_STORE')
             return credentialStore.modify(mutate)
           },
           delete: async () => {
-            throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
+            throw new LlmError('Codex credentials are owned by Codex CLI', 'NO_CREDENTIAL_STORE')
           },
         },
         authContext: { env: async () => undefined, fileExists: async () => false },

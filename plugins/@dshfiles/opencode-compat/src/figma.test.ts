@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import Skill from '@deepseek-ai/dsh-skill'
 import { decodeJson } from '@dshfiles/dshx/json'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -27,12 +26,7 @@ it('loads the upstream Figma plugin and reports its unsupported MCP call', async
   try {
     await host.ctx.plugin(Skill)
     const mounted = await host.mount(plugin, { packageId: '@dshfiles/opencode-compat' })
-    const status = await host.tools.execute({
-      callId: ToolCallId('figma-status'),
-      name: 'opencode_plugins_status',
-      arguments: {},
-      signal: new AbortController().signal,
-    })
+    const status = await host.runTool({ name: 'opencode_plugins_status', arguments: {} })
     const result = JSON.stringify(status.content)
     expect(result).toContain('loaded')
     expect(result).toContain('ctx.mcp.transform')

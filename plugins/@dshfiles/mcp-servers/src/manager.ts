@@ -242,8 +242,19 @@ export class McpManager extends Context.Service<
                   env: {},
                   toolCallTimeoutMs,
                   failOnStartupError: false,
+                  closeTimeoutMs: 5_000,
+                  expandTemplates: false,
                 }
-              : { transport: 'streamable-http', serverName: server.serverName, url: server.url, headers: {}, toolCallTimeoutMs, failOnStartupError: false },
+              : {
+                  transport: 'streamable-http',
+                  serverName: server.serverName,
+                  url: server.url,
+                  headers: {},
+                  toolCallTimeoutMs,
+                  failOnStartupError: false,
+                  closeTimeoutMs: 5_000,
+                  expandTemplates: false,
+                },
           redactions: [],
         })
 
@@ -268,6 +279,8 @@ export class McpManager extends Context.Service<
                 env: resolved,
                 toolCallTimeoutMs,
                 failOnStartupError: false,
+                closeTimeoutMs: 5_000,
+                expandTemplates: false,
               },
               redactions: Object.values(resolved),
             }
@@ -302,6 +315,8 @@ export class McpManager extends Context.Service<
               headers: resolvedHeaders,
               toolCallTimeoutMs,
               failOnStartupError: false,
+              closeTimeoutMs: 5_000,
+              expandTemplates: false,
             },
             redactions: [...Object.values(resolvedHeaders), ...Object.values(Option.getOrElse(localEnv, () => ({})))],
             ...(startCommand !== undefined && Option.isSome(localEnv) && { localCommand: { ...startCommand, env: localEnv.value } }),

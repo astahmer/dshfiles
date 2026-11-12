@@ -34,12 +34,8 @@ export const sessionDomain = (config: { readonly ctx: Context; readonly input: D
             system: [...parts],
             messages: [],
             options: {},
-            tools: Object.fromEntries(
-              assembly.tools.map(tool => [
-                tool.name,
-                { description: tool.description, input: Schema.decodeUnknownSync(Schema.Record(Schema.String, Schema.Json))(tool.parameters) },
-              ]),
-            ),
+            // DSH 0.2.2 assembles tool declarations after the system prompt, so the hook no longer sees them.
+            tools: {},
           }
           await callback(context)
           if (context.messages.length || Object.keys(context.options).length)
@@ -49,11 +45,7 @@ export const sessionDomain = (config: { readonly ctx: Context; readonly input: D
             if (section === undefined) return { name: `opencode-compat:${config.input.pluginId}:${indexForHook}:${index}`, text: part.text, interpolate: false }
             return part.text === section.text ? section : { ...section, text: part.text }
           })
-          const tools = assembly.tools.flatMap(tool => {
-            const edited = context.tools[tool.name]
-            return edited === undefined ? [] : [{ ...tool, description: edited.description }]
-          })
-          return { ...assembly, sections, tools }
+          return { ...assembly, sections }
         })
         config.input.contributions.hooks.push('session.context')
         return config.input.register({

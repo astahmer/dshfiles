@@ -842,7 +842,9 @@ export default defineClient({
       useEffect(
         () =>
           registerSidebarWorkbenchPanels(workbenchPanels(), {
-            renderSlot: (...args) => current.current.renderSlot(...args),
+            get renderSlot() {
+              return current.current.renderSlot
+            },
             footerTitles: slot => ctx.slots.entriesOfSlot(slot).map(entry => resolveSlotLabel(entry.options.label) ?? ''),
             subscribeFooterTitles: listener => {
               const unsubscribe = [

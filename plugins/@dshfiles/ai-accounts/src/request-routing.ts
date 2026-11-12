@@ -216,7 +216,7 @@ export class RequestRouting extends Context.Service<
             failedSelection: { provider: request.provider, model: request.model },
             message: planBlock.message,
           })
-          return yield* Effect.fail(new LlmError(planBlock.message, 'QUOTA_EXCEEDED'))
+          return yield* Effect.fail(new LlmError(planBlock.message, 'QUOTA'))
         }
         yield* Ref.update(activeRoutes, active =>
           HashMap.set(active, id, {
