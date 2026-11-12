@@ -74,21 +74,19 @@ describe('GitLab merge-request normalization', () => {
   const base = { iid: 4, state: 'opened', detailed_merge_status: 'mergeable' }
 
   it('maps an open merge request with a green pipeline', () => {
-    expect(normalizeMergeRequest({ ...base, head_pipeline: { status: 'success' }, approvals_required: 0 })).toMatchObject({
+    expect(normalizeMergeRequest({ ...base, head_pipeline: { status: 'success' } })).toMatchObject({
       state: 'OPEN',
       mergeable: 'MERGEABLE',
       mergeStateStatus: 'CLEAN',
-      reviewDecision: 'APPROVED',
       statusCheckRollup: [{ context: 'pipeline', state: 'SUCCESS' }],
     })
   })
 
-  it('maps conflicts, drafts, blocked discussions, a failing pipeline and a required review', () => {
+  it('maps conflicts, drafts, blocked discussions and a failing pipeline', () => {
     expect(normalizeMergeRequest({ ...base, detailed_merge_status: 'conflict' })).toMatchObject({ mergeable: 'CONFLICTING', mergeStateStatus: 'BLOCKED' })
     expect(normalizeMergeRequest({ ...base, detailed_merge_status: 'draft_status' })).toMatchObject({ mergeStateStatus: 'DRAFT' })
     expect(normalizeMergeRequest({ ...base, blocking_discussions_resolved: false })).toMatchObject({ mergeStateStatus: 'BLOCKED' })
-    expect(normalizeMergeRequest({ ...base, head_pipeline: { status: 'failed' }, approvals_required: 2 })).toMatchObject({
-      reviewDecision: 'REVIEW_REQUIRED',
+    expect(normalizeMergeRequest({ ...base, head_pipeline: { status: 'failed' } })).toMatchObject({
       statusCheckRollup: [{ context: 'pipeline', state: 'FAILURE' }],
     })
   })
@@ -111,6 +109,13 @@ describe('GitLab merge-request normalization', () => {
       { created_at: 'yesterday', author: { username: 'bo' } },
     ]
     expect(normalizeMergeRequest({ ...base, notes })).toMatchObject({ comments: [{ author: { login: 'ana' }, createdAt: '2026-01-02T03:04:05Z' }] })
+  })
+
+  it('reports no review decision, because the payload holds the approval rule, not who approved', () => {
+    for (const approvalsRequired of [0, 2]) {
+      const payload = { ...base, approvals_required: approvalsRequired }
+      expect(normalizeMergeRequest(payload)).toMatchObject({ reviewDecision: null })
+    }
   })
 
   it('leaves unknown statuses readable instead of guessing', () => {

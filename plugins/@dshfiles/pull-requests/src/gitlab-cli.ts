@@ -148,7 +148,6 @@ export const glabMergeRequestSchema = Schema.Struct({
   description: Schema.optional(Schema.NullOr(Schema.String)),
   web_url: Schema.optional(Schema.String),
   head_pipeline: Schema.optional(Schema.NullOr(Schema.Struct({ status: Schema.optional(Schema.String) }))),
-  approvals_required: Schema.optional(Schema.Number),
   user_notes_count: Schema.optional(Schema.Number),
   notes: Schema.optional(
     Schema.Array(
@@ -164,17 +163,21 @@ export type GlabMergeRequest = typeof glabMergeRequestSchema.Type
 
 const MERGED = new Set(['merged'])
 const CLOSED = new Set(['closed'])
-const OPEN = new Set(['opened', 'locked'])
 
 const stateOf = (mr: GlabMergeRequest): GitHubPullRequestView['state'] => {
   const state = mr.state.toLowerCase()
   if (MERGED.has(state)) return 'MERGED'
   if (CLOSED.has(state)) return 'CLOSED'
-  return OPEN.has(state) ? 'OPEN' : 'OPEN'
+  // `opened`, `locked` and any newer state still name a merge request that can change, so it stays watched.
+  return 'OPEN'
 }
 
 const CONFLICT_STATUSES = new Set(['conflict', 'cannot_be_merged'])
 
+/**
+ * GitLab's merge-request payload has the approval rule (`approvals_required`), not whether it is met, so the review
+ * decision stays unknown rather than guessed.
+ */
 const mergeFields = (mr: GlabMergeRequest): Pick<GitHubPullRequestView, 'mergeable' | 'mergeStateStatus' | 'reviewDecision'> => {
   const detailed = (mr.detailed_merge_status ?? mr.merge_status ?? '').toLowerCase()
   const mergeable: GitHubPullRequestView['mergeable'] = CONFLICT_STATUSES.has(detailed) ? 'CONFLICTING' : detailed === '' ? 'UNKNOWN' : 'MERGEABLE'
@@ -188,9 +191,7 @@ const mergeFields = (mr: GlabMergeRequest): Pick<GitHubPullRequestView, 'mergeab
     if (mergeable === 'MERGEABLE') return 'CLEAN'
     return 'UNKNOWN'
   }
-  const reviewDecision: GitHubPullRequestView['reviewDecision'] =
-    mr.approvals_required === undefined ? null : mr.approvals_required > 0 ? 'REVIEW_REQUIRED' : 'APPROVED'
-  return { mergeable, mergeStateStatus: mergeStateStatus(), reviewDecision }
+  return { mergeable, mergeStateStatus: mergeStateStatus(), reviewDecision: null }
 }
 
 /** GitLab pipeline statuses mapped to the GitHub check states the watcher stores; others are upper-cased as they are. */
