@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { JjIntegrationTestHost, type ActivityEvent, type JjIntegrationTestHarness } from './host-test-harness.js'
+import { defaultJjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
 
 const jj = JjIntegrationTestHost.jj
 
@@ -21,6 +22,17 @@ const normalize = (text: string, root: string): string =>
     .replace(/thread-[0-9a-f]{6}/g, '<thread>')
     .replace(/\b[k-z]{12,32}\b/g, '<change>')
     .replace(/\b[0-9a-f]{12,40}\b/g, '<commit>')
+
+/**
+ * Automatic cleanup's first run waits five minutes and this file runs longer, so its `workspace.cleaned` events would
+ * land inside whichever snapshot is running at that moment. The delay has no setting, so the Host under test keeps the
+ * automatic cleanup off and every settings revision below keeps it off.
+ */
+const landOutcomeSettings = {
+  syncWorkspaceAfterLand: '',
+  autoIntegrationScope: 'isolated',
+  autoCleanup: { ...defaultJjIntegrationSettings.autoCleanup, enabled: false },
+} satisfies Partial<JjIntegrationSettings>
 
 describe.skipIf(!jjAvailable)('jj-integration land outcomes', () => {
   let root: string
@@ -51,7 +63,7 @@ describe.skipIf(!jjAvailable)('jj-integration land outcomes', () => {
 
   beforeAll(async () => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'jj-land-outcomes-')))
-    harness = await JjIntegrationTestHost.start({ settings: { syncWorkspaceAfterLand: '', autoIntegrationScope: 'isolated' } })
+    harness = await JjIntegrationTestHost.start({ settings: landOutcomeSettings })
   })
 
   afterAll(async () => {
@@ -573,7 +585,7 @@ describe.skipIf(!jjAvailable)('jj-integration land outcomes', () => {
         const result = await integrateAutomatically({
           prepare: async (repo, sessionId) => {
             const path = await describedThread(repo, sessionId)
-            harness.setSettings({ syncWorkspaceAfterLand: '', autoIntegrationScope: 'isolated', bookmark: 'missing-bookmark' })
+            harness.setSettings({ ...landOutcomeSettings, bookmark: 'missing-bookmark' })
             return path
           },
         })
@@ -599,7 +611,7 @@ describe.skipIf(!jjAvailable)('jj-integration land outcomes', () => {
           }
         `)
       } finally {
-        harness.setSettings({ syncWorkspaceAfterLand: '', autoIntegrationScope: 'isolated' })
+        harness.setSettings(landOutcomeSettings)
       }
     })
 
@@ -610,14 +622,14 @@ describe.skipIf(!jjAvailable)('jj-integration land outcomes', () => {
       await harness.register(repo, [sessionId])
       const eventStart = harness.events.length
       expect(await harness.verifyTurn({ sessionId, path: repo })).toEqual([])
-      harness.setSettings({ syncWorkspaceAfterLand: '', autoIntegrationScope: 'none' })
+      harness.setSettings({ ...landOutcomeSettings, autoIntegrationScope: 'none' })
       try {
         const threadSession = 'session-auto-none'
         harness.setSession(threadSession, { running: false, questions: 0 })
         const path = await harness.provisionThread(repo, { sessionIds: [threadSession] })
         expect(await harness.verifyTurn({ sessionId: threadSession, path })).toEqual([])
       } finally {
-        harness.setSettings({ syncWorkspaceAfterLand: '', autoIntegrationScope: 'isolated' })
+        harness.setSettings(landOutcomeSettings)
       }
       expect(eventsSince(eventStart).filter(event => event.type.startsWith('workspace.auto_integration'))).toEqual([])
     })
