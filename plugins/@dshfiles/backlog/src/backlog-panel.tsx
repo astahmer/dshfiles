@@ -518,7 +518,6 @@ export const BacklogPanel = (props: {
     lastRevision.current = revision.data
   }, [revision.data, queryClient])
   usePanelRequests({
-    draftKey,
     visible,
     onCapture: setCaptureRequest,
     onFocus: key => {

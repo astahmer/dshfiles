@@ -24,12 +24,13 @@ import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
 import { backlogApi, BacklogViews } from './api.js'
 import { ReplyRouting } from './reply-routing.js'
 import { BacklogFocusModel } from './backlog-focus.js'
+import { BacklogNavigation } from './backlog-navigation.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogMentions } from './backlog-mentions.js'
 import { BacklogMentionChip } from './backlog-mention-chip.js'
 import { BacklogMentionDropInput } from './backlog-mention-drop.js'
 import { backlogUserTextRule } from './backlog-user-text.js'
-import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { WorkbenchMainNavigation, workbenchPanels } from '@dshfiles/workbench/registry'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
 import { BACKLOG_PANEL_ID } from './panel-draft.js'
 import { backlogInlineReference } from './backlog-inline-reference.js'
@@ -51,10 +52,20 @@ export default defineClient({
     metadata?.plugin?.add(InlineReferences, backlogInlineReference)
     ctx.effect(() => ctx.uiConversation.userText.register(backlogUserTextRule), 'backlog: sent mentions render as chips')
     const api = createApiClient(ctx, backlogApi)
+    const showBacklog = (): void => {
+      void BacklogNavigation.show({
+        workbench: () => WorkbenchMainNavigation.open(PANEL_ID),
+        selectMainPanel: () => {
+          // SAFETY: this entry registers PANEL_ID as a main-slot key below.
+          ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+        },
+      }).catch((error: unknown) => {
+        console.error('Could not show the Backlog page; open it from the sidebar.', error)
+      })
+    }
     const openCaptureWith = (text: string): void => {
       BacklogFocusModel.requestCapture(text)
-      // SAFETY: this entry registers PANEL_ID as a main-slot key below.
-      ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+      showBacklog()
     }
     ctx.effect(() => {
       const openCapture = (event: Event): void => {
@@ -303,8 +314,7 @@ export default defineClient({
     )
     const openInBacklog = (id: number | string): void => {
       BacklogFocusModel.request(id)
-      // SAFETY: this entry registers PANEL_ID as a main-slot key just below, so it is a live panel id.
-      ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+      showBacklog()
     }
     // An Inbox item about a backlog item opens that item here; the inbox owns the row, this page owns the target.
     metadata?.plugin?.add(AttentionSubjectOpeners, {
