@@ -89,6 +89,94 @@ OpenCode's `warm` alternative sends a minimal ping before the lifetime ends so t
 
 **Limits:** the sweep reads the newest 200 visible threads (`sessions.list`), so a very large history leaves older threads alone. A running thread is skipped. A thread this Host never observed active, including every thread at startup, is skipped until it emits a new request, turn end, or idle status. A failed command is logged and not retried for the same idle stretch, and a compaction is never attempted after the cache lifetime has expired.
 
+## Engine setup comparison (2026-11-12, b:2ng6)
+
+The web seed loads this engine as a root row and, through its restated `preset-standard`, the stock `compaction-basic` in the preset's isolated `compaction` group, so two automatic engines see every step. The owned engine's `agent/pre-step` hook runs first; the stock one acts only when the owned one failed or left the thread over its threshold. Only the stock group has a tool-result pruner: the root `tool-result-pruner` row is disabled, so this engine never prunes. Four setups were replayed:
+
+| Setup | Profile composition                                                                               |
+| ----- | ------------------------------------------------------------------------------------------------- |
+| A     | Both engines automatic (the seed before this comparison)                                          |
+| B     | Stock row loaded with `auto: false`; this engine is the only automatic one                        |
+| C     | Stock row removed; root `tool-result-pruner` row on                                               |
+| D     | A plus the root `tool-result-pruner` row on: this engine prunes, the stock row stays the fallback |
+
+**Method.** `scripts/replay-workload.mjs` turns a recorded Session log into a shape-only workload: each user input, model step and tool result with its size, tool and skill names and image count, in recorded order, with no text. `tests/replay/harness.ts` replays it through the real agent loop (`AgentLoop`, `SessionStore`, `TokenMeter`, both engines and the pruner mounted as the profile composes them) and a scripted model: it answers each step with the recorded tool calls, each tool with a filler result of the recorded size, and each summary request with a 5,200-character summary (the median of six long threads' recorded checkpoints). Routes carry the recorded window and an output reservation that reproduces the recorded checkpoint sizes (gpt-6-luna: 272,000 / 32,000, so a 174,464-token threshold; gpt-6.1-sol: 128,000 / 16,384). Neither route declares image pricing, as on the live routes that logged `Cannot safely size an image-bearing summary` 14 times in ten days. A request over the window fails with `CONTEXT_WINDOW_EXCEEDED`. Each setup ran three times per scenario (A six times on the first two), the order rotated each repeat; B and C on images and skills-subagents ran once, since their counts are deterministic and a collapsed run's wall time means nothing. Counts and tokens were identical across repeats. The numbers compare setups, not absolute rates: filler text prices differently from real output, and the recorded small-context thread wrote 6 checkpoints where its replay under A writes 12.
+
+| Scenario (recorded thread)                               | Shape                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| tool-heavy (`session-284fe9d9`, first 1,500 calls)       | 824 steps, 5.3 M result chars, 146 results over 8 KB, 63 skill loads, 365 tools |
+| large-results (`session-850d8fc3`)                       | 771 calls, 116 results over 8 KB (max 49,933 chars), one pasted image           |
+| images (`session-ab223c99`)                              | 1,326 calls, 50 images (screenshots read as tool results)                       |
+| small-context (`session-b7f48396`, gpt-6.1-sol 128k)     | 236 calls, 47 tools, 20 skill loads                                             |
+| skills-subagents (`session-1c924e97`, first 1,500 calls) | 139 skill loads of 23 skills, 7 subagent calls, 22 images                       |
+
+Results (`loadedSkills: off`; median over repeats). _Checkpoints_: succeeded / failed, with how many each engine wrote (ours / stock). _Uncached_: request tokens outside the prefix the previous request shared, the prompt-cache proxy. _Lost work_: overflow errors / turns that ended in error / recorded steps the replay dropped because no request of their turn fit. _Recent whole_: of the last 10 tool results before each checkpoint, the share still verbatim and unpruned in the next request.
+
+| Scenario         | Setup | Checkpoints ok / failed (ours / stock) | Pruned | Peak tokens | Uncached tokens | Summary requests | Lost work           | Recent whole | Engine ms per compaction |
+| ---------------- | ----- | -------------------------------------- | ------ | ----------- | --------------- | ---------------- | ------------------- | ------------ | ------------------------ |
+| tool-heavy       | A     | 21 / 0 (21 / 0)                        | 0      | 188k        | 2.64 M          | 21               | 0 / 0 / 0           | 100 %        | 12 (9–14) (n=6)          |
+| tool-heavy       | B     | 21 / 0 (21 / 0)                        | 0      | 188k        | 2.64 M          | 21               | 0 / 0 / 0           | 100 %        | 14 (11–15) (n=3)         |
+| tool-heavy       | C     | 14 / 0 (14 / 0)                        | 146    | 189k        | 3.13 M          | 14               | 0 / 0 / 0           | 88 %         | 18 (11–56) (n=3)         |
+| tool-heavy       | D     | 14 / 0 (14 / 0)                        | 146    | 189k        | 3.13 M          | 14               | 0 / 0 / 0           | 88 %         | 11 (11–16) (n=3)         |
+| large-results    | A     | 11 / 4 (10 / 1)                        | 13     | 178k        | 1.66 M          | 11               | 0 / 0 / 0           | 100 %        | 10 (8–53) (n=6)          |
+| large-results    | B     | 5 / 338 (5 / 0)                        | 0      | 268k        | 0.90 M          | 5                | 337 / 337 / 158     | 100 %        | 10 (5–20) (n=3)          |
+| large-results    | C     | 2 / 335 (2 / 0)                        | 70     | 271k        | 1.06 M          | 2                | 332 / 329 / 154     | 80 %         | 10 (6–17) (n=3)          |
+| large-results    | D     | 6 / 1 (5 / 1)                          | 115    | 188k        | 1.85 M          | 6                | 0 / 0 / 0           | 88 %         | 9 (7–9) (n=3)            |
+| images           | A     | 11 / 27 (1 / 10)                       | 97     | 195k        | 2.74 M          | 11               | 0 / 0 / 0           | 94 %         | 7 (7–9) (n=3)            |
+| images           | B     | 0 / 2,013 (0 / 0)                      | 0      | 271k        | 0.27 M          | 0                | 2,012 / 2,012 / 968 | –            | 8 (n=1)                  |
+| images           | C     | 0 / 1,904 (0 / 0)                      | 32     | 271k        | 0.50 M          | 0                | 1,902 / 1,900 / 918 | –            | 7 (n=1)                  |
+| images           | D     | 10 / 9 (1 / 9)                         | 105    | 199k        | 2.56 M          | 10               | 0 / 0 / 0           | 92 %         | 9 (6–11) (n=3)           |
+| small-context    | A     | 12 / 0 (12 / 0)                        | 0      | 55k         | 0.49 M          | 12               | 0 / 0 / 0           | 93 %         | 8 (5–8) (n=3)            |
+| small-context    | B     | 12 / 0 (12 / 0)                        | 0      | 55k         | 0.49 M          | 12               | 0 / 0 / 0           | 93 %         | 5 (4–9) (n=3)            |
+| small-context    | C     | 10 / 0 (10 / 0)                        | 22     | 55k         | 0.50 M          | 10               | 0 / 0 / 0           | 81 %         | 6 (4–7) (n=3)            |
+| small-context    | D     | 10 / 0 (10 / 0)                        | 22     | 55k         | 0.50 M          | 10               | 0 / 0 / 0           | 81 %         | 6 (5–10) (n=3)           |
+| skills-subagents | A     | 15 / 34 (7 / 8)                        | 184    | 192k        | 3.29 M          | 15               | 0 / 0 / 0           | 89 %         | 5 (4–5) (n=3)            |
+| skills-subagents | B     | 2 / 1,655 (2 / 0)                      | 0      | 271k        | 0.52 M          | 2                | 1,654 / 1,654 / 779 | 100 %        | 6 (n=1)                  |
+| skills-subagents | C     | 1 / 1,519 (1 / 0)                      | 82     | 272k        | 0.81 M          | 1                | 1,514 / 1,510 / 712 | 70 %         | 6 (n=1)                  |
+| skills-subagents | D     | 13 / 8 (5 / 8)                         | 242    | 192k        | 3.35 M          | 13               | 0 / 0 / 0           | 85 %         | 9 (5–18) (n=3)           |
+
+Where B or C lose work, their token totals cover only the steps that still ran and are not comparable; _Lost work_ is their measure.
+
+What `loadedSkills` changes (same scenarios, _Skills kept_: loaded skills still named or present in the request right after each checkpoint):
+
+| Scenario         | Setup | Skills kept, off → names | Checkpoints, off → names | Total request tokens, off → names |
+| ---------------- | ----- | ------------------------ | ------------------------ | --------------------------------- |
+| tool-heavy       | A     | 11 % → 100 %             | 21 → 21                  | 121.7 M → 121.8 M                 |
+| tool-heavy       | B     | 11 % → 100 %             | 21 → 21                  | 121.7 M → 121.8 M                 |
+| tool-heavy       | C     | 19 % → 100 %             | 14 → 14                  | 126.3 M → 126.4 M                 |
+| large-results    | A     | 13 % → 62 %              | 11 → 11                  | 56.3 M → 56.3 M                   |
+| large-results    | B     | 35 % → 100 %             | 5 → 5                    | 37.3 M → 37.3 M                   |
+| large-results    | C     | 91 % → 100 %             | 2 → 2                    | 42.3 M → 42.3 M                   |
+| images           | A     | 34 % → 37 %              | 11 → 11                  | 176.5 M → 176.5 M                 |
+| images           | B     | –                        | 0 → 0                    | 27.9 M → 27.9 M                   |
+| images           | C     | –                        | 0 → 0                    | 40.2 M → 40.2 M                   |
+| small-context    | A     | 14 % → 100 %             | 12 → 13                  | 10.6 M → 10.6 M                   |
+| small-context    | B     | 14 % → 100 %             | 12 → 13                  | 10.6 M → 10.6 M                   |
+| small-context    | C     | 16 % → 100 %             | 10 → 10                  | 10.6 M → 10.8 M                   |
+| skills-subagents | A     | 32 % → 53 %              | 15 → 15                  | 147.0 M → 147.5 M                 |
+| skills-subagents | B     | 0 % → 100 %              | 2 → 2                    | 24.1 M → 24.1 M                   |
+| skills-subagents | C     | 63 % → 100 %             | 1 → 1                    | 41.4 M → 41.1 M                   |
+
+**Wall time.** The replay's engine time per compaction is 5–20 ms median in every setup (spread up to 56 ms under a load average of 60–100): the model call dominates. Live, a stock checkpoint took 42 s median (p10 28 s, p90 69 s, 121 checkpoints on gpt-6-luna); this engine's 14 recorded checkpoints took 109 s median, but on gpt-6.1-terra with larger spans, so not comparable. The number of summary requests is the model-time proxy: one per checkpoint in every run here (no span needed splitting).
+
+**Live baseline (ten days to 2026-11-12, all threads):** 135 automatic checkpoints, 121 written by the stock row and 14 by this engine; this engine failed 319 times on the summary budget (fixed 2026-11-08 in `jj:qksquuvpmqku`) and 14 times on image pricing. So far the stock row has been doing the work this engine refused.
+
+**Winner: A, both engines automatic.** The web seed keeps it; only `loadedSkills: names` changes.
+
+1. **B is never better than A.** Where this engine succeeds, the stock row only measures: tool-heavy and small-context are identical in every column. Where it fails, B has no fallback. This engine refuses to size an image-bearing summary on a route without image pricing, in the overflow recovery too, so one image ends every later turn: images 0 checkpoints and 2,013 failed, 968 of 1,125 recorded steps lost; skills-subagents 1,654 overflows and 779 steps lost; large-results, with a single pasted image, 337 overflows and 158 steps lost. A recovers all three through the stock row with no overflow.
+2. **C fails the same way, and `/compact` cannot rescue it.** Without the stock row the preset's `/compact` resolves to this engine, which refuses the same span; in B it still resolves to the stock row (read from the composition, not replayed). Where nothing fails, the pruner cuts checkpoints by 17–33 % (tool-heavy 21 → 14, small-context 12 → 10) but adds 2–19 % uncached tokens, because each prune rewrites an old result inside the cached prefix, and 12–19 % of the ten newest results reach the next request pruned.
+3. **D is not a clear win either.** It keeps A's recovery and C's shorter checkpoint count (−9 to −45 %), at +2 to +19 % uncached tokens in four of five scenarios (−7 % on images) and 8–19 % of recent results pruned. It trades turn-blocking summary time (42 s per stock checkpoint live) against prompt-cache misses; only a priced run on real models settles that.
+4. **A's own weak spot:** a checkpoint the stock row writes drops the `<loaded-skills>` block, so with `names` A keeps 37–62 % of loaded skills in the image-bearing threads and 100 % where this engine wrote every checkpoint.
+
+What would make one engine enough: this engine must summarize an image-bearing span without declared image pricing (for example by sending each image as the placeholder text image offload already uses). Then B and C lose their failure mode, the stock fallback and its `<loaded-skills>` gap can go, and the matrix should be re-run with C and D.
+
+**Reproduce:**
+
+```bash
+COMPACTION_REPLAY=/tmp/replay.json pnpm exec vitest run tests/compaction-replay.spec.ts -t matrix   # 3 repeats; COMPACTION_REPLAY_SCENARIOS / _SETUPS / _REPEATS narrow it
+node scripts/replay-report.mjs /tmp/replay.json
+```
+
 ## Verify
 
 ```bash

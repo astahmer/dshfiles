@@ -3,6 +3,16 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Compaction engine setups replayed on recorded threads (2026-11-12, `b:2ng6`)
+
+Five recorded threads (tool-heavy, large tool results, images, a 128k model, skills with subagents) replayed through
+the real agent loop under four compaction setups. Keeping both engines automatic (the seed) wins: demoting or removing
+the stock row loses 158–968 recorded steps to unrecovered overflows on any thread with an image, because the owned
+engine refuses image summaries on routes without image pricing. Turning on the root pruner cuts checkpoints 9–45 % but
+adds up to 19 % uncached tokens. `loadedSkills: names` is now on in the seed (skills kept after a checkpoint 11–34 % →
+37–100 %, under 0.5 % more tokens). Table, method and what would settle the pruner question: the
+[context-compaction README](../plugins/@dshfiles/context-compaction/README.md#engine-setup-comparison-2026-11-12-b2ng6).
+
 ## Decoded logs share repeated replay signatures (2026-11-12, `b:rfp1`)
 
 A pre-fork `assistant/message` stores each provider reasoning signature on the message source and again on the terminal
