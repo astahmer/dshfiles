@@ -66,9 +66,23 @@ const buildPlugin = plugin =>
     child.once('close', handleClose)
   })
 
-const bootAlone = async plugin => {
+/** The owned bundles a plugin needs at runtime, transitively: their Loader rows provide the services it injects. */
+const bundleDependencies = async (plugin, plugins, seen = new Set([plugin.id])) => {
+  const { dependencies = {} } = JSON.parse(await readFile(resolve(plugin.dir, 'package.json'), 'utf8'))
+  const direct = plugins.filter(candidate => !seen.has(candidate.id) && Object.hasOwn(dependencies, candidate.id))
+  for (const dependency of direct) seen.add(dependency.id)
+  const nested = []
+  for (const dependency of direct) nested.push(...(await bundleDependencies(dependency, plugins, seen)))
+  return [...direct, ...nested]
+}
+
+const bootAlone = async (plugin, plugins) => {
+  const companions = await bundleDependencies(plugin, plugins)
   // A preset-child fork the seed keeps on the stock package boots alone the way opting in composes it.
-  const profile = await prepareComposedBootProfile([{ projectRoot: plugin.dir, packageId: plugin.id }], { sourceProfileRoot, swapNestedNativeForks: true })
+  const profile = await prepareComposedBootProfile(
+    [{ projectRoot: plugin.dir, packageId: plugin.id }, ...companions.map(companion => ({ projectRoot: companion.dir, packageId: companion.id }))],
+    { sourceProfileRoot, swapNestedNativeForks: true },
+  )
   try {
     return await checkClientBoot({
       projectRoot: workspace,
@@ -143,7 +157,7 @@ const bootOnePlugin = async (plugins, ignoredIds) => {
     console.log(`  skip ${plugin.id}: listed in boot-ignore.json`)
     return
   }
-  const result = await bootAlone(plugin).catch(error => ({ browserError: error instanceof Error ? error.message : String(error) }))
+  const result = await bootAlone(plugin, plugins).catch(error => ({ browserError: error instanceof Error ? error.message : String(error) }))
   const problem = describe(result)
   if (problem === undefined) {
     console.log(`  ok  ${plugin.id}`)
@@ -238,7 +252,7 @@ const main = async () => {
 
   for (const plugin of composedOnly ? [] : runnable) {
     if (buildFailures.has(plugin.id)) continue
-    const result = await bootAlone(plugin).catch(error => ({
+    const result = await bootAlone(plugin, plugins).catch(error => ({
       ok: false,
       failures: [],
       slotFailures: [],
