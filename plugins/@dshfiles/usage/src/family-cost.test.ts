@@ -93,4 +93,29 @@ describe('usage family cost', () => {
       expect(cost.members).toEqual([])
     }).pipe(Effect.provide(usageRepoTest())),
   )
+
+  it.effect('counts each request once when two threads name each other as parent', () =>
+    Effect.gen(function* () {
+      const store = yield* UsageRepo
+      for (const [meta, requests] of [
+        [session('loop-a', 'loop-b'), 1],
+        [session('loop-b', 'loop-a'), 2],
+      ] as const) {
+        yield* store.commitLogSlice({
+          path: `/${meta.id}`,
+          sessionId: meta.id,
+          offset: 1,
+          size: 1,
+          mtimeMs: 1,
+          state: '{}',
+          session: meta,
+          rows: Array.from({ length: requests }, (_, index) => row(`${meta.id}-${String(index)}`, meta.id)),
+        })
+      }
+      const cost = yield* store.familyCost({ sessionId: 'loop-a' })
+      expect(cost.own.requests).toBe(1)
+      expect(cost.family.requests).toBe(3)
+      expect(cost.members.map(member => [member.sessionId, member.depth, member.requests])).toEqual([['loop-b', 1, 2]])
+    }).pipe(Effect.provide(usageRepoTest())),
+  )
 })

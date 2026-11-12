@@ -1148,7 +1148,10 @@ const make = (sql: SqlClient.SqlClient) =>
       Effect.mapError(failed('requests')),
     )
 
-    /** Depth-first over `sessions.parent_session`; `UNION` (not `ALL`) stops a malformed parent cycle. */
+    /**
+     * Depth-first over `sessions.parent_session`, bounded at depth 32. A malformed parent cycle revisits ids at greater
+     * depths, which `UNION` cannot merge, so the join reads each id once at its shallowest depth.
+     */
     const familyCost = Effect.fn('usage family cost read')(
       function* (query: FamilyCostQuery) {
         const rows = yield* read(
@@ -1156,11 +1159,12 @@ const make = (sql: SqlClient.SqlClient) =>
           `WITH RECURSIVE family(id, depth) AS (
                SELECT ?, 0
                UNION SELECT s.id, family.depth + 1 FROM sessions s JOIN family ON s.parent_session = family.id WHERE family.depth < 32
-             )
-             SELECT r.session_id, s.title, s.parent_session, MIN(family.depth) AS depth,
+             ),
+             members(id, depth) AS (SELECT id, MIN(depth) FROM family GROUP BY id)
+             SELECT r.session_id, s.title, s.parent_session, MIN(members.depth) AS depth,
                COALESCE(SUM(${COST_SQL}), 0) AS cost, COUNT(*) AS requests, COALESCE(SUM(${TOKENS_SQL}), 0) AS tokens,
                COALESCE(SUM(r.input IS NOT NULL AND rr.provider IS NULL), 0) AS unpriced
-             FROM ${FROM_SQL} JOIN family ON family.id = r.session_id
+             FROM ${FROM_SQL} JOIN members ON members.id = r.session_id
              WHERE ${VISIBLE_SQL}
              GROUP BY r.session_id ORDER BY cost DESC, requests DESC`,
           [query.sessionId],
